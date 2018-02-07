@@ -4,14 +4,14 @@ The CLI to interact with Astronomer Enterprise
 
 ## Commands
 
-### `ast login`
+### `astro login`
 
 Auth with Astronomer Enterprise cluster
 
-### `ast create-user`
+### `astro create-user`
 
 Create Astronomer Enterprise users
 
-### `ast airflow deploy`
+### `astro airflow deploy`
 
 Deploy Airflow code to an Astronomer Airflow instance
