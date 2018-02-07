@@ -1,4 +1,4 @@
-# ast CLI
+# astro Enterprise CLI
 
 The CLI to interact with Astronomer Enterprise
 
