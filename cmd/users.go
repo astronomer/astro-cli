@@ -35,8 +35,13 @@ func init() {
 	// Users root
 	RootCmd.AddCommand(usersRootCmd)
 
+	// Users list
 	usersRootCmd.AddCommand(usersListCmd)
+
+	// Users create
 	usersRootCmd.AddCommand(usersCreateCmd)
+
+	// Users delete
 	usersRootCmd.AddCommand(usersDeleteCmd)
 }
 
