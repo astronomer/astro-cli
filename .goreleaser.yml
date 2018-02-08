@@ -1,0 +1,37 @@
+project_name: astro
+release:
+  github:
+    owner: astronomerio
+    name: astro
+brew:
+  install: bin.install "astro"
+builds:
+- goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+    - amd64
+    - "386"
+  goarm:
+   - "6"
+  main: .
+  ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+  binary: astro
+  ignore:
+    - goos: windows
+      goarch: amd64
+archive:
+  format: tar.gz
+  format_overrides:
+    - goos: windows
+      format: zip
+  name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+  files:
+    LICENSE
+    README.md
+    CHANGELOG.md
+snapshot:
+  name_template: 'SNAPSHOT-{{ .Commit }}'
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
