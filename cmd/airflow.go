@@ -12,8 +12,15 @@ var (
 
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
-		Short: "Manage airflow projects",
-		Long:  "Manage airflow projects",
+		Short: "Manage airflow projects and deployments",
+		Long:  "Manage airflow projects and deployments",
+	}
+
+	airflowInitCmd = &cobra.Command{
+		Use:   "init",
+		Short: "Scaffold a new airflow project",
+		Long:  "Scaffold a new airflow project",
+		Run:   airflowInit,
 	}
 
 	airflowInitCmd = &cobra.Command{
@@ -25,8 +32,8 @@ var (
 
 	airflowCreateCmd = &cobra.Command{
 		Use:   "create",
-		Short: "Create a new airflow project",
-		Long:  "Create a new airflow project",
+		Short: "Create a new airflow deployment",
+		Long:  "Create a new airflow deployment",
 		Run:   airflowCreate,
 	}
 
@@ -40,8 +47,8 @@ var (
 
 	airflowStatusCmd = &cobra.Command{
 		Use:   "status",
-		Short: "Print the status of the airflow cluster",
-		Long:  "Print the status of the airflow cluster",
+		Short: "Print the status of an airflow deployment",
+		Long:  "Print the status of an airflow deployment",
 		Run:   airflowStatus,
 	}
 )
