@@ -23,13 +23,6 @@ var (
 		Run:   airflowInit,
 	}
 
-	airflowInitCmd = &cobra.Command{
-		Use:   "init",
-		Short: "Scaffold a new airflow project",
-		Long:  "Scaffold a new airflow project",
-		Run:   airflowInit,
-	}
-
 	airflowCreateCmd = &cobra.Command{
 		Use:   "create",
 		Short: "Create a new airflow deployment",
