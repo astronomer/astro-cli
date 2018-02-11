@@ -16,6 +16,13 @@ var (
 		Long:  "Manage airflow projects",
 	}
 
+	airflowInitCmd = &cobra.Command{
+		Use:   "init",
+		Short: "Scaffold a new airflow project",
+		Long:  "Scaffold a new airflow project",
+		Run:   airflowInit,
+	}
+
 	airflowCreateCmd = &cobra.Command{
 		Use:   "create",
 		Short: "Create a new airflow project",
@@ -43,6 +50,9 @@ func init() {
 	// Airflow root
 	RootCmd.AddCommand(airflowRootCmd)
 
+	// Airflow init
+	airflowRootCmd.AddCommand(airflowInitCmd)
+
 	// Airflow create
 	airflowRootCmd.AddCommand(airflowCreateCmd)
 
@@ -55,6 +65,10 @@ func init() {
 
 	// Airflow status
 	airflowRootCmd.AddCommand(airflowStatusCmd)
+}
+
+func airflowInit(cmd *cobra.Command, args []string) {
+	airflow.Init()
 }
 
 func airflowCreate(cmd *cobra.Command, args []string) {
