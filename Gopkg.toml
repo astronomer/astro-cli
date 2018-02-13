@@ -35,4 +35,8 @@
 
 [[constraint]]
   name = "github.com/spf13/viper"
-  version = "1.0.0"
+  revision = "aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/iancoleman/strcase"

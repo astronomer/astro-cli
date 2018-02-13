@@ -7,3 +7,67 @@ const dockerfile = `FROM astronomerinc/ap-airflow:latest-onbuild`
 const dockerignore = `.astro
 .git
 `
+
+// composeyml is the docker-compose template
+const composeyml = `
+version: '2'
+
+volumes:
+  postgres_data: {}
+
+services:
+  postgres:
+    image: postgres:10.1-alpine
+    restart: unless-stopped
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+    ports:
+      - {{ .PostgresPort }}:{{ .PostgresPort }}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: {{ .PostgresUser }}
+      POSTGRES_PASSWORD: {{ .PostgresPassword }}
+
+  scheduler:
+    image: {{ .AirflowImage }}
+    build:
+      context: .
+    command: ["airflow", "scheduler"]
+    restart: unless-stopped
+    user: {{ .AirflowUser }}
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-scheduler"
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
+    volumes:
+      - {{ .AirflowHome }}:/usr/local/airflow
+
+  webserver:
+    image: {{ .AirflowImage }}
+    build:
+      context: .
+    command: ["airflow", "webserver"]
+    restart: unless-stopped
+    user: {{ .AirflowUser }}
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-webserver"
+    depends_on:
+      - scheduler
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
+    ports:
+      - {{ .AirflowWebserverPort }}:{{ .AirflowWebserverPort }}
+    volumes:
+      - {{ .AirflowHome }}:/usr/local/airflow
+`

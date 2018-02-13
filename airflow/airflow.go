@@ -9,6 +9,10 @@ import (
 	"github.com/astronomerio/astro-cli/utils"
 )
 
+func imageName(name, tag string) string {
+	return fmt.Sprintf("%s/%s:%s", name, "airflow", tag)
+}
+
 func initDirs(root string, dirs []string) bool {
 	// Any inputs exist
 	exists := false
@@ -58,12 +62,9 @@ func initFiles(root string, files map[string]string) bool {
 }
 
 // Init will scaffold out a new airflow project
-func Init() {
-	// Grab working directory
-	path := utils.GetWorkingDir()
-
+func Init(path string) {
 	// List of directories to create
-	dirs := []string{".astro", "dags", "plugins"}
+	dirs := []string{"dags", "plugins"}
 
 	// Map of files to create
 	files := map[string]string{
@@ -74,19 +75,10 @@ func Init() {
 	}
 
 	// Initailize directories
-	astroDirExists := initDirs(path, dirs[:1])
-
-	// Initailize directories
-	initDirs(path, dirs[1:])
+	initDirs(path, dirs)
 
 	// Initialize files
 	initFiles(path, files)
-
-	if astroDirExists {
-		fmt.Printf("Reinitialized existing astronomer project in %s\n", path)
-	} else {
-		fmt.Printf("Initialized empty astronomer project in %s\n", path)
-	}
 }
 
 // Create new airflow deployment
@@ -109,8 +101,4 @@ func Deploy(name, tag string) {
 	remoteImage := fmt.Sprintf("%s/%s", docker.CloudRegistry, image)
 	docker.Exec("tag", image, remoteImage)
 	docker.Exec("push", remoteImage)
-}
-
-func imageName(name, tag string) string {
-	return fmt.Sprintf("%s/%s:%s", name, "airflow", tag)
 }
