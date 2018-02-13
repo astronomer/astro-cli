@@ -1,15 +1,20 @@
 package airflow
 
+import "strings"
+
 // dockerfile is the Dockerfile template
-const dockerfile = `FROM astronomerinc/ap-airflow:latest-onbuild`
+var dockerfile = strings.TrimSpace(`
+FROM astronomerinc/ap-airflow:latest-onbuild
+`)
 
 // dockerignore is the .dockerignore template
-const dockerignore = `.astro
+var dockerignore = strings.TrimSpace(`
+.astro
 .git
-`
+`)
 
 // composeyml is the docker-compose template
-const composeyml = `
+var composeyml = strings.TrimSpace(`
 version: '2'
 
 volumes:
@@ -32,8 +37,6 @@ services:
 
   scheduler:
     image: {{ .AirflowImage }}
-    build:
-      context: .
     command: ["airflow", "scheduler"]
     restart: unless-stopped
     user: {{ .AirflowUser }}
@@ -47,12 +50,12 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
     volumes:
-      - {{ .AirflowHome }}:/usr/local/airflow
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
 
   webserver:
     image: {{ .AirflowImage }}
-    build:
-      context: .
     command: ["airflow", "webserver"]
     restart: unless-stopped
     user: {{ .AirflowUser }}
@@ -69,5 +72,7 @@ services:
     ports:
       - {{ .AirflowWebserverPort }}:{{ .AirflowWebserverPort }}
     volumes:
-      - {{ .AirflowHome }}:/usr/local/airflow
-`
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+`)

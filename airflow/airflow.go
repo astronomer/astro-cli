@@ -5,13 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/utils"
 )
-
-func imageName(name, tag string) string {
-	return fmt.Sprintf("%s/%s:%s", name, "airflow", tag)
-}
 
 func initDirs(root string, dirs []string) bool {
 	// Any inputs exist
@@ -64,7 +59,7 @@ func initFiles(root string, files map[string]string) bool {
 // Init will scaffold out a new airflow project
 func Init(path string) {
 	// List of directories to create
-	dirs := []string{"dags", "plugins"}
+	dirs := []string{"dags", "plugins", "include"}
 
 	// Map of files to create
 	files := map[string]string{
@@ -83,22 +78,4 @@ func Init(path string) {
 
 // Create new airflow deployment
 func Create() {
-}
-
-// Build builds the airflow project
-func Build(name, tag string) {
-	image := imageName(name, tag)
-	fmt.Printf("Building %s...\n", image)
-	docker.Exec("build", "-t", image, ".")
-}
-
-// Deploy pushes a new docker image
-// TODO: Check for uncommitted git changes
-// TODO: Command to bump version or create version automatically
-func Deploy(name, tag string) {
-	image := imageName(name, tag)
-	fmt.Printf("Pushing %s...\n", image)
-	remoteImage := fmt.Sprintf("%s/%s", docker.CloudRegistry, image)
-	docker.Exec("tag", image, remoteImage)
-	docker.Exec("push", remoteImage)
 }

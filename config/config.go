@@ -89,7 +89,7 @@ func initProject() {
 
 	configPath, searchErr := utils.FindDirInPath(ConfigDir)
 	if searchErr != nil {
-		fmt.Printf("Error initializing config: %v\n", searchErr)
+		fmt.Printf("Error searching for project dir: %v\n", searchErr)
 		return
 	}
 
@@ -170,9 +170,18 @@ func ProjectConfigExists() bool {
 	return configExists(viperProject)
 }
 
+// ProjectRoot returns the path to the nearest project root
+func ProjectRoot() (string, error) {
+	configPath, searchErr := utils.FindDirInPath(ConfigDir)
+	if searchErr != nil {
+		return "", searchErr
+	}
+	return filepath.Dir(configPath), nil
+}
+
 // GetString will return the requested config, check working dir and fallback to home
 func GetString(config string) string {
-	if configExists(viperProject) {
+	if configExists(viperProject) && viperProject.IsSet(config) {
 		return viperProject.GetString(config)
 	}
 	return viperHome.GetString(config)

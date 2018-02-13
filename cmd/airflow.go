@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -90,6 +91,16 @@ func init() {
 	airflowRootCmd.AddCommand(airflowStopCmd)
 }
 
+// projectRoot returns the project root
+func projectRoot() string {
+	path, err := config.ProjectRoot()
+	if err != nil {
+		fmt.Printf("Error searching for project dir: %v\n", err)
+		os.Exit(1)
+	}
+	return path
+}
+
 // TODO: allow specify directory and/or project name (store in .astro/config)
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) {
@@ -134,28 +145,24 @@ func airflowDeploy(cmd *cobra.Command, args []string) {
 	deploymentName := args[0]
 	deploymentTag := args[1]
 
-	airflow.Build(deploymentName, deploymentTag)
-	airflow.Deploy(deploymentName, deploymentTag)
+	airflow.Deploy(projectRoot(), deploymentName, deploymentTag)
 }
 
+// Get airflow status
 func airflowStatus(cmd *cobra.Command, args []string) {
 }
 
+// Start airflow
 func airflowStart(cmd *cobra.Command, args []string) {
-	// Grab working directory
-	path := utils.GetWorkingDir()
-
-	err := airflow.Start(path)
+	err := airflow.Start(projectRoot())
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
+// Stop airflow
 func airflowStop(cmd *cobra.Command, args []string) {
-	// Grab working directory
-	path := utils.GetWorkingDir()
-
-	err := airflow.Stop(path)
+	err := airflow.Stop(projectRoot())
 	if err != nil {
 		fmt.Println(err)
 	}
