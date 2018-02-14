@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	version    = ""
-	gitcommit  = ""
+	version    string
+	gitCommit  string
 	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "Astronomer CLI version",
@@ -23,6 +23,6 @@ func init() {
 
 func printVersion(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Astro CLI Version: %s\n", version)
-	fmt.Printf("Git Commit: %s\n", gitcommit)
+	fmt.Printf("Git Commit: %s\n", gitCommit)
 	return nil
 }
