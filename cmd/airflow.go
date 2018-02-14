@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,14 +28,14 @@ var (
 		Use:   "init",
 		Short: "Scaffold a new airflow project",
 		Long:  "Scaffold a new airflow project",
-		Run:   airflowInit,
+		RunE:  airflowInit,
 	}
 
 	airflowCreateCmd = &cobra.Command{
 		Use:   "create",
 		Short: "Create a new airflow deployment",
 		Long:  "Create a new airflow deployment",
-		Run:   airflowCreate,
+		RunE:  airflowCreate,
 	}
 
 	airflowDeployCmd = &cobra.Command{
@@ -42,28 +43,35 @@ var (
 		Short: "Deploy an airflow project",
 		Long:  "Deploy an airflow project to a given deployment",
 		Args:  cobra.ExactArgs(2),
-		Run:   airflowDeploy,
+		RunE:  airflowDeploy,
 	}
 
 	airflowStatusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "Print the status of an airflow deployment",
 		Long:  "Print the status of an airflow deployment",
-		Run:   airflowStatus,
+		RunE:  airflowStatus,
 	}
 
 	airflowStartCmd = &cobra.Command{
 		Use:   "start",
 		Short: "Start a development airflow cluster",
 		Long:  "Start a development airflow cluster",
-		Run:   airflowStart,
+		RunE:  airflowStart,
 	}
 
 	airflowStopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a development airflow cluster",
 		Long:  "Stop a development airflow cluster",
-		Run:   airflowStop,
+		RunE:  airflowStop,
+	}
+
+	airflowPSCmd = &cobra.Command{
+		Use:   "ps",
+		Short: "List airflow containers",
+		Long:  "List airflow containers",
+		RunE:  airflowPS,
 	}
 )
 
@@ -89,6 +97,9 @@ func init() {
 
 	// Airflow stop
 	airflowRootCmd.AddCommand(airflowStopCmd)
+
+	// Airflow PS
+	airflowRootCmd.AddCommand(airflowPSCmd)
 }
 
 // projectRoot returns the project root
@@ -103,7 +114,7 @@ func projectRoot() string {
 
 // TODO: allow specify directory and/or project name (store in .astro/config)
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string) {
+func airflowInit(cmd *cobra.Command, args []string) error {
 	// Grab working directory
 	path := utils.GetWorkingDir()
 
@@ -114,8 +125,7 @@ func airflowInit(cmd *cobra.Command, args []string) {
 			MatchString
 
 		if !projectNameValid(projectName) {
-			fmt.Println("Project name is invalid")
-			return
+			return errors.New("Project name is invalid")
 		}
 	} else {
 		projectDirectory := filepath.Base(path)
@@ -134,36 +144,34 @@ func airflowInit(cmd *cobra.Command, args []string) {
 	} else {
 		fmt.Printf("Initialized empty astronomer project in %s\n", path)
 	}
+
+	return nil
 }
 
-func airflowCreate(cmd *cobra.Command, args []string) {
-	fmt.Println(config.GetString(config.CFGProjectName))
-	airflow.Create()
+func airflowCreate(cmd *cobra.Command, args []string) error {
+	return airflow.Create()
 }
 
-func airflowDeploy(cmd *cobra.Command, args []string) {
-	deploymentName := args[0]
-	deploymentTag := args[1]
-
-	airflow.Deploy(projectRoot(), deploymentName, deploymentTag)
+func airflowDeploy(cmd *cobra.Command, args []string) error {
+	return airflow.Deploy(projectRoot(), args[0], args[1])
 }
 
 // Get airflow status
-func airflowStatus(cmd *cobra.Command, args []string) {
+func airflowStatus(cmd *cobra.Command, args []string) error {
+	return nil
 }
 
 // Start airflow
-func airflowStart(cmd *cobra.Command, args []string) {
-	err := airflow.Start(projectRoot())
-	if err != nil {
-		fmt.Println(err)
-	}
+func airflowStart(cmd *cobra.Command, args []string) error {
+	return airflow.Start(projectRoot())
 }
 
 // Stop airflow
-func airflowStop(cmd *cobra.Command, args []string) {
-	err := airflow.Stop(projectRoot())
-	if err != nil {
-		fmt.Println(err)
-	}
+func airflowStop(cmd *cobra.Command, args []string) error {
+	return airflow.Stop(projectRoot())
+}
+
+// Airflow PS
+func airflowPS(cmd *cobra.Command, args []string) error {
+	return airflow.PS()
 }

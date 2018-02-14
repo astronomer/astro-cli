@@ -17,6 +17,10 @@ var dockerignore = strings.TrimSpace(`
 var composeyml = strings.TrimSpace(`
 version: '2'
 
+networks:
+  airflow:
+    driver: bridge
+
 volumes:
   postgres_data: {}
 
@@ -24,6 +28,8 @@ services:
   postgres:
     image: postgres:10.1-alpine
     restart: unless-stopped
+    networks:
+      - airflow
     labels:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
@@ -39,6 +45,8 @@ services:
     image: {{ .AirflowImage }}
     command: ["airflow", "scheduler"]
     restart: unless-stopped
+    networks:
+      - airflow
     user: {{ .AirflowUser }}
     labels:
       io.astronomer.docker: "true"
@@ -58,6 +66,8 @@ services:
     image: {{ .AirflowImage }}
     command: ["airflow", "webserver"]
     restart: unless-stopped
+    networks:
+      - airflow
     user: {{ .AirflowUser }}
     labels:
       io.astronomer.docker: "true"

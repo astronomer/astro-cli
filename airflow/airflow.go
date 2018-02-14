@@ -57,7 +57,7 @@ func initFiles(root string, files map[string]string) bool {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path string) {
+func Init(path string) error {
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 
@@ -74,8 +74,11 @@ func Init(path string) {
 
 	// Initialize files
 	initFiles(path, files)
+
+	return nil
 }
 
 // Create new airflow deployment
-func Create() {
+func Create() error {
+	return nil
 }

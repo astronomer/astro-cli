@@ -136,11 +136,17 @@ func Stop(path string) error {
 // Deploy pushes a new docker image
 // TODO: Check for uncommitted git changes
 // TODO: Command to bump version or create version automatically
-func Deploy(path, name, tag string) {
+func Deploy(path, name, tag string) error {
 	imageName := imageName(name, tag)
 	imageBuild(path, imageName)
 	fmt.Printf("Pushing %s...\n", imageName)
 	remoteImage := fmt.Sprintf("%s/%s", docker.CloudRegistry, imageName)
 	docker.Exec("tag", imageName, remoteImage)
 	docker.Exec("push", remoteImage)
+	return nil
+}
+
+// PS prints the running airflow containers
+func PS() error {
+	return nil
 }
