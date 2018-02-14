@@ -173,5 +173,5 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 
 // Airflow PS
 func airflowPS(cmd *cobra.Command, args []string) error {
-	return airflow.PS()
+	return airflow.PS(projectRoot())
 }

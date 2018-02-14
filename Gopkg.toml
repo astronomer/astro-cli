@@ -40,3 +40,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/iancoleman/strcase"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/olekukonko/tablewriter"

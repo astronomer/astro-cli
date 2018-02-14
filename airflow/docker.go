@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/astronomerio/astro-cli/config"
 	docker "github.com/astronomerio/astro-cli/docker"
@@ -13,6 +15,7 @@ import (
 	"github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
+	"github.com/pkg/errors"
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -90,14 +93,14 @@ func Start(path string) error {
 	}, nil)
 
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	// Start up our project
 	err = project.Up(context.Background(), options.Up{})
 
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	return nil
@@ -120,33 +123,80 @@ func Stop(path string) error {
 	}, nil)
 
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	// Shut down our project
 	err = project.Down(context.Background(), options.Down{RemoveVolume: true})
 
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	return nil
+}
+
+// PS prints the running airflow containers
+func PS(path string) error {
+	// Get project name from config
+	projectName := config.GetString(config.CFGProjectName)
+
+	// Generate the docker-compose yaml
+	yaml := generateConfig(projectName, path)
+
+	// Create the project
+	project, err := dockercompose.NewProject(&ctx.Context{
+		Context: project.Context{
+			ComposeBytes: [][]byte{[]byte(yaml)},
+			ProjectName:  projectName,
+		},
+	}, nil)
+	if err != nil {
+		return errors.Wrap(err, "Error creating docker-compose project")
+	}
+
+	// Shut down our project
+	psInfo, err := project.Ps(context.Background())
+	if err != nil {
+		return errors.Wrap(err, "Error checking docker-compose status")
+	}
+
+	// Columns for table
+	infoColumns := []string{"Name", "State", "Ports"}
+
+	// Create a new tabwriter
+	tw := new(tabwriter.Writer)
+	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight)
+
+	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
+	for _, info := range psInfo {
+		data := []string{}
+		for _, lbl := range infoColumns {
+			data = append(data, info[lbl])
+		}
+		fmt.Fprintln(tw, strings.Join(data, "\t"))
+	}
+
+	// Flush to stdout
+	return tw.Flush()
 }
 
 // Deploy pushes a new docker image
 // TODO: Check for uncommitted git changes
 // TODO: Command to bump version or create version automatically
 func Deploy(path, name, tag string) error {
+	// Grab image name
 	imageName := imageName(name, tag)
+
+	// Build our image
 	imageBuild(path, imageName)
+
 	fmt.Printf("Pushing %s...\n", imageName)
+
+	// Tag and push to our repository
 	remoteImage := fmt.Sprintf("%s/%s", docker.CloudRegistry, imageName)
 	docker.Exec("tag", imageName, remoteImage)
 	docker.Exec("push", remoteImage)
-	return nil
-}
 
-// PS prints the running airflow containers
-func PS() error {
 	return nil
 }
