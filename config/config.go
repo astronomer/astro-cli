@@ -176,6 +176,9 @@ func ProjectRoot() (string, error) {
 	if searchErr != nil {
 		return "", searchErr
 	}
+	if len(configPath) == 0 {
+		return "", nil
+	}
 	return filepath.Dir(configPath), nil
 }
 

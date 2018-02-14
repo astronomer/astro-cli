@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -16,6 +15,7 @@ import (
 )
 
 var (
+	projectRoot string
 	projectName string
 
 	airflowRootCmd = &cobra.Command{
@@ -38,14 +38,6 @@ var (
 		RunE:  airflowCreate,
 	}
 
-	airflowDeployCmd = &cobra.Command{
-		Use:   "deploy",
-		Short: "Deploy an airflow project",
-		Long:  "Deploy an airflow project to a given deployment",
-		Args:  cobra.ExactArgs(2),
-		RunE:  airflowDeploy,
-	}
-
 	airflowStatusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "Print the status of an airflow deployment",
@@ -53,29 +45,40 @@ var (
 		RunE:  airflowStatus,
 	}
 
+	airflowDeployCmd = &cobra.Command{
+		Use:   "deploy",
+		Short: "Deploy an airflow project",
+		Long:  "Deploy an airflow project to a given deployment",
+		Args:  cobra.ExactArgs(2),
+		RunE:  checkForProject(airflowDeploy),
+	}
+
 	airflowStartCmd = &cobra.Command{
 		Use:   "start",
 		Short: "Start a development airflow cluster",
 		Long:  "Start a development airflow cluster",
-		RunE:  airflowStart,
+		RunE:  checkForProject(airflowStart),
 	}
 
 	airflowStopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a development airflow cluster",
 		Long:  "Stop a development airflow cluster",
-		RunE:  airflowStop,
+		RunE:  checkForProject(airflowStop),
 	}
 
 	airflowPSCmd = &cobra.Command{
 		Use:   "ps",
 		Short: "List airflow containers",
 		Long:  "List airflow containers",
-		RunE:  airflowPS,
+		RunE:  checkForProject(airflowPS),
 	}
 )
 
 func init() {
+	// Set up project root
+	projectRoot, _ = config.ProjectRoot()
+
 	// Airflow root
 	RootCmd.AddCommand(airflowRootCmd)
 
@@ -102,14 +105,15 @@ func init() {
 	airflowRootCmd.AddCommand(airflowPSCmd)
 }
 
-// projectRoot returns the project root
-func projectRoot() string {
-	path, err := config.ProjectRoot()
-	if err != nil {
-		fmt.Printf("Error searching for project dir: %v\n", err)
-		os.Exit(1)
+// Check for project wraps functions that can only be run within a project directory
+// and will return an error otherwise.
+func checkForProject(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(projectRoot) > 0 {
+			return f(cmd, args)
+		}
+		return errors.New("Not in an astronomer project directory")
 	}
-	return path
 }
 
 // TODO: allow specify directory and/or project name (store in .astro/config)
@@ -153,7 +157,7 @@ func airflowCreate(cmd *cobra.Command, args []string) error {
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
-	return airflow.Deploy(projectRoot(), args[0], args[1])
+	return airflow.Deploy(projectRoot, args[0], args[1])
 }
 
 // Get airflow status
@@ -163,15 +167,15 @@ func airflowStatus(cmd *cobra.Command, args []string) error {
 
 // Start airflow
 func airflowStart(cmd *cobra.Command, args []string) error {
-	return airflow.Start(projectRoot())
+	return airflow.Start(projectRoot)
 }
 
 // Stop airflow
 func airflowStop(cmd *cobra.Command, args []string) error {
-	return airflow.Stop(projectRoot())
+	return airflow.Stop(projectRoot)
 }
 
 // Airflow PS
 func airflowPS(cmd *cobra.Command, args []string) error {
-	return airflow.PS(projectRoot())
+	return airflow.PS(projectRoot)
 }
