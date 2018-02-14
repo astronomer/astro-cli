@@ -38,13 +38,6 @@ var (
 		RunE:  airflowCreate,
 	}
 
-	airflowStatusCmd = &cobra.Command{
-		Use:   "status",
-		Short: "Print the status of an airflow deployment",
-		Long:  "Print the status of an airflow deployment",
-		RunE:  airflowStatus,
-	}
-
 	airflowDeployCmd = &cobra.Command{
 		Use:   "deploy",
 		Short: "Deploy an airflow project",
@@ -91,9 +84,6 @@ func init() {
 
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
-
-	// Airflow status
-	airflowRootCmd.AddCommand(airflowStatusCmd)
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
@@ -158,11 +148,6 @@ func airflowCreate(cmd *cobra.Command, args []string) error {
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
 	return airflow.Deploy(projectRoot, args[0], args[1])
-}
-
-// Get airflow status
-func airflowStatus(cmd *cobra.Command, args []string) error {
-	return nil
 }
 
 // Start airflow
