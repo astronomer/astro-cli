@@ -96,7 +96,7 @@ func Start(airflowHome string) error {
 
 	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error creating docker-compose project")
 	}
 
 	// Build this project image
@@ -105,7 +105,7 @@ func Start(airflowHome string) error {
 	// Start up our project
 	err = project.Up(context.Background(), options.Up{})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error building, (re)creating or starting project containers")
 	}
 
 	return nil
@@ -118,13 +118,13 @@ func Stop(airflowHome string) error {
 
 	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error creating docker-compose project")
 	}
 
 	// Shut down our project
 	err = project.Down(context.Background(), options.Down{RemoveVolume: true})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error stopping and removing containers")
 	}
 
 	return nil
