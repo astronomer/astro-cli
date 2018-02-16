@@ -46,10 +46,15 @@ How to get started as a developer.
     git clone git@github.com:astronomerio/astro-cli.git
     cd astro-cli
     make build
+    ```
+
+2. (Optional) Install to `$GOBIN`:
+
+    ```
     make install
     ```
 
-2. Run:
+3. Run:
 
     ```
     $ astro
