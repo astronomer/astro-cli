@@ -40,7 +40,20 @@ How to get started as a user.
 
 How to get started as a developer.
 
-TODO
+1. Build:
+
+    ```
+    git clone git@github.com:astronomerio/astro-cli.git
+    cd astro-cli
+    make build
+    make install
+    ```
+
+2. Run:
+
+    ```
+    $ astro
+    ```
 
 ### Vendor
 
