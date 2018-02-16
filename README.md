@@ -5,7 +5,7 @@
 1. Install Go:
 
     ```
-    brew install go
+    $ brew install go
     ```
 
     More info: https://golang.org/doc/install
@@ -19,6 +19,22 @@
     ```
 
     More info: https://github.com/golang/go/wiki/SettingGOPATH
+
+## Quickstart
+
+How to get started as a user.
+
+1. Install Astro CLI:
+
+    ```
+    $ go get github.com/astronomerio/astro-cli
+    ```
+
+2. Run it to see commands:
+
+    ```
+    $ astro-cli
+    ```
 
 ### Vendor
 - All dependnecies are managed with dep, with the exception of libcompose. It needs to be manually added with `go get github.com/docker/libcompose`. Issue here: https://github.com/docker/libcompose/issues/503.
