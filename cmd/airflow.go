@@ -106,7 +106,6 @@ func checkForProject(f func(*cobra.Command, []string) error) func(*cobra.Command
 	}
 }
 
-// TODO: allow specify directory and/or project name (store in .astro/config)
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
 	// Grab working directory
