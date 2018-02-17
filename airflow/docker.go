@@ -149,10 +149,12 @@ func PS(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
+	// Create a libcompose project
 	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
 	}
+
 	// List project containers
 	psInfo, err := project.Ps(context.Background())
 	if err != nil {
@@ -166,6 +168,7 @@ func PS(airflowHome string) error {
 	tw := new(tabwriter.Writer)
 	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight)
 
+	// Append data to table
 	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
 	for _, info := range psInfo {
 		data := []string{}
