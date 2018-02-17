@@ -40,7 +40,7 @@ How to get started as a user.
 
     ```
     $ mkdir hello-astro && cd hello-astro
-    $ astro airflow init
+    $ astro-cli airflow init
     ```
 
 ## Development
