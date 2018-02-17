@@ -106,6 +106,7 @@ func Start(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
+	// Create a libcompose project
 	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
@@ -128,6 +129,7 @@ func Stop(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
+	// Create a libcompose project
 	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
