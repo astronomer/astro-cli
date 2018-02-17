@@ -28,6 +28,12 @@ var (
 	CFGPostgresHost = "postgres.host"
 	// CFGPostgresPort is the default postgres port
 	CFGPostgresPort = "postgres.port"
+	// CFGRegistryAuthority is the default docker registry
+	CFGRegistryAuthority = "docker.registry.authority"
+	// CFGRegistryUser is the default docker registry
+	CFGRegistryUser = "docker.registry.user"
+	// CFGRegistryPassword is the default docker registry
+	CFGRegistryPassword = "docker.registry.password"
 
 	// CFGProjectName is the name of a project
 	CFGProjectName = "project.name"
@@ -61,6 +67,10 @@ func initHome() {
 	viperHome.SetDefault(CFGPostgresPassword, "postgres")
 	viperHome.SetDefault(CFGPostgresHost, "postgres")
 	viperHome.SetDefault(CFGPostgresPort, "5432")
+	// XXX: Change default to hosted cloud, allow to be set by user for EE
+	viperHome.SetDefault(CFGRegistryAuthority, "registry.gcp.astronomer.io")
+	viperHome.SetDefault(CFGRegistryUser, "admin")
+	viperHome.SetDefault(CFGRegistryPassword, "admin")
 
 	// If home config does not exist, create it
 	if !utils.Exists(HomeConfigFile) {

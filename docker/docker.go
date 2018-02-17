@@ -5,9 +5,6 @@ import (
 )
 
 const (
-	// CloudRegistry is the default astronomer registry.
-	// XXX: This will change.
-	CloudRegistry = "registry.gcp.astronomer.io"
 	// Docker is the docker command.
 	Docker = "docker"
 )

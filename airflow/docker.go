@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -16,6 +18,11 @@ import (
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
 	"github.com/pkg/errors"
+)
+
+const (
+	componentName   = "airflow"
+	deployTagPrefix = "cli-"
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -30,9 +37,14 @@ type ComposeConfig struct {
 	AirflowWebserverPort string
 }
 
+// repositoryName creates an airflow repository name
+func repositoryName(name string) string {
+	return fmt.Sprintf("%s/%s", name, componentName)
+}
+
 // imageName creates an airflow image name
 func imageName(name, tag string) string {
-	return fmt.Sprintf("%s/%s:%s", name, "ap-airflow", tag)
+	return fmt.Sprintf("%s:%s", repositoryName(name), tag)
 }
 
 // imageBuild builds the airflow project
@@ -40,7 +52,7 @@ func imageBuild(path, imageName string) {
 	// Change to location of Dockerfile
 	os.Chdir(path)
 
-	fmt.Printf("Building %s...\n", imageName)
+	// Build image
 	docker.Exec("build", "-t", imageName, ".")
 }
 
@@ -183,20 +195,49 @@ func PS(path string) error {
 
 // Deploy pushes a new docker image
 // TODO: Check for uncommitted git changes
-// TODO: Command to bump version or create version automatically
-func Deploy(path, name, tag string) error {
-	// Grab image name
-	imageName := imageName(name, tag)
+func Deploy(path, name string) error {
+	// Get a list of tags in the repository for this image
+	tags, err := docker.ListRepositoryTags(repositoryName(name))
+	if err != nil {
+		return err
+	}
+
+	// Keep track of the highest tag we have listed in the registry
+	// Default to 0, if never deployed before
+	highestTag := 0
+
+	// Loop through tags in the registry and find the highest one
+	re := regexp.MustCompile("^" + deployTagPrefix + "(\\d+)$")
+	for _, tag := range tags {
+		matches := re.FindStringSubmatch(tag)
+		if len(matches) > 0 {
+			t, _ := strconv.Atoi(matches[1])
+			if t > highestTag {
+				highestTag = t
+			}
+		}
+	}
+
+	// Build the image to deploy
+	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
+	deployImage := imageName(name, "latest")
 
 	// Build our image
-	imageBuild(path, imageName)
+	fmt.Println("Building image")
+	imageBuild(path, deployImage)
 
-	fmt.Printf("Pushing %s...\n", imageName)
+	// Tag our build with remote registry and incremented tag
+	tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
+	remoteImage := fmt.Sprintf("%s/%s",
+		config.GetString(config.CFGRegistryAuthority), imageName(name, tag))
+	docker.Exec("tag", deployImage, remoteImage)
 
-	// Tag and push to our repository
-	remoteImage := fmt.Sprintf("%s/%s", docker.CloudRegistry, imageName)
-	docker.Exec("tag", imageName, remoteImage)
+	// Push image to registry
+	fmt.Println("Pushing image to Astronomer registry")
 	docker.Exec("push", remoteImage)
+
+	// Delete the image tags we just generated
+	docker.Exec("rmi", remoteImage)
 
 	return nil
 }
