@@ -50,15 +50,15 @@ How to get started as a developer.
 1. Build:
 
     ```
-    git clone git@github.com:astronomerio/astro-cli.git
-    cd astro-cli
-    make build
+    $ git clone git@github.com:astronomerio/astro-cli.git
+    $ cd astro-cli
+    $ make build
     ```
 
 2. (Optional) Install to `$GOBIN`:
 
     ```
-    make install
+    $ make install
     ```
 
 3. Run:
