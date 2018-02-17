@@ -85,16 +85,10 @@ func generateConfig(projectName, airflowHome string) string {
 	return buff.String()
 }
 
-// Start starts a local airflow development cluster
-func Start(path string) error {
-	// Get project name from config
-	projectName := config.GetString(config.CFGProjectName)
-
-	// Build this project image
-	imageBuild(path, imageName(projectName, "latest"))
-
+// createProjectFromContext creates project with yaml config as context
+func createProjectFromContext(projectName, airflowHome string) (project.APIProject, error) {
 	// Generate the docker-compose yaml
-	yaml := generateConfig(projectName, path)
+	yaml := generateConfig(projectName, airflowHome)
 
 	// Create the project
 	project, err := dockercompose.NewProject(&ctx.Context{
@@ -104,70 +98,60 @@ func Start(path string) error {
 		},
 	}, nil)
 
+	return project, err
+}
+
+// Start starts a local airflow development cluster
+func Start(airflowHome string) error {
+	// Get project name from config
+	projectName := config.GetString(config.CFGProjectName)
+
+	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error creating docker-compose project")
 	}
+
+	// Build this project image
+	imageBuild(airflowHome, imageName(projectName, "latest"))
 
 	// Start up our project
 	err = project.Up(context.Background(), options.Up{})
-
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error building, (re)creating or starting project containers")
 	}
 
 	return nil
 }
 
 // Stop stops a local airflow development cluster
-func Stop(path string) error {
+func Stop(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
-	// Generate the docker-compose yaml
-	yaml := generateConfig(projectName, path)
-
-	// Create the project
-	project, err := dockercompose.NewProject(&ctx.Context{
-		Context: project.Context{
-			ComposeBytes: [][]byte{[]byte(yaml)},
-			ProjectName:  projectName,
-		},
-	}, nil)
-
+	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error creating docker-compose project")
 	}
 
 	// Shut down our project
 	err = project.Down(context.Background(), options.Down{RemoveVolume: true})
-
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error stopping and removing containers")
 	}
 
 	return nil
 }
 
 // PS prints the running airflow containers
-func PS(path string) error {
+func PS(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
-	// Generate the docker-compose yaml
-	yaml := generateConfig(projectName, path)
-
-	// Create the project
-	project, err := dockercompose.NewProject(&ctx.Context{
-		Context: project.Context{
-			ComposeBytes: [][]byte{[]byte(yaml)},
-			ProjectName:  projectName,
-		},
-	}, nil)
+	project, err := createProjectFromContext(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
 	}
-
-	// Shut down our project
+	// List project containers
 	psInfo, err := project.Ps(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "Error checking docker-compose status")
