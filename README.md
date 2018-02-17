@@ -8,9 +8,9 @@
     $ brew install go
     ```
 
-    More info: https://golang.org/doc/install
+    More info: <https://golang.org/doc/install>
 
-2. Set `GOPATH` (recommended: `~/go`) etc in .bash_profile or .bashrc:
+1. Set `GOPATH` (recommended: `~/go`) in .bash_profile or .bashrc:
 
     ```
     export GOPATH=$HOME/go
@@ -18,7 +18,7 @@
     export PATH=$PATH:$GOBIN
     ```
 
-    More info: https://github.com/golang/go/wiki/SettingGOPATH
+    More info: <https://github.com/golang/go/wiki/SettingGOPATH>
 
 ## Quickstart
 
@@ -30,13 +30,13 @@ How to get started as a user.
     $ go get github.com/astronomerio/astro-cli
     ```
 
-2. Run it to see commands:
+1. Run it to see commands:
 
     ```
     $ astro-cli
     ```
 
-3. Create a project:
+1. Create a project:
 
     ```
     $ mkdir hello-astro && cd hello-astro
@@ -55,13 +55,13 @@ How to get started as a developer.
     $ make build
     ```
 
-2. (Optional) Install to `$GOBIN`:
+1. (Optional) Install to `$GOBIN`:
 
     ```
     $ make install
     ```
 
-3. Run:
+1. Run:
 
     ```
     $ astro
@@ -69,5 +69,5 @@ How to get started as a developer.
 
 ### Vendor
 
-- All dependencies are managed with dep, with the exception of libcompose. It needs to be manually added with `go get github.com/docker/libcompose`. Issue here: https://github.com/docker/libcompose/issues/503.
+- All dependencies are managed with dep, with the exception of libcompose. It needs to be manually added with `go get github.com/docker/libcompose`. Issue here: <https://github.com/docker/libcompose/issues/503>.
 - Alternatively, it is also a git submodule, which should get pulled in when cloned.
