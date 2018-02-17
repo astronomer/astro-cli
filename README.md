@@ -36,6 +36,13 @@ How to get started as a user.
     $ astro-cli
     ```
 
+3. Create a project:
+
+    ```
+    $ mkdir hello-astro && cd hello-astro
+    $ astro airflow init
+    ```
+
 ## Development
 
 How to get started as a developer.
