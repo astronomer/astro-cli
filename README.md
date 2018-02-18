@@ -30,17 +30,25 @@ How to get started as a user.
     $ go get github.com/astronomerio/astro-cli
     ```
 
+1. Add to .bash_profile:
+
+    ```
+    alias astro=astro-cli
+    ```
+
+    *Note: This is temporary while we have two CLIs (the older one is for current SaaS customers). Eventually this CLI will replace the old one and this step will be unncessary.*
+
 1. Run it to see commands:
 
     ```
-    $ astro-cli
+    $ astro
     ```
 
 1. Create a project:
 
     ```
     $ mkdir hello-astro && cd hello-astro
-    $ astro-cli airflow init
+    $ astro airflow init
     ```
 
 ## Development
