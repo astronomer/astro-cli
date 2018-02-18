@@ -23,6 +23,7 @@ networks:
 
 volumes:
   postgres_data: {}
+  airflow_logs: {}
 
 services:
   postgres:
@@ -61,6 +62,7 @@ services:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+      - airflow_logs:/usr/local/airflow/logs
 
   webserver:
     image: {{ .AirflowImage }}
@@ -85,4 +87,5 @@ services:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+      - airflow_logs:/usr/local/airflow/logs
 `)

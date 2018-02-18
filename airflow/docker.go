@@ -136,7 +136,7 @@ func Stop(airflowHome string) error {
 	}
 
 	// Shut down our project
-	err = project.Down(context.Background(), options.Down{RemoveVolume: true})
+	err = project.Down(context.Background(), options.Down{RemoveVolume: true, RemoveOrphans: true})
 	if err != nil {
 		return errors.Wrap(err, "Error stopping and removing containers")
 	}
