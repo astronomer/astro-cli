@@ -41,14 +41,14 @@ How to get started as a user.
 1. Run it to see commands:
 
     ```
-    $ astro-cli
+    $ astro
     ```
 
 1. Create a project:
 
     ```
     $ mkdir hello-astro && cd hello-astro
-    $ astro-cli airflow init
+    $ astro airflow init
     ```
 
 ## Development
