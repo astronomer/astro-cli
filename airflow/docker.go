@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	componentName   = "airflow"
-	deployTagPrefix = "cli-"
+	componentName     = "airflow"
+	deployTagPrefix   = "cli-"
+	dockerStateUp     = "Up"
+	dockerStateExited = "Exited"
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -85,8 +87,18 @@ func generateConfig(projectName, airflowHome string) string {
 	return buff.String()
 }
 
-// createProjectFromContext creates project with yaml config as context
-func createProjectFromContext(projectName, airflowHome string) (project.APIProject, error) {
+func checkServiceState(serviceState, expectedState string) bool {
+	scrubbedState := strings.Split(serviceState, " ")[0]
+
+	if scrubbedState == expectedState {
+		return true
+	}
+
+	return false
+}
+
+// createProject creates project with yaml config as context
+func createProject(projectName, airflowHome string) (project.APIProject, error) {
 	// Generate the docker-compose yaml
 	yaml := generateConfig(projectName, airflowHome)
 
@@ -107,30 +119,50 @@ func Start(airflowHome string) error {
 	projectName := config.GetString(config.CFGProjectName)
 
 	// Create a libcompose project
-	project, err := createProjectFromContext(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
 	}
 
-	// Build this project image
-	imageBuild(airflowHome, imageName(projectName, "latest"))
-
-	// Start up our project
-	err = project.Up(context.Background(), options.Up{})
+	// Fetch project containers
+	psInfo, err := project.Ps(context.Background())
 	if err != nil {
-		return errors.Wrap(err, "Error building, (re)creating or starting project containers")
+		return errors.Wrap(err, "Error checking docker-compose status")
+	}
+
+	if len(psInfo) > 0 {
+		// Ensure project is not already running
+		for _, info := range psInfo {
+			if checkServiceState(info["State"], dockerStateUp) {
+				return errors.New("Project is already running, cannot start")
+			}
+		}
+
+		err = project.Start(context.Background())
+		if err != nil {
+			return errors.Wrap(err, "Error building, (re)creating or starting project containers")
+		}
+	} else {
+		// Build this project image
+		imageBuild(airflowHome, imageName(projectName, "latest"))
+
+		// Start up our project
+		err = project.Up(context.Background(), options.Up{})
+		if err != nil {
+			return errors.Wrap(err, "Error building, (re)creating or starting project containers")
+		}
 	}
 
 	return nil
 }
 
-// Stop stops a local airflow development cluster
-func Stop(airflowHome string) error {
+// Kill stops a local airflow development cluster
+func Kill(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
 	// Create a libcompose project
-	project, err := createProjectFromContext(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
 	}
@@ -144,13 +176,33 @@ func Stop(airflowHome string) error {
 	return nil
 }
 
+// Stop a running docker project
+func Stop(airflowHome string) error {
+	// Get project name from config
+	projectName := config.GetString(config.CFGProjectName)
+
+	// Create a libcompose project
+	project, err := createProject(projectName, airflowHome)
+	if err != nil {
+		return errors.Wrap(err, "Error creating docker-compose project")
+	}
+
+	// Pause our project
+	err = project.Stop(context.Background(), 30)
+	if err != nil {
+		return errors.Wrap(err, "Error pausing project containers")
+	}
+
+	return nil
+}
+
 // PS prints the running airflow containers
 func PS(airflowHome string) error {
 	// Get project name from config
 	projectName := config.GetString(config.CFGProjectName)
 
 	// Create a libcompose project
-	project, err := createProjectFromContext(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome)
 	if err != nil {
 		return errors.Wrap(err, "Error creating docker-compose project")
 	}
