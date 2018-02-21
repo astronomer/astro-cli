@@ -53,6 +53,13 @@ var (
 		RunE:  checkForProject(airflowStart),
 	}
 
+	airflowKillCmd = &cobra.Command{
+		Use:   "kill",
+		Short: "Kill a development airflow cluster",
+		Long:  "Kill a development airflow cluster",
+		RunE:  checkForProject(airflowKill),
+	}
+
 	airflowStopCmd = &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a development airflow cluster",
@@ -87,6 +94,9 @@ func init() {
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
+
+	// Airflow kill
+	airflowRootCmd.AddCommand(airflowKillCmd)
 
 	// Airflow stop
 	airflowRootCmd.AddCommand(airflowStopCmd)
@@ -149,17 +159,22 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 	return airflow.Deploy(projectRoot, args[0])
 }
 
-// Start airflow
+// Start an airflow cluster
 func airflowStart(cmd *cobra.Command, args []string) error {
 	return airflow.Start(projectRoot)
 }
 
-// Stop airflow
+// Kill an airflow cluster
+func airflowKill(cmd *cobra.Command, args []string) error {
+	return airflow.Kill(projectRoot)
+}
+
+// Stop an airflow cluster
 func airflowStop(cmd *cobra.Command, args []string) error {
 	return airflow.Stop(projectRoot)
 }
 
-// Airflow PS
+// List containers of an airflow cluster
 func airflowPS(cmd *cobra.Command, args []string) error {
 	return airflow.PS(projectRoot)
 }
