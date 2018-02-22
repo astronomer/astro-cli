@@ -7,10 +7,10 @@ import (
 
 // Login logs a user into the docker registry. Will need to login to Houston next.
 func Login() {
-	docker.Exec("login", config.GetString(config.CFGRegistryAuthority))
+	docker.Exec("login", config.CFG.RegistryAuthority.GetString())
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
 func Logout() {
-	docker.Exec("logout", config.GetString(config.CFGRegistryAuthority))
+	docker.Exec("logout", config.CFG.RegistryAuthority.GetString())
 }

@@ -129,7 +129,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	if !exists {
 		config.CreateProjectConfig(path)
 	}
-	config.SetProjectString(config.CFGProjectName, projectName)
+	config.CFG.ProjectName.SetProjectString(projectName)
 	airflow.Init(path)
 
 	if exists {
