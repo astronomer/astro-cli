@@ -195,8 +195,18 @@ func ProjectRoot() (string, error) {
 // GetString will return the requested config, check working dir and fallback to home
 func GetString(config string) string {
 	if configExists(viperProject) && viperProject.IsSet(config) {
-		return viperProject.GetString(config)
+		return GetHomeString(config)
 	}
+	return GetHomeString(config)
+}
+
+// GetProjectString will return a project config
+func GetProjectString(config string) string {
+	return viperProject.GetString(config)
+}
+
+// GetHomeString will return config from home string
+func GetHomeString(config string) string {
 	return viperHome.GetString(config)
 }
 
