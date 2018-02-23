@@ -23,7 +23,7 @@ jobs:
           name: "Write metadata"
           command: |
             if [ "${CIRCLE_TAG}" != "" ]; then
-              ./.circleci/scripts/write_metadata.sh $CIRCLE_TAG "`date '+%B %d, %Y @ %H:%M:%S'`"
+              chmod +x ./.circleci/scripts/write_metadata.sh $CIRCLE_TAG "`date '+%B %d, %Y @ %H:%M:%S'`"
             else
               echo "Not tagged, skipping step"
             fi
