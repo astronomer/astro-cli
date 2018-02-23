@@ -1,10 +1,10 @@
-project_name: astro
+project_name: astro-cli
 release:
   github:
     owner: astronomerio
-    name: astro
+    name: astro-cli
 brew:
-  install: bin.install "astro"
+  install: bin.install "astro-cli"
 builds:
 - goos:
   - linux
@@ -16,7 +16,7 @@ builds:
   goarm:
    - "6"
   main: .
-  ldflags: -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Dat e}}
+  ldflags: -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
   binary: astro
   ignore:
     - goos: windows
