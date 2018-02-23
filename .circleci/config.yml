@@ -20,14 +20,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "Write metadata"
-          command: |
-            if [ "${CIRCLE_TAG}" != "" ]; then
-              sh ./.circleci/scripts/write_metadata.sh $CIRCLE_TAG "`date '+%B %d, %Y @ %H:%M:%S'`"
-            else
-              echo "Not tagged, skipping step"
-            fi
-      - run:
           name: "Install Goreleaser"
           command: |
             if [ "${CIRCLE_TAG}" != "" ]; then
