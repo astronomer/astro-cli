@@ -44,3 +44,27 @@
 [[constraint]]
   branch = "master"
   name = "github.com/olekukonko/tablewriter"
+
+[[constraint]]
+  name = "github.com/docker/libcompose"
+  revision = "57bd716502dcbe1799f026148016022b0f3b989c"
+
+[[override]]
+  name = "github.com/docker/docker"
+  revision = "a68ae4a2d95b1ff143025a435195af0f1ab30ace"
+
+[[override]]
+  name = "github.com/docker/distribution"
+  revision = "6664ec703991875e14419ff4960921cce7678bab"
+
+[[override]]
+  name = "github.com/docker/cli"
+  revision = "ef7d8be86c96f48cd05ae692b4ad1c18aaac6940"
+
+[[override]]
+  name = "github.com/docker/go-metrics"
+  revision = "b8fbfd8f51b86cbfefb5f00fd998df220a234337"
+
+[[override]]
+  name = "github.com/xeipuuv/gojsonschema"
+  revision = "0c8571ac0ce161a5feb57375a9cdf148c98c0f70"
