@@ -17,7 +17,7 @@ builds:
    - "6"
   main: .
   ldflags: -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
-  binary: astro
+  binary: astro-cli
   ignore:
     - goos: windows
       goarch: amd64
