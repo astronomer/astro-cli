@@ -28,9 +28,9 @@ archive:
       format: zip
   name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   files:
-    LICENSE
-    README.md
-    CHANGELOG.md
+  - LICENSE*
+  - README.md
+  - CHANGELOG.md
 snapshot:
   name_template: 'SNAPSHOT-{{ .Commit }}'
 checksum:
