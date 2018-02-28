@@ -11,12 +11,12 @@ builds:
   - darwin
   - windows
   goarch:
-    - amd64
-    - "386"
+  - amd64
+  - "386"
   goarm:
-   - "6"
+  - "6"
   main: .
-  ldflags: -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+  ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
   binary: astro-cli
   ignore:
     - goos: windows
@@ -26,12 +26,18 @@ archive:
   format_overrides:
     - goos: windows
       format: zip
-  name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+  name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{
+    .Arm }}{{ end }}'
   files:
+  - licence*
+  - LICENCE*
+  - license*
   - LICENSE*
-  - README.md
-  - CHANGELOG.md
+  - readme*
+  - README*
+  - changelog*
+  - CHANGELOG*
 snapshot:
-  name_template: 'SNAPSHOT-{{ .Commit }}'
+  name_template: SNAPSHOT-{{ .Commit }}
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'

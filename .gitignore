@@ -1,5 +1,7 @@
 .astro/
 astro
 Dockerfile
+meta/
+dist/
 packages.txt
 requirements.txt
