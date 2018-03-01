@@ -1,5 +1,7 @@
 # Astronomer CLI
 
+The Astronomer CLI is the recommended way to get started developing and deploying on Astronomer Enterprise Edition.
+
 ## Setup
 
 1. Install Go:
