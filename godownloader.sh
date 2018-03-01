@@ -282,7 +282,7 @@ EOF
 
 OWNER=astronomerio
 REPO=astro-cli
-BINARY=astro-cli
+BINARY=astro
 FORMAT=tar.gz
 OS=$(uname_os)
 ARCH=$(uname_arch)
