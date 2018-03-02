@@ -179,7 +179,7 @@ func Kill(airflowHome string) error {
 // Stop a running docker project
 func Stop(airflowHome string) error {
 	// Get project name from config
-	projectName := config.GetString(config.CFGProjectName)
+	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
