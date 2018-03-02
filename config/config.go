@@ -20,28 +20,25 @@ var (
 	// ConfigDir is the directory for astro files
 	ConfigDir = ".astro"
 
-	// CFGPostgresUser is the default postgres user
-	CFGPostgresUser = "postgres.user"
-	// CFGPostgresPassword is the default postgres password
-	CFGPostgresPassword = "postgres.password"
-	// CFGPostgresHost is the default postgres host
-	CFGPostgresHost = "postgres.host"
-	// CFGPostgresPort is the default postgres port
-	CFGPostgresPort = "postgres.port"
-	// CFGRegistryAuthority is the default docker registry
-	CFGRegistryAuthority = "docker.registry.authority"
-	// CFGRegistryUser is the default docker registry
-	CFGRegistryUser = "docker.registry.user"
-	// CFGRegistryPassword is the default docker registry
-	CFGRegistryPassword = "docker.registry.password"
-
-	// CFGProjectName is the name of a project
-	CFGProjectName = "project.name"
-
 	// HomeConfigPath is the path to the users global directory
 	HomeConfigPath = filepath.Join(utils.GetHomeDir(), ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+
+	// CFGStrMap maintains string to cfg mapping
+	CFGStrMap = make(map[string]cfg)
+
+	// CFG Houses configuration meta
+	CFG = cfgs{
+		PostgresUser:      initCfg("postgres.user", true, true),
+		PostgresPassword:  initCfg("postgres.password", true, true),
+		PostgresHost:      initCfg("postgres.host", true, true),
+		PostgresPort:      initCfg("postgres.port", true, true),
+		RegistryAuthority: initCfg("docker.registry.authority", true, true),
+		RegistryUser:      initCfg("docker.registry.user", true, true),
+		RegistryPassword:  initCfg("docker.registry.password", true, true),
+		ProjectName:       initCfg("project.name", true, true),
+	}
 
 	// viperHome is the viper object in the users home directory
 	viperHome *viper.Viper
@@ -55,6 +52,12 @@ func InitConfig() {
 	initProject()
 }
 
+func initCfg(path string, gettable bool, settable bool) cfg {
+	cfg := cfg{path, gettable, settable}
+	CFGStrMap[path] = cfg
+	return cfg
+}
+
 // Init viper for config file in home directory
 func initHome() {
 	viperHome = viper.New()
@@ -63,14 +66,14 @@ func initHome() {
 	viperHome.SetConfigFile(HomeConfigFile)
 
 	// Set defaults
-	viperHome.SetDefault(CFGPostgresUser, "postgres")
-	viperHome.SetDefault(CFGPostgresPassword, "postgres")
-	viperHome.SetDefault(CFGPostgresHost, "postgres")
-	viperHome.SetDefault(CFGPostgresPort, "5432")
+	viperHome.SetDefault(CFG.PostgresUser.Path, "postgres")
+	viperHome.SetDefault(CFG.PostgresPassword.Path, "postgres")
+	viperHome.SetDefault(CFG.PostgresHost.Path, "postgres")
+	viperHome.SetDefault(CFG.PostgresPort.Path, "5432")
 	// XXX: Change default to hosted cloud, allow to be set by user for EE
-	viperHome.SetDefault(CFGRegistryAuthority, "registry.gcp.astronomer.io")
-	viperHome.SetDefault(CFGRegistryUser, "admin")
-	viperHome.SetDefault(CFGRegistryPassword, "admin")
+	viperHome.SetDefault(CFG.RegistryAuthority.Path, "registry.gcp.astronomer.io")
+	viperHome.SetDefault(CFG.RegistryUser.Path, "admin")
+	viperHome.SetDefault(CFG.RegistryPassword.Path, "admin")
 
 	// If home config does not exist, create it
 	if !utils.Exists(HomeConfigFile) {
@@ -157,24 +160,6 @@ func CreateConfig(v *viper.Viper, path, file string) error {
 	return saveConfig(v, file)
 }
 
-// SetHomeString sets a string value in home config
-func SetHomeString(config, value string) {
-	if !configExists(viperHome) {
-		return
-	}
-	viperHome.Set(config, value)
-	saveConfig(viperHome, HomeConfigFile)
-}
-
-// SetProjectString sets a string value in project config
-func SetProjectString(config, value string) {
-	if !configExists(viperProject) {
-		return
-	}
-	viperProject.Set(config, value)
-	saveConfig(viperProject, viperProject.ConfigFileUsed())
-}
-
 // ProjectConfigExists returns a boolean indicating if a project config file exists
 func ProjectConfigExists() bool {
 	return configExists(viperProject)
@@ -190,14 +175,6 @@ func ProjectRoot() (string, error) {
 		return "", nil
 	}
 	return filepath.Dir(configPath), nil
-}
-
-// GetString will return the requested config, check working dir and fallback to home
-func GetString(config string) string {
-	if configExists(viperProject) && viperProject.IsSet(config) {
-		return viperProject.GetString(config)
-	}
-	return viperHome.GetString(config)
 }
 
 // saveConfig will save the config to a file

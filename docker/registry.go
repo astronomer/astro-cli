@@ -17,9 +17,9 @@ type ListRepositoryTagsResponse struct {
 
 // ListRepositoryTags lists the tags for a given repository
 func ListRepositoryTags(repository string) ([]string, error) {
-	registry := config.GetString(config.CFGRegistryAuthority)
-	user := config.GetString(config.CFGRegistryUser)
-	password := config.GetString(config.CFGRegistryPassword)
+	registry := config.CFG.RegistryAuthority.GetString()
+	user := config.CFG.RegistryUser.GetString()
+	password := config.CFG.RegistryPassword.GetString()
 
 	// Get an HTTP Client
 	client := &http.Client{}

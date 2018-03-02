@@ -67,10 +67,10 @@ func generateConfig(projectName, airflowHome string) string {
 	}
 
 	config := ComposeConfig{
-		PostgresUser:         config.GetString(config.CFGPostgresUser),
-		PostgresPassword:     config.GetString(config.CFGPostgresPassword),
-		PostgresHost:         config.GetString(config.CFGPostgresHost),
-		PostgresPort:         config.GetString(config.CFGPostgresPort),
+		PostgresUser:         config.CFG.PostgresUser.GetString(),
+		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
+		PostgresHost:         config.CFG.PostgresHost.GetString(),
+		PostgresPort:         config.CFG.PostgresPort.GetString(),
 		AirflowImage:         imageName(projectName, "latest"),
 		AirflowHome:          airflowHome,
 		AirflowUser:          "astro",
@@ -116,7 +116,7 @@ func createProject(projectName, airflowHome string) (project.APIProject, error) 
 // Start starts a local airflow development cluster
 func Start(airflowHome string) error {
 	// Get project name from config
-	projectName := config.GetString(config.CFGProjectName)
+	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
@@ -159,7 +159,7 @@ func Start(airflowHome string) error {
 // Kill stops a local airflow development cluster
 func Kill(airflowHome string) error {
 	// Get project name from config
-	projectName := config.GetString(config.CFGProjectName)
+	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
@@ -199,7 +199,7 @@ func Stop(airflowHome string) error {
 // PS prints the running airflow containers
 func PS(airflowHome string) error {
 	// Get project name from config
-	projectName := config.GetString(config.CFGProjectName)
+	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
@@ -270,7 +270,7 @@ func Deploy(path, name string) error {
 	// Tag our build with remote registry and incremented tag
 	tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
 	remoteImage := fmt.Sprintf("%s/%s",
-		config.GetString(config.CFGRegistryAuthority), imageName(name, tag))
+		config.CFG.RegistryAuthority.GetString(), imageName(name, tag))
 	docker.Exec("tag", deployImage, remoteImage)
 
 	// Push image to registry
