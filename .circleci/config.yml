@@ -20,16 +20,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: "Installing PIP & AWS CLI"
-          command: |
-            if [ "${CIRCLE_TAG}" != "" ]; then
-              sudo apt-get update
-              sudo apt-get install -y python-pip
-              sudo pip install awscli
-            else
-              echo "Not tagged, skipping deploy"
-            fi
-      - run:
           name: "Write metadata"
           command: |
             if [ "${CIRCLE_TAG}" != "" ]; then
@@ -45,24 +35,6 @@ jobs:
             else
               echo "Not tagged, skipping step"
             fi
-# Apparently gorelaser runs on install, since the repo already has a goreleaser.yml, it does the build after installing
-#      - run:
-#          name: "Run goreleaser"
-#          command: |
-#            if [ "${CIRCLE_TAG}" != "" ]; then
-#              make release
-#            else
-#              echo "Not tagged, skipping step"
-#            fi
-#      - run:
-#          name: "Push install.sh S3"
-#          command: |
-#            if [ "${CIRCLE_TAG}" != "" ]; then
-#              ./.circleci/scripts/s3_upload_installer.sh $CIRCLE_TAG
-#            else
-#              echo "Not tagged, skipping step"
-#            fi
-
 workflows:
   version: 2
   distribute:
