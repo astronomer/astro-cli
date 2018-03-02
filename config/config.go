@@ -71,7 +71,7 @@ func initHome() {
 	viperHome.SetDefault(CFG.PostgresHost.Path, "postgres")
 	viperHome.SetDefault(CFG.PostgresPort.Path, "5432")
 	// XXX: Change default to hosted cloud, allow to be set by user for EE
-	viperHome.SetDefault(CFG.RegistryAuthority.Path, "registry.gcp.astronomer.io")
+	viperHome.SetDefault(CFG.RegistryAuthority.Path, "")
 	viperHome.SetDefault(CFG.RegistryUser.Path, "admin")
 	viperHome.SetDefault(CFG.RegistryPassword.Path, "admin")
 
