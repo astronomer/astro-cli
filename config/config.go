@@ -14,7 +14,7 @@ var (
 	// ConfigFileName is the name of the config files (home / project)
 	ConfigFileName = "config"
 	// ConfigFileType is the config file extension
-	ConfigFileType = "json"
+	ConfigFileType = "yaml"
 	// ConfigFileNameWithExt is the config filename with extension
 	ConfigFileNameWithExt = fmt.Sprintf("%s.%s", ConfigFileName, ConfigFileType)
 	// ConfigDir is the directory for astro files
