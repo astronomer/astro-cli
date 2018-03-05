@@ -2,9 +2,11 @@ package config
 
 // cfg defines settings a single configuration setting can have
 type cfg struct {
-	Path     string
-	Gettable bool
-	Settable bool
+	Path       string
+	Gettable   bool
+	Settable   bool
+	SetDefault bool
+	Default    string
 }
 
 // cfgs houses all configurations for an astro project

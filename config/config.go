@@ -30,14 +30,14 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		PostgresUser:      initCfg("postgres.user", true, true),
-		PostgresPassword:  initCfg("postgres.password", true, true),
-		PostgresHost:      initCfg("postgres.host", true, true),
-		PostgresPort:      initCfg("postgres.port", true, true),
-		RegistryAuthority: initCfg("docker.registry.authority", true, true),
-		RegistryUser:      initCfg("docker.registry.user", true, true),
-		RegistryPassword:  initCfg("docker.registry.password", true, true),
-		ProjectName:       initCfg("project.name", true, true),
+		PostgresUser:      initCfg("postgres.user", true, true, true, "postgres"),
+		PostgresPassword:  initCfg("postgres.password", true, true, true, "postgres"),
+		PostgresHost:      initCfg("postgres.host", true, true, true, "postgres"),
+		PostgresPort:      initCfg("postgres.port", true, true, true, "5432"),
+		RegistryAuthority: initCfg("docker.registry.authority", true, true, true, ""),
+		RegistryUser:      initCfg("docker.registry.user", true, true, true, "admin"),
+		RegistryPassword:  initCfg("docker.registry.password", true, true, true, "admin"),
+		ProjectName:       initCfg("project.name", true, true, false, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -52,8 +52,8 @@ func InitConfig() {
 	initProject()
 }
 
-func initCfg(path string, gettable bool, settable bool) cfg {
-	cfg := cfg{path, gettable, settable}
+func initCfg(path string, gettable bool, settable bool, setD bool, d string) cfg {
+	cfg := cfg{path, gettable, settable, setD, d}
 	CFGStrMap[path] = cfg
 	return cfg
 }
@@ -65,15 +65,11 @@ func initHome() {
 	viperHome.SetConfigType(ConfigFileType)
 	viperHome.SetConfigFile(HomeConfigFile)
 
-	// Set defaults
-	viperHome.SetDefault(CFG.PostgresUser.Path, "postgres")
-	viperHome.SetDefault(CFG.PostgresPassword.Path, "postgres")
-	viperHome.SetDefault(CFG.PostgresHost.Path, "postgres")
-	viperHome.SetDefault(CFG.PostgresPort.Path, "5432")
-	// XXX: Change default to hosted cloud, allow to be set by user for EE
-	viperHome.SetDefault(CFG.RegistryAuthority.Path, "")
-	viperHome.SetDefault(CFG.RegistryUser.Path, "admin")
-	viperHome.SetDefault(CFG.RegistryPassword.Path, "admin")
+	for _, cfg := range CFGStrMap {
+		if cfg.SetDefault {
+			viperHome.SetDefault(cfg.Path, cfg.Default)
+		}
+	}
 
 	// If home config does not exist, create it
 	if !utils.Exists(HomeConfigFile) {
