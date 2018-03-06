@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/pkg/errors"
@@ -9,10 +10,15 @@ import (
 )
 
 var (
+	// Flags
+	globalFlag bool
+
+	//Commands
 	configRootCmd = &cobra.Command{
-		Use:   "config",
-		Short: "Manage astro project configurations",
-		Long:  "Manage astro project configurations",
+		Use:              "config",
+		Short:            "Manage astro project configurations",
+		Long:             "Manage astro project configurations",
+		PersistentPreRun: ensureGlobalFlag,
 	}
 
 	configGetCmd = &cobra.Command{
@@ -20,8 +26,6 @@ var (
 		Short: "Get astro project configuration",
 		Long:  "Get astro project configuration",
 		RunE:  configGet,
-		// TODO add arg validator
-		// TODO check project specific config
 	}
 
 	configSetCmd = &cobra.Command{
@@ -29,8 +33,6 @@ var (
 		Short: "Set astro project configuration",
 		Long:  "Set astro project configuration",
 		RunE:  configSet,
-		// TODO add arg validator
-		// TODO check project specific config
 	}
 )
 
@@ -40,11 +42,22 @@ func init() {
 
 	// Config root
 	RootCmd.AddCommand(configRootCmd)
+	RootCmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 
 	// Config get
 	configRootCmd.AddCommand(configGetCmd)
+
 	// Config set
 	configRootCmd.AddCommand(configSetCmd)
+}
+
+func ensureGlobalFlag(cmd *cobra.Command, args []string) {
+	if !(len(projectRoot) > 0) && !globalFlag {
+		var c = "astro config " + cmd.Use + " " + args[0] + " -g"
+		fmt.Println("You are attempting to " + cmd.Use + " a project config outside of a project directory\n" +
+			"To " + cmd.Use + " a global config try\n" + c)
+		os.Exit(1)
+	}
 }
 
 func configGet(command *cobra.Command, args []string) error {
@@ -62,7 +75,11 @@ func configGet(command *cobra.Command, args []string) error {
 		return errors.New(errMsg)
 	}
 
-	fmt.Printf("%s: %s\n", cfg.Path, cfg.GetString())
+	if globalFlag {
+		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetHomeString())
+	} else {
+		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetProjectString())
+	}
 
 	return nil
 }
@@ -84,7 +101,11 @@ func configSet(command *cobra.Command, args []string) error {
 		return errors.New(errMsg)
 	}
 
-	cfg.SetProjectString(args[1])
+	if globalFlag {
+		cfg.SetHomeString(args[1])
+	} else {
+		cfg.SetProjectString(args[1])
+	}
 
 	fmt.Printf("Setting %s to %s successfully\n", cfg.Path, args[1])
 	return nil
