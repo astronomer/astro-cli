@@ -152,7 +152,8 @@ func Start(airflowHome string) error {
 			return errors.Wrap(err, "Error building, (re)creating or starting project containers")
 		}
 	}
-
+	fmt.Println("Airflow Webserver: http://localhost:8080/admin/")
+	fmt.Println("Postgres Database: localhost:5432/postgres")
 	return nil
 }
 
