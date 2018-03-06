@@ -153,6 +153,7 @@ func Start(airflowHome string) error {
 		}
 	}
 	fmt.Println("Airflow Webserver: http://localhost:8080/admin/")
+	fmt.Println("Postgres Database: localhost:5432/postgres")
 	return nil
 }
 
