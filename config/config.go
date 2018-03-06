@@ -30,14 +30,14 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		PostgresUser:      initCfg("postgres.user", true, true, true, "postgres"),
-		PostgresPassword:  initCfg("postgres.password", true, true, true, "postgres"),
-		PostgresHost:      initCfg("postgres.host", true, true, true, "postgres"),
-		PostgresPort:      initCfg("postgres.port", true, true, true, "5432"),
-		RegistryAuthority: initCfg("docker.registry.authority", true, true, true, ""),
-		RegistryUser:      initCfg("docker.registry.user", true, true, true, "admin"),
-		RegistryPassword:  initCfg("docker.registry.password", true, true, true, "admin"),
-		ProjectName:       initCfg("project.name", true, true, false, ""),
+		PostgresUser:      newCfg("postgres.user", true, "postgres"),
+		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
+		PostgresHost:      newCfg("postgres.host", true, "postgres"),
+		PostgresPort:      newCfg("postgres.port", true, "5432"),
+		RegistryAuthority: newCfg("docker.registry.authority", true, ""),
+		RegistryUser:      newCfg("docker.registry.user", true, "admin"),
+		RegistryPassword:  newCfg("docker.registry.password", true, "admin"),
+		ProjectName:       newCfg("project.name", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -52,12 +52,6 @@ func InitConfig() {
 	initProject()
 }
 
-func initCfg(path string, gettable bool, settable bool, setD bool, d string) cfg {
-	cfg := cfg{path, gettable, settable, setD, d}
-	CFGStrMap[path] = cfg
-	return cfg
-}
-
 // Init viper for config file in home directory
 func initHome() {
 	viperHome = viper.New()
@@ -66,7 +60,7 @@ func initHome() {
 	viperHome.SetConfigFile(HomeConfigFile)
 
 	for _, cfg := range CFGStrMap {
-		if cfg.SetDefault {
+		if len(cfg.Default) > 0 {
 			viperHome.SetDefault(cfg.Path, cfg.Default)
 		}
 	}

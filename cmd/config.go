@@ -70,11 +70,6 @@ func configGet(command *cobra.Command, args []string) error {
 		return errors.New("Config does not exist, check your config key")
 	}
 
-	if !cfg.Gettable {
-		errMsg := fmt.Sprintf("Config %s is not gettable", cfg.Path)
-		return errors.New(errMsg)
-	}
-
 	if globalFlag {
 		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetHomeString())
 	} else {
@@ -94,11 +89,6 @@ func configSet(command *cobra.Command, args []string) error {
 
 	if !ok {
 		return errors.New("Config does not exist, check your config key")
-	}
-
-	if !cfg.Settable {
-		errMsg := fmt.Sprintf("Config %s is not settable", cfg.Path)
-		return errors.New(errMsg)
 	}
 
 	if globalFlag {
