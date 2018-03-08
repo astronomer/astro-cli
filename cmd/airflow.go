@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -39,39 +40,44 @@ var (
 	}
 
 	airflowDeployCmd = &cobra.Command{
-		Use:   "deploy",
-		Short: "Deploy an airflow project",
-		Long:  "Deploy an airflow project to a given deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE:  checkForProject(airflowDeploy),
+		Use:    "deploy",
+		Short:  "Deploy an airflow project",
+		Long:   "Deploy an airflow project to a given deployment",
+		Args:   cobra.ExactArgs(1),
+		PreRun: ensureProjectDir,
+		RunE:   airflowDeploy,
 	}
 
 	airflowStartCmd = &cobra.Command{
-		Use:   "start",
-		Short: "Start a development airflow cluster",
-		Long:  "Start a development airflow cluster",
-		RunE:  checkForProject(airflowStart),
+		Use:    "start",
+		Short:  "Start a development airflow cluster",
+		Long:   "Start a development airflow cluster",
+		PreRun: ensureProjectDir,
+		RunE:   airflowStart,
 	}
 
 	airflowKillCmd = &cobra.Command{
-		Use:   "kill",
-		Short: "Kill a development airflow cluster",
-		Long:  "Kill a development airflow cluster",
-		RunE:  checkForProject(airflowKill),
+		Use:    "kill",
+		Short:  "Kill a development airflow cluster",
+		Long:   "Kill a development airflow cluster",
+		PreRun: ensureProjectDir,
+		RunE:   airflowKill,
 	}
 
 	airflowStopCmd = &cobra.Command{
-		Use:   "stop",
-		Short: "Stop a development airflow cluster",
-		Long:  "Stop a development airflow cluster",
-		RunE:  checkForProject(airflowStop),
+		Use:    "stop",
+		Short:  "Stop a development airflow cluster",
+		Long:   "Stop a development airflow cluster",
+		PreRun: ensureProjectDir,
+		RunE:   airflowStop,
 	}
 
 	airflowPSCmd = &cobra.Command{
-		Use:   "ps",
-		Short: "List airflow containers",
-		Long:  "List airflow containers",
-		RunE:  checkForProject(airflowPS),
+		Use:    "ps",
+		Short:  "List airflow containers",
+		Long:   "List airflow containers",
+		PreRun: ensureProjectDir,
+		RunE:   airflowPS,
 	}
 )
 
@@ -105,14 +111,10 @@ func init() {
 	airflowRootCmd.AddCommand(airflowPSCmd)
 }
 
-// Check for project wraps functions that can only be run within a project directory
-// and will return an error otherwise.
-func checkForProject(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		if len(projectRoot) > 0 {
-			return f(cmd, args)
-		}
-		return errors.New("Not in an astronomer project directory")
+func ensureProjectDir(cmd *cobra.Command, args []string) {
+	if !(len(projectRoot) > 0) {
+		fmt.Println("Error: Not in an astronomer project directory")
+		os.Exit(1)
 	}
 }
 

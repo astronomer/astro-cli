@@ -14,7 +14,7 @@ var (
 	// ConfigFileName is the name of the config files (home / project)
 	ConfigFileName = "config"
 	// ConfigFileType is the config file extension
-	ConfigFileType = "json"
+	ConfigFileType = "yaml"
 	// ConfigFileNameWithExt is the config filename with extension
 	ConfigFileNameWithExt = fmt.Sprintf("%s.%s", ConfigFileName, ConfigFileType)
 	// ConfigDir is the directory for astro files
@@ -30,14 +30,14 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		PostgresUser:      initCfg("postgres.user", true, true),
-		PostgresPassword:  initCfg("postgres.password", true, true),
-		PostgresHost:      initCfg("postgres.host", true, true),
-		PostgresPort:      initCfg("postgres.port", true, true),
-		RegistryAuthority: initCfg("docker.registry.authority", true, true),
-		RegistryUser:      initCfg("docker.registry.user", true, true),
-		RegistryPassword:  initCfg("docker.registry.password", true, true),
-		ProjectName:       initCfg("project.name", true, true),
+		PostgresUser:      newCfg("postgres.user", true, "postgres"),
+		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
+		PostgresHost:      newCfg("postgres.host", true, "postgres"),
+		PostgresPort:      newCfg("postgres.port", true, "5432"),
+		RegistryAuthority: newCfg("docker.registry.authority", true, ""),
+		RegistryUser:      newCfg("docker.registry.user", true, "admin"),
+		RegistryPassword:  newCfg("docker.registry.password", true, "admin"),
+		ProjectName:       newCfg("project.name", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -52,12 +52,6 @@ func InitConfig() {
 	initProject()
 }
 
-func initCfg(path string, gettable bool, settable bool) cfg {
-	cfg := cfg{path, gettable, settable}
-	CFGStrMap[path] = cfg
-	return cfg
-}
-
 // Init viper for config file in home directory
 func initHome() {
 	viperHome = viper.New()
@@ -65,15 +59,11 @@ func initHome() {
 	viperHome.SetConfigType(ConfigFileType)
 	viperHome.SetConfigFile(HomeConfigFile)
 
-	// Set defaults
-	viperHome.SetDefault(CFG.PostgresUser.Path, "postgres")
-	viperHome.SetDefault(CFG.PostgresPassword.Path, "postgres")
-	viperHome.SetDefault(CFG.PostgresHost.Path, "postgres")
-	viperHome.SetDefault(CFG.PostgresPort.Path, "5432")
-	// XXX: Change default to hosted cloud, allow to be set by user for EE
-	viperHome.SetDefault(CFG.RegistryAuthority.Path, "")
-	viperHome.SetDefault(CFG.RegistryUser.Path, "admin")
-	viperHome.SetDefault(CFG.RegistryPassword.Path, "admin")
+	for _, cfg := range CFGStrMap {
+		if len(cfg.Default) > 0 {
+			viperHome.SetDefault(cfg.Path, cfg.Default)
+		}
+	}
 
 	// If home config does not exist, create it
 	if !utils.Exists(HomeConfigFile) {
