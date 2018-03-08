@@ -63,10 +63,11 @@ func Init(path string) error {
 
 	// Map of files to create
 	files := map[string]string{
-		".dockerignore":    dockerignore,
-		"Dockerfile":       dockerfile,
-		"packages.txt":     "",
-		"requirements.txt": "",
+		".dockerignore":       dockerignore,
+		"Dockerfile":          dockerfile,
+		"packages.txt":        "",
+		"requirements.txt":    "",
+		"dags/example-dag.py": exampledag,
 	}
 
 	// Initailize directories
