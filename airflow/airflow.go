@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/astronomerio/astro-cli/airflow/include"
 	"github.com/astronomerio/astro-cli/utils"
 )
 
@@ -63,10 +64,11 @@ func Init(path string) error {
 
 	// Map of files to create
 	files := map[string]string{
-		".dockerignore":    dockerignore,
-		"Dockerfile":       dockerfile,
-		"packages.txt":     "",
-		"requirements.txt": "",
+		".dockerignore":       include.Dockerignore,
+		"Dockerfile":          include.Dockerfile,
+		"packages.txt":        "",
+		"requirements.txt":    "",
+		"dags/example-dag.py": include.Exampledag,
 	}
 
 	// Initailize directories
