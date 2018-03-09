@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/astronomerio/astro-cli/airflow/include"
 	"github.com/astronomerio/astro-cli/config"
 	docker "github.com/astronomerio/astro-cli/docker"
 	dockercompose "github.com/docker/libcompose/docker"
@@ -60,7 +61,7 @@ func imageBuild(path, imageName string) {
 
 // generateConfig generates the docker-compose config
 func generateConfig(projectName, airflowHome string) string {
-	tmpl, err := template.New("yml").Parse(composeyml)
+	tmpl, err := template.New("yml").Parse(include.Composeyml)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
