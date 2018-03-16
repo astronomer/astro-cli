@@ -53,6 +53,26 @@ How to get started as a user.
     $ astro airflow init
     ```
 
+## Help
+
+The CLI includes a help command, descriptions, as well as usage info for subcommands.
+
+To see the help overview:
+
+```
+$ astro help
+```
+
+Or for subcommands:
+
+```
+$ astro airflow --help
+```
+
+```
+$ astro airflow create --help
+```
+
 ## Development
 
 How to get started as a developer.
