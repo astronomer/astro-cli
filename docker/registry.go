@@ -34,8 +34,21 @@ func ListRepositoryTags(repository string) ([]string, error) {
 
 	// Make the request
 	resp, reqErr := client.Do(req)
+
 	if reqErr != nil {
 		return []string{}, errors.Wrap(reqErr, "Error requesting repositories")
+	}
+
+	// TODO Remove config suggestion and 401 check once houston is handling auth
+	if resp.StatusCode == 401 {
+
+		fmt.Println(`Failed to authenticate to registry
+	
+	You can set your registry auth using
+		astro config set docker.registry.user [registry_user] -g
+		astro config set docker.registry.password [registry_password] -g
+		`)
+		return []string{}, errors.New("")
 	}
 
 	// Close body reader
