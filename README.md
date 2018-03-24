@@ -27,13 +27,19 @@ The Astronomer CLI is the recommended way to get started developing and deployin
 How to get started as a user.
 
 1. Install Astro CLI:
-
+- via `curl`
+    ```
+    curl -sL https://install.astronomer.io | sudo bash
+    ```
+    
+- via `go get`
+    
+    install go binary:
     ```
     $ go get github.com/astronomerio/astro-cli
     ```
-
-1. Add to .bash_profile:
-
+    
+    Add to .bash_profile:
     ```
     alias astro=astro-cli
     ```
