@@ -37,7 +37,7 @@ func ExecLogin(registry, username, password string) error {
 	}
 
 	loginCmd := fmt.Sprintf("echo '%s' | docker login %s -u %s --password-stdin", password, registry, username)
-	cmd := exec.Command("bash", "-c", loginCmd)
+	cmd := exec.Command("/usr/bin/env", "sh", "-c", loginCmd)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin

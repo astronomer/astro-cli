@@ -16,8 +16,7 @@ func Login() {
 
 	err := docker.ExecLogin(registry, username, password)
 	if err != nil {
-		// Println instead of panic to prevent excessive error logging to
-		// stdout on a failed login
+		// Println instead of panic to prevent excessive error logging to stdout on a failed login
 		fmt.Println(err)
 		return
 	}
