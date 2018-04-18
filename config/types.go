@@ -9,6 +9,10 @@ type cfg struct {
 
 // cfgs houses all configurations for an astro project
 type cfgs struct {
+	APIHostName       cfg
+	APIProtocol       cfg
+	APIPort           cfg
+	APIVersion        cfg
 	PostgresUser      cfg
 	PostgresPassword  cfg
 	PostgresHost      cfg

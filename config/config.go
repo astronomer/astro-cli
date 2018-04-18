@@ -38,6 +38,10 @@ var (
 		RegistryUser:      newCfg("docker.registry.user", true, "admin"),
 		RegistryPassword:  newCfg("docker.registry.password", true, "admin"),
 		ProjectName:       newCfg("project.name", true, ""),
+		APIHostName:       newCfg("api.hostname", true, "localhost"),
+		APIProtocol:       newCfg("api.protocol", true, "http"),
+		APIPort:           newCfg("api.port", true, "8870"),
+		APIVersion:        newCfg("api.version", true, "v1"),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -174,4 +178,15 @@ func saveConfig(v *viper.Viper, file string) error {
 		return errors.Wrap(err, "Error saving config")
 	}
 	return nil
+}
+
+// APIURL will return a full qualified API url
+func APIURL() string {
+	return fmt.Sprintf(
+		"%s://%s:%s/%s",
+		CFG.APIProtocol.GetString(),
+		CFG.APIHostName.GetString(),
+		CFG.APIPort.GetString(),
+		CFG.APIVersion.GetString(),
+	)
 }
