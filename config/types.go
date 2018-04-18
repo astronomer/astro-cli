@@ -12,7 +12,7 @@ type cfgs struct {
 	APIHostName       cfg
 	APIProtocol       cfg
 	APIPort           cfg
-	APIVersion        cfg
+	APIAuthToken      cfg
 	PostgresUser      cfg
 	PostgresPassword  cfg
 	PostgresHost      cfg

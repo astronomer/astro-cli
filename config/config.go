@@ -41,7 +41,7 @@ var (
 		APIHostName:       newCfg("api.hostname", true, "localhost"),
 		APIProtocol:       newCfg("api.protocol", true, "http"),
 		APIPort:           newCfg("api.port", true, "8870"),
-		APIVersion:        newCfg("api.version", true, "v1"),
+		APIAuthToken:      newCfg("api.authToken", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -183,10 +183,9 @@ func saveConfig(v *viper.Viper, file string) error {
 // APIURL will return a full qualified API url
 func APIURL() string {
 	return fmt.Sprintf(
-		"%s://%s:%s/%s",
+		"%s://%s:%s/v1",
 		CFG.APIProtocol.GetString(),
 		CFG.APIHostName.GetString(),
 		CFG.APIPort.GetString(),
-		CFG.APIVersion.GetString(),
 	)
 }
