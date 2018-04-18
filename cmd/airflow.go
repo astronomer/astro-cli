@@ -36,6 +36,7 @@ var (
 		Use:   "create",
 		Short: "Create a new airflow deployment",
 		Long:  "Create a new airflow deployment",
+		Args:  cobra.ExactArgs(1),
 		RunE:  airflowCreate,
 	}
 
@@ -154,7 +155,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 }
 
 func airflowCreate(cmd *cobra.Command, args []string) error {
-	return airflow.Create()
+	return airflow.Create(args[0])
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {

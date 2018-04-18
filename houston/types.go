@@ -1,5 +1,11 @@
 package houston
 
+type CreateDeploymentResponse struct {
+	Data struct {
+		CreateDeployment Deployment `json:"createDeployment"`
+	} `json:"data"`
+}
+
 type CreateTokenResponse struct {
 	Data struct {
 		CreateToken Token `json:"createToken"`
@@ -14,6 +20,9 @@ type Token struct {
 }
 
 type Deployment struct {
+	Success     bool   `json:"success"`
+	Message     string `json:"message"`
+	Code        string `json:"code"`
 	Id          string `json:"uuid"`
 	Type        string `json:"type"`
 	Title       string `json:"title"`

@@ -27,6 +27,21 @@ var (
 	}
 	`
 
+	createDeploymentRequest = `
+	mutation CreateDeployment {
+		createDeployment(
+		  title: "%s",
+		  organizationUuid: "",
+		  teamUuid: "",
+		  version: "") {
+		  success,
+		  message,
+		  id,
+		  code
+		}
+	  }
+	`
+
 	// log = logrus.WithField("package", "houston")
 )
 
@@ -61,9 +76,9 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 	}
 
 	// set headers
-	// if config.GetString(config.AuthTokenCFG) != "" {
-	// 	doOpts.Headers["authorization"] = config.GetString(config.AuthTokenCFG)
-	// }
+	if config.CFG.APIAuthToken.GetString() != "" {
+		doOpts.Headers["authorization"] = config.CFG.APIAuthToken.GetString()
+	}
 
 	// if config.GetString(config.OrgIDCFG) != "" {
 	// 	doOpts.Headers["organization"] = config.GetString(config.OrgIDCFG)
@@ -90,7 +105,7 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 	return response, nil
 }
 
-// CreateToken will request a new token from Huston, passing the users e-mail and password.
+// CreateToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a CreateTokenResponse structure with the users ID and Token inside.
 func (c *Client) CreateToken(email string, password string) (*CreateTokenResponse, error) {
 	// logger := log.WithField("method", "CreateToken")
@@ -106,10 +121,32 @@ func (c *Client) CreateToken(email string, password string) (*CreateTokenRespons
 
 	var body CreateTokenResponse
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
-
 	if err != nil {
 		// logger.Error(err)
 		return nil, errors.Wrap(err, "CreateToken JSON decode failed")
+	}
+	return &body, nil
+}
+
+// CreateDeployment will send request to Houston to create a new AirflowDeployment
+// Returns a CreateDeploymentResponse which contains the unique id of deployment
+func (c *Client) CreateDeployment(title string) (*CreateDeploymentResponse, error) {
+	// logger := log.WithField("method", "CreateDeployment")
+	// logger.Debug("Entered CreateDeployment")
+
+	request := fmt.Sprintf(createDeploymentRequest, title)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		// logger.Error(err)
+		return nil, errors.Wrap(err, "CreateDeployment Failed")
+	}
+
+	var body CreateDeploymentResponse
+	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
+	if err != nil {
+		// logger.Error(key)
+		return nil, errors.Wrap(err, "CreateDeployment JSON decode failed")
 	}
 	return &body, nil
 }

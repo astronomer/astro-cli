@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/astronomerio/astro-cli/airflow/include"
+	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/utils"
 )
 
@@ -81,6 +82,16 @@ func Init(path string) error {
 }
 
 // Create new airflow deployment
-func Create() error {
+func Create(title string) error {
+	HTTP := houston.NewHTTPClient()
+	API := houston.NewHoustonClient(HTTP)
+
+	// authenticate with houston
+	body, houstonErr := API.CreateDeployment(title)
+	if houstonErr != nil {
+		panic(houstonErr)
+	}
+
+	fmt.Println(body.Data.CreateDeployment.Message)
 	return nil
 }
