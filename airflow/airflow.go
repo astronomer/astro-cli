@@ -86,12 +86,28 @@ func Create(title string) error {
 	HTTP := houston.NewHTTPClient()
 	API := houston.NewHoustonClient(HTTP)
 
-	// authenticate with houston
 	body, houstonErr := API.CreateDeployment(title)
 	if houstonErr != nil {
-		panic(houstonErr)
+		return houstonErr
 	}
 
 	fmt.Println(body.Data.CreateDeployment.Message)
+	return nil
+}
+
+// List all airflow deployments
+func List() error {
+	HTTP := houston.NewHTTPClient()
+	API := houston.NewHoustonClient(HTTP)
+
+	body, houstonErr := API.FetchDeployments()
+	if houstonErr != nil {
+		return houstonErr
+	}
+
+	for _, d := range body.Data.FetchDeployments {
+		rowTmp := "Title: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
+		fmt.Printf(rowTmp, d.Title, d.Id, d.ReleaseName, d.Version)
+	}
 	return nil
 }

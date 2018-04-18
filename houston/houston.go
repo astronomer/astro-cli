@@ -13,20 +13,6 @@ import (
 )
 
 var (
-	createTokenRequest = `
-	mutation createToken {
-	  createToken(username:"%s", password:"%s") {
-	    success
-	    message
-	    token
-	    decoded {
-	      id
-	      sU
-	    }
-	  }
-	}
-	`
-
 	createDeploymentRequest = `
 	mutation CreateDeployment {
 		createDeployment(
@@ -41,6 +27,31 @@ var (
 		}
 	  }
 	`
+
+	createTokenRequest = `
+	mutation createToken {
+	  createToken(username:"%s", password:"%s") {
+	    success
+	    message
+	    token
+	    decoded {
+	      id
+	      sU
+	    }
+	  }
+	}
+	`
+
+	fetchDeploymentsRequest = `
+	query FetchAllDeployments {
+		fetchDeployments {
+		  uuid
+		  type
+		  title
+		  release_name
+		  version
+		}
+	  }`
 
 	// log = logrus.WithField("package", "houston")
 )
@@ -105,6 +116,29 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 	return response, nil
 }
 
+// CreateDeployment will send request to Houston to create a new AirflowDeployment
+// Returns a CreateDeploymentResponse which contains the unique id of deployment
+func (c *Client) CreateDeployment(title string) (*CreateDeploymentResponse, error) {
+	// logger := log.WithField("method", "CreateDeployment")
+	// logger.Debug("Entered CreateDeployment")
+
+	request := fmt.Sprintf(createDeploymentRequest, title)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		// logger.Error(err)
+		return nil, errors.Wrap(err, "CreateDeployment Failed")
+	}
+
+	var body CreateDeploymentResponse
+	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
+	if err != nil {
+		// logger.Error(key)
+		return nil, errors.Wrap(err, "CreateDeployment JSON decode failed")
+	}
+	return &body, nil
+}
+
 // CreateToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a CreateTokenResponse structure with the users ID and Token inside.
 func (c *Client) CreateToken(email string, password string) (*CreateTokenResponse, error) {
@@ -128,25 +162,25 @@ func (c *Client) CreateToken(email string, password string) (*CreateTokenRespons
 	return &body, nil
 }
 
-// CreateDeployment will send request to Houston to create a new AirflowDeployment
-// Returns a CreateDeploymentResponse which contains the unique id of deployment
-func (c *Client) CreateDeployment(title string) (*CreateDeploymentResponse, error) {
-	// logger := log.WithField("method", "CreateDeployment")
-	// logger.Debug("Entered CreateDeployment")
+// FetchDeployments will request all airflow deployments from Houston
+// Returns a FetchDeploymentResponse structure with deployment details
+func (c *Client) FetchDeployments() (*FetchDeploymentsResponse, error) {
+	// logger := log.WithField("method", "FetchDeployments")
+	// logger.Debug("Entered FetchDeployments")
 
-	request := fmt.Sprintf(createDeploymentRequest, title)
+	request := fetchDeploymentsRequest
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
 		// logger.Error(err)
-		return nil, errors.Wrap(err, "CreateDeployment Failed")
+		return nil, errors.Wrap(err, "FetchDeployments Failed")
 	}
 
-	var body CreateDeploymentResponse
+	var body FetchDeploymentsResponse
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
 	if err != nil {
-		// logger.Error(key)
-		return nil, errors.Wrap(err, "CreateDeployment JSON decode failed")
+		//logger.Error(err)
+		return nil, errors.Wrap(err, "FetchDeployments JSON decode failed")
 	}
 	return &body, nil
 }

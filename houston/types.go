@@ -2,13 +2,19 @@ package houston
 
 type CreateDeploymentResponse struct {
 	Data struct {
-		CreateDeployment Deployment `json:"createDeployment"`
+		CreateDeployment CreatedDeployment `json:"createDeployment"`
 	} `json:"data"`
 }
 
 type CreateTokenResponse struct {
 	Data struct {
 		CreateToken Token `json:"createToken"`
+	} `json:"data"`
+}
+
+type FetchDeploymentsResponse struct {
+	Data struct {
+		FetchDeployments []Deployment `json:"fetchDeployments"`
 	} `json:"data"`
 }
 
@@ -19,10 +25,14 @@ type Token struct {
 	Decoded Decoded `json:"decoded"`
 }
 
+type CreatedDeployment struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Code    string `json:"code"`
+	Id      string `json:"uuid"`
+}
+
 type Deployment struct {
-	Success     bool   `json:"success"`
-	Message     string `json:"message"`
-	Code        string `json:"code"`
 	Id          string `json:"uuid"`
 	Type        string `json:"type"`
 	Title       string `json:"title"`

@@ -40,6 +40,13 @@ var (
 		RunE:  airflowCreate,
 	}
 
+	airflowListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List airflow clusters",
+		Long:  "List all created airflow clusters",
+		RunE:  airflowList,
+	}
+
 	airflowDeployCmd = &cobra.Command{
 		Use:    "deploy",
 		Short:  "Deploy an airflow project",
@@ -95,6 +102,9 @@ func init() {
 
 	// Airflow create
 	airflowRootCmd.AddCommand(airflowCreateCmd)
+
+	// Airflow list
+	airflowRootCmd.AddCommand(airflowListCmd)
 
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
@@ -156,6 +166,10 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 
 func airflowCreate(cmd *cobra.Command, args []string) error {
 	return airflow.Create(args[0])
+}
+
+func airflowList(cmd *cobra.Command, args []string) error {
+	return airflow.List()
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
