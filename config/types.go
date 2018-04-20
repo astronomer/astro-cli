@@ -14,8 +14,7 @@ type cfgs struct {
 	PostgresHost      cfg
 	PostgresPort      cfg
 	RegistryAuthority cfg
-	RegistryUser      cfg
-	RegistryPassword  cfg
+	RegistryAuth      cfg
 	ProjectName       cfg
 }
 

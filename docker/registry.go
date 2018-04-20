@@ -18,8 +18,10 @@ type ListRepositoryTagsResponse struct {
 // ListRepositoryTags lists the tags for a given repository
 func ListRepositoryTags(repository string) ([]string, error) {
 	registry := config.CFG.RegistryAuthority.GetString()
-	user := config.CFG.RegistryUser.GetString()
-	password := config.CFG.RegistryPassword.GetString()
+	user, password, err := config.FetchDecodedAuth()
+	if err != nil {
+		return []string{}, errors.Wrap(err, "Error fetching credentials")
+	}
 
 	// Get an HTTP Client
 	client := &http.Client{}
@@ -44,9 +46,8 @@ func ListRepositoryTags(repository string) ([]string, error) {
 
 		fmt.Println(`Failed to authenticate to registry
 	
-	You can set your registry auth using
-		astro config set docker.registry.user [registry_user] -g
-		astro config set docker.registry.password [registry_password] -g
+	You can re-authenticate to the registry with
+		astro auth login
 		`)
 		return []string{}, errors.New("")
 	}

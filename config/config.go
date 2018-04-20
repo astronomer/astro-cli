@@ -1,9 +1,11 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/astronomerio/astro-cli/utils"
 	"github.com/pkg/errors"
@@ -35,8 +37,7 @@ var (
 		PostgresHost:      newCfg("postgres.host", true, "postgres"),
 		PostgresPort:      newCfg("postgres.port", true, "5432"),
 		RegistryAuthority: newCfg("docker.registry.authority", true, ""),
-		RegistryUser:      newCfg("docker.registry.user", true, "admin"),
-		RegistryPassword:  newCfg("docker.registry.password", true, "admin"),
+		RegistryAuth:      newCfg("docker.registry.auth", true, ""),
 		ProjectName:       newCfg("project.name", true, ""),
 	}
 
@@ -174,4 +175,44 @@ func saveConfig(v *viper.Viper, file string) error {
 		return errors.Wrap(err, "Error saving config")
 	}
 	return nil
+}
+
+// FetchDecodedAuth fetches auth string from config, decodes and
+// returns username password
+func FetchDecodedAuth() (string, string, error) {
+	encodedAuth := CFG.RegistryAuth.GetString()
+	return DecodeAuth(encodedAuth)
+}
+
+// EncodeAuth creates a base64 encoded string to containing authorization information
+func EncodeAuth(username, password string) string {
+	authStr := username + ":" + password
+	msg := []byte(authStr)
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(msg)))
+	base64.StdEncoding.Encode(encoded, msg)
+	return string(encoded)
+}
+
+// DecodeAuth decodes a base64 encoded string and returns username and password
+func DecodeAuth(authStr string) (string, string, error) {
+	if authStr == "" {
+		return "", "", nil
+	}
+
+	decLen := base64.StdEncoding.DecodedLen(len(authStr))
+	decoded := make([]byte, decLen)
+	authByte := []byte(authStr)
+	n, err := base64.StdEncoding.Decode(decoded, authByte)
+	if err != nil {
+		return "", "", err
+	}
+	if n > decLen {
+		return "", "", errors.Errorf("Something went wrong decoding auth config")
+	}
+	arr := strings.SplitN(string(decoded), ":", 2)
+	if len(arr) != 2 {
+		return "", "", errors.Errorf("Invalid auth configuration file")
+	}
+	password := strings.Trim(arr[1], "\x00")
+	return arr[0], password, nil
 }
