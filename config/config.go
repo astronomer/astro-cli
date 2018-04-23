@@ -177,9 +177,9 @@ func saveConfig(v *viper.Viper, file string) error {
 	return nil
 }
 
-// FetchDecodedAuth fetches auth string from config, decodes and
+// GetDecodedAuth fetches auth string from config, decodes and
 // returns username password
-func FetchDecodedAuth() (string, string, error) {
+func GetDecodedAuth() (string, string, error) {
 	encodedAuth := CFG.RegistryAuth.GetString()
 	return DecodeAuth(encodedAuth)
 }

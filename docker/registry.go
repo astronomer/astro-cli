@@ -18,7 +18,7 @@ type ListRepositoryTagsResponse struct {
 // ListRepositoryTags lists the tags for a given repository
 func ListRepositoryTags(repository string) ([]string, error) {
 	registry := config.CFG.RegistryAuthority.GetString()
-	user, password, err := config.FetchDecodedAuth()
+	user, password, err := config.GetDecodedAuth()
 	if err != nil {
 		return []string{}, errors.Wrap(err, "Error fetching credentials")
 	}
