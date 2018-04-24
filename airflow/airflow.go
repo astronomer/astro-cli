@@ -4,10 +4,35 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/astronomerio/astro-cli/airflow/include"
+	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/utils"
+	"github.com/iancoleman/strcase"
+	"github.com/pkg/errors"
 )
+
+func initProject(path string) {
+	// List of directories to create
+	dirs := []string{"dags", "plugins", "include"}
+
+	// Initailize directories
+	initDirs(path, dirs)
+
+	// Map of files to create
+	files := map[string]string{
+		".dockerignore":       include.Dockerignore,
+		"Dockerfile":          include.Dockerfile,
+		"packages.txt":        "",
+		"requirements.txt":    "",
+		"dags/example-dag.py": include.Exampledag,
+	}
+
+	// Initialize files
+	initFiles(path, files)
+}
 
 func initDirs(root string, dirs []string) bool {
 	// Any inputs exist
@@ -58,24 +83,28 @@ func initFiles(root string, files map[string]string) bool {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path string) error {
-	// List of directories to create
-	dirs := []string{"dags", "plugins", "include"}
+func Init(projectName string) error {
+	// Grab working directory
+	path := utils.GetWorkingDir()
 
-	// Map of files to create
-	files := map[string]string{
-		".dockerignore":       include.Dockerignore,
-		"Dockerfile":          include.Dockerfile,
-		"packages.txt":        "",
-		"requirements.txt":    "",
-		"dags/example-dag.py": include.Exampledag,
+	projectName, err := validateOrCreateProjectName(path, projectName)
+	if err != nil {
+		return err
 	}
 
-	// Initailize directories
-	initDirs(path, dirs)
+	exists := config.ProjectConfigExists()
+	if !exists {
+		config.CreateProjectConfig(path)
+	}
+	config.CFG.ProjectName.SetProjectString(projectName)
 
-	// Initialize files
-	initFiles(path, files)
+	initProject(path)
+
+	if exists {
+		fmt.Printf("Reinitialized existing astronomer project in %s\n", path)
+	} else {
+		fmt.Printf("Initialized empty astronomer project in %s\n", path)
+	}
 
 	return nil
 }
@@ -83,4 +112,19 @@ func Init(path string) error {
 // Create new airflow deployment
 func Create() error {
 	return nil
+}
+
+func validateOrCreateProjectName(path, projectName string) (string, error) {
+	if len(projectName) != 0 {
+		projectNameValid := regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).MatchString
+		if !projectNameValid(projectName) {
+			return "", errors.New("Project name is invalid")
+		}
+	} else {
+		projectDirectory := filepath.Base(path)
+
+		return strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1), nil
+	}
+
+	return projectName, nil
 }
