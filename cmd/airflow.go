@@ -1,17 +1,11 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/utils"
-	"github.com/iancoleman/strcase"
 	"github.com/spf13/cobra"
 )
 
@@ -120,37 +114,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
-	// Grab working directory
-	path := utils.GetWorkingDir()
-
-	// Validate project name
-	if len(projectName) != 0 {
-		projectNameValid := regexp.
-			MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).
-			MatchString
-
-		if !projectNameValid(projectName) {
-			return errors.New("Project name is invalid")
-		}
-	} else {
-		projectDirectory := filepath.Base(path)
-		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
-	}
-
-	exists := config.ProjectConfigExists()
-	if !exists {
-		config.CreateProjectConfig(path)
-	}
-	config.CFG.ProjectName.SetProjectString(projectName)
-	airflow.Init(path)
-
-	if exists {
-		fmt.Printf("Reinitialized existing astronomer project in %s\n", path)
-	} else {
-		fmt.Printf("Initialized empty astronomer project in %s\n", path)
-	}
-
-	return nil
+	return airflow.Init(projectName)
 }
 
 func airflowCreate(cmd *cobra.Command, args []string) error {
