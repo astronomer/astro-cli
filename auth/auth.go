@@ -27,7 +27,7 @@ func Login() {
 		return
 	}
 
-	config.CFG.APIAuthToken.SetProjectString(body.Data.CreateToken.Token)
+	config.CFG.UserAPIAuthToken.SetProjectString(body.Data.CreateToken.Token)
 
 	//authenticate with registry
 	dockerErr := docker.ExecLogin(registry, username, password)

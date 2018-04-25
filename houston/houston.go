@@ -88,8 +88,8 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 	}
 
 	// set headers
-	if config.CFG.APIAuthToken.GetString() != "" {
-		doOpts.Headers["authorization"] = config.CFG.APIAuthToken.GetString()
+	if config.CFG.UserAPIAuthToken.GetString() != "" {
+		doOpts.Headers["authorization"] = config.CFG.UserAPIAuthToken.GetString()
 	}
 
 	// if config.GetString(config.OrgIDCFG) != "" {
