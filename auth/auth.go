@@ -22,8 +22,7 @@ func Login() {
 	}
 
 	// pass successful credentials to config
-	config.CFG.RegistryUser.SetProjectString(username)
-	config.CFG.RegistryPassword.SetProjectString(password)
+	config.CFG.RegistryAuth.SetProjectString(config.EncodeAuth(username, password))
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
