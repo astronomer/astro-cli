@@ -19,6 +19,7 @@ var (
 		  title: "%s",
 		  organizationUuid: "",
 		  teamUuid: "",
+          type: "airflow",
 		  version: "") {
 		  success,
 		  message,
@@ -30,7 +31,7 @@ var (
 
 	createTokenRequest = `
 	mutation createToken {
-	  createToken(username:"%s", password:"%s") {
+	  createToken(identity:"%s", password:"%s") {
 	    success
 	    message
 	    token
