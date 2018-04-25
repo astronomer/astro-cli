@@ -30,6 +30,9 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
+		CloudDomain:       newCfg("cloud.domain", true, ""),
+		CloudAPIProtocol:  newCfg("cloud.api.protocol", true, "https"),
+		CloudAPIPort:	   newCfg("cloud.api.port", true, "443"),
 		PostgresUser:      newCfg("postgres.user", true, "postgres"),
 		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
 		PostgresHost:      newCfg("postgres.host", true, "postgres"),
@@ -38,10 +41,7 @@ var (
 		RegistryUser:      newCfg("docker.registry.user", true, "admin"),
 		RegistryPassword:  newCfg("docker.registry.password", true, "admin"),
 		ProjectName:       newCfg("project.name", true, ""),
-		APIHostName:       newCfg("api.hostname", true, "localhost"),
-		APIProtocol:       newCfg("api.protocol", true, "http"),
-		APIPort:           newCfg("api.port", true, "8870"),
-		APIAuthToken:      newCfg("api.authToken", true, ""),
+		UserAPIAuthToken:  newCfg("user.apiAuthToken", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -183,9 +183,9 @@ func saveConfig(v *viper.Viper, file string) error {
 // APIURL will return a full qualified API url
 func APIURL() string {
 	return fmt.Sprintf(
-		"%s://%s:%s/v1",
-		CFG.APIProtocol.GetString(),
-		CFG.APIHostName.GetString(),
-		CFG.APIPort.GetString(),
+		"%s://houston.%s:%s/v1",
+		CFG.CloudAPIProtocol.GetString(),
+		CFG.CloudDomain.GetString(),
+		CFG.CloudAPIPort.GetString(),
 	)
 }
