@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/astronomerio/astro-cli/auth"
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/pkg/errors"
@@ -44,11 +46,32 @@ func init() {
 
 func authLogin(cmd *cobra.Command, args []string) error {
 	if len(registryOverride) > 0 {
-		config.CFG.RegistryAuthority.SetProjectString(registryOverride)
+
 	}
 
-	if config.CFG.RegistryAuthority.GetHomeString() == "" &&
-		registryOverride == "" {
+	projectRegistry := config.CFG.RegistryAuthority.GetProjectString()
+	projectCloudDomain := config.CFG.CloudDomain.GetProjectString()
+	globalCloudDomain := config.CFG.CloudDomain.GetHomeString()
+	globalRegistry := config.CFG.RegistryAuthority.GetHomeString()
+
+	// checks for registry in all the expected places
+	// prompts user for any implicit behavior
+	switch {
+	case registryOverride != "":
+		config.CFG.RegistryAuthority.SetProjectString(registryOverride)
+	case projectRegistry != "":
+		// Don't prompt user, using project config is default expected behavior
+		break
+	case projectCloudDomain != "":
+		config.CFG.RegistryAuthority.SetProjectString(fmt.Sprintf("registry.%s", projectCloudDomain))
+		fmt.Printf("No registry set, using default: registry.%s\n", projectCloudDomain)
+	case globalCloudDomain != "":
+		config.CFG.RegistryAuthority.SetProjectString(fmt.Sprintf("registry.%s", globalCloudDomain))
+		fmt.Printf("No registry set, using default: registry.%s\n", globalCloudDomain)
+	case globalRegistry != "":
+		// Don't prompt user, falling back to global config is default expected behavior
+		break
+	default:
 		return errors.New("No registry set. Use -r to pass a custom registry\n\nEx.\nastro auth login -r registry.EXAMPLE_DOMAIN.com\n ")
 	}
 
