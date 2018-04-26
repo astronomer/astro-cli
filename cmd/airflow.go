@@ -10,7 +10,7 @@ import (
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/utils"
+	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/iancoleman/strcase"
 	"github.com/spf13/cobra"
 )
@@ -132,7 +132,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) {
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
 	// Grab working directory
-	path := utils.GetWorkingDir()
+	path := fileutil.GetWorkingDir()
 
 	// Validate project name
 	if len(projectName) != 0 {

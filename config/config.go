@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astronomerio/astro-cli/utils"
+	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -21,7 +21,7 @@ var (
 	ConfigDir = ".astro"
 
 	// HomeConfigPath is the path to the users global directory
-	HomeConfigPath = filepath.Join(utils.GetHomeDir(), ConfigDir)
+	HomeConfigPath = filepath.Join(fileutil.GetHomeDir(), ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
 
@@ -70,7 +70,7 @@ func initHome() {
 	}
 
 	// If home config does not exist, create it
-	if !utils.Exists(HomeConfigFile) {
+	if !fileutil.Exists(HomeConfigFile) {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
 			fmt.Printf("Error creating default config in home dir: %s", err)
@@ -94,7 +94,7 @@ func initProject() {
 	viperProject.SetConfigName(ConfigFileName)
 	viperProject.SetConfigType(ConfigFileType)
 
-	configPath, searchErr := utils.FindDirInPath(ConfigDir)
+	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
 		fmt.Printf("Error searching for project dir: %v\n", searchErr)
 		return
@@ -104,7 +104,7 @@ func initProject() {
 	projectConfigFile := filepath.Join(configPath, ConfigFileNameWithExt)
 
 	// If path is empty or config file does not exist, just return
-	if len(configPath) == 0 || configPath == HomeConfigPath || !utils.Exists(projectConfigFile) {
+	if len(configPath) == 0 || configPath == HomeConfigPath || !fileutil.Exists(projectConfigFile) {
 		return
 	}
 
@@ -161,7 +161,7 @@ func ProjectConfigExists() bool {
 
 // ProjectRoot returns the path to the nearest project root
 func ProjectRoot() (string, error) {
-	configPath, searchErr := utils.FindDirInPath(ConfigDir)
+	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
 		return "", searchErr
 	}

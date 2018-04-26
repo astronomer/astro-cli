@@ -7,7 +7,7 @@ import (
 
 	"github.com/astronomerio/astro-cli/airflow/include"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/utils"
+	"github.com/astronomerio/astro-cli/pkg/fileutil"
 )
 
 func initDirs(root string, dirs []string) bool {
@@ -20,7 +20,7 @@ func initDirs(root string, dirs []string) bool {
 		fullpath := filepath.Join(root, dir)
 
 		// Move on if already exists
-		if utils.Exists(fullpath) {
+		if fileutil.Exists(fullpath) {
 			exists = true
 			continue
 		}
@@ -44,13 +44,13 @@ func initFiles(root string, files map[string]string) bool {
 		fullpath := filepath.Join(root, file)
 
 		// Move on if already exiss
-		if utils.Exists(fullpath) {
+		if fileutil.Exists(fullpath) {
 			exists = true
 			continue
 		}
 
 		// Write files out
-		if err := utils.WriteStringToFile(fullpath, content); err != nil {
+		if err := fileutil.WriteStringToFile(fullpath, content); err != nil {
 			fmt.Println(err)
 		}
 	}
