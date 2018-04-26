@@ -1,15 +1,15 @@
 package houston
 
 import (
-	"encoding/json"
 	"fmt"
+	"encoding/json"
 	"io/ioutil"
 	"strings"
+	"github.com/pkg/errors"
+	// "github.com/sirupsen/logrus"
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
-	"github.com/pkg/errors"
-	// "github.com/sirupsen/logrus"
 )
 
 var (
@@ -45,26 +45,37 @@ var (
 
 	fetchDeploymentsRequest = `
 	query FetchAllDeployments {
-		fetchDeployments {
-		  uuid
-		  type
-		  title
-		  release_name
-		  version
-		}
-	  }`
+	  fetchDeployments {
+	    uuid
+		type
+		title
+		release_name
+		version
+	  }
+	}`
+
+	fetchDeploymentRequest = `
+	query FetchDeployment {
+	  fetchDeployments(deploymentUuid: "%s") {
+		uuid
+		type
+		title
+		release_name
+		version
+	  }
+	}`
 
 	// log = logrus.WithField("package", "houston")
 )
 
-// HoustonClient containers the logger and HTTPClient used to communicate with the HoustonAPI
-type HoustonClient struct {
+// Client containers the logger and HTTPClient used to communicate with the HoustonAPI
+type Client struct {
 	HTTPClient *httputil.HTTPClient
 }
 
 // NewHoustonClient returns a new Client with the logger and HTTP client setup.
-func NewHoustonClient(c *httputil.HTTPClient) *HoustonClient {
-	return &HoustonClient{
+func NewHoustonClient(c *httputil.HTTPClient) *Client {
+	return &Client{
 		HTTPClient: c,
 	}
 }
@@ -75,7 +86,7 @@ type GraphQLQuery struct {
 }
 
 // QueryHouston executes a query against the Houston API
-func (c *HoustonClient) QueryHouston(query string) (httputil.HTTPResponse, error) {
+func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	// logger := log.WithField("function", "QueryHouston")
 	doOpts := httputil.DoOptions{
 		Data: GraphQLQuery{query},
@@ -96,14 +107,14 @@ func (c *HoustonClient) QueryHouston(query string) (httputil.HTTPResponse, error
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", config.APIURL(), &doOpts)
 	if err != nil {
-		return response, err
+		return nil, err
 	}
 	defer httpResponse.Body.Close()
 
 	// strings.NewReader(jsonStream)
 	body, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
-		return response, err
+		return nil, err
 	}
 
 	response = httputil.HTTPResponse{
@@ -114,12 +125,18 @@ func (c *HoustonClient) QueryHouston(query string) (httputil.HTTPResponse, error
 	// logger.Debug(query)
 	// logger.Debug(response.Body)
 
-	return response, nil
+	decode := HoustonResponse{}
+	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
+	if err != nil {
+		//logger.Error(err)
+		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
+	}
+	return &decode, nil
 }
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
-// Returns a CreateDeploymentResponse which contains the unique id of deployment
-func (c *HoustonClient) CreateDeployment(title string) (*CreateDeploymentResponse, error) {
+// Returns a StatusResponse which contains the unique id of deployment
+func (c *Client) CreateDeployment(title string) (*StatusResponse, error) {
 	// logger := log.WithField("method", "CreateDeployment")
 	// logger.Debug("Entered CreateDeployment")
 
@@ -131,18 +148,12 @@ func (c *HoustonClient) CreateDeployment(title string) (*CreateDeploymentRespons
 		return nil, errors.Wrap(err, "CreateDeployment Failed")
 	}
 
-	var body CreateDeploymentResponse
-	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
-	if err != nil {
-		// logger.Error(key)
-		return nil, errors.Wrap(err, "CreateDeployment JSON decode failed")
-	}
-	return &body, nil
+	return response.Data.CreateDeployment, nil
 }
 
 // CreateToken will request a new token from Houston, passing the users e-mail and password.
-// Returns a CreateTokenResponse structure with the users ID and Token inside.
-func (c *HoustonClient) CreateToken(email string, password string) (*CreateTokenResponse, error) {
+// Returns a Token structure with the users ID and Token inside.
+func (c *Client) CreateToken(email string, password string) (*Token, error) {
 	// logger := log.WithField("method", "CreateToken")
 	// logger.Debug("Entered CreateToken")
 
@@ -154,18 +165,12 @@ func (c *HoustonClient) CreateToken(email string, password string) (*CreateToken
 		return nil, errors.Wrap(err, "CreateToken Failed")
 	}
 
-	var body CreateTokenResponse
-	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
-	if err != nil {
-		// logger.Error(err)
-		return nil, errors.Wrap(err, "CreateToken JSON decode failed")
-	}
-	return &body, nil
+	return response.Data.CreateToken, nil
 }
 
 // FetchDeployments will request all airflow deployments from Houston
-// Returns a FetchDeploymentResponse structure with deployment details
-func (c *HoustonClient) FetchDeployments() (*FetchDeploymentsResponse, error) {
+// Returns a []Deployment structure with deployment details
+func (c *Client) FetchDeployments() ([]Deployment, error) {
 	// logger := log.WithField("method", "FetchDeployments")
 	// logger.Debug("Entered FetchDeployments")
 
@@ -177,11 +182,25 @@ func (c *HoustonClient) FetchDeployments() (*FetchDeploymentsResponse, error) {
 		return nil, errors.Wrap(err, "FetchDeployments Failed")
 	}
 
-	var body FetchDeploymentsResponse
-	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&body)
+	return response.Data.FetchDeployments, nil
+}
+
+// FetchDeployment will request a specific airflow deployments from Houston by uuid
+// Returns a Deployment structure with deployment details
+func (c *Client) FetchDeployment(deploymentUuid string) (*Deployment, error) {
+	// logger := log.WithField("method", "FetchDeployments")
+	// logger.Debug("Entered FetchDeployments")
+
+	request := fmt.Sprintf(fetchDeploymentRequest, deploymentUuid)
+
+	response, err := c.QueryHouston(request)
 	if err != nil {
-		//logger.Error(err)
-		return nil, errors.Wrap(err, "FetchDeployments JSON decode failed")
+		// logger.Error(err)
+		return nil, errors.Wrap(err, "FetchDeployment Failed")
 	}
-	return &body, nil
+
+	if len(response.Data.FetchDeployments) == 0 {
+		return nil, fmt.Errorf("deployment not found for uuid \"%s\"", deploymentUuid)
+	}
+	return &response.Data.FetchDeployments[0], nil
 }

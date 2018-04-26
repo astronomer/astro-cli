@@ -23,15 +23,15 @@ func Login() {
 	API := houston.NewHoustonClient(HTTP)
 
 	// authenticate with houston
-	body, houstonErr := API.CreateToken(username, password)
+	token, houstonErr := API.CreateToken(username, password)
 	if houstonErr != nil {
 		panic(houstonErr)
-	} else if body.Data.CreateToken.Success != true {
-		fmt.Println(body.Data.CreateToken.Message)
+	} else if token.Success != true {
+		fmt.Println(token.Message)
 		return
 	}
 
-	config.CFG.UserAPIAuthToken.SetProjectString(body.Data.CreateToken.Token)
+	config.CFG.UserAPIAuthToken.SetProjectString(token.Token)
 
 	//authenticate with registry
 	dockerErr := docker.ExecLogin(registry, username, password)

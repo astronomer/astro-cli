@@ -11,6 +11,7 @@ import (
 
 var (
 	registryOverride string
+	domainOverride string
 
 	authRootCmd = &cobra.Command{
 		Use:   "auth",
@@ -40,13 +41,14 @@ func init() {
 	// Auth login
 	authRootCmd.AddCommand(authLoginCmd)
 	authLoginCmd.Flags().StringVarP(&registryOverride, "registry", "r", "", "pass a custom project registry for authentication")
+	authLoginCmd.Flags().StringVarP(&domainOverride, "domain", "d", "", "pass the cluster domain for authentication")
 	// Auth logout
 	authRootCmd.AddCommand(authLogoutCmd)
 }
 
 func authLogin(cmd *cobra.Command, args []string) error {
-	if len(registryOverride) > 0 {
-
+	if domainOverride != "" {
+		config.CFG.CloudDomain.SetProjectString(domainOverride)
 	}
 
 	projectRegistry := config.CFG.RegistryAuthority.GetProjectString()
@@ -64,7 +66,9 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		break
 	case projectCloudDomain != "":
 		config.CFG.RegistryAuthority.SetProjectString(fmt.Sprintf("registry.%s", projectCloudDomain))
-		fmt.Printf("No registry set, using default: registry.%s\n", projectCloudDomain)
+		if domainOverride == "" {
+			fmt.Printf("No registry set, using default: registry.%s\n", projectCloudDomain)
+		}
 	case globalCloudDomain != "":
 		config.CFG.RegistryAuthority.SetProjectString(fmt.Sprintf("registry.%s", globalCloudDomain))
 		fmt.Printf("No registry set, using default: registry.%s\n", globalCloudDomain)
@@ -72,7 +76,7 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		// Don't prompt user, falling back to global config is default expected behavior
 		break
 	default:
-		return errors.New("No registry set. Use -r to pass a custom registry\n\nEx.\nastro auth login -r registry.EXAMPLE_DOMAIN.com\n ")
+		return errors.New("No domain specified (`cloud.domain` in config.yaml). Use -d to pass your cluster domain\n\nEx.\nastro auth login -d EXAMPLE_DOMAIN.com\n ")
 	}
 
 	auth.Login()

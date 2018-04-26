@@ -51,7 +51,7 @@ var (
 		Use:    "deploy",
 		Short:  "Deploy an airflow project",
 		Long:   "Deploy an airflow project to a given deployment",
-		Args:   cobra.ExactArgs(1),
+		Args:   cobra.MaximumNArgs(1),
 		PreRun: ensureProjectDir,
 		RunE:   airflowDeploy,
 	}
@@ -173,7 +173,11 @@ func airflowList(cmd *cobra.Command, args []string) error {
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
-	return airflow.Deploy(projectRoot, args[0])
+	releaseName := ""
+	if len(args) > 0 {
+		releaseName = args[0]
+	}
+	return airflow.Deploy(projectRoot, releaseName)
 }
 
 // Start an airflow cluster

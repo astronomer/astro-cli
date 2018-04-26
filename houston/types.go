@@ -1,8 +1,10 @@
 package houston
 
-type CreateDeploymentResponse struct {
+type HoustonResponse struct {
 	Data struct {
-		CreateDeployment CreatedDeployment `json:"createDeployment"`
+		CreateDeployment *StatusResponse `json:"createDeployment,omitempty"`
+		CreateToken *Token `json:"createToken,omitempty"`
+		FetchDeployments []Deployment `json:"fetchDeployments"`
 	} `json:"data"`
 }
 
@@ -25,11 +27,11 @@ type Token struct {
 	Decoded Decoded `json:"decoded"`
 }
 
-type CreatedDeployment struct {
+type StatusResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Code    string `json:"code"`
-	Id      string `json:"uuid"`
+	Id      string `json:"id"`
 }
 
 type Deployment struct {

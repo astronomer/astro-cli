@@ -9,10 +9,12 @@ import (
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
+	"github.com/astronomerio/astro-cli/config"
 )
 
 var (
-	HTTP = httputil.NewHTTPClient()
+	http = httputil.NewHTTPClient()
+	api = houston.NewHoustonClient(http)
 )
 
 func initDirs(root string, dirs []string) bool {
@@ -88,27 +90,27 @@ func Init(path string) error {
 
 // Create new airflow deployment
 func Create(title string) error {
-	API := houston.NewHoustonClient(HTTP)
-
-	body, houstonErr := API.CreateDeployment(title)
-	if houstonErr != nil {
-		return houstonErr
+	response, err := api.CreateDeployment(title)
+	if err != nil {
+		return err
 	}
+	deployment, err := api.FetchDeployment(response.Id)
 
-	fmt.Println(body.Data.CreateDeployment.Message)
+	fmt.Println(response.Message)
+	fmt.Printf("\nAirflow Dashboard: https://%s-airflow.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	fmt.Printf("Flower Dashboard: https://%s-flower.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	fmt.Printf("Grafana Dashboard: https://%s-grafana.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
 	return nil
 }
 
 // List all airflow deployments
 func List() error {
-	API := houston.NewHoustonClient(HTTP)
-
-	body, houstonErr := API.FetchDeployments()
-	if houstonErr != nil {
-		return houstonErr
+	deployments, err := api.FetchDeployments()
+	if err != nil {
+		return err
 	}
 
-	for _, d := range body.Data.FetchDeployments {
+	for _, d := range deployments {
 		rowTmp := "Title: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
 		fmt.Printf(rowTmp, d.Title, d.Id, d.ReleaseName, d.Version)
 	}
