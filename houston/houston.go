@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"strings"
 
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 	// "github.com/sirupsen/logrus"
 )
@@ -57,30 +57,27 @@ var (
 	// log = logrus.WithField("package", "houston")
 )
 
-// Client containers the logger and HTTPClient used to communicate with the HoustonAPI
-type Client struct {
-	HTTPClient *HTTPClient
-}
-
-type HoustonResponse struct {
-	Raw  *http.Response
-	Body string
+// HoustonClient containers the logger and HTTPClient used to communicate with the HoustonAPI
+type HoustonClient struct {
+	HTTPClient *httputil.HTTPClient
 }
 
 // NewHoustonClient returns a new Client with the logger and HTTP client setup.
-func NewHoustonClient(HTTPClient *HTTPClient) *Client {
-	return &Client{
-		HTTPClient: HTTPClient,
+func NewHoustonClient(c *httputil.HTTPClient) *HoustonClient {
+	return &HoustonClient{
+		HTTPClient: c,
 	}
 }
 
+// GraphQLQuery wraps a graphql query string
 type GraphQLQuery struct {
 	Query string `json:"query"`
 }
 
-func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
+// QueryHouston executes a query against the Houston API
+func (c *HoustonClient) QueryHouston(query string) (httputil.HTTPResponse, error) {
 	// logger := log.WithField("function", "QueryHouston")
-	doOpts := DoOptions{
+	doOpts := httputil.DoOptions{
 		Data: GraphQLQuery{query},
 		Headers: map[string]string{
 			"Accept": "application/json",
@@ -96,7 +93,7 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 	// 	doOpts.Headers["organization"] = config.GetString(config.OrgIDCFG)
 	// }
 
-	var response HoustonResponse
+	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", config.APIURL(), &doOpts)
 	if err != nil {
 		return response, err
@@ -109,7 +106,10 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 		return response, err
 	}
 
-	response = HoustonResponse{httpResponse, string(body)}
+	response = httputil.HTTPResponse{
+		Raw:  httpResponse,
+		Body: string(body),
+	}
 
 	// logger.Debug(query)
 	// logger.Debug(response.Body)
@@ -119,7 +119,7 @@ func (c *Client) QueryHouston(query string) (HoustonResponse, error) {
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
 // Returns a CreateDeploymentResponse which contains the unique id of deployment
-func (c *Client) CreateDeployment(title string) (*CreateDeploymentResponse, error) {
+func (c *HoustonClient) CreateDeployment(title string) (*CreateDeploymentResponse, error) {
 	// logger := log.WithField("method", "CreateDeployment")
 	// logger.Debug("Entered CreateDeployment")
 
@@ -142,7 +142,7 @@ func (c *Client) CreateDeployment(title string) (*CreateDeploymentResponse, erro
 
 // CreateToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a CreateTokenResponse structure with the users ID and Token inside.
-func (c *Client) CreateToken(email string, password string) (*CreateTokenResponse, error) {
+func (c *HoustonClient) CreateToken(email string, password string) (*CreateTokenResponse, error) {
 	// logger := log.WithField("method", "CreateToken")
 	// logger.Debug("Entered CreateToken")
 
@@ -165,7 +165,7 @@ func (c *Client) CreateToken(email string, password string) (*CreateTokenRespons
 
 // FetchDeployments will request all airflow deployments from Houston
 // Returns a FetchDeploymentResponse structure with deployment details
-func (c *Client) FetchDeployments() (*FetchDeploymentsResponse, error) {
+func (c *HoustonClient) FetchDeployments() (*FetchDeploymentsResponse, error) {
 	// logger := log.WithField("method", "FetchDeployments")
 	// logger.Debug("Entered FetchDeployments")
 

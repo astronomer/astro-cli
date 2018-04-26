@@ -8,6 +8,11 @@ import (
 	"github.com/astronomerio/astro-cli/airflow/include"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
+	"github.com/astronomerio/astro-cli/pkg/httputil"
+)
+
+var (
+	HTTP = httputil.NewHTTPClient()
 )
 
 func initDirs(root string, dirs []string) bool {
@@ -83,7 +88,6 @@ func Init(path string) error {
 
 // Create new airflow deployment
 func Create(title string) error {
-	HTTP := houston.NewHTTPClient()
 	API := houston.NewHoustonClient(HTTP)
 
 	body, houstonErr := API.CreateDeployment(title)
@@ -97,7 +101,6 @@ func Create(title string) error {
 
 // List all airflow deployments
 func List() error {
-	HTTP := houston.NewHTTPClient()
 	API := houston.NewHoustonClient(HTTP)
 
 	body, houstonErr := API.FetchDeployments()

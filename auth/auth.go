@@ -6,7 +6,12 @@ import (
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
+)
+
+var (
+	HTTP = httputil.NewHTTPClient()
 )
 
 // Login logs a user into the docker registry. Will need to login to Houston next.
@@ -15,7 +20,6 @@ func Login() {
 	username := input.InputText("Username: ")
 	password, _ := input.InputPassword("Password: ")
 
-	HTTP := houston.NewHTTPClient()
 	API := houston.NewHoustonClient(HTTP)
 
 	// authenticate with houston

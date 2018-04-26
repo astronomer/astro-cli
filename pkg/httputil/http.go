@@ -1,4 +1,4 @@
-package houston
+package httputil
 
 import (
 	"bytes"
@@ -16,6 +16,12 @@ import (
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
 type HTTPClient struct {
 	HTTPClient *http.Client
+}
+
+// HTTPResponse houses respnse object
+type HTTPResponse struct {
+	Raw  *http.Response
+	Body string
 }
 
 // DoOptions are options passed to the HTTPClient.Do function
