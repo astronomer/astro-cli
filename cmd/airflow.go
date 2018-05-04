@@ -6,6 +6,7 @@ import (
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -92,7 +93,7 @@ func init() {
 
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
-	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force-deploy", "f", false, "Force deploy if uncommited changes")
+	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommited changes")
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
