@@ -237,7 +237,6 @@ func PS(airflowHome string) error {
 }
 
 // Deploy pushes a new docker image
-// TODO: Check for uncommitted git changes
 func Deploy(path, name string) error {
 	// Get a list of tags in the repository for this image
 	tags, err := docker.ListRepositoryTags(repositoryName(name))

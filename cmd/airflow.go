@@ -6,12 +6,14 @@ import (
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/utils"
 	"github.com/spf13/cobra"
 )
 
 var (
 	projectRoot string
 	projectName string
+	forceDeploy bool
 
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
@@ -91,6 +93,7 @@ func init() {
 
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
+	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommited changes")
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
@@ -122,6 +125,11 @@ func airflowCreate(cmd *cobra.Command, args []string) error {
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
+	if utils.HasUncommitedChanges() && !forceDeploy {
+		fmt.Println("Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy.")
+		return nil
+	}
+
 	return airflow.Deploy(projectRoot, args[0])
 }
 
