@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Exists returns a boolean indicating if the givin path already exists
+// Exists returns a boolean indicating if the given path already exists
 func Exists(path string) bool {
 	if path == "" {
 		return false

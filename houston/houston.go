@@ -1,13 +1,13 @@
 package houston
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"strings"
+
 	"github.com/pkg/errors"
 	// "github.com/sirupsen/logrus"
-
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 )
@@ -26,8 +26,7 @@ var (
 		  id,
 		  code
 		}
-	  }
-	`
+	  }`
 
 	createTokenRequest = `
 	mutation createToken {
@@ -40,8 +39,7 @@ var (
 	      sU
 	    }
 	  }
-	}
-	`
+	}`
 
 	fetchDeploymentsRequest = `
 	query FetchAllDeployments {
