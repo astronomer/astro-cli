@@ -13,8 +13,8 @@ import (
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/pkg/git"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
-	"github.com/astronomerio/astro-cli/utils"
 )
 
 var (
@@ -181,7 +181,7 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		releaseName = args[0]
 	}
-	if utils.HasUncommitedChanges() && !forceDeploy {
+	if git.HasUncommitedChanges() && !forceDeploy {
 		fmt.Println("Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy.")
 		return nil
 	}
