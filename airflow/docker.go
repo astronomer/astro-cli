@@ -240,7 +240,6 @@ func PS(airflowHome string) error {
 }
 
 // Deploy pushes a new docker image
-// TODO: Check for uncommitted git changes
 func Deploy(path, name string) error {
 	if name == "" {
 		deployments, err := api.FetchDeployments()
