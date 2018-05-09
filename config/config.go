@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomerio/astro-cli/utils"
+	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
@@ -23,7 +23,7 @@ var (
 	ConfigDir = ".astro"
 
 	// HomeConfigPath is the path to the users global directory
-	HomeConfigPath = filepath.Join(utils.GetHomeDir(), ConfigDir)
+	HomeConfigPath = filepath.Join(fileutil.GetHomeDir(), ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
 
@@ -32,6 +32,9 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
+		CloudDomain:       newCfg("cloud.domain", true, ""),
+		CloudAPIProtocol:  newCfg("cloud.api.protocol", true, "https"),
+		CloudAPIPort:	   newCfg("cloud.api.port", true, "443"),
 		PostgresUser:      newCfg("postgres.user", true, "postgres"),
 		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
 		PostgresHost:      newCfg("postgres.host", true, "postgres"),
@@ -39,6 +42,7 @@ var (
 		RegistryAuthority: newCfg("docker.registry.authority", true, ""),
 		RegistryAuth:      newCfg("docker.registry.auth", true, ""),
 		ProjectName:       newCfg("project.name", true, ""),
+		UserAPIAuthToken:  newCfg("user.apiAuthToken", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -67,7 +71,7 @@ func initHome() {
 	}
 
 	// If home config does not exist, create it
-	if !utils.Exists(HomeConfigFile) {
+	if !fileutil.Exists(HomeConfigFile) {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
 			fmt.Printf("Error creating default config in home dir: %s", err)
@@ -91,7 +95,7 @@ func initProject() {
 	viperProject.SetConfigName(ConfigFileName)
 	viperProject.SetConfigType(ConfigFileType)
 
-	configPath, searchErr := utils.FindDirInPath(ConfigDir)
+	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
 		fmt.Printf("Error searching for project dir: %v\n", searchErr)
 		return
@@ -101,7 +105,7 @@ func initProject() {
 	projectConfigFile := filepath.Join(configPath, ConfigFileNameWithExt)
 
 	// If path is empty or config file does not exist, just return
-	if len(configPath) == 0 || configPath == HomeConfigPath || !utils.Exists(projectConfigFile) {
+	if len(configPath) == 0 || configPath == HomeConfigPath || !fileutil.Exists(projectConfigFile) {
 		return
 	}
 
@@ -158,7 +162,7 @@ func ProjectConfigExists() bool {
 
 // ProjectRoot returns the path to the nearest project root
 func ProjectRoot() (string, error) {
-	configPath, searchErr := utils.FindDirInPath(ConfigDir)
+	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
 		return "", searchErr
 	}
@@ -175,6 +179,16 @@ func saveConfig(v *viper.Viper, file string) error {
 		return errors.Wrap(err, "Error saving config")
 	}
 	return nil
+}
+
+// APIURL will return a full qualified API url
+func APIURL() string {
+	return fmt.Sprintf(
+		"%s://houston.%s:%s/v1",
+		CFG.CloudAPIProtocol.GetString(),
+		CFG.CloudDomain.GetString(),
+		CFG.CloudAPIPort.GetString(),
+	)
 }
 
 // GetDecodedAuth fetches auth string from config, decodes and

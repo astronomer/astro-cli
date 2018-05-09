@@ -1,17 +1,25 @@
 package airflow
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/astronomerio/astro-cli/airflow/include"
-	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/utils"
 	"github.com/iancoleman/strcase"
-	"github.com/pkg/errors"
+
+	"github.com/astronomerio/astro-cli/airflow/include"
+	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/pkg/fileutil"
+	"github.com/astronomerio/astro-cli/pkg/httputil"
+	"github.com/astronomerio/astro-cli/config"
+)
+
+var (
+	http = httputil.NewHTTPClient()
+	api = houston.NewHoustonClient(http)
 )
 
 func initProject(path string) {
@@ -44,7 +52,7 @@ func initDirs(root string, dirs []string) bool {
 		fullpath := filepath.Join(root, dir)
 
 		// Move on if already exists
-		if utils.Exists(fullpath) {
+		if fileutil.Exists(fullpath) {
 			exists = true
 			continue
 		}
@@ -68,13 +76,13 @@ func initFiles(root string, files map[string]string) bool {
 		fullpath := filepath.Join(root, file)
 
 		// Move on if already exiss
-		if utils.Exists(fullpath) {
+		if fileutil.Exists(fullpath) {
 			exists = true
 			continue
 		}
 
 		// Write files out
-		if err := utils.WriteStringToFile(fullpath, content); err != nil {
+		if err := fileutil.WriteStringToFile(fullpath, content); err != nil {
 			fmt.Println(err)
 		}
 	}
@@ -85,7 +93,7 @@ func initFiles(root string, files map[string]string) bool {
 // Init will scaffold out a new airflow project
 func Init(projectName string) error {
 	// Grab working directory
-	path := utils.GetWorkingDir()
+	path := fileutil.GetWorkingDir()
 
 	projectName, err := validateOrCreateProjectName(path, projectName)
 	if err != nil {
@@ -110,7 +118,31 @@ func Init(projectName string) error {
 }
 
 // Create new airflow deployment
-func Create() error {
+func Create(title string) error {
+	response, err := api.CreateDeployment(title)
+	if err != nil {
+		return err
+	}
+	deployment, err := api.FetchDeployment(response.Id)
+
+	fmt.Println(response.Message)
+	fmt.Printf("\nAirflow Dashboard: https://%s-airflow.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	fmt.Printf("Flower Dashboard: https://%s-flower.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	fmt.Printf("Grafana Dashboard: https://%s-grafana.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	return nil
+}
+
+// List all airflow deployments
+func List() error {
+	deployments, err := api.FetchDeployments()
+	if err != nil {
+		return err
+	}
+
+	for _, d := range deployments {
+		rowTmp := "Title: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
+		fmt.Printf(rowTmp, d.Title, d.Id, d.ReleaseName, d.Version)
+	}
 	return nil
 }
 

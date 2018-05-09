@@ -9,6 +9,9 @@ type cfg struct {
 
 // cfgs houses all configurations for an astro project
 type cfgs struct {
+	CloudDomain	  	  cfg
+	CloudAPIProtocol  cfg
+	CloudAPIPort      cfg
 	PostgresUser      cfg
 	PostgresPassword  cfg
 	PostgresHost      cfg
@@ -16,6 +19,7 @@ type cfgs struct {
 	RegistryAuthority cfg
 	RegistryAuth      cfg
 	ProjectName       cfg
+	UserAPIAuthToken  cfg
 }
 
 // Creates a new cfg struct

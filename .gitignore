@@ -5,3 +5,7 @@ meta/
 dist/
 packages.txt
 requirements.txt
+
+# IDEs
+.idea/
+.vscode/

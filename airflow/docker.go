@@ -11,14 +11,17 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/astronomerio/astro-cli/airflow/include"
-	"github.com/astronomerio/astro-cli/config"
-	docker "github.com/astronomerio/astro-cli/docker"
 	dockercompose "github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
 	"github.com/pkg/errors"
+
+	"github.com/astronomerio/astro-cli/airflow/include"
+	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/docker"
+	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/pkg/input"
 )
 
 const (
@@ -238,6 +241,34 @@ func PS(airflowHome string) error {
 
 // Deploy pushes a new docker image
 func Deploy(path, name string) error {
+	if name == "" {
+		deployments, err := api.FetchDeployments()
+		if err != nil {
+			return err
+		}
+
+		if len(deployments) == 0 {
+			return errors.New("No airflow deployments found")
+		}
+
+		deployMap := map[string]houston.Deployment{}
+		fmt.Println("Select which airflow deployment you want to deploy to:")
+		for i, deployment := range deployments {
+			index := i + 1
+			deployMap[strconv.Itoa(index)] = deployment
+			fmt.Printf("%d) %s (%s)\n", index, deployment.Title, deployment.ReleaseName)
+		}
+
+		choice := input.InputText("")
+		selected, ok := deployMap[choice]
+		if !ok {
+			return errors.New("Invalid deployment selection")
+		}
+		name = selected.ReleaseName
+	}
+	fmt.Printf("Deploying: %s\n", name)
+	fmt.Println(repositoryName(name))
+
 	// Get a list of tags in the repository for this image
 	tags, err := docker.ListRepositoryTags(repositoryName(name))
 	if err != nil {

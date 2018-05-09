@@ -326,6 +326,12 @@
   revision = "282c8707aa210456a825798969cc27edda34992a"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/shurcooL/go"
+  packages = ["ctxhttp"]
+  revision = "47fa5b7ceee66c60ac3a281416089035bf526a3c"
+
+[[projects]]
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
@@ -439,6 +445,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e9fc06cdc2748ad4d6c7199e3f6ad1d19c416801086d914f2252edb70464ece7"
+  inputs-digest = "f3633d08b4ae352ae9054c1f956b70b7666a6ce524011d6ee0b1a89e3bfd7c76"
   solver-name = "gps-cdcl"
   solver-version = 1

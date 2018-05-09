@@ -1,13 +1,20 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/iancoleman/strcase"
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/utils"
-	"github.com/spf13/cobra"
+	"github.com/astronomerio/astro-cli/pkg/git"
+	"github.com/astronomerio/astro-cli/pkg/fileutil"
 )
 
 var (
@@ -32,14 +39,22 @@ var (
 		Use:   "create",
 		Short: "Create a new airflow deployment",
 		Long:  "Create a new airflow deployment",
+		Args:  cobra.ExactArgs(1),
 		RunE:  airflowCreate,
+	}
+
+	airflowListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List airflow clusters",
+		Long:  "List all created airflow clusters",
+		RunE:  airflowList,
 	}
 
 	airflowDeployCmd = &cobra.Command{
 		Use:    "deploy",
 		Short:  "Deploy an airflow project",
 		Long:   "Deploy an airflow project to a given deployment",
-		Args:   cobra.ExactArgs(1),
+		Args:   cobra.MaximumNArgs(1),
 		PreRun: ensureProjectDir,
 		RunE:   airflowDeploy,
 	}
@@ -91,6 +106,9 @@ func init() {
 	// Airflow create
 	airflowRootCmd.AddCommand(airflowCreateCmd)
 
+	// Airflow list
+	airflowRootCmd.AddCommand(airflowListCmd)
+
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
 	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommited changes")
@@ -117,20 +135,57 @@ func ensureProjectDir(cmd *cobra.Command, args []string) {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
-	return airflow.Init(projectName)
+	// Grab working directory
+	path := fileutil.GetWorkingDir()
+
+	// Validate project name
+	if len(projectName) != 0 {
+		projectNameValid := regexp.
+			MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).
+			MatchString
+
+		if !projectNameValid(projectName) {
+			return errors.New("Project name is invalid")
+		}
+	} else {
+		projectDirectory := filepath.Base(path)
+		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
+	}
+
+	exists := config.ProjectConfigExists()
+	if !exists {
+		config.CreateProjectConfig(path)
+	}
+	config.CFG.ProjectName.SetProjectString(projectName)
+	airflow.Init(path)
+
+	if exists {
+		fmt.Printf("Reinitialized existing astronomer project in %s\n", path)
+	} else {
+		fmt.Printf("Initialized empty astronomer project in %s\n", path)
+	}
+
+	return nil
 }
 
 func airflowCreate(cmd *cobra.Command, args []string) error {
-	return airflow.Create()
+	return airflow.Create(args[0])
+}
+
+func airflowList(cmd *cobra.Command, args []string) error {
+	return airflow.List()
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
-	if utils.HasUncommitedChanges() && !forceDeploy {
+	releaseName := ""
+	if len(args) > 0 {
+		releaseName = args[0]
+	}
+	if git.HasUncommitedChanges() && !forceDeploy {
 		fmt.Println("Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy.")
 		return nil
 	}
-
-	return airflow.Deploy(projectRoot, args[0])
+	return airflow.Deploy(projectRoot, releaseName)
 }
 
 // Start an airflow cluster
