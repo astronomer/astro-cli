@@ -8,13 +8,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/iancoleman/strcase"
+	"github.com/spf13/cobra"
 
 	"github.com/astronomerio/astro-cli/airflow"
 	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/pkg/git"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
+	"github.com/astronomerio/astro-cli/pkg/git"
 )
 
 var (

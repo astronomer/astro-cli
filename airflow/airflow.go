@@ -11,36 +11,16 @@ import (
 	"github.com/iancoleman/strcase"
 
 	"github.com/astronomerio/astro-cli/airflow/include"
+	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
-	"github.com/astronomerio/astro-cli/config"
 )
 
 var (
 	http = httputil.NewHTTPClient()
-	api = houston.NewHoustonClient(http)
+	api  = houston.NewHoustonClient(http)
 )
-
-func initProject(path string) {
-	// List of directories to create
-	dirs := []string{"dags", "plugins", "include"}
-
-	// Initailize directories
-	initDirs(path, dirs)
-
-	// Map of files to create
-	files := map[string]string{
-		".dockerignore":       include.Dockerignore,
-		"Dockerfile":          include.Dockerfile,
-		"packages.txt":        "",
-		"requirements.txt":    "",
-		"dags/example-dag.py": include.Exampledag,
-	}
-
-	// Initialize files
-	initFiles(path, files)
-}
 
 func initDirs(root string, dirs []string) bool {
 	// Any inputs exist
@@ -91,28 +71,24 @@ func initFiles(root string, files map[string]string) bool {
 }
 
 // Init will scaffold out a new airflow project
-func Init(projectName string) error {
-	// Grab working directory
-	path := fileutil.GetWorkingDir()
+func Init(path string) error {
+	// List of directories to create
+	dirs := []string{"dags", "plugins", "include"}
 
-	projectName, err := validateOrCreateProjectName(path, projectName)
-	if err != nil {
-		return err
+	// Map of files to create
+	files := map[string]string{
+		".dockerignore":       include.Dockerignore,
+		"Dockerfile":          include.Dockerfile,
+		"packages.txt":        "",
+		"requirements.txt":    "",
+		"dags/example-dag.py": include.Exampledag,
 	}
 
-	exists := config.ProjectConfigExists()
-	if !exists {
-		config.CreateProjectConfig(path)
-	}
-	config.CFG.ProjectName.SetProjectString(projectName)
+	// Initailize directories
+	initDirs(path, dirs)
 
-	initProject(path)
-
-	if exists {
-		fmt.Printf("Reinitialized existing astronomer project in %s\n", path)
-	} else {
-		fmt.Printf("Initialized empty astronomer project in %s\n", path)
-	}
+	// Initialize files
+	initFiles(path, files)
 
 	return nil
 }
