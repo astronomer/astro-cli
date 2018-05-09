@@ -34,7 +34,8 @@ var (
 	CFG = cfgs{
 		CloudDomain:       newCfg("cloud.domain", true, ""),
 		CloudAPIProtocol:  newCfg("cloud.api.protocol", true, "https"),
-		CloudAPIPort:	   newCfg("cloud.api.port", true, "443"),
+		CloudAPIPort:      newCfg("cloud.api.port", true, "443"),
+		CloudAPIToken:     newCfg("cloud.api.token", true, ""),
 		PostgresUser:      newCfg("postgres.user", true, "postgres"),
 		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
 		PostgresHost:      newCfg("postgres.host", true, "postgres"),
@@ -42,7 +43,6 @@ var (
 		RegistryAuthority: newCfg("docker.registry.authority", true, ""),
 		RegistryAuth:      newCfg("docker.registry.auth", true, ""),
 		ProjectName:       newCfg("project.name", true, ""),
-		UserAPIAuthToken:  newCfg("user.apiAuthToken", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory

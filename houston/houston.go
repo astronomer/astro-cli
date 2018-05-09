@@ -94,8 +94,8 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	}
 
 	// set headers
-	if config.CFG.UserAPIAuthToken.GetString() != "" {
-		doOpts.Headers["authorization"] = config.CFG.UserAPIAuthToken.GetString()
+	if config.CFG.CloudAPIToken.GetString() != "" {
+		doOpts.Headers["authorization"] = config.CFG.CloudAPIToken.GetString()
 	}
 
 	// if config.GetString(config.OrgIDCFG) != "" {
