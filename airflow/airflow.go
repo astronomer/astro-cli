@@ -100,11 +100,18 @@ func Create(title string) error {
 		return err
 	}
 	deployment, err := api.FetchDeployment(response.Id)
+	if err != nil {
+		return err
+	}
 
 	fmt.Println(response.Message)
-	fmt.Printf("\nAirflow Dashboard: https://%s-airflow.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-	fmt.Printf("Flower Dashboard: https://%s-flower.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-	fmt.Printf("Grafana Dashboard: https://%s-grafana.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+
+	if response.Success {
+		fmt.Printf("\nAirflow Dashboard: https://%s-airflow.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+		fmt.Printf("Flower Dashboard: https://%s-flower.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+		fmt.Printf("Grafana Dashboard: https://%s-grafana.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	}
+
 	return nil
 }
 
