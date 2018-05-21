@@ -41,6 +41,8 @@ func Login() {
 		return
 	}
 
+	fmt.Printf("Successfully authenticated to %s", registry)
+
 	// pass successful credentials to config
 	config.CFG.RegistryAuth.SetProjectString(config.EncodeAuth(username, password))
 }
