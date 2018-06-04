@@ -11,7 +11,7 @@ import (
 
 var (
 	registryOverride string
-	domainOverride string
+	domainOverride   string
 
 	authRootCmd = &cobra.Command{
 		Use:   "auth",
@@ -51,6 +51,10 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		config.CFG.CloudDomain.SetProjectString(domainOverride)
 	}
 
+	if registryOverride != "" {
+		config.CFG.RegistryAuthority.SetProjectString(registryOverride)
+	}
+
 	projectRegistry := config.CFG.RegistryAuthority.GetProjectString()
 	projectCloudDomain := config.CFG.CloudDomain.GetProjectString()
 	globalCloudDomain := config.CFG.CloudDomain.GetHomeString()
@@ -59,8 +63,6 @@ func authLogin(cmd *cobra.Command, args []string) error {
 	// checks for registry in all the expected places
 	// prompts user for any implicit behavior
 	switch {
-	case registryOverride != "":
-		config.CFG.RegistryAuthority.SetProjectString(registryOverride)
 	case projectRegistry != "":
 		// Don't prompt user, using project config is default expected behavior
 		break
