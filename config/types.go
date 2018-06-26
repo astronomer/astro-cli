@@ -13,6 +13,7 @@ type cfgs struct {
 	CloudAPIProtocol  cfg
 	CloudAPIPort      cfg
 	CloudAPIToken     cfg
+	LocalAPIURL       cfg
 	PostgresUser      cfg
 	PostgresPassword  cfg
 	PostgresHost      cfg

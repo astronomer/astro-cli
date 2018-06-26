@@ -36,6 +36,7 @@ var (
 		CloudAPIProtocol:  newCfg("cloud.api.protocol", true, "https"),
 		CloudAPIPort:      newCfg("cloud.api.port", true, "443"),
 		CloudAPIToken:     newCfg("cloud.api.token", true, ""),
+		LocalAPIURL:       newCfg("local.api.url", true, ""),
 		PostgresUser:      newCfg("postgres.user", true, "postgres"),
 		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
 		PostgresHost:      newCfg("postgres.host", true, "postgres"),
@@ -183,12 +184,16 @@ func saveConfig(v *viper.Viper, file string) error {
 
 // APIURL will return a full qualified API url
 func APIURL() string {
-	return fmt.Sprintf(
-		"%s://houston.%s:%s/v1",
-		CFG.CloudAPIProtocol.GetString(),
-		CFG.CloudDomain.GetString(),
-		CFG.CloudAPIPort.GetString(),
-	)
+	if len(CFG.LocalAPIURL.GetString()) != 0 {
+		return CFG.LocalAPIURL.GetString()
+	} else {
+		return fmt.Sprintf(
+			"%s://houston.%s:%s/v1",
+			CFG.CloudAPIProtocol.GetString(),
+			CFG.CloudDomain.GetString(),
+			CFG.CloudAPIPort.GetString(),
+		)
+	}
 }
 
 // GetDecodedAuth fetches auth string from config, decodes and
