@@ -1,6 +1,6 @@
 package houston
 
-// HoustonReasponse wraps all houston response structs used for json marashalling
+// HoustonResponse wraps all houston response structs used for json marashalling
 type HoustonResponse struct {
 	Data struct {
 		CreateDeployment *Status      `json:"createDeployment,omitempty"`

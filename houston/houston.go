@@ -135,12 +135,16 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		//logger.Error(err)
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
+
+	if decode.Errors != nil {
+		return nil, errors.New(decode.Errors[0].Message)
+	}
 	return &decode, nil
 }
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
 // Returns a StatusResponse which contains the unique id of deployment
-func (c *Client) CreateDeployment(title string) (*StatusResponse, error) {
+func (c *Client) CreateDeployment(title string) (*Status, error) {
 	// logger := log.WithField("method", "CreateDeployment")
 	// logger.Debug("Entered CreateDeployment")
 
