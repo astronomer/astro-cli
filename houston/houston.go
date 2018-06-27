@@ -15,19 +15,31 @@ import (
 var (
 	createDeploymentRequest = `
 	mutation CreateDeployment {
-		createDeployment(
-		  title: "%s",
-		  organizationUuid: "",
-		  teamUuid: "",
-          type: "airflow",
+		createDeployment(	
+			title: "%s",
+			organizationUuid: "",
+			teamUuid: "",
+			type: "airflow",
 			version: ""
 		) {	
-		  success,
-		  message,
-		  id,
-		  code
+			success,
+			message,
+			id,
+			code
 		}
 	  }`
+
+	createUserRequest = `
+	mutation CreateUser {
+		createUser(
+			email: "%s",
+			password: "%s"
+		) {
+			success,
+			message,
+			token
+		}
+	}`
 
 	createTokenRequest = `
 	mutation createToken {
@@ -35,10 +47,10 @@ var (
 		  identity:"%s",
 		  password:"%s"
 		) {
-	    success
-	    message
-	    token
-	    decoded {
+			success
+			message
+			token
+			decoded {
 	      id
 	      sU
 	    }
@@ -61,11 +73,11 @@ var (
 	  fetchDeployments(
 			deploymentUuid: "%s"
 		) {	
-		uuid
-		type
-		title
-		release_name
-		version
+			uuid
+			type
+			title
+			release_name
+			version
 	  }
 	}`
 
@@ -159,6 +171,7 @@ func (c *Client) CreateDeployment(title string) (*Status, error) {
 	return response.Data.CreateDeployment, nil
 }
 
+// TODO This probably is removed in latest
 // CreateToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a Token structure with the users ID and Token inside.
 func (c *Client) CreateToken(email string, password string) (*Token, error) {
@@ -174,6 +187,19 @@ func (c *Client) CreateToken(email string, password string) (*Token, error) {
 	}
 
 	return response.Data.CreateToken, nil
+}
+
+// CreateUser will send a request to houston to create a new user
+// Returns a Status object with a new token
+func (c *Client) CreateUser(email string, password string) (*Token, error) {
+	request := fmt.Sprintf(createUserRequest, email, password)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateUser Failed")
+	}
+	fmt.Println(response)
+	return response.Data.CreateUser, nil
 }
 
 // FetchDeployments will request all airflow deployments from Houston

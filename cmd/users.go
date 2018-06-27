@@ -1,6 +1,12 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+	"os"
+
+	"github.com/astronomerio/astro-cli/users"
+	"github.com/spf13/cobra"
+)
 
 var (
 	usersRootCmd = &cobra.Command{
@@ -20,7 +26,7 @@ var (
 		Use:   "create",
 		Short: "Add an astronomer user",
 		Long:  "Add an astronomer user",
-		Run:   usersCreate,
+		RunE:  usersCreate,
 	}
 
 	usersDeleteCmd = &cobra.Command{
@@ -48,7 +54,13 @@ func init() {
 func usersList(cmd *cobra.Command, args []string) {
 }
 
-func usersCreate(cmd *cobra.Command, args []string) {
+func usersCreate(cmd *cobra.Command, args []string) error {
+	err := users.CreateUser()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	return nil
 }
 
 func usersDelete(cmd *cobra.Command, args []string) {
