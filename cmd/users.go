@@ -9,6 +9,9 @@ import (
 )
 
 var (
+	skipVerify bool
+	userEmail  string
+
 	usersRootCmd = &cobra.Command{
 		Use:   "users",
 		Short: "Manage astronomer users",
@@ -46,6 +49,8 @@ func init() {
 
 	// Users create
 	usersRootCmd.AddCommand(usersCreateCmd)
+	usersCreateCmd.Flags().BoolVar(&skipVerify, "skip-verify", false, "Skips password verification on create")
+	usersCreateCmd.Flags().StringVar(&userEmail, "email", "", "Supply user email at runtime")
 
 	// Users delete
 	usersRootCmd.AddCommand(usersDeleteCmd)
@@ -55,7 +60,7 @@ func usersList(cmd *cobra.Command, args []string) {
 }
 
 func usersCreate(cmd *cobra.Command, args []string) error {
-	err := users.CreateUser()
+	err := users.CreateUser(skipVerify, userEmail)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
