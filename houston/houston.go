@@ -20,7 +20,8 @@ var (
 		  organizationUuid: "",
 		  teamUuid: "",
           type: "airflow",
-		  version: "") {
+			version: ""
+		) {	
 		  success,
 		  message,
 		  id,
@@ -30,7 +31,10 @@ var (
 
 	createTokenRequest = `
 	mutation createToken {
-	  createToken(identity:"%s", password:"%s") {
+	  createToken(
+		  identity:"%s",
+		  password:"%s"
+		) {
 	    success
 	    message
 	    token
@@ -54,7 +58,9 @@ var (
 
 	fetchDeploymentRequest = `
 	query FetchDeployment {
-	  fetchDeployments(deploymentUuid: "%s") {
+	  fetchDeployments(
+			deploymentUuid: "%s"
+		) {	
 		uuid
 		type
 		title
