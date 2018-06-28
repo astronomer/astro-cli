@@ -21,6 +21,7 @@ import (
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/input"
 )
 
@@ -125,27 +126,27 @@ func Start(airflowHome string) error {
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
 	if err != nil {
-		return errors.Wrap(err, "Error creating docker-compose project")
+		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
 
 	// Fetch project containers
 	psInfo, err := project.Ps(context.Background())
 	if err != nil {
-		return errors.Wrap(err, "Error checking docker-compose status")
+		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
 
 	if len(psInfo) > 0 {
 		// Ensure project is not already running
 		for _, info := range psInfo {
 			if checkServiceState(info["State"], dockerStateUp) {
-				fmt.Println("Project is already running, cannot start")
+				fmt.Println(messages.COMPOSE_PROJECT_RUNNING)
 				os.Exit(1)
 			}
 		}
 
 		err = project.Start(context.Background())
 		if err != nil {
-			return errors.Wrap(err, "Error building, (re)creating or starting project containers")
+			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
 	} else {
 		// Build this project image
@@ -154,11 +155,11 @@ func Start(airflowHome string) error {
 		// Start up our project
 		err = project.Up(context.Background(), options.Up{})
 		if err != nil {
-			return errors.Wrap(err, "Error building, (re)creating or starting project containers")
+			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
 	}
-	fmt.Println("Airflow Webserver: http://localhost:8080/admin/")
-	fmt.Println("Postgres Database: localhost:5432/postgres")
+	fmt.Println(messages.COMPOSE_LINK_WEBSERVER)
+	fmt.Println(messages.COMPOSE_LINK_POSTGRES)
 	return nil
 }
 
@@ -170,13 +171,13 @@ func Kill(airflowHome string) error {
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
 	if err != nil {
-		return errors.Wrap(err, "Error creating docker-compose project")
+		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
 
 	// Shut down our project
 	err = project.Down(context.Background(), options.Down{RemoveVolume: true, RemoveOrphans: true})
 	if err != nil {
-		return errors.Wrap(err, "Error stopping and removing containers")
+		return errors.Wrap(err, messages.COMPOSE_STOP_ERROR)
 	}
 
 	return nil
@@ -190,13 +191,13 @@ func Stop(airflowHome string) error {
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
 	if err != nil {
-		return errors.Wrap(err, "Error creating docker-compose project")
+		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
 
 	// Pause our project
 	err = project.Stop(context.Background(), 30)
 	if err != nil {
-		return errors.Wrap(err, "Error pausing project containers")
+		return errors.Wrap(err, messages.COMPOSE_PAUSE_ERROR)
 	}
 
 	return nil
@@ -210,13 +211,13 @@ func PS(airflowHome string) error {
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
 	if err != nil {
-		return errors.Wrap(err, "Error creating docker-compose project")
+		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
 
 	// List project containers
 	psInfo, err := project.Ps(context.Background())
 	if err != nil {
-		return errors.Wrap(err, "Error checking docker-compose status")
+		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
 
 	// Columns for table
@@ -249,11 +250,11 @@ func Deploy(path, name string) error {
 		}
 
 		if len(deployments) == 0 {
-			return errors.New("No airflow deployments found")
+			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
 		}
 
 		deployMap := map[string]houston.Deployment{}
-		fmt.Println("Select which airflow deployment you want to deploy to:")
+		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMT)
 		for i, deployment := range deployments {
 			index := i + 1
 			deployMap[strconv.Itoa(index)] = deployment
@@ -263,11 +264,11 @@ func Deploy(path, name string) error {
 		choice := input.InputText("")
 		selected, ok := deployMap[choice]
 		if !ok {
-			return errors.New("Invalid deployment selection")
+			return errors.New(messages.HOUSTON_INVALID_DEPLOYMENT_KEY)
 		}
 		name = selected.ReleaseName
 	}
-	fmt.Printf("Deploying: %s\n", name)
+	fmt.Printf(messages.HOUSTON_DEPLOYING_PROMPT, name)
 	fmt.Println(repositoryName(name))
 
 	// Get a list of tags in the repository for this image
@@ -297,7 +298,7 @@ func Deploy(path, name string) error {
 	deployImage := imageName(name, "latest")
 
 	// Build our image
-	fmt.Println("Building image")
+	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
 	imageBuild(path, deployImage)
 
 	// Tag our build with remote registry and incremented tag
@@ -307,7 +308,7 @@ func Deploy(path, name string) error {
 	docker.Exec("tag", deployImage, remoteImage)
 
 	// Push image to registry
-	fmt.Println("Pushing image to Astronomer registry")
+	fmt.Println(messages.COMPOSE_PUSHING_IMAGE_PROMPT)
 	docker.Exec("push", remoteImage)
 
 	// Delete the image tags we just generated
