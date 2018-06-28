@@ -18,16 +18,16 @@ func PrintVersion(version, gitCommit string) error {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
 	}
 
-	fmt.Printf(messages.INFO_CURR_CLI_VERSION+"\n", version)
-	fmt.Printf(messages.INFO_CURR_CLI_COMMIT+"\n", gitCommit)
+	fmt.Printf(messages.CLI_CURR_VERSION+"\n", version)
+	fmt.Printf(messages.CLI_CURR_COMMIT+"\n", gitCommit)
 	return nil
 }
 
 // CheckForUpdate checks current version against latest on github
 func CheckForUpdate(version, gitCommit string) error {
 	if !isValidVersion(version) {
-		fmt.Println(messages.INFO_UNTAGGED_VERSION)
-		fmt.Println(messages.INFO_CLI_INSTALL_CMD)
+		fmt.Println(messages.CLI_UNTAGGED_PROMPT)
+		fmt.Println(messages.CLI_INSTALL_CMD)
 		return nil
 	}
 
@@ -49,10 +49,10 @@ func CheckForUpdate(version, gitCommit string) error {
 	latestTag := latestTagResp.TagName
 
 	if latestTagResp.TagName > version {
-		fmt.Printf(messages.INFO_CURR_CLI_VERSION_DATE+"\n", version, currentPub)
-		fmt.Printf(messages.INFO_LATEST_CLI_VERSION_DATE+"\n", latestTag, latestPub)
-		fmt.Println(messages.INFO_UPGRADE_CLI)
-		fmt.Println(messages.INFO_CLI_INSTALL_CMD)
+		fmt.Printf(messages.CLI_CURR_VERSION_DATE+"\n", version, currentPub)
+		fmt.Printf(messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
+		fmt.Println(messages.CLI_UPGRADE_PROMPT)
+		fmt.Println(messages.CLI_INSTALL_CMD)
 		return nil
 	}
 
