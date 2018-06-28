@@ -5,6 +5,7 @@ import (
 
 	"github.com/astronomerio/astro-cli/auth"
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -69,16 +70,16 @@ func authLogin(cmd *cobra.Command, args []string) error {
 	case projectCloudDomain != "":
 		config.CFG.RegistryAuthority.SetProjectString(fmt.Sprintf("registry.%s", projectCloudDomain))
 		if domainOverride == "" {
-			fmt.Printf("No registry set, using default: registry.%s\n", projectCloudDomain)
+			fmt.Printf(messages.REGISTRY_USE_DEFAULT+"\n", projectCloudDomain)
 		}
 	case globalCloudDomain != "":
 		config.CFG.RegistryAuthority.SetProjectString(fmt.Sprintf("registry.%s", globalCloudDomain))
-		fmt.Printf("No registry set, using default: registry.%s\n", globalCloudDomain)
+		fmt.Printf(messages.REGISTRY_USE_DEFAULT+"\n", globalCloudDomain)
 	case globalRegistry != "":
 		// Don't prompt user, falling back to global config is default expected behavior
 		break
 	default:
-		return errors.New("No domain specified (`cloud.domain` in config.yaml). Use -d to pass your cluster domain\n\nEx.\nastro auth login -d EXAMPLE_DOMAIN.com\n ")
+		return errors.New(messages.CONFIG_DOMAIN_NOT_SET)
 	}
 
 	auth.Login()

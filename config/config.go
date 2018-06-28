@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -75,7 +76,7 @@ func initHome() {
 	if !fileutil.Exists(HomeConfigFile) {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
-			fmt.Printf("Error creating default config in home dir: %s", err)
+			fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
 			return
 		}
 	}
@@ -83,7 +84,7 @@ func initHome() {
 	// Read in home config
 	err := viperHome.ReadInConfig()
 	if err != nil {
-		fmt.Printf("Error reading config in home dir: %s", err)
+		fmt.Printf(messages.CONFIG_READ_ERROR, err)
 		return
 	}
 }
@@ -98,7 +99,7 @@ func initProject() {
 
 	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
-		fmt.Printf("Error searching for project dir: %v\n", searchErr)
+		fmt.Printf(messages.CONFIG_SEARCH_ERROR+"\n", searchErr)
 		return
 	}
 
@@ -116,7 +117,7 @@ func initProject() {
 	// Read in project config
 	readErr := viperProject.ReadInConfig()
 	if readErr != nil {
-		fmt.Printf("Error reading config in project dir: %s", readErr)
+		fmt.Printf(messages.CONFIG_READ_ERROR, readErr)
 	}
 }
 
@@ -127,7 +128,7 @@ func CreateProjectConfig(projectPath string) {
 
 	err := CreateConfig(viperProject, projectConfigDir, projectConfigFile)
 	if err != nil {
-		fmt.Printf("Error creating default config in project dir: %s", err)
+		fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
 		return
 	}
 
@@ -144,12 +145,12 @@ func configExists(v *viper.Viper) bool {
 func CreateConfig(v *viper.Viper, path, file string) error {
 	err := os.MkdirAll(path, 0770)
 	if err != nil {
-		return errors.Wrap(err, "Error creating config directory")
+		return errors.Wrap(err, messages.CONFIG_CREATE_DIR_ERROR)
 	}
 
 	_, err = os.Create(file)
 	if err != nil {
-		return errors.Wrap(err, "Error creating config file")
+		return errors.Wrap(err, messages.CONFIG_CREATE_FILE_ERROR)
 	}
 	os.Chmod(file, 0600)
 
@@ -177,7 +178,7 @@ func ProjectRoot() (string, error) {
 func saveConfig(v *viper.Viper, file string) error {
 	err := v.WriteConfigAs(file)
 	if err != nil {
-		return errors.Wrap(err, "Error saving config")
+		return errors.Wrap(err, messages.CONFIG_SAVE_ERROR)
 	}
 	return nil
 }
@@ -213,6 +214,7 @@ func EncodeAuth(username, password string) string {
 }
 
 // DecodeAuth decodes a base64 encoded string and returns username and password
+// TODO Deprecate with v0.3.0
 func DecodeAuth(authStr string) (string, string, error) {
 	if authStr == "" {
 		return "", "", nil
