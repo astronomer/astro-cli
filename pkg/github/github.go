@@ -51,7 +51,6 @@ func (c *Client) GithubRequest(url string, method string) (*httputil.HTTPRespons
 	}
 	defer httpResponse.Body.Close()
 
-	// strings.NewReader(jsonStream)
 	body, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, err
@@ -77,7 +76,6 @@ func RepoLatestRequest(orgName string, repoName string) (*RepoLatestResponse, er
 	decode := RepoLatestResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		//logger.Error(err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Failed to JSON decode Github response from %s", url))
 	}
 	return &decode, nil
@@ -95,7 +93,6 @@ func RepoTagRequest(orgName string, repoName string, tagName string) (*RepoLates
 	decode := RepoLatestResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		//logger.Error(err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Failed to JSON decode Github response from %s", url))
 	}
 	return &decode, nil
