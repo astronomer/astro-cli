@@ -6,6 +6,7 @@ import (
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
 )
@@ -17,8 +18,8 @@ var (
 // Login logs a user into the docker registry. Will need to login to Houston next.
 func Login() {
 	registry := config.CFG.RegistryAuthority.GetString()
-	username := input.InputText("Username: ")
-	password, _ := input.InputPassword("Password: ")
+	username := input.InputText(messages.INPUT_USERNAME)
+	password, _ := input.InputPassword(messages.INPUT_PASSWORD)
 
 	API := houston.NewHoustonClient(HTTP)
 
@@ -41,7 +42,7 @@ func Login() {
 		return
 	}
 
-	fmt.Printf("Successfully authenticated to %s", registry)
+	fmt.Printf(messages.REGISTRY_AUTH_SUCCESS, registry)
 
 	// pass successful credentials to config
 	config.CFG.RegistryAuth.SetProjectString(config.EncodeAuth(username, password))
