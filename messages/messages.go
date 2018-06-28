@@ -35,5 +35,10 @@ var (
 	HOUSTON_SELECT_DEPLOYMENT_PROMT = "Select which airflow deployment you want to deploy to:"
 	HOUSTON_INVALID_DEPLOYMENT_KEY  = "Invalid deployment selection"
 
+	INPUT_PASSWORD = "Password: "
+	INPUT_USERNAME = "Username: "
+
+	REGISTRY_AUTH_SUCCESS = "Successfully authenticated to %s"
+
 	NA = "N/A"
 )
