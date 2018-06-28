@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 )
 
 var (
-	http = httputil.NewHTTPClient()
-	api  = NewGithubClient(http)
+	httpclient = httputil.NewHTTPClient()
 )
 
 // RepoLatestResponse represents a tag info response from Github API
@@ -30,9 +30,9 @@ type Client struct {
 }
 
 // NewGithubClient returns a HTTP client for interfacing with github
-func NewGithubClient(c *httputil.HTTPClient) *Client {
+func NewGithubClient() *Client {
 	return &Client{
-		HTTPClient: c,
+		HTTPClient: httpclient,
 	}
 }
 
@@ -65,10 +65,10 @@ func (c *Client) GithubRequest(url string, method string) (*httputil.HTTPRespons
 }
 
 // RepoLatestRequest Makes a request to grab the latest release of a github repository
-func RepoLatestRequest(orgName string, repoName string) (*RepoLatestResponse, error) {
+func (c *Client) RepoLatestRequest(orgName string, repoName string) (*RepoLatestResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", orgName, repoName)
 
-	response, err := api.GithubRequest(url, "GET")
+	response, err := c.GithubRequest(url, "GET")
 	if err != nil {
 		return nil, err
 	}
@@ -76,15 +76,16 @@ func RepoLatestRequest(orgName string, repoName string) (*RepoLatestResponse, er
 	decode := RepoLatestResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Failed to JSON decode Github response from %s", url))
+		return nil, errors.Wrap(err, fmt.Sprintf(messages.ERROR_GITHUB_JSON_MARSHALLING, url))
 	}
 	return &decode, nil
 }
 
 // RepoTagRequest makes a request to grab a specific tag of a github repository
-func RepoTagRequest(orgName string, repoName string, tagName string) (*RepoLatestResponse, error) {
+func (c *Client) RepoTagRequest(orgName string, repoName string, tagName string) (*RepoLatestResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", orgName, repoName, tagName)
-	response, err := api.GithubRequest(url, "GET")
+
+	response, err := c.GithubRequest(url, "GET")
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func RepoTagRequest(orgName string, repoName string, tagName string) (*RepoLates
 	decode := RepoLatestResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Failed to JSON decode Github response from %s", url))
+		return nil, errors.Wrap(err, fmt.Sprintf(messages.ERROR_GITHUB_JSON_MARSHALLING, url))
 	}
 	return &decode, nil
 }
