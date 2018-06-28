@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -54,20 +55,19 @@ func init() {
 func ensureGlobalFlag(cmd *cobra.Command, args []string) {
 	if !(len(projectRoot) > 0) && !globalFlag {
 		var c = "astro config " + cmd.Use + " " + args[0] + " -g"
-		fmt.Println("You are attempting to " + cmd.Use + " a project config outside of a project directory\n" +
-			"To " + cmd.Use + " a global config try\n" + c)
+		fmt.Printf(messages.CONFIG_USE_OUTSIDE_PROJECT_DIR, cmd.Use, cmd.Use, c)
 		os.Exit(1)
 	}
 }
 
 func configGet(command *cobra.Command, args []string) error {
 	if len(args) != 1 {
-		return errors.New("Must specify config key")
+		return errors.New(messages.CONFIG_PATH_KEY_MISSING_ERROR)
 	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errors.New("Config does not exist, check your config key")
+		return errors.New(messages.CONFIG_PATH_KEY_INVALID_ERROR)
 	}
 
 	if globalFlag {
@@ -81,14 +81,14 @@ func configGet(command *cobra.Command, args []string) error {
 
 func configSet(command *cobra.Command, args []string) error {
 	if len(args) != 2 {
-		return errors.New("Must specify exactly two arguments (key value) when setting a config")
+		return errors.New(messages.CONFIG_INVALID_SET_ARGS)
 	}
 
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 
 	if !ok {
-		return errors.New("Config does not exist, check your config key")
+		return errors.New(messages.CONFIG_PATH_KEY_INVALID_ERROR)
 	}
 
 	if globalFlag {
@@ -97,6 +97,6 @@ func configSet(command *cobra.Command, args []string) error {
 		cfg.SetProjectString(args[1])
 	}
 
-	fmt.Printf("Setting %s to %s successfully\n", cfg.Path, args[1])
+	fmt.Printf(messages.CONFIG_SET_SUCCESS+"\n", cfg.Path, args[1])
 	return nil
 }

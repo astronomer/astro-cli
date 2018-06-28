@@ -13,7 +13,16 @@ var (
 	CLI_UPGRADE_PROMPT      = "There is a more recent version of the Astronomer CLI available.\nYou can install the latest tagged release with the following command"
 	CLI_UNTAGGED_PROMPT     = "Your current Astronomer CLI is not tagged.\nThis is likely the result of building from source. You can install the latest tagged release with the following command"
 
-	CONFIG_PROJECT_NAME_ERROR = "Project name is invalid"
+	CONFIG_DOMAIN_NOT_SET_ERROR    = "No domain specified (`cloud.domain` in config.yaml). Use -d to pass your cluster domain\n\nEx.\nastro auth login -d EXAMPLE_DOMAIN.com\n "
+	CONFIG_PATH_KEY_MISSING_ERROR  = "Must specify config key"
+	CONFIG_PATH_KEY_INVALID_ERROR  = "Config does not exist, check your config key"
+	CONFIG_PROJECT_NAME_ERROR      = "Project name is invalid"
+	CONFIG_PROJECT_DIR_ERROR       = "Error: Not in an astronomer project directory"
+	CONFIG_INIT_PROJECT_CONFIG     = "Initialized empty astronomer project in %s"
+	CONFIG_INVALID_SET_ARGS        = "Must specify exactly two arguments (key value) when setting a config"
+	CONFIG_REINIT_PROJECT_CONFIG   = "Reinitialized existing astronomer project in %s"
+	CONFIG_SET_SUCCESS             = "Setting %s to %s successfully"
+	CONFIG_USE_OUTSIDE_PROJECT_DIR = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s"
 
 	COMPOSE_CREATE_ERROR         = "Error creating docker-compose project"
 	COMPOSE_IMAGE_BUILDING_PROMT = "Building image..."
@@ -38,7 +47,9 @@ var (
 	INPUT_PASSWORD = "Password: "
 	INPUT_USERNAME = "Username: "
 
-	REGISTRY_AUTH_SUCCESS = "Successfully authenticated to %s"
+	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s"
+	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy."
+	REGISTRY_USE_DEFAULT         = "No registry set, using default: registry.%s"
 
 	NA = "N/A"
 )
