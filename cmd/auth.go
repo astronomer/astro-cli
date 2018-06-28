@@ -79,7 +79,7 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		// Don't prompt user, falling back to global config is default expected behavior
 		break
 	default:
-		return errors.New(messages.CONFIG_DOMAIN_NOT_SET)
+		return errors.New(messages.CONFIG_DOMAIN_NOT_SET_ERROR)
 	}
 
 	auth.Login()
