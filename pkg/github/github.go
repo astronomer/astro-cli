@@ -84,7 +84,6 @@ func RepoLatestRequest(orgName string, repoName string) (*RepoLatestResponse, er
 // RepoTagRequest makes a request to grab a specific tag of a github repository
 func RepoTagRequest(orgName string, repoName string, tagName string) (*RepoLatestResponse, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", orgName, repoName, tagName)
-	fmt.Println(url)
 	response, err := api.GithubRequest(url, "GET")
 	if err != nil {
 		return nil, err
