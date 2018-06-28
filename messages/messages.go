@@ -54,8 +54,11 @@ var (
 	INPUT_USERNAME = "Username: "
 
 	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s"
+	REGISTRY_AUTH_FAIL           = "Failed to authenticate to registry\nYou can re-authenticate to the registry with\n\t\tastro auth login"
+	REGISTRY_DECODE_AUTH_ERROR   = "Error fetching credentials"
 	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy."
 	REGISTRY_USE_DEFAULT         = "No registry set, using default: registry.%s"
+	REGISTRY_TAGS_REQUEST_ERROR  = "Error requesting respostory tags"
 
 	NA = "N/A"
 )
