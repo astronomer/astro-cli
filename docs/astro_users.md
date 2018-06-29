@@ -12,12 +12,6 @@ Manage astronomer users
   -h, --help   help for users
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro]({{< relref "docs/astro.md" >}})	 - Astronomer - CLI

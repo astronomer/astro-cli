@@ -12,20 +12,11 @@ Manage airflow projects and deployments
   -h, --help   help for airflow
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro]({{< relref "docs/astro.md" >}})	 - Astronomer - CLI
-* [astro airflow create]({{< relref "docs/astro_airflow_create.md" >}})	 - Create a new airflow deployment
-* [astro airflow deploy]({{< relref "docs/astro_airflow_deploy.md" >}})	 - Deploy an airflow project
 * [astro airflow init]({{< relref "docs/astro_airflow_init.md" >}})	 - Scaffold a new airflow project
 * [astro airflow kill]({{< relref "docs/astro_airflow_kill.md" >}})	 - Kill a development airflow cluster
-* [astro airflow list]({{< relref "docs/astro_airflow_list.md" >}})	 - List airflow clusters
 * [astro airflow ps]({{< relref "docs/astro_airflow_ps.md" >}})	 - List airflow containers
 * [astro airflow start]({{< relref "docs/astro_airflow_start.md" >}})	 - Start a development airflow cluster
 * [astro airflow stop]({{< relref "docs/astro_airflow_stop.md" >}})	 - Stop a development airflow cluster

@@ -16,12 +16,6 @@ astro users list [flags]
   -h, --help   help for list
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro users]({{< relref "docs/astro_users.md" >}})	 - Manage astronomer users

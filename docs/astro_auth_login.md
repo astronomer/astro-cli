@@ -18,12 +18,6 @@ astro auth login [flags]
   -r, --registry string   pass a custom project registry for authentication
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro auth]({{< relref "docs/astro_auth.md" >}})	 - Mangage astronomer identity

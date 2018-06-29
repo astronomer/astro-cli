@@ -16,12 +16,6 @@ astro airflow ps [flags]
   -h, --help   help for ps
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro airflow]({{< relref "docs/astro_airflow.md" >}})	 - Manage airflow projects and deployments

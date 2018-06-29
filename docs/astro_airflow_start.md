@@ -16,12 +16,6 @@ astro airflow start [flags]
   -h, --help   help for start
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro airflow]({{< relref "docs/astro_airflow.md" >}})	 - Manage airflow projects and deployments

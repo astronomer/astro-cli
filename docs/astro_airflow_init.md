@@ -17,12 +17,6 @@ astro airflow init [flags]
   -n, --name string   Name of airflow project
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro airflow]({{< relref "docs/astro_airflow.md" >}})	 - Manage airflow projects and deployments

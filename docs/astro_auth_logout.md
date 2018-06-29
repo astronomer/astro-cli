@@ -16,12 +16,6 @@ astro auth logout [flags]
   -h, --help   help for logout
 ```
 
-### Options inherited from parent commands
-
-```
-  -g, --global   view or modify global config
-```
-
 ### SEE ALSO
 
 * [astro auth]({{< relref "docs/astro_auth.md" >}})	 - Mangage astronomer identity

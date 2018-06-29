@@ -9,13 +9,8 @@ Manage astro project configurations
 ### Options
 
 ```
-  -h, --help   help for config
-```
-
-### Options inherited from parent commands
-
-```
   -g, --global   view or modify global config
+  -h, --help     help for config
 ```
 
 ### SEE ALSO
