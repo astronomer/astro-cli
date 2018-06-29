@@ -38,27 +38,30 @@ var (
 	}
 
 	airflowCreateCmd = &cobra.Command{
-		Use:   "create",
-		Short: "Create a new airflow deployment",
-		Long:  "Create a new airflow deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE:  airflowCreate,
+		Use:        "create",
+		Short:      "Create a new airflow deployment",
+		Long:       "Create a new airflow deployment",
+		Args:       cobra.ExactArgs(1),
+		RunE:       airflowCreate,
+		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment create"),
 	}
 
 	airflowListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List airflow clusters",
-		Long:  "List all created airflow clusters",
-		RunE:  airflowList,
+		Use:        "list",
+		Short:      "List airflow clusters",
+		Long:       "List all created airflow clusters",
+		RunE:       airflowList,
+		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment list"),
 	}
 
 	airflowDeployCmd = &cobra.Command{
-		Use:    "deploy",
-		Short:  "Deploy an airflow project",
-		Long:   "Deploy an airflow project to a given deployment",
-		Args:   cobra.MaximumNArgs(1),
-		PreRun: ensureProjectDir,
-		RunE:   airflowDeploy,
+		Use:        "deploy",
+		Short:      "Deploy an airflow project",
+		Long:       "Deploy an airflow project to a given deployment",
+		Args:       cobra.MaximumNArgs(1),
+		PreRun:     ensureProjectDir,
+		RunE:       airflowDeploy,
+		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment list"),
 	}
 
 	airflowStartCmd = &cobra.Command{
