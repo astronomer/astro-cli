@@ -43,7 +43,7 @@ func init() {
 
 	// Config root
 	RootCmd.AddCommand(configRootCmd)
-	RootCmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
+	configRootCmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 
 	// Config get
 	configRootCmd.AddCommand(configGetCmd)
