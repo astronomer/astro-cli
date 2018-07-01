@@ -7,7 +7,7 @@ import (
 var (
 	workspaceRootCmd = &cobra.Command{
 		Use:     "workspace",
-		Aliases: []string{"wo", "ws", "work", "space"},
+		Aliases: []string{"wo", "ws"},
 		Short:   "Manage Astronomer workspaces",
 		Long:    "Manage astronomer workspaces",
 	}
