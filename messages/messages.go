@@ -4,6 +4,7 @@ var (
 	ERROR_INVALID_CLI_VERSION     = "Astronomer CLI version is not valid"
 	ERROR_GITHUB_JSON_MARSHALLING = "Failed to JSON decode Github response from %s"
 
+	CLI_CMD_DEPRECATE       = "Deprecated in favor of %s"
 	CLI_CURR_VERSION        = "Astro CLI Version: v%s"
 	CLI_CURR_COMMIT         = "Git Commit: %s"
 	CLI_CURR_VERSION_DATE   = CLI_CURR_VERSION + " (%s)"
