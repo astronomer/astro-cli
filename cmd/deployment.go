@@ -7,7 +7,7 @@ import (
 var (
 	deploymentRootCmd = &cobra.Command{
 		Use:     "deployment",
-		Aliases: []string{"de", "dep"},
+		Aliases: []string{"de"},
 		Short:   "Manage airflow deployments",
 		Long:    "Manage airflow deployments",
 	}
