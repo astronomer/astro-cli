@@ -20,15 +20,15 @@ var (
 
 	userListCmd = &cobra.Command{
 		Use:   "list",
-		Short: "List astronomer user",
-		Long:  "List astronomer user",
+		Short: "List astronomer users",
+		Long:  "List astronomer users",
 		Run:   userList,
 	}
 
 	userCreateCmd = &cobra.Command{
 		Use:   "create",
-		Short: "Add an astronomer user",
-		Long:  "Add an astronomer user",
+		Short: "Create a user in the astronomer platform",
+		Long:  "Create a user in the astronomer platform, user will receive an invite at the email address provided",
 		RunE:  userCreate,
 	}
 
