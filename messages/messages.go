@@ -46,13 +46,17 @@ var (
 	EE_LINK_FLOWER  = "Grafana Dashboard: https://%s-grafana.%s"
 	EE_LINK_GRAFANA = "Flower Dashboard: https://%s-flower.%s"
 
+	HOUSTON_BASIC_AUTH_DISABLED     = "Basic authentication is disabled, conact administrator or defer back to oAuth"
 	HOUSTON_DEPLOYING_PROMPT        = "Deploying: %s\n"
 	HOUSTON_NO_DEPLOYMENTS_ERROR    = "No airflow deployments found"
 	HOUSTON_SELECT_DEPLOYMENT_PROMT = "Select which airflow deployment you want to deploy to:"
+	HOUSTON_OAUTH_REDIRECT          = "Please visit the following URL, authenticate and paste token in next prompt \n%s"
+	HOUSTON_OAUTH_DISABLED          = "OAuth is disabled, contact administrator or defer to basic auth"
 	HOUSTON_INVALID_DEPLOYMENT_KEY  = "Invalid deployment selection"
 
-	INPUT_PASSWORD = "Password: "
-	INPUT_USERNAME = "Username: "
+	INPUT_PASSWORD    = "Password: "
+	INPUT_USERNAME    = "Username (leave blank for oAuth): "
+	INPUT_OAUTH_TOKEN = "oAuth Token: "
 
 	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s"
 	REGISTRY_AUTH_FAIL           = "Failed to authenticate to registry\nYou can re-authenticate to the registry with\n\t\tastro auth login"

@@ -36,6 +36,6 @@ func CreateUser(skipVerify bool, emailIn string) error {
 		return houstonErr
 	}
 
-	config.CFG.CloudAPIToken.SetProjectString(status.Token)
+	config.CFG.CloudAPIToken.SetProjectString(status.Value)
 	return nil
 }

@@ -41,9 +41,10 @@ var (
 		}
 	}`
 
-	createTokenRequest = `
-	mutation createToken {
+	createBasicTokenRequest = `
+	mutation createBasicToken {
 	  createToken(
+		  authStrategy:LOCAL
 		  identity:"%s",
 		  password:"%s"
 		) {
@@ -54,6 +55,18 @@ var (
 	      id
 	      sU
 	    }
+	  }
+	}`
+
+	createOAuthTokenRequest = `
+	mutation createOauthBasicToken {
+	  createToken(
+		authStrategy:%s
+		credentials:"%s"
+		) { 
+		token {
+			value
+		}
 	  }
 	}`
 
@@ -81,6 +94,14 @@ var (
 	  }
 	}`
 
+	getAuthConfigRequest = `
+	query GetAuthConfig {
+		authConfig(state: "cli") {
+		  localEnabled
+		  googleEnabled
+		  googleOAuthUrl
+		}
+	  }`
 	// log = logrus.WithField("package", "houston")
 )
 
@@ -171,19 +192,31 @@ func (c *Client) CreateDeployment(title string) (*Status, error) {
 	return response.Data.CreateDeployment, nil
 }
 
-// TODO This probably is removed in latest
-// CreateToken will request a new token from Houston, passing the users e-mail and password.
+// CreateBasicToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a Token structure with the users ID and Token inside.
-func (c *Client) CreateToken(email string, password string) (*Token, error) {
+func (c *Client) CreateBasicToken(email string, password string) (*AuthUser, error) {
 	// logger := log.WithField("method", "CreateToken")
 	// logger.Debug("Entered CreateToken")
 
-	request := fmt.Sprintf(createTokenRequest, email, password)
+	request := fmt.Sprintf(createBasicTokenRequest, email, password)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
 		// logger.Error(err)
-		return nil, errors.Wrap(err, "CreateToken Failed")
+		return nil, errors.Wrap(err, "CreateBasicToken Failed")
+	}
+
+	return response.Data.CreateToken, nil
+}
+
+// CreateOAuthToken passes an OAuth type and authCode to createOauthTokenRequest in order allow houston to authenticate user
+// Returns a Token structure with the users ID and Token inside.
+func (c *Client) CreateOAuthToken(authCode string) (*AuthUser, error) {
+	request := fmt.Sprintf(createOAuthTokenRequest, "GOOGLE_OAUTH", authCode)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateOAuthToken Failed")
 	}
 
 	return response.Data.CreateToken, nil
@@ -237,4 +270,17 @@ func (c *Client) FetchDeployment(deploymentUuid string) (*Deployment, error) {
 		return nil, fmt.Errorf("deployment not found for uuid \"%s\"", deploymentUuid)
 	}
 	return &response.Data.FetchDeployments[0], nil
+}
+
+// GetAuthConfig will fetch authentication configuration from houston
+func (c *Client) GetAuthConfig() (*AuthConfig, error) {
+	request := getAuthConfigRequest
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		// logger.Error(err)
+		return nil, errors.Wrap(err, "GetAuthConfig Failed")
+	}
+
+	return response.Data.GetAuthConfig, nil
 }
