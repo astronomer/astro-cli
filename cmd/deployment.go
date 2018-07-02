@@ -19,6 +19,13 @@ var (
 		RunE:  deploymentCreate,
 	}
 
+	deploymentDeleteCmd = &cobra.Command{
+		Use:   "delete",
+		Short: "Delete an airflow deployment",
+		Long:  "Delete an airflow deployment",
+		RunE:  deploymentDelete,
+	}
+
 	deploymentListCmd = &cobra.Command{
 		Use:   "list",
 		Short: "List airflow deployments",
@@ -49,6 +56,10 @@ func init() {
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
+	return nil
+}
+
+func deploymentDelete(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
