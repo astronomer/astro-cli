@@ -17,13 +17,13 @@ var (
 	authRootCmd = &cobra.Command{
 		Use:   "auth",
 		Short: "Mangage astronomer identity",
-		Long:  "Manage astronomer identity",
+		Long:  "Handles authentication to the Astronomer Platform",
 	}
 
 	authLoginCmd = &cobra.Command{
 		Use:   "login",
 		Short: "Login to Astronomer services",
-		Long:  "Login to Astronomer services",
+		Long:  "Authenticate to houston-api using oAuth or basic auth.",
 		RunE:  authLogin,
 	}
 

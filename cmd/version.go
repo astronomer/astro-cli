@@ -11,7 +11,7 @@ var (
 	versionCmd  = &cobra.Command{
 		Use:   "version",
 		Short: "Astronomer CLI version",
-		Long:  "Astronomer CLI version",
+		Long:  "The astro-cli semantic version and git commit tied to that release.",
 		RunE:  printVersion,
 	}
 

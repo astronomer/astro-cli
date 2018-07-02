@@ -9,7 +9,7 @@ var (
 		Use:     "deployment",
 		Aliases: []string{"de"},
 		Short:   "Manage airflow deployments",
-		Long:    "Manage airflow deployments",
+		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 	}
 
 	deploymentCreateCmd = &cobra.Command{

@@ -9,14 +9,15 @@ var (
 		Use:     "workspace",
 		Aliases: []string{"wo", "ws"},
 		Short:   "Manage Astronomer workspaces",
-		Long:    "Manage astronomer workspaces",
+		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 	}
 
 	workspaceListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List astronomer workspaces",
-		Long:  "List astronomer workspaces",
-		RunE:  workspaceList,
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List astronomer workspaces",
+		Long:    "List astronomer workspaces",
+		RunE:    workspaceList,
 	}
 
 	workspaceCreateCmd = &cobra.Command{
@@ -58,18 +59,20 @@ func init() {
 	workspaceRootCmd.AddCommand(workspaceUpdateCmd)
 }
 
-func workspaceList(cmd *cobra.Command, args []string) error {
-	return nil
-}
-
 func workspaceCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func workspaceList(cmd *cobra.Command, args []string) error {
+	return nil
+}
+
+// TODO
 func workspaceDelete(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// TODO
 func workspaceUpdate(cmd *cobra.Command, args []string) error {
 	return nil
 }

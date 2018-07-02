@@ -27,13 +27,13 @@ var (
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
 		Short: "Manage airflow projects and deployments",
-		Long:  "Manage airflow projects and deployments",
+		Long:  "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
 	}
 
 	airflowInitCmd = &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold a new airflow project",
-		Long:  "Scaffold a new airflow project",
+		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
 		RunE:  airflowInit,
 	}
 

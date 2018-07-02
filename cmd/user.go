@@ -15,7 +15,7 @@ var (
 	userRootCmd = &cobra.Command{
 		Use:   "user",
 		Short: "Manage astronomer user",
-		Long:  "Manage astronomer user",
+		Long:  "Users represents a human who has authenticated with the Astronomer platform",
 	}
 
 	userListCmd = &cobra.Command{
