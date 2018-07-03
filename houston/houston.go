@@ -102,6 +102,18 @@ var (
 		  googleOAuthUrl
 		}
 	  }`
+
+	getWorkspaceAllRequest = `
+	query GetWorkspaces {
+		teams {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
 	// log = logrus.WithField("package", "houston")
 )
 
@@ -283,4 +295,16 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 	}
 
 	return response.Data.GetAuthConfig, nil
+}
+
+// GetWorkspaceAll returns all available workspaces from houston API
+func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
+	request := getWorkspaceAllRequest
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetWorkspaceAll Failed")
+	}
+
+	return response.Data.GetWorkspace, nil
 }

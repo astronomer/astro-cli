@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/astronomerio/astro-cli/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +65,8 @@ func workspaceCreate(cmd *cobra.Command, args []string) error {
 }
 
 func workspaceList(cmd *cobra.Command, args []string) error {
-	return nil
+	err := workspace.List()
+	return err
 }
 
 // TODO
