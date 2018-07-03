@@ -35,6 +35,7 @@ var (
 		Use:   "delete",
 		Short: "Delete an astronomer workspace",
 		Long:  "Delete an astronomer workspace",
+		Args:  cobra.ExactArgs(1),
 		RunE:  workspaceDelete,
 	}
 
@@ -76,9 +77,8 @@ func workspaceList(cmd *cobra.Command, args []string) error {
 
 }
 
-// TODO
 func workspaceDelete(cmd *cobra.Command, args []string) error {
-	return nil
+	return workspace.Delete(args[0])
 }
 
 // TODO

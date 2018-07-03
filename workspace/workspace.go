@@ -42,3 +42,15 @@ func List() error {
 	}
 	return nil
 }
+
+// Delete a workspace by uuid
+func Delete(uuid string) error {
+	ws, err := api.DeleteWorkspace(uuid)
+	if err != nil {
+		return err
+	}
+	fmt.Println(ws)
+
+	fmt.Printf(messages.HOUSTON_WORKSPACE_DELETE_SUCCESS, ws.Label, ws.Uuid)
+	return nil
+}

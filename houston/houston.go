@@ -85,6 +85,18 @@ var (
 	  }
 	}`
 
+	deleteWorkspaceRequest = `
+	mutation DeleteWorkspace {
+		deleteTeam(teamUuid: "%s") {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
 	fetchDeploymentsRequest = `
 	query FetchAllDeployments {
 	  fetchDeployments {
@@ -261,15 +273,30 @@ func (c *Client) CreateUser(email string, password string) (*Token, error) {
 	return response.Data.CreateUser, nil
 }
 
+// CreateWorkspace will send a request to houston to create a new workspace
+// Returns an object representing created workspace
 func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) {
 	request := fmt.Sprintf(createWorkspaceRequest, label, description)
-	fmt.Println(request)
+
 	response, err := c.QueryHouston(request)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateWorkspace Failed")
 	}
 
 	return response.Data.CreateWorkspace, nil
+}
+
+// DeleteWorkspace will send a request to houston to create a new workspace
+// Returns an object representing deleted workspace
+func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
+	request := fmt.Sprintf(deleteWorkspaceRequest, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "DeleteWorkspace Failed")
+	}
+
+	return response.Data.DeleteWorkspace, nil
 }
 
 // FetchDeployments will request all airflow deployments from Houston

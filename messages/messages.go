@@ -54,6 +54,7 @@ var (
 	HOUSTON_OAUTH_DISABLED           = "OAuth is disabled, contact administrator or defer to basic auth"
 	HOUSTON_INVALID_DEPLOYMENT_KEY   = "Invalid deployment selection"
 	HOUSTON_WORKSPACE_CREATE_SUCCESS = "Successfully created %s (%s)"
+	HOUSTON_WORKSPACE_DELETE_SUCCESS = "Succesfully deleted %s (%s)"
 
 	INPUT_PASSWORD    = "Password: "
 	INPUT_USERNAME    = "Username (leave blank for oAuth): "
