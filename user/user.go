@@ -31,9 +31,9 @@ func CreateUser(skipVerify bool, emailIn string) error {
 		}
 	}
 
-	status, houstonErr := API.CreateUser(email, password)
-	if houstonErr != nil {
-		return houstonErr
+	status, err := API.CreateUser(email, password)
+	if err != nil {
+		return err
 	}
 
 	config.CFG.CloudAPIToken.SetProjectString(status.Value)
