@@ -3,13 +3,12 @@ package cmd
 import (
 	"github.com/astronomerio/astro-cli/auth"
 	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/messages"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var (
 	domainOverride string
+	oAuthOnly      bool
 
 	authRootCmd = &cobra.Command{
 		Use:   "auth",
@@ -39,6 +38,7 @@ func init() {
 	// Auth login
 	authRootCmd.AddCommand(authLoginCmd)
 	authLoginCmd.Flags().StringVarP(&domainOverride, "domain", "d", "", "pass the cluster domain for authentication")
+	authLoginCmd.Flags().BoolVarP(&oAuthOnly, "oauth", "o", false, "do not prompt for local auth")
 	// Auth logout
 	authRootCmd.AddCommand(authLogoutCmd)
 }
@@ -48,17 +48,10 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		config.CFG.CloudDomain.SetProjectString(domainOverride)
 	}
 
-	projectCloudDomain := config.CFG.CloudDomain.GetProjectString()
-	globalCloudDomain := config.CFG.CloudDomain.GetHomeString()
-
-	if len(projectCloudDomain) == 0 && len(globalCloudDomain) == 0 {
-		return errors.New(messages.CONFIG_DOMAIN_NOT_SET_ERROR)
-	}
-
-	auth.Login()
+	auth.Login(oAuthOnly)
 	return nil
 }
 
 func authLogout(cmd *cobra.Command, args []string) {
-	auth.Logout()
+	// auth.Logout()
 }

@@ -142,7 +142,7 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	// }
 
 	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", config.APIURL(), &doOpts)
+	httpResponse, err := c.HTTPClient.Do("POST", config.APIUrl(), &doOpts)
 	if err != nil {
 		return nil, err
 	}

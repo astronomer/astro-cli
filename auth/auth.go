@@ -32,7 +32,8 @@ func basicAuth(username string) string {
 
 // oAuth handles oAuth with houston api
 func oAuth(oAuthUrl string) string {
-	fmt.Sprintf(messages.HOUSTON_OAUTH_REDIRECT, oAuthUrl)
+	fmt.Println("\n" + messages.HOUSTON_OAUTH_REDIRECT)
+	fmt.Println(oAuthUrl + "\n")
 	authSecret := input.InputText(messages.INPUT_OAUTH_TOKEN)
 
 	token, err := API.CreateOAuthToken(authSecret)
@@ -44,12 +45,12 @@ func oAuth(oAuthUrl string) string {
 }
 
 // registryAuth authenticates with the private registry
-func registryAuth(username, password string) error {
-	registry := config.CFG.RegistryAuthority.GetString()
+func registryAuth() error {
+	registry := config.RegistryUrl()
+	token := config.CFG.CloudAPIToken.GetProjectString()
 
-	dockerErr := docker.ExecLogin(registry, username, password)
+	dockerErr := docker.ExecLogin(registry, "user", token)
 	if dockerErr != nil {
-		// Println instead of panic to prevent excessive error logging to stdout on a failed login
 		fmt.Println(dockerErr)
 		os.Exit(1)
 	}
@@ -59,8 +60,8 @@ func registryAuth(username, password string) error {
 	return nil
 }
 
-// Login logs a user into the docker registry. Will need to login to Houston next.
-func Login() {
+// Login handles authentication to houston and registry
+func Login(oAuthOnly bool) {
 	token := ""
 	authConfig, err := API.GetAuthConfig()
 	if err != nil {
@@ -68,7 +69,11 @@ func Login() {
 		os.Exit(1)
 	}
 
-	username := input.InputText(messages.INPUT_USERNAME)
+	username := ""
+	if !oAuthOnly {
+		username = input.InputText(messages.INPUT_USERNAME)
+	}
+
 	if len(username) == 0 {
 		if authConfig.GoogleEnabled {
 			token = oAuth(authConfig.OauthUrl)
@@ -85,13 +90,11 @@ func Login() {
 	}
 
 	config.CFG.CloudAPIToken.SetProjectString(token)
-
-	// pass successful credentials to config
-	// TODO
-	// config.CFG.RegistryAuth.SetProjectString(config.EncodeAuth(username, password))
+	registryAuth()
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
 func Logout() {
-	docker.Exec("logout", config.CFG.RegistryAuthority.GetString())
+	// forget jwt
+	config.CFG.CloudAPIToken.SetProjectString("")
 }

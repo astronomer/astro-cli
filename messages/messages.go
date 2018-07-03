@@ -50,7 +50,7 @@ var (
 	HOUSTON_DEPLOYING_PROMPT        = "Deploying: %s\n"
 	HOUSTON_NO_DEPLOYMENTS_ERROR    = "No airflow deployments found"
 	HOUSTON_SELECT_DEPLOYMENT_PROMT = "Select which airflow deployment you want to deploy to:"
-	HOUSTON_OAUTH_REDIRECT          = "Please visit the following URL, authenticate and paste token in next prompt \n%s"
+	HOUSTON_OAUTH_REDIRECT          = "Please visit the following URL, authenticate and paste token in next prompt "
 	HOUSTON_OAUTH_DISABLED          = "OAuth is disabled, contact administrator or defer to basic auth"
 	HOUSTON_INVALID_DEPLOYMENT_KEY  = "Invalid deployment selection"
 
