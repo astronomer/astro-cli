@@ -1,12 +1,11 @@
 package config
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -32,17 +31,16 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		CloudDomain:       newCfg("cloud.domain", true, ""),
-		CloudAPIProtocol:  newCfg("cloud.api.protocol", true, "https"),
-		CloudAPIPort:      newCfg("cloud.api.port", true, "443"),
-		CloudAPIToken:     newCfg("cloud.api.token", true, ""),
-		PostgresUser:      newCfg("postgres.user", true, "postgres"),
-		PostgresPassword:  newCfg("postgres.password", true, "postgres"),
-		PostgresHost:      newCfg("postgres.host", true, "postgres"),
-		PostgresPort:      newCfg("postgres.port", true, "5432"),
-		RegistryAuthority: newCfg("docker.registry.authority", true, ""),
-		RegistryAuth:      newCfg("docker.registry.auth", true, ""),
-		ProjectName:       newCfg("project.name", true, ""),
+		CloudDomain:      newCfg("cloud.domain", true, ""),
+		CloudAPIProtocol: newCfg("cloud.api.protocol", true, "https"),
+		CloudAPIPort:     newCfg("cloud.api.port", true, "443"),
+		CloudAPIToken:    newCfg("cloud.api.token", true, ""),
+		LocalAPIURL:      newCfg("local.api.url", true, ""),
+		PostgresUser:     newCfg("postgres.user", true, "postgres"),
+		PostgresPassword: newCfg("postgres.password", true, "postgres"),
+		PostgresHost:     newCfg("postgres.host", true, "postgres"),
+		PostgresPort:     newCfg("postgres.port", true, "5432"),
+		ProjectName:      newCfg("project.name", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -74,7 +72,7 @@ func initHome() {
 	if !fileutil.Exists(HomeConfigFile) {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
-			fmt.Printf("Error creating default config in home dir: %s", err)
+			fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
 			return
 		}
 	}
@@ -82,7 +80,7 @@ func initHome() {
 	// Read in home config
 	err := viperHome.ReadInConfig()
 	if err != nil {
-		fmt.Printf("Error reading config in home dir: %s", err)
+		fmt.Printf(messages.CONFIG_READ_ERROR, err)
 		return
 	}
 }
@@ -97,7 +95,7 @@ func initProject() {
 
 	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
-		fmt.Printf("Error searching for project dir: %v\n", searchErr)
+		fmt.Printf(messages.CONFIG_SEARCH_ERROR+"\n", searchErr)
 		return
 	}
 
@@ -115,7 +113,7 @@ func initProject() {
 	// Read in project config
 	readErr := viperProject.ReadInConfig()
 	if readErr != nil {
-		fmt.Printf("Error reading config in project dir: %s", readErr)
+		fmt.Printf(messages.CONFIG_READ_ERROR, readErr)
 	}
 }
 
@@ -126,7 +124,7 @@ func CreateProjectConfig(projectPath string) {
 
 	err := CreateConfig(viperProject, projectConfigDir, projectConfigFile)
 	if err != nil {
-		fmt.Printf("Error creating default config in project dir: %s", err)
+		fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
 		return
 	}
 
@@ -143,12 +141,12 @@ func configExists(v *viper.Viper) bool {
 func CreateConfig(v *viper.Viper, path, file string) error {
 	err := os.MkdirAll(path, 0770)
 	if err != nil {
-		return errors.Wrap(err, "Error creating config directory")
+		return errors.Wrap(err, messages.CONFIG_CREATE_DIR_ERROR)
 	}
 
 	_, err = os.Create(file)
 	if err != nil {
-		return errors.Wrap(err, "Error creating config file")
+		return errors.Wrap(err, messages.CONFIG_CREATE_FILE_ERROR)
 	}
 	os.Chmod(file, 0600)
 
@@ -176,57 +174,31 @@ func ProjectRoot() (string, error) {
 func saveConfig(v *viper.Viper, file string) error {
 	err := v.WriteConfigAs(file)
 	if err != nil {
-		return errors.Wrap(err, "Error saving config")
+		return errors.Wrap(err, messages.CONFIG_SAVE_ERROR)
 	}
 	return nil
 }
 
-// APIURL will return a full qualified API url
-func APIURL() string {
+func getUrl(svc string) string {
 	return fmt.Sprintf(
-		"%s://houston.%s:%s/v1",
+		"%s://%s.%s:%s/v1",
 		CFG.CloudAPIProtocol.GetString(),
+		svc,
 		CFG.CloudDomain.GetString(),
 		CFG.CloudAPIPort.GetString(),
 	)
 }
 
-// GetDecodedAuth fetches auth string from config, decodes and
-// returns username password
-func GetDecodedAuth() (string, string, error) {
-	encodedAuth := CFG.RegistryAuth.GetString()
-	return DecodeAuth(encodedAuth)
+// APIUrl will return a full qualified API url
+func APIUrl() string {
+	if len(CFG.LocalAPIURL.GetString()) != 0 {
+		return CFG.LocalAPIURL.GetString()
+	} else {
+		return getUrl("houston")
+	}
 }
 
-// EncodeAuth creates a base64 encoded string to containing authorization information
-func EncodeAuth(username, password string) string {
-	authStr := username + ":" + password
-	msg := []byte(authStr)
-	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(msg)))
-	base64.StdEncoding.Encode(encoded, msg)
-	return string(encoded)
-}
-
-// DecodeAuth decodes a base64 encoded string and returns username and password
-func DecodeAuth(authStr string) (string, string, error) {
-	if authStr == "" {
-		return "", "", nil
-	}
-
-	decLen := base64.StdEncoding.DecodedLen(len(authStr))
-	decoded := make([]byte, decLen)
-	authByte := []byte(authStr)
-	n, err := base64.StdEncoding.Decode(decoded, authByte)
-	if err != nil {
-		return "", "", err
-	}
-	if n > decLen {
-		return "", "", errors.Errorf("Something went wrong decoding auth config")
-	}
-	arr := strings.SplitN(string(decoded), ":", 2)
-	if len(arr) != 2 {
-		return "", "", errors.Errorf("Invalid auth configuration file")
-	}
-	password := strings.Trim(arr[1], "\x00")
-	return arr[0], password, nil
+// RegistryUrl will return a fully qualified houston URL
+func RegistryUrl() string {
+	return getUrl("registry")
 }

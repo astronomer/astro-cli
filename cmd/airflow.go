@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/astronomerio/astro-cli/messages"
+
 	"github.com/iancoleman/strcase"
 	"github.com/spf13/cobra"
 
@@ -25,38 +27,41 @@ var (
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
 		Short: "Manage airflow projects and deployments",
-		Long:  "Manage airflow projects and deployments",
+		Long:  "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
 	}
 
 	airflowInitCmd = &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold a new airflow project",
-		Long:  "Scaffold a new airflow project",
+		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
 		RunE:  airflowInit,
 	}
 
 	airflowCreateCmd = &cobra.Command{
-		Use:   "create",
-		Short: "Create a new airflow deployment",
-		Long:  "Create a new airflow deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE:  airflowCreate,
+		Use:        "create",
+		Short:      "Create a new airflow deployment",
+		Long:       "Create a new airflow deployment",
+		Args:       cobra.ExactArgs(1),
+		RunE:       airflowCreate,
+		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment create"),
 	}
 
 	airflowListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List airflow clusters",
-		Long:  "List all created airflow clusters",
-		RunE:  airflowList,
+		Use:        "list",
+		Short:      "List airflow clusters",
+		Long:       "List all created airflow clusters",
+		RunE:       airflowList,
+		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment list"),
 	}
 
 	airflowDeployCmd = &cobra.Command{
-		Use:    "deploy",
-		Short:  "Deploy an airflow project",
-		Long:   "Deploy an airflow project to a given deployment",
-		Args:   cobra.MaximumNArgs(1),
-		PreRun: ensureProjectDir,
-		RunE:   airflowDeploy,
+		Use:        "deploy",
+		Short:      "Deploy an airflow project",
+		Long:       "Deploy an airflow project to a given deployment",
+		Args:       cobra.MaximumNArgs(1),
+		PreRun:     ensureProjectDir,
+		RunE:       airflowDeploy,
+		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment list"),
 	}
 
 	airflowStartCmd = &cobra.Command{
@@ -128,7 +133,7 @@ func init() {
 
 func ensureProjectDir(cmd *cobra.Command, args []string) {
 	if !(len(projectRoot) > 0) {
-		fmt.Println("Error: Not in an astronomer project directory")
+		fmt.Println(messages.CONFIG_PROJECT_DIR_ERROR)
 		os.Exit(1)
 	}
 }
@@ -145,7 +150,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 			MatchString
 
 		if !projectNameValid(projectName) {
-			return errors.New("Project name is invalid")
+			return errors.New(messages.CONFIG_PROJECT_NAME_ERROR)
 		}
 	} else {
 		projectDirectory := filepath.Base(path)
@@ -160,9 +165,9 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	airflow.Init(path)
 
 	if exists {
-		fmt.Printf("Reinitialized existing astronomer project in %s\n", path)
+		fmt.Printf(messages.CONFIG_REINIT_PROJECT_CONFIG+"\n", path)
 	} else {
-		fmt.Printf("Initialized empty astronomer project in %s\n", path)
+		fmt.Printf(messages.CONFIG_INIT_PROJECT_CONFIG+"\n", path)
 	}
 
 	return nil
@@ -182,7 +187,7 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 		releaseName = args[0]
 	}
 	if git.HasUncommitedChanges() && !forceDeploy {
-		fmt.Println("Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy.")
+		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
 	return airflow.Deploy(projectRoot, releaseName)

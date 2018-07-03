@@ -1,28 +1,45 @@
 package cmd
 
 import (
-	"fmt"
-
+	"github.com/astronomerio/astro-cli/version"
 	"github.com/spf13/cobra"
 )
 
 var (
-	version    string
-	gitCommit  string
-	versionCmd = &cobra.Command{
+	currVersion string
+	currCommit  string
+	versionCmd  = &cobra.Command{
 		Use:   "version",
 		Short: "Astronomer CLI version",
-		Long:  "Astronomer CLI version",
+		Long:  "The astro-cli semantic version and git commit tied to that release.",
 		RunE:  printVersion,
+	}
+
+	upgradeCmd = &cobra.Command{
+		Use:   "upgrade",
+		Short: "Check for newer version of Astronomer CLI",
+		Long:  "Check for newer version of Astronomer CLI",
+		RunE:  upgradeCheck,
 	}
 )
 
 func init() {
 	RootCmd.AddCommand(versionCmd)
+	RootCmd.AddCommand(upgradeCmd)
 }
 
 func printVersion(cmd *cobra.Command, args []string) error {
-	fmt.Printf("Astro CLI Version: %s\n", version)
-	fmt.Printf("Git Commit: %s\n", gitCommit)
+	err := version.PrintVersion(currVersion, currCommit)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func upgradeCheck(cmd *cobra.Command, args []string) error {
+	err := version.CheckForUpdate(currVersion, currCommit)
+	if err != nil {
+		return err
+	}
 	return nil
 }

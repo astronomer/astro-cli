@@ -13,6 +13,7 @@ import (
 	"github.com/astronomerio/astro-cli/airflow/include"
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 )
@@ -107,9 +108,9 @@ func Create(title string) error {
 	fmt.Println(response.Message)
 
 	if response.Success {
-		fmt.Printf("\nAirflow Dashboard: https://%s-airflow.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-		fmt.Printf("Flower Dashboard: https://%s-flower.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-		fmt.Printf("Grafana Dashboard: https://%s-grafana.%s\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+		fmt.Printf("\n"+messages.EE_LINK_AIRFLOW+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+		fmt.Printf(messages.EE_LINK_FLOWER+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+		fmt.Printf(messages.EE_LINK_GRAFANA+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
 	}
 
 	return nil
@@ -133,7 +134,7 @@ func validateOrCreateProjectName(path, projectName string) (string, error) {
 	if len(projectName) != 0 {
 		projectNameValid := regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).MatchString
 		if !projectNameValid(projectName) {
-			return "", errors.New("Project name is invalid")
+			return "", errors.New(messages.CONFIG_PROJECT_NAME_ERROR)
 		}
 	} else {
 		projectDirectory := filepath.Base(path)

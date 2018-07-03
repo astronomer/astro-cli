@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/pkg/errors"
 )
 
@@ -20,7 +21,7 @@ func ListRepositoryTags(repository string) ([]string, error) {
 	registry := config.CFG.RegistryAuthority.GetString()
 	user, password, err := config.GetDecodedAuth()
 	if err != nil {
-		return []string{}, errors.Wrap(err, "Error fetching credentials")
+		return []string{}, errors.Wrap(err, messages.REGISTRY_DECODE_AUTH_ERROR)
 	}
 
 	// Get an HTTP Client
@@ -30,7 +31,7 @@ func ListRepositoryTags(repository string) ([]string, error) {
 	url := fmt.Sprintf("https://%s/v2/%s/tags/list", registry, repository)
 	req, createErr := http.NewRequest("GET", url, nil)
 	if createErr != nil {
-		return []string{}, errors.Wrap(createErr, "Error requesting repositories")
+		return []string{}, errors.Wrap(createErr, messages.REGISTRY_TAGS_REQUEST_ERROR)
 	}
 	req.SetBasicAuth(user, password)
 
@@ -38,17 +39,13 @@ func ListRepositoryTags(repository string) ([]string, error) {
 	resp, reqErr := client.Do(req)
 
 	if reqErr != nil {
-		return []string{}, errors.Wrap(reqErr, "Error requesting repositories")
+		return []string{}, errors.Wrap(reqErr, messages.REGISTRY_TAGS_REQUEST_ERROR)
 	}
 
 	// TODO Remove config suggestion and 401 check once houston is handling auth
 	if resp.StatusCode == 401 {
 
-		fmt.Println(`Failed to authenticate to registry
-	
-	You can re-authenticate to the registry with
-		astro auth login
-		`)
+		fmt.Println(messages.REGISTRY_AUTH_FAIL)
 		return []string{}, errors.New("")
 	}
 
