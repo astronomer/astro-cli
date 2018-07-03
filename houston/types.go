@@ -6,8 +6,11 @@ type HoustonResponse struct {
 		CreateDeployment *Status      `json:"createDeployment,omitempty"`
 		CreateToken      *AuthUser    `json:"createToken,omitempty"`
 		CreateUser       *Token       `json:"createUser,omitempty"`
+		CreateWorkspace  *Workspace   `json:"createTeam,omitempty"`
+		DeleteWorkspace  *Workspace   `json:"deleteTeam,omitempty"`
 		FetchDeployments []Deployment `json:"fetchDeployments,omitempty"`
 		GetAuthConfig    *AuthConfig  `json:"authConfig,omitempty"`
+		GetWorkspace     []Workspace  `json:"teams,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -83,4 +86,15 @@ type User struct {
 	// created at
 	// updated at
 	// profile
+}
+
+type Workspace struct {
+	Uuid        string `json:"uuid"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Active      bool   `json:"active"`
+	Users       []User `json:"users"`
+	// groups
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }

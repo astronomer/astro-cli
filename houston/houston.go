@@ -29,6 +29,21 @@ var (
 		}
 	  }`
 
+	createWorkspaceRequest = `
+	mutation CreateWorkspace {
+		createTeam(
+			label: "%s",
+			description: "%s"
+		) {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
 	createUserRequest = `
 	mutation CreateUser {
 		createUser(
@@ -70,6 +85,18 @@ var (
 	  }
 	}`
 
+	deleteWorkspaceRequest = `
+	mutation DeleteWorkspace {
+		deleteTeam(teamUuid: "%s") {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
 	fetchDeploymentsRequest = `
 	query FetchAllDeployments {
 	  fetchDeployments {
@@ -102,6 +129,18 @@ var (
 		  googleOAuthUrl
 		}
 	  }`
+
+	getWorkspaceAllRequest = `
+	query GetWorkspaces {
+		teams {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
 	// log = logrus.WithField("package", "houston")
 )
 
@@ -231,8 +270,33 @@ func (c *Client) CreateUser(email string, password string) (*Token, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateUser Failed")
 	}
-	fmt.Println(response)
 	return response.Data.CreateUser, nil
+}
+
+// CreateWorkspace will send a request to houston to create a new workspace
+// Returns an object representing created workspace
+func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) {
+	request := fmt.Sprintf(createWorkspaceRequest, label, description)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateWorkspace Failed")
+	}
+
+	return response.Data.CreateWorkspace, nil
+}
+
+// DeleteWorkspace will send a request to houston to create a new workspace
+// Returns an object representing deleted workspace
+func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
+	request := fmt.Sprintf(deleteWorkspaceRequest, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "DeleteWorkspace Failed")
+	}
+
+	return response.Data.DeleteWorkspace, nil
 }
 
 // FetchDeployments will request all airflow deployments from Houston
@@ -283,4 +347,16 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 	}
 
 	return response.Data.GetAuthConfig, nil
+}
+
+// GetWorkspaceAll returns all available workspaces from houston API
+func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
+	request := getWorkspaceAllRequest
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetWorkspaceAll Failed")
+	}
+
+	return response.Data.GetWorkspace, nil
 }

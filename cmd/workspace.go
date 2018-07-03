@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"github.com/astronomerio/astro-cli/workspace"
 	"github.com/spf13/cobra"
 )
 
 var (
+	createDesc string
+
 	workspaceRootCmd = &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"wo", "ws"},
@@ -24,6 +27,7 @@ var (
 		Use:   "create",
 		Short: "Create an astronomer workspaces",
 		Long:  "Create an astronomer workspaces",
+		Args:  cobra.ExactArgs(1),
 		RunE:  workspaceCreate,
 	}
 
@@ -31,6 +35,7 @@ var (
 		Use:   "delete",
 		Short: "Delete an astronomer workspace",
 		Long:  "Delete an astronomer workspace",
+		Args:  cobra.ExactArgs(1),
 		RunE:  workspaceDelete,
 	}
 
@@ -51,6 +56,7 @@ func init() {
 
 	// workspace create
 	workspaceRootCmd.AddCommand(workspaceCreateCmd)
+	workspaceCreateCmd.Flags().StringVarP(&createDesc, "desc", "d", "", "description for your new workspace")
 
 	// workspace delete
 	workspaceRootCmd.AddCommand(workspaceDeleteCmd)
@@ -60,16 +66,19 @@ func init() {
 }
 
 func workspaceCreate(cmd *cobra.Command, args []string) error {
-	return nil
+	if len(createDesc) == 0 {
+		createDesc = "N/A"
+	}
+	return workspace.Create(args[0], createDesc)
 }
 
 func workspaceList(cmd *cobra.Command, args []string) error {
-	return nil
+	return workspace.List()
+
 }
 
-// TODO
 func workspaceDelete(cmd *cobra.Command, args []string) error {
-	return nil
+	return workspace.Delete(args[0])
 }
 
 // TODO
