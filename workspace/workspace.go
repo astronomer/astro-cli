@@ -19,9 +19,7 @@ func Create(label, desc string) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf(messages.HOUSTON_WORKSPACE_CREATE_SUCCESS, w.Label, w.Description)
-
+	fmt.Printf(messages.HOUSTON_WORKSPACE_CREATE_SUCCESS, w.Label, w.Uuid)
 	return nil
 }
 

@@ -6,7 +6,7 @@ type HoustonResponse struct {
 		CreateDeployment *Status      `json:"createDeployment,omitempty"`
 		CreateToken      *AuthUser    `json:"createToken,omitempty"`
 		CreateUser       *Token       `json:"createUser,omitempty"`
-		CreateWorkspace  *Workspace   `json:"createWorkspace,omitempty"`
+		CreateWorkspace  *Workspace   `json:"createTeam,omitempty"`
 		FetchDeployments []Deployment `json:"fetchDeployments,omitempty"`
 		GetAuthConfig    *AuthConfig  `json:"authConfig,omitempty"`
 		GetWorkspace     []Workspace  `json:"teams,omitempty"`
