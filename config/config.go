@@ -179,16 +179,26 @@ func saveConfig(v *viper.Viper, file string) error {
 	return nil
 }
 
-// APIURL will return a full qualified API url
-func APIURL() string {
+func getUrl(svc string) string {
+	return fmt.Sprintf(
+		"%s://%s.%s:%s/v1",
+		CFG.CloudAPIProtocol.GetString(),
+		svc,
+		CFG.CloudDomain.GetString(),
+		CFG.CloudAPIPort.GetString(),
+	)
+}
+
+// APIUrl will return a full qualified API url
+func APIUrl() string {
 	if len(CFG.LocalAPIURL.GetString()) != 0 {
 		return CFG.LocalAPIURL.GetString()
 	} else {
-		return fmt.Sprintf(
-			"%s://houston.%s:%s/v1",
-			CFG.CloudAPIProtocol.GetString(),
-			CFG.CloudDomain.GetString(),
-			CFG.CloudAPIPort.GetString(),
-		)
+		return getUrl("houston")
 	}
+}
+
+// RegistryUrl will return a fully qualified houston URL
+func RegistryUrl() string {
+	return getUrl("registry")
 }
