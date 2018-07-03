@@ -29,6 +29,21 @@ var (
 		}
 	  }`
 
+	createWorkspaceRequest = `
+	mutation CreateWorkspace {
+		createTeam(
+			label: "%s",
+			description: "%s"
+		) {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
 	createUserRequest = `
 	mutation CreateUser {
 		createUser(
@@ -243,8 +258,18 @@ func (c *Client) CreateUser(email string, password string) (*Token, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateUser Failed")
 	}
-	fmt.Println(response)
 	return response.Data.CreateUser, nil
+}
+
+func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) {
+	request := fmt.Sprintf(createWorkspaceRequest, label, description)
+	fmt.Println(request)
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateWorkspace Failed")
+	}
+
+	return response.Data.CreateWorkspace, nil
 }
 
 // FetchDeployments will request all airflow deployments from Houston

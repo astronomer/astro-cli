@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 )
 
@@ -12,6 +13,18 @@ var (
 	api  = houston.NewHoustonClient(http)
 )
 
+// Create a workspace
+func Create(label, desc string) error {
+	w, err := api.CreateWorkspace(label, desc)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(messages.HOUSTON_WORKSPACE_CREATE_SUCCESS, w.Label, w.Description)
+
+	return nil
+}
+
 // List all workspaces
 func List() error {
 	ws, err := api.GetWorkspaceAll()
@@ -19,7 +32,6 @@ func List() error {
 		return err
 	}
 
-	fmt.Println(ws)
 	for _, w := range ws {
 		wsTitle := "Title     : %s\n"
 		wsId := "Id        : %s\n"
