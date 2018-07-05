@@ -37,23 +37,6 @@ var (
 		RunE:  airflowInit,
 	}
 
-	airflowCreateCmd = &cobra.Command{
-		Use:        "create",
-		Short:      "Create a new airflow deployment",
-		Long:       "Create a new airflow deployment",
-		Args:       cobra.ExactArgs(1),
-		RunE:       airflowCreate,
-		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment create"),
-	}
-
-	airflowListCmd = &cobra.Command{
-		Use:        "list",
-		Short:      "List airflow clusters",
-		Long:       "List all created airflow clusters",
-		RunE:       airflowList,
-		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment list"),
-	}
-
 	airflowDeployCmd = &cobra.Command{
 		Use:        "deploy",
 		Short:      "Deploy an airflow project",
@@ -107,12 +90,6 @@ func init() {
 	// Airflow init
 	airflowInitCmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
 	airflowRootCmd.AddCommand(airflowInitCmd)
-
-	// Airflow create
-	airflowRootCmd.AddCommand(airflowCreateCmd)
-
-	// Airflow list
-	airflowRootCmd.AddCommand(airflowListCmd)
 
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
@@ -171,14 +148,6 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func airflowCreate(cmd *cobra.Command, args []string) error {
-	return airflow.Create(args[0])
-}
-
-func airflowList(cmd *cobra.Command, args []string) error {
-	return airflow.List()
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {

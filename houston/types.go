@@ -3,12 +3,13 @@ package houston
 // HoustonResponse wraps all houston response structs used for json marashalling
 type HoustonResponse struct {
 	Data struct {
-		CreateDeployment *Status      `json:"createDeployment,omitempty"`
+		CreateDeployment *Deployment  `json:"createDeployment,omitempty"`
 		CreateToken      *AuthUser    `json:"createToken,omitempty"`
 		CreateUser       *Token       `json:"createUser,omitempty"`
 		CreateWorkspace  *Workspace   `json:"createTeam,omitempty"`
+		DeleteDeployment *Deployment  `json:"deleteDeployment,omitempty`
 		DeleteWorkspace  *Workspace   `json:"deleteTeam,omitempty"`
-		FetchDeployments []Deployment `json:"fetchDeployments,omitempty"`
+		GetDeployments   []Deployment `json:"deployments,omitempty"`
 		GetAuthConfig    *AuthConfig  `json:"authConfig,omitempty"`
 		GetWorkspace     []Workspace  `json:"teams,omitempty"`
 	} `json:"data"`
@@ -32,9 +33,12 @@ type Decoded struct {
 type Deployment struct {
 	Id          string `json:"uuid"`
 	Type        string `json:"type"`
-	Title       string `json:"title"`
-	ReleaseName string `json:"release_name"`
+	Title       string `json:"label"`
+	ReleaseName string `json:"releaseName"`
 	Version     string `json:"version"`
+	Team        string `json:"team"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
 }
 
 // Email
