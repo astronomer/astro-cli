@@ -113,7 +113,7 @@ var (
 
 	fetchDeploymentsRequest = `
 	query GetDeployments {
-	  deployments {
+	  deployments(teamUuid: "%s") {
 		uuid
 		type
 		label
@@ -229,8 +229,8 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
 // Returns a StatusResponse which contains the unique id of deployment
-func (c *Client) CreateDeployment(title, teamId string) (*Deployment, error) {
-	request := fmt.Sprintf(createDeploymentRequest, title, teamId)
+func (c *Client) CreateDeployment(title, wsId string) (*Deployment, error) {
+	request := fmt.Sprintf(createDeploymentRequest, title, wsId)
 	fmt.Println(request)
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -317,8 +317,8 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 
 // FetchDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
-func (c *Client) FetchDeployments() ([]Deployment, error) {
-	request := fetchDeploymentsRequest
+func (c *Client) FetchDeployments(ws string) ([]Deployment, error) {
+	request := fmt.Sprintf(fetchDeploymentsRequest, ws)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {

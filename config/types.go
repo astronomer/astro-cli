@@ -19,6 +19,7 @@ type cfgs struct {
 	PostgresHost     cfg
 	PostgresPort     cfg
 	ProjectName      cfg
+	ProjectWorkspace cfg
 }
 
 // Creates a new cfg struct

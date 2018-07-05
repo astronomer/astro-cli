@@ -242,9 +242,9 @@ func PS(airflowHome string) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, name string) error {
+func Deploy(path, name, wsId string) error {
 	if name == "" {
-		deployments, err := api.FetchDeployments()
+		deployments, err := api.FetchDeployments(wsId)
 		if err != nil {
 			return err
 		}
@@ -302,9 +302,10 @@ func Deploy(path, name string) error {
 	imageBuild(path, deployImage)
 
 	// Tag our build with remote registry and incremented tag
-	tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
-	remoteImage := fmt.Sprintf("%s/%s",
-		config.CFG.RegistryAuthority.GetString(), imageName(name, tag))
+	// tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
+	// remoteImage := fmt.Sprintf("%s/%s",
+	// 	config.CFG.RegistryAuthority.GetString(), imageName(name, tag))
+	remoteImage := "TODO"
 	docker.Exec("tag", deployImage, remoteImage)
 
 	// Push image to registry
