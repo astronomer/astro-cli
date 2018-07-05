@@ -16,16 +16,17 @@ var (
 	createDeploymentRequest = `
 	mutation CreateDeployment {
 		createDeployment(	
-			title: "%s",
-			organizationUuid: "",
-			teamUuid: "",
+			label: "%s",
 			type: "airflow",
-			version: ""
+			teamUuid: "%s"
 		) {	
-			success,
-			message,
-			id,
-			code
+			uuid
+			type
+			label
+			releaseName
+			version
+			createdAt
+			updatedAt
 		}
 	  }`
 
@@ -85,6 +86,19 @@ var (
 	  }
 	}`
 
+	deleteDeploymentRequest = `
+	mutation DeleteDeployment {
+		deleteDeployment(deploymentUuid: "%s") {
+			uuid
+			type
+			label
+			releaseName
+			version
+			createdAt
+			updatedAt
+		}
+	}`
+
 	deleteWorkspaceRequest = `
 	mutation DeleteWorkspace {
 		deleteTeam(teamUuid: "%s") {
@@ -98,26 +112,30 @@ var (
 	}`
 
 	fetchDeploymentsRequest = `
-	query FetchAllDeployments {
-	  fetchDeployments {
-	    uuid
+	query GetDeployments {
+	  deployments {
+		uuid
 		type
-		title
-		release_name
+		label
+		releaseName
 		version
+		createdAt
+		updatedAt
 	  }
 	}`
 
 	fetchDeploymentRequest = `
-	query FetchDeployment {
-	  fetchDeployments(
+	query GetDeployment {
+	  deployments(
 			deploymentUuid: "%s"
 		) {	
 			uuid
 			type
-			title
-			release_name
+			label
+			releaseName
 			version
+			createdAt
+			updatedAt
 	  }
 	}`
 
@@ -163,7 +181,6 @@ type GraphQLQuery struct {
 
 // QueryHouston executes a query against the Houston API
 func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
-	// logger := log.WithField("function", "QueryHouston")
 	doOpts := httputil.DoOptions{
 		Data: GraphQLQuery{query},
 		Headers: map[string]string{
@@ -198,13 +215,9 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		Body: string(body),
 	}
 
-	// logger.Debug(query)
-	// logger.Debug(response.Body)
-
 	decode := HoustonResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		//logger.Error(err)
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
 
@@ -216,15 +229,11 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
 // Returns a StatusResponse which contains the unique id of deployment
-func (c *Client) CreateDeployment(title string) (*Status, error) {
-	// logger := log.WithField("method", "CreateDeployment")
-	// logger.Debug("Entered CreateDeployment")
-
-	request := fmt.Sprintf(createDeploymentRequest, title)
-
+func (c *Client) CreateDeployment(title, teamId string) (*Deployment, error) {
+	request := fmt.Sprintf(createDeploymentRequest, title, teamId)
+	fmt.Println(request)
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		// logger.Error(err)
 		return nil, errors.Wrap(err, "CreateDeployment Failed")
 	}
 
@@ -234,14 +243,10 @@ func (c *Client) CreateDeployment(title string) (*Status, error) {
 // CreateBasicToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a Token structure with the users ID and Token inside.
 func (c *Client) CreateBasicToken(email string, password string) (*AuthUser, error) {
-	// logger := log.WithField("method", "CreateToken")
-	// logger.Debug("Entered CreateToken")
-
 	request := fmt.Sprintf(createBasicTokenRequest, email, password)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		// logger.Error(err)
 		return nil, errors.Wrap(err, "CreateBasicToken Failed")
 	}
 
@@ -286,6 +291,17 @@ func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) 
 	return response.Data.CreateWorkspace, nil
 }
 
+func (c *Client) DeleteDeployment(uuid string) (*Deployment, error) {
+	request := fmt.Sprintf(deleteDeploymentRequest, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "DeleteDeployment Failed")
+	}
+
+	return response.Data.DeleteDeployment, nil
+}
+
 // DeleteWorkspace will send a request to houston to create a new workspace
 // Returns an object representing deleted workspace
 func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
@@ -302,38 +318,30 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 // FetchDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
 func (c *Client) FetchDeployments() ([]Deployment, error) {
-	// logger := log.WithField("method", "FetchDeployments")
-	// logger.Debug("Entered FetchDeployments")
-
 	request := fetchDeploymentsRequest
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		// logger.Error(err)
 		return nil, errors.Wrap(err, "FetchDeployments Failed")
 	}
 
-	return response.Data.FetchDeployments, nil
+	return response.Data.GetDeployments, nil
 }
 
 // FetchDeployment will request a specific airflow deployments from Houston by uuid
 // Returns a Deployment structure with deployment details
 func (c *Client) FetchDeployment(deploymentUuid string) (*Deployment, error) {
-	// logger := log.WithField("method", "FetchDeployments")
-	// logger.Debug("Entered FetchDeployments")
-
 	request := fmt.Sprintf(fetchDeploymentRequest, deploymentUuid)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		// logger.Error(err)
 		return nil, errors.Wrap(err, "FetchDeployment Failed")
 	}
 
-	if len(response.Data.FetchDeployments) == 0 {
+	if len(response.Data.GetDeployments) == 0 {
 		return nil, fmt.Errorf("deployment not found for uuid \"%s\"", deploymentUuid)
 	}
-	return &response.Data.FetchDeployments[0], nil
+	return &response.Data.GetDeployments[0], nil
 }
 
 // GetAuthConfig will fetch authentication configuration from houston
@@ -342,7 +350,6 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		// logger.Error(err)
 		return nil, errors.Wrap(err, "GetAuthConfig Failed")
 	}
 

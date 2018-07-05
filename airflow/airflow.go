@@ -11,7 +11,6 @@ import (
 	"github.com/iancoleman/strcase"
 
 	"github.com/astronomerio/astro-cli/airflow/include"
-	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
@@ -91,42 +90,6 @@ func Init(path string) error {
 	// Initialize files
 	initFiles(path, files)
 
-	return nil
-}
-
-// Create new airflow deployment
-func Create(title string) error {
-	response, err := api.CreateDeployment(title)
-	if err != nil {
-		return err
-	}
-	deployment, err := api.FetchDeployment(response.Id)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(response.Message)
-
-	if response.Success {
-		fmt.Printf("\n"+messages.EE_LINK_AIRFLOW+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-		fmt.Printf(messages.EE_LINK_FLOWER+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-		fmt.Printf(messages.EE_LINK_GRAFANA+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-	}
-
-	return nil
-}
-
-// List all airflow deployments
-func List() error {
-	deployments, err := api.FetchDeployments()
-	if err != nil {
-		return err
-	}
-
-	for _, d := range deployments {
-		rowTmp := "Title: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
-		fmt.Printf(rowTmp, d.Title, d.Id, d.ReleaseName, d.Version)
-	}
 	return nil
 }
 
