@@ -258,7 +258,7 @@ func Deploy(path, name, wsId string) error {
 		for i, deployment := range deployments {
 			index := i + 1
 			deployMap[strconv.Itoa(index)] = deployment
-			fmt.Printf("%d) %s (%s)\n", index, deployment.Title, deployment.ReleaseName)
+			fmt.Printf("%d) %s (%s)\n", index, deployment.Label, deployment.ReleaseName)
 		}
 
 		choice := input.InputText("")

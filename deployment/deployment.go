@@ -14,8 +14,8 @@ var (
 	api  = houston.NewHoustonClient(http)
 )
 
-func Create(title, ws string) error {
-	deployment, err := api.CreateDeployment(title, ws)
+func Create(label, ws string) error {
+	deployment, err := api.CreateDeployment(label, ws)
 	if err != nil {
 		return err
 	}
@@ -48,8 +48,8 @@ func List(ws string) error {
 	}
 
 	for _, d := range deployments {
-		rowTmp := "Title: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
-		fmt.Printf(rowTmp, d.Title, d.Id, d.ReleaseName, d.Version)
+		rowTmp := "Label: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
+		fmt.Printf(rowTmp, d.Label, d.Id, d.ReleaseName, d.Version)
 	}
 	return nil
 }

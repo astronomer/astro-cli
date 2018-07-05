@@ -31,13 +31,13 @@ func List() error {
 	}
 
 	for _, w := range ws {
-		wsTitle := "Title     : %s\n"
+		wsLabel := "Label     : %s\n"
 		wsId := "Id        : %s\n"
 		wsActiveFlag := "Act. Flag : %s\n"
 		wsDesc := "Desc.     : %s\n"
 
-		// rowTmp := "Title: %s\nId: %s\nActive Flag: %s\nDesc.: %s\n\n"
-		rowTmp := wsTitle + wsId + wsActiveFlag + wsDesc
+		// rowTmp := "Label: %s\nId: %s\nActive Flag: %s\nDesc.: %s\n\n"
+		rowTmp := wsLabel + wsId + wsActiveFlag + wsDesc
 		fmt.Printf(rowTmp, w.Label, w.Uuid, w.Active, w.Description)
 	}
 	return nil

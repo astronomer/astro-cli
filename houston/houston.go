@@ -229,8 +229,8 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
 // Returns a StatusResponse which contains the unique id of deployment
-func (c *Client) CreateDeployment(title, wsId string) (*Deployment, error) {
-	request := fmt.Sprintf(createDeploymentRequest, title, wsId)
+func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
+	request := fmt.Sprintf(createDeploymentRequest, label, wsId)
 	fmt.Println(request)
 	response, err := c.QueryHouston(request)
 	if err != nil {

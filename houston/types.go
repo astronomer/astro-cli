@@ -33,7 +33,7 @@ type Decoded struct {
 type Deployment struct {
 	Id          string `json:"uuid"`
 	Type        string `json:"type"`
-	Title       string `json:"label"`
+	Label       string `json:"label"`
 	ReleaseName string `json:"releaseName"`
 	Version     string `json:"version"`
 	Team        string `json:"team"`
