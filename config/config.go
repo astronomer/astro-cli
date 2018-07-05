@@ -41,6 +41,7 @@ var (
 		PostgresHost:     newCfg("postgres.host", true, "postgres"),
 		PostgresPort:     newCfg("postgres.port", true, "5432"),
 		ProjectName:      newCfg("project.name", true, ""),
+		ProjectWorkspace: newCfg("project.workspace", true, ""),
 	}
 
 	// viperHome is the viper object in the users home directory

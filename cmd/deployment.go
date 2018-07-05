@@ -6,8 +6,6 @@ import (
 )
 
 var (
-	teamId string
-
 	deploymentRootCmd = &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de"},
@@ -53,20 +51,28 @@ func init() {
 
 	// deployment create
 	deploymentRootCmd.AddCommand(deploymentCreateCmd)
-	deploymentCreateCmd.Flags().StringVarP(&teamId, "teamId", "t", "", "team id to associate with deployment")
+	deploymentCreateCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	// deploymentCreateCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment delete
 	deploymentRootCmd.AddCommand(deploymentDeleteCmd)
+	deploymentDeleteCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	// deploymentDeleteCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment list
 	deploymentRootCmd.AddCommand(deploymentListCmd)
+	deploymentListCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	// deploymentListCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment update
 	deploymentRootCmd.AddCommand(deploymentUpdateCmd)
+	deploymentUpdateCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	// deploymentUpdateCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
-	return deployment.Create(args[0], teamId)
+	ws := workspaceValidator()
+	return deployment.Create(args[0], ws)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -74,7 +80,8 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentList(cmd *cobra.Command, args []string) error {
-	return deployment.List()
+	ws := workspaceValidator()
+	return deployment.List(ws)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {

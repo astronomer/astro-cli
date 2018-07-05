@@ -94,6 +94,7 @@ func init() {
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
 	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommited changes")
+	airflowDeployCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
@@ -151,6 +152,8 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
+	ws := workspaceValidator()
+
 	releaseName := ""
 	if len(args) > 0 {
 		releaseName = args[0]
@@ -159,7 +162,7 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
-	return airflow.Deploy(projectRoot, releaseName)
+	return airflow.Deploy(projectRoot, releaseName, ws)
 }
 
 // Start an airflow cluster
