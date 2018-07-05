@@ -14,7 +14,7 @@ var (
 	}
 
 	deploymentCreateCmd = &cobra.Command{
-		Use:   "create",
+		Use:   "create DEPLOYMENT",
 		Short: "Create a new Astronomer Deployment",
 		Long:  "Create a new Astronomer Deployment",
 		Args:  cobra.ExactArgs(1),
@@ -22,7 +22,7 @@ var (
 	}
 
 	deploymentDeleteCmd = &cobra.Command{
-		Use:   "delete",
+		Use:   "delete DEPLOYMENT",
 		Short: "Delete an airflow deployment",
 		Long:  "Delete an airflow deployment",
 		Args:  cobra.ExactArgs(1),

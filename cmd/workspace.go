@@ -24,7 +24,7 @@ var (
 	}
 
 	workspaceCreateCmd = &cobra.Command{
-		Use:   "create",
+		Use:   "create WORKSPACE",
 		Short: "Create an astronomer workspaces",
 		Long:  "Create an astronomer workspaces",
 		Args:  cobra.ExactArgs(1),
@@ -32,7 +32,7 @@ var (
 	}
 
 	workspaceDeleteCmd = &cobra.Command{
-		Use:   "delete",
+		Use:   "delete WORKSPACE",
 		Short: "Delete an astronomer workspace",
 		Long:  "Delete an astronomer workspace",
 		Args:  cobra.ExactArgs(1),
