@@ -38,7 +38,7 @@ var (
 	}
 
 	airflowDeployCmd = &cobra.Command{
-		Use:        "deploy",
+		Use:        "deploy DEPLOYMENT",
 		Short:      "Deploy an airflow project",
 		Long:       "Deploy an airflow project to a given deployment",
 		Args:       cobra.MaximumNArgs(1),
