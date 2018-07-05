@@ -48,26 +48,20 @@ var (
 func init() {
 	// deployment root
 	RootCmd.AddCommand(deploymentRootCmd)
+	deploymentRootCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	// deploymentRootCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment create
 	deploymentRootCmd.AddCommand(deploymentCreateCmd)
-	deploymentCreateCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-	// deploymentCreateCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment delete
 	deploymentRootCmd.AddCommand(deploymentDeleteCmd)
-	deploymentDeleteCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-	// deploymentDeleteCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment list
 	deploymentRootCmd.AddCommand(deploymentListCmd)
-	deploymentListCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-	// deploymentListCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment update
 	deploymentRootCmd.AddCommand(deploymentUpdateCmd)
-	deploymentUpdateCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-	// deploymentUpdateCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
