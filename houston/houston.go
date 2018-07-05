@@ -111,7 +111,7 @@ var (
 		}
 	}`
 
-	fetchDeploymentsRequest = `
+	getDeploymentsRequest = `
 	query GetDeployments {
 	  deployments(teamUuid: "%s") {
 		uuid
@@ -124,7 +124,7 @@ var (
 	  }
 	}`
 
-	fetchDeploymentRequest = `
+	getDeploymentRequest = `
 	query GetDeployment {
 	  deployments(
 			deploymentUuid: "%s"
@@ -315,27 +315,27 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 	return response.Data.DeleteWorkspace, nil
 }
 
-// FetchDeployments will request all airflow deployments from Houston
+// GetDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
-func (c *Client) FetchDeployments(ws string) ([]Deployment, error) {
-	request := fmt.Sprintf(fetchDeploymentsRequest, ws)
+func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
+	request := fmt.Sprintf(getDeploymentsRequest, ws)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		return nil, errors.Wrap(err, "FetchDeployments Failed")
+		return nil, errors.Wrap(err, "GetDeployments Failed")
 	}
 
 	return response.Data.GetDeployments, nil
 }
 
-// FetchDeployment will request a specific airflow deployments from Houston by uuid
+// GetDeployment will request a specific airflow deployments from Houston by uuid
 // Returns a Deployment structure with deployment details
-func (c *Client) FetchDeployment(deploymentUuid string) (*Deployment, error) {
-	request := fmt.Sprintf(fetchDeploymentRequest, deploymentUuid)
+func (c *Client) GetDeployment(deploymentUuid string) (*Deployment, error) {
+	request := fmt.Sprintf(getDeploymentRequest, deploymentUuid)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
-		return nil, errors.Wrap(err, "FetchDeployment Failed")
+		return nil, errors.Wrap(err, "GetDeployment Failed")
 	}
 
 	if len(response.Data.GetDeployments) == 0 {
@@ -344,7 +344,7 @@ func (c *Client) FetchDeployment(deploymentUuid string) (*Deployment, error) {
 	return &response.Data.GetDeployments[0], nil
 }
 
-// GetAuthConfig will fetch authentication configuration from houston
+// GetAuthConfig will get authentication configuration from houston
 func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 	request := getAuthConfigRequest
 

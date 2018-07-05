@@ -42,7 +42,7 @@ func Delete(uuid string) error {
 
 // List all airflow deployments
 func List(ws string) error {
-	deployments, err := api.FetchDeployments(ws)
+	deployments, err := api.GetDeployments(ws)
 	if err != nil {
 		return err
 	}

@@ -129,7 +129,7 @@ func Start(airflowHome string) error {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
 
-	// Fetch project containers
+	// Get project containers
 	psInfo, err := project.Ps(context.Background())
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
@@ -244,7 +244,7 @@ func PS(airflowHome string) error {
 // Deploy pushes a new docker image
 func Deploy(path, name, wsId string) error {
 	if name == "" {
-		deployments, err := api.FetchDeployments(wsId)
+		deployments, err := api.GetDeployments(wsId)
 		if err != nil {
 			return err
 		}
