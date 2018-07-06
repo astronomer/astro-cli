@@ -48,6 +48,27 @@ var (
 		Long:    "Update a workspace name, as well as users and roles assigned to a workspace",
 		RunE:    workspaceUpdate,
 	}
+
+	workspaceUserRootCmd = &cobra.Command{
+		Use:   "user",
+		Short: "Manage workspace user resources",
+		Long:  "Users can be added or removed from workspaces",
+	}
+
+	workspaceUserAddCmd = &cobra.Command{
+		Use:   "add EMAIL",
+		Short: "Add a user to a workspace",
+		Long:  "Add a user to a workspace",
+		RunE:  workspaceUserAdd,
+	}
+
+	workspaceUserRmCmd = &cobra.Command{
+		Use:     "remove EMAIL",
+		Aliases: []string{"rm"},
+		Short:   "Add a user to a workspace",
+		Long:    "Add a user to a workspace",
+		RunE:    workspaceUserRm,
+	}
 )
 
 func init() {
@@ -66,6 +87,17 @@ func init() {
 
 	// workspace update
 	workspaceRootCmd.AddCommand(workspaceUpdateCmd)
+
+	// workspace user root
+	workspaceRootCmd.AddCommand(workspaceUserRootCmd)
+
+	// workspace user add
+	workspaceUserRootCmd.AddCommand(workspaceUserAddCmd)
+	workspaceUserAddCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+
+	// workspace user remove
+	workspaceUserRootCmd.AddCommand(workspaceUserRmCmd)
+	workspaceUserRmCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 }
 
 func workspaceCreate(cmd *cobra.Command, args []string) error {
@@ -87,4 +119,14 @@ func workspaceDelete(cmd *cobra.Command, args []string) error {
 // TODO
 func workspaceUpdate(cmd *cobra.Command, args []string) error {
 	return nil
+}
+
+func workspaceUserAdd(cmd *cobra.Command, args []string) error {
+	ws := workspaceValidator()
+	return workspace.Add(ws, args[0])
+}
+
+func workspaceUserRm(cmd *cobra.Command, args []string) error {
+	ws := workspaceValidator()
+	return workspace.Remove(ws, args[0])
 }

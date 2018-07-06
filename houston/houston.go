@@ -13,6 +13,25 @@ import (
 )
 
 var (
+	addWorkspaceUserRequest = `
+	mutation AddWorkspaceUser {
+		workspaceAddUser(
+			workspaceUuid: "%s",
+			email: "%s",
+		) {
+			uuid
+			label
+			description
+			active
+			users {
+				uuid
+				username
+			}
+			createdAt
+			updatedAt
+		}
+	}`
+
 	createDeploymentRequest = `
 	mutation CreateDeployment {
 		createDeployment(	
@@ -28,7 +47,7 @@ var (
 			createdAt
 			updatedAt
 		}
-	  }`
+	}`
 
 	createWorkspaceRequest = `
 	mutation CreateWorkspace {
@@ -159,7 +178,25 @@ var (
 			updatedAt
 		}
 	}`
-	// log = logrus.WithField("package", "houston")
+
+	removeWorkspaceUserRequest = `
+	mutation RemoveWorkspaceUser {
+		workspaceRemoveUser(
+			workspaceUuid: "%s",
+			userUuid: "%s",
+		) {
+			uuid
+			label
+			description
+			active
+			users {
+				uuid
+				username
+			}
+			createdAt
+			updatedAt
+		}
+	}`
 )
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
@@ -193,10 +230,6 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		doOpts.Headers["authorization"] = config.CFG.CloudAPIToken.GetString()
 	}
 
-	// if config.GetString(config.OrgIDCFG) != "" {
-	// 	doOpts.Headers["organization"] = config.GetString(config.OrgIDCFG)
-	// }
-
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", config.APIUrl(), &doOpts)
 	if err != nil {
@@ -225,6 +258,17 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		return nil, errors.New(decode.Errors[0].Message)
 	}
 	return &decode, nil
+}
+
+func (c *Client) AddWorkspaceUser(workspaceId, email string) (*Workspace, error) {
+	request := fmt.Sprintf(addWorkspaceUserRequest, workspaceId, email)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "AddWorkspaceUser Failed")
+	}
+
+	return response.Data.AddWorkspaceUser, nil
 }
 
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
@@ -366,4 +410,15 @@ func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 	}
 
 	return response.Data.GetWorkspace, nil
+}
+
+func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, error) {
+	request := fmt.Sprintf(removeWorkspaceUserRequest, workspaceId, email)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "RemoveWorkspaceUser Failed")
+	}
+
+	return response.Data.RemoveWorkspaceUser, nil
 }

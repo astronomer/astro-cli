@@ -3,15 +3,17 @@ package houston
 // HoustonResponse wraps all houston response structs used for json marashalling
 type HoustonResponse struct {
 	Data struct {
-		CreateDeployment *Deployment  `json:"createDeployment,omitempty"`
-		CreateToken      *AuthUser    `json:"createToken,omitempty"`
-		CreateUser       *Token       `json:"createUser,omitempty"`
-		CreateWorkspace  *Workspace   `json:"createWorkspace,omitempty"`
-		DeleteDeployment *Deployment  `json:"deleteDeployment,omitempty`
-		DeleteWorkspace  *Workspace   `json:"deleteWorkspace,omitempty"`
-		GetDeployments   []Deployment `json:"deployments,omitempty"`
-		GetAuthConfig    *AuthConfig  `json:"authConfig,omitempty"`
-		GetWorkspace     []Workspace  `json:"Workspaces,omitempty"`
+		AddWorkspaceUser    *Workspace   `json:"workspaceAddUser,omitempty"`
+		RemoveWorkspaceUser *Workspace   `json:"workspaceRemoveUser,omitempty"`
+		CreateDeployment    *Deployment  `json:"createDeployment,omitempty"`
+		CreateToken         *AuthUser    `json:"createToken,omitempty"`
+		CreateUser          *Token       `json:"createUser,omitempty"`
+		CreateWorkspace     *Workspace   `json:"createWorkspace,omitempty"`
+		DeleteDeployment    *Deployment  `json:"deleteDeployment,omitempty"`
+		DeleteWorkspace     *Workspace   `json:"deleteWorkspace,omitempty"`
+		GetDeployments      []Deployment `json:"deployments,omitempty"`
+		GetAuthConfig       *AuthConfig  `json:"authConfig,omitempty"`
+		GetWorkspace        []Workspace  `json:"Workspaces,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
