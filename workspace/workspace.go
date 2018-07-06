@@ -49,7 +49,6 @@ func Delete(uuid string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(ws)
 
 	fmt.Printf(messages.HOUSTON_WORKSPACE_DELETE_SUCCESS, ws.Label, ws.Uuid)
 	return nil
