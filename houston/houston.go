@@ -13,7 +13,154 @@ import (
 )
 
 var (
-	addWorkspaceUserRequest = `
+	authConfigGetRequest = `
+	query GetAuthConfig {
+		authConfig(state: "cli") {
+		  localEnabled
+		  googleEnabled
+		  googleOAuthUrl
+		}
+	  }`
+
+	deploymentCreateRequest = `
+	mutation CreateDeployment {
+		createDeployment(	
+			label: "%s",
+			type: "airflow",
+			workspaceUuid: "%s"
+		) {	
+			uuid
+			type
+			label
+			releaseName
+			version
+			createdAt
+			updatedAt
+		}
+	}`
+
+	deploymentDeleteRequest = `
+	mutation DeleteDeployment {
+		deleteDeployment(deploymentUuid: "%s") {
+			uuid
+			type
+			label
+			releaseName
+			version
+			createdAt
+			updatedAt
+		}
+	}`
+
+	deploymentGetRequest = `
+	query GetDeployment {
+	  deployments(
+			deploymentUuid: "%s"
+		) {	
+			uuid
+			type
+			label
+			releaseName
+			version
+			createdAt
+			updatedAt
+	  }
+	}`
+
+	deploymentsGetRequest = `
+	query GetDeployments {
+	  deployments(workspaceUuid: "%s") {
+		uuid
+		type
+		label
+		releaseName
+		version
+		createdAt
+		updatedAt
+	  }
+	}`
+
+	tokenBasicCreateRequest = `
+	mutation createBasicToken {
+	  createToken(
+		  authStrategy:LOCAL
+		  identity:"%s",
+		  password:"%s"
+		) {
+			success
+			message
+			token
+			decoded {
+	      id
+	      sU
+	    }
+	  }
+	}`
+
+	tokenOAuthCreateRequest = `
+	mutation createOauthBasicToken {
+	  createToken(
+		authStrategy:%s
+		credentials:"%s"
+		) { 
+		token {
+			value
+		}
+	  }
+	}`
+
+	userCreateRequest = `
+	mutation CreateUser {
+		createUser(
+			email: "%s",
+			password: "%s"
+		) {
+			success,
+			message,
+			token
+		}
+	}`
+
+	workspaceAllGetRequest = `
+	query GetWorkspaces {
+		workspaces {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
+	workspaceCreateRequest = `
+	mutation CreateWorkspace {
+		createWorkspace(
+			label: "%s",
+			description: "%s"
+		) {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
+	workspaceDeleteRequest = `
+	mutation DeleteWorkspace {
+		deleteWorkspace(workspaceUuid: "%s") {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
+	workspaceUserAddRequest = `
 	mutation AddWorkspaceUser {
 		workspaceAddUser(
 			workspaceUuid: "%s",
@@ -32,154 +179,7 @@ var (
 		}
 	}`
 
-	createDeploymentRequest = `
-	mutation CreateDeployment {
-		createDeployment(	
-			label: "%s",
-			type: "airflow",
-			workspaceUuid: "%s"
-		) {	
-			uuid
-			type
-			label
-			releaseName
-			version
-			createdAt
-			updatedAt
-		}
-	}`
-
-	createWorkspaceRequest = `
-	mutation CreateWorkspace {
-		createWorkspace(
-			label: "%s",
-			description: "%s"
-		) {
-			uuid
-			label
-			description
-			active
-			createdAt
-			updatedAt
-		}
-	}`
-
-	createUserRequest = `
-	mutation CreateUser {
-		createUser(
-			email: "%s",
-			password: "%s"
-		) {
-			success,
-			message,
-			token
-		}
-	}`
-
-	createBasicTokenRequest = `
-	mutation createBasicToken {
-	  createToken(
-		  authStrategy:LOCAL
-		  identity:"%s",
-		  password:"%s"
-		) {
-			success
-			message
-			token
-			decoded {
-	      id
-	      sU
-	    }
-	  }
-	}`
-
-	createOAuthTokenRequest = `
-	mutation createOauthBasicToken {
-	  createToken(
-		authStrategy:%s
-		credentials:"%s"
-		) { 
-		token {
-			value
-		}
-	  }
-	}`
-
-	deleteDeploymentRequest = `
-	mutation DeleteDeployment {
-		deleteDeployment(deploymentUuid: "%s") {
-			uuid
-			type
-			label
-			releaseName
-			version
-			createdAt
-			updatedAt
-		}
-	}`
-
-	deleteWorkspaceRequest = `
-	mutation DeleteWorkspace {
-		deleteWorkspace(workspaceUuid: "%s") {
-			uuid
-			label
-			description
-			active
-			createdAt
-			updatedAt
-		}
-	}`
-
-	getDeploymentsRequest = `
-	query GetDeployments {
-	  deployments(workspaceUuid: "%s") {
-		uuid
-		type
-		label
-		releaseName
-		version
-		createdAt
-		updatedAt
-	  }
-	}`
-
-	getDeploymentRequest = `
-	query GetDeployment {
-	  deployments(
-			deploymentUuid: "%s"
-		) {	
-			uuid
-			type
-			label
-			releaseName
-			version
-			createdAt
-			updatedAt
-	  }
-	}`
-
-	getAuthConfigRequest = `
-	query GetAuthConfig {
-		authConfig(state: "cli") {
-		  localEnabled
-		  googleEnabled
-		  googleOAuthUrl
-		}
-	  }`
-
-	getWorkspaceAllRequest = `
-	query GetWorkspaces {
-		workspaces {
-			uuid
-			label
-			description
-			active
-			createdAt
-			updatedAt
-		}
-	}`
-
-	removeWorkspaceUserRequest = `
+	workspaceUserRemoveRequest = `
 	mutation RemoveWorkspaceUser {
 		workspaceRemoveUser(
 			workspaceUuid: "%s",
@@ -261,7 +261,7 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 }
 
 func (c *Client) AddWorkspaceUser(workspaceId, email string) (*Workspace, error) {
-	request := fmt.Sprintf(addWorkspaceUserRequest, workspaceId, email)
+	request := fmt.Sprintf(workspaceUserAddRequest, workspaceId, email)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -274,7 +274,7 @@ func (c *Client) AddWorkspaceUser(workspaceId, email string) (*Workspace, error)
 // CreateDeployment will send request to Houston to create a new AirflowDeployment
 // Returns a StatusResponse which contains the unique id of deployment
 func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
-	request := fmt.Sprintf(createDeploymentRequest, label, wsId)
+	request := fmt.Sprintf(deploymentCreateRequest, label, wsId)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -287,7 +287,7 @@ func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
 // CreateBasicToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a Token structure with the users ID and Token inside.
 func (c *Client) CreateBasicToken(email string, password string) (*AuthUser, error) {
-	request := fmt.Sprintf(createBasicTokenRequest, email, password)
+	request := fmt.Sprintf(tokenBasicCreateRequest, email, password)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -300,7 +300,7 @@ func (c *Client) CreateBasicToken(email string, password string) (*AuthUser, err
 // CreateOAuthToken passes an OAuth type and authCode to createOauthTokenRequest in order allow houston to authenticate user
 // Returns a Token structure with the users ID and Token inside.
 func (c *Client) CreateOAuthToken(authCode string) (*AuthUser, error) {
-	request := fmt.Sprintf(createOAuthTokenRequest, "GOOGLE_OAUTH", authCode)
+	request := fmt.Sprintf(tokenOAuthCreateRequest, "GOOGLE_OAUTH", authCode)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -313,7 +313,7 @@ func (c *Client) CreateOAuthToken(authCode string) (*AuthUser, error) {
 // CreateUser will send a request to houston to create a new user
 // Returns a Status object with a new token
 func (c *Client) CreateUser(email string, password string) (*Token, error) {
-	request := fmt.Sprintf(createUserRequest, email, password)
+	request := fmt.Sprintf(userCreateRequest, email, password)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -325,7 +325,7 @@ func (c *Client) CreateUser(email string, password string) (*Token, error) {
 // CreateWorkspace will send a request to houston to create a new workspace
 // Returns an object representing created workspace
 func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) {
-	request := fmt.Sprintf(createWorkspaceRequest, label, description)
+	request := fmt.Sprintf(workspaceCreateRequest, label, description)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -336,7 +336,7 @@ func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) 
 }
 
 func (c *Client) DeleteDeployment(uuid string) (*Deployment, error) {
-	request := fmt.Sprintf(deleteDeploymentRequest, uuid)
+	request := fmt.Sprintf(deploymentDeleteRequest, uuid)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -349,7 +349,7 @@ func (c *Client) DeleteDeployment(uuid string) (*Deployment, error) {
 // DeleteWorkspace will send a request to houston to create a new workspace
 // Returns an object representing deleted workspace
 func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
-	request := fmt.Sprintf(deleteWorkspaceRequest, uuid)
+	request := fmt.Sprintf(workspaceDeleteRequest, uuid)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -362,7 +362,7 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 // GetDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
 func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
-	request := fmt.Sprintf(getDeploymentsRequest, ws)
+	request := fmt.Sprintf(deploymentsGetRequest, ws)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -375,7 +375,7 @@ func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
 // GetDeployment will request a specific airflow deployments from Houston by uuid
 // Returns a Deployment structure with deployment details
 func (c *Client) GetDeployment(deploymentUuid string) (*Deployment, error) {
-	request := fmt.Sprintf(getDeploymentRequest, deploymentUuid)
+	request := fmt.Sprintf(deploymentGetRequest, deploymentUuid)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -390,7 +390,7 @@ func (c *Client) GetDeployment(deploymentUuid string) (*Deployment, error) {
 
 // GetAuthConfig will get authentication configuration from houston
 func (c *Client) GetAuthConfig() (*AuthConfig, error) {
-	request := getAuthConfigRequest
+	request := authConfigGetRequest
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -402,7 +402,7 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 
 // GetWorkspaceAll returns all available workspaces from houston API
 func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
-	request := getWorkspaceAllRequest
+	request := workspaceAllGetRequest
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
@@ -413,7 +413,7 @@ func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 }
 
 func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, error) {
-	request := fmt.Sprintf(removeWorkspaceUserRequest, workspaceId, email)
+	request := fmt.Sprintf(workspaceUserAddRequest, workspaceId, email)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
