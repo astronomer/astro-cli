@@ -15,8 +15,8 @@ var (
 	api  = houston.NewHoustonClient(http)
 )
 
-// CreateUser verifies input before sending a CreateUser API call to houston
-func CreateUser(email string) error {
+// Create verifies input before sending a CreateUser API call to houston
+func Create(email string) error {
 	if len(email) == 0 {
 		email = input.InputText("Email: ")
 	}
@@ -34,6 +34,20 @@ func CreateUser(email string) error {
 	}
 
 	fmt.Printf(messages.HOUSTON_USER_CREATE_SUCCESS, r.User.Uuid, email)
+
+	return nil
+}
+
+func List() error {
+	r, err := api.GetUserAll()
+	if err != nil {
+		return err
+	}
+
+	for _, u := range r {
+		rowTmp := "Username: %s\nId: %s\nStatus: %s\n\n"
+		fmt.Printf(rowTmp, u.Username, u.Uuid, u.Status)
+	}
 
 	return nil
 }

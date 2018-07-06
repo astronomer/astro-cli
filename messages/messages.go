@@ -55,6 +55,7 @@ var (
 	HOUSTON_OAUTH_REDIRECT                = "Please visit the following URL, authenticate and paste token in next prompt\n"
 	HOUSTON_OAUTH_DISABLED                = "OAuth is disabled, contact administrator or defer to basic auth\n"
 	HOUSTON_INVALID_DEPLOYMENT_KEY        = "Invalid deployment selection\n"
+	HOUSTON_NO_USERS                      = "There are no users to list or you don't have permissions to list users that do exist"
 	HOUSTON_WORKSPACE_CREATE_SUCCESS      = "Successfully created %s (%s)\n"
 	HOUSTON_WORKSPACE_DELETE_SUCCESS      = "Succesfully deleted %s (%s)\n"
 	HOUSTON_WORKSPACE_USER_ADD_SUCCESS    = "Successfully added user %s from workspace (%s)\n"

@@ -13,6 +13,7 @@ type HoustonResponse struct {
 		DeleteWorkspace     *Workspace   `json:"deleteWorkspace,omitempty"`
 		GetDeployments      []Deployment `json:"deployments,omitempty"`
 		GetAuthConfig       *AuthConfig  `json:"authConfig,omitempty"`
+		GetUsers            []User       `json:"users,omitempty"`
 		GetWorkspace        []Workspace  `json:"Workspaces,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
@@ -50,7 +51,6 @@ type Deployment struct {
 	UpdatedAt   string `json:"updatedAt"`
 }
 
-// Email
 type Email struct {
 	Address  string `json:"address"`
 	Verified bool   `json:"verified"`

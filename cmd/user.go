@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/astronomerio/astro-cli/user"
 	"github.com/spf13/cobra"
 )
@@ -17,13 +14,13 @@ var (
 		Long:  "Users represents a human who has authenticated with the Astronomer platform",
 	}
 
-	userListCmd = &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List astronomer users",
-		Long:    "List astronomer users",
-		Run:     userList,
-	}
+	// userListCmd = &cobra.Command{
+	// 	Use:     "list",
+	// 	Aliases: []string{"ls"},
+	// 	Short:   "List astronomer users",
+	// 	Long:    "List astronomer users",
+	// 	RunE:    userList,
+	// }
 
 	userCreateCmd = &cobra.Command{
 		Use:     "create",
@@ -47,7 +44,7 @@ func init() {
 	RootCmd.AddCommand(userRootCmd)
 
 	// User list
-	userRootCmd.AddCommand(userListCmd)
+	// userRootCmd.AddCommand(userListCmd)
 
 	// User create
 	userRootCmd.AddCommand(userCreateCmd)
@@ -57,16 +54,12 @@ func init() {
 	userRootCmd.AddCommand(userDeleteCmd)
 }
 
-func userList(cmd *cobra.Command, args []string) {
+func userList(cmd *cobra.Command, args []string) error {
+	return nil
 }
 
 func userCreate(cmd *cobra.Command, args []string) error {
-	err := user.CreateUser(userEmail)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	return nil
+	return user.Create(userEmail)
 }
 
 func userDelete(cmd *cobra.Command, args []string) {

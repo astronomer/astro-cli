@@ -128,6 +128,25 @@ var (
 		}
 	}`
 
+	userGetAllRequest = `
+	query GetUsers {
+		users {
+			uuid
+			emails {
+				address
+				verified
+				primary
+				createdAt
+				updatedAt
+			}
+			fullName
+			username
+			status
+			createdAt
+			updatedAt
+		}
+	}`
+
 	workspaceAllGetRequest = `
 	query GetWorkspaces {
 		workspaces {
@@ -417,6 +436,17 @@ func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 	}
 
 	return response.Data.GetWorkspace, nil
+}
+
+func (c *Client) GetUserAll() ([]User, error) {
+	request := userGetAllRequest
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetUserAll Failed")
+	}
+
+	return response.Data.GetUsers, nil
 }
 
 func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, error) {
