@@ -10,7 +10,7 @@ var (
 
 	workspaceRootCmd = &cobra.Command{
 		Use:     "workspace",
-		Aliases: []string{"wo", "ws"},
+		Aliases: []string{"wo"},
 		Short:   "Manage Astronomer workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 	}
@@ -24,26 +24,29 @@ var (
 	}
 
 	workspaceCreateCmd = &cobra.Command{
-		Use:   "create WORKSPACE",
-		Short: "Create an astronomer workspaces",
-		Long:  "Create an astronomer workspaces",
-		Args:  cobra.ExactArgs(1),
-		RunE:  workspaceCreate,
+		Use:     "create WORKSPACE",
+		Aliases: []string{"cr"},
+		Short:   "Create an astronomer workspaces",
+		Long:    "Create an astronomer workspaces",
+		Args:    cobra.ExactArgs(1),
+		RunE:    workspaceCreate,
 	}
 
 	workspaceDeleteCmd = &cobra.Command{
-		Use:   "delete WORKSPACE",
-		Short: "Delete an astronomer workspace",
-		Long:  "Delete an astronomer workspace",
-		Args:  cobra.ExactArgs(1),
-		RunE:  workspaceDelete,
+		Use:     "delete WORKSPACE",
+		Aliases: []string{"de"},
+		Short:   "Delete an astronomer workspace",
+		Long:    "Delete an astronomer workspace",
+		Args:    cobra.ExactArgs(1),
+		RunE:    workspaceDelete,
 	}
 
 	workspaceUpdateCmd = &cobra.Command{
-		Use:   "update",
-		Short: "Update an Astronomer workspace",
-		Long:  "Update a workspace name, as well as users and roles assigned to a workspace",
-		RunE:  workspaceUpdate,
+		Use:     "update",
+		Aliases: []string{"up"},
+		Short:   "Update an Astronomer workspace",
+		Long:    "Update a workspace name, as well as users and roles assigned to a workspace",
+		RunE:    workspaceUpdate,
 	}
 )
 

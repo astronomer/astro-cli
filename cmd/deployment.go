@@ -14,19 +14,21 @@ var (
 	}
 
 	deploymentCreateCmd = &cobra.Command{
-		Use:   "create DEPLOYMENT",
-		Short: "Create a new Astronomer Deployment",
-		Long:  "Create a new Astronomer Deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE:  deploymentCreate,
+		Use:     "create DEPLOYMENT",
+		Aliases: []string{"cr"},
+		Short:   "Create a new Astronomer Deployment",
+		Long:    "Create a new Astronomer Deployment",
+		Args:    cobra.ExactArgs(1),
+		RunE:    deploymentCreate,
 	}
 
 	deploymentDeleteCmd = &cobra.Command{
-		Use:   "delete DEPLOYMENT",
-		Short: "Delete an airflow deployment",
-		Long:  "Delete an airflow deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE:  deploymentDelete,
+		Use:     "delete DEPLOYMENT",
+		Aliases: []string{"de"},
+		Short:   "Delete an airflow deployment",
+		Long:    "Delete an airflow deployment",
+		Args:    cobra.ExactArgs(1),
+		RunE:    deploymentDelete,
 	}
 
 	deploymentListCmd = &cobra.Command{
@@ -38,10 +40,11 @@ var (
 	}
 
 	deploymentUpdateCmd = &cobra.Command{
-		Use:   "update",
-		Short: "Update airflow deployments",
-		Long:  "Update airflow deployments",
-		RunE:  deploymentUpdate,
+		Use:     "update",
+		Aliases: []string{"up"},
+		Short:   "Update airflow deployments",
+		Long:    "Update airflow deployments",
+		RunE:    deploymentUpdate,
 	}
 )
 
