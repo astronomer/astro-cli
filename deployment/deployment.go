@@ -24,7 +24,6 @@ func Create(label, ws string) error {
 
 	fmt.Printf("\n"+messages.EE_LINK_AIRFLOW+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
 	fmt.Printf(messages.EE_LINK_FLOWER+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-	fmt.Printf(messages.EE_LINK_GRAFANA+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
 
 	return nil
 }

@@ -43,8 +43,7 @@ var (
 	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:5432/postgres"
 
 	EE_LINK_AIRFLOW = "Airflow Dashboard: https://%s-airflow.%s"
-	EE_LINK_FLOWER  = "Grafana Dashboard: https://%s-grafana.%s"
-	EE_LINK_GRAFANA = "Flower Dashboard: https://%s-flower.%s"
+	EE_LINK_FLOWER  = "Flower Dashboard: https://%s-flower.%s"
 
 	HOUSTON_BASIC_AUTH_DISABLED           = "Basic authentication is disabled, conact administrator or defer back to oAuth"
 	HOUSTON_DEPLOYING_PROMPT              = "Deploying: %s\n"
