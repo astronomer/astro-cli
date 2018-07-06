@@ -13,15 +13,15 @@ import (
 )
 
 var (
-	HTTP = httputil.NewHTTPClient()
-	API  = houston.NewHoustonClient(HTTP)
+	http = httputil.NewHTTPClient()
+	api  = houston.NewHoustonClient(http)
 )
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username string) string {
 	password, _ := input.InputPassword(messages.INPUT_PASSWORD)
 
-	token, err := API.CreateBasicToken(username, password)
+	token, err := api.CreateBasicToken(username, password)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -36,7 +36,7 @@ func oAuth(oAuthUrl string) string {
 	fmt.Println(oAuthUrl + "\n")
 	authSecret := input.InputText(messages.INPUT_OAUTH_TOKEN)
 
-	token, err := API.CreateOAuthToken(authSecret)
+	token, err := api.CreateOAuthToken(authSecret)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -61,9 +61,9 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(oAuthOnly bool) {
+func Login(oAuthOnly bool) error {
 	token := ""
-	authConfig, err := API.GetAuthConfig()
+	authConfig, err := api.GetAuthConfig()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -91,6 +91,8 @@ func Login(oAuthOnly bool) {
 
 	config.CFG.CloudAPIToken.SetProjectString(token)
 	registryAuth()
+
+	return nil
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
