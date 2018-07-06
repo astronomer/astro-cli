@@ -115,9 +115,16 @@ var (
 			email: "%s",
 			password: "%s"
 		) {
-			success,
-			message,
-			token
+			user {
+				uuid
+				username
+				status
+				createdAt
+				updatedAt
+			}
+			token {
+				value
+			}
 		}
 	}`
 
@@ -312,7 +319,7 @@ func (c *Client) CreateOAuthToken(authCode string) (*AuthUser, error) {
 
 // CreateUser will send a request to houston to create a new user
 // Returns a Status object with a new token
-func (c *Client) CreateUser(email string, password string) (*Token, error) {
+func (c *Client) CreateUser(email string, password string) (*AuthUser, error) {
 	request := fmt.Sprintf(userCreateRequest, email, password)
 
 	response, err := c.QueryHouston(request)

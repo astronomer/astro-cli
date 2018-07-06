@@ -7,7 +7,7 @@ type HoustonResponse struct {
 		RemoveWorkspaceUser *Workspace   `json:"workspaceRemoveUser,omitempty"`
 		CreateDeployment    *Deployment  `json:"createDeployment,omitempty"`
 		CreateToken         *AuthUser    `json:"createToken,omitempty"`
-		CreateUser          *Token       `json:"createUser,omitempty"`
+		CreateUser          *AuthUser    `json:"createUser,omitempty"`
 		CreateWorkspace     *Workspace   `json:"createWorkspace,omitempty"`
 		DeleteDeployment    *Deployment  `json:"deleteDeployment,omitempty"`
 		DeleteWorkspace     *Workspace   `json:"deleteWorkspace,omitempty"`
@@ -16,6 +16,13 @@ type HoustonResponse struct {
 		GetWorkspace        []Workspace  `json:"Workspaces,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
+}
+
+// AuthConfig holds data related to oAuth and basic authentication
+type AuthConfig struct {
+	LocalEnabled  bool   `json:"localEnabled"`
+	GoogleEnabled bool   `json:"googleEnabled"`
+	OauthUrl      string `json:"googleOAuthUrl"`
 }
 
 type AuthUser struct {
@@ -55,13 +62,6 @@ type Email struct {
 // Error defines struct of a houston response Error object
 type Error struct {
 	Message string `json:"message"`
-}
-
-// AuthConfig holds data related to oAuth and basic authentication
-type AuthConfig struct {
-	LocalEnabled  bool   `json:"localEnabled"`
-	GoogleEnabled bool   `json:"googleEnabled"`
-	OauthUrl      string `json:"googleOAuthUrl"`
 }
 
 // Status defines structure of a houston response StatusResponse object

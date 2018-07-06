@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	skipVerify bool
-	userEmail  string
+	userEmail string
 
 	userRootCmd = &cobra.Command{
 		Use:   "user",
@@ -19,24 +18,27 @@ var (
 	}
 
 	userListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List astronomer users",
-		Long:  "List astronomer users",
-		Run:   userList,
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List astronomer users",
+		Long:    "List astronomer users",
+		Run:     userList,
 	}
 
 	userCreateCmd = &cobra.Command{
-		Use:   "create",
-		Short: "Create a user in the astronomer platform",
-		Long:  "Create a user in the astronomer platform, user will receive an invite at the email address provided",
-		RunE:  userCreate,
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create a user in the astronomer platform",
+		Long:    "Create a user in the astronomer platform, user will receive an invite at the email address provided",
+		RunE:    userCreate,
 	}
 
 	userDeleteCmd = &cobra.Command{
-		Use:   "delete",
-		Short: "Delete an astronomer user",
-		Long:  "Delete an astronomer user",
-		Run:   userDelete,
+		Use:     "delete",
+		Aliases: []string{"de"},
+		Short:   "Delete an astronomer user",
+		Long:    "Delete an astronomer user",
+		Run:     userDelete,
 	}
 )
 
@@ -49,7 +51,6 @@ func init() {
 
 	// User create
 	userRootCmd.AddCommand(userCreateCmd)
-	userCreateCmd.Flags().BoolVar(&skipVerify, "skip-verify", false, "Skips password verification on create")
 	userCreateCmd.Flags().StringVar(&userEmail, "email", "", "Supply user email at runtime")
 
 	// User delete
@@ -60,7 +61,7 @@ func userList(cmd *cobra.Command, args []string) {
 }
 
 func userCreate(cmd *cobra.Command, args []string) error {
-	err := user.CreateUser(skipVerify, userEmail)
+	err := user.CreateUser(userEmail)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

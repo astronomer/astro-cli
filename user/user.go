@@ -2,40 +2,38 @@ package user
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
 )
 
 var (
-	HTTP = httputil.NewHTTPClient()
+	http = httputil.NewHTTPClient()
+	api  = houston.NewHoustonClient(http)
 )
 
 // CreateUser verifies input before sending a CreateUser API call to houston
-func CreateUser(skipVerify bool, emailIn string) error {
-	API := houston.NewHoustonClient(HTTP)
-	email := emailIn
-
-	if len(emailIn) == 0 {
+func CreateUser(email string) error {
+	if len(email) == 0 {
 		email = input.InputText("Email: ")
 	}
 
 	password, _ := input.InputPassword("Password: ")
 
-	if !skipVerify {
-		passwordVerify, _ := input.InputPassword("Re-enter Password: ")
-		if password != passwordVerify {
-			return errors.New("Passwords do not match, try again")
-		}
+	passwordVerify, _ := input.InputPassword("Re-enter Password: ")
+	if password != passwordVerify {
+		return errors.New("Passwords do not match")
 	}
 
-	status, err := API.CreateUser(email, password)
+	r, err := api.CreateUser(email, password)
 	if err != nil {
 		return err
 	}
 
-	config.CFG.CloudAPIToken.SetProjectString(status.Value)
+	fmt.Printf(messages.HOUSTON_USER_CREATE_SUCCESS, r.User.Uuid, email)
+
 	return nil
 }
