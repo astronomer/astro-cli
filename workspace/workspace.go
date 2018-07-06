@@ -31,14 +31,9 @@ func List() error {
 	}
 
 	for _, w := range ws {
-		wsLabel := "Label     : %s\n"
-		wsId := "Id        : %s\n"
-		wsActiveFlag := "Act. Flag : %s\n"
-		wsDesc := "Desc.     : %s\n"
+		rowTmp := "Label: %s\nId: %s\nDesc.: %s\n\n"
 
-		// rowTmp := "Label: %s\nId: %s\nActive Flag: %s\nDesc.: %s\n\n"
-		rowTmp := wsLabel + wsId + wsActiveFlag + wsDesc
-		fmt.Printf(rowTmp, w.Label, w.Uuid, w.Active, w.Description)
+		fmt.Printf(rowTmp, w.Label, w.Uuid, w.Description)
 	}
 	return nil
 }
