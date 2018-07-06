@@ -48,8 +48,7 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		config.CFG.CloudDomain.SetProjectString(domainOverride)
 	}
 
-	auth.Login(oAuthOnly)
-	return nil
+	return auth.Login(oAuthOnly)
 }
 
 func authLogout(cmd *cobra.Command, args []string) {

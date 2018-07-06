@@ -85,16 +85,19 @@ var (
 	  createToken(
 		  authStrategy:LOCAL
 		  identity:"%s",
-		  password:"%s"
+		  credentials:"%s"
 		) {
-			success
-			message
-			token
-			decoded {
-	      id
-	      sU
-	    }
-	  }
+			user {
+				uuid
+				username
+				status
+				createdAt
+				updatedAt
+			}
+			token {
+				value
+			}
+		}
 	}`
 
 	tokenOAuthCreateRequest = `
@@ -312,7 +315,7 @@ func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
 
 // CreateBasicToken will request a new token from Houston, passing the users e-mail and password.
 // Returns a Token structure with the users ID and Token inside.
-func (c *Client) CreateBasicToken(email string, password string) (*AuthUser, error) {
+func (c *Client) CreateBasicToken(email, password string) (*AuthUser, error) {
 	request := fmt.Sprintf(tokenBasicCreateRequest, email, password)
 
 	response, err := c.QueryHouston(request)
