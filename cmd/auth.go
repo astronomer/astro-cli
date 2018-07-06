@@ -52,5 +52,5 @@ func authLogin(cmd *cobra.Command, args []string) error {
 }
 
 func authLogout(cmd *cobra.Command, args []string) {
-	// auth.Logout()
+	auth.Logout()
 }
