@@ -18,7 +18,7 @@ var (
 		createDeployment(	
 			label: "%s",
 			type: "airflow",
-			teamUuid: "%s"
+			workspaceUuid: "%s"
 		) {	
 			uuid
 			type
@@ -32,7 +32,7 @@ var (
 
 	createWorkspaceRequest = `
 	mutation CreateWorkspace {
-		createTeam(
+		createWorkspace(
 			label: "%s",
 			description: "%s"
 		) {
@@ -101,7 +101,7 @@ var (
 
 	deleteWorkspaceRequest = `
 	mutation DeleteWorkspace {
-		deleteTeam(teamUuid: "%s") {
+		deleteWorkspace(workspaceUuid: "%s") {
 			uuid
 			label
 			description
@@ -113,7 +113,7 @@ var (
 
 	getDeploymentsRequest = `
 	query GetDeployments {
-	  deployments(teamUuid: "%s") {
+	  deployments(workspaceUuid: "%s") {
 		uuid
 		type
 		label
@@ -150,7 +150,7 @@ var (
 
 	getWorkspaceAllRequest = `
 	query GetWorkspaces {
-		teams {
+		workspaces {
 			uuid
 			label
 			description
@@ -231,7 +231,7 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 // Returns a StatusResponse which contains the unique id of deployment
 func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
 	request := fmt.Sprintf(createDeploymentRequest, label, wsId)
-	fmt.Println(request)
+
 	response, err := c.QueryHouston(request)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateDeployment Failed")

@@ -6,12 +6,12 @@ type HoustonResponse struct {
 		CreateDeployment *Deployment  `json:"createDeployment,omitempty"`
 		CreateToken      *AuthUser    `json:"createToken,omitempty"`
 		CreateUser       *Token       `json:"createUser,omitempty"`
-		CreateWorkspace  *Workspace   `json:"createTeam,omitempty"`
+		CreateWorkspace  *Workspace   `json:"createWorkspace,omitempty"`
 		DeleteDeployment *Deployment  `json:"deleteDeployment,omitempty`
-		DeleteWorkspace  *Workspace   `json:"deleteTeam,omitempty"`
+		DeleteWorkspace  *Workspace   `json:"deleteWorkspace,omitempty"`
 		GetDeployments   []Deployment `json:"deployments,omitempty"`
 		GetAuthConfig    *AuthConfig  `json:"authConfig,omitempty"`
-		GetWorkspace     []Workspace  `json:"teams,omitempty"`
+		GetWorkspace     []Workspace  `json:"Workspaces,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -36,7 +36,7 @@ type Deployment struct {
 	Label       string `json:"label"`
 	ReleaseName string `json:"releaseName"`
 	Version     string `json:"version"`
-	Team        string `json:"team"`
+	Workspace   string `json:"workspace"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
 }
