@@ -44,6 +44,10 @@ func List() error {
 		return err
 	}
 
+	if len(r) == 0 {
+		fmt.Println(messages.HOUSTON_NO_USERS)
+	}
+
 	for _, u := range r {
 		rowTmp := "Username: %s\nId: %s\nStatus: %s\n\n"
 		fmt.Printf(rowTmp, u.Username, u.Uuid, u.Status)
