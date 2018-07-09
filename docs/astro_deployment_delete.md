@@ -1,19 +1,19 @@
-## astro deployment create
+## astro deployment delete
 
-Create a new Astronomer Deployment
+Delete an airflow deployment
 
 ### Synopsis
 
-Create a new Astronomer Deployment
+Delete an airflow deployment
 
 ```
-astro deployment create DEPLOYMENT [flags]
+astro deployment delete DEPLOYMENT [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for create
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
