@@ -2,17 +2,21 @@
 
 The Astronomer CLI is the recommended way to get started developing and deploying on Astronomer Enterprise Edition.
 
-## Setup
+## Install
 
-1. Install Go:
+- via `curl`
+    ```
+    curl -sL https://install.astronomer.io | sudo bash
+    ```
 
+- via `go get`
     ```
     $ brew install go
     ```
 
     More info: <https://golang.org/doc/install>
 
-1. Set `GOPATH` (recommended: `~/go`) in .bash_profile or .bashrc:
+    Set `GOPATH` (recommended: `~/go`) in .bash_profile or .bashrc:
 
     ```
     export GOPATH=$HOME/go
@@ -22,29 +26,12 @@ The Astronomer CLI is the recommended way to get started developing and deployin
 
     More info: <https://github.com/golang/go/wiki/SettingGOPATH>
 
-## Quickstart
-
-How to get started as a user.
-
-1. Install Astro CLI:
-- via `curl`
-    ```
-    curl -sL https://install.astronomer.io | sudo bash
-    ```
-    
-- via `go get`
-    
-    install go binary:
+    Install astro-cli binary:
     ```
     $ go get github.com/astronomerio/astro-cli
     ```
-    
-    Add to .bash_profile:
-    ```
-    alias astro=astro-cli
-    ```
 
-    *Note: This is temporary while we have two CLIs (the older one is for current SaaS customers). Eventually this CLI will replace the old one and this step will be unncessary.*
+## Getting Started
 
 1. Run it to see commands:
 
@@ -102,3 +89,6 @@ How to get started as a developer.
     ```
     $ astro
     ```
+
+### Testing w/ houston-api
+astro-cli communicates with [houston-api](https://github.com/astronomerio/houston-api) in order to manage Astronomer EE resources (users, workspaces, deployments). Follow the Development section on the houston-api README in order develop and test the integration between these two systems.
