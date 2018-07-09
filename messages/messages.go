@@ -28,6 +28,7 @@ var (
 	CONFIG_REINIT_PROJECT_CONFIG   = "Reinitialized existing astronomer project in %s\n"
 	CONFIG_SAVE_ERROR              = "Error saving config\n"
 	CONFIG_SEARCH_ERROR            = "Error searching for project dir: %v\n"
+	CONFIG_SET_DEFAULT_WORKSPACE   = "Default \"Personal\" workspace found, setting default workspace to %s\n"
 	CONFIG_SET_SUCCESS             = "Setting %s to %s successfully\n"
 	CONFIG_USE_OUTSIDE_PROJECT_DIR = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s\n"
 
@@ -68,7 +69,7 @@ var (
 	INPUT_OAUTH_TOKEN = "oAuth Token: "
 
 	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s\n"
-	REGISTRY_AUTH_FAIL           = "Failed to authenticate to registry\nYou can re-authenticate to the registry with\n\t\tastro auth login"
+	REGISTRY_AUTH_FAIL           = "Failed to authenticate to the registry, this can occur when registry is offline. Until authenticated you will not be able to push new images to your Airflow clusters\n"
 	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy."
 	REGISTRY_TAGS_REQUEST_ERROR  = "Error requesting respostory tags"
 

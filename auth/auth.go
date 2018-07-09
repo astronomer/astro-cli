@@ -30,6 +30,20 @@ func basicAuth(username string) string {
 	return token.Token.Value
 }
 
+func getWorkspaceByLabel(label string) *houston.Workspace {
+	workspaces, err := api.GetWorkspaceAll()
+	if err != nil {
+		return nil
+	}
+	for _, ws := range workspaces {
+		if ws.Label == label {
+			return &ws
+		}
+	}
+
+	return nil
+}
+
 // oAuth handles oAuth with houston api
 func oAuth(oAuthUrl string) string {
 	fmt.Println("\n" + messages.HOUSTON_OAUTH_REDIRECT)
@@ -49,10 +63,9 @@ func registryAuth() error {
 	registry := config.RegistryUrl()
 	token := config.CFG.CloudAPIToken.GetProjectString()
 
-	dockerErr := docker.ExecLogin(registry, "user", token)
-	if dockerErr != nil {
-		fmt.Println(dockerErr)
-		os.Exit(1)
+	err := docker.ExecLogin(registry, "user", token)
+	if err != nil {
+		return err
 	}
 
 	fmt.Printf(messages.REGISTRY_AUTH_SUCCESS, registry)
@@ -89,8 +102,20 @@ func Login(oAuthOnly bool) error {
 		}
 	}
 
+	personalWorkspace := config.CFG.ProjectWorkspace.GetProjectString()
+	if len(personalWorkspace) == 0 {
+		ws := getWorkspaceByLabel("Personal")
+		if ws != nil {
+			config.CFG.ProjectWorkspace.SetProjectString(ws.Uuid)
+			fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, ws.Uuid)
+		}
+	}
+
 	config.CFG.CloudAPIToken.SetProjectString(token)
-	registryAuth()
+	err = registryAuth()
+	if err != nil {
+		fmt.Printf(messages.REGISTRY_AUTH_FAIL)
+	}
 
 	return nil
 }
