@@ -6,6 +6,7 @@ import (
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
+	"github.com/astronomerio/astro-cli/pkg/jsonstr"
 )
 
 var (
@@ -46,5 +47,19 @@ func Delete(uuid string) error {
 	}
 
 	fmt.Printf(messages.HOUSTON_WORKSPACE_DELETE_SUCCESS, ws.Label, ws.Uuid)
+	return nil
+}
+
+// Update an astronomer workspace
+func Update(workspaceId string, args map[string]string) error {
+	s := jsonstr.MapToJsonObjStr(args)
+
+	ws, err := api.UpdateWorkspace(workspaceId, s)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(messages.HOUSTON_WORKSPACE_UPDATE_SUCCESS, ws.Uuid)
+
 	return nil
 }

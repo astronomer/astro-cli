@@ -97,6 +97,5 @@ func Login(oAuthOnly bool) error {
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
 func Logout() {
-	// forget jwt
 	config.CFG.CloudAPIToken.SetProjectString("")
 }

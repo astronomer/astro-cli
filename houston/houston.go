@@ -202,6 +202,18 @@ var (
 		}
 	}`
 
+	workspaceUpdateRequest = `
+	mutation UpdateWorkspace {
+		updateWorkspace(workspaceUuid:"%s",
+		  payload: %s
+		) {
+		  uuid
+		  description
+		  label
+		  active
+		}
+	  }`
+
 	workspaceUserAddRequest = `
 	mutation AddWorkspaceUser {
 		workspaceAddUser(
@@ -479,11 +491,21 @@ func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, err
 func (c *Client) UpdateDeployment(deploymentId, jsonPayload string) (*Deployment, error) {
 	request := fmt.Sprintf(deploymentUpdateRequest, deploymentId, jsonPayload)
 
-	fmt.Println(request)
 	response, err := c.QueryHouston(request)
 	if err != nil {
 		return nil, errors.Wrap(err, "UpdateDeployment Failed")
 	}
 
 	return response.Data.UpdateDeployment, nil
+}
+
+func (c *Client) UpdateWorkspace(workspaceId, jsonPayload string) (*Workspace, error) {
+	request := fmt.Sprintf(workspaceUpdateRequest, workspaceId, jsonPayload)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "UpdateWorkspace Failed")
+	}
+
+	return response.Data.UpdateWorkspace, nil
 }

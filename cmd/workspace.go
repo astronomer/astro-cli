@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	createDesc string
+	workspaceUpdateAttrs = []string{"label"}
+	createDesc           string
 
 	workspaceRootCmd = &cobra.Command{
 		Use:     "workspace",
@@ -46,7 +47,10 @@ var (
 		Aliases: []string{"up"},
 		Short:   "Update an Astronomer workspace",
 		Long:    "Update a workspace name, as well as users and roles assigned to a workspace",
-		RunE:    workspaceUpdate,
+		Args: func(cmd *cobra.Command, args []string) error {
+			return updateArgValidator(args[1:], workspaceUpdateAttrs)
+		},
+		RunE: workspaceUpdate,
 	}
 
 	workspaceUserRootCmd = &cobra.Command{
@@ -116,9 +120,13 @@ func workspaceDelete(cmd *cobra.Command, args []string) error {
 	return workspace.Delete(args[0])
 }
 
-// TODO
 func workspaceUpdate(cmd *cobra.Command, args []string) error {
-	return nil
+	argsMap, err := argsToMap(args[1:])
+	if err != nil {
+		return err
+	}
+
+	return workspace.Update(args[0], argsMap)
 }
 
 func workspaceUserAdd(cmd *cobra.Command, args []string) error {
