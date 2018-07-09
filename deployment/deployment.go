@@ -7,6 +7,7 @@ import (
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
+	"github.com/astronomerio/astro-cli/pkg/jsonstr"
 )
 
 var (
@@ -50,5 +51,19 @@ func List(ws string) error {
 		rowTmp := "Label: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
 		fmt.Printf(rowTmp, d.Label, d.Id, d.ReleaseName, d.Version)
 	}
+	return nil
+}
+
+// Update an airflow deployment
+func Update(deploymentId string, args map[string]string) error {
+	s := jsonstr.MapToJsonObjStr(args)
+
+	dep, err := api.UpdateDeployment(deploymentId, s)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(messages.HOUSTON_DEPLOYMENT_UPDATE_SUCCESS, dep.Id)
+
 	return nil
 }

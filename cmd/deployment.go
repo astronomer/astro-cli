@@ -6,6 +6,8 @@ import (
 )
 
 var (
+	deploymentUpdateAttrs = []string{"label"}
+
 	deploymentRootCmd = &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de"},
@@ -44,7 +46,10 @@ var (
 		Aliases: []string{"up"},
 		Short:   "Update airflow deployments",
 		Long:    "Update airflow deployments",
-		RunE:    deploymentUpdate,
+		Args: func(cmd *cobra.Command, args []string) error {
+			return updateArgValidator(args[1:], deploymentUpdateAttrs)
+		},
+		RunE: deploymentUpdate,
 	}
 )
 
@@ -82,5 +87,10 @@ func deploymentList(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {
-	return nil
+	argsMap, err := argsToMap(args[1:])
+	if err != nil {
+		return err
+	}
+
+	return deployment.Update(args[0], argsMap)
 }

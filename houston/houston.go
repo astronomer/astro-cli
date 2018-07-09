@@ -80,6 +80,19 @@ var (
 	  }
 	}`
 
+	deploymentUpdateRequest = `
+	mutation UpdateDeplomyent {
+		updateDeployment(deploymentUuid:"%s",
+		  payload: %s
+		) {
+		  uuid
+		  type
+		  label
+		  releaseName
+		  version
+		}
+	  }`
+
 	tokenBasicCreateRequest = `
 	mutation createBasicToken {
 	  createToken(
@@ -461,4 +474,16 @@ func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, err
 	}
 
 	return response.Data.RemoveWorkspaceUser, nil
+}
+
+func (c *Client) UpdateDeployment(deploymentId, jsonPayload string) (*Deployment, error) {
+	request := fmt.Sprintf(deploymentUpdateRequest, deploymentId, jsonPayload)
+
+	fmt.Println(request)
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "UpdateDeployment Failed")
+	}
+
+	return response.Data.UpdateDeployment, nil
 }

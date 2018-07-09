@@ -49,6 +49,7 @@ var (
 	HOUSTON_DEPLOYING_PROMPT              = "Deploying: %s\n"
 	HOUSTON_DEPLOYMENT_CREATE_SUCCESS     = "Successfully created %s\n"
 	HOUSTON_DEPLOYMENT_DELETE_SUCCESS     = "Successfully deleted %s\n"
+	HOUSTON_DEPLOYMENT_UPDATE_SUCCESS     = "Successfully updated deployment %s"
 	HOUSTON_NO_DEPLOYMENTS_ERROR          = "No airflow deployments found"
 	HOUSTON_SELECT_DEPLOYMENT_PROMT       = "Select which airflow deployment you want to deploy to:"
 	HOUSTON_OAUTH_REDIRECT                = "Please visit the following URL, authenticate and paste token in next prompt\n"

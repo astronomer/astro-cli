@@ -9,6 +9,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+func argsToMap(args []string) (map[string]string, error) {
+	argsMap := make(map[string]string)
+	for _, kv := range args {
+		split := strings.Split(kv, "=")
+		if len(split) == 1 {
+			return nil, fmt.Errorf("Failed to parse key value pair (%s)", kv)
+		}
+
+		argsMap[split[0]] = split[1]
+	}
+	return argsMap, nil
+}
+
 func isValidUpdateAttr(arg string, valids []string) bool {
 	for _, e := range valids {
 		if e == arg {
@@ -28,7 +41,6 @@ func updateArgValidator(args, validArgs []string) error {
 		if len(split) == 1 {
 			return fmt.Errorf("Failed to parse key value pair (%s)", kv)
 		}
-
 		k := split[0]
 		if !isValidUpdateAttr(k, validArgs) {
 			return fmt.Errorf("invalid update arg key specified (%s)", k)
