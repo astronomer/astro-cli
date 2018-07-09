@@ -92,3 +92,10 @@ How to get started as a developer.
 
 ### Testing w/ houston-api
 astro-cli communicates with [houston-api](https://github.com/astronomerio/houston-api) in order to manage Astronomer EE resources (users, workspaces, deployments). Follow the Development section on the houston-api README in order develop and test the integration between these two systems.
+
+## Docs
+Docs (/docs) are generated using the `github.com/spf13/cobra/doc` pkg. Currently this pkg is broken with go vendoring, the following instructions include a workaround
+
+1. Remove the `/vendor/github.com/spf13/cobra` pkg, forcing Go to search your go path for the package instead
+2. `go run gendocs/gendocs.go`
+3. restore `/vendor/github.com/spf13/cobra`
