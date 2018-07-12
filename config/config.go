@@ -182,7 +182,7 @@ func saveConfig(v *viper.Viper, file string) error {
 
 func getUrl(svc string) string {
 	return fmt.Sprintf(
-		"%s://%s.%s:%s/v1",
+		"%s://%s.%s:%s/",
 		CFG.CloudAPIProtocol.GetString(),
 		svc,
 		CFG.CloudDomain.GetString(),
@@ -195,11 +195,6 @@ func APIUrl() string {
 	if len(CFG.LocalAPIURL.GetString()) != 0 {
 		return CFG.LocalAPIURL.GetString()
 	} else {
-		return getUrl("houston")
+		return getUrl("houston") + "v1"
 	}
-}
-
-// RegistryUrl will return a fully qualified houston URL
-func RegistryUrl() string {
-	return getUrl("registry")
 }

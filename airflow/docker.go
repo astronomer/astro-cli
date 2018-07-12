@@ -302,10 +302,12 @@ func Deploy(path, name, wsId string) error {
 	imageBuild(path, deployImage)
 
 	// Tag our build with remote registry and incremented tag
-	// tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
-	// remoteImage := fmt.Sprintf("%s/%s",
-	// 	config.CFG.RegistryAuthority.GetString(), imageName(name, tag))
-	remoteImage := "TODO"
+	tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
+
+	registry := "registry." + config.CFG.CloudDomain.GetString()
+
+	remoteImage := fmt.Sprintf("%s/%s",
+		registry, imageName(name, tag))
 	docker.Exec("tag", deployImage, remoteImage)
 
 	// Push image to registry

@@ -60,7 +60,7 @@ func oAuth(oAuthUrl string) string {
 
 // registryAuth authenticates with the private registry
 func registryAuth() error {
-	registry := config.RegistryUrl()
+	registry := "registry." + config.CFG.CloudDomain.GetString()
 	token := config.CFG.CloudAPIToken.GetProjectString()
 
 	err := docker.ExecLogin(registry, "user", token)
