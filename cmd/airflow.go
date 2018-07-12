@@ -38,13 +38,12 @@ var (
 	}
 
 	airflowDeployCmd = &cobra.Command{
-		Use:        "deploy DEPLOYMENT",
-		Short:      "Deploy an airflow project",
-		Long:       "Deploy an airflow project to a given deployment",
-		Args:       cobra.MaximumNArgs(1),
-		PreRun:     ensureProjectDir,
-		RunE:       airflowDeploy,
-		Deprecated: fmt.Sprintf(messages.CLI_CMD_DEPRECATE, "astro deployment list"),
+		Use:    "deploy DEPLOYMENT",
+		Short:  "Deploy an airflow project",
+		Long:   "Deploy an airflow project to a given deployment",
+		Args:   cobra.MaximumNArgs(1),
+		PreRun: ensureProjectDir,
+		RunE:   airflowDeploy,
 	}
 
 	airflowStartCmd = &cobra.Command{
