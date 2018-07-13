@@ -15,8 +15,8 @@ type HoustonResponse struct {
 		GetAuthConfig       *AuthConfig  `json:"authConfig,omitempty"`
 		GetUsers            []User       `json:"users,omitempty"`
 		GetWorkspace        []Workspace  `json:"workspaces,omitempty"`
-		UpdateDeployment    *Deployment  `json:"updateDeployment,omitempty`
-		UpdateWorkspace     *Workspace   `json:updateWorkspace,omitempty`
+		UpdateDeployment    *Deployment  `json:"updateDeployment,omitempty"`
+		UpdateWorkspace     *Workspace   `json:"updateWorkspace,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
