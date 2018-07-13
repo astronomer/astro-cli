@@ -75,6 +75,10 @@ var (
 		type
 		label
 		releaseName
+		deployInfo {
+			latest
+			next
+		}
 		version
 		createdAt
 		updatedAt

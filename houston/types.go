@@ -43,16 +43,24 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	Id          string `json:"uuid"`
-	Type        string `json:"type"`
-	Label       string `json:"label"`
-	ReleaseName string `json:"releaseName"`
-	Version     string `json:"version"`
-	Workspace   string `json:"workspace"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	Id             string         `json:"uuid"`
+	Type           string         `json:"type"`
+	Label          string         `json:"label"`
+	ReleaseName    string         `json:"releaseName"`
+	Version        string         `json:"version"`
+	DeploymentInfo DeploymentInfo `json:"deployInfo"`
+	Workspace      string         `json:"workspace"`
+	CreatedAt      string         `json:"createdAt"`
+	UpdatedAt      string         `json:"updatedAt"`
 }
 
+// DeploymentInfo contains registry related information for a deployment
+type DeploymentInfo struct {
+	Latest string `json:"latest"`
+	Next   string `json:"next"`
+}
+
+// Email contains various pieces of a users email
 type Email struct {
 	Address  string `json:"address"`
 	Verified bool   `json:"verified"`
@@ -74,18 +82,20 @@ type Status struct {
 	Id      string `json:"id"`
 }
 
-// Token defines structure of a houston response token object
+// Token contains a houston auth token as well as it's payload of components
 type Token struct {
 	Value   string       `json:"value"`
 	Payload TokenPayload `json:"payload"`
 }
 
+// TokenPayload contains components of a houston auth token
 type TokenPayload struct {
 	Uuid string `json:"uuid"`
 	Iat  int    `json:"iat"`
 	Exp  int    `json:"exp"`
 }
 
+// User contains all components of an Astronomer user
 type User struct {
 	Uuid     string  `json:"uuid"`
 	Emails   []Email `json:"emails"`
@@ -96,6 +106,7 @@ type User struct {
 	// profile
 }
 
+// Workspace contains all components of an Astronomer Workspace
 type Workspace struct {
 	Uuid        string `json:"uuid"`
 	Label       string `json:"label"`

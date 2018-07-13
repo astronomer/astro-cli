@@ -11,15 +11,8 @@ import (
 	"github.com/iancoleman/strcase"
 
 	"github.com/astronomerio/astro-cli/airflow/include"
-	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
-)
-
-var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
 )
 
 func initDirs(root string, dirs []string) bool {

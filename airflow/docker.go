@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -22,6 +21,7 @@ import (
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
+	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
 )
 
@@ -30,6 +30,11 @@ const (
 	deployTagPrefix   = "cli-"
 	dockerStateUp     = "Up"
 	dockerStateExited = "Exited"
+)
+
+var (
+	http = httputil.NewHTTPClient()
+	api  = houston.NewHoustonClient(http)
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -243,12 +248,12 @@ func PS(airflowHome string) error {
 
 // Deploy pushes a new docker image
 func Deploy(path, name, wsId string) error {
-	if name == "" {
-		deployments, err := api.GetDeployments(wsId)
-		if err != nil {
-			return err
-		}
+	deployments, err := api.GetDeployments(wsId)
+	if err != nil {
+		return err
+	}
 
+	if name == "" {
 		if len(deployments) == 0 {
 			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
 		}
@@ -268,30 +273,16 @@ func Deploy(path, name, wsId string) error {
 		}
 		name = selected.ReleaseName
 	}
-	fmt.Printf(messages.HOUSTON_DEPLOYING_PROMPT, name)
-	fmt.Println(repositoryName(name))
 
-	// Get a list of tags in the repository for this image
-	tags, err := docker.ListRepositoryTags(repositoryName(name))
-	if err != nil {
-		return err
-	}
-
-	// Keep track of the highest tag we have listed in the registry
-	// Default to 0, if never deployed before
-	highestTag := 0
-
-	// Loop through tags in the registry and find the highest one
-	re := regexp.MustCompile("^" + deployTagPrefix + "(\\d+)$")
-	for _, tag := range tags {
-		matches := re.FindStringSubmatch(tag)
-		if len(matches) > 0 {
-			t, _ := strconv.Atoi(matches[1])
-			if t > highestTag {
-				highestTag = t
-			}
+	nextTag := ""
+	for _, deployment := range deployments {
+		if deployment.ReleaseName == name {
+			nextTag = deployment.DeploymentInfo.Next
 		}
 	}
+
+	fmt.Printf(messages.HOUSTON_DEPLOYING_PROMPT, name)
+	fmt.Println(repositoryName(name))
 
 	// Build the image to deploy
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
@@ -302,12 +293,12 @@ func Deploy(path, name, wsId string) error {
 	imageBuild(path, deployImage)
 
 	// Tag our build with remote registry and incremented tag
-	tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
+	// tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
 
 	registry := "registry." + config.CFG.CloudDomain.GetString()
 
 	remoteImage := fmt.Sprintf("%s/%s",
-		registry, imageName(name, tag))
+		registry, imageName(name, nextTag))
 	docker.Exec("tag", deployImage, remoteImage)
 
 	// Push image to registry
