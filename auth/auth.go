@@ -102,12 +102,21 @@ func Login(oAuthOnly bool) error {
 		}
 	}
 
-	personalWorkspace := config.CFG.ProjectWorkspace.GetProjectString()
-	if len(personalWorkspace) == 0 {
-		ws := getWorkspaceByLabel("Personal")
-		if ws != nil {
-			config.CFG.ProjectWorkspace.SetProjectString(ws.Uuid)
-			fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, ws.Uuid)
+	projectWorkspace := config.CFG.ProjectWorkspace.GetProjectString()
+	if len(projectWorkspace) == 0 {
+		// Attempt to set projectworkspace if there is only one workspace
+		workspaces, err := api.GetWorkspaceAll()
+		if err != nil {
+			return nil
+		}
+
+		if len(workspaces) == 1 {
+			for _, w := range workspaces {
+				config.CFG.ProjectWorkspace.SetProjectString(w.Uuid)
+				fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Uuid)
+			}
+		} else {
+			fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 		}
 	}
 
