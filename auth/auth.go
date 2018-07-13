@@ -101,6 +101,7 @@ func Login(oAuthOnly bool) error {
 			fmt.Println(messages.HOUSTON_BASIC_AUTH_DISABLED)
 		}
 	}
+	config.CFG.CloudAPIToken.SetProjectString(token)
 
 	projectWorkspace := config.CFG.ProjectWorkspace.GetProjectString()
 	if len(projectWorkspace) == 0 {
@@ -120,7 +121,6 @@ func Login(oAuthOnly bool) error {
 		}
 	}
 
-	config.CFG.CloudAPIToken.SetProjectString(token)
 	err = registryAuth()
 	if err != nil {
 		fmt.Printf(messages.REGISTRY_AUTH_FAIL)
