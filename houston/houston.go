@@ -314,7 +314,7 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	}
 
 	if decode.Errors != nil {
-		fmt.Printf("Houston Error: %s\n", decode.Errors[0].Message)
+		fmt.Printf("Error: %s\n", decode.Errors[0].Message)
 		os.Exit(1)
 	}
 	return &decode, nil
