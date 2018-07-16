@@ -275,7 +275,7 @@ type GraphQLQuery struct {
 	Query string `json:"query"`
 }
 
-// QueryHouston executes a query against the Houston API
+// QueryHouston executes a query against the Houston API, logging out any errors contained in the response object
 func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	doOpts := httputil.DoOptions{
 		Data: GraphQLQuery{query},
@@ -320,6 +320,8 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	return &decode, nil
 }
 
+// AddWorkspaceUser sends request to Houston to add a user to a workspace
+// Returns a Workspace object
 func (c *Client) AddWorkspaceUser(workspaceId, email string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceUserAddRequest, workspaceId, email)
 
@@ -331,8 +333,8 @@ func (c *Client) AddWorkspaceUser(workspaceId, email string) (*Workspace, error)
 	return response.Data.AddWorkspaceUser, nil
 }
 
-// CreateDeployment will send request to Houston to create a new AirflowDeployment
-// Returns a StatusResponse which contains the unique id of deployment
+// CreateDeployment sends request to Houston to create a new Airflow deployment cluster
+// Returns a Deployment object
 func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
 	request := fmt.Sprintf(deploymentCreateRequest, label, wsId)
 
@@ -344,8 +346,8 @@ func (c *Client) CreateDeployment(label, wsId string) (*Deployment, error) {
 	return response.Data.CreateDeployment, nil
 }
 
-// CreateBasicToken will request a new token from Houston, passing the users e-mail and password.
-// Returns a Token structure with the users ID and Token inside.
+// CreateBasicToken sends request to Houston in order to fetch a Basic user Token
+// Returns an AuthUser object
 func (c *Client) CreateBasicToken(email, password string) (*AuthUser, error) {
 	request := fmt.Sprintf(tokenBasicCreateRequest, email, password)
 
@@ -370,8 +372,8 @@ func (c *Client) CreateOAuthToken(authCode string) (*AuthUser, error) {
 	return response.Data.CreateToken, nil
 }
 
-// CreateUser will send a request to houston to create a new user
-// Returns a Status object with a new token
+// CreateUser sends request to request to Houston in order to create a new platform User
+// Returns an AuthUser object containing an token
 func (c *Client) CreateUser(email string, password string) (*AuthUser, error) {
 	request := fmt.Sprintf(userCreateRequest, email, password)
 
@@ -382,7 +384,7 @@ func (c *Client) CreateUser(email string, password string) (*AuthUser, error) {
 	return response.Data.CreateUser, nil
 }
 
-// CreateWorkspace will send a request to houston to create a new workspace
+// CreateWorkspace will send a request to Houston to create a new workspace
 // Returns an object representing created workspace
 func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceCreateRequest, label, description)
@@ -395,6 +397,8 @@ func (c *Client) CreateWorkspace(label, description string) (*Workspace, error) 
 	return response.Data.CreateWorkspace, nil
 }
 
+// DeleteDeployment sends a request to Houston in order to delete a specified deployment
+// Returns a Deployment object which represents the Deployment that was deleted
 func (c *Client) DeleteDeployment(uuid string) (*Deployment, error) {
 	request := fmt.Sprintf(deploymentDeleteRequest, uuid)
 
@@ -406,7 +410,7 @@ func (c *Client) DeleteDeployment(uuid string) (*Deployment, error) {
 	return response.Data.DeleteDeployment, nil
 }
 
-// DeleteWorkspace will send a request to houston to create a new workspace
+// DeleteWorkspace will send a request to Houston to create a new workspace
 // Returns an object representing deleted workspace
 func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceDeleteRequest, uuid)
@@ -449,6 +453,7 @@ func (c *Client) GetDeployment(deploymentUuid string) (*Deployment, error) {
 }
 
 // GetAuthConfig will get authentication configuration from houston
+// Returns the requested AuthConfig object
 func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 	request := authConfigGetRequest
 
@@ -461,6 +466,7 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 }
 
 // GetWorkspaceAll returns all available workspaces from houston API
+// Returns a slice of all Workspaces a user has access to
 func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 	request := workspaceAllGetRequest
 
@@ -472,6 +478,8 @@ func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 	return response.Data.GetWorkspace, nil
 }
 
+// GetUserAll sends a request to Houston in order to fetch a slice of users
+// Returns a slice of all users a user has permission to view
 func (c *Client) GetUserAll() ([]User, error) {
 	request := userGetAllRequest
 
@@ -483,6 +491,8 @@ func (c *Client) GetUserAll() ([]User, error) {
 	return response.Data.GetUsers, nil
 }
 
+// RemoveWorkspaceUser sends a request to Houston in order to remove a user from a workspace
+// Returns an object representing the Workspace from which the user was removed
 func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceUserAddRequest, workspaceId, email)
 
@@ -494,6 +504,8 @@ func (c *Client) RemoveWorkspaceUser(workspaceId, email string) (*Workspace, err
 	return response.Data.RemoveWorkspaceUser, nil
 }
 
+// UpdateDeployment sends a request to Houston in order to update the attributes of deployment
+// Returns the updated Deployment object
 func (c *Client) UpdateDeployment(deploymentId, jsonPayload string) (*Deployment, error) {
 	request := fmt.Sprintf(deploymentUpdateRequest, deploymentId, jsonPayload)
 
@@ -505,6 +517,8 @@ func (c *Client) UpdateDeployment(deploymentId, jsonPayload string) (*Deployment
 	return response.Data.UpdateDeployment, nil
 }
 
+// UpdateWorkspace sends a request to Houston in order to update the attributes of the workspace
+// Returns an updated Workspace object
 func (c *Client) UpdateWorkspace(workspaceId, jsonPayload string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceUpdateRequest, workspaceId, jsonPayload)
 
