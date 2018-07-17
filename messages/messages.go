@@ -29,7 +29,7 @@ var (
 	CONFIG_REINIT_PROJECT_CONFIG   = "Reinitialized existing astronomer project in %s\n"
 	CONFIG_SAVE_ERROR              = "Error saving config\n"
 	CONFIG_SEARCH_ERROR            = "Error searching for project dir: %v\n"
-	CONFIG_SET_DEFAULT_WORKSPACE   = "Default \"Personal\" workspace found, setting default workspace to %s\n"
+	CONFIG_SET_DEFAULT_WORKSPACE   = "Default \"%s\" (%s) workspace found, setting default workspace.\n"
 	CONFIG_SET_SUCCESS             = "Setting %s to %s successfully\n"
 	CONFIG_USE_OUTSIDE_PROJECT_DIR = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s\n"
 
