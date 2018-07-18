@@ -258,15 +258,18 @@ func Deploy(path, name, wsId string) error {
 			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
 		}
 
+		cloudDomain := config.CFG.CloudDomain.GetString()
+		fmt.Printf(messages.HOUSTON_DEPLOYMENT_HEADER, cloudDomain)
+		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMPT)
+
 		deployMap := map[string]houston.Deployment{}
-		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMT)
 		for i, deployment := range deployments {
 			index := i + 1
 			deployMap[strconv.Itoa(index)] = deployment
 			fmt.Printf("%d) %s (%s)\n", index, deployment.Label, deployment.ReleaseName)
 		}
 
-		choice := input.InputText("")
+		choice := input.InputText("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
 			return errors.New(messages.HOUSTON_INVALID_DEPLOYMENT_KEY)
