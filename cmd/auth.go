@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/astronomerio/astro-cli/auth"
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/messages"
+	"github.com/astronomerio/astro-cli/pkg/input"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +48,19 @@ func init() {
 }
 
 func authLogin(cmd *cobra.Command, args []string) error {
-	if domainOverride != "" {
+	// Set Global Domain
+	if !(len(projectRoot) > 0) && domainOverride != "" {
+		prompt := fmt.Sprintf(messages.CONFIG_SET_GLOBAL_DOMAIN_PROMPT, domainOverride)
+		setGlobal, err := input.InputConfirm(prompt)
+		if err != nil {
+			return err
+		}
+		if setGlobal {
+			config.CFG.CloudDomain.SetHomeString(domainOverride)
+		}
+	}
+	// Set Project Domain
+	if len(projectRoot) > 0 && domainOverride != "" {
 		config.CFG.CloudDomain.SetProjectString(domainOverride)
 	}
 
