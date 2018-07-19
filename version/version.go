@@ -45,15 +45,18 @@ func CheckForUpdate(version, gitCommit string) error {
 	}
 
 	currentPub := currentTagResp.PublishedAt.Format("2006.01.02")
+	currentTag := currentTagResp.TagName
 	latestPub := latestTagResp.PublishedAt.Format("2006.01.02")
 	latestTag := latestTagResp.TagName
 
-	if latestTagResp.TagName > version {
-		fmt.Printf(messages.CLI_CURR_VERSION_DATE+"\n", version, currentPub)
-		fmt.Printf(messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
+	fmt.Printf(messages.CLI_CURR_VERSION_DATE+"\n", currentTag, currentPub)
+	fmt.Printf(messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
+
+	if latestTag > currentTag {
 		fmt.Println(messages.CLI_UPGRADE_PROMPT)
 		fmt.Println(messages.CLI_INSTALL_CMD)
-		return nil
+	} else {
+		fmt.Println(messages.CLI_RUNNING_LATEST)
 	}
 
 	return nil
