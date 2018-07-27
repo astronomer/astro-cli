@@ -2,9 +2,8 @@ package config
 
 // cfg defines settings a single configuration setting can have
 type cfg struct {
-	Path     string
-	Settable bool
-	Default  string
+	Path    string
+	Default string
 }
 
 // cfgs houses all configurations for an astro project
@@ -23,8 +22,8 @@ type cfgs struct {
 }
 
 // Creates a new cfg struct
-func newCfg(path string, settable bool, dflt string) cfg {
-	cfg := cfg{path, settable, dflt}
+func newCfg(path string, dflt string) cfg {
+	cfg := cfg{path, dflt}
 	CFGStrMap[path] = cfg
 	return cfg
 }

@@ -31,17 +31,17 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		CloudDomain:      newCfg("cloud.domain", true, ""),
-		CloudAPIProtocol: newCfg("cloud.api.protocol", true, "https"),
-		CloudAPIPort:     newCfg("cloud.api.port", true, "443"),
-		CloudAPIToken:    newCfg("cloud.api.token", true, ""),
-		LocalAPIURL:      newCfg("local.api.url", true, ""),
-		PostgresUser:     newCfg("postgres.user", true, "postgres"),
-		PostgresPassword: newCfg("postgres.password", true, "postgres"),
-		PostgresHost:     newCfg("postgres.host", true, "postgres"),
-		PostgresPort:     newCfg("postgres.port", true, "5432"),
-		ProjectName:      newCfg("project.name", true, ""),
-		ProjectWorkspace: newCfg("project.workspace", true, ""),
+		CloudDomain:      newCfg("cloud.domain", ""),
+		CloudAPIProtocol: newCfg("cloud.api.protocol", "https"),
+		CloudAPIPort:     newCfg("cloud.api.port", "443"),
+		CloudAPIToken:    newCfg("cloud.api.token", ""),
+		LocalAPIURL:      newCfg("local.api.url", ""),
+		PostgresUser:     newCfg("postgres.user", "postgres"),
+		PostgresPassword: newCfg("postgres.password", "postgres"),
+		PostgresHost:     newCfg("postgres.host", "postgres"),
+		PostgresPort:     newCfg("postgres.port", "5432"),
+		ProjectName:      newCfg("project.name", ""),
+		ProjectWorkspace: newCfg("project.workspace", ""),
 	}
 
 	// viperHome is the viper object in the users home directory
