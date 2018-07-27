@@ -302,6 +302,7 @@ func Deploy(path, name, wsId string) error {
 
 	remoteImage := fmt.Sprintf("%s/%s",
 		registry, imageName(name, nextTag))
+
 	docker.Exec("tag", deployImage, remoteImage)
 
 	// Push image to registry
