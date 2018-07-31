@@ -9,7 +9,7 @@ The Astronomer CLI is the recommended way to get started developing and deployin
     curl -sL https://install.astronomer.io | sudo bash
     ```
 
-- via `go get`
+- **or** via `go get`
     ```
     $ brew install go
     ```
@@ -33,7 +33,7 @@ The Astronomer CLI is the recommended way to get started developing and deployin
 
 ## Getting Started
 
-1. Run it to see commands:
+1. Confirm the install worked:
 
     ```
     $ astro
