@@ -8,21 +8,30 @@ import (
 )
 
 func ListClusters() error {
+	var domain string
 	c, err := config.GetClusters()
 	if err != nil {
 		return err
 	}
 
+	ctx, err := config.GetCurrentCluster()
+	if err != nil {
+		return err
+	}
+
 	for k, v := range c.Clusters {
-		var name string
 		if v.Domain != "" {
-			name = v.Domain
+			domain = v.Domain
 		} else {
-			name = strings.Replace(k, "_", ".", -1)
+			domain = strings.Replace(k, "_", ".", -1)
 		}
-		fmt.Println(name)
-		fmt.Printf("\t Workspace: %s", v.Workspace)
-		fmt.Println("\n")
+
+		if domain == ctx.Domain {
+			domain = domain + " (current)"
+		}
+
+		fmt.Println(domain)
+
 	}
 
 	return nil

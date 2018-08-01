@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/astronomerio/astro-cli/cluster"
+	"github.com/astronomerio/astro-cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -20,18 +21,32 @@ var (
 		Long:    "List known Astronomer Enterprise clusters",
 		RunE:    clusterList,
 	}
+
+	clusterSwitchCmd = &cobra.Command{
+		Use:     "switch",
+		Aliases: []string{"sw"},
+		Short:   "Switch to a different cluster context",
+		Long:    "Switch to a different cluster context",
+		RunE:    clusterSwitch,
+		Args:    cobra.ExactArgs(1),
+	}
 )
 
 func init() {
 	// deployment root
 	RootCmd.AddCommand(clusterRootCmd)
 
-	// deployment create
 	clusterRootCmd.AddCommand(clusterListCmd)
+	clusterRootCmd.AddCommand(clusterSwitchCmd)
 
 }
 
 func clusterList(cmd *cobra.Command, args []string) error {
 	cluster.ListClusters()
 	return nil
+}
+
+func clusterSwitch(cmd *cobra.Command, args []string) error {
+	c := config.Cluster{Domain: args[0]}
+	return c.SwitchCluster()
 }
