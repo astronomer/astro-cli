@@ -60,10 +60,14 @@ func oAuth(oAuthUrl string) string {
 
 // registryAuth authenticates with the private registry
 func registryAuth() error {
-	registry := "registry." + config.CFG.CloudDomain.GetString()
-	token := config.CFG.CloudAPIToken.GetProjectString()
+	c, err := config.GetCurrentCluster()
+	if err != nil {
+		return err
+	}
 
-	err := docker.ExecLogin(registry, "user", token)
+	registry := "registry." + c.Domain
+	token := c.Token
+	err = docker.ExecLogin(registry, "user", token)
 	if err != nil {
 		return err
 	}
@@ -74,8 +78,15 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(oAuthOnly bool) error {
-	token := ""
+func Login(domain string, oAuthOnly bool) error {
+	var token string
+	c, err := config.GetCluster(domain)
+	if err != nil {
+		return err
+	}
+
+	c.SwitchCluster()
+
 	authConfig, err := api.GetAuthConfig()
 	if err != nil {
 		fmt.Println(err)
@@ -101,7 +112,8 @@ func Login(oAuthOnly bool) error {
 			fmt.Println(messages.HOUSTON_BASIC_AUTH_DISABLED)
 		}
 	}
-	config.CFG.CloudAPIToken.SetProjectString(token)
+
+	c.SetClusterKey("token", token)
 
 	// Attempt to set projectworkspace if there is only one workspace
 	workspaces, err := api.GetWorkspaceAll()
@@ -111,7 +123,7 @@ func Login(oAuthOnly bool) error {
 
 	if len(workspaces) == 1 {
 		w := workspaces[0]
-		config.CFG.ProjectWorkspace.SetProjectString(w.Uuid)
+		c.SetClusterKey("workspace", w.Uuid)
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Uuid)
 	} else {
 		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
@@ -126,6 +138,8 @@ func Login(oAuthOnly bool) error {
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
-func Logout() {
-	config.CFG.CloudAPIToken.SetProjectString("")
+func Logout(domain string) {
+	c, _ := config.GetCluster(domain)
+
+	c.SetClusterKey("token", "")
 }

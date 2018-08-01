@@ -31,10 +31,12 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
+		Clusters:         newCfg("clusters", ""),
 		CloudDomain:      newCfg("cloud.domain", ""),
 		CloudAPIProtocol: newCfg("cloud.api.protocol", "https"),
 		CloudAPIPort:     newCfg("cloud.api.port", "443"),
 		CloudAPIToken:    newCfg("cloud.api.token", ""),
+		Context:          newCfg("context", ""),
 		LocalAPIURL:      newCfg("local.api.url", ""),
 		PostgresUser:     newCfg("postgres.user", "postgres"),
 		PostgresPassword: newCfg("postgres.password", "postgres"),
