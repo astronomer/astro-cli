@@ -83,7 +83,6 @@ func GetClusters() (Clusters, error) {
 		return C, err
 	}
 
-	fmt.Println(C)
 	return C, nil
 }
 

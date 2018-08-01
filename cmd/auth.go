@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/astronomerio/astro-cli/auth"
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/spf13/cobra"
@@ -47,41 +44,22 @@ func init() {
 }
 
 func authLogin(cmd *cobra.Command, args []string) error {
-	var domain string
+	c := config.Cluster{}
 
+	// Determine whether to use current cluster context of domain arg[]
 	if len(args) == 1 {
-		domain = args[0]
+		c.Domain = args[0]
+		c.SetCluster()
 	} else {
-		c, _ := config.GetCurrentCluster()
-		if len(c.Domain) == 0 {
-			fmt.Println("Please provide a base domain to authenticate to")
-			os.Exit(1)
-		}
+		c, _ = config.GetCurrentCluster()
 	}
 
-	// Create Cluster Context if It Doesn't Exist
-	if !config.ClusterExists(domain) {
-		fmt.Println("cluster doesn't exist")
-		c := config.Cluster{Domain: domain}
-
-		err := c.SetCluster()
-		if err != nil {
-			return err
-		}
-	}
-
-	// Rollback if login fails
-	currCluster, err := config.GetCurrentCluster()
+	err := auth.Login(c.Domain, oAuthOnly)
 	if err != nil {
 		return err
 	}
 
-	err = auth.Login(domain, oAuthOnly)
-	if err != nil {
-		currCluster.SwitchCluster()
-	}
-
-	return err
+	return nil
 }
 
 func authLogout(cmd *cobra.Command, args []string) {
