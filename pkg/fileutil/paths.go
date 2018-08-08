@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,6 +31,8 @@ func GetHomeDir() string {
 }
 
 // FindDirInPath walks up the current directory looking for the .astro folder
+// TODO Deprecate if remains unused, removed due to
+// https://github.com/astronomerio/astro-cli/issues/103
 func FindDirInPath(search string) (string, error) {
 	// Start in our current directory
 	workingDir := GetWorkingDir()
@@ -59,4 +62,20 @@ func FindDirInPath(search string) (string, error) {
 	}
 
 	return "", nil
+}
+
+// IsEmptyDir checks if path is an empty dir
+func IsEmptyDir(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1) // Or f.Readdir(1)
+	if err == io.EOF {
+		return true
+	}
+	return false // Either not empty or error, suits both cases
 }
