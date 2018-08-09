@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 
+	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
@@ -47,6 +48,25 @@ func Delete(uuid string) error {
 	}
 
 	fmt.Printf(messages.HOUSTON_WORKSPACE_DELETE_SUCCESS, ws.Label, ws.Uuid)
+	return nil
+}
+
+// Switch switches workspaces
+func Switch(uuid string) error {
+	c, err := cluster.GetCurrentCluster()
+	if err != nil {
+		return err
+	}
+
+	c.Workspace = uuid
+
+	err = c.SetContext()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Workspace: %s", uuid)
+
 	return nil
 }
 

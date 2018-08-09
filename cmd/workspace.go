@@ -42,6 +42,15 @@ var (
 		RunE:    workspaceDelete,
 	}
 
+	workspaceSwitchCmd = &cobra.Command{
+		Use:     "switch WORKSPACE",
+		Aliases: []string{"sw"},
+		Short:   "Switch to a different astronomer workspace",
+		Long:    "Switch to a different astronomer workspace",
+		Args:    cobra.ExactArgs(1),
+		RunE:    workspaceSwitch,
+	}
+
 	workspaceUpdateCmd = &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
@@ -69,8 +78,8 @@ var (
 	workspaceUserRmCmd = &cobra.Command{
 		Use:     "remove EMAIL",
 		Aliases: []string{"rm"},
-		Short:   "Add a user to a workspace",
-		Long:    "Add a user to a workspace",
+		Short:   "Remove a user from a workspace",
+		Long:    "Remove a user from a workspace",
 		RunE:    workspaceUserRm,
 	}
 )
@@ -88,6 +97,9 @@ func init() {
 
 	// workspace delete
 	workspaceRootCmd.AddCommand(workspaceDeleteCmd)
+
+	// workspace switch
+	workspaceRootCmd.AddCommand(workspaceSwitchCmd)
 
 	// workspace update
 	workspaceRootCmd.AddCommand(workspaceUpdateCmd)
@@ -137,4 +149,9 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 func workspaceUserRm(cmd *cobra.Command, args []string) error {
 	ws := workspaceValidator()
 	return workspace.Remove(ws, args[0])
+}
+
+func workspaceSwitch(cmd *cobra.Command, args []string) error {
+	ws := workspaceValidator()
+	return workspace.Switch(ws)
 }
