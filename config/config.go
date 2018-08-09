@@ -31,7 +31,7 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		Clusters:         newCfg("clusters", ""),
+		Contexts:         newCfg("clusters", ""),
 		CloudDomain:      newCfg("cloud.domain", ""),
 		CloudAPIProtocol: newCfg("cloud.api.protocol", "https"),
 		CloudAPIPort:     newCfg("cloud.api.port", "443"),

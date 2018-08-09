@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
@@ -60,7 +60,7 @@ func oAuth(oAuthUrl string) string {
 
 // registryAuth authenticates with the private registry
 func registryAuth() error {
-	c, err := config.GetCurrentCluster()
+	c, err := cluster.GetCurrentCluster()
 	if err != nil {
 		return err
 	}
@@ -80,12 +80,30 @@ func registryAuth() error {
 // Login handles authentication to houston and registry
 func Login(domain string, oAuthOnly bool) error {
 	var token string
-	c, err := config.GetCluster(domain)
+	var err error
+
+	// If no domain specified
+	// Create cluster if it does not exist
+	if len(domain) != 0 {
+		if !cluster.ClusterExists(domain) {
+			// Save new cluster since it did not exists
+			err = cluster.SetCluster(domain)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Switch cluster now that we ensured cluster exists
+		err = cluster.SwitchCluster(domain)
+		if err != nil {
+			return err
+		}
+	}
+
+	c, err := cluster.GetCurrentCluster()
 	if err != nil {
 		return err
 	}
-
-	c.SwitchCluster()
 
 	authConfig, err := api.GetAuthConfig()
 	if err != nil {
@@ -113,7 +131,11 @@ func Login(domain string, oAuthOnly bool) error {
 		}
 	}
 
-	c.SetClusterKey("token", token)
+	c, err = cluster.GetCluster(domain)
+	if err != nil {
+		return err
+	}
+	c.SetContextKey("token", token)
 
 	// Attempt to set projectworkspace if there is only one workspace
 	workspaces, err := api.GetWorkspaceAll()
@@ -123,7 +145,7 @@ func Login(domain string, oAuthOnly bool) error {
 
 	if len(workspaces) == 1 {
 		w := workspaces[0]
-		c.SetClusterKey("workspace", w.Uuid)
+		c.SetContextKey("workspace", w.Uuid)
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Uuid)
 	} else {
 		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
@@ -139,7 +161,7 @@ func Login(domain string, oAuthOnly bool) error {
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
 func Logout(domain string) {
-	c, _ := config.GetCluster(domain)
+	c, _ := cluster.GetCluster(domain)
 
-	c.SetClusterKey("token", "")
+	c.SetContextKey("token", "")
 }

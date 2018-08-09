@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	// "github.com/sirupsen/logrus"
 
-	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 )
 
@@ -285,7 +285,7 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		},
 	}
 
-	cl, err := config.GetCurrentCluster()
+	cl, err := cluster.GetCurrentCluster()
 	if err != nil {
 		return nil, err
 	}

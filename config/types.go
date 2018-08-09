@@ -8,7 +8,7 @@ type cfg struct {
 
 // cfgs houses all configurations for an astro project
 type cfgs struct {
-	Clusters         cfg
+	Contexts         cfg
 	CloudDomain      cfg
 	CloudAPIProtocol cfg
 	CloudAPIPort     cfg

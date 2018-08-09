@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/astronomerio/astro-cli/auth"
-	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/spf13/cobra"
 )
 
@@ -44,17 +44,13 @@ func init() {
 }
 
 func authLogin(cmd *cobra.Command, args []string) error {
-	c := config.Cluster{}
+	var domain string
 
-	// Determine whether to use current cluster context of domain arg[]
 	if len(args) == 1 {
-		c.Domain = args[0]
-		c.SetCluster()
-	} else {
-		c, _ = config.GetCurrentCluster()
+		domain = args[0]
 	}
 
-	err := auth.Login(c.Domain, oAuthOnly)
+	err := auth.Login(domain, oAuthOnly)
 	if err != nil {
 		return err
 	}
@@ -68,7 +64,7 @@ func authLogout(cmd *cobra.Command, args []string) {
 	if len(args) == 1 {
 		domain = args[0]
 	} else {
-		c, _ := config.GetCurrentCluster()
+		c, _ := cluster.GetCurrentCluster()
 		domain = c.Domain
 	}
 

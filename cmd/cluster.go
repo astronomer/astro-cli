@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/astronomerio/astro-cli/cluster"
-	"github.com/astronomerio/astro-cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +37,6 @@ func init() {
 
 	clusterRootCmd.AddCommand(clusterListCmd)
 	clusterRootCmd.AddCommand(clusterSwitchCmd)
-
 }
 
 func clusterList(cmd *cobra.Command, args []string) error {
@@ -47,6 +45,5 @@ func clusterList(cmd *cobra.Command, args []string) error {
 }
 
 func clusterSwitch(cmd *cobra.Command, args []string) error {
-	c := config.Cluster{Domain: args[0]}
-	return c.SwitchCluster()
+	return cluster.SwitchCluster(args[0])
 }
