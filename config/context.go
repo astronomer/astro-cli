@@ -37,7 +37,7 @@ func (c Context) ContextExists() bool {
 		return false
 	}
 
-	return viperHome.IsSet("clusters" + "." + key)
+	return viperHome.IsSet("contexts" + "." + key)
 }
 
 // GetContext gets the full context from the specified Context receiver struct
@@ -52,7 +52,7 @@ func (c Context) GetContext() (Context, error) {
 		return c, errors.New("Cluster not set, have you authenticated to this cluster?")
 	}
 
-	err = viperHome.UnmarshalKey("clusters"+"."+key, &c)
+	err = viperHome.UnmarshalKey("contexts"+"."+key, &c)
 	if err != nil {
 		return c, err
 	}
@@ -83,7 +83,7 @@ func (c Context) SetContext() error {
 		"workspace": c.Workspace,
 	}
 
-	viperHome.Set("clusters"+"."+key, context)
+	viperHome.Set("contexts"+"."+key, context)
 	saveConfig(viperHome, HomeConfigFile)
 
 	return nil
@@ -96,7 +96,7 @@ func (c Context) SetContextKey(key, value string) error {
 		return err
 	}
 
-	cfgPath := fmt.Sprintf("clusters.%s.%s", cKey, key)
+	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, key)
 	viperHome.Set(cfgPath, value)
 	saveConfig(viperHome, HomeConfigFile)
 
