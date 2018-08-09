@@ -85,7 +85,7 @@ func Login(domain string, oAuthOnly bool) error {
 	// If no domain specified
 	// Create cluster if it does not exist
 	if len(domain) != 0 {
-		if !cluster.ClusterExists(domain) {
+		if !cluster.Exists(domain) {
 			// Save new cluster since it did not exists
 			err = cluster.SetCluster(domain)
 			if err != nil {
@@ -94,7 +94,7 @@ func Login(domain string, oAuthOnly bool) error {
 		}
 
 		// Switch cluster now that we ensured cluster exists
-		err = cluster.SwitchCluster(domain)
+		err = cluster.Switch(domain)
 		if err != nil {
 			return err
 		}

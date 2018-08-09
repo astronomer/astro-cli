@@ -11,7 +11,7 @@ import (
 // ListClusters lists all available clusters a user has previously
 // authenticated to
 // Returns error
-func ListClusters() error {
+func List() error {
 	var domain string
 	c, err := GetClusters()
 	if err != nil {
@@ -42,7 +42,7 @@ func ListClusters() error {
 }
 
 // ClusterExists checks to see if cluster exist in config
-func ClusterExists(domain string) bool {
+func Exists(domain string) bool {
 	c := config.Context{Domain: domain}
 
 	return c.ContextExists()
@@ -85,7 +85,7 @@ func SetCluster(domain string) error {
 
 // SwitchCluster is a thin wrapper around the switch cluster receiver
 // Returns error
-func SwitchCluster(domain string) error {
+func Switch(domain string) error {
 	c := config.Context{Domain: domain}
 	err := c.SwitchContext()
 	if err != nil {

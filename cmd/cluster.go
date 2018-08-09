@@ -40,10 +40,10 @@ func init() {
 }
 
 func clusterList(cmd *cobra.Command, args []string) error {
-	cluster.ListClusters()
+	cluster.List()
 	return nil
 }
 
 func clusterSwitch(cmd *cobra.Command, args []string) error {
-	return cluster.SwitchCluster(args[0])
+	return cluster.Switch(args[0])
 }
