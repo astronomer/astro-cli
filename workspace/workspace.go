@@ -32,11 +32,20 @@ func List() error {
 		return err
 	}
 
-	for _, w := range ws {
-		rowTmp := "Label: %s\nId: %s\nDesc.: %s\n\n"
+	c, err := config.GetCurrentContext()
 
-		fmt.Printf(rowTmp, w.Label, w.Uuid, w.Description)
+	for _, w := range ws {
+		isCurrent := ""
+		rowTmp := "Label: %s  %s\nId: %s\nDesc.: %s\n\n"
+
+		fmt.Println(c.Workspace)
+		fmt.Println(w.Uuid)
+		if c.Workspace == w.Uuid {
+			isCurrent = "(Current)"
+		}
+		fmt.Printf(rowTmp, w.Label, isCurrent, w.Uuid, w.Description)
 	}
+
 	return nil
 }
 
@@ -49,6 +58,21 @@ func Delete(uuid string) error {
 
 	fmt.Printf(messages.HOUSTON_WORKSPACE_DELETE_SUCCESS, ws.Label, ws.Uuid)
 	return nil
+}
+
+// GetCurrentWorkspace gets the current workspace set in context config
+// Returns a string representing the current workspace and an error if it doesn't exist
+func GetCurrentWorkspace() (string, error) {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+
+	if len(c.Workspace) == 0 {
+		return "", errors.New("Current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACID")
+	}
+
+	return c.Workspace, nil
 }
 
 // Switch switches workspaces
