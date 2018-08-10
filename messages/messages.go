@@ -12,7 +12,7 @@ var (
 	CLI_LATEST_VERSION_DATE   = CLI_LATEST_VERSION + " (%s)"
 	CLI_INSTALL_CMD           = "\t$ curl -sL https://install.astronomer.io | sudo bash"
 	CLI_RUNNING_LATEST        = "You are running the latest version."
-	CLI_SET_WORKSPACE_EXAMPLE = "No default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro config set project.workspace [WORKSPACEID]\n"
+	CLI_SET_WORKSPACE_EXAMPLE = "No default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
 	CLI_UPGRADE_PROMPT        = "There is a more recent version of the Astronomer CLI available.\nYou can install the latest tagged release with the following command"
 	CLI_UNTAGGED_PROMPT       = "Your current Astronomer CLI is not tagged.\nThis is likely the result of building from source. You can install the latest tagged release with the following command"
 
