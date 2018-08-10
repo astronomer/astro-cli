@@ -143,15 +143,14 @@ func Login(domain string, oAuthOnly bool) error {
 		return nil
 	}
 
-	if len(workspaces) == 1 {
+	if len(workspaces) == 1 && len(c.Workspace) == 0 {
 		w := workspaces[0]
 		c.SetContextKey("workspace", w.Uuid)
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Uuid)
-	} else {
+	}
+
+	if len(workspaces) != 1 && len(c.Workspace) == 0 {
 		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
-		if len(c.Workspace) != 0 {
-			fmt.Printf("Workspace: %s", c.Workspace)
-		}
 	}
 
 	err = registryAuth()
