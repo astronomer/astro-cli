@@ -43,14 +43,14 @@ func List() error {
 		name := w.Label
 		workspace := w.Uuid
 
-		// colorFmt := "\033[33;m"
-		// colorTrm := "\033[0m"
-
+		colorFmt := "\033[33;m"
+		colorTrm := "\033[0m"
+		fullStr := fmt.Sprintf(r, isCurrent, name, workspace)
 		if c.Workspace == w.Uuid {
-			isCurrent = "*"
+			fmt.Print(colorFmt + fullStr + colorTrm)
+		} else {
+			fmt.Print(fullStr)
 		}
-
-		fmt.Printf(r, isCurrent, name, workspace)
 	}
 
 	return nil
