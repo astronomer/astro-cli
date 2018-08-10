@@ -31,6 +31,62 @@ func GetCurrentContext() (Context, error) {
 
 	return c.GetContext()
 }
+
+// PrintContext prints current context to stdOut
+func (c Context) PrintContext() error {
+	c, err := c.GetContext()
+	if err != nil {
+		return err
+	}
+
+	cluster := c.Domain
+	if len(cluster) == 0 {
+		cluster = "N/A"
+	}
+
+	workspace := c.Workspace
+	if len(workspace) == 0 {
+		workspace = "N/A"
+	}
+
+	r := "| %36s | %36s |\n"
+	fmt.Printf("|%77s|\n", BufferString("Current Context", 77))
+	fmt.Printf("| %75s |\n", strings.Repeat("=", 75))
+	fmt.Printf(r, BufferString("Cluster", 36), BufferString("Workspace", 36))
+	fmt.Printf(r, strings.Repeat("-", 36), strings.Repeat("-", 36))
+	fmt.Printf(r, BufferString(cluster, 36), BufferString(workspace, 36))
+	fmt.Printf(r, strings.Repeat("-", 36), strings.Repeat("-", 36))
+
+	return nil
+}
+
+func BufferString(s string, l int) string {
+	sl := len(s)
+
+	if sl > l {
+		return ""
+	}
+
+	bufferLen := (l - sl) / 2
+
+	return s + strings.Repeat(" ", bufferLen)
+}
+
+// PrintCurrentContext prints the current config context
+func PrintCurrentContext() error {
+	c, err := GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	err = c.PrintContext()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetContextKey allows a cluster domain to be used without interfering
 // with viper's dot (.) notation for fetching configs by replacing with underscores (_)
 func (c Context) GetContextKey() (string, error) {

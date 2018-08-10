@@ -1,9 +1,10 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/astronomerio/astro-cli/cluster"
+	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
@@ -77,19 +78,18 @@ func GetCurrentWorkspace() (string, error) {
 
 // Switch switches workspaces
 func Switch(uuid string) error {
-	c, err := cluster.GetCurrentCluster()
+	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
 	c.Workspace = uuid
-
 	err = c.SetContext()
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Workspace: %s", uuid)
+	config.PrintCurrentContext()
 
 	return nil
 }

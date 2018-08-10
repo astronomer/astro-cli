@@ -149,6 +149,9 @@ func Login(domain string, oAuthOnly bool) error {
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Uuid)
 	} else {
 		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
+		if len(c.Workspace) != 0 {
+			fmt.Printf("Workspace: %s", c.Workspace)
+		}
 	}
 
 	err = registryAuth()

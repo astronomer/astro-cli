@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -84,6 +83,6 @@ func Switch(domain string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Cluster: %s\n", c.Domain)
+	config.PrintCurrentContext()
 	return nil
 }
