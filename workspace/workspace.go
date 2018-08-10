@@ -28,6 +28,8 @@ func Create(label, desc string) error {
 
 // List all workspaces
 func List() error {
+	r := "  %s%-44s %-50s\n"
+	isCurrent := " "
 	ws, err := api.GetWorkspaceAll()
 	if err != nil {
 		return err
@@ -35,16 +37,20 @@ func List() error {
 
 	c, err := config.GetCurrentContext()
 
+	fmt.Printf(r, isCurrent, "NAME", "UUID")
 	for _, w := range ws {
-		isCurrent := ""
-		rowTmp := "Label: %s  %s\nId: %s\nDesc.: %s\n\n"
+		isCurrent = " "
+		name := w.Label
+		workspace := w.Uuid
 
-		fmt.Println(c.Workspace)
-		fmt.Println(w.Uuid)
+		// colorFmt := "\033[33;m"
+		// colorTrm := "\033[0m"
+
 		if c.Workspace == w.Uuid {
-			isCurrent = "(Current)"
+			isCurrent = "*"
 		}
-		fmt.Printf(rowTmp, w.Label, isCurrent, w.Uuid, w.Description)
+
+		fmt.Printf(r, isCurrent, name, workspace)
 	}
 
 	return nil
