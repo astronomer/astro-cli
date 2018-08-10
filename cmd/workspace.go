@@ -152,6 +152,5 @@ func workspaceUserRm(cmd *cobra.Command, args []string) error {
 }
 
 func workspaceSwitch(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
-	return workspace.Switch(ws)
+	return workspace.Switch(args[0])
 }
