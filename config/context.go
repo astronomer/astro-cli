@@ -18,6 +18,19 @@ type Context struct {
 	Token     string `mapstructure:"token"`
 }
 
+// GetCurrentContext looks up current context and gets cooresponding Context struct
+func GetCurrentContext() (Context, error) {
+	c := Context{}
+
+	domain := CFG.Context.GetHomeString()
+	if len(domain) == 0 {
+		return Context{}, errors.New("No context set, have you authenticated to a cluster?")
+	}
+
+	c.Domain = domain
+
+	return c.GetContext()
+}
 // GetContextKey allows a cluster domain to be used without interfering
 // with viper's dot (.) notation for fetching configs by replacing with underscores (_)
 func (c Context) GetContextKey() (string, error) {

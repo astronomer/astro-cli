@@ -49,17 +49,10 @@ func Exists(domain string) bool {
 }
 
 // GetCurrentCluster gets the  current cluster set in the config
+// Is a convenience wrapp around config.GetCurrentContext()
 // Returns full Context struct
 func GetCurrentCluster() (config.Context, error) {
-	c := config.Context{}
-
-	domain := config.CFG.Context.GetHomeString()
-	if len(domain) == 0 {
-		return config.Context{}, errors.New("No context set, have you authenticated to a cluster?")
-	}
-
-	c.Domain = domain
-	return c.GetContext()
+	return config.GetCurrentContext()
 }
 
 // GetCluster gets the specified context by domain name
