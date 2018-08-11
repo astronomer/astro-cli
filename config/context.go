@@ -49,27 +49,11 @@ func (c Context) PrintContext() error {
 		workspace = "N/A"
 	}
 
-	r := "| %36s | %36s |\n"
-	fmt.Printf("|%77s|\n", BufferString("Current Context", 77))
-	fmt.Printf("| %75s |\n", strings.Repeat("=", 75))
-	fmt.Printf(r, BufferString("Cluster", 36), BufferString("Workspace", 36))
-	fmt.Printf(r, strings.Repeat("-", 36), strings.Repeat("-", 36))
-	fmt.Printf(r, BufferString(cluster, 36), BufferString(workspace, 36))
-	fmt.Printf(r, strings.Repeat("-", 36), strings.Repeat("-", 36))
+	r := "%-36s %-36s\n"
+	fmt.Printf(r, "CLUSTER", "WORKSPACE")
+	fmt.Printf(r, cluster, workspace)
 
 	return nil
-}
-
-func BufferString(s string, l int) string {
-	sl := len(s)
-
-	if sl > l {
-		return ""
-	}
-
-	bufferLen := (l - sl) / 2
-
-	return s + strings.Repeat(" ", bufferLen)
 }
 
 // PrintCurrentContext prints the current config context

@@ -42,14 +42,21 @@ func Delete(uuid string) error {
 
 // List all airflow deployments
 func List(ws string) error {
+	r := "  %-30s %-50s"
+	// colorFmt := "\033[33;m"
+	// colorTrm := "\033[0m"
+
 	deployments, err := api.GetDeployments(ws)
 	if err != nil {
 		return err
 	}
 
+	h := fmt.Sprintf(r, "NAME", "UUID")
+	fmt.Println(h)
+
 	for _, d := range deployments {
-		rowTmp := "Label: %s\nId: %s\nRelease: %s\nVersion: %s\n\n"
-		fmt.Printf(rowTmp, d.Label, d.Id, d.ReleaseName, d.Version)
+		fullStr := fmt.Sprintf(r, d.Label, d.Id)
+		fmt.Println(fullStr)
 	}
 	return nil
 }
