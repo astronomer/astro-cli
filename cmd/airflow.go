@@ -1,16 +1,18 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/astronomerio/astro-cli/pkg/input"
+	"github.com/iancoleman/strcase"
+	"github.com/pkg/errors"
+
 	"github.com/astronomerio/astro-cli/messages"
 
-	"github.com/iancoleman/strcase"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomerio/astro-cli/airflow"
@@ -20,7 +22,6 @@ import (
 )
 
 var (
-	projectRoot string
 	projectName string
 	forceDeploy bool
 
@@ -80,9 +81,6 @@ var (
 )
 
 func init() {
-	// Set up project root
-	projectRoot, _ = config.ProjectRoot()
-
 	// Airflow root
 	RootCmd.AddCommand(airflowRootCmd)
 
@@ -109,7 +107,7 @@ func init() {
 }
 
 func ensureProjectDir(cmd *cobra.Command, args []string) {
-	if !(len(projectRoot) > 0) {
+	if !config.IsProjectDir(config.WorkingPath) {
 		fmt.Println(messages.CONFIG_PROJECT_DIR_ERROR)
 		os.Exit(1)
 	}
@@ -117,9 +115,6 @@ func ensureProjectDir(cmd *cobra.Command, args []string) {
 
 // Use project name for image name
 func airflowInit(cmd *cobra.Command, args []string) error {
-	// Grab working directory
-	path := fileutil.GetWorkingDir()
-
 	// Validate project name
 	if len(projectName) != 0 {
 		projectNameValid := regexp.
@@ -130,21 +125,31 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 			return errors.New(messages.CONFIG_PROJECT_NAME_ERROR)
 		}
 	} else {
-		projectDirectory := filepath.Base(path)
+		projectDirectory := filepath.Base(config.WorkingPath)
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
+	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
+	if !emtpyDir {
+		i, _ := input.InputConfirm(
+			fmt.Sprintf("%s \nYou are not in an empty directory, are you you want to initialize a project?", config.WorkingPath))
+
+		if !i {
+			fmt.Println("Cancelling project initialization...\n")
+			os.Exit(1)
+		}
+	}
 	exists := config.ProjectConfigExists()
 	if !exists {
-		config.CreateProjectConfig(path)
+		config.CreateProjectConfig(config.WorkingPath)
 	}
 	config.CFG.ProjectName.SetProjectString(projectName)
-	airflow.Init(path)
+	airflow.Init(config.WorkingPath)
 
 	if exists {
-		fmt.Printf(messages.CONFIG_REINIT_PROJECT_CONFIG+"\n", path)
+		fmt.Printf(messages.CONFIG_REINIT_PROJECT_CONFIG+"\n", config.WorkingPath)
 	} else {
-		fmt.Printf(messages.CONFIG_INIT_PROJECT_CONFIG+"\n", path)
+		fmt.Printf(messages.CONFIG_INIT_PROJECT_CONFIG+"\n", config.WorkingPath)
 	}
 
 	return nil
@@ -161,25 +166,25 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
-	return airflow.Deploy(projectRoot, releaseName, ws)
+	return airflow.Deploy(config.WorkingPath, releaseName, ws)
 }
 
 // Start an airflow cluster
 func airflowStart(cmd *cobra.Command, args []string) error {
-	return airflow.Start(projectRoot)
+	return airflow.Start(config.WorkingPath)
 }
 
 // Kill an airflow cluster
 func airflowKill(cmd *cobra.Command, args []string) error {
-	return airflow.Kill(projectRoot)
+	return airflow.Kill(config.WorkingPath)
 }
 
 // Stop an airflow cluster
 func airflowStop(cmd *cobra.Command, args []string) error {
-	return airflow.Stop(projectRoot)
+	return airflow.Stop(config.WorkingPath)
 }
 
 // List containers of an airflow cluster
 func airflowPS(cmd *cobra.Command, args []string) error {
-	return airflow.PS(projectRoot)
+	return airflow.PS(config.WorkingPath)
 }

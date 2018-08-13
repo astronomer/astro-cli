@@ -38,9 +38,6 @@ var (
 )
 
 func init() {
-	// Set up project root
-	projectRoot, _ = config.ProjectRoot()
-
 	// Config root
 	RootCmd.AddCommand(configRootCmd)
 	configRootCmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
@@ -53,7 +50,7 @@ func init() {
 }
 
 func ensureGlobalFlag(cmd *cobra.Command, args []string) {
-	if !(len(projectRoot) > 0) && !globalFlag {
+	if !config.IsProjectDir(config.WorkingPath) && !globalFlag {
 		var c = "astro config " + cmd.Use + " " + args[0] + " -g"
 		fmt.Printf(messages.CONFIG_USE_OUTSIDE_PROJECT_DIR, cmd.Use, cmd.Use, c)
 		os.Exit(1)

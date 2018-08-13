@@ -21,10 +21,15 @@ var (
 	// ConfigDir is the directory for astro files
 	ConfigDir = ".astro"
 
-	// HomeConfigPath is the path to the users global directory
-	HomeConfigPath = filepath.Join(fileutil.GetHomeDir(), ConfigDir)
+	// HomePath is the path to a users home directory
+	HomePath = fileutil.GetHomeDir()
+	// HomeConfigPath is the path to the users global config directory
+	HomeConfigPath = filepath.Join(HomePath, ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+
+	// WorkingPath is the path to the working directory
+	WorkingPath = fileutil.GetWorkingDir()
 
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
@@ -95,22 +100,18 @@ func initProject() {
 	viperProject.SetConfigName(ConfigFileName)
 	viperProject.SetConfigType(ConfigFileType)
 
-	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
-	if searchErr != nil {
-		fmt.Printf(messages.CONFIG_SEARCH_ERROR+"\n", searchErr)
-		return
-	}
-
 	// Construct the path to the config file
-	projectConfigFile := filepath.Join(configPath, ConfigFileNameWithExt)
+	workingConfigPath := filepath.Join(WorkingPath, ConfigDir)
+
+	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
 
 	// If path is empty or config file does not exist, just return
-	if len(configPath) == 0 || configPath == HomeConfigPath || !fileutil.Exists(projectConfigFile) {
+	if len(workingConfigPath) == 0 || workingConfigPath == HomeConfigPath || !fileutil.Exists(workingConfigFile) {
 		return
 	}
 
 	// Add the path we discovered
-	viperProject.SetConfigFile(projectConfigFile)
+	viperProject.SetConfigFile(workingConfigFile)
 
 	// Read in project config
 	readErr := viperProject.ReadInConfig()
@@ -161,6 +162,8 @@ func ProjectConfigExists() bool {
 }
 
 // ProjectRoot returns the path to the nearest project root
+// TODO Deprecate if remains unused, removed due to
+// https://github.com/astronomerio/astro-cli/issues/103
 func ProjectRoot() (string, error) {
 	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {
@@ -170,6 +173,19 @@ func ProjectRoot() (string, error) {
 		return "", nil
 	}
 	return filepath.Dir(configPath), nil
+}
+
+// IsProjectDir returns a boolean depending on if path is a valid project dir
+func IsProjectDir(path string) bool {
+	configPath := filepath.Join(path, ConfigDir)
+	configFile := filepath.Join(configPath, ConfigFileNameWithExt)
+
+	// Home directory is not a project directory
+	if HomePath == path {
+		return false
+	}
+
+	return fileutil.Exists(configFile)
 }
 
 // saveConfig will save the config to a file
