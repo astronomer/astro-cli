@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
@@ -60,10 +60,14 @@ func oAuth(oAuthUrl string) string {
 
 // registryAuth authenticates with the private registry
 func registryAuth() error {
-	registry := "registry." + config.CFG.CloudDomain.GetString()
-	token := config.CFG.CloudAPIToken.GetProjectString()
+	c, err := cluster.GetCurrentCluster()
+	if err != nil {
+		return err
+	}
 
-	err := docker.ExecLogin(registry, "user", token)
+	registry := "registry." + c.Domain
+	token := c.Token
+	err = docker.ExecLogin(registry, "user", token)
 	if err != nil {
 		return err
 	}
@@ -74,8 +78,33 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(oAuthOnly bool) error {
-	token := ""
+func Login(domain string, oAuthOnly bool) error {
+	var token string
+	var err error
+
+	// If no domain specified
+	// Create cluster if it does not exist
+	if len(domain) != 0 {
+		if !cluster.Exists(domain) {
+			// Save new cluster since it did not exists
+			err = cluster.SetCluster(domain)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Switch cluster now that we ensured cluster exists
+		err = cluster.Switch(domain)
+		if err != nil {
+			return err
+		}
+	}
+
+	c, err := cluster.GetCurrentCluster()
+	if err != nil {
+		return err
+	}
+
 	authConfig, err := api.GetAuthConfig()
 	if err != nil {
 		fmt.Println(err)
@@ -101,7 +130,12 @@ func Login(oAuthOnly bool) error {
 			fmt.Println(messages.HOUSTON_BASIC_AUTH_DISABLED)
 		}
 	}
-	config.CFG.CloudAPIToken.SetProjectString(token)
+
+	c, err = cluster.GetCluster(domain)
+	if err != nil {
+		return err
+	}
+	c.SetContextKey("token", token)
 
 	// Attempt to set projectworkspace if there is only one workspace
 	workspaces, err := api.GetWorkspaceAll()
@@ -109,11 +143,13 @@ func Login(oAuthOnly bool) error {
 		return nil
 	}
 
-	if len(workspaces) == 1 {
+	if len(workspaces) == 1 && len(c.Workspace) == 0 {
 		w := workspaces[0]
-		config.CFG.ProjectWorkspace.SetProjectString(w.Uuid)
+		c.SetContextKey("workspace", w.Uuid)
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Uuid)
-	} else {
+	}
+
+	if len(workspaces) != 1 && len(c.Workspace) == 0 {
 		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 	}
 
@@ -126,6 +162,8 @@ func Login(oAuthOnly bool) error {
 }
 
 // Logout logs a user out of the docker registry. Will need to logout of Houston next.
-func Logout() {
-	config.CFG.CloudAPIToken.SetProjectString("")
+func Logout(domain string) {
+	c, _ := cluster.GetCluster(domain)
+
+	c.SetContextKey("token", "")
 }

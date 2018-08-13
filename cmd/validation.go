@@ -5,7 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/workspace"
+
 	"github.com/pkg/errors"
 )
 
@@ -52,7 +53,10 @@ func updateArgValidator(args, validArgs []string) error {
 
 func workspaceValidator() string {
 	wsFlag := workspaceId
-	wsCfg := config.CFG.ProjectWorkspace.GetString()
+	wsCfg, err := workspace.GetCurrentWorkspace()
+	if err != nil {
+		return ""
+	}
 
 	if len(wsFlag) != 0 {
 		return wsFlag

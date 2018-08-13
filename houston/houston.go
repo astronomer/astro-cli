@@ -9,7 +9,8 @@ import (
 
 	"github.com/pkg/errors"
 	// "github.com/sirupsen/logrus"
-	"github.com/astronomerio/astro-cli/config"
+
+	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 )
 
@@ -284,13 +285,18 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		},
 	}
 
+	cl, err := cluster.GetCurrentCluster()
+	if err != nil {
+		return nil, err
+	}
+
 	// set headers
-	if config.CFG.CloudAPIToken.GetString() != "" {
-		doOpts.Headers["authorization"] = config.CFG.CloudAPIToken.GetString()
+	if cl.Token != "" {
+		doOpts.Headers["authorization"] = cl.Token
 	}
 
 	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", config.APIUrl(), &doOpts)
+	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
 	if err != nil {
 		return nil, err
 	}
