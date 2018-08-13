@@ -8,6 +8,7 @@ import (
 
 var (
 	oAuthOnly bool
+	domain    string
 
 	authRootCmd = &cobra.Command{
 		Use:   "auth",
@@ -44,8 +45,6 @@ func init() {
 }
 
 func authLogin(cmd *cobra.Command, args []string) error {
-	var domain string
-
 	if len(args) == 1 {
 		domain = args[0]
 	}
@@ -59,8 +58,6 @@ func authLogin(cmd *cobra.Command, args []string) error {
 }
 
 func authLogout(cmd *cobra.Command, args []string) {
-	var domain string
-
 	if len(args) == 1 {
 		domain = args[0]
 	} else {
