@@ -28,7 +28,7 @@ func Create(label, desc string) error {
 
 // List all workspaces
 func List() error {
-	r := "  %-44s %-50s\n"
+	r := "  %-44s %-50s"
 	colorFmt := "\033[33;m"
 	colorTrm := "\033[0m"
 
@@ -39,7 +39,8 @@ func List() error {
 
 	c, err := config.GetCurrentContext()
 
-	fmt.Printf(r, "NAME", "UUID")
+	head := fmt.Sprintf(r, "NAME", "UUID")
+	fmt.Println(head)
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
