@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/astronomerio/astro-cli/config"
@@ -23,8 +24,18 @@ func Create(label, ws string) error {
 
 	fmt.Printf(messages.HOUSTON_DEPLOYMENT_CREATE_SUCCESS, deployment.Id)
 
-	fmt.Printf("\n"+messages.EE_LINK_AIRFLOW+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
-	fmt.Printf(messages.EE_LINK_FLOWER+"\n", deployment.ReleaseName, config.CFG.CloudDomain.GetString())
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	cloudDomain := c.Domain
+	if len(cloudDomain) == 0 {
+		return errors.New("No domain set, re-authenticate.")
+	}
+
+	fmt.Printf("\n"+messages.EE_LINK_AIRFLOW+"\n", deployment.ReleaseName, cloudDomain)
+	fmt.Printf(messages.EE_LINK_FLOWER+"\n", deployment.ReleaseName, cloudDomain)
 
 	return nil
 }

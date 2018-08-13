@@ -32,7 +32,6 @@ var (
 	// CFG Houses configuration meta
 	CFG = cfgs{
 		Contexts:         newCfg("contexts", ""),
-		CloudDomain:      newCfg("cloud.domain", ""),
 		CloudAPIProtocol: newCfg("cloud.api.protocol", "https"),
 		CloudAPIPort:     newCfg("cloud.api.port", "443"),
 		CloudAPIToken:    newCfg("cloud.api.token", ""),
@@ -180,23 +179,4 @@ func saveConfig(v *viper.Viper, file string) error {
 		return errors.Wrap(err, messages.CONFIG_SAVE_ERROR)
 	}
 	return nil
-}
-
-func getUrl(svc string) string {
-	return fmt.Sprintf(
-		"%s://%s.%s:%s/",
-		CFG.CloudAPIProtocol.GetString(),
-		svc,
-		CFG.CloudDomain.GetString(),
-		CFG.CloudAPIPort.GetString(),
-	)
-}
-
-// APIUrl will return a full qualified API url
-func APIUrl() string {
-	if len(CFG.LocalAPIURL.GetString()) != 0 {
-		return CFG.LocalAPIURL.GetString()
-	} else {
-		return getUrl("houston") + "v1"
-	}
 }

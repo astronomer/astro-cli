@@ -253,12 +253,21 @@ func Deploy(path, name, wsId string) error {
 		return err
 	}
 
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	cloudDomain := c.Domain
+	if len(cloudDomain) == 0 {
+		return errors.New("No domain set, re-authenticate.")
+	}
+
 	if name == "" {
 		if len(deployments) == 0 {
 			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
 		}
 
-		cloudDomain := config.CFG.CloudDomain.GetString()
 		fmt.Printf(messages.HOUSTON_DEPLOYMENT_HEADER, cloudDomain)
 		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMPT)
 
@@ -295,10 +304,7 @@ func Deploy(path, name, wsId string) error {
 	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
 	imageBuild(path, deployImage)
 
-	// Tag our build with remote registry and incremented tag
-	// tag := fmt.Sprintf("%s%d", deployTagPrefix, highestTag+1)
-
-	registry := "registry." + config.CFG.CloudDomain.GetString()
+	registry := "registry." + cloudDomain
 
 	remoteImage := fmt.Sprintf("%s/%s",
 		registry, imageName(name, nextTag))
