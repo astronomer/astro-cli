@@ -41,7 +41,9 @@ func CheckForUpdate(version, gitCommit string) error {
 	// fetch meta data around current cli version
 	currentTagResp, err := api.RepoTagRequest("astronomerio", "astro-cli", string("v")+version)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Release info not found, please upgrade.")
+		fmt.Println(messages.CLI_INSTALL_CMD)
+		return nil
 	}
 
 	currentPub := currentTagResp.PublishedAt.Format("2006.01.02")
