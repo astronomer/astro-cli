@@ -9,28 +9,6 @@ The Astronomer CLI is the recommended way to get started developing and deployin
     curl -sL https://install.astronomer.io | sudo bash
     ```
 
-- **or** via `go get`
-    ```
-    $ brew install go
-    ```
-
-    More info: <https://golang.org/doc/install>
-
-    Set `GOPATH` (recommended: `~/go`) in .bash_profile or .bashrc:
-
-    ```
-    export GOPATH=$HOME/go
-    export GOBIN=$HOME/go/bin
-    export PATH=$PATH:$GOBIN
-    ```
-
-    More info: <https://github.com/golang/go/wiki/SettingGOPATH>
-
-    Install astro-cli binary:
-    ```
-    $ go get github.com/astronomerio/astro-cli
-    ```
-
 ## Getting Started
 
 1. Confirm the install worked:
@@ -39,7 +17,7 @@ The Astronomer CLI is the recommended way to get started developing and deployin
     $ astro
     ```
 
-1. Create a project:
+2. Create a project:
 
     ```
     $ mkdir hello-astro && cd hello-astro
