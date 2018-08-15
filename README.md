@@ -88,8 +88,20 @@ How to get started as a developer.
     $ astro
     ```
 
-### Testing w/ houston-api
-astro-cli communicates with [houston-api](https://github.com/astronomerio/houston-api) in order to manage Astronomer EE resources (users, workspaces, deployments). Follow the Development section on the houston-api README in order develop and test the integration between these two systems.
+### Testing Locally 
+astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to 
+
+1. setup both [houston-api](https://github.com/astronomerio/houston-api) and [orbit-ui](https://github.com/astronomerio/orbit-ui).
+2. edit your global or project config to enable local development
+
+ex.
+
+```yaml
+local:
+  enabled: true
+  houston: http://localhost:8870/v1
+  orbit: http://localhost:5000
+```
 
 ## Docs
 Docs (/docs) are generated using the `github.com/spf13/cobra/doc` pkg. Currently this pkg is broken with go vendoring, the following instructions include a workaround
