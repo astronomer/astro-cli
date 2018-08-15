@@ -109,3 +109,22 @@ Docs (/docs) are generated using the `github.com/spf13/cobra/doc` pkg. Currently
 1. Remove the `/vendor/github.com/spf13/cobra` pkg, forcing Go to search your go path for the package instead
 2. `go run gendocs/gendocs.go`
 3. restore `/vendor/github.com/spf13/cobra`
+
+## Versioning
+
+Astronomer Enterprise is under very active development. Because of this we cannot make backwards compatibility guarantees between versions.
+
+THe astro-cli is following a semantic versioning scheme
+
+`{MAJOR_RELEASE}.{MINOR_RELEASE}.{PATCH_RELEASE}`
+
+with all releases up until 1.0.0 considered beta.
+
+
+### Compatibility
+Starting with `v0.3.3` the astro-cli began tightly tracking the platform release versioning, this means that compatibility is only guaranteed between matching __minor__ versions of the platform and the astro-cli.
+
+ie. astro-cli `v0.4.0` is guaranteed to be compatible with houston-api `v0.4.x` but with houston-api `v0.5.x`
+
+### Note
+These changes were introduced platform wide with v0.4.0
