@@ -17,9 +17,11 @@ import (
 var (
 	authConfigGetRequest = `
 	query GetAuthConfig {
-		authConfig(state: "cli") {
+		authConfig(redirect: "") {
 		  localEnabled
 		  googleEnabled
+		  githubEnabled
+		  auth0Enabled
 		  googleOAuthUrl
 		}
 	  }`
@@ -102,9 +104,8 @@ var (
 	tokenBasicCreateRequest = `
 	mutation createBasicToken {
 	  createToken(
-		  authStrategy:LOCAL
 		  identity:"%s",
-		  credentials:"%s"
+		  password:"%s"
 		) {
 			user {
 				uuid
@@ -117,18 +118,6 @@ var (
 				value
 			}
 		}
-	}`
-
-	tokenOAuthCreateRequest = `
-	mutation createOauthBasicToken {
-	  createToken(
-		authStrategy:%s
-		credentials:"%s"
-		) { 
-		token {
-			value
-		}
-	  }
 	}`
 
 	userCreateRequest = `
@@ -360,19 +349,6 @@ func (c *Client) CreateBasicToken(email, password string) (*AuthUser, error) {
 	response, err := c.QueryHouston(request)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateBasicToken Failed")
-	}
-
-	return response.Data.CreateToken, nil
-}
-
-// CreateOAuthToken passes an OAuth type and authCode to createOauthTokenRequest in order allow houston to authenticate user
-// Returns a Token structure with the users ID and Token inside.
-func (c *Client) CreateOAuthToken(authCode string) (*AuthUser, error) {
-	request := fmt.Sprintf(tokenOAuthCreateRequest, "GOOGLE_OAUTH", authCode)
-
-	response, err := c.QueryHouston(request)
-	if err != nil {
-		return nil, errors.Wrap(err, "CreateOAuthToken Failed")
 	}
 
 	return response.Data.CreateToken, nil

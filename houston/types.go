@@ -23,9 +23,10 @@ type HoustonResponse struct {
 
 // AuthConfig holds data related to oAuth and basic authentication
 type AuthConfig struct {
-	LocalEnabled  bool   `json:"localEnabled"`
-	GoogleEnabled bool   `json:"googleEnabled"`
-	OauthUrl      string `json:"googleOAuthUrl"`
+	LocalEnabled  bool `json:"localEnabled"`
+	GoogleEnabled bool `json:"googleEnabled"`
+	GithubEnabled bool `json:"githubEnabled"`
+	Auth0Enabled  bool `json:"auth0Enabled"`
 }
 
 type AuthUser struct {

@@ -168,10 +168,25 @@ func (c Context) SwitchContext() error {
 
 // GetAPIURL returns full Houston API Url for the provided Context
 func (c Context) GetAPIURL() string {
+	if len(CFG.LocalEnabled.GetString()) != 0 {
+		return CFG.LocalHouston.GetString()
+	}
 	return fmt.Sprintf(
 		"%s://houston.%s:%s/v1",
 		CFG.CloudAPIProtocol.GetString(),
 		c.Domain,
 		CFG.CloudAPIPort.GetString(),
+	)
+}
+
+// GetAppURL returns full Houston API Url for the provided Context
+func (c Context) GetAppURL() string {
+	if len(CFG.LocalEnabled.GetString()) != 0 {
+		return CFG.LocalOrbit.GetString()
+	}
+	return fmt.Sprintf(
+		"%s://app.%s",
+		CFG.CloudAPIProtocol.GetString(),
+		c.Domain,
 	)
 }
