@@ -61,7 +61,7 @@ $ astro airflow --help
 ```
 
 ```
-$ astro airflow create --help
+$ astro airflow deploy --help
 ```
 
 ## Development
