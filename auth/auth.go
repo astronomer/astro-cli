@@ -124,10 +124,6 @@ func Login(domain string, oAuthOnly bool) error {
 		}
 	}
 
-	c, err = cluster.GetCluster(domain)
-	if err != nil {
-		return err
-	}
 	c.SetContextKey("token", token)
 
 	// Attempt to set projectworkspace if there is only one workspace
