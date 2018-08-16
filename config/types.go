@@ -13,7 +13,9 @@ type cfgs struct {
 	CloudAPIPort     cfg
 	CloudAPIToken    cfg
 	Context          cfg
-	LocalAPIURL      cfg
+	LocalEnabled     cfg
+	LocalHouston     cfg
+	LocalOrbit       cfg
 	PostgresUser     cfg
 	PostgresPassword cfg
 	PostgresHost     cfg

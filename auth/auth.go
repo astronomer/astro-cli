@@ -48,14 +48,7 @@ func getWorkspaceByLabel(label string) *houston.Workspace {
 func oAuth(oAuthUrl string) string {
 	fmt.Println("\n" + messages.HOUSTON_OAUTH_REDIRECT)
 	fmt.Println(oAuthUrl + "\n")
-	authSecret := input.InputText(messages.INPUT_OAUTH_TOKEN)
-
-	token, err := api.CreateOAuthToken(authSecret)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	return token.Token.Value
+	return input.InputText(messages.INPUT_OAUTH_TOKEN)
 }
 
 // registryAuth authenticates with the private registry
@@ -112,13 +105,13 @@ func Login(domain string, oAuthOnly bool) error {
 	}
 
 	username := ""
-	if !oAuthOnly {
+	if !oAuthOnly && authConfig.LocalEnabled {
 		username = input.InputText(messages.INPUT_USERNAME)
 	}
 
 	if len(username) == 0 {
-		if authConfig.GoogleEnabled {
-			token = oAuth(authConfig.OauthUrl)
+		if authConfig.GoogleEnabled || authConfig.Auth0Enabled || authConfig.GithubEnabled {
+			token = oAuth(c.GetAppURL() + "/login?source=cli")
 		} else {
 			fmt.Println(messages.HOUSTON_OAUTH_DISABLED)
 			os.Exit(1)
@@ -131,10 +124,6 @@ func Login(domain string, oAuthOnly bool) error {
 		}
 	}
 
-	c, err = cluster.GetCluster(domain)
-	if err != nil {
-		return err
-	}
 	c.SetContextKey("token", token)
 
 	// Attempt to set projectworkspace if there is only one workspace
