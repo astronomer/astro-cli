@@ -9,6 +9,18 @@ The Astronomer CLI is the recommended way to get started developing and deployin
     curl -sL https://install.astronomer.io | sudo bash
     ```
 
+### Previous Versions
+
+-via `curl`
+   ```
+   curl -sL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
+   ```
+   
+ie
+   ```
+   curl -sL https://install.astronomer.io | sudo bash -s -- v0.3.1
+   ```
+
 ## Getting Started
 
 1. Confirm the install worked:
