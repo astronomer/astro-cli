@@ -8,20 +8,21 @@ type cfg struct {
 
 // cfgs houses all configurations for an astro project
 type cfgs struct {
-	Contexts         cfg
-	CloudAPIProtocol cfg
-	CloudAPIPort     cfg
-	CloudAPIToken    cfg
-	Context          cfg
-	LocalEnabled     cfg
-	LocalHouston     cfg
-	LocalOrbit       cfg
-	PostgresUser     cfg
-	PostgresPassword cfg
-	PostgresHost     cfg
-	PostgresPort     cfg
-	ProjectName      cfg
-	ProjectWorkspace cfg
+	Contexts          cfg
+	CloudAPIProtocol  cfg
+	CloudAPIPort      cfg
+	CloudAPIToken     cfg
+	Context           cfg
+	LocalEnabled      cfg
+	LocalHouston      cfg
+	LocalOrbit        cfg
+	PostgresUser      cfg
+	PostgresPassword  cfg
+	PostgresHost      cfg
+	PostgresPort      cfg
+	ProjectName       cfg
+	ProjectDeployment cfg
+	ProjectWorkspace  cfg
 }
 
 // Creates a new cfg struct

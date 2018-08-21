@@ -247,7 +247,7 @@ func PS(airflowHome string) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, name, wsId string) error {
+func Deploy(path, name, wsId string, prompt bool) error {
 	deployments, err := api.GetDeployments(wsId)
 	if err != nil {
 		return err
@@ -263,7 +263,13 @@ func Deploy(path, name, wsId string) error {
 		return errors.New("No domain set, re-authenticate.")
 	}
 
-	if name == "" {
+	// Use config deployment if provided
+	if len(name) == 0 {
+		name = config.CFG.ProjectDeployment.GetProjectString()
+	}
+
+	// Prompt user for deployment if no deployment passed in
+	if len(name) == 0 || prompt {
 		if len(deployments) == 0 {
 			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
 		}

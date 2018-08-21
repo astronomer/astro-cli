@@ -36,20 +36,21 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		Contexts:         newCfg("contexts", ""),
-		CloudAPIProtocol: newCfg("cloud.api.protocol", "https"),
-		CloudAPIPort:     newCfg("cloud.api.port", "443"),
-		CloudAPIToken:    newCfg("cloud.api.token", ""),
-		Context:          newCfg("context", ""),
-		LocalEnabled:     newCfg("local.enabled", ""),
-		LocalHouston:     newCfg("local.houston", ""),
-		LocalOrbit:       newCfg("local.orbit", ""),
-		PostgresUser:     newCfg("postgres.user", "postgres"),
-		PostgresPassword: newCfg("postgres.password", "postgres"),
-		PostgresHost:     newCfg("postgres.host", "postgres"),
-		PostgresPort:     newCfg("postgres.port", "5432"),
-		ProjectName:      newCfg("project.name", ""),
-		ProjectWorkspace: newCfg("project.workspace", ""),
+		Contexts:          newCfg("contexts", ""),
+		CloudAPIProtocol:  newCfg("cloud.api.protocol", "https"),
+		CloudAPIPort:      newCfg("cloud.api.port", "443"),
+		CloudAPIToken:     newCfg("cloud.api.token", ""),
+		Context:           newCfg("context", ""),
+		LocalEnabled:      newCfg("local.enabled", ""),
+		LocalHouston:      newCfg("local.houston", ""),
+		LocalOrbit:        newCfg("local.orbit", ""),
+		PostgresUser:      newCfg("postgres.user", "postgres"),
+		PostgresPassword:  newCfg("postgres.password", "postgres"),
+		PostgresHost:      newCfg("postgres.host", "postgres"),
+		PostgresPort:      newCfg("postgres.port", "5432"),
+		ProjectDeployment: newCfg("project.deployment", ""),
+		ProjectName:       newCfg("project.name", ""),
+		ProjectWorkspace:  newCfg("project.workspace", ""),
 	}
 
 	// viperHome is the viper object in the users home directory
