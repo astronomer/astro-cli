@@ -200,7 +200,7 @@ func Stop(airflowHome string) error {
 	}
 
 	// Pause our project
-	err = project.Stop(context.Background(), 30)
+	err = project.Stop(context.Background(), 5)
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_PAUSE_ERROR)
 	}
