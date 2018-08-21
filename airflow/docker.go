@@ -148,8 +148,8 @@ func Start(airflowHome string) error {
 				os.Exit(1)
 			}
 		}
-
-		err = project.Start(context.Background())
+		imageBuild(airflowHome, imageName(projectName, "latest"))
+		err = project.Up(context.Background(), options.Up{})
 		if err != nil {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}

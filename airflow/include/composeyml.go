@@ -11,8 +11,10 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data: {}
-  airflow_logs: {}
+  postgres_data:
+    driver: local
+  airflow_logs:
+    driver: local
   
 services:
   postgres:
