@@ -148,8 +148,8 @@ func Start(airflowHome string) error {
 				os.Exit(1)
 			}
 		}
-
-		err = project.Start(context.Background())
+		imageBuild(airflowHome, imageName(projectName, "latest"))
+		err = project.Up(context.Background(), options.Up{})
 		if err != nil {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
@@ -200,7 +200,7 @@ func Stop(airflowHome string) error {
 	}
 
 	// Pause our project
-	err = project.Stop(context.Background(), 30)
+	err = project.Stop(context.Background(), 5)
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_PAUSE_ERROR)
 	}
