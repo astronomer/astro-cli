@@ -35,6 +35,12 @@
   revision = "d8fb8589b0e8e85b8c8bbaa8840226d0dfeb7371"
 
 [[projects]]
+  name = "github.com/cpuguy83/go-md2man"
+  packages = ["md2man"]
+  revision = "20f5889cbdc3c73dbd2862796665e7c465ade7d1"
+  version = "v1.0.8"
+
+[[projects]]
   name = "github.com/docker/cli"
   packages = [
     "cli/command/image/build",
@@ -144,6 +150,7 @@
 [[projects]]
   name = "github.com/docker/libcompose"
   packages = [
+    "cli/logger",
     "config",
     "docker",
     "docker/auth",
@@ -326,6 +333,12 @@
   revision = "282c8707aa210456a825798969cc27edda34992a"
 
 [[projects]]
+  name = "github.com/russross/blackfriday"
+  packages = ["."]
+  revision = "55d61fa8aa702f59229e6cff85793c22e580eaf5"
+  version = "v1.5.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/shurcooL/go"
   packages = ["ctxhttp"]
@@ -354,7 +367,10 @@
 
 [[projects]]
   name = "github.com/spf13/cobra"
-  packages = ["."]
+  packages = [
+    ".",
+    "doc"
+  ]
   revision = "7b2c5ac9fc04fc5efafb60700713d4fa609b777b"
   version = "v0.0.1"
 
@@ -445,6 +461,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f3633d08b4ae352ae9054c1f956b70b7666a6ce524011d6ee0b1a89e3bfd7c76"
+  inputs-digest = "a91233c98c64e8c6076f83875e8289afa7b75b10e19d75aea1d320986b5b3403"
   solver-name = "gps-cdcl"
   solver-version = 1
