@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/docker/libcompose/cli/logger"
 	dockercompose "github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
@@ -115,8 +116,9 @@ func createProject(projectName, airflowHome string) (project.APIProject, error) 
 	// Create the project
 	project, err := dockercompose.NewProject(&ctx.Context{
 		Context: project.Context{
-			ComposeBytes: [][]byte{[]byte(yaml)},
-			ProjectName:  projectName,
+			ComposeBytes:  [][]byte{[]byte(yaml)},
+			ProjectName:   projectName,
+			LoggerFactory: logger.NewColorLoggerFactory(),
 		},
 	}, nil)
 
@@ -183,6 +185,34 @@ func Kill(airflowHome string) error {
 	err = project.Down(context.Background(), options.Down{RemoveVolume: true, RemoveOrphans: true})
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_STOP_ERROR)
+	}
+
+	return nil
+}
+
+// Logs out airflow webserver or scheduler logs
+func Logs(airflowHome string, webserver, scheduler, follow bool) error {
+	s := make([]string, 0)
+
+	// Get project name from config
+	projectName := config.CFG.ProjectName.GetString()
+
+	// Create libcompose project
+	project, err := createProject(projectName, airflowHome)
+	if err != nil {
+		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
+	}
+
+	if scheduler {
+		s = append(s, "scheduler")
+	}
+	if webserver {
+		s = append(s, "webserver")
+	}
+
+	err = project.Log(context.Background(), follow, s...)
+	if err != nil {
+		return err
 	}
 
 	return nil
