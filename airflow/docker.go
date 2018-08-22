@@ -203,6 +203,16 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
 
+	psInfo, err := project.Ps(context.Background())
+	if err != nil {
+		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
+	}
+
+	if len(psInfo) == 0 {
+		fmt.Println("Project is not running, first start the project to view logs")
+		os.Exit(1)
+	}
+
 	if scheduler {
 		s = append(s, "scheduler")
 	}
