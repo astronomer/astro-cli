@@ -22,13 +22,13 @@ import (
 )
 
 var (
-	projectName   string
-	followLogs    bool
-	forceDeploy   bool
-        forcePrompt   bool
-	schedulerLogs bool
-	webserverLogs bool
-
+	projectName      string
+	followLogs       bool
+	forceDeploy      bool
+	forcePrompt      bool
+	saveDeployConfig bool
+	schedulerLogs    bool
+	webserverLogs    bool
 
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
