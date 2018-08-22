@@ -22,10 +22,13 @@ import (
 )
 
 var (
-	projectName      string
-	forceDeploy      bool
-	saveDeployConfig bool
-	forcePrompt      bool
+	projectName   string
+	followLogs    bool
+	forceDeploy   bool
+  forcePrompt   bool
+	schedulerLogs bool
+	webserverLogs bool
+
 
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
@@ -65,6 +68,14 @@ var (
 		RunE:   airflowKill,
 	}
 
+	airflowLogsCmd = &cobra.Command{
+		Use:    "logs",
+		Short:  "Output logs for a development airflow cluster",
+		Long:   "Output logs for a development airflow cluster",
+		PreRun: ensureProjectDir,
+		RunE:   airflowLogs,
+	}
+
 	airflowStopCmd = &cobra.Command{
 		Use:    "stop",
 		Short:  "Stop a development airflow cluster",
@@ -102,6 +113,12 @@ func init() {
 
 	// Airflow kill
 	airflowRootCmd.AddCommand(airflowKillCmd)
+
+	// Airflow logs
+	airflowRootCmd.AddCommand(airflowLogsCmd)
+	airflowLogsCmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
+	airflowLogsCmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
+	airflowLogsCmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
 
 	// Airflow stop
 	airflowRootCmd.AddCommand(airflowStopCmd)
@@ -189,6 +206,17 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 // Kill an airflow cluster
 func airflowKill(cmd *cobra.Command, args []string) error {
 	return airflow.Kill(config.WorkingPath)
+}
+
+// Outputs logs for a development airflow cluster
+func airflowLogs(cmd *cobra.Command, args []string) error {
+	// default is to display all logs
+	if !schedulerLogs && !webserverLogs {
+		schedulerLogs = true
+		webserverLogs = true
+	}
+
+	return airflow.Logs(config.WorkingPath, webserverLogs, schedulerLogs, followLogs)
 }
 
 // Stop an airflow cluster
