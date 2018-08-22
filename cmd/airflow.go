@@ -22,11 +22,13 @@ import (
 )
 
 var (
-	projectName   string
-	followLogs    bool
-	forceDeploy   bool
-	schedulerLogs bool
-	webserverLogs bool
+	projectName      string
+	followLogs       bool
+	forceDeploy      bool
+	forcePrompt      bool
+	saveDeployConfig bool
+	schedulerLogs    bool
+	webserverLogs    bool
 
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
@@ -102,6 +104,8 @@ func init() {
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
 	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommited changes")
+	airflowDeployCmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
+	airflowDeployCmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	airflowDeployCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 
 	// Airflow start
@@ -176,14 +180,22 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 	ws := workspaceValidator()
 
 	releaseName := ""
+
+	// Get release name from args, if passed
 	if len(args) > 0 {
 		releaseName = args[0]
 	}
+
+	// Save releasename in config if specified
+	if len(releaseName) > 0 && saveDeployConfig {
+		config.CFG.ProjectDeployment.SetProjectString(releaseName)
+	}
+
 	if git.HasUncommitedChanges() && !forceDeploy {
 		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
-	return airflow.Deploy(config.WorkingPath, releaseName, ws)
+	return airflow.Deploy(config.WorkingPath, releaseName, ws, forcePrompt)
 }
 
 // Start an airflow cluster
