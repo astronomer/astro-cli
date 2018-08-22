@@ -25,7 +25,7 @@ var (
 	projectName   string
 	followLogs    bool
 	forceDeploy   bool
-  forcePrompt   bool
+        forcePrompt   bool
 	schedulerLogs bool
 	webserverLogs bool
 
