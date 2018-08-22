@@ -133,7 +133,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	projectConfigFile := filepath.Join(projectRoot, config.ConfigDir, config.ConfigFileNameWithExt)
+	projectConfigFile := filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt)
 	configExists := fileutil.Exists(projectConfigFile)
 	if !configExists {
 		fmt.Println("Error: Project not initialized")
