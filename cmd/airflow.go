@@ -132,6 +132,13 @@ func ensureProjectDir(cmd *cobra.Command, args []string) {
 		fmt.Println(messages.CONFIG_PROJECT_DIR_ERROR)
 		os.Exit(1)
 	}
+
+	projectConfigFile := filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt)
+	configExists := fileutil.Exists(projectConfigFile)
+	if !configExists {
+		fmt.Println("Error: Project not initialized")
+		os.Exit(1)
+	}
 }
 
 // Use project name for image name
