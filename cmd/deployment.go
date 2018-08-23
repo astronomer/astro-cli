@@ -7,6 +7,8 @@ import (
 )
 
 var (
+	allDeployments bool
+
 	deploymentUpdateAttrs = []string{"label"}
 
 	deploymentRootCmd = &cobra.Command{
@@ -68,6 +70,7 @@ func init() {
 
 	// deployment list
 	deploymentRootCmd.AddCommand(deploymentListCmd)
+	deploymentListCmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 
 	// deployment update
 	deploymentRootCmd.AddCommand(deploymentUpdateCmd)
@@ -81,7 +84,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true	
+	cmd.SilenceUsage = true
 
 	return deployment.Create(args[0], ws)
 }
@@ -99,11 +102,16 @@ func deploymentList(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
-	
+
+	// Don't validate workspace if viewing all deployments
+	if !allDeployments {
+		ws = ""
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws)
+	return deployment.List(ws, allDeployments)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {
@@ -114,6 +122,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	
+
 	return deployment.Update(args[0], argsMap)
 }

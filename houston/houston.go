@@ -87,6 +87,23 @@ var (
 	  }
 	}`
 
+	deploymentsGetAllRequest = `
+	query GetAllDeployments {
+	  deployments {
+		uuid
+		type
+		label
+		releaseName
+		deployInfo {
+			latest
+			next
+		}
+		version
+		createdAt
+		updatedAt
+	  }
+	}`
+
 	deploymentUpdateRequest = `
 	mutation UpdateDeplomyent {
 		updateDeployment(deploymentUuid:"%s",
@@ -402,6 +419,19 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 	}
 
 	return response.Data.DeleteWorkspace, nil
+}
+
+// GetAllDeployments will request all airflow deployments from Houston
+// Returns a []Deployment structure with deployment details
+func (c *Client) GetAllDeployments() ([]Deployment, error) {
+	request := deploymentsGetRequest
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetAllDeployments Failed")
+	}
+
+	return response.Data.GetDeployments, nil
 }
 
 // GetDeployments will request all airflow deployments from Houston
