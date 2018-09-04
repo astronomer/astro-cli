@@ -147,7 +147,7 @@ func Start(airflowHome string) error {
 		// Ensure project is not already running
 		for _, info := range psInfo {
 			if checkServiceState(info["State"], dockerStateUp) {
-				return errors.Wrap(err, "cannot start, project already running")
+				return errors.New("cannot start, project already running")
 			}
 		}
 		imageBuild(airflowHome, imageName(projectName, "latest"))
