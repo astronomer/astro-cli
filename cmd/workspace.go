@@ -121,15 +121,24 @@ func workspaceCreate(cmd *cobra.Command, args []string) error {
 	if len(createDesc) == 0 {
 		createDesc = "N/A"
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return workspace.Create(args[0], createDesc)
 }
 
 func workspaceList(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	
 	return workspace.List()
-
 }
 
 func workspaceDelete(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return workspace.Delete(args[0])
 }
 
@@ -139,6 +148,9 @@ func workspaceUpdate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	
 	return workspace.Update(args[0], argsMap)
 }
 
@@ -148,6 +160,9 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
 
 	return workspace.Add(ws, args[0])
 }
@@ -159,9 +174,15 @@ func workspaceUserRm(cmd *cobra.Command, args []string) error {
 		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	
 	return workspace.Remove(ws, args[0])
 }
 
 func workspaceSwitch(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return workspace.Switch(args[0])
 }

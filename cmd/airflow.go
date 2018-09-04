@@ -182,6 +182,11 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		config.CreateProjectConfig(config.WorkingPath)
 	}
 	config.CFG.ProjectName.SetProjectString(projectName)
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// Execute method
 	airflow.Init(config.WorkingPath)
 
 	if exists {
@@ -216,16 +221,26 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Deploy(config.WorkingPath, releaseName, ws, forcePrompt)
 }
 
 // Start an airflow cluster
 func airflowStart(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Start(config.WorkingPath)
 }
 
 // Kill an airflow cluster
 func airflowKill(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Kill(config.WorkingPath)
 }
 
@@ -237,15 +252,25 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 		webserverLogs = true
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+
 	return airflow.Logs(config.WorkingPath, webserverLogs, schedulerLogs, followLogs)
 }
 
 // Stop an airflow cluster
 func airflowStop(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Stop(config.WorkingPath)
 }
 
 // List containers of an airflow cluster
 func airflowPS(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.PS(config.WorkingPath)
 }

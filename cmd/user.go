@@ -30,13 +30,13 @@ var (
 		RunE:    userCreate,
 	}
 
-	userDeleteCmd = &cobra.Command{
-		Use:     "delete",
-		Aliases: []string{"de"},
-		Short:   "Delete an astronomer user",
-		Long:    "Delete an astronomer user",
-		Run:     userDelete,
-	}
+	// userDeleteCmd = &cobra.Command{
+	// 	Use:     "delete",
+	// 	Aliases: []string{"de"},
+	// 	Short:   "Delete an astronomer user",
+	// 	Long:    "Delete an astronomer user",
+	// 	Run:     userDelete,
+	// }
 )
 
 func init() {
@@ -51,16 +51,19 @@ func init() {
 	userCreateCmd.Flags().StringVar(&userEmail, "email", "", "Supply user email at runtime")
 
 	// User delete
-	userRootCmd.AddCommand(userDeleteCmd)
+	// userRootCmd.AddCommand(userDeleteCmd)
 }
 
-func userList(cmd *cobra.Command, args []string) error {
-	return nil
-}
+// func userList(cmd *cobra.Command, args []string) error {
+// 	return nil
+// }
 
 func userCreate(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	
 	return user.Create(userEmail)
 }
 
-func userDelete(cmd *cobra.Command, args []string) {
-}
+// func userDelete(cmd *cobra.Command, args []string) {
+// }
