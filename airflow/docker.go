@@ -70,11 +70,10 @@ func imageBuild(path, imageName string) {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome string) string {
+func generateConfig(projectName, airflowHome string) (string, error) {
 	tmpl, err := template.New("yml").Parse(include.Composeyml)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return "", errors.Wrap(err, "failed to generate config")
 	}
 
 	config := ComposeConfig{
@@ -91,11 +90,10 @@ func generateConfig(projectName, airflowHome string) string {
 	buff := new(bytes.Buffer)
 	err = tmpl.Execute(buff, config)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return "", errors.Wrap(err, "failed to generate config")
 	}
 
-	return buff.String()
+	return buff.String(), nil
 }
 
 func checkServiceState(serviceState, expectedState string) bool {
@@ -111,7 +109,10 @@ func checkServiceState(serviceState, expectedState string) bool {
 // createProject creates project with yaml config as context
 func createProject(projectName, airflowHome string) (project.APIProject, error) {
 	// Generate the docker-compose yaml
-	yaml := generateConfig(projectName, airflowHome)
+	yaml, err := generateConfig(projectName, airflowHome)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create project")
+	}
 
 	// Create the project
 	project, err := dockercompose.NewProject(&ctx.Context{
@@ -146,8 +147,7 @@ func Start(airflowHome string) error {
 		// Ensure project is not already running
 		for _, info := range psInfo {
 			if checkServiceState(info["State"], dockerStateUp) {
-				fmt.Println(messages.COMPOSE_PROJECT_RUNNING)
-				os.Exit(1)
+				return errors.Wrap(err, "cannot start, project already running")
 			}
 		}
 		imageBuild(airflowHome, imageName(projectName, "latest"))
@@ -209,8 +209,7 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 	}
 
 	if len(psInfo) == 0 {
-		fmt.Println("Project is not running, first start the project to view logs")
-		os.Exit(1)
+		return errors.Wrap(err, "cannot view logs, project not running")
 	}
 
 	if scheduler {

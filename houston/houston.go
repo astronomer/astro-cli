@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -309,9 +308,9 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 	}
 
 	if decode.Errors != nil {
-		fmt.Printf("Error: %s\n", decode.Errors[0].Message)
-		os.Exit(1)
+		return nil, errors.New("failed to successfully decode response")
 	}
+
 	return &decode, nil
 }
 

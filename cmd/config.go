@@ -50,7 +50,9 @@ func init() {
 }
 
 func ensureGlobalFlag(cmd *cobra.Command, args []string) {
-	if !config.IsProjectDir(config.WorkingPath) && !globalFlag {
+	isProjectDir, _ := config.IsProjectDir(config.WorkingPath)
+
+	if !isProjectDir && !globalFlag {
 		var c = "astro config " + cmd.Use + " " + args[0] + " -g"
 		fmt.Printf(messages.CONFIG_USE_OUTSIDE_PROJECT_DIR, cmd.Use, cmd.Use, c)
 		os.Exit(1)

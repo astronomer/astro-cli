@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/astronomerio/astro-cli/workspace"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -142,12 +143,22 @@ func workspaceUpdate(cmd *cobra.Command, args []string) error {
 }
 
 func workspaceUserAdd(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
+
 	return workspace.Add(ws, args[0])
 }
 
 func workspaceUserRm(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
+
 	return workspace.Remove(ws, args[0])
 }
 

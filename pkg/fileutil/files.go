@@ -1,30 +1,30 @@
 package fileutil
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // Exists returns a boolean indicating if the given path already exists
-func Exists(path string) bool {
+func Exists(path string) (bool, error) {
 	if path == "" {
-		return false
+		return false, nil
 	}
 
 	_, err := os.Stat(path)
 	if err == nil {
-		return true
+		return true, nil
 	}
 
 	if !os.IsNotExist(err) {
-		fmt.Println(err)
-		os.Exit(1)
+		return false, errors.Wrap(err, "cannot determine if path exists, error ambiguous")
 	}
 
-	return false
+	return false, nil
 }
 
 // WriteStringToFile write a string to a file

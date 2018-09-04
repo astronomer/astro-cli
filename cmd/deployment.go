@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/astronomerio/astro-cli/deployment"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -73,7 +74,12 @@ func init() {
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
+
 	return deployment.Create(args[0], ws)
 }
 
@@ -82,7 +88,11 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentList(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
 	return deployment.List(ws)
 }
 

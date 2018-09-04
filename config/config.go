@@ -22,14 +22,14 @@ var (
 	ConfigDir = ".astro"
 
 	// HomePath is the path to a users home directory
-	HomePath = fileutil.GetHomeDir()
+	HomePath, _ = fileutil.GetHomeDir()
 	// HomeConfigPath is the path to the users global config directory
 	HomeConfigPath = filepath.Join(HomePath, ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
 
 	// WorkingPath is the path to the working directory
-	WorkingPath = fileutil.GetWorkingDir()
+	WorkingPath, _ = fileutil.GetWorkingDir()
 
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
@@ -79,7 +79,9 @@ func initHome() {
 	}
 
 	// If home config does not exist, create it
-	if !fileutil.Exists(HomeConfigFile) {
+	homeConfigExists, _ := fileutil.Exists(HomeConfigFile)
+
+	if !homeConfigExists {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
 			fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
@@ -109,7 +111,8 @@ func initProject() {
 	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
 
 	// If path is empty or config file does not exist, just return
-	if len(workingConfigPath) == 0 || workingConfigPath == HomeConfigPath || !fileutil.Exists(workingConfigFile) {
+	workingConfigExists, _ := fileutil.Exists(workingConfigFile)
+	if len(workingConfigPath) == 0 || workingConfigPath == HomeConfigPath || !workingConfigExists {
 		return
 	}
 
@@ -179,13 +182,13 @@ func ProjectRoot() (string, error) {
 }
 
 // IsProjectDir returns a boolean depending on if path is a valid project dir
-func IsProjectDir(path string) bool {
+func IsProjectDir(path string) (bool, error) {
 	configPath := filepath.Join(path, ConfigDir)
 	configFile := filepath.Join(configPath, ConfigFileNameWithExt)
 
 	// Home directory is not a project directory
 	if HomePath == path {
-		return false
+		return false, nil
 	}
 
 	return fileutil.Exists(configFile)

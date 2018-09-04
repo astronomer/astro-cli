@@ -1,12 +1,12 @@
 package airflow
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/iancoleman/strcase"
 
@@ -15,52 +15,46 @@ import (
 	"github.com/astronomerio/astro-cli/pkg/fileutil"
 )
 
-func initDirs(root string, dirs []string) bool {
-	// Any inputs exist
-	exists := false
-
+func initDirs(root string, dirs []string) error {
 	// Create the dirs
 	for _, dir := range dirs {
 		// Create full path to directory
 		fullpath := filepath.Join(root, dir)
 
 		// Move on if already exists
-		if fileutil.Exists(fullpath) {
-			exists = true
-			continue
+		_, err := fileutil.Exists(fullpath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to check existence of '%s'", fullpath)
 		}
 
 		// Create directory
 		if err := os.MkdirAll(dir, 0777); err != nil {
-			fmt.Println(err)
+			return errors.Wrapf(err, "failed to create dir '%s'", dir)
 		}
 	}
 
-	return exists
+	return nil
 }
 
-func initFiles(root string, files map[string]string) bool {
-	// Any inputs exist
-	exists := false
-
+func initFiles(root string, files map[string]string) error {
 	// Create the files
 	for file, content := range files {
 		// Create full path to file
 		fullpath := filepath.Join(root, file)
 
-		// Move on if already exiss
-		if fileutil.Exists(fullpath) {
-			exists = true
-			continue
+		// Move on if already exists
+		_, err := fileutil.Exists(fullpath)
+		if err != nil {
+			return errors.Wrapf(err, "failed to check existence of '%s'", fullpath)
 		}
 
 		// Write files out
 		if err := fileutil.WriteStringToFile(fullpath, content); err != nil {
-			fmt.Println(err)
+			return errors.Wrapf(err, "failed to create file '%s'", fullpath)
 		}
 	}
 
-	return exists
+	return nil
 }
 
 // Init will scaffold out a new airflow project
@@ -78,10 +72,14 @@ func Init(path string) error {
 	}
 
 	// Initailize directories
-	initDirs(path, dirs)
+	if err := initDirs(path, dirs); err != nil {
+		return errors.Wrap(err, "failed to create project directories")
+	}
 
 	// Initialize files
-	initFiles(path, files)
+	if err := initFiles(path, files); err != nil {
+		return errors.Wrap(err, "failed to create project files")
+	}
 
 	return nil
 }

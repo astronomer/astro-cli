@@ -2,7 +2,6 @@ package auth
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/astronomerio/astro-cli/cluster"
 	"github.com/astronomerio/astro-cli/docker"
@@ -10,6 +9,7 @@ import (
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -18,16 +18,15 @@ var (
 )
 
 // basicAuth handles authentication with the houston api
-func basicAuth(username string) string {
+func basicAuth(username string) (string, error) {
 	password, _ := input.InputPassword(messages.INPUT_PASSWORD)
 
 	token, err := api.CreateBasicToken(username, password)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return "", errors.Wrap(err, "failed to fetch local/db auth token")
 	}
 
-	return token.Token.Value
+	return token.Token.Value, nil
 }
 
 func getWorkspaceByLabel(label string) *houston.Workspace {
@@ -100,8 +99,7 @@ func Login(domain string, oAuthOnly bool) error {
 
 	authConfig, err := api.GetAuthConfig()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return errors.Wrap(err, "failed to fetch auth config")
 	}
 
 	username := ""
@@ -113,12 +111,14 @@ func Login(domain string, oAuthOnly bool) error {
 		if authConfig.GoogleEnabled || authConfig.Auth0Enabled || authConfig.GithubEnabled {
 			token = oAuth(c.GetAppURL() + "/login?source=cli")
 		} else {
-			fmt.Println(messages.HOUSTON_OAUTH_DISABLED)
-			os.Exit(1)
+			return errors.New("cannot authenticate, oauth is disabled")
 		}
 	} else {
 		if authConfig.LocalEnabled {
-			token = basicAuth(username)
+			token, err = basicAuth(username)
+			if err != nil {
+				return errors.Wrap(err, "local auth login failed")
+			}
 		} else {
 			fmt.Println(messages.HOUSTON_BASIC_AUTH_DISABLED)
 		}
