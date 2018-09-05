@@ -123,6 +123,53 @@ var (
 		}
 	  }`
 
+	serviceAccountCreateRequest = `
+	mutation CreateServiceAccount {
+		createServiceAccount(
+			label: "%s",
+			category: "%s",
+			entityType: %s
+		) {
+		  apiKey
+		  label
+		  category
+		  entityType
+		  active
+		}
+	  }`
+
+	serviceAccountDeleteRequest = `
+	mutation DeleteServiceAccount {
+		deleteServiceAccount(
+		serviceAccountUuid:"%s"
+		) {
+		  uuid
+		  label
+		  category
+		  entityType
+		  entityUuid
+		}
+	  }`
+
+	serviceAccountsGetRequest = `
+	query GetServiceAccount {
+		serviceAccounts(
+			entityType:%s,
+      entityUuid:"%s"
+		) {
+      uuid
+      apiKey
+      label
+      category
+      entityType
+      entityUuid
+      active
+      createdAt
+      updatedAt
+      lastUsedAt
+		}
+	  }`
+
 	tokenBasicCreateRequest = `
 	mutation createBasicToken {
 	  createToken(
@@ -388,6 +435,19 @@ func (c *Client) CreateBasicToken(email, password string) (*AuthUser, error) {
 	return response.Data.CreateToken, nil
 }
 
+// CreateServiceAccount sends a request to Houston in order to fetch a newly created service account
+// Returns a ServiceAccount object
+func (c *Client) CreateServiceAccount(uuid, label, category, entityType string) (*ServiceAccount, error) {
+	request := fmt.Sprintf(serviceAccountCreateRequest, label, category, entityType)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "CreateServiceAccount Failed")
+	}
+
+	return response.Data.CreateServiceAccount, nil
+}
+
 // CreateUser sends request to request to Houston in order to create a new platform User
 // Returns an AuthUser object containing an token
 func (c *Client) CreateUser(email string, password string) (*AuthUser, error) {
@@ -426,7 +486,7 @@ func (c *Client) DeleteDeployment(uuid string) (*Deployment, error) {
 	return response.Data.DeleteDeployment, nil
 }
 
-// DeleteWorkspace will send a request to Houston to create a new workspace
+// DeleteWorkspace will send a request to Houston to delete a workspace
 // Returns an object representing deleted workspace
 func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceDeleteRequest, uuid)
@@ -452,6 +512,19 @@ func (c *Client) GetAllDeployments() ([]Deployment, error) {
 	return response.Data.GetDeployments, nil
 }
 
+// DeleteServiceAccount will send a request to Houston to delete a service account
+// Returns an object representing deleted service account
+func (c *Client) DeleteServiceAccount(uuid string) (*ServiceAccount, error) {
+	request := fmt.Sprintf(serviceAccountDeleteRequest, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "DeleteServiceAccount Request")
+	}
+
+	return response.Data.DeleteServiceAccount, nil
+}
+
 // GetDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
 func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
@@ -467,19 +540,19 @@ func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
 
 // GetDeployment will request a specific airflow deployments from Houston by uuid
 // Returns a Deployment structure with deployment details
-func (c *Client) GetDeployment(deploymentUuid string) (*Deployment, error) {
-	request := fmt.Sprintf(deploymentGetRequest, deploymentUuid)
+// func (c *Client) GetDeployment(deploymentUuid string) (*Deployment, error) {
+// 	request := fmt.Sprintf(deploymentGetRequest, deploymentUuid)
 
-	response, err := c.QueryHouston(request)
-	if err != nil {
-		return nil, errors.Wrap(err, "GetDeployment Failed")
-	}
+// 	response, err := c.QueryHouston(request)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "GetDeployment Failed")
+// 	}
 
-	if len(response.Data.GetDeployments) == 0 {
-		return nil, fmt.Errorf("deployment not found for uuid \"%s\"", deploymentUuid)
-	}
-	return &response.Data.GetDeployments[0], nil
-}
+// 	if len(response.Data.GetDeployments) == 0 {
+// 		return nil, fmt.Errorf("deployment not found for uuid \"%s\"", deploymentUuid)
+// 	}
+// 	return &response.Data.GetDeployments[0], nil
+// }
 
 // GetAuthConfig will get authentication configuration from houston
 // Returns the requested AuthConfig object
@@ -494,8 +567,21 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 	return response.Data.GetAuthConfig, nil
 }
 
-// GetWorkspaceAll returns all available workspaces from houston API
-// Returns a slice of all Workspaces a user has access to
+// GetServiceAccounts will get GetServiceAccounts from houston
+// Returns slice of GetServiceAccounts
+func (c *Client) GetServiceAccounts(entityType, uuid string) ([]ServiceAccount, error) {
+	request := fmt.Sprintf(serviceAccountsGetRequest, entityType, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetServiceAccounts Failed")
+	}
+
+	return response.Data.GetServiceAccounts, nil
+}
+
+// GetWorkspace returns all available workspaces from houston API
+// Returns a workspace struct
 func (c *Client) GetWorkspace(uuid string) (*Workspace, error) {
 	request := fmt.Sprintf(workspaceGetRequest, uuid)
 
