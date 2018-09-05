@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -12,10 +14,10 @@ const (
 )
 
 // Exec executes a docker command
-func Exec(args ...string) {
+func Exec(args ...string) error {
 	_, lookErr := exec.LookPath(Docker)
 	if lookErr != nil {
-		panic(lookErr)
+		return errors.Wrap(lookErr, "failed to find the docker binary")
 	}
 
 	cmd := exec.Command(Docker, args...)
@@ -24,8 +26,10 @@ func Exec(args ...string) {
 	cmd.Stderr = os.Stderr
 
 	if cmdErr := cmd.Run(); cmdErr != nil {
-		panic(cmdErr)
+		return errors.Wrapf(cmdErr, "failed to execute cmd")
 	}
+
+	return nil
 }
 
 // ExecLogin executes a docker login

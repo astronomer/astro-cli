@@ -61,12 +61,17 @@ func imageName(name, tag string) string {
 }
 
 // imageBuild builds the airflow project
-func imageBuild(path, imageName string) {
+func imageBuild(path, imageName string) error {
 	// Change to location of Dockerfile
 	os.Chdir(path)
 
 	// Build image
-	docker.Exec("build", "-t", imageName, ".")
+	err := docker.Exec("build", "-t", imageName, ".")
+	if err != nil {
+		return errors.Wrapf(err, "command 'docker build -t %s failed", imageName)
+	}
+
+	return nil
 }
 
 // generateConfig generates the docker-compose config
@@ -150,14 +155,22 @@ func Start(airflowHome string) error {
 				return errors.New("cannot start, project already running")
 			}
 		}
-		imageBuild(airflowHome, imageName(projectName, "latest"))
+		
+		err = imageBuild(airflowHome, imageName(projectName, "latest"))
+		if err != nil {
+			return err
+		}
+
 		err = project.Up(context.Background(), options.Up{})
 		if err != nil {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
 	} else {
 		// Build this project image
-		imageBuild(airflowHome, imageName(projectName, "latest"))
+		err = imageBuild(airflowHome, imageName(projectName, "latest"))
+		if err != nil {
+			return err
+		}
 
 		// Start up our project
 		err = project.Up(context.Background(), options.Up{})
@@ -347,21 +360,34 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	// Build our image
 	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
-	imageBuild(path, deployImage)
+	
+	err = imageBuild(path, deployImage)
+	if err != nil {
+		return err
+	}
 
 	registry := "registry." + cloudDomain
 
 	remoteImage := fmt.Sprintf("%s/%s",
 		registry, imageName(name, nextTag))
 
-	docker.Exec("tag", deployImage, remoteImage)
+	err = docker.Exec("tag", deployImage, remoteImage)
+	if err != nil {
+		return errors.Wrapf(err, "command 'docker tag %s %s' failed", deployImage, remoteImage)
+	}
 
 	// Push image to registry
 	fmt.Println(messages.COMPOSE_PUSHING_IMAGE_PROMPT)
-	docker.Exec("push", remoteImage)
+	err = docker.Exec("push", remoteImage)
+	if err != nil {
+		return errors.Wrapf(err, "command 'docker push %s' failed", remoteImage)
+	}
 
 	// Delete the image tags we just generated
-	docker.Exec("rmi", remoteImage)
+	err = docker.Exec("rmi", remoteImage)
+	if err != nil {
+		return errors.Wrapf(err, "command 'docker rmi %s' failed", remoteImage)
+	}
 
 	return nil
 }
