@@ -7,6 +7,7 @@ import (
 
 // RootCmd is the astro root command.
 var (
+	// Debug       bool
 	workspaceId string
 	RootCmd     = &cobra.Command{
 		Use:   "astro",
@@ -17,4 +18,5 @@ var (
 
 func init() {
 	cobra.OnInitialize(config.InitConfig)
+	// RootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "debug output")
 }

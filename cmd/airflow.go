@@ -44,52 +44,52 @@ var (
 	}
 
 	airflowDeployCmd = &cobra.Command{
-		Use:    "deploy DEPLOYMENT",
-		Short:  "Deploy an airflow project",
-		Long:   "Deploy an airflow project to a given deployment",
-		Args:   cobra.MaximumNArgs(1),
-		PreRun: ensureProjectDir,
-		RunE:   airflowDeploy,
+		Use:     "deploy DEPLOYMENT",
+		Short:   "Deploy an airflow project",
+		Long:    "Deploy an airflow project to a given deployment",
+		Args:    cobra.MaximumNArgs(1),
+		PreRunE: ensureProjectDir,
+		RunE:    airflowDeploy,
 	}
 
 	airflowStartCmd = &cobra.Command{
-		Use:    "start",
-		Short:  "Start a development airflow cluster",
-		Long:   "Start a development airflow cluster",
-		PreRun: ensureProjectDir,
-		RunE:   airflowStart,
+		Use:     "start",
+		Short:   "Start a development airflow cluster",
+		Long:    "Start a development airflow cluster",
+		PreRunE: ensureProjectDir,
+		RunE:    airflowStart,
 	}
 
 	airflowKillCmd = &cobra.Command{
-		Use:    "kill",
-		Short:  "Kill a development airflow cluster",
-		Long:   "Kill a development airflow cluster",
-		PreRun: ensureProjectDir,
-		RunE:   airflowKill,
+		Use:     "kill",
+		Short:   "Kill a development airflow cluster",
+		Long:    "Kill a development airflow cluster",
+		PreRunE: ensureProjectDir,
+		RunE:    airflowKill,
 	}
 
 	airflowLogsCmd = &cobra.Command{
-		Use:    "logs",
-		Short:  "Output logs for a development airflow cluster",
-		Long:   "Output logs for a development airflow cluster",
-		PreRun: ensureProjectDir,
-		RunE:   airflowLogs,
+		Use:     "logs",
+		Short:   "Output logs for a development airflow cluster",
+		Long:    "Output logs for a development airflow cluster",
+		PreRunE: ensureProjectDir,
+		RunE:    airflowLogs,
 	}
 
 	airflowStopCmd = &cobra.Command{
-		Use:    "stop",
-		Short:  "Stop a development airflow cluster",
-		Long:   "Stop a development airflow cluster",
-		PreRun: ensureProjectDir,
-		RunE:   airflowStop,
+		Use:     "stop",
+		Short:   "Stop a development airflow cluster",
+		Long:    "Stop a development airflow cluster",
+		PreRunE: ensureProjectDir,
+		RunE:    airflowStop,
 	}
 
 	airflowPSCmd = &cobra.Command{
-		Use:    "ps",
-		Short:  "List airflow containers",
-		Long:   "List airflow containers",
-		PreRun: ensureProjectDir,
-		RunE:   airflowPS,
+		Use:     "ps",
+		Short:   "List airflow containers",
+		Long:    "List airflow containers",
+		PreRunE: ensureProjectDir,
+		RunE:    airflowPS,
 	}
 )
 
@@ -127,18 +127,28 @@ func init() {
 	airflowRootCmd.AddCommand(airflowPSCmd)
 }
 
-func ensureProjectDir(cmd *cobra.Command, args []string) {
-	if !config.IsProjectDir(config.WorkingPath) {
-		fmt.Println(messages.CONFIG_PROJECT_DIR_ERROR)
-		os.Exit(1)
+func ensureProjectDir(cmd *cobra.Command, args []string) error {
+	isProjectDir, err := config.IsProjectDir(config.WorkingPath)
+	if err != nil {
+		return errors.Wrap(err, "cannot ensure is a project directory")
+	}
+
+	if !isProjectDir {
+		return errors.New("not in a project directory")
 	}
 
 	projectConfigFile := filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt)
-	configExists := fileutil.Exists(projectConfigFile)
-	if !configExists {
-		fmt.Println("Error: Project not initialized")
-		os.Exit(1)
+
+	configExists, err := fileutil.Exists(projectConfigFile)
+	if err != nil {
+		return errors.Wrapf(err, "failed to check existence of '%s'", projectConfigFile)
 	}
+
+	if !configExists {
+		return errors.New("project config file does not exists")
+	}
+
+	return nil
 }
 
 // Use project name for image name
@@ -172,6 +182,11 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		config.CreateProjectConfig(config.WorkingPath)
 	}
 	config.CFG.ProjectName.SetProjectString(projectName)
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// Execute method
 	airflow.Init(config.WorkingPath)
 
 	if exists {
@@ -184,7 +199,11 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 }
 
 func airflowDeploy(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
 
 	releaseName := ""
 
@@ -202,16 +221,26 @@ func airflowDeploy(cmd *cobra.Command, args []string) error {
 		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Deploy(config.WorkingPath, releaseName, ws, forcePrompt)
 }
 
 // Start an airflow cluster
 func airflowStart(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Start(config.WorkingPath)
 }
 
 // Kill an airflow cluster
 func airflowKill(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Kill(config.WorkingPath)
 }
 
@@ -223,15 +252,25 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 		webserverLogs = true
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+
 	return airflow.Logs(config.WorkingPath, webserverLogs, schedulerLogs, followLogs)
 }
 
 // Stop an airflow cluster
 func airflowStop(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.Stop(config.WorkingPath)
 }
 
 // List containers of an airflow cluster
 func airflowPS(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return airflow.PS(config.WorkingPath)
 }

@@ -50,14 +50,16 @@ func init() {
 }
 
 func ensureGlobalFlag(cmd *cobra.Command, args []string) {
-	if !config.IsProjectDir(config.WorkingPath) && !globalFlag {
+	isProjectDir, _ := config.IsProjectDir(config.WorkingPath)
+
+	if !isProjectDir && !globalFlag {
 		var c = "astro config " + cmd.Use + " " + args[0] + " -g"
 		fmt.Printf(messages.CONFIG_USE_OUTSIDE_PROJECT_DIR, cmd.Use, cmd.Use, c)
 		os.Exit(1)
 	}
 }
 
-func configGet(command *cobra.Command, args []string) error {
+func configGet(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New(messages.CONFIG_PATH_KEY_MISSING_ERROR)
 	}
@@ -66,6 +68,10 @@ func configGet(command *cobra.Command, args []string) error {
 	if !ok {
 		return errors.New(messages.CONFIG_PATH_KEY_INVALID_ERROR)
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 
 	if globalFlag {
 		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetHomeString())
@@ -76,7 +82,7 @@ func configGet(command *cobra.Command, args []string) error {
 	return nil
 }
 
-func configSet(command *cobra.Command, args []string) error {
+func configSet(cmd *cobra.Command, args []string) error {
 	if len(args) != 2 {
 		return errors.New(messages.CONFIG_INVALID_SET_ARGS)
 	}
@@ -87,6 +93,9 @@ func configSet(command *cobra.Command, args []string) error {
 	if !ok {
 		return errors.New(messages.CONFIG_PATH_KEY_INVALID_ERROR)
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
 
 	if globalFlag {
 		cfg.SetHomeString(args[1])

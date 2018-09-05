@@ -49,6 +49,9 @@ func authLogin(cmd *cobra.Command, args []string) error {
 		domain = args[0]
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	err := auth.Login(domain, oAuthOnly)
 	if err != nil {
 		return err
@@ -64,6 +67,10 @@ func authLogout(cmd *cobra.Command, args []string) {
 		c, _ := cluster.GetCurrentCluster()
 		domain = c.Domain
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 
 	auth.Logout(domain)
 }

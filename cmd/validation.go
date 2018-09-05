@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/astronomerio/astro-cli/workspace"
@@ -51,23 +50,20 @@ func updateArgValidator(args, validArgs []string) error {
 	return nil
 }
 
-func workspaceValidator() string {
+func coalesceWorkspace() (string, error) {
 	wsFlag := workspaceId
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
-		return ""
+		return "", errors.Wrap(err, "failed to get current workspace")
 	}
 
 	if len(wsFlag) != 0 {
-		return wsFlag
+		return wsFlag, nil
 	}
 
 	if len(wsCfg) != 0 {
-		return wsCfg
+		return wsCfg, nil
 	}
 
-	fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
-	os.Exit(1)
-
-	return ""
+	return "", errors.New("no valid workspace source found")
 }

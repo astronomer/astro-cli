@@ -8,26 +8,17 @@ import (
 	"path/filepath"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 )
 
 // GetWorkingDir returns the curent working directory
-func GetWorkingDir() string {
-	work, err := os.Getwd()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	return work
+func GetWorkingDir() (string, error) {
+	return os.Getwd()
 }
 
 // GetHomeDir returns the home directory
-func GetHomeDir() string {
-	home, err := homedir.Dir()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	return home
+func GetHomeDir() (string, error) {
+	return homedir.Dir()
 }
 
 // FindDirInPath walks up the current directory looking for the .astro folder
@@ -35,7 +26,10 @@ func GetHomeDir() string {
 // https://github.com/astronomerio/astro-cli/issues/103
 func FindDirInPath(search string) (string, error) {
 	// Start in our current directory
-	workingDir := GetWorkingDir()
+	workingDir, err := GetWorkingDir()
+	if err != nil {
+		return "", err
+	}
 
 	// Recursively walk up the filesystem tree
 	for true {
@@ -45,12 +39,20 @@ func FindDirInPath(search string) (string, error) {
 		}
 
 		// If searching home path, stop at home root
-		if workingDir == GetHomeDir() {
-			return "", nil
+		homeDir, err := GetHomeDir()
+		if err != nil {
+			return "", err
+		}
+
+		if workingDir == homeDir {
+			return "", errors.New("current working directory is a home directory")
 		}
 
 		// Check if our file exists
-		exists := Exists(filepath.Join(workingDir, search))
+		exists, err := Exists(filepath.Join(workingDir, search))
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to check existence of '%s'", filepath.Join(workingDir, search))
+		}
 
 		// Return where we found it
 		if exists {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/astronomerio/astro-cli/deployment"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -73,16 +74,35 @@ func init() {
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true	
+
 	return deployment.Create(args[0], ws)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return deployment.Delete(args[0])
 }
 
 func deploymentList(cmd *cobra.Command, args []string) error {
-	ws := workspaceValidator()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
+	
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return deployment.List(ws)
 }
 
@@ -92,5 +112,8 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	
 	return deployment.Update(args[0], argsMap)
 }

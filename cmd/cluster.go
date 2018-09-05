@@ -40,10 +40,15 @@ func init() {
 }
 
 func clusterList(cmd *cobra.Command, args []string) error {
-	cluster.List()
-	return nil
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return cluster.List()
 }
 
 func clusterSwitch(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	return cluster.Switch(args[0])
 }
