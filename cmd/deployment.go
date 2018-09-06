@@ -104,7 +104,7 @@ func deploymentList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Don't validate workspace if viewing all deployments
-	if !allDeployments {
+	if allDeployments {
 		ws = ""
 	}
 
