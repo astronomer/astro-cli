@@ -62,7 +62,7 @@ func List(ws string, all bool) error {
 	// colorTrm := "\033[0m"
 
 	if all {
-		deployments, err = api.GetDeployments(ws)
+		deployments, err = api.GetAllDeployments()
 		if err != nil {
 			return err
 		}

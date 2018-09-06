@@ -424,7 +424,7 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 // GetAllDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
 func (c *Client) GetAllDeployments() ([]Deployment, error) {
-	request := deploymentsGetRequest
+	request := deploymentsGetAllRequest
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
