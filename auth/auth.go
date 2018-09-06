@@ -57,6 +57,10 @@ func registryAuth() error {
 		return err
 	}
 
+	if c.Domain == "localhost" {
+		return nil
+	}
+
 	registry := "registry." + c.Domain
 	token := c.Token
 	err = docker.ExecLogin(registry, "user", token)
