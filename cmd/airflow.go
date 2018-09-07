@@ -170,7 +170,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
 	if !emtpyDir {
 		i, _ := input.InputConfirm(
-			fmt.Sprintf("%s \nYou are not in an empty directory, are you you want to initialize a project?", config.WorkingPath))
+			fmt.Sprintf("%s \nYou are not in an empty directory. Are you sure you want to initialize a project?", config.WorkingPath))
 
 		if !i {
 			fmt.Println("Cancelling project initialization...\n")
@@ -254,7 +254,6 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
 
 	return airflow.Logs(config.WorkingPath, webserverLogs, schedulerLogs, followLogs)
 }

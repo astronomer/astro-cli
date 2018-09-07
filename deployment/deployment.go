@@ -1,8 +1,9 @@
 package deployment
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
@@ -52,21 +53,34 @@ func Delete(uuid string) error {
 }
 
 // List all airflow deployments
-func List(ws string) error {
-	r := "  %-30s %-50s %-30s"
+func List(ws string, all bool) error {
+	var deployments []houston.Deployment
+	var err error
+
+	r := "  %-30s %-50s %-30s %-50s"
+	h := fmt.Sprintf(r, "NAME", "UUID", "RELEASE NAME", "WORKSPACE")
 	// colorFmt := "\033[33;m"
 	// colorTrm := "\033[0m"
 
-	deployments, err := api.GetDeployments(ws)
-	if err != nil {
-		return err
+	if all {
+		deployments, err = api.GetAllDeployments()
+		if err != nil {
+			return err
+		}
+	} else {
+		deployments, err = api.GetDeployments(ws)
+		if err != nil {
+			return err
+		}
 	}
 
-	h := fmt.Sprintf(r, "NAME", "UUID", "RELEASE NAME")
 	fmt.Println(h)
 
 	for _, d := range deployments {
-		fullStr := fmt.Sprintf(r, d.Label, d.Id, d.ReleaseName)
+		if all {
+			ws = d.Workspace.Uuid
+		}
+		fullStr := fmt.Sprintf(r, d.Label, d.Id, d.ReleaseName, ws)
 		fmt.Println(fullStr)
 	}
 	return nil

@@ -77,6 +77,29 @@ var (
 		type
 		label
 		releaseName
+		workspace {
+          uuid
+		}
+		deployInfo {
+			latest
+			next
+		}
+		version
+		createdAt
+		updatedAt
+	  }
+	}`
+
+	deploymentsGetAllRequest = `
+	query GetAllDeployments {
+	  deployments {
+		uuid
+		type
+		label
+		releaseName
+		workspace {
+			uuid
+		}
 		deployInfo {
 			latest
 			next
@@ -160,6 +183,18 @@ var (
 	workspaceAllGetRequest = `
 	query GetWorkspaces {
 		workspaces {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
+	workspaceGetRequest = `
+	query GetWorkspaces {
+		workspaces(workspaceUuid:"%s") {
 			uuid
 			label
 			description
@@ -300,15 +335,15 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		Raw:  httpResponse,
 		Body: string(body),
 	}
-
 	decode := HoustonResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
 
+	// Houston Specific Errors
 	if decode.Errors != nil {
-		return nil, errors.New("failed to successfully decode response")
+		return nil, errors.New(decode.Errors[0].Message)
 	}
 
 	return &decode, nil
@@ -404,6 +439,19 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 	return response.Data.DeleteWorkspace, nil
 }
 
+// GetAllDeployments will request all airflow deployments from Houston
+// Returns a []Deployment structure with deployment details
+func (c *Client) GetAllDeployments() ([]Deployment, error) {
+	request := deploymentsGetAllRequest
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetAllDeployments Failed")
+	}
+
+	return response.Data.GetDeployments, nil
+}
+
 // GetDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
 func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
@@ -448,6 +496,19 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 
 // GetWorkspaceAll returns all available workspaces from houston API
 // Returns a slice of all Workspaces a user has access to
+func (c *Client) GetWorkspace(uuid string) (*Workspace, error) {
+	request := fmt.Sprintf(workspaceGetRequest, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetWorkspace Failed")
+	}
+
+	return response.Data.GetWorkspace, nil
+}
+
+// GetWorkspaceAll returns all available workspaces from houston API
+// Returns a slice of all Workspaces a user has access to
 func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 	request := workspaceAllGetRequest
 
@@ -456,7 +517,7 @@ func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 		return nil, errors.Wrap(err, "GetWorkspaceAll Failed")
 	}
 
-	return response.Data.GetWorkspace, nil
+	return response.Data.GetWorkspaces, nil
 }
 
 // GetUserAll sends a request to Houston in order to fetch a slice of users

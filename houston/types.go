@@ -14,7 +14,8 @@ type HoustonResponse struct {
 		GetDeployments      []Deployment `json:"deployments,omitempty"`
 		GetAuthConfig       *AuthConfig  `json:"authConfig,omitempty"`
 		GetUsers            []User       `json:"users,omitempty"`
-		GetWorkspace        []Workspace  `json:"workspaces,omitempty"`
+		GetWorkspace        *Workspace   `json:"workspace,omitempty"`
+		GetWorkspaces       []Workspace  `json:"workspaces,omitempty"`
 		UpdateDeployment    *Deployment  `json:"updateDeployment,omitempty"`
 		UpdateWorkspace     *Workspace   `json:"updateWorkspace,omitempty"`
 	} `json:"data"`
@@ -50,7 +51,7 @@ type Deployment struct {
 	ReleaseName    string         `json:"releaseName"`
 	Version        string         `json:"version"`
 	DeploymentInfo DeploymentInfo `json:"deployInfo"`
-	Workspace      string         `json:"workspace"`
+	Workspace      Workspace      `json:"workspace"`
 	CreatedAt      string         `json:"createdAt"`
 	UpdatedAt      string         `json:"updatedAt"`
 }
@@ -73,6 +74,7 @@ type Email struct {
 // Error defines struct of a houston response Error object
 type Error struct {
 	Message string `json:"message"`
+	Name    string `json:"name"`
 }
 
 // Status defines structure of a houston response StatusResponse object

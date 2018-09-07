@@ -1,8 +1,9 @@
 package workspace
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
@@ -84,6 +85,12 @@ func GetCurrentWorkspace() (string, error) {
 
 // Switch switches workspaces
 func Switch(uuid string) error {
+	// validate workspace
+	_, err := api.GetWorkspace(uuid)
+	if err != nil {
+		return errors.Wrap(err, "workspace uuid is not valid")
+	}
+
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err

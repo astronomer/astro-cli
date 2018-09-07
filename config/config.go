@@ -41,7 +41,6 @@ var (
 		CloudAPIPort:      newCfg("cloud.api.port", "443"),
 		CloudAPIToken:     newCfg("cloud.api.token", ""),
 		Context:           newCfg("context", ""),
-		LocalEnabled:      newCfg("local.enabled", ""),
 		LocalHouston:      newCfg("local.houston", ""),
 		LocalOrbit:        newCfg("local.orbit", ""),
 		PostgresUser:      newCfg("postgres.user", "postgres"),
