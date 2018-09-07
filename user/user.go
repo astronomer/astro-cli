@@ -33,7 +33,15 @@ func Create(email string) error {
 		return err
 	}
 
-	fmt.Printf(messages.HOUSTON_USER_CREATE_SUCCESS, r.User.Uuid, email)
+	msg := "Successfully created user %s. %s"
+
+	loginMsg := "You may now login to the platform."
+	if r.User.Status == "pending" {
+		loginMsg = "Check your email for a verification."
+	}
+
+	msg = fmt.Sprintf(msg, email, loginMsg)
+	fmt.Println(msg)
 
 	return nil
 }

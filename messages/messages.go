@@ -65,7 +65,6 @@ var (
 	HOUSTON_WORKSPACE_USER_ADD_SUCCESS    = "Successfully added user %s from workspace (%s)\n"
 	HOUSTON_WORKSPACE_USER_REMOVE_SUCCESS = "Successfully removed user %s from workspace (%s)\n"
 	HOUSTON_WORKSPACE_UPDATE_SUCCESS      = "Successfully updated workspace %s"
-	HOUSTON_USER_CREATE_SUCCESS           = "Successfully created user (%s) with email %s\n"
 
 	INPUT_PASSWORD    = "Password: "
 	INPUT_USERNAME    = "Username (leave blank for oAuth): "
