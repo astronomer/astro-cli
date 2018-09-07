@@ -186,6 +186,18 @@ var (
 		}
 	}`
 
+	workspaceGetRequest = `
+	query GetWorkspaces {
+		workspaces(workspaceUuid:"%s") {
+			uuid
+			label
+			description
+			active
+			createdAt
+			updatedAt
+		}
+	}`
+
 	workspaceCreateRequest = `
 	mutation CreateWorkspace {
 		createWorkspace(
@@ -478,6 +490,19 @@ func (c *Client) GetAuthConfig() (*AuthConfig, error) {
 
 // GetWorkspaceAll returns all available workspaces from houston API
 // Returns a slice of all Workspaces a user has access to
+func (c *Client) GetWorkspace(uuid string) (*Workspace, error) {
+	request := fmt.Sprintf(workspaceGetRequest, uuid)
+
+	response, err := c.QueryHouston(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetWorkspace Failed")
+	}
+
+	return response.Data.GetWorkspace, nil
+}
+
+// GetWorkspaceAll returns all available workspaces from houston API
+// Returns a slice of all Workspaces a user has access to
 func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 	request := workspaceAllGetRequest
 
@@ -486,7 +511,7 @@ func (c *Client) GetWorkspaceAll() ([]Workspace, error) {
 		return nil, errors.Wrap(err, "GetWorkspaceAll Failed")
 	}
 
-	return response.Data.GetWorkspace, nil
+	return response.Data.GetWorkspaces, nil
 }
 
 // GetUserAll sends a request to Houston in order to fetch a slice of users
