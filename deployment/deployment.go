@@ -1,8 +1,9 @@
 package deployment
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
@@ -77,7 +78,7 @@ func List(ws string, all bool) error {
 
 	for _, d := range deployments {
 		if all {
-			ws = d.Workspace
+			ws = d.Workspace.Uuid
 		}
 		fullStr := fmt.Sprintf(r, d.Label, d.Id, d.ReleaseName, ws)
 		fmt.Println(fullStr)

@@ -77,6 +77,9 @@ var (
 		type
 		label
 		releaseName
+		workspace {
+          uuid
+		}
 		deployInfo {
 			latest
 			next
@@ -94,6 +97,9 @@ var (
 		type
 		label
 		releaseName
+		workspace {
+			uuid
+		}
 		deployInfo {
 			latest
 			next
@@ -329,15 +335,15 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 		Raw:  httpResponse,
 		Body: string(body),
 	}
-
 	decode := HoustonResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
 
+	// Houston Specific Errors
 	if decode.Errors != nil {
-		return nil, errors.New("failed to successfully decode response")
+		return nil, errors.New(decode.Errors[0].Message)
 	}
 
 	return &decode, nil
