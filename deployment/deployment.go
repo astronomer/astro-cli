@@ -58,7 +58,7 @@ func List(ws string, all bool) error {
 	var err error
 
 	r := "  %-30s %-50s %-30s %-50s"
-	h := fmt.Sprintf(r, "NAME", "UUID", "RELEASE NAME", "WORKSPACE")
+	h := fmt.Sprintf(r, "NAME", "RELEASE NAME", "DEPLOYMENT ID", "WORKSPACE")
 	// colorFmt := "\033[33;m"
 	// colorTrm := "\033[0m"
 
@@ -80,7 +80,7 @@ func List(ws string, all bool) error {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-		fullStr := fmt.Sprintf(r, d.Label, d.Id, d.ReleaseName, ws)
+		fullStr := fmt.Sprintf(r, d.Label, d.ReleaseName, d.Id, ws)
 		fmt.Println(fullStr)
 	}
 	return nil
