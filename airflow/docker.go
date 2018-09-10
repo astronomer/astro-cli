@@ -3,6 +3,7 @@ package airflow
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"fmt"
 	"html/template"
 	"os"
@@ -54,6 +55,22 @@ type ComposeConfig struct {
 	AirflowHome          string
 	AirflowUser          string
 	AirflowWebserverPort string
+}
+
+// projectNameUnique creates a reasonably unique project name based on the hashed
+// path of the project. This prevents collisions of projects with identical dir names
+// in different paths. ie (~/dev/project1 vs ~/prod/project1)
+func projectNameUnique() string {
+	projectName := config.CFG.ProjectName.GetString()
+
+	pwd := []byte(
+		fileutil.GetWorkingDir(),
+	)
+
+	b := md5.Sum(pwd)
+	s := fmt.Sprintf("%x", b[:])
+
+	return projectName + "_" + s[0:6]
 }
 
 // repositoryName creates an airflow repository name
@@ -157,7 +174,7 @@ func createProject(projectName, airflowHome string, envFile string) (project.API
 // Start starts a local airflow development cluster
 func Start(airflowHome string, envFile string) error {
 	// Get project name from config
-	projectName := config.CFG.ProjectName.GetString()
+	projectName := projectNameUnique()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, envFile)
@@ -233,7 +250,7 @@ func Start(airflowHome string, envFile string) error {
 // Kill stops a local airflow development cluster
 func Kill(airflowHome string) error {
 	// Get project name from config
-	projectName := config.CFG.ProjectName.GetString()
+	projectName := projectNameUnique()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, "")
@@ -290,7 +307,8 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 // Stop a running docker project
 func Stop(airflowHome string) error {
 	// Get project name from config
-	projectName := config.CFG.ProjectName.GetString()
+	projectName := projectNameUnique()
+
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, "")
 	if err != nil {
@@ -309,7 +327,7 @@ func Stop(airflowHome string) error {
 // PS prints the running airflow containers
 func PS(airflowHome string) error {
 	// Get project name from config
-	projectName := config.CFG.ProjectName.GetString()
+	projectName := projectNameUnique()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, "")
