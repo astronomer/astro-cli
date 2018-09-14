@@ -1,6 +1,6 @@
 # Astronomer CLI
 
-The Astronomer CLI is the recommended way to get started developing and deploying on Astronomer Enterprise Edition.
+The Astronomer CLI is the recommended way to get started developing and deploying Airflow projects to Astronomer Enterprise Edition.
 
 ## Install
 
