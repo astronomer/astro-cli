@@ -1,0 +1,10 @@
+pipeline:
+  build:
+    image: golang
+    commands: 
+      - make build
+  
+  # test:
+  #   image: golang
+  #   commands:
+  #     - make test
