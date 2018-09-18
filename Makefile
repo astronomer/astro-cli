@@ -4,8 +4,8 @@ GIT_COMMIT=$(shell git rev-parse HEAD)
 GIT_COMMIT_SHORT=$(shell git rev-parse --short HEAD)
 VERSION ?= SNAPSHOT-${GIT_COMMIT_SHORT}
 
-LDFLAGS_VERSION=-X github.com/astronomerio/astro-cli/cmd.version=${VERSION} 
-LDFLAGS_GIT_COMMIT=-X github.com/astronomerio/astro-cli/cmd.gitCommit=${GIT_COMMIT}
+LDFLAGS_VERSION=-X github.com/astronomerio/astro-cli/cmd.currVersion=${VERSION} 
+LDFLAGS_GIT_COMMIT=-X github.com/astronomerio/astro-cli/cmd.currCommit=${GIT_COMMIT}
 
 .DEFAULT_GOAL := build
 
