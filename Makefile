@@ -48,3 +48,7 @@ install: build
 	$(eval DESTDIR ?= $(GOBIN))
 	mkdir -p $(DESTDIR)
 	cp ${OUTPUT} $(DESTDIR)
+
+uninstall:
+	$(eval DESTDIR ?= $(GOBIN))
+	rm $(GOBIN)/$(OUTPUT)
