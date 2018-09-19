@@ -12,3 +12,16 @@ pipeline:
     image: golang
     commands:
       - make test
+
+  push:
+    image: golang
+    commands: |
+      if [ "${CI_TAG}" != "" ]; then
+        curl -sL https://git.io/goreleaser | bash
+      else
+        echo "Not tagged, skipping step"
+      fi
+    when:
+      event: tag
+      tag:
+        include: "v[0-9].[0-9].[0-9]"
