@@ -22,4 +22,4 @@ pipeline:
         echo "Not tagged, skipping step"
       fi
     when:
-      tag: /^v\d[\d\.]+/
+      event: tag
