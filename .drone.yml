@@ -8,7 +8,7 @@ pipeline:
     commands: 
       - make build
   
-  # test:
-  #   image: golang
-  #   commands:
-  #     - make test
+  test:
+    image: golang
+    commands:
+      - make test
