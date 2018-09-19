@@ -13,28 +13,20 @@ jobs:
           name: "Astro version:"
           command: |
             echo $CIRCLE_TAG
-  deploy:
-    <<: *defaults
-    docker:
-       - image: circleci/golang:1.8
-    steps:
-      - checkout
-      - run:
-          name: "Write metadata"
-          command: |
-            if [ "${CIRCLE_TAG}" != "" ]; then
-              ./.circleci/scripts/write_metadata.sh $CIRCLE_TAG "`date '+%B %d, %Y @ %H:%M:%S'`"
-            else
-              echo "Not tagged, skipping step"
-            fi
-      - run:
-          name: "Install Goreleaser"
-          command: |
-            if [ "${CIRCLE_TAG}" != "" ]; then
-              curl -sL https://git.io/goreleaser | bash
-            else
-              echo "Not tagged, skipping step"
-            fi
+  # deploy:
+  #   <<: *defaults
+  #   docker:
+  #      - image: circleci/golang:1.8
+  #   steps:
+  #     - checkout
+      # - run:
+      #     name: "Install Goreleaser"
+      #     command: |
+      #       if [ "${CIRCLE_TAG}" != "" ]; then
+      #         curl -sL https://git.io/goreleaser | bash
+      #       else
+      #         echo "Not tagged, skipping step"
+      #       fi
 workflows:
   version: 2
   distribute:
