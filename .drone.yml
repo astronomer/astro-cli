@@ -22,4 +22,4 @@ pipeline:
         echo "Not tagged, skipping step"
       fi
     when:
-      event: tag
+      tag: v*.*.*
