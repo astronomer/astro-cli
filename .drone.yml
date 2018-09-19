@@ -23,5 +23,3 @@ pipeline:
       fi
     when:
       event: tag
-      tag:
-        include: "v[0-9].[0-9].[0-9]"
