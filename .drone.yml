@@ -16,7 +16,7 @@ pipeline:
   push:
     image: golang
     commands: |
-      if [ "${CI_TAG}" != "" ]; then
+      if [ "${DRONE_TAG}" != "" ]; then
         curl -sL https://git.io/goreleaser | bash
       else
         echo "Not tagged, skipping step"
