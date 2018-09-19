@@ -16,7 +16,7 @@ build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" main.go
 
 test:
-    go test -v
+	go test -v
 
 format:
 	@echo "--> Running go fmt"
