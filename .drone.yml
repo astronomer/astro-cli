@@ -14,8 +14,10 @@ pipeline:
       - make test
 
   push:
-    image: golang
-    commands: 
-      - curl -sL https://git.io/goreleaser | bash
+    image: goreleaser/goreleaser:v0.86
+    secrets: [ github_token ]
+    commands:
+      - git fetch --no-tags origin +refs/tags/${DRONE_TAG}:refs/tags/${DRONE_TAG}
+      - goreleaser release --rm-dist
     when:
-      event: [ tag ] 
+      event: tag
