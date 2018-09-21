@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-
 	sa "github.com/astronomerio/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -114,11 +111,7 @@ func saCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(label) == 0 {
-		// Scrub attrs for label
-		r := []rune(uuid)
-		last12 := string(r[len(r)-12:])
-
-		label = fmt.Sprintf("%s %s Service Account", strings.Title(strings.ToLower(entityType)), last12)
+		return errors.New("must provide a service-account label with the --label (-l) flag")
 	}
 
 	// Silence Usage as we have now validated command input

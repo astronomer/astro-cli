@@ -126,6 +126,7 @@ var (
 	serviceAccountCreateRequest = `
 	mutation CreateServiceAccount {
 		createServiceAccount(
+			entityUuid: "%s",
 			label: "%s",
 			category: "%s",
 			entityType: %s
@@ -442,8 +443,8 @@ func (c *Client) CreateBasicToken(email, password string) (*AuthUser, error) {
 
 // CreateServiceAccount sends a request to Houston in order to fetch a newly created service account
 // Returns a ServiceAccount object
-func (c *Client) CreateServiceAccount(uuid, label, category, entityType string) (*ServiceAccount, error) {
-	request := fmt.Sprintf(serviceAccountCreateRequest, label, category, entityType)
+func (c *Client) CreateServiceAccount(entityUuid, label, category, entityType string) (*ServiceAccount, error) {
+	request := fmt.Sprintf(serviceAccountCreateRequest, entityUuid, label, category, entityType)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
