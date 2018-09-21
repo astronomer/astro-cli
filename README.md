@@ -22,9 +22,8 @@ ie
    ```
 
 
-> Note: If you get mkdir error during installation please run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script. Also, don't forget to download go. 
+> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally. 
 
-    $ brew install node
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
 ## Getting Started
