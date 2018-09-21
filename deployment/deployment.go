@@ -21,10 +21,18 @@ var (
 )
 
 func Create(label, ws string) error {
-	d, err := api.CreateDeployment(label, ws)
+	// d, err := api.CreateDeployment(label, ws)
+	// deployment, err := api.CreateDeployment(label, ws)
+	// if err != nil {
+	// 	return err
+	// }
+	vars := map[string]string{"label": label, "workspaceUuid": ws}
+	response, err := api.QueryHouston2(houston.CreateDeploymentTest, vars)
 	if err != nil {
 		return err
 	}
+
+	d := response.Data.CreateDeployment
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
