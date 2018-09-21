@@ -21,6 +21,11 @@ ie
    curl -sL https://install.astronomer.io | sudo bash -s -- v0.3.1
    ```
 
+
+> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally. 
+
+    $ cat godownloader.sh | bash -s -- -b /usr/local/bin
+
 ## Getting Started
 
 1. Confirm the install worked:
