@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	sa "github.com/astronomerio/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
@@ -112,10 +113,12 @@ func saCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	r := []rune(uuid)
-	last12 := string(r[len(r)-12:])
 	if len(label) == 0 {
-		label = fmt.Sprintf("%s %s Service Account", entityType, last12)
+		// Scrub attrs for label
+		r := []rune(uuid)
+		last12 := string(r[len(r)-12:])
+
+		label = fmt.Sprintf("%s %s Service Account", strings.Title(strings.ToLower(entityType)), last12)
 	}
 
 	// Silence Usage as we have now validated command input

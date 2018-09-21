@@ -13,7 +13,7 @@ var (
 )
 
 func Create(uuid, label, category, entityType string) error {
-	r := "  %-40s %-50s %-50s"
+	r := "  %-45s %-50s %-50s"
 
 	sa, err := api.CreateServiceAccount(uuid, label, category, entityType)
 	if err != nil {
@@ -44,7 +44,7 @@ func Delete(uuid string) error {
 }
 
 func Get(entityType, uuid string) error {
-	r := "  %-30s %-30s %-50s %-30s"
+	r := "  %-45s %-30s %-50s %-30s"
 
 	resp, err := api.GetServiceAccounts(entityType, uuid)
 	if err != nil {
