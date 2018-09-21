@@ -14,6 +14,27 @@ import (
 )
 
 var (
+	createDeploymentTest = `mutation CreateDeployment(
+		$label: String!,
+		$type: String = "airflow",
+			$version: String = "1.9.0",
+		$workspaceUuid: Uuid!) {
+		  createDeployment(	
+			  label: $label,
+			  type: $type,
+		version: $version,
+			  workspaceUuid: $workspaceUuid
+		  ) {	
+			  uuid
+			  type
+			  label
+			  releaseName
+			  version
+			  createdAt
+			  updatedAt
+		  }
+	  }`
+
 	authConfigGetRequest = `
 	query GetAuthConfig {
 		authConfig(redirect: "") {
@@ -26,7 +47,10 @@ var (
 	  }`
 
 	deploymentCreateRequest = `
-	mutation CreateDeployment {
+	mutation CreateDeployment(
+		$label: String!,
+		$type: String! = "airflow",
+		workspaceUuid: Uuid) {
 		createDeployment(	
 			label: "%s",
 			type: "airflow",
