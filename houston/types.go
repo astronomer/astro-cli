@@ -96,6 +96,7 @@ type ServiceAccount struct {
 	Category   string `json:"category"`
 	EntityType string `json:"entityType"`
 	EntityUuid string `json:"entityUuid"`
+	LastUsedAt string `json:"lastUsedAt"`
 	Active     bool   `json:"active"`
 }
 

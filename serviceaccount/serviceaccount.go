@@ -37,18 +37,18 @@ func Delete(uuid string) error {
 }
 
 func Get(entityType, uuid string) error {
-	r := "  %-30s %-50s %-30s"
+	r := "  %-30s %-30s %-50s %-30s"
 
 	resp, err := api.GetServiceAccounts(entityType, uuid)
 	if err != nil {
 		return err
 	}
 
-	h := fmt.Sprintf(r, "NAME", "UUID", "CATEGORY")
+	h := fmt.Sprintf(r, "NAME", "CATEGORY", "UUID", "APIKEY")
 	fmt.Println(h)
 
 	for _, sa := range resp {
-		fullStr := fmt.Sprintf(r, sa.Label, sa.Uuid, sa.Category)
+		fullStr := fmt.Sprintf(r, sa.Label, sa.Category, sa.Uuid, sa.ApiKey)
 		fmt.Println(fullStr)
 	}
 	return nil
