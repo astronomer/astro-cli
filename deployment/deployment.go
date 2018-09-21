@@ -57,7 +57,7 @@ func List(ws string, all bool) error {
 	var deployments []houston.Deployment
 	var err error
 
-	r := "  %-30s %-50s %-30s %-50s"
+	r := "  %-30s %-50s %-50s %-50s"
 	h := fmt.Sprintf(r, "NAME", "RELEASE NAME", "DEPLOYMENT ID", "WORKSPACE")
 	// colorFmt := "\033[33;m"
 	// colorTrm := "\033[0m"
