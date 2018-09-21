@@ -130,11 +130,16 @@ var (
 			category: "%s",
 			entityType: %s
 		) {
-		  apiKey
-		  label
-		  category
-		  entityType
-		  active
+			uuid
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
 		}
 	  }`
 

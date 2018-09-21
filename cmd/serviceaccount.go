@@ -112,8 +112,10 @@ func saCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	r := []rune(uuid)
+	last12 := string(r[len(r)-12:])
 	if len(label) == 0 {
-		label = fmt.Sprintf("%s %s Service Account", entityType, uuid)
+		label = fmt.Sprintf("%s %s Service Account", entityType, last12)
 	}
 
 	// Silence Usage as we have now validated command input

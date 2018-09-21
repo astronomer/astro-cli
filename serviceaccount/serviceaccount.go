@@ -13,18 +13,25 @@ var (
 )
 
 func Create(uuid, label, category, entityType string) error {
+	r := "  %-40s %-50s %-50s"
+
 	sa, err := api.CreateServiceAccount(uuid, label, category, entityType)
 	if err != nil {
 		return err
 	}
 
-	msg := fmt.Sprintf("%s %s token: %s", sa.EntityType, sa.Uuid, sa.ApiKey)
-	fmt.Println(msg)
+	h := fmt.Sprintf(r, "NAME", "UUID", "APIKEY")
+	fmt.Println(h)
 
+	fullStr := fmt.Sprintf(r, sa.Label, sa.Uuid, sa.ApiKey)
+	fmt.Println(fullStr)
+
+	fmt.Println("\n Service account successfully created.")
 	return nil
 }
 
 func Delete(uuid string) error {
+
 	resp, err := api.DeleteServiceAccount(uuid)
 	if err != nil {
 		return err
