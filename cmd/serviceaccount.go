@@ -24,21 +24,21 @@ var (
 	}
 
 	saCreateCmd = &cobra.Command{
-		Use:     "create ENTITY-UUID",
+		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a service-account in the astronomer platform",
 		Long:    "Create a service-account in the astronomer platform",
 		RunE:    saCreate,
 	}
 
-	// saDeleteCmd = &cobra.Command{
-	// 	Use:     "delete UUID",
-	// 	Aliases: []string{"de"},
-	// 	Short:   "Delete a service-account in the astronomer platform",
-	// 	Long:    "Delete a service-account in the astronomer platform",
-	// 	RunE:    saDelete,
-	// 	Args:    cobra.ExactArgs(1),
-	// }
+	saDeleteCmd = &cobra.Command{
+		Use:     "delete [SA-UUID]",
+		Aliases: []string{"de"},
+		Short:   "Delete a service-account in the astronomer platform",
+		Long:    "Delete a service-account in the astronomer platform",
+		RunE:    saDelete,
+		Args:    cobra.ExactArgs(1),
+	}
 
 	saGetCmd = &cobra.Command{
 		Use:   "get",
@@ -66,6 +66,8 @@ func init() {
 	saGetCmd.Flags().StringVarP(&deploymentUuid, "deployment-uuid", "d", "", "[UUID]")
 	saGetCmd.Flags().StringVarP(&userUuid, "user-uuid", "u", "", "[UUID]")
 	saGetCmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
+
+	saRootCmd.AddCommand(saDeleteCmd)
 }
 
 func getValidEntity() (string, string, error) {
@@ -120,12 +122,12 @@ func saCreate(cmd *cobra.Command, args []string) error {
 	return sa.Create(uuid, label, category, entityType)
 }
 
-// func saDelete(cmd *cobra.Command, args []string) error {
-// 	// Silence Usage as we have now validated command input
-// 	cmd.SilenceUsage = true
+func saDelete(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
 
-// 	return sa.Delete()
-// }
+	return sa.Delete(args[0])
+}
 
 func saGet(cmd *cobra.Command, args []string) error {
 	entityType, uuid, err := getValidEntity()
