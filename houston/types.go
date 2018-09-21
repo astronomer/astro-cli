@@ -3,21 +3,24 @@ package houston
 // HoustonResponse wraps all houston response structs used for json marashalling
 type HoustonResponse struct {
 	Data struct {
-		AddWorkspaceUser    *Workspace   `json:"workspaceAddUser,omitempty"`
-		RemoveWorkspaceUser *Workspace   `json:"workspaceRemoveUser,omitempty"`
-		CreateDeployment    *Deployment  `json:"createDeployment,omitempty"`
-		CreateToken         *AuthUser    `json:"createToken,omitempty"`
-		CreateUser          *AuthUser    `json:"createUser,omitempty"`
-		CreateWorkspace     *Workspace   `json:"createWorkspace,omitempty"`
-		DeleteDeployment    *Deployment  `json:"deleteDeployment,omitempty"`
-		DeleteWorkspace     *Workspace   `json:"deleteWorkspace,omitempty"`
-		GetDeployments      []Deployment `json:"deployments,omitempty"`
-		GetAuthConfig       *AuthConfig  `json:"authConfig,omitempty"`
-		GetUsers            []User       `json:"users,omitempty"`
-		GetWorkspace        *Workspace   `json:"workspace,omitempty"`
-		GetWorkspaces       []Workspace  `json:"workspaces,omitempty"`
-		UpdateDeployment    *Deployment  `json:"updateDeployment,omitempty"`
-		UpdateWorkspace     *Workspace   `json:"updateWorkspace,omitempty"`
+		AddWorkspaceUser     *Workspace       `json:"workspaceAddUser,omitempty"`
+		RemoveWorkspaceUser  *Workspace       `json:"workspaceRemoveUser,omitempty"`
+		CreateDeployment     *Deployment      `json:"createDeployment,omitempty"`
+		CreateToken          *AuthUser        `json:"createToken,omitempty"`
+		CreateServiceAccount *ServiceAccount  `json:"createServiceAccount,omitempty"`
+		CreateUser           *AuthUser        `json:"createUser,omitempty"`
+		CreateWorkspace      *Workspace       `json:"createWorkspace,omitempty"`
+		DeleteDeployment     *Deployment      `json:"deleteDeployment,omitempty"`
+		DeleteServiceAccount *ServiceAccount  `json:"deleteServiceAccount,omitempty"`
+		DeleteWorkspace      *Workspace       `json:"deleteWorkspace,omitempty"`
+		GetDeployments       []Deployment     `json:"deployments,omitempty"`
+		GetAuthConfig        *AuthConfig      `json:"authConfig,omitempty"`
+		GetServiceAccounts   []ServiceAccount `json:"serviceAccounts,omitempty"`
+		GetUsers             []User           `json:"users,omitempty"`
+		GetWorkspace         *Workspace       `json:"workspace,omitempty"`
+		GetWorkspaces        []Workspace      `json:"workspaces,omitempty"`
+		UpdateDeployment     *Deployment      `json:"updateDeployment,omitempty"`
+		UpdateWorkspace      *Workspace       `json:"updateWorkspace,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -83,6 +86,18 @@ type Status struct {
 	Message string `json:"message"`
 	Code    string `json:"code"`
 	Id      string `json:"id"`
+}
+
+// ServiceACcount defines a structure of a ServiceAccountResponse object
+type ServiceAccount struct {
+	Uuid       string `json:"uuid"`
+	ApiKey     string `json:"apiKey"`
+	Label      string `json:"label"`
+	Category   string `json:"category"`
+	EntityType string `json:"entityType"`
+	EntityUuid string `json:"entityUuid"`
+	LastUsedAt string `json:"lastUsedAt"`
+	Active     bool   `json:"active"`
 }
 
 // Token contains a houston auth token as well as it's payload of components
