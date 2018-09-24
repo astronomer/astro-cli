@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// Table represents a table to be printed
 type Table struct {
 	// A slice of ints defining the padding for each column
 	Padding         []int
@@ -15,11 +16,8 @@ type Table struct {
 
 	// Truncate rows if they exceed padding length
 	Truncate bool
-	// 2d slice of strings, with each slice containing a row
-	// representation (nested slice of strings) of info to print
-	// Rows [][]string
 
-	// A place to store rows with padding correctly applied to them
+	// An array of row structs
 	Rows []Row
 
 	// A message to print after table has been printed
@@ -28,21 +26,21 @@ type Table struct {
 	// Optional message to print if no rows were passed to table
 	NoResultsMsg string
 
-	// Highlight a row with color
-
-	// Function which will eval whether to apply color to a row
+	// Len 2 array with elements representing ColorCode and ColorTrm respectively
 	ColorRowCode [2]string
 	// Function which will eval whether to apply color to a col
 	// ColorColCond    func(t *Table) (bool, error)
 	// ColorColCode [2]string
 }
 
+// Row represents a row to be printed
 type Row struct {
 	Raw      []string
 	Rendered string
 	Colored  bool
 }
 
+// AddRow is the preferred interface for adding a row to a table
 func (t *Table) AddRow(row []string, color bool) {
 	if len(t.RenderedPadding) == 0 {
 		p := t.GetPadding()
@@ -62,6 +60,7 @@ func (t *Table) AddRow(row []string, color bool) {
 	t.Rows = append(t.Rows, r)
 }
 
+// Print header __as well as__ rows
 func (t *Table) Print() error {
 	if len(t.Rows) == 0 && len(t.NoResultsMsg) != 0 {
 		fmt.Println(t.NoResultsMsg)
@@ -77,6 +76,7 @@ func (t *Table) Print() error {
 	return nil
 }
 
+// PrintHeader prints header
 func (t *Table) PrintHeader() {
 	if len(t.RenderedPadding) == 0 {
 		p := t.GetPadding()
@@ -89,6 +89,7 @@ func (t *Table) PrintHeader() {
 	fmt.Println(t.RenderedHeader)
 }
 
+// PrintRows prints rows with an "S"
 func (t *Table) PrintRows() {
 	for _, r := range t.Rows {
 		if r.Colored && len(t.ColorRowCode) == 2 {
@@ -99,6 +100,7 @@ func (t *Table) PrintRows() {
 	}
 }
 
+// GetPadding converts an array of ints into template padding for str fmting
 func (t *Table) GetPadding() string {
 	padStr := " "
 	for _, x := range t.Padding {
@@ -109,6 +111,10 @@ func (t *Table) GetPadding() string {
 	return padStr
 }
 
+// strSliceToInterface is a necessary conversion for passing
+// a series of strings as a variadic parameter to fmt.Sprintf()
+// ex
+// fmt.Sprintf(temp, strSliceToInterface(sliceofStrings)...)
 func strSliceToInterSlice(ss []string) []interface{} {
 	is := make([]interface{}, len(ss))
 	for i, v := range ss {
