@@ -10,7 +10,7 @@ var (
 		Use:     "cluster",
 		Aliases: []string{"cl"},
 		Short:   "Manage Astronomer EE clusters",
-		Long:    "Clusteres represent a single installation of the Astronomer Enterprise platform",
+		Long:    "Clusters represent a single installation of the Astronomer Enterprise platform",
 	}
 
 	clusterListCmd = &cobra.Command{
