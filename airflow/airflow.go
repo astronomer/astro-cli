@@ -43,9 +43,13 @@ func initFiles(root string, files map[string]string) error {
 		fullpath := filepath.Join(root, file)
 
 		// Move on if already exists
-		_, err := fileutil.Exists(fullpath)
+		fileExist, err := fileutil.Exists(fullpath)
 		if err != nil {
 			return errors.Wrapf(err, "failed to check existence of '%s'", fullpath)
+		}
+
+		if fileExist {
+			continue
 		}
 
 		// Write files out
