@@ -10,6 +10,7 @@ import (
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/jsonstr"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
@@ -29,9 +30,11 @@ func Create(label, desc string) error {
 
 // List all workspaces
 func List() error {
-	r := "  %-44s %-50s"
-	colorFmt := "\033[33;m"
-	colorTrm := "\033[0m"
+	tab := printutil.Table{
+		Padding:      []int{44, 50},
+		Header:       []string{"NAME", "UUID"},
+		ColorRowCode: [2]string{"\033[33;m", "\033[0m"},
+	}
 
 	ws, err := api.GetWorkspaceAll()
 	if err != nil {
@@ -39,20 +42,18 @@ func List() error {
 	}
 
 	c, err := config.GetCurrentContext()
-
-	head := fmt.Sprintf(r, "NAME", "UUID")
-	fmt.Println(head)
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
 
-		fullStr := fmt.Sprintf(r, name, workspace)
 		if c.Workspace == w.Uuid {
-			fullStr = colorFmt + fullStr + colorTrm
+			tab.AddRow([]string{name, workspace}, true)
+		} else {
+			tab.AddRow([]string{name, workspace}, false)
 		}
-
-		fmt.Println(fullStr)
 	}
+
+	tab.Print()
 
 	return nil
 }

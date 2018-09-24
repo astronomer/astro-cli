@@ -10,6 +10,7 @@ import (
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/jsonstr"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
@@ -57,11 +58,6 @@ func List(ws string, all bool) error {
 	var deployments []houston.Deployment
 	var err error
 
-	r := "  %-30s %-50s %-50s %-50s"
-	h := fmt.Sprintf(r, "NAME", "RELEASE NAME", "DEPLOYMENT ID", "WORKSPACE")
-	// colorFmt := "\033[33;m"
-	// colorTrm := "\033[0m"
-
 	if all {
 		deployments, err = api.GetAllDeployments()
 		if err != nil {
@@ -74,15 +70,22 @@ func List(ws string, all bool) error {
 		}
 	}
 
-	fmt.Println(h)
+	tab := printutil.Table{
+		Padding: []int{30, 50, 50, 50},
+		Header:  []string{"NAME", "RELEASE NAME", "DEPLOYMENT ID", "WORKSPACE"},
+	}
 
+	// Build rows
 	for _, d := range deployments {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-		fullStr := fmt.Sprintf(r, d.Label, d.ReleaseName, d.Id, ws)
-		fmt.Println(fullStr)
+
+		tab.AddRow([]string{d.Label, d.ReleaseName, d.Id, ws}, false)
 	}
+
+	tab.Print()
+
 	return nil
 }
 

@@ -1,19 +1,21 @@
 package cluster
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
-// List all available clusters a user has previously
-// authenticated to
+// List all available clusters a user has previously authenticated to
 // Returns error
 func List() error {
-	r := "  %-44s"
-	colorFmt := "\033[33;m"
-	colorTrm := "\033[0m"
+	tab := printutil.Table{
+		Padding:      []int{44},
+		Header:       []string{"NAME"},
+		ColorRowCode: [2]string{"\033[33;m", "\033[0m"},
+	}
+
 	var domain string
 
 	c, err := GetClusters()
@@ -26,8 +28,6 @@ func List() error {
 		return err
 	}
 
-	h := fmt.Sprintf(r, "NAME")
-	fmt.Println(h)
 	for k, v := range c.Contexts {
 		if v.Domain != "" {
 			domain = v.Domain
@@ -35,14 +35,14 @@ func List() error {
 			domain = strings.Replace(k, "_", ".", -1)
 		}
 
-		fullStr := fmt.Sprintf(r, domain)
 		if domain == ctx.Domain {
-			fullStr = colorFmt + fullStr + colorTrm
+			tab.AddRow([]string{domain}, true)
+		} else {
+			tab.AddRow([]string{domain}, false)
 		}
-
-		fmt.Println(fullStr)
-
 	}
+
+	tab.Print()
 
 	return nil
 }
