@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
 )
@@ -42,24 +41,6 @@ func Create(email string) error {
 
 	msg = fmt.Sprintf(msg, email, loginMsg)
 	fmt.Println(msg)
-
-	return nil
-}
-
-func List() error {
-	r, err := api.GetUserAll()
-	if err != nil {
-		return err
-	}
-
-	if len(r) == 0 {
-		fmt.Println(messages.HOUSTON_NO_USERS)
-	}
-
-	for _, u := range r {
-		rowTmp := "Username: %s\nId: %s\nStatus: %s\n\n"
-		fmt.Printf(rowTmp, u.Username, u.Uuid, u.Status)
-	}
 
 	return nil
 }

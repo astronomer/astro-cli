@@ -4,6 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/astronomerio/astro-cli/pkg/printutil"
+)
+
+var (
+	tab = printutil.Table{
+		Padding: []int{36, 36},
+		Header:  []string{"CLUSTER", "WORKSPACE"},
+	}
 )
 
 // Contexts holds all available Context structs in a map
@@ -49,9 +58,8 @@ func (c Context) PrintContext() error {
 		workspace = "N/A"
 	}
 
-	r := "%-36s %-36s\n"
-	fmt.Printf(r, "CLUSTER", "WORKSPACE")
-	fmt.Printf(r, cluster, workspace)
+	tab.AddRow([]string{cluster, workspace}, false)
+	tab.Print()
 
 	return nil
 }
@@ -158,10 +166,17 @@ func (c Context) SetContextKey(key, value string) error {
 
 // SwitchContext sets the current config context to the one matching the provided Context struct
 func (c Context) SwitchContext() error {
-	if c.ContextExists() {
+	co, err := c.GetContext()
+	if err != nil {
+		return err
+	} else {
 		viperHome.Set("context", c.Domain)
 		saveConfig(viperHome, HomeConfigFile)
 	}
+
+	tab.AddRow([]string{co.Domain, co.Workspace}, false)
+	tab.SuccessMsg = "\n Switched cluster"
+	tab.Print()
 
 	return nil
 }

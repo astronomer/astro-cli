@@ -7,14 +7,20 @@ import (
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/jsonstr"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
 	http = httputil.NewHTTPClient()
 	api  = houston.NewHoustonClient(http)
+
+	tab = printutil.Table{
+		Padding:      []int{44, 50},
+		Header:       []string{"NAME", "UUID"},
+		ColorRowCode: [2]string{"\033[33;m", "\033[0m"},
+	}
 )
 
 // Create a workspace
@@ -23,48 +29,51 @@ func Create(label, desc string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf(messages.HOUSTON_WORKSPACE_CREATE_SUCCESS, w.Label, w.Uuid)
+
+	tab.AddRow([]string{w.Label, w.Uuid}, false)
+	tab.SuccessMsg = "\n Successfully created workspace"
+	tab.Print()
+
 	return nil
 }
 
 // List all workspaces
 func List() error {
-	r := "  %-44s %-50s"
-	colorFmt := "\033[33;m"
-	colorTrm := "\033[0m"
-
 	ws, err := api.GetWorkspaceAll()
 	if err != nil {
 		return err
 	}
 
 	c, err := config.GetCurrentContext()
-
-	head := fmt.Sprintf(r, "NAME", "UUID")
-	fmt.Println(head)
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
 
-		fullStr := fmt.Sprintf(r, name, workspace)
 		if c.Workspace == w.Uuid {
-			fullStr = colorFmt + fullStr + colorTrm
+			tab.AddRow([]string{name, workspace}, true)
+		} else {
+			tab.AddRow([]string{name, workspace}, false)
 		}
-
-		fmt.Println(fullStr)
 	}
+
+	tab.Print()
 
 	return nil
 }
 
 // Delete a workspace by uuid
 func Delete(uuid string) error {
-	ws, err := api.DeleteWorkspace(uuid)
+	_, err := api.DeleteWorkspace(uuid)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf(messages.HOUSTON_WORKSPACE_DELETE_SUCCESS, ws.Label, ws.Uuid)
+	// TODO remove tab print until houston properly returns attrs on delete
+	// tab.AddRow([]string{w.Label, w.Uuid}, false)
+	// tab.SuccessMsg = "\n Successfully deleted workspace"
+	// tab.Print()
+	fmt.Println("\n Successfully deleted workspace")
+
 	return nil
 }
 
@@ -77,7 +86,7 @@ func GetCurrentWorkspace() (string, error) {
 	}
 
 	if len(c.Workspace) == 0 {
-		return "", errors.New("Current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACID")
+		return "", errors.New("Current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 	}
 
 	return c.Workspace, nil
@@ -111,12 +120,14 @@ func Switch(uuid string) error {
 func Update(workspaceId string, args map[string]string) error {
 	s := jsonstr.MapToJsonObjStr(args)
 
-	ws, err := api.UpdateWorkspace(workspaceId, s)
+	w, err := api.UpdateWorkspace(workspaceId, s)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf(messages.HOUSTON_WORKSPACE_UPDATE_SUCCESS, ws.Uuid)
+	tab.AddRow([]string{w.Label, w.Uuid}, false)
+	tab.SuccessMsg = "\n Successfully updated workspace"
+	tab.Print()
 
 	return nil
 }

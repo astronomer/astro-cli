@@ -3,51 +3,54 @@ package deployment
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/jsonstr"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
 	http = httputil.NewHTTPClient()
 	api  = houston.NewHoustonClient(http)
+
+	tab = printutil.Table{
+		Padding: []int{30, 50, 50},
+		Header:  []string{"NAME", "RELEASE NAME", "DEPLOYMENT ID"},
+	}
 )
 
 func Create(label, ws string) error {
-	deployment, err := api.CreateDeployment(label, ws)
+	d, err := api.CreateDeployment(label, ws)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf(messages.HOUSTON_DEPLOYMENT_CREATE_SUCCESS, deployment.Id)
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
+	tab.SuccessMsg = "\n Successfully created deployment. Deployment can be accessed at the following URLs \n" +
+		fmt.Sprintf("\n Airflow Dashboard: https://%s-airflow.%s", d.ReleaseName, c.Domain) +
+		fmt.Sprintf("\n Flower Dashboard: https://%s-flower.%s", d.ReleaseName, c.Domain)
 
-	cloudDomain := c.Domain
-	if len(cloudDomain) == 0 {
-		return errors.New("No domain set, re-authenticate.")
-	}
-
-	fmt.Printf("\n"+messages.EE_LINK_AIRFLOW+"\n", deployment.ReleaseName, cloudDomain)
-	fmt.Printf(messages.EE_LINK_FLOWER+"\n", deployment.ReleaseName, cloudDomain)
+	tab.Print()
 
 	return nil
 }
 
 func Delete(uuid string) error {
-	resp, err := api.DeleteDeployment(uuid)
+	_, err := api.DeleteDeployment(uuid)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf(messages.HOUSTON_DEPLOYMENT_DELETE_SUCCESS, resp.Id)
+	// TODO - add back in tab print once houston returns all relevant information
+	// tab.AddRow([]string{d.Label, d.ReleaseName, d.Id, d.Workspace.Uuid}, false)
+	// tab.SuccessMsg = "\n Successfully deleted deployment"
+	// tab.Print()
+	fmt.Println("\n Successfully deleted deployment")
 
 	return nil
 }
@@ -56,11 +59,6 @@ func Delete(uuid string) error {
 func List(ws string, all bool) error {
 	var deployments []houston.Deployment
 	var err error
-
-	r := "  %-30s %-50s %-50s %-50s"
-	h := fmt.Sprintf(r, "NAME", "RELEASE NAME", "DEPLOYMENT ID", "WORKSPACE")
-	// colorFmt := "\033[33;m"
-	// colorTrm := "\033[0m"
 
 	if all {
 		deployments, err = api.GetAllDeployments()
@@ -74,15 +72,17 @@ func List(ws string, all bool) error {
 		}
 	}
 
-	fmt.Println(h)
-
+	// Build rows
 	for _, d := range deployments {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-		fullStr := fmt.Sprintf(r, d.Label, d.ReleaseName, d.Id, ws)
-		fmt.Println(fullStr)
+
+		tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
 	}
+
+	tab.Print()
+
 	return nil
 }
 
@@ -90,12 +90,14 @@ func List(ws string, all bool) error {
 func Update(deploymentId string, args map[string]string) error {
 	s := jsonstr.MapToJsonObjStr(args)
 
-	dep, err := api.UpdateDeployment(deploymentId, s)
+	d, err := api.UpdateDeployment(deploymentId, s)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf(messages.HOUSTON_DEPLOYMENT_UPDATE_SUCCESS, dep.Id)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
+	tab.SuccessMsg = "\n Successfully updated deployment"
+	tab.Print()
 
 	return nil
 }
