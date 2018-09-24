@@ -90,6 +90,6 @@ func Switch(domain string) error {
 	if err != nil {
 		return err
 	}
-	config.PrintCurrentContext()
+
 	return nil
 }
