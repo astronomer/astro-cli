@@ -54,11 +54,9 @@ var (
 	HOUSTON_OAUTH_REDIRECT                = "Please visit the following URL, authenticate and paste token in next prompt\n"
 	HOUSTON_INVALID_DEPLOYMENT_KEY        = "Invalid deployment selection\n"
 	HOUSTON_NO_USERS                      = "There are no users to list or you don't have permissions to list users that do exist"
-	HOUSTON_WORKSPACE_CREATE_SUCCESS      = "Successfully created %s (%s)\n"
 	HOUSTON_WORKSPACE_DELETE_SUCCESS      = "Succesfully deleted %s (%s)\n"
 	HOUSTON_WORKSPACE_USER_ADD_SUCCESS    = "Successfully added user %s from workspace (%s)\n"
 	HOUSTON_WORKSPACE_USER_REMOVE_SUCCESS = "Successfully removed user %s from workspace (%s)\n"
-	HOUSTON_WORKSPACE_UPDATE_SUCCESS      = "Successfully updated workspace %s"
 
 	INPUT_PASSWORD    = "Password: "
 	INPUT_USERNAME    = "Username (leave blank for oAuth): "

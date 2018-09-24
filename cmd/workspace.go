@@ -58,6 +58,9 @@ var (
 		Short:   "Update an Astronomer workspace",
 		Long:    "Update a workspace name, as well as users and roles assigned to a workspace",
 		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) <= 1 {
+				return errors.New("must specify a workspace ID and at least one attribute to update.")
+			}
 			return updateArgValidator(args[1:], workspaceUpdateAttrs)
 		},
 		RunE: workspaceUpdate,
@@ -131,7 +134,7 @@ func workspaceCreate(cmd *cobra.Command, args []string) error {
 func workspaceList(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	
+
 	return workspace.List()
 }
 
@@ -150,7 +153,7 @@ func workspaceUpdate(cmd *cobra.Command, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	
+
 	return workspace.Update(args[0], argsMap)
 }
 
@@ -176,7 +179,7 @@ func workspaceUserRm(cmd *cobra.Command, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	
+
 	return workspace.Remove(ws, args[0])
 }
 
