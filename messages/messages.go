@@ -46,15 +46,9 @@ var (
 	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:8080/admin/"
 	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:5432/postgres"
 
-	EE_LINK_AIRFLOW = "Airflow Dashboard: https://%s-airflow.%s"
-	EE_LINK_FLOWER  = "Flower Dashboard: https://%s-flower.%s"
-
 	HOUSTON_BASIC_AUTH_DISABLED           = "Basic authentication is disabled, conact administrator or defer back to oAuth"
 	HOUSTON_DEPLOYMENT_HEADER             = "Authenticated to %s \n\n"
 	HOUSTON_DEPLOYING_PROMPT              = "Deploying: %s\n"
-	HOUSTON_DEPLOYMENT_CREATE_SUCCESS     = "Successfully created %s\n"
-	HOUSTON_DEPLOYMENT_DELETE_SUCCESS     = "Successfully deleted %s\n"
-	HOUSTON_DEPLOYMENT_UPDATE_SUCCESS     = "Successfully updated deployment %s"
 	HOUSTON_NO_DEPLOYMENTS_ERROR          = "No airflow deployments found"
 	HOUSTON_SELECT_DEPLOYMENT_PROMPT      = "Select which airflow deployment you want to deploy to:"
 	HOUSTON_OAUTH_REDIRECT                = "Please visit the following URL, authenticate and paste token in next prompt\n"
