@@ -30,9 +30,22 @@ type GraphQLQuery struct {
 	Query string `json:"query"`
 }
 
-type GraphQLQuery2 struct {
+type Request struct {
 	Query     string            `json:"query"`
 	Variables map[string]string `json:"variables"`
+}
+
+func (h *Request) Do() (*HoustonResponse, error) {
+	api := NewHoustonClient(httputil.NewHTTPClient())
+
+	doOpts := httputil.DoOptions{
+		Data: h,
+		Headers: map[string]string{
+			"Accept": "application/json",
+		},
+	}
+
+	return api.Do(doOpts)
 }
 
 // QueryHouston executes a query against the Houston API, logging out any errors contained in the response object
@@ -86,13 +99,14 @@ func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
 }
 
 // QueryHouston executes a query against the Houston API, logging out any errors contained in the response object
-func (c *Client) QueryHouston2(query string, variables map[string]string) (*HoustonResponse, error) {
-	doOpts := httputil.DoOptions{
-		Data: GraphQLQuery2{query, variables},
-		Headers: map[string]string{
-			"Accept": "application/json",
-		},
-	}
+func (c *Client) Do(doOpts httputil.DoOptions) (*HoustonResponse, error) {
+	// TODO RMV
+	// doOpts := httputil.DoOptions{
+	// 	Data: GraphQLQuery2{query, variables},
+	// 	Headers: map[string]string{
+	// 		"Accept": "application/json",
+	// 	},
+	// }
 
 	cl, err := cluster.GetCurrentCluster()
 	if err != nil {
@@ -240,16 +254,17 @@ func (c *Client) DeleteWorkspace(uuid string) (*Workspace, error) {
 
 // GetAllDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
-func (c *Client) GetAllDeployments() ([]Deployment, error) {
-	request := deploymentsGetAllRequest
+// TODO RMV
+// func (c *Client) GetAllDeployments() ([]Deployment, error) {
+// 	request := deploymentsGetAllRequest
 
-	response, err := c.QueryHouston(request)
-	if err != nil {
-		return nil, errors.Wrap(err, "GetAllDeployments Failed")
-	}
+// 	response, err := c.QueryHouston(request)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "GetAllDeployments Failed")
+// 	}
 
-	return response.Data.GetDeployments, nil
-}
+// 	return response.Data.GetDeployments, nil
+// }
 
 // DeleteServiceAccount will send a request to Houston to delete a service account
 // Returns an object representing deleted service account
@@ -267,7 +282,7 @@ func (c *Client) DeleteServiceAccount(uuid string) (*ServiceAccount, error) {
 // GetDeployments will request all airflow deployments from Houston
 // Returns a []Deployment structure with deployment details
 func (c *Client) GetDeployments(ws string) ([]Deployment, error) {
-	request := fmt.Sprintf(deploymentsGetRequest, ws)
+	request := fmt.Sprintf(DeploymentsGetRequest, ws)
 
 	response, err := c.QueryHouston(request)
 	if err != nil {
