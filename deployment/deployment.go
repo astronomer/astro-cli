@@ -5,15 +5,11 @@ import (
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/jsonstr"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
-
 	tab = printutil.Table{
 		Padding: []int{30, 50, 50},
 		Header:  []string{"NAME", "RELEASE NAME", "DEPLOYMENT ID"},
@@ -21,18 +17,17 @@ var (
 )
 
 func Create(label, ws string) error {
-	// d, err := api.CreateDeployment(label, ws)
-	// deployment, err := api.CreateDeployment(label, ws)
-	// if err != nil {
-	// 	return err
-	// }
-	vars := map[string]string{"label": label, "workspaceUuid": ws}
-	response, err := api.QueryHouston2(houston.CreateDeploymentTest, vars)
+	req := houston.Request{
+		Query:     houston.DeploymentCreateRequest,
+		Variables: map[string]string{"label": label, "workspaceUuid": ws},
+	}
+
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
 
-	d := response.Data.CreateDeployment
+	d := r.Data.CreateDeployment
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -49,7 +44,12 @@ func Create(label, ws string) error {
 }
 
 func Delete(uuid string) error {
-	_, err := api.DeleteDeployment(uuid)
+	req := houston.Request{
+		Query:     houston.DeploymentDeleteRequest,
+		Variables: map[string]string{"deploymentUuid": uuid},
+	}
+
+	_, err := req.Do()
 	if err != nil {
 		return err
 	}
@@ -66,19 +66,27 @@ func Delete(uuid string) error {
 // List all airflow deployments
 func List(ws string, all bool) error {
 	var deployments []houston.Deployment
+	var r *houston.HoustonResponse
 	var err error
 
+	req := houston.Request{
+		Query: houston.DeploymentsGetRequest,
+	}
+
 	if all {
-		deployments, err = api.GetAllDeployments()
+		r, err = req.Do()
 		if err != nil {
 			return err
 		}
 	} else {
-		deployments, err = api.GetDeployments(ws)
+		req.Variables = map[string]string{"workspaceUuid": ws}
+		r, err = req.Do()
 		if err != nil {
 			return err
 		}
 	}
+
+	deployments = r.Data.GetDeployments
 
 	// Build rows
 	for _, d := range deployments {
