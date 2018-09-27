@@ -588,7 +588,7 @@ func (c *Client) GetServiceAccounts(entityType, uuid string) ([]ServiceAccount, 
 
 // GetWorkspace returns all available workspaces from houston API
 // Returns a workspace struct
-func (c *Client) GetWorkspace(uuid string) (*Workspace, error) {
+func (c *Client) GetWorkspace(uuid string) ([]Workspace, error) {
 	request := fmt.Sprintf(workspaceGetRequest, uuid)
 
 	response, err := c.QueryHouston(request)
@@ -596,7 +596,7 @@ func (c *Client) GetWorkspace(uuid string) (*Workspace, error) {
 		return nil, errors.Wrap(err, "GetWorkspace Failed")
 	}
 
-	return response.Data.GetWorkspace, nil
+	return response.Data.GetWorkspaces, nil
 }
 
 // GetWorkspaceAll returns all available workspaces from houston API

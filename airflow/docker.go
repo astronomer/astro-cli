@@ -24,6 +24,7 @@ import (
 	"github.com/astronomerio/astro-cli/messages"
 	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 const (
@@ -36,6 +37,11 @@ const (
 var (
 	http = httputil.NewHTTPClient()
 	api  = houston.NewHoustonClient(http)
+
+	tab = printutil.Table{
+		Padding: []int{5, 30, 30, 50},
+		Header:  []string{"#", "RELEASE NAME", "WORKSPACE", "DEPLOYMENT UUID"},
+	}
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -155,7 +161,7 @@ func Start(airflowHome string) error {
 				return errors.New("cannot start, project already running")
 			}
 		}
-		
+
 		err = imageBuild(airflowHome, imageName(projectName, "latest"))
 		if err != nil {
 			return err
@@ -300,6 +306,13 @@ func PS(airflowHome string) error {
 
 // Deploy pushes a new docker image
 func Deploy(path, name, wsId string, prompt bool) error {
+	// TODO This will need refactored once graphql query variabels are built
+	ws, err := api.GetWorkspace(wsId)
+	if err != nil {
+		return err
+	}
+	w := ws[0]
+
 	deployments, err := api.GetDeployments(wsId)
 	if err != nil {
 		return err
@@ -330,12 +343,14 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMPT)
 
 		deployMap := map[string]houston.Deployment{}
-		for i, deployment := range deployments {
+		for i, d := range deployments {
 			index := i + 1
-			deployMap[strconv.Itoa(index)] = deployment
-			fmt.Printf("%d) %s (%s)\n", index, deployment.Label, deployment.ReleaseName)
+			tab.AddRow([]string{strconv.Itoa(index), d.ReleaseName, w.Label, d.Id}, false)
+
+			deployMap[strconv.Itoa(index)] = d
 		}
 
+		tab.Print()
 		choice := input.InputText("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
@@ -360,7 +375,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	// Build our image
 	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
-	
+
 	err = imageBuild(path, deployImage)
 	if err != nil {
 		return err
