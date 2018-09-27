@@ -113,9 +113,6 @@ func Update(uuid string, args map[string]string) error {
 		return err
 	}
 
-	fmt.Println(req.Query)
-	fmt.Println(req.Variables)
-
 	d := r.Data.UpdateDeployment
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
