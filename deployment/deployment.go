@@ -103,15 +103,10 @@ func List(ws string, all bool) error {
 
 // Update an airflow deployment
 func Update(uuid string, args map[string]string) error {
-	// s := jsonstr.MapToJsonObjStr(args)
-
 	req := houston.Request{
 		Query:     houston.DeploymentUpdateRequest,
-		Variables: make(map[string]interface{}),
+		Variables: map[string]interface{}{"deploymentUuid": uuid, "payload": args},
 	}
-
-	req.Variables["deploymentUuid"] = uuid
-	req.Variables["payload"] = args
 
 	r, err := req.Do()
 	if err != nil {
