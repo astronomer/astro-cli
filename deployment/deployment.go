@@ -5,7 +5,6 @@ import (
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/jsonstr"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
@@ -19,7 +18,7 @@ var (
 func Create(label, ws string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
-		Variables: map[string]string{"label": label, "workspaceUuid": ws},
+		Variables: map[string]interface{}{"label": label, "workspaceUuid": ws},
 	}
 
 	r, err := req.Do()
@@ -46,7 +45,7 @@ func Create(label, ws string) error {
 func Delete(uuid string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentDeleteRequest,
-		Variables: map[string]string{"deploymentUuid": uuid},
+		Variables: map[string]interface{}{"deploymentUuid": uuid},
 	}
 
 	_, err := req.Do()
@@ -79,7 +78,7 @@ func List(ws string, all bool) error {
 			return err
 		}
 	} else {
-		req.Variables = map[string]string{"workspaceUuid": ws}
+		req.Variables = map[string]interface{}{"workspaceUuid": ws}
 		r, err = req.Do()
 		if err != nil {
 			return err
@@ -103,13 +102,26 @@ func List(ws string, all bool) error {
 }
 
 // Update an airflow deployment
-func Update(deploymentId string, args map[string]string) error {
-	s := jsonstr.MapToJsonObjStr(args)
+func Update(uuid string, args map[string]string) error {
+	// s := jsonstr.MapToJsonObjStr(args)
 
-	d, err := api.UpdateDeployment(deploymentId, s)
+	req := houston.Request{
+		Query:     houston.DeploymentUpdateRequest,
+		Variables: make(map[string]interface{}),
+	}
+
+	req.Variables["deploymentUuid"] = uuid
+	req.Variables["payload"] = args
+
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
+
+	fmt.Println(req.Query)
+	fmt.Println(req.Variables)
+
+	d := r.Data.UpdateDeployment
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"

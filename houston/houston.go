@@ -31,8 +31,8 @@ type GraphQLQuery struct {
 }
 
 type Request struct {
-	Query     string            `json:"query"`
-	Variables map[string]string `json:"variables"`
+	Query     string                 `json:"query"`
+	Variables map[string]interface{} `json:"variables"`
 }
 
 func (h *Request) Do() (*HoustonResponse, error) {
