@@ -15,7 +15,7 @@ volumes:
     driver: local
   airflow_logs:
     driver: local
-  
+
 services:
   postgres:
     image: postgres:10.1-alpine
@@ -32,7 +32,7 @@ services:
     environment:
       POSTGRES_USER: {{ .PostgresUser }}
       POSTGRES_PASSWORD: {{ .PostgresPassword }}
-    
+
   scheduler:
     image: {{ .AirflowImage }}
     command: ["airflow", "scheduler"]
@@ -49,12 +49,13 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
       - airflow_logs:/usr/local/airflow/logs
-  
+
   webserver:
     image: {{ .AirflowImage }}
     command: ["airflow", "webserver"]
@@ -72,6 +73,7 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
     ports:
       - {{ .AirflowWebserverPort }}:{{ .AirflowWebserverPort }}
     volumes:
@@ -79,4 +81,4 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
       - airflow_logs:/usr/local/airflow/logs
-	`)
+    `)
