@@ -55,7 +55,6 @@ var (
 	HOUSTON_INVALID_DEPLOYMENT_KEY        = "Invalid deployment selection\n"
 	HOUSTON_NO_USERS                      = "There are no users to list or you don't have permissions to list users that do exist"
 	HOUSTON_WORKSPACE_DELETE_SUCCESS      = "Succesfully deleted %s (%s)\n"
-	HOUSTON_WORKSPACE_USER_ADD_SUCCESS    = "Successfully added user %s from workspace (%s)\n"
 	HOUSTON_WORKSPACE_USER_REMOVE_SUCCESS = "Successfully removed user %s from workspace (%s)\n"
 
 	INPUT_PASSWORD    = "Password: "

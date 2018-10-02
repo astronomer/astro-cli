@@ -1,27 +1,52 @@
 package workspace
 
 import (
-	"fmt"
+	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
+)
 
-	"github.com/astronomerio/astro-cli/messages"
+var (
+	utab = printutil.Table{
+		Padding: []int{30, 50, 50},
+		Header:  []string{"NAME", "WORKSPACE ID", "EMAIL"},
+	}
 )
 
 // Add a user to a workspace
 func Add(workspaceUuid, email string) error {
-	r, err := api.AddWorkspaceUser(workspaceUuid, email)
+	req := houston.Request{
+		Query:     houston.WorkspaceUserAddRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceUuid, "email": email},
+	}
+
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
-	fmt.Printf(messages.HOUSTON_WORKSPACE_USER_ADD_SUCCESS, r.Users[0].Username, r.Uuid)
+	w := r.Data.AddWorkspaceUser
+
+	utab.AddRow([]string{w.Label, w.Uuid, email}, false)
+	utab.SuccessMsg = "Successfully added user to workspace"
+	utab.Print()
+
 	return nil
 }
 
 // Remove a user from a workspace
 func Remove(workspaceUuid, email string) error {
-	r, err := api.RemoveWorkspaceUser(workspaceUuid, email)
+	req := houston.Request{
+		Query:     houston.WorkspaceUserRemoveRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceUuid, "email": email},
+	}
+
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
-	fmt.Printf(messages.HOUSTON_WORKSPACE_USER_REMOVE_SUCCESS, r.Users[0].Username, r.Uuid)
+	w := r.Data.RemoveWorkspaceUser
+
+	utab.AddRow([]string{w.Label, w.Uuid, email}, false)
+	utab.SuccessMsg = "Successfully removed user from workspace"
+	utab.Print()
 	return nil
 }
