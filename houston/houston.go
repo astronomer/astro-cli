@@ -35,11 +35,11 @@ type Request struct {
 	Variables map[string]interface{} `json:"variables"`
 }
 
-func (h *Request) Do() (*HoustonResponse, error) {
+func (r *Request) Do() (*HoustonResponse, error) {
 	api := NewHoustonClient(httputil.NewHTTPClient())
 
 	doOpts := httputil.DoOptions{
-		Data: h,
+		Data: r,
 		Headers: map[string]string{
 			"Accept": "application/json",
 		},
@@ -47,6 +47,24 @@ func (h *Request) Do() (*HoustonResponse, error) {
 
 	return api.Do(doOpts)
 }
+
+// TODO fix or RMV
+// func (r *Request) Do2() (*interface{}, error) {
+// 	api := NewHoustonClient(httputil.NewHTTPClient())
+
+// 	doOpts := httputil.DoOptions{
+// 		Data: r,
+// 		Headers: map[string]string{
+// 			"Accept": "application/json",
+// 		},
+// 	}
+
+// 	if r.RespType == nil {
+// 		return api.Do(doOpts)
+// 	} else {
+// 		return api.Do(doOpts).Data
+// 	}
+// }
 
 // QueryHouston executes a query against the Houston API, logging out any errors contained in the response object
 func (c *Client) QueryHouston(query string) (*HoustonResponse, error) {
