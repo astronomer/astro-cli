@@ -5,13 +5,7 @@ import (
 	"fmt"
 
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
-)
-
-var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
 )
 
 // Create verifies input before sending a CreateUser API call to houston

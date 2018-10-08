@@ -7,14 +7,10 @@ import (
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
-
 	tab = printutil.Table{
 		Padding:      []int{44, 50},
 		Header:       []string{"NAME", "UUID"},
