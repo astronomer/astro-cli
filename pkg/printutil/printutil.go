@@ -2,6 +2,7 @@ package printutil
 
 import (
 	"fmt"
+	"strconv"
 )
 
 // Table represents a table to be printed
@@ -19,6 +20,9 @@ type Table struct {
 
 	// An array of row structs
 	Rows []Row
+
+	// RowSelectionPrompt puts a number in front of each row and prompts user for selection
+	GetUserInput bool
 
 	// A message to print after table has been printed
 	SuccessMsg string
@@ -48,7 +52,6 @@ func (t *Table) AddRow(row []string, color bool) {
 	}
 
 	ri := strSliceToInterSlice(row)
-
 	rr := fmt.Sprintf(t.RenderedPadding, ri...)
 
 	r := Row{
@@ -83,19 +86,30 @@ func (t *Table) PrintHeader() {
 		t.RenderedPadding = p
 	}
 
+	headerSelectPrefix := ""
+	if t.GetUserInput {
+		headerSelectPrefix = fmt.Sprintf("%-5s", "#")
+	}
+
 	header := strSliceToInterSlice(t.Header)
 	t.RenderedHeader = fmt.Sprintf(t.RenderedPadding, header...)
 
-	fmt.Println(t.RenderedHeader)
+	fmt.Println(headerSelectPrefix + t.RenderedHeader)
 }
 
 // PrintRows prints rows with an "S"
 func (t *Table) PrintRows() {
-	for _, r := range t.Rows {
+	for i, r := range t.Rows {
+		// Responsible for adding the int in front of a row for selection by user
+		rowSelectPrefix := ""
+		if t.GetUserInput {
+			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
+		}
+
 		if r.Colored && len(t.ColorRowCode) == 2 {
-			fmt.Println(t.ColorRowCode[0] + r.Rendered + t.ColorRowCode[1])
+			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + r.Rendered + t.ColorRowCode[1])
 		} else {
-			fmt.Println(r.Rendered)
+			fmt.Println(rowSelectPrefix + r.Rendered)
 		}
 	}
 }
