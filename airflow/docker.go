@@ -302,9 +302,13 @@ func PS(airflowHome string) error {
 
 // Deploy pushes a new docker image
 func Deploy(path, name, wsId string, prompt bool) error {
+	if len(wsId) == 0 {
+		return errors.New("no workspace uuid provided")
+	}
+
 	// Validate workspace
 	wsReq := houston.Request{
-		Query:     houston.WorkspaceGetRequest,
+		Query:     houston.WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": wsId},
 	}
 
@@ -313,7 +317,11 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		return err
 	}
 
-	w := wsResp.Data.GetWorkspace
+	if len(wsResp.Data.GetWorkspaces) == 0 {
+		return fmt.Errorf("no workspaces with uuid (%s) found", wsId)
+	}
+
+	w := wsResp.Data.GetWorkspaces[0]
 
 	// Get Deployments from workspace UUID
 	deReq := houston.Request{
