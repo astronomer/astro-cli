@@ -5,13 +5,7 @@ import (
 	"fmt"
 
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
-)
-
-var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
 )
 
 // Create verifies input before sending a CreateUser API call to houston
@@ -27,15 +21,22 @@ func Create(email string) error {
 		return errors.New("Passwords do not match")
 	}
 
-	r, err := api.CreateUser(email, password)
+	req := houston.Request{
+		Query:     houston.UserCreateRequest,
+		Variables: map[string]interface{}{"email": email, "password": password},
+	}
+
+	resp, err := req.Do()
 	if err != nil {
 		return err
 	}
 
+	authUser := resp.Data.CreateUser
+
 	msg := "Successfully created user %s. %s"
 
 	loginMsg := "You may now login to the platform."
-	if r.User.Status == "pending" {
+	if authUser.User.Status == "pending" {
 		loginMsg = "Check your email for a verification."
 	}
 

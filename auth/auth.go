@@ -7,33 +7,39 @@ import (
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
 	"github.com/pkg/errors"
-)
-
-var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
 )
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username string) (string, error) {
 	password, _ := input.InputPassword(messages.INPUT_PASSWORD)
 
-	token, err := api.CreateBasicToken(username, password)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to fetch local/db auth token")
+	req := houston.Request{
+		Query:     houston.TokenBasicCreateRequest,
+		Variables: map[string]interface{}{"identity": username, "password": password},
 	}
 
-	return token.Token.Value, nil
+	resp, err := req.Do()
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Data.CreateToken.Token.Value, nil
 }
 
 func getWorkspaceByLabel(label string) *houston.Workspace {
-	workspaces, err := api.GetWorkspaceAll()
+
+	req := houston.Request{
+		Query: houston.WorkspacesGetRequest,
+	}
+
+	resp, err := req.Do()
 	if err != nil {
 		return nil
 	}
+	workspaces := resp.Data.GetWorkspaces
+
 	for _, ws := range workspaces {
 		if ws.Label == label {
 			return &ws
@@ -101,10 +107,15 @@ func Login(domain string, oAuthOnly bool) error {
 		return err
 	}
 
-	authConfig, err := api.GetAuthConfig()
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch auth config")
+	acReq := houston.Request{
+		Query: houston.AuthConfigGetRequest,
 	}
+
+	acResp, err := acReq.Do()
+	if err != nil {
+		return err
+	}
+	authConfig := acResp.Data.GetAuthConfig
 
 	username := ""
 	if !oAuthOnly && authConfig.LocalEnabled {
@@ -130,11 +141,16 @@ func Login(domain string, oAuthOnly bool) error {
 
 	c.SetContextKey("token", token)
 
-	// Attempt to set projectworkspace if there is only one workspace
-	workspaces, err := api.GetWorkspaceAll()
-	if err != nil {
-		return nil
+	wsReq := houston.Request{
+		Query: houston.WorkspacesGetRequest,
 	}
+
+	wsResp, err := wsReq.Do()
+	if err != nil {
+		return err
+	}
+
+	workspaces := wsResp.Data.GetWorkspaces
 
 	if len(workspaces) == 1 && len(c.Workspace) == 0 {
 		w := workspaces[0]

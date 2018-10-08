@@ -7,15 +7,10 @@ import (
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
-	"github.com/astronomerio/astro-cli/pkg/jsonstr"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
-
 	tab = printutil.Table{
 		Padding:      []int{44, 50},
 		Header:       []string{"NAME", "UUID"},
@@ -25,10 +20,17 @@ var (
 
 // Create a workspace
 func Create(label, desc string) error {
-	w, err := api.CreateWorkspace(label, desc)
+	req := houston.Request{
+		Query:     houston.WorkspaceCreateRequest,
+		Variables: map[string]interface{}{"label": label, "description": desc},
+	}
+
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
+
+	w := r.Data.CreateWorkspace
 
 	tab.AddRow([]string{w.Label, w.Uuid}, false)
 	tab.SuccessMsg = "\n Successfully created workspace"
@@ -39,10 +41,16 @@ func Create(label, desc string) error {
 
 // List all workspaces
 func List() error {
-	ws, err := api.GetWorkspaceAll()
+	req := houston.Request{
+		Query: houston.WorkspacesGetRequest,
+	}
+
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
+
+	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
 	for _, w := range ws {
@@ -63,7 +71,12 @@ func List() error {
 
 // Delete a workspace by uuid
 func Delete(uuid string) error {
-	_, err := api.DeleteWorkspace(uuid)
+	req := houston.Request{
+		Query:     houston.WorkspaceDeleteRequest,
+		Variables: map[string]interface{}{"workspaceUuid": uuid},
+	}
+
+	_, err := req.Do()
 	if err != nil {
 		return err
 	}
@@ -95,7 +108,12 @@ func GetCurrentWorkspace() (string, error) {
 // Switch switches workspaces
 func Switch(uuid string) error {
 	// validate workspace
-	_, err := api.GetWorkspace(uuid)
+	req := houston.Request{
+		Query:     houston.WorkspacesGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": uuid},
+	}
+
+	_, err := req.Do()
 	if err != nil {
 		return errors.Wrap(err, "workspace uuid is not valid")
 	}
@@ -117,13 +135,19 @@ func Switch(uuid string) error {
 }
 
 // Update an astronomer workspace
-func Update(workspaceId string, args map[string]string) error {
-	s := jsonstr.MapToJsonObjStr(args)
+func Update(uuid string, args map[string]string) error {
+	// validate workspace
+	req := houston.Request{
+		Query:     houston.WorkspaceUpdateRequest,
+		Variables: map[string]interface{}{"workspaceUuid": uuid, "payload": args},
+	}
 
-	w, err := api.UpdateWorkspace(workspaceId, s)
+	r, err := req.Do()
 	if err != nil {
 		return err
 	}
+
+	w := r.Data.UpdateWorkspace
 
 	tab.AddRow([]string{w.Label, w.Uuid}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"

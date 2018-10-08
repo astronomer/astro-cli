@@ -22,7 +22,6 @@ import (
 	"github.com/astronomerio/astro-cli/docker"
 	"github.com/astronomerio/astro-cli/houston"
 	"github.com/astronomerio/astro-cli/messages"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
 	"github.com/astronomerio/astro-cli/pkg/input"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
@@ -35,9 +34,6 @@ const (
 )
 
 var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
-
 	tab = printutil.Table{
 		Padding: []int{5, 30, 30, 50},
 		Header:  []string{"#", "RELEASE NAME", "WORKSPACE", "DEPLOYMENT UUID"},
@@ -306,17 +302,39 @@ func PS(airflowHome string) error {
 
 // Deploy pushes a new docker image
 func Deploy(path, name, wsId string, prompt bool) error {
-	// TODO This will need refactored once graphql query variabels are built
-	ws, err := api.GetWorkspace(wsId)
-	if err != nil {
-		return err
+	if len(wsId) == 0 {
+		return errors.New("no workspace uuid provided")
 	}
-	w := ws[0]
 
-	deployments, err := api.GetDeployments(wsId)
+	// Validate workspace
+	wsReq := houston.Request{
+		Query:     houston.WorkspacesGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": wsId},
+	}
+
+	wsResp, err := wsReq.Do()
 	if err != nil {
 		return err
 	}
+
+	if len(wsResp.Data.GetWorkspaces) == 0 {
+		return fmt.Errorf("no workspaces with uuid (%s) found", wsId)
+	}
+
+	w := wsResp.Data.GetWorkspaces[0]
+
+	// Get Deployments from workspace UUID
+	deReq := houston.Request{
+		Query:     houston.DeploymentsGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": w.Uuid},
+	}
+
+	deResp, err := deReq.Do()
+	if err != nil {
+		return err
+	}
+
+	deployments := deResp.Data.GetDeployments
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
