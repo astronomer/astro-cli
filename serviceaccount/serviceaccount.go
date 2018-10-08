@@ -42,7 +42,7 @@ func Create(uuid, label, category, entityType string) error {
 func Delete(uuid string) error {
 	req := houston.Request{
 		Query:     houston.ServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"entityUuid": uuid},
+		Variables: map[string]interface{}{"serviceAccountUuid": uuid},
 	}
 
 	resp, err := req.Do()
