@@ -4,7 +4,7 @@ package houston
 
 var (
 	AuthConfigGetRequest = `
-	query GetAuthConfig($redirect: String!) {
+	query GetAuthConfig($redirect: String) {
 		authConfig(redirect: $redirect) {
 			localEnabled
 			googleEnabled
@@ -227,7 +227,7 @@ var (
 		}
 	}`
 
-	WorkspaceGetRequest = `
+	WorkspacesGetRequest = `
 	query GetWorkspaces($workspaceUuid: Uuid, $label: String, $userUuid: Uuid) {
 		workspaces(
 			workspaceUuid: $workspaceUuid

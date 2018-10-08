@@ -31,7 +31,7 @@ func basicAuth(username string) (string, error) {
 func getWorkspaceByLabel(label string) *houston.Workspace {
 
 	req := houston.Request{
-		Query: houston.WorkspaceGetRequest,
+		Query: houston.WorkspacesGetRequest,
 	}
 
 	resp, err := req.Do()
@@ -142,7 +142,7 @@ func Login(domain string, oAuthOnly bool) error {
 	c.SetContextKey("token", token)
 
 	wsReq := houston.Request{
-		Query: houston.WorkspaceGetRequest,
+		Query: houston.WorkspacesGetRequest,
 	}
 
 	wsResp, err := wsReq.Do()

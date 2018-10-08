@@ -42,7 +42,7 @@ func Create(label, desc string) error {
 // List all workspaces
 func List() error {
 	req := houston.Request{
-		Query: houston.WorkspaceGetRequest,
+		Query: houston.WorkspacesGetRequest,
 	}
 
 	r, err := req.Do()
@@ -109,7 +109,7 @@ func GetCurrentWorkspace() (string, error) {
 func Switch(uuid string) error {
 	// validate workspace
 	req := houston.Request{
-		Query:     houston.WorkspaceGetRequest,
+		Query:     houston.WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": uuid},
 	}
 
