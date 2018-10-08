@@ -27,7 +27,7 @@ var (
 		Short:   "Switch to a different cluster context",
 		Long:    "Switch to a different cluster context",
 		RunE:    clusterSwitch,
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 	}
 )
 
@@ -50,5 +50,10 @@ func clusterSwitch(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return cluster.Switch(args[0])
+	d := ""
+	if len(args) == 1 {
+		d = args[0]
+	}
+
+	return cluster.Switch(d)
 }

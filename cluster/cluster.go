@@ -1,21 +1,26 @@
 package cluster
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomerio/astro-cli/pkg/input"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
+	"github.com/pkg/errors"
+)
+
+var (
+	tab = printutil.Table{
+		Padding:      []int{44},
+		Header:       []string{"NAME"},
+		ColorRowCode: [2]string{"\033[33;m", "\033[0m"},
+	}
 )
 
 // List all available clusters a user has previously authenticated to
 // Returns error
 func List() error {
-	tab := printutil.Table{
-		Padding:      []int{44},
-		Header:       []string{"NAME"},
-		ColorRowCode: [2]string{"\033[33;m", "\033[0m"},
-	}
-
 	var domain string
 
 	c, err := GetClusters()
@@ -82,9 +87,66 @@ func SetCluster(domain string) error {
 	return c.SetContext()
 }
 
+func getClusterSelection() (string, error) {
+	var domain string
+	tab.GetUserInput = true
+
+	c, err := GetClusters()
+	if err != nil {
+		return "", err
+	}
+
+	ctx, err := GetCurrentCluster()
+	if err != nil {
+		return "", err
+	}
+
+	contexts := []string{}
+	for k, v := range c.Contexts {
+		if v.Domain != "" {
+			domain = v.Domain
+		} else {
+			domain = strings.Replace(k, "_", ".", -1)
+		}
+
+		contexts = append(contexts, domain)
+
+		colorRow := false
+		if domain == ctx.Domain {
+			colorRow = true
+		}
+
+		tab.AddRow([]string{domain}, colorRow)
+	}
+
+	tab.Print()
+
+	in := input.InputText("\n> ")
+	i, err := strconv.ParseInt(
+		in,
+		10,
+		64,
+	)
+
+	if err != nil {
+		return "", errors.Wrapf(err, "cannot parse %s to int", in)
+	}
+
+	return contexts[i-1], nil
+
+}
+
 // SwitchCluster is a thin wrapper around the switch cluster receiver
 // Returns error
 func Switch(domain string) error {
+	if len(domain) == 0 {
+		d, err := getClusterSelection()
+		if err != nil {
+			return err
+		}
+		domain = d
+	}
+
 	c := config.Context{Domain: domain}
 	err := c.SwitchContext()
 	if err != nil {
