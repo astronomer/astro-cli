@@ -48,7 +48,7 @@ var (
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different astronomer workspace",
 		Long:    "Switch to a different astronomer workspace",
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 		RunE:    workspaceSwitch,
 	}
 
@@ -187,5 +187,11 @@ func workspaceSwitch(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return workspace.Switch(args[0])
+	uuid := ""
+
+	if len(args) == 1 {
+		uuid = args[0]
+	}
+
+	return workspace.Switch(uuid)
 }

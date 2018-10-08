@@ -2,11 +2,13 @@ package workspace
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/pkg/errors"
 
 	"github.com/astronomerio/astro-cli/config"
 	"github.com/astronomerio/astro-cli/houston"
+	"github.com/astronomerio/astro-cli/pkg/input"
 	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
@@ -105,8 +107,58 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
+func getWorkspaceSelection() (string, error) {
+	tab.GetUserInput = true
+
+	req := houston.Request{
+		Query: houston.WorkspacesGetRequest,
+	}
+
+	r, err := req.Do()
+	if err != nil {
+		return "", err
+	}
+
+	ws := r.Data.GetWorkspaces
+
+	c, err := config.GetCurrentContext()
+	for _, w := range ws {
+		name := w.Label
+		workspace := w.Uuid
+
+		if c.Workspace == w.Uuid {
+			tab.AddRow([]string{name, workspace}, true)
+		} else {
+			tab.AddRow([]string{name, workspace}, false)
+		}
+	}
+
+	tab.Print()
+
+	in := input.InputText("\n> ")
+	i, err := strconv.ParseInt(
+		in,
+		10,
+		64,
+	)
+
+	if err != nil {
+		return "", errors.Wrapf(err, "cannot parse %s to int", in)
+	}
+
+	return ws[i-1].Uuid, nil
+}
+
 // Switch switches workspaces
 func Switch(uuid string) error {
+	if len(uuid) == 0 {
+		_uuid, err := getWorkspaceSelection()
+		if err != nil {
+			return err
+		}
+
+		uuid = _uuid
+	}
 	// validate workspace
 	req := houston.Request{
 		Query:     houston.WorkspacesGetRequest,
