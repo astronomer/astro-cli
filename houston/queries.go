@@ -3,20 +3,7 @@ package houston
 // "github.com/sirupsen/logrus"
 
 var (
-
-	// TODO RMV
-	authConfigGetRequest = `
-	query GetAuthConfig {
-		authConfig(redirect: "") {
-		  localEnabled
-		  googleEnabled
-		  githubEnabled
-		  auth0Enabled
-		  googleOAuthUrl
-		}
-		}`
-
-	AuthConfigGetRequest2 = `
+	AuthConfigGetRequest = `
 	query GetAuthConfig($redirect: String!) {
 		authConfig(redirect: $redirect) {
 			localEnabled
@@ -26,27 +13,6 @@ var (
 			googleOAuthUrl
 		}
 	}`
-
-	// TODO RMV
-	// deploymentCreateRequest = `
-	// mutation CreateDeployment(
-	// 	$label: String!,
-	// 	$type: String! = "airflow",
-	// 	workspaceUuid: Uuid) {
-	// 	createDeployment(
-	// 		label: "%s",
-	// 		type: "airflow",
-	// 		workspaceUuid: "%s"
-	// 	) {
-	// 		uuid
-	// 		type
-	// 		label
-	// 		releaseName
-	// 		version
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
 
 	DeploymentCreateRequest = `
 	mutation CreateDeployment(
@@ -71,20 +37,6 @@ var (
 		}
 	}`
 
-	// TODO RMV
-	// deploymentDeleteRequest = `
-	// mutation DeleteDeployment {
-	// 	deleteDeployment(deploymentUuid: "%s") {
-	// 		uuid
-	// 		type
-	// 		label
-	// 		releaseName
-	// 		version
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
-
 	DeploymentDeleteRequest = `
 	mutation DeleteDeployment($deploymentUuid: Uuid!) {
 		deleteDeployment(deploymentUuid: $deploymentUuid) {
@@ -101,22 +53,6 @@ var (
 			updatedAt
 		}
 	}`
-
-	// TODO RMV
-	// deploymentGetRequest = `
-	// query GetDeployment {
-	//   deployments(
-	// 		deploymentUuid: "%s"
-	// 	) {
-	// 		uuid
-	// 		type
-	// 		label
-	// 		releaseName
-	// 		version
-	// 		createdAt
-	// 		updatedAt
-	//   }
-	// }`
 
 	DeploymentsGetRequest = `
 	query GetDeployment(
@@ -146,41 +82,6 @@ var (
 		}
 	}`
 
-	// TODO RMV
-	// deploymentsGetAllRequest = `
-	// query GetAllDeployments {
-	//   deployments {
-	// 	uuid
-	// 	type
-	// 	label
-	// 	releaseName
-	// 	workspace {
-	// 		uuid
-	// 	}
-	// 	deployInfo {
-	// 		latest
-	// 		next
-	// 	}
-	// 	version
-	// 	createdAt
-	// 	updatedAt
-	//   }
-	// }`
-
-	// // TODO RMV
-	// deploymentUpdateRequest = `
-	// mutation UpdateDeplomyent {
-	// 	updateDeployment(deploymentUuid:"%s",
-	// 	  payload: %s
-	// 	) {
-	// 	  uuid
-	// 	  type
-	// 	  label
-	// 	  releaseName
-	// 	  version
-	// 	}
-	//   }`
-
 	DeploymentUpdateRequest = `
 	mutation UpdateDeplomyent($deploymentUuid: Uuid!, $payload: JSON!) {
 		updateDeployment(deploymentUuid: $deploymentUuid, payload: $payload) {
@@ -197,28 +98,6 @@ var (
 			updatedAt
 		}
 	}`
-
-	// // TODO RMV
-	// serviceAccountCreateRequest = `
-	// mutation CreateServiceAccount {
-	// 	createServiceAccount(
-	// 		entityUuid: "%s",
-	// 		label: "%s",
-	// 		category: "%s",
-	// 		entityType: %s
-	// 	) {
-	// 		uuid
-	// 		apiKey
-	// 		label
-	// 		category
-	// 		entityType
-	// 		entityUuid
-	// 		active
-	// 		createdAt
-	// 		updatedAt
-	// 		lastUsedAt
-	// 	}
-	// 	}`
 
 	ServiceAccountCreateRequest = `
 		mutation CreateServiceAccount(
@@ -246,20 +125,6 @@ var (
 			}
 		}`
 
-	// // TODO RMV
-	// serviceAccountDeleteRequest = `
-	// mutation DeleteServiceAccount {
-	// 	deleteServiceAccount(
-	// 	serviceAccountUuid:"%s"
-	// 	) {
-	// 	  uuid
-	// 	  label
-	// 	  category
-	// 	  entityType
-	// 	  entityUuid
-	// 	}
-	//   }`
-
 	ServiceAccountDeleteRequest = `
 	mutation DeleteServiceAccount($serviceAccountUuid: Uuid!) {
 		deleteServiceAccount(serviceAccountUuid: $serviceAccountUuid) {
@@ -275,26 +140,6 @@ var (
 					lastUsedAt
 		}
 	}`
-
-	// // TODO RMV
-	// serviceAccountsGetRequest = `
-	// query GetServiceAccount {
-	// 	serviceAccounts(
-	// 		entityType:%s,
-	//     entityUuid:"%s"
-	// 	) {
-	//     uuid
-	//     apiKey
-	//     label
-	//     category
-	//     entityType
-	//     entityUuid
-	//     active
-	//     createdAt
-	//     updatedAt
-	//     lastUsedAt
-	// 	}
-	//   }`
 
 	ServiceAccountsGetRequest = `
 	query GetServiceAccount(
@@ -320,26 +165,6 @@ var (
 		}
 	}`
 
-	// // TODO RMV
-	// tokenBasicCreateRequest = `
-	// mutation createBasicToken {
-	//   createToken(
-	// 	  identity:"%s",
-	// 	  password:"%s"
-	// 	) {
-	// 		user {
-	// 			uuid
-	// 			username
-	// 			status
-	// 			createdAt
-	// 			updatedAt
-	// 		}
-	// 		token {
-	// 			value
-	// 		}
-	// 	}
-	// }`
-
 	TokenBasicCreateRequest = `
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {
@@ -356,26 +181,6 @@ var (
 			}
 		}
 	}`
-
-	// // TODO RMV
-	// userCreateRequest = `
-	// mutation CreateUser {
-	// 	createUser(
-	// 		email: "%s",
-	// 		password: "%s"
-	// 	) {
-	// 		user {
-	// 			uuid
-	// 			username
-	// 			status
-	// 			createdAt
-	// 			updatedAt
-	// 		}
-	// 		token {
-	// 			value
-	// 		}
-	// 	}
-	// }`
 
 	UserCreateRequest = `
 	mutation CreateUser(
@@ -403,26 +208,6 @@ var (
 		}
 	}`
 
-	// TODO RMV
-	// userGetAllRequest = `
-	// query GetUsers {
-	// 	users {
-	// 		uuid
-	// 		emails {
-	// 			address
-	// 			verified
-	// 			primary
-	// 			createdAt
-	// 			updatedAt
-	// 		}
-	// 		fullName
-	// 		username
-	// 		status
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
-
 	UserGetAllRequest = `
 	query GetUsers($userUuid: Uuid, $username: String, $email: String) {
 		users(userUuid: $userUuid, username: $username, email: $email) {
@@ -442,32 +227,6 @@ var (
 		}
 	}`
 
-	// TOOD RMV ???
-	// workspaceAllGetRequest = `
-	// query GetWorkspaces {
-	// 	workspaces {
-	// 		uuid
-	// 		label
-	// 		description
-	// 		active
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
-
-	// TODO RMV
-	// workspaceGetRequest = `
-	// query GetWorkspaces {
-	// 	workspaces(workspaceUuid:"%s") {
-	// 		uuid
-	// 		label
-	// 		description
-	// 		active
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
-
 	WorkspaceGetRequest = `
 	query GetWorkspaces($workspaceUuid: Uuid, $label: String, $userUuid: Uuid) {
 		workspaces(
@@ -484,22 +243,6 @@ var (
 		}
 	}`
 
-	// TODO RMV
-	// workspaceCreateRequest = `
-	// mutation CreateWorkspace {
-	// 	createWorkspace(
-	// 		label: "%s",
-	// 		description: "%s"
-	// 	) {
-	// 		uuid
-	// 		label
-	// 		description
-	// 		active
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
-
 	WorkspaceCreateRequest = `
 	mutation CreateWorkspace($label: String!, $description: String = "N/A") {
 		createWorkspace(label: $label, description: $description) {
@@ -511,19 +254,6 @@ var (
 			updatedAt
 		}
 	}`
-
-	// TODO RMV
-	// workspaceDeleteRequest = `
-	// mutation DeleteWorkspace {
-	// 	deleteWorkspace(workspaceUuid: "%s") {
-	// 		uuid
-	// 		label
-	// 		description
-	// 		active
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
 
 	WorkspaceDeleteRequest = `
 	mutation DeleteWorkspace($workspaceUuid: Uuid!) {
@@ -537,19 +267,6 @@ var (
 		}
 	}`
 
-	// TODO RMV
-	// workspaceUpdateRequest = `
-	// mutation UpdateWorkspace {
-	// 	updateWorkspace(workspaceUuid:"%s",
-	// 	  payload: %s
-	// 	) {
-	// 	  uuid
-	// 	  description
-	// 	  label
-	// 	  active
-	// 	}
-	//   }`
-
 	WorkspaceUpdateRequest = `
 	mutation UpdateWorkspace($workspaceUuid: Uuid!, $payload: JSON!) {
 		updateWorkspace(workspaceUuid: $workspaceUuid, payload: $payload) {
@@ -562,26 +279,6 @@ var (
 			updatedAt
 		}
 	}`
-
-	// TODO RMV
-	// workspaceUserAddRequest = `
-	// mutation AddWorkspaceUser {
-	// 	workspaceAddUser(
-	// 		workspaceUuid: "%s",
-	// 		email: "%s",
-	// 	) {
-	// 		uuid
-	// 		label
-	// 		description
-	// 		active
-	// 		users {
-	// 			uuid
-	// 			username
-	// 		}
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
 
 	WorkspaceUserAddRequest = `
 	mutation AddWorkspaceUser($workspaceUuid: Uuid!, $email: String!) {
@@ -598,26 +295,6 @@ var (
 			updatedAt
 		}
 	}`
-
-	// TODO RMV
-	// workspaceUserRemoveRequest = `
-	// mutation RemoveWorkspaceUser {
-	// 	workspaceRemoveUser(
-	// 		workspaceUuid: "%s",
-	// 		userUuid: "%s",
-	// 	) {
-	// 		uuid
-	// 		label
-	// 		description
-	// 		active
-	// 		users {
-	// 			uuid
-	// 			username
-	// 		}
-	// 		createdAt
-	// 		updatedAt
-	// 	}
-	// }`
 
 	WorkspaceUserRemoveRequest = `
 	mutation RemoveWorkspaceUser(
