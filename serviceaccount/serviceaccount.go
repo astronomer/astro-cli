@@ -4,59 +4,77 @@ import (
 	"fmt"
 
 	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
+	"github.com/astronomerio/astro-cli/pkg/printutil"
 )
 
 var (
-	http = httputil.NewHTTPClient()
-	api  = houston.NewHoustonClient(http)
+	tab = printutil.Table{
+		Padding: []int{40, 40, 50, 50},
+		Header:  []string{"NAME", "CATEGORY", "UUID", "APIKEY"},
+	}
 )
 
 func Create(uuid, label, category, entityType string) error {
-	r := "  %-45s %-50s %-50s"
+	req := houston.Request{
+		Query: houston.ServiceAccountCreateRequest,
+		Variables: map[string]interface{}{
+			"entityUuid": uuid,
+			"label":      label,
+			"category":   category,
+			"entityType": entityType,
+		},
+	}
 
-	sa, err := api.CreateServiceAccount(uuid, label, category, entityType)
+	resp, err := req.Do()
 	if err != nil {
 		return err
 	}
 
-	h := fmt.Sprintf(r, "NAME", "UUID", "APIKEY")
-	fmt.Println(h)
+	sa := resp.Data.CreateServiceAccount
 
-	fullStr := fmt.Sprintf(r, sa.Label, sa.Uuid, sa.ApiKey)
-	fmt.Println(fullStr)
+	tab.AddRow([]string{sa.Label, sa.Category, sa.Uuid, sa.ApiKey}, false)
+	tab.SuccessMsg = "\n Service account successfully created."
 
-	fmt.Println("\n Service account successfully created.")
+	tab.Print()
 	return nil
 }
 
 func Delete(uuid string) error {
+	req := houston.Request{
+		Query:     houston.ServiceAccountDeleteRequest,
+		Variables: map[string]interface{}{"entityUuid": uuid},
+	}
 
-	resp, err := api.DeleteServiceAccount(uuid)
+	resp, err := req.Do()
 	if err != nil {
 		return err
 	}
 
-	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", resp.Label, resp.Uuid)
+	sa := resp.Data.DeleteServiceAccount
+
+	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Uuid)
 	fmt.Println(msg)
 
 	return nil
 }
 
 func Get(entityType, uuid string) error {
-	r := "  %-45s %-30s %-50s %-30s"
+	req := houston.Request{
+		Query:     houston.ServiceAccountsGetRequest,
+		Variables: map[string]interface{}{"entityUuid": uuid, "entityType": entityType},
+	}
 
-	resp, err := api.GetServiceAccounts(entityType, uuid)
+	resp, err := req.Do()
 	if err != nil {
 		return err
 	}
 
-	h := fmt.Sprintf(r, "NAME", "CATEGORY", "UUID", "APIKEY")
-	fmt.Println(h)
+	sas := resp.Data.GetServiceAccounts
 
-	for _, sa := range resp {
-		fullStr := fmt.Sprintf(r, sa.Label, sa.Category, sa.Uuid, sa.ApiKey)
-		fmt.Println(fullStr)
+	for _, sa := range sas {
+		tab.AddRow([]string{sa.Label, sa.Category, sa.Uuid, sa.ApiKey}, false)
 	}
+
+	tab.Print()
 	return nil
 }
