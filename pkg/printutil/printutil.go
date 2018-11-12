@@ -39,6 +39,8 @@ type Table struct {
 	altPadding []int
 
 	headerPadding []int
+
+	DynamicPadding bool
 }
 
 // Row represents a row to be printed
@@ -75,35 +77,10 @@ func (t *Table) AddRow(row []string, color bool) {
 // comment
 func (t *Table) AddRows(rows [][]string, color bool) {
 
-	for _, row := range rows {
-		for i, col := range row {
-			colLength := len(col) + 5
-			if len(t.altPadding) != len(row) {
-				t.altPadding = append(t.altPadding, colLength)
-			} else {
-				if len(t.altPadding) >= i {
-					if t.altPadding[i] < colLength {
-						t.altPadding[i] = colLength
-					}
-				}
-			}
-		}
-	}
-
-	for i, val := range t.altPadding {
-		if len(t.headerPadding) == 0 {
-			for _, num := range t.Header {
-				fmt.Println(num)
-				colLength := len(num) + 5
-				t.headerPadding = append(t.headerPadding, colLength)
-			}
-		}
-
-		if val < t.headerPadding[i] {
-			t.altPadding[i] = t.headerPadding[i]
-		} else {
-			t.headerPadding[i] = t.altPadding[i]
-		}
+	if t.DynamicPadding {
+		t.dynamicPadding(rows)
+	} else {
+		t.altPadding = t.Padding
 	}
 
 	for _, row := range rows {
@@ -143,12 +120,7 @@ func (t *Table) Print() error {
 
 // PrintHeader prints header
 func (t *Table) PrintHeader() {
-	if len(t.headerPadding) == 0 {
-		for _, num := range t.Header {
-			colLength := len(num) + 5
-			t.headerPadding = append(t.headerPadding, colLength)
-		}
-	}
+	t.createHeaderPadding()
 
 	p := t.GetPadding(t.headerPadding)
 
@@ -200,4 +172,43 @@ func strSliceToInterSlice(ss []string) []interface{} {
 		is[i] = v
 	}
 	return is
+}
+
+func (t *Table) createHeaderPadding() {
+	if len(t.headerPadding) == 0 {
+		for _, num := range t.Header {
+			colLength := len(num) + 5
+			t.headerPadding = append(t.headerPadding, colLength)
+		}
+	}
+}
+
+func (t *Table) coalesceHeaderAndRowPadding(val int, i int) {
+	if val < t.headerPadding[i] {
+		t.altPadding[i] = t.headerPadding[i]
+	} else {
+		t.headerPadding[i] = t.altPadding[i]
+	}
+}
+
+func (t *Table) dynamicPadding(rows [][]string) {
+	for _, row := range rows {
+		for i, col := range row {
+			colLength := len(col) + 5
+			if len(t.altPadding) != len(row) {
+				t.altPadding = append(t.altPadding, colLength)
+			} else {
+				if len(t.altPadding) >= i {
+					if t.altPadding[i] < colLength {
+						t.altPadding[i] = colLength
+					}
+				}
+			}
+		}
+	}
+
+	for i, val := range t.altPadding {
+		t.createHeaderPadding()
+		t.coalesceHeaderAndRowPadding(val, i)
+	}
 }
