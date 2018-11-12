@@ -35,6 +35,10 @@ type Table struct {
 	// Function which will eval whether to apply color to a col
 	// ColorColCond    func(t *Table) (bool, error)
 	// ColorColCode [2]string
+
+	altPadding []int
+
+	headerPadding []int
 }
 
 // Row represents a row to be printed
@@ -46,8 +50,13 @@ type Row struct {
 
 // AddRow is the preferred interface for adding a row to a table
 func (t *Table) AddRow(row []string, color bool) {
+	for _, num := range row {
+		colLength := len(num) + 2
+		t.altPadding = append(t.altPadding, colLength)
+	}
+
 	if len(t.RenderedPadding) == 0 {
-		p := t.GetPadding()
+		p := t.GetPadding(t.altPadding)
 		t.RenderedPadding = p
 	}
 
@@ -61,6 +70,59 @@ func (t *Table) AddRow(row []string, color bool) {
 	}
 
 	t.Rows = append(t.Rows, r)
+}
+
+// comment
+func (t *Table) AddRows(rows [][]string, color bool) {
+
+	for _, row := range rows {
+		for i, col := range row {
+			colLength := len(col) + 5
+			if len(t.altPadding) != len(row) {
+				t.altPadding = append(t.altPadding, colLength)
+			} else {
+				if len(t.altPadding) >= i {
+					if t.altPadding[i] < colLength {
+						t.altPadding[i] = colLength
+					}
+				}
+			}
+		}
+	}
+
+	for i, val := range t.altPadding {
+		if len(t.headerPadding) == 0 {
+			for _, num := range t.Header {
+				fmt.Println(num)
+				colLength := len(num) + 5
+				t.headerPadding = append(t.headerPadding, colLength)
+			}
+		}
+
+		if val < t.headerPadding[i] {
+			t.altPadding[i] = t.headerPadding[i]
+		} else {
+			t.headerPadding[i] = t.altPadding[i]
+		}
+	}
+
+	for _, row := range rows {
+		if len(t.RenderedPadding) == 0 {
+			p := t.GetPadding(t.altPadding)
+			t.RenderedPadding = p
+		}
+
+		ri := strSliceToInterSlice(row)
+		rr := fmt.Sprintf(t.RenderedPadding, ri...)
+
+		r := Row{
+			Raw:      row,
+			Rendered: rr,
+			Colored:  color,
+		}
+
+		t.Rows = append(t.Rows, r)
+	}
 }
 
 // Print header __as well as__ rows
@@ -81,10 +143,14 @@ func (t *Table) Print() error {
 
 // PrintHeader prints header
 func (t *Table) PrintHeader() {
-	if len(t.RenderedPadding) == 0 {
-		p := t.GetPadding()
-		t.RenderedPadding = p
+	if len(t.headerPadding) == 0 {
+		for _, num := range t.Header {
+			colLength := len(num) + 5
+			t.headerPadding = append(t.headerPadding, colLength)
+		}
 	}
+
+	p := t.GetPadding(t.headerPadding)
 
 	headerSelectPrefix := ""
 	if t.GetUserInput {
@@ -92,7 +158,7 @@ func (t *Table) PrintHeader() {
 	}
 
 	header := strSliceToInterSlice(t.Header)
-	t.RenderedHeader = fmt.Sprintf(t.RenderedPadding, header...)
+	t.RenderedHeader = fmt.Sprintf(p, header...)
 
 	fmt.Println(headerSelectPrefix + t.RenderedHeader)
 }
@@ -115,13 +181,12 @@ func (t *Table) PrintRows() {
 }
 
 // GetPadding converts an array of ints into template padding for str fmting
-func (t *Table) GetPadding() string {
+func (t *Table) GetPadding(padding []int) string {
 	padStr := " "
-	for _, x := range t.Padding {
+	for _, x := range padding {
 		temp := "%ds"
 		padStr += "%-" + fmt.Sprintf(temp, x)
 	}
-
 	return padStr
 }
 

@@ -10,8 +10,8 @@ import (
 
 var (
 	tab = printutil.Table{
-		Padding: []int{30, 50, 50},
-		Header:  []string{"NAME", "RELEASE NAME", "DEPLOYMENT ID"},
+		Padding: []int{30, 30, 10, 50},
+		Header:  []string{"NAME", "RELEASE NAME", "CHART", "DEPLOYMENT ID"},
 	}
 )
 
@@ -32,7 +32,7 @@ func Create(label, ws string) error {
 	if err != nil {
 		return err
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
 	tab.SuccessMsg = "\n Successfully created deployment. Deployment can be accessed at the following URLs \n" +
 		fmt.Sprintf("\n Airflow Dashboard: https://%s-airflow.%s", d.ReleaseName, c.Domain) +
 		fmt.Sprintf("\n Flower Dashboard: https://%s-flower.%s", d.ReleaseName, c.Domain)
@@ -87,14 +87,17 @@ func List(ws string, all bool) error {
 
 	deployments = r.Data.GetDeployments
 
+	rows := [][]string{}
 	// Build rows
 	for _, d := range deployments {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-
-		tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
+		row := []string{d.Label, d.ReleaseName, d.Version, d.Id}
+		rows = append(rows, row)
 	}
+
+	tab.AddRows(rows, false)
 
 	tab.Print()
 
@@ -115,7 +118,7 @@ func Update(uuid string, args map[string]string) error {
 
 	d := r.Data.UpdateDeployment
 
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Id}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
 	tab.Print()
 
