@@ -10,8 +10,9 @@ import (
 
 var (
 	tab = printutil.Table{
-		Padding: []int{30, 30, 10, 50},
-		Header:  []string{"NAME", "RELEASE NAME", "CHART", "DEPLOYMENT ID"},
+		Padding:        []int{30, 30, 10, 50},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "RELEASE NAME", "CHART", "DEPLOYMENT ID"},
 	}
 )
 
