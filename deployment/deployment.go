@@ -95,7 +95,6 @@ func List(ws string, all bool) error {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-
 		row := printutil.TempRow{[]string{d.Label, d.ReleaseName, d.Version, d.Id}, false}
 		rows = append(rows, row)
 	}
