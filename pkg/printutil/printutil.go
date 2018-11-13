@@ -43,6 +43,12 @@ type Table struct {
 	DynamicPadding bool
 }
 
+// comment
+type TempRow struct {
+	Values []string
+	Color  bool
+}
+
 // Row represents a row to be printed
 type Row struct {
 	Raw      []string
@@ -51,12 +57,12 @@ type Row struct {
 }
 
 // AddRow is the preferred interface for adding a row to a table
-func (t *Table) AddRow(row []string, color bool) {
+func (t *Table) AddRow(values []string, color bool) {
 
 	if len(t.altPadding) == 0 {
 		if t.DynamicPadding {
-			rows := [][]string{}
-			rows = append(rows, row)
+			rows := []TempRow{}
+			rows = append(rows, TempRow{values, color})
 			t.dynamicPadding(rows)
 		} else {
 			t.altPadding = t.Padding
@@ -68,11 +74,11 @@ func (t *Table) AddRow(row []string, color bool) {
 		t.RenderedPadding = p
 	}
 
-	ri := strSliceToInterSlice(row)
+	ri := strSliceToInterSlice(values)
 	rr := fmt.Sprintf(t.RenderedPadding, ri...)
 
 	r := Row{
-		Raw:      row,
+		Raw:      values,
 		Rendered: rr,
 		Colored:  color,
 	}
@@ -81,7 +87,7 @@ func (t *Table) AddRow(row []string, color bool) {
 }
 
 // comment
-func (t *Table) AddRows(rows [][]string, color bool) {
+func (t *Table) AddRows(rows []TempRow) {
 
 	if t.DynamicPadding {
 		t.dynamicPadding(rows)
@@ -90,7 +96,7 @@ func (t *Table) AddRows(rows [][]string, color bool) {
 	}
 
 	for _, row := range rows {
-		t.AddRow(row, color)
+		t.AddRow(row.Values, row.Color)
 	}
 }
 
@@ -135,7 +141,6 @@ func (t *Table) PrintRows() {
 		if t.GetUserInput {
 			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
 		}
-
 		if r.Colored && len(t.ColorRowCode) == 2 {
 			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + r.Rendered + t.ColorRowCode[1])
 		} else {
@@ -183,11 +188,11 @@ func (t *Table) coalesceHeaderAndRowPadding(val int, i int) {
 	}
 }
 
-func (t *Table) dynamicPadding(rows [][]string) {
+func (t *Table) dynamicPadding(rows []TempRow) {
 	for _, row := range rows {
-		for i, col := range row {
+		for i, col := range row.Values {
 			colLength := len(col) + 5
-			if len(t.altPadding) != len(row) {
+			if len(t.altPadding) != len(row.Values) {
 				t.altPadding = append(t.altPadding, colLength)
 			} else {
 				if t.altPadding[i] < colLength {

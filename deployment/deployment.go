@@ -88,17 +88,19 @@ func List(ws string, all bool) error {
 
 	deployments = r.Data.GetDeployments
 
-	rows := [][]string{}
+	rows := []printutil.TempRow{}
+
 	// Build rows
 	for _, d := range deployments {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-		row := []string{d.Label, d.ReleaseName, d.Version, d.Id}
+
+		row := printutil.TempRow{[]string{d.Label, d.ReleaseName, d.Version, d.Id}, false}
 		rows = append(rows, row)
 	}
 
-	tab.AddRows(rows, false)
+	tab.AddRows(rows)
 
 	tab.Print()
 
