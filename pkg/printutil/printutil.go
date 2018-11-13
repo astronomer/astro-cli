@@ -198,10 +198,8 @@ func (t *Table) dynamicPadding(rows [][]string) {
 			if len(t.altPadding) != len(row) {
 				t.altPadding = append(t.altPadding, colLength)
 			} else {
-				if len(t.altPadding) >= i {
-					if t.altPadding[i] < colLength {
-						t.altPadding[i] = colLength
-					}
+				if t.altPadding[i] < colLength {
+					t.altPadding[i] = colLength
 				}
 			}
 		}
