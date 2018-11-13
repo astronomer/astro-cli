@@ -16,7 +16,7 @@ var (
 	tab = printutil.Table{
 		Padding:      []int{44, 50},
 		Header:       []string{"NAME", "UUID"},
-		ColorRowCode: [2]string{"\033[33;m", "\033[0m"},
+		ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
 	}
 )
 
