@@ -52,9 +52,15 @@ type Row struct {
 
 // AddRow is the preferred interface for adding a row to a table
 func (t *Table) AddRow(row []string, color bool) {
-	for _, num := range row {
-		colLength := len(num) + 2
-		t.altPadding = append(t.altPadding, colLength)
+
+	if len(t.altPadding) == 0 {
+		if t.DynamicPadding {
+			rows := [][]string{}
+			rows = append(rows, row)
+			t.dynamicPadding(rows)
+		} else {
+			t.altPadding = t.Padding
+		}
 	}
 
 	if len(t.RenderedPadding) == 0 {
@@ -84,21 +90,7 @@ func (t *Table) AddRows(rows [][]string, color bool) {
 	}
 
 	for _, row := range rows {
-		if len(t.RenderedPadding) == 0 {
-			p := t.GetPadding(t.altPadding)
-			t.RenderedPadding = p
-		}
-
-		ri := strSliceToInterSlice(row)
-		rr := fmt.Sprintf(t.RenderedPadding, ri...)
-
-		r := Row{
-			Raw:      row,
-			Rendered: rr,
-			Colored:  color,
-		}
-
-		t.Rows = append(t.Rows, r)
+		t.AddRow(row, color)
 	}
 }
 
