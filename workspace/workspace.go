@@ -57,8 +57,6 @@ func List() error {
 
 	c, err := config.GetCurrentContext()
 
-	rows := []printutil.TempRow{}
-
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
@@ -70,11 +68,9 @@ func List() error {
 		} else {
 			color = false
 		}
-		row := printutil.TempRow{Values: []string{name, workspace}, Color: color}
-		rows = append(rows, row)
+		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.AddRows(rows)
 	tab.Print()
 
 	return nil
@@ -132,8 +128,6 @@ func getWorkspaceSelection() (string, error) {
 
 	c, err := config.GetCurrentContext()
 
-	rows := []printutil.TempRow{}
-
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
@@ -145,11 +139,8 @@ func getWorkspaceSelection() (string, error) {
 		} else {
 			color = false
 		}
-		row := printutil.TempRow{Values: []string{name, workspace}, Color: color}
-		rows = append(rows, row)
+		tab.AddRow([]string{name, workspace}, color)
 	}
-
-	tab.AddRows(rows)
 
 	tab.Print()
 

@@ -12,7 +12,7 @@ var (
 	tab = printutil.Table{
 		Padding:        []int{30, 30, 10, 50},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "RELEASE NAME", "CHART", "DEPLOYMENT ID"},
+		Header:         []string{"NAME", "RELEASE NAME", "ASTRO", "DEPLOYMENT ID"},
 	}
 )
 
@@ -88,18 +88,13 @@ func List(ws string, all bool) error {
 
 	deployments = r.Data.GetDeployments
 
-	rows := []printutil.TempRow{}
-
 	// Build rows
 	for _, d := range deployments {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-		row := printutil.TempRow{[]string{d.Label, d.ReleaseName, d.Version, d.Id}, false}
-		rows = append(rows, row)
+		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id}, false)
 	}
-
-	tab.AddRows(rows)
 
 	tab.Print()
 
