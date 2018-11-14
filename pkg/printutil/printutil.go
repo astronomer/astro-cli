@@ -38,15 +38,7 @@ type Table struct {
 
 	altPadding []int
 
-	headerPadding []int
-
 	DynamicPadding bool
-}
-
-// comment
-type TempRow struct {
-	Values []string
-	Color  bool
 }
 
 // Row represents a row to be printed
@@ -58,46 +50,18 @@ type Row struct {
 
 // AddRow is the preferred interface for adding a row to a table
 func (t *Table) AddRow(values []string, color bool) {
-
-	if len(t.altPadding) == 0 {
-		if t.DynamicPadding {
-			rows := []TempRow{}
-			rows = append(rows, TempRow{values, color})
-			t.dynamicPadding(rows)
-		} else {
-			t.altPadding = t.Padding
-		}
-	}
-
-	if len(t.RenderedPadding) == 0 {
-		p := t.GetPadding(t.altPadding)
-		t.RenderedPadding = p
-	}
-
-	ri := strSliceToInterSlice(values)
-	rr := fmt.Sprintf(t.RenderedPadding, ri...)
-
-	r := Row{
-		Raw:      values,
-		Rendered: rr,
-		Colored:  color,
-	}
-
-	t.Rows = append(t.Rows, r)
-}
-
-// comment
-func (t *Table) AddRows(rows []TempRow) {
-
 	if t.DynamicPadding {
-		t.dynamicPadding(rows)
+		t.dynamicPadding(Row{Raw: values, Colored: color})
 	} else {
 		t.altPadding = t.Padding
 	}
 
-	for _, row := range rows {
-		t.AddRow(row.Values, row.Color)
+	r := Row{
+		Raw:     values,
+		Colored: color,
 	}
+
+	t.Rows = append(t.Rows, r)
 }
 
 // Print header __as well as__ rows
@@ -118,9 +82,13 @@ func (t *Table) Print() error {
 
 // PrintHeader prints header
 func (t *Table) PrintHeader() {
-	t.createHeaderPadding()
+	if t.DynamicPadding {
+		t.dynamicPadding(Row{Raw: t.Header, Colored: false})
+	} else {
+		t.altPadding = t.Padding
+	}
 
-	p := t.GetPadding(t.headerPadding)
+	p := t.GetPadding(t.altPadding)
 
 	headerSelectPrefix := ""
 	if t.GetUserInput {
@@ -135,16 +103,25 @@ func (t *Table) PrintHeader() {
 
 // PrintRows prints rows with an "S"
 func (t *Table) PrintRows() {
+
+	if len(t.RenderedPadding) == 0 {
+		p := t.GetPadding(t.altPadding)
+		t.RenderedPadding = p
+	}
+
 	for i, r := range t.Rows {
+		ri := strSliceToInterSlice(r.Raw)
+		rr := fmt.Sprintf(t.RenderedPadding, ri...)
+
 		// Responsible for adding the int in front of a row for selection by user
 		rowSelectPrefix := ""
 		if t.GetUserInput {
 			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
 		}
 		if r.Colored && len(t.ColorRowCode) == 2 {
-			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + r.Rendered + t.ColorRowCode[1])
+			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + rr + t.ColorRowCode[1])
 		} else {
-			fmt.Println(rowSelectPrefix + r.Rendered)
+			fmt.Println(rowSelectPrefix + rr)
 		}
 	}
 }
@@ -171,39 +148,25 @@ func strSliceToInterSlice(ss []string) []interface{} {
 	return is
 }
 
-func (t *Table) createHeaderPadding() {
-	if len(t.headerPadding) == 0 {
-		for _, num := range t.Header {
-			colLength := len(num) + 5
-			t.headerPadding = append(t.headerPadding, colLength)
+// If the altPadding slice is smaller than the number of incoming Values
+// slice, then that means that values still need to be added to fill it up.
+//
+// If the altPadding slice length is equivalent to the Values slice length,
+// then it should compare the length of the incoming value being evaluated
+//  to see if it longer than the value already stored in it's place in
+// altPadding. If it is, replace it's value with the length of the
+// incoming value.
+//
+// This helps ensure as it iterates through each row that the length
+// of the longest value for each column is kept or replaced as new
+// values are introduced.
+func (t *Table) dynamicPadding(row Row) {
+	for i, col := range row.Raw {
+		colLength := len(col) + 5
+		if len(t.altPadding) < len(row.Raw) {
+			t.altPadding = append(t.altPadding, colLength)
+		} else if t.altPadding[i] < colLength {
+			t.altPadding[i] = colLength
 		}
-	}
-}
-
-func (t *Table) coalesceHeaderAndRowPadding(val int, i int) {
-	if val < t.headerPadding[i] {
-		t.altPadding[i] = t.headerPadding[i]
-	} else {
-		t.headerPadding[i] = t.altPadding[i]
-	}
-}
-
-func (t *Table) dynamicPadding(rows []TempRow) {
-	for _, row := range rows {
-		for i, col := range row.Values {
-			colLength := len(col) + 5
-			if len(t.altPadding) != len(row.Values) {
-				t.altPadding = append(t.altPadding, colLength)
-			} else {
-				if t.altPadding[i] < colLength {
-					t.altPadding[i] = colLength
-				}
-			}
-		}
-	}
-
-	for i, val := range t.altPadding {
-		t.createHeaderPadding()
-		t.coalesceHeaderAndRowPadding(val, i)
 	}
 }
