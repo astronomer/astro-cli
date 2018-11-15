@@ -38,8 +38,8 @@ var (
 	COMPOSE_PAUSE_ERROR          = "Error pausing project containers"
 	COMPOSE_RECREATE_ERROR       = "Error building, (re)creating or starting project containers"
 	COMPOSE_PUSHING_IMAGE_PROMPT = "Pushing image to Astronomer registry"
-	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:8080/admin/"
-	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:5432/postgres"
+	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:%s/admin/"
+	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:%s/postgres"
 
 	HOUSTON_BASIC_AUTH_DISABLED      = "Basic authentication is disabled, conact administrator or defer back to oAuth"
 	HOUSTON_DEPLOYMENT_HEADER        = "Authenticated to %s \n\n"
