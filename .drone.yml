@@ -3,16 +3,19 @@ workspace:
   path: src/github.com/astronomerio/astro-cli
 
 pipeline:
+  # Build binary
   build:
     image: golang
     commands: 
       - make build
-  
+
+  # Test the code
   test:
     image: golang
     commands:
       - make test
 
+  # Cut releases with goreleaser when tagged
   push:
     image: goreleaser/goreleaser:v0.86
     secrets: [ github_token ]
