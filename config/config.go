@@ -36,11 +36,11 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		Contexts:          newCfg("contexts", ""),
 		CloudAPIProtocol:  newCfg("cloud.api.protocol", "https"),
 		CloudAPIPort:      newCfg("cloud.api.port", "443"),
 		CloudAPIToken:     newCfg("cloud.api.token", ""),
 		Context:           newCfg("context", ""),
+		Contexts:          newCfg("contexts", ""),
 		LocalHouston:      newCfg("local.houston", ""),
 		LocalOrbit:        newCfg("local.orbit", ""),
 		PostgresUser:      newCfg("postgres.user", "postgres"),
@@ -50,6 +50,7 @@ var (
 		ProjectDeployment: newCfg("project.deployment", ""),
 		ProjectName:       newCfg("project.name", ""),
 		ProjectWorkspace:  newCfg("project.workspace", ""),
+		WebserverPort:     newCfg("webserver.port", "8080"),
 	}
 
 	// viperHome is the viper object in the users home directory

@@ -91,7 +91,7 @@ func generateConfig(projectName, airflowHome string) (string, error) {
 		AirflowImage:         imageName(projectName, "latest"),
 		AirflowHome:          airflowHome,
 		AirflowUser:          "astro",
-		AirflowWebserverPort: "8080",
+		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
 	}
 
 	buff := new(bytes.Buffer)
@@ -180,8 +180,8 @@ func Start(airflowHome string) error {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
 	}
-	fmt.Println(messages.COMPOSE_LINK_WEBSERVER)
-	fmt.Println(messages.COMPOSE_LINK_POSTGRES)
+	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
+	fmt.Printf(messages.COMPOSE_LINK_POSTGRES, config.CFG.PostgresPort.GetString())
 	return nil
 }
 
