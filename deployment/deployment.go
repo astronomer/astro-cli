@@ -10,8 +10,9 @@ import (
 
 var (
 	tab = printutil.Table{
-		Padding: []int{30, 30, 10, 50},
-		Header:  []string{"NAME", "RELEASE NAME", "CHART", "DEPLOYMENT ID"},
+		Padding:        []int{30, 30, 10, 50},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "RELEASE NAME", "ASTRO", "DEPLOYMENT ID"},
 	}
 )
 
@@ -92,8 +93,7 @@ func List(ws string, all bool) error {
 		if all {
 			ws = d.Workspace.Uuid
 		}
-
-		tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id}, false)
 	}
 
 	tab.Print()

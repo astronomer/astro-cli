@@ -9,8 +9,9 @@ import (
 
 var (
 	tab = printutil.Table{
-		Padding: []int{40, 40, 50, 50},
-		Header:  []string{"NAME", "CATEGORY", "UUID", "APIKEY"},
+		Padding:        []int{40, 40, 50, 50},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "CATEGORY", "UUID", "APIKEY"},
 	}
 )
 

@@ -14,7 +14,8 @@ import (
 
 var (
 	tab = printutil.Table{
-		Padding:      []int{44, 50},
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
 		Header:       []string{"NAME", "UUID"},
 		ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
 	}
@@ -55,15 +56,19 @@ func List() error {
 	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
+
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
 
+		var color bool
+
 		if c.Workspace == w.Uuid {
-			tab.AddRow([]string{name, workspace}, true)
+			color = true
 		} else {
-			tab.AddRow([]string{name, workspace}, false)
+			color = false
 		}
+		tab.AddRow([]string{name, workspace}, color)
 	}
 
 	tab.Print()
@@ -122,15 +127,19 @@ func getWorkspaceSelection() (string, error) {
 	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
+
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Uuid
 
+		var color bool
+
 		if c.Workspace == w.Uuid {
-			tab.AddRow([]string{name, workspace}, true)
+			color = true
 		} else {
-			tab.AddRow([]string{name, workspace}, false)
+			color = false
 		}
+		tab.AddRow([]string{name, workspace}, color)
 	}
 
 	tab.Print()

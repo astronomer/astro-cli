@@ -35,6 +35,10 @@ type Table struct {
 	// Function which will eval whether to apply color to a col
 	// ColorColCond    func(t *Table) (bool, error)
 	// ColorColCode [2]string
+
+	altPadding []int
+
+	DynamicPadding bool
 }
 
 // Row represents a row to be printed
@@ -45,19 +49,16 @@ type Row struct {
 }
 
 // AddRow is the preferred interface for adding a row to a table
-func (t *Table) AddRow(row []string, color bool) {
-	if len(t.RenderedPadding) == 0 {
-		p := t.GetPadding()
-		t.RenderedPadding = p
+func (t *Table) AddRow(values []string, color bool) {
+	if t.DynamicPadding {
+		t.dynamicPadding(Row{Raw: values, Colored: color})
+	} else {
+		t.altPadding = t.Padding
 	}
 
-	ri := strSliceToInterSlice(row)
-	rr := fmt.Sprintf(t.RenderedPadding, ri...)
-
 	r := Row{
-		Raw:      row,
-		Rendered: rr,
-		Colored:  color,
+		Raw:     values,
+		Colored: color,
 	}
 
 	t.Rows = append(t.Rows, r)
@@ -81,10 +82,13 @@ func (t *Table) Print() error {
 
 // PrintHeader prints header
 func (t *Table) PrintHeader() {
-	if len(t.RenderedPadding) == 0 {
-		p := t.GetPadding()
-		t.RenderedPadding = p
+	if t.DynamicPadding {
+		t.dynamicPadding(Row{Raw: t.Header, Colored: false})
+	} else {
+		t.altPadding = t.Padding
 	}
+
+	p := t.GetPadding(t.altPadding)
 
 	headerSelectPrefix := ""
 	if t.GetUserInput {
@@ -92,36 +96,43 @@ func (t *Table) PrintHeader() {
 	}
 
 	header := strSliceToInterSlice(t.Header)
-	t.RenderedHeader = fmt.Sprintf(t.RenderedPadding, header...)
+	t.RenderedHeader = fmt.Sprintf(p, header...)
 
 	fmt.Println(headerSelectPrefix + t.RenderedHeader)
 }
 
 // PrintRows prints rows with an "S"
 func (t *Table) PrintRows() {
+
+	if len(t.RenderedPadding) == 0 {
+		p := t.GetPadding(t.altPadding)
+		t.RenderedPadding = p
+	}
+
 	for i, r := range t.Rows {
+		ri := strSliceToInterSlice(r.Raw)
+		rr := fmt.Sprintf(t.RenderedPadding, ri...)
+
 		// Responsible for adding the int in front of a row for selection by user
 		rowSelectPrefix := ""
 		if t.GetUserInput {
 			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
 		}
-
 		if r.Colored && len(t.ColorRowCode) == 2 {
-			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + r.Rendered + t.ColorRowCode[1])
+			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + rr + t.ColorRowCode[1])
 		} else {
-			fmt.Println(rowSelectPrefix + r.Rendered)
+			fmt.Println(rowSelectPrefix + rr)
 		}
 	}
 }
 
 // GetPadding converts an array of ints into template padding for str fmting
-func (t *Table) GetPadding() string {
+func (t *Table) GetPadding(padding []int) string {
 	padStr := " "
-	for _, x := range t.Padding {
+	for _, x := range padding {
 		temp := "%ds"
 		padStr += "%-" + fmt.Sprintf(temp, x)
 	}
-
 	return padStr
 }
 
@@ -135,4 +146,27 @@ func strSliceToInterSlice(ss []string) []interface{} {
 		is[i] = v
 	}
 	return is
+}
+
+// If the altPadding slice is smaller than the number of incoming Values
+// slice, then that means that values still need to be added to fill it up.
+//
+// If the altPadding slice length is equivalent to the Values slice length,
+// then it should compare the length of the incoming value being evaluated
+//  to see if it longer than the value already stored in it's place in
+// altPadding. If it is, replace it's value with the length of the
+// incoming value.
+//
+// This helps ensure as it iterates through each row that the length
+// of the longest value for each column is kept or replaced as new
+// values are introduced.
+func (t *Table) dynamicPadding(row Row) {
+	for i, col := range row.Raw {
+		colLength := len(col) + 5
+		if len(t.altPadding) < len(row.Raw) {
+			t.altPadding = append(t.altPadding, colLength)
+		} else if t.altPadding[i] < colLength {
+			t.altPadding[i] = colLength
+		}
+	}
 }
