@@ -6,7 +6,7 @@ pipeline:
   # Build binary
   build:
     image: golang
-    commands: 
+    commands:
       - make build
 
   # Test the code
