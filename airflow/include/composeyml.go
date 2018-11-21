@@ -51,6 +51,8 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+    env_file:
+      - .env
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
@@ -77,6 +79,8 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+    env_file:
+      - .env
     ports:
       - {{ .AirflowWebserverPort }}:{{ .AirflowWebserverPort }}
     expose:
