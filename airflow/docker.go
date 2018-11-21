@@ -181,7 +181,7 @@ func Start(airflowHome string) error {
 		}
 	}
 	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
-	fmt.Printf(messages.COMPOSE_LINK_POSTGRES, config.CFG.PostgresPort.GetString())
+	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 	return nil
 }
 

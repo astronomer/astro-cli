@@ -26,7 +26,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
     ports:
-      - {{ .PostgresPort }}:{{ .PostgresPort }}
+      - {{ .PostgresPort }}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -48,7 +48,7 @@ services:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
     volumes:
@@ -72,15 +72,12 @@ services:
       - scheduler
       - postgres
     environment:
-      AIRFLOW__WEBSERVER__WEB_SERVER_PORT: {{ .AirflowWebserverPort }}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:{{ .PostgresPort }}
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
     ports:
-      - {{ .AirflowWebserverPort }}:{{ .AirflowWebserverPort }}
-    expose:
-      - {{ .AirflowWebserverPort }}
+      - {{ .AirflowWebserverPort }}:8080
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
