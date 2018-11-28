@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"os/exec"
+
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -50,6 +52,7 @@ type ComposeConfig struct {
 	AirflowHome          string
 	AirflowUser          string
 	AirflowWebserverPort string
+	PrivateKey           string
 }
 
 // repositoryName creates an airflow repository name
@@ -63,12 +66,20 @@ func imageName(name, tag string) string {
 }
 
 // imageBuild builds the airflow project
-func imageBuild(path, imageName string) error {
+func imageBuild(path, imageName string, PrivateKey string) error {
 	// Change to location of Dockerfile
 	os.Chdir(path)
 
+	key, errl := exec.Command("cat", PrivateKey).Output()
+
+	if errl != nil {
+		println(errl.Error())
+	}
+
+	buildArg := "PRIVATE_RSA_KEY=" + string(key)
+
 	// Build image
-	err := docker.Exec("build", "-t", imageName, ".")
+	err := docker.Exec("build", "--build-arg", buildArg, "-t", imageName, ".")
 	if err != nil {
 		return errors.Wrapf(err, "command 'docker build -t %s failed", imageName)
 	}
@@ -92,6 +103,7 @@ func generateConfig(projectName, airflowHome string) (string, error) {
 		AirflowHome:          airflowHome,
 		AirflowUser:          "astro",
 		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
+		PrivateKey:           config.CFG.PrivateKey.GetString(),
 	}
 
 	buff := new(bytes.Buffer)
@@ -134,7 +146,7 @@ func createProject(projectName, airflowHome string) (project.APIProject, error) 
 }
 
 // Start starts a local airflow development cluster
-func Start(airflowHome string) error {
+func Start(airflowHome string, PrivateKey string) error {
 	// Get project name from config
 	projectName := config.CFG.ProjectName.GetString()
 
@@ -158,7 +170,7 @@ func Start(airflowHome string) error {
 			}
 		}
 
-		err = imageBuild(airflowHome, imageName(projectName, "latest"))
+		err = imageBuild(airflowHome, imageName(projectName, "latest"), PrivateKey)
 		if err != nil {
 			return err
 		}
@@ -169,7 +181,7 @@ func Start(airflowHome string) error {
 		}
 	} else {
 		// Build this project image
-		err = imageBuild(airflowHome, imageName(projectName, "latest"))
+		err = imageBuild(airflowHome, imageName(projectName, "latest"), PrivateKey)
 		if err != nil {
 			return err
 		}
@@ -394,7 +406,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	// Build our image
 	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
 
-	err = imageBuild(path, deployImage)
+	err = imageBuild(path, deployImage, config.CFG.PrivateKey.GetString())
 	if err != nil {
 		return err
 	}
