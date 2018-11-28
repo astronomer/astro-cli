@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/version"
 )
 
 func initDirs(root string, dirs []string) error {
@@ -68,8 +70,9 @@ func Init(path string) error {
 
 	// Map of files to create
 	files := map[string]string{
-		".dockerignore":             include.Dockerignore,
-		"Dockerfile":                include.Dockerfile,
+		".dockerignore": include.Dockerignore,
+		"Dockerfile": fmt.Sprintf(include.Dockerfile,
+			version.GetTagFromVersion()),
 		"packages.txt":              "",
 		"requirements.txt":          "",
 		"dags/example-dag.py":       include.Exampledag,

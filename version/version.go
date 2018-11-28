@@ -3,17 +3,23 @@ package version
 import (
 	"errors"
 	"fmt"
+	s "strings"
 
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
 )
 
 var (
-	api = github.NewGithubClient()
+	CurrVersion string
+	CurrCommit  string
+	api         = github.NewGithubClient()
 )
 
 // PrintVersion outputs current cli version and git commit if exists
-func PrintVersion(version, gitCommit string) error {
+func PrintVersion() error {
+	version := CurrVersion
+	gitCommit := CurrCommit
+
 	if !isValidVersion(version) {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
 	}
@@ -24,7 +30,9 @@ func PrintVersion(version, gitCommit string) error {
 }
 
 // CheckForUpdate checks current version against latest on github
-func CheckForUpdate(version, gitCommit string) error {
+func CheckForUpdate() error {
+	version := CurrVersion
+
 	if !isValidVersion(version) {
 		fmt.Println(messages.CLI_UNTAGGED_PROMPT)
 		fmt.Println(messages.CLI_INSTALL_CMD)
@@ -69,4 +77,14 @@ func isValidVersion(version string) bool {
 		return false
 	}
 	return true
+}
+
+func GetTagFromVersion() string {
+	version := CurrVersion
+
+	if !isValidVersion(version) || s.HasPrefix(version, "SNAPSHOT-") {
+		return "master-onbuild-1.9.0"
+	} else {
+		return fmt.Sprintf("%s-%s-onbuild", version, "1.9.0")
+	}
 }
