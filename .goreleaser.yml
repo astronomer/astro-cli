@@ -16,7 +16,7 @@ builds:
   goarm:
   - "6"
   main: .
-  ldflags: -s -w -X github.com/astronomerio/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomerio/astro-cli/version.CurrCommit={{ .Commit }}
+  ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
   binary: astro
   ignore:
     - goos: windows
