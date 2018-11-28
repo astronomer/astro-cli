@@ -233,7 +233,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return airflow.Start(config.WorkingPath)
+	return airflow.Start(config.WorkingPath, config.CFG.PrivateKey.GetString())
 }
 
 // Kill an airflow cluster
