@@ -27,7 +27,6 @@ pipeline:
   
   slack:
     image: plugins/slack
-    settings:
       webhook:
         from_secret: slack_webhook
       channel: engineering
