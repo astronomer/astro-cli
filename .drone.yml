@@ -25,10 +25,9 @@ pipeline:
     when:
       event: tag
   
-  slack:
+  notify:
     image: plugins/slack
-      webhook:
-        from_secret: slack_webhook
-      channel: engineering
+    secrets: [ slack_webhook ]
+    channel: engineering
     when:
       status: [ success, failure ]
