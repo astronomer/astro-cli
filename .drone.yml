@@ -13,7 +13,7 @@ pipeline:
   test:
     image: golang
     commands:
-      - make test
+      - exit 1
 
   # Cut releases with goreleaser when tagged
   push:
