@@ -6,9 +6,7 @@ import (
 )
 
 var (
-	currVersion string
-	currCommit  string
-	versionCmd  = &cobra.Command{
+	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "Astronomer CLI version",
 		Long:  "The astro-cli semantic version and git commit tied to that release.",
@@ -32,7 +30,7 @@ func printVersion(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	err := version.PrintVersion(currVersion, currCommit)
+	err := version.PrintVersion()
 	if err != nil {
 		return err
 	}
@@ -43,7 +41,7 @@ func upgradeCheck(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	err := version.CheckForUpdate(currVersion, currCommit)
+	err := version.CheckForUpdate()
 	if err != nil {
 		return err
 	}
