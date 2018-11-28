@@ -24,6 +24,7 @@ type cfgs struct {
 	ProjectDeployment cfg
 	ProjectWorkspace  cfg
 	WebserverPort     cfg
+	PrivateKey        cfg
 }
 
 // Creates a new cfg struct

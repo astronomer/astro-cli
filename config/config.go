@@ -51,6 +51,7 @@ var (
 		ProjectName:       newCfg("project.name", ""),
 		ProjectWorkspace:  newCfg("project.workspace", ""),
 		WebserverPort:     newCfg("webserver.port", "8080"),
+		PrivateKey:        newCfg("project.private_key", ""),
 	}
 
 	// viperHome is the viper object in the users home directory
