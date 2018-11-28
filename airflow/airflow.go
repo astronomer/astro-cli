@@ -10,9 +10,9 @@ import (
 
 	"github.com/iancoleman/strcase"
 
-	"github.com/astronomerio/astro-cli/airflow/include"
-	"github.com/astronomerio/astro-cli/messages"
-	"github.com/astronomerio/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/airflow/include"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 func initDirs(root string, dirs []string) error {

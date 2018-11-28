@@ -1,6 +1,6 @@
 workspace:
   base: /go
-  path: src/github.com/astronomerio/astro-cli
+  path: src/github.com/astronomer/astro-cli
 
 pipeline:
   # Build binary

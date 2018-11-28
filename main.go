@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/astronomerio/astro-cli/cmd"
+	"github.com/astronomer/astro-cli/cmd"
 )
 
 func main() {

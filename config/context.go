@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/astronomerio/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (

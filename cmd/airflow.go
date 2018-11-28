@@ -7,18 +7,18 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/astronomerio/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
 
-	"github.com/astronomerio/astro-cli/messages"
+	"github.com/astronomer/astro-cli/messages"
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomerio/astro-cli/airflow"
-	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/pkg/fileutil"
-	"github.com/astronomerio/astro-cli/pkg/git"
+	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/git"
 )
 
 var (

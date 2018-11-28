@@ -3,9 +3,9 @@ package deployment
 import (
 	"fmt"
 
-	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (

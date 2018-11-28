@@ -17,13 +17,13 @@ import (
 	"github.com/docker/libcompose/project/options"
 	"github.com/pkg/errors"
 
-	"github.com/astronomerio/astro-cli/airflow/include"
-	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/docker"
-	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/messages"
-	"github.com/astronomerio/astro-cli/pkg/input"
-	"github.com/astronomerio/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/airflow/include"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const (

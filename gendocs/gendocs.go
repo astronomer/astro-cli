@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/astronomerio/astro-cli/cmd"
+	"github.com/astronomer/astro-cli/cmd"
 	"github.com/spf13/cobra/doc"
 )
 

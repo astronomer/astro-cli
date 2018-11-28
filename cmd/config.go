@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/astronomerio/astro-cli/config"
-	"github.com/astronomerio/astro-cli/messages"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -71,7 +71,6 @@ func configGet(cmd *cobra.Command, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
 
 	if globalFlag {
 		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetHomeString())

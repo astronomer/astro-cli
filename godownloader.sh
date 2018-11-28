@@ -6,12 +6,12 @@ set -e
 usage() {
   this=$1
   cat <<EOF
-$this: download go binaries for astronomerio/astro-cli
+$this: download go binaries for astronomer/astro-cli
 
 Usage: $this [-b] bindir [tag]
   -b sets bindir or installation directory, Defaults to ./bin
    [tag] is a tag from
-   https://github.com/astronomerio/astro-cli/releases
+   https://github.com/astronomer/astro-cli/releases
    If tag is missing, then an attempt to find the latest will be found.
 
    Consider setting GITHUB_TOKEN to avoid triggering GitHub rate limits.
@@ -280,7 +280,7 @@ End of functions from https://github.com/client9/shlib
 ------------------------------------------------------------------------
 EOF
 
-OWNER=astronomerio
+OWNER=astronomer
 REPO=astro-cli
 BINARY=astro
 FORMAT=tar.gz

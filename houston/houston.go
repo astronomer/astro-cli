@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 	// "github.com/sirupsen/logrus"
 
-	"github.com/astronomerio/astro-cli/cluster"
-	"github.com/astronomerio/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI

@@ -23,7 +23,7 @@ func GetHomeDir() (string, error) {
 
 // FindDirInPath walks up the current directory looking for the .astro folder
 // TODO Deprecate if remains unused, removed due to
-// https://github.com/astronomerio/astro-cli/issues/103
+// https://github.com/astronomer/astro-cli/issues/103
 func FindDirInPath(search string) (string, error) {
 	// Start in our current directory
 	workingDir, err := GetWorkingDir()

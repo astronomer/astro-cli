@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/astronomerio/astro-cli/auth"
-	"github.com/astronomerio/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/auth"
+	"github.com/astronomer/astro-cli/cluster"
 	"github.com/spf13/cobra"
 )
 
@@ -70,7 +70,6 @@ func authLogout(cmd *cobra.Command, args []string) {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
 
 	auth.Logout(domain)
 }

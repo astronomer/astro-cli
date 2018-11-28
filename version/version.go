@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/astronomerio/astro-cli/messages"
-	"github.com/astronomerio/astro-cli/pkg/github"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/github"
 )
 
 var (
@@ -32,14 +32,14 @@ func CheckForUpdate(version, gitCommit string) error {
 	}
 
 	// fetch latest cli version
-	latestTagResp, err := api.RepoLatestRequest("astronomerio", "astro-cli")
+	latestTagResp, err := api.RepoLatestRequest("astronomer", "astro-cli")
 	if err != nil {
 		fmt.Println(err)
 		latestTagResp.TagName = messages.NA
 	}
 
 	// fetch meta data around current cli version
-	currentTagResp, err := api.RepoTagRequest("astronomerio", "astro-cli", string("v")+version)
+	currentTagResp, err := api.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
 	if err != nil {
 		fmt.Println("Release info not found, please upgrade.")
 		fmt.Println(messages.CLI_INSTALL_CMD)

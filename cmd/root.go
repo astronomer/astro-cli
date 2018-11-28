@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/astronomerio/astro-cli/config"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
 )
 

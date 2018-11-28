@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/astronomerio/astro-cli/user"
+	"github.com/astronomer/astro-cli/user"
 	"github.com/spf13/cobra"
 )
 
@@ -61,7 +61,7 @@ func init() {
 func userCreate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	
+
 	return user.Create(userEmail)
 }
 

@@ -3,11 +3,11 @@ package auth
 import (
 	"fmt"
 
-	"github.com/astronomerio/astro-cli/cluster"
-	"github.com/astronomerio/astro-cli/docker"
-	"github.com/astronomerio/astro-cli/houston"
-	"github.com/astronomerio/astro-cli/messages"
-	"github.com/astronomerio/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/pkg/errors"
 )
 
