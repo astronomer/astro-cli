@@ -24,3 +24,12 @@ pipeline:
       - goreleaser release --rm-dist
     when:
       event: tag
+  
+  slack:
+    image: plugins/slack
+    settings:
+      webhook:
+        from_secret: slack_webhook
+      channel: engineering
+    when:
+      status: [ success, failure ]
