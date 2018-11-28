@@ -30,4 +30,4 @@ pipeline:
     secrets: [ slack_webhook ]
     channel: engineering
     when:
-      status: [ success, failure ]
+      status: [ failure ]
