@@ -35,8 +35,9 @@ const (
 
 var (
 	tab = printutil.Table{
-		Padding: []int{5, 30, 30, 50},
-		Header:  []string{"#", "RELEASE NAME", "WORKSPACE", "DEPLOYMENT UUID"},
+		Padding:        []int{5, 30, 30, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "RELEASE NAME", "WORKSPACE", "DEPLOYMENT UUID"},
 	}
 )
 
@@ -363,7 +364,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		deployMap := map[string]houston.Deployment{}
 		for i, d := range deployments {
 			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), d.ReleaseName, w.Label, d.Id}, false)
+			tab.AddRow([]string{strconv.Itoa(index), d.Label, d.ReleaseName, w.Label, d.Id}, false)
 
 			deployMap[strconv.Itoa(index)] = d
 		}
