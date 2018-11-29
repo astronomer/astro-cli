@@ -37,7 +37,7 @@ var (
 	tab = printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
-		Header:         []string{"#", "RELEASE NAME", "WORKSPACE", "DEPLOYMENT UUID"},
+		Header:         []string{"#", "LABEL", "RELEASE NAME", "WORKSPACE", "DEPLOYMENT UUID"},
 	}
 )
 
