@@ -64,7 +64,7 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path string) error {
+func Init(path string, airflowVersion string) error {
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 
@@ -72,7 +72,7 @@ func Init(path string) error {
 	files := map[string]string{
 		".dockerignore": include.Dockerignore,
 		"Dockerfile": fmt.Sprintf(include.Dockerfile,
-			version.GetTagFromVersion()),
+			version.GetTagFromVersion(airflowVersion)),
 		"packages.txt":              "",
 		"requirements.txt":          "",
 		"dags/example-dag.py":       include.Exampledag,
