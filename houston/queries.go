@@ -18,7 +18,7 @@ var (
 	mutation CreateDeployment(
 		$label: String!
 		$type: String = "airflow"
-		$version: String = "1.9.0"
+		$version: String = "0.7.5"
 		$workspaceUuid: Uuid!
 	) {
 		createDeployment(
