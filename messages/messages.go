@@ -3,6 +3,7 @@ package messages
 var (
 	ERROR_INVALID_CLI_VERSION     = "Astronomer CLI version is not valid"
 	ERROR_GITHUB_JSON_MARSHALLING = "Failed to JSON decode Github response from %s"
+	ERROR_INVALID_AIRFLOW_VERSION = "Unsupported Airflow Version specified. Please choose from: %s \n"
 
 	CLI_CMD_DEPRECATE         = "Deprecated in favor of %s\n"
 	CLI_CURR_VERSION          = "Astro CLI Version: %s "

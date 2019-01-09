@@ -23,6 +23,7 @@ import (
 
 var (
 	projectName      string
+	airflowVersion   string
 	envFile          string
 	followLogs       bool
 	forceDeploy      bool
@@ -41,6 +42,7 @@ var (
 		Use:   "init",
 		Short: "Scaffold a new airflow project",
 		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
+		Args:  cobra.MaximumNArgs(1),
 		RunE:  airflowInit,
 	}
 
@@ -101,6 +103,7 @@ func init() {
 
 	// Airflow init
 	airflowInitCmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
+	airflowInitCmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
 	airflowRootCmd.AddCommand(airflowInitCmd)
 
 	// Airflow deploy
@@ -170,6 +173,12 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
+	acceptableAirflowVersions := []string{"1.9.0", "1.10.1"}
+
+	if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
+		return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
+	}
+
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
 	if !emtpyDir {
 		i, _ := input.InputConfirm(
@@ -190,7 +199,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	airflow.Init(config.WorkingPath)
+	airflow.Init(config.WorkingPath, airflowVersion)
 
 	if exists {
 		fmt.Printf(messages.CONFIG_REINIT_PROJECT_CONFIG+"\n", config.WorkingPath)
@@ -280,4 +289,13 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	return airflow.PS(config.WorkingPath)
+}
+
+func acceptableVersion(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
