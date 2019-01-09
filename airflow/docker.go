@@ -47,6 +47,7 @@ type ComposeConfig struct {
 	PostgresPassword     string
 	PostgresHost         string
 	PostgresPort         string
+	AirflowEnvFile       string
 	AirflowImage         string
 	AirflowHome          string
 	AirflowUser          string
@@ -78,7 +79,7 @@ func imageBuild(path, imageName string) error {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome string) (string, error) {
+func generateConfig(projectName, airflowHome string, envFile string) (string, error) {
 	tmpl, err := template.New("yml").Parse(include.Composeyml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
@@ -93,6 +94,7 @@ func generateConfig(projectName, airflowHome string) (string, error) {
 		AirflowHome:          airflowHome,
 		AirflowUser:          "astro",
 		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
+		AirflowEnvFile:       envFile,
 	}
 
 	buff := new(bytes.Buffer)
@@ -115,9 +117,12 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome string) (project.APIProject, error) {
+func createProject(projectName, airflowHome string, envFile string) (project.APIProject, error) {
+	if envFile == "" {
+		envFile = ".env"
+	}
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome)
+	yaml, err := generateConfig(projectName, airflowHome, envFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
@@ -135,12 +140,12 @@ func createProject(projectName, airflowHome string) (project.APIProject, error) 
 }
 
 // Start starts a local airflow development cluster
-func Start(airflowHome string) error {
+func Start(airflowHome string, envFile string) error {
 	// Get project name from config
 	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome, envFile)
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
@@ -192,7 +197,7 @@ func Kill(airflowHome string) error {
 	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome, "")
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
@@ -214,7 +219,7 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 	projectName := config.CFG.ProjectName.GetString()
 
 	// Create libcompose project
-	project, err := createProject(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome, "")
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
@@ -249,7 +254,7 @@ func Stop(airflowHome string) error {
 	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome, "")
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
@@ -269,7 +274,7 @@ func PS(airflowHome string) error {
 	projectName := config.CFG.ProjectName.GetString()
 
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome)
+	project, err := createProject(projectName, airflowHome, "")
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
 	}
