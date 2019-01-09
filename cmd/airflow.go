@@ -24,6 +24,7 @@ import (
 var (
 	projectName      string
 	airflowVersion   string
+	envFile          string
 	followLogs       bool
 	forceDeploy      bool
 	forcePrompt      bool
@@ -58,6 +59,7 @@ var (
 		Use:     "start",
 		Short:   "Start a development airflow cluster",
 		Long:    "Start a development airflow cluster",
+		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStart,
 	}
@@ -113,6 +115,7 @@ func init() {
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
+	airflowStartCmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 
 	// Airflow kill
 	airflowRootCmd.AddCommand(airflowKillCmd)
@@ -242,7 +245,12 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return airflow.Start(config.WorkingPath)
+	// Get release name from args, if passed
+	if len(args) > 0 {
+		envFile = args[0]
+	}
+
+	return airflow.Start(config.WorkingPath, envFile)
 }
 
 // Kill an airflow cluster

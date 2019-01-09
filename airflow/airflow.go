@@ -75,6 +75,7 @@ func Init(path string, airflowVersion string) error {
 			version.GetTagFromVersion(airflowVersion)),
 		"packages.txt":              "",
 		"requirements.txt":          "",
+		".env":                      "",
 		"dags/example-dag.py":       include.Exampledag,
 		"plugins/example-plugin.py": include.ExamplePlugin,
 	}

@@ -1,6 +1,6 @@
 # Astronomer CLI
 
-The Astronomer CLI is the recommended way to get started developing and deploying Airflow projects to Astronomer Enterprise Edition.
+The Astronomer CLI can be used to build Airflow DAGs locally and run them via Docker-Compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
 
 ## Install
 
