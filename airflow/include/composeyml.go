@@ -52,7 +52,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
     env_file:
-           - {{ .AirflowEnvFile }}
+      - {{ .AirflowEnvFile }}
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
@@ -81,7 +81,7 @@ services:
     ports:
       - {{ .AirflowWebserverPort }}:8080
     env_file:
-           - {{ .AirflowEnvFile }}
+      - {{ .AirflowEnvFile }}
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
