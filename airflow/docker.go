@@ -284,19 +284,19 @@ func Start(airflowHome string, envFile string) error {
 				if len(pool.PoolName) == 0 && pool.PoolSlot > 0 {
 					fmt.Print("Skipping Pool Creation: No Pool Name Specified.")
 				} else {
-				airflowCommand := fmt.Sprintf("airflow pool -s \"%s\" \"%s\" \"%s\"", pool.PoolName, pool.PoolSlot, pool.PoolDescription)
-				cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
-				cmd.Stdin = os.Stdin
-				cmd.Stderr = os.Stderr
-				if cmdErr := cmd.Run(); cmdErr != nil {
-					return errors.Wrapf(cmdErr, "Error adding %s Pool", pool.PoolName)
-				} else {
-					fmt.Printf("Added Pool: %s\n", pool.PoolName)
+					airflowCommand := fmt.Sprintf("airflow pool -s \"%s\" \"%v\" \"%s\"", pool.PoolName, pool.PoolSlot, pool.PoolDescription)
+					cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
+					cmd.Stdin = os.Stdin
+					cmd.Stderr = os.Stderr
+					if cmdErr := cmd.Run(); cmdErr != nil {
+						return errors.Wrapf(cmdErr, "Error adding %s Pool", pool.PoolName)
+					} else {
+						fmt.Printf("Added Pool: %s\n", pool.PoolName)
+					}
 				}
 			}
 		}
 	}
-
 	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 	return nil
