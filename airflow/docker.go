@@ -248,39 +248,51 @@ func Start(airflowHome string, envFile string) error {
 		if strings.Contains(info["Name"], "scheduler") {
 			for _, conn := range settings.Airflow.Connections {
 
-				airflowCommand := fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnUri, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
-				cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
-				cmd.Stdin = os.Stdin
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if cmdErr := cmd.Run(); cmdErr != nil {
-					return errors.Wrapf(cmdErr, "Error adding %s Connection", conn.ConnID)
+				if len(conn.ConnID) == 0 {
+					fmt.Print("Skipping Connection: Conn ID must be specified.")
+				} else if len(conn.ConnType) == 0 && len(conn.ConnUri) == 0 {
+					fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
 				} else {
-					fmt.Printf("Added Connection: %s\n", conn.ConnID)
+					airflowCommand := fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnUri, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
+					cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
+					cmd.Stdin = os.Stdin
+					cmd.Stderr = os.Stderr
+					if cmdErr := cmd.Run(); cmdErr != nil {
+						return errors.Wrapf(cmdErr, "Error adding %s Connection", conn.ConnID)
+					} else {
+						fmt.Printf("Added Connection: %s\n", conn.ConnID)
+					}
 				}
-
 			}
 			for _, variable := range settings.Airflow.Variables {
-				fmt.Printf("Adding New Variable: %s\n", variable.VariableName)
-				airflowCommand := fmt.Sprintf("airflow variables -s \"%s\" \"%s\"", variable.VariableName, variable.VariableValue)
-				cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
-				cmd.Stdin = os.Stdin
-				cmd.Stderr = os.Stderr
-				if cmdErr := cmd.Run(); cmdErr != nil {
-					return errors.Wrapf(cmdErr, "failed to execute variable cmd")
-				}
+				if len(variable.VariableName) == 0 && len(variable.VariableValue) > 0 {
+					fmt.Print("Skipping Variable Creation: No Variable Name Specified.")
 
+				} else {
+					airflowCommand := fmt.Sprintf("airflow variables -s \"%s\" \"%s\"", variable.VariableName, variable.VariableValue)
+					cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
+					cmd.Stdin = os.Stdin
+					cmd.Stderr = os.Stderr
+					if cmdErr := cmd.Run(); cmdErr != nil {
+						return errors.Wrapf(cmdErr, "Error adding %s Variable", variable.VariableName)
+					} else {
+						fmt.Printf("Added Variable: %s\n", variable.VariableName)
+					}
+				}
 			}
 			for _, pool := range settings.Airflow.Pools {
-				fmt.Printf("Adding New Pool: %s\n", pool.PoolName)
+				if len(pool.PoolName) == 0 && pool.PoolSlot > 0 {
+					fmt.Print("Skipping Pool Creation: No Pool Name Specified.")
+				} else {
 				airflowCommand := fmt.Sprintf("airflow pool -s \"%s\" \"%s\" \"%s\"", pool.PoolName, pool.PoolSlot, pool.PoolDescription)
 				cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
 				cmd.Stdin = os.Stdin
 				cmd.Stderr = os.Stderr
 				if cmdErr := cmd.Run(); cmdErr != nil {
-					return errors.Wrapf(cmdErr, "failed to execute pool cmd")
+					return errors.Wrapf(cmdErr, "Error adding %s Pool", pool.PoolName)
+				} else {
+					fmt.Printf("Added Pool: %s\n", pool.PoolName)
 				}
-
 			}
 		}
 	}
