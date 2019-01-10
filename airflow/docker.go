@@ -248,9 +248,7 @@ func Start(airflowHome string, envFile string) error {
 		if strings.Contains(info["Name"], "scheduler") {
 			for _, conn := range settings.Airflow.Connections {
 
-				if len(conn.ConnID) == 0 {
-					fmt.Print("Skipping Connection: Conn ID must be specified.")
-				} else if len(conn.ConnType) == 0 && len(conn.ConnUri) == 0 {
+				if len(conn.ConnID) > 0 && len(conn.ConnType) == 0 && len(conn.ConnUri) == 0 {
 					fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
 				} else {
 					airflowCommand := fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnUri, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
