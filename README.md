@@ -6,7 +6,7 @@ The Astronomer CLI can be used to build Airflow DAGs locally and run them via Do
 
 - via `curl`
     ```
-    curl -sSL https://install.astronomer.io | sudo bash
+    curl -sSL https://install.astronomer.io | sudo bash -s --v0.7.5
     ```
 
 ### Previous Versions
