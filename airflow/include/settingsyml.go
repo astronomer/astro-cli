@@ -2,7 +2,10 @@ package include
 
 import "strings"
 
+// Settingsyml is the settings template
 var Settingsyml = strings.TrimSpace(`
+  # This feature is in Beta.
+  # Please report any bugs to https://github.com/astronomer/astro-cli/issues
   airflow:
     connections:
       - conn_id:
