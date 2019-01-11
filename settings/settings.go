@@ -32,7 +32,7 @@ var (
 	settings Config
 )
 
-// ConfigSettings is a thing
+// ConfigSettings is the main builder of the settings package
 func ConfigSettings(id string) {
 	InitSettings()
 	AddVariables(id)
