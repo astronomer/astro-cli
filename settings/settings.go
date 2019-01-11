@@ -37,9 +37,9 @@ var (
 // ConfigSettings is the main builder of the settings package
 func ConfigSettings(id string) {
 	InitSettings()
-	AddVariables(id)
 	AddConnections(id)
 	AddPools(id)
+	AddVariables(id)
 }
 
 // InitSettings initializes settings file
@@ -58,7 +58,9 @@ func InitSettings() {
 	if readErr != nil {
 		fmt.Printf(messages.CONFIG_READ_ERROR, readErr)
 	}
+
 	err := viperSettings.Unmarshal(&settings)
+
 	if err != nil {
 		errors.Wrap(err, "unable to decode into struct")
 	}
@@ -96,7 +98,8 @@ func AddConnections(id string) {
 				airflowCommand = fmt.Sprintf("airflow connections -d --conn_id \"%s\"", conn.ConnID)
 				AirflowCommand(id, airflowCommand)
 			}
-			airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnURI, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
+			airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra '%s' --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnURI, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
+			fmt.Println(airflowCommand)
 			AirflowCommand(id, airflowCommand)
 			fmt.Printf("Added Connection: %s\n", conn.ConnID)
 		}
