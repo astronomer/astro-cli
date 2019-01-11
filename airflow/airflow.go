@@ -76,6 +76,7 @@ func Init(path string, airflowVersion string) error {
 		"packages.txt":              "",
 		"requirements.txt":          "",
 		".env":                      "",
+		"settings.yaml":             include.Settingsyml,
 		"dags/example-dag.py":       include.Exampledag,
 		"plugins/example-plugin.py": include.ExamplePlugin,
 	}

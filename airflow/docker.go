@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/settings"
 )
 
 const (
@@ -185,7 +186,20 @@ func Start(airflowHome string, envFile string) error {
 		if err != nil {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
+
 	}
+
+	psInfo, err = project.Ps(context.Background())
+	if err != nil {
+		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
+	}
+
+	for _, info := range psInfo {
+		if strings.Contains(info["Name"], "scheduler") {
+			settings.ConfigSettings(info["Id"])
+		}
+	}
+
 	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 	return nil
