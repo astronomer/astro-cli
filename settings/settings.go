@@ -2,9 +2,11 @@ package settings
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -63,7 +65,7 @@ func InitSettings() {
 }
 
 // AddVariables is a function to add Variables from settings.yaml
-func AddVariables(id string) error {
+func AddVariables(id string) (string, error) {
 	variables := settings.Airflow.Variables
 
 	for _, variable := range variables {
@@ -72,53 +74,80 @@ func AddVariables(id string) error {
 
 		} else {
 			airflowCommand := fmt.Sprintf("airflow variables -s \"%s\" \"%s\"", variable.VariableName, variable.VariableValue)
-			AirflowCommand(id, airflowCommand)
+			out, err := AirflowCommand(id, airflowCommand)
+			if err != nil {
+				return "", err
+			}
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
+			return out, nil
+
 		}
 	}
-	return nil
+	return "", nil
 }
 
 // AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string) error {
+func AddConnections(id string) (string, error) {
 	connections := settings.Airflow.Connections
-
+	airflowCommand := fmt.Sprintf("airflow connections -l")
+	out, err := AirflowCommand(id, airflowCommand)
+	if err != nil {
+		return "", err
+	}
 	for _, conn := range connections {
 		if len(conn.ConnID) > 0 && len(conn.ConnType) == 0 && len(conn.ConnURI) == 0 {
 			fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
 		} else {
-			airflowCommand := fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnURI, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
-			AirflowCommand(id, airflowCommand)
+			quotedConnID := "'" + conn.ConnID + "'"
+			if strings.Contains(out, quotedConnID) {
+				fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
+				airflowCommand = fmt.Sprintf("airflow connections -d --conn_id \"%s\"", conn.ConnID)
+				_, err = AirflowCommand(id, airflowCommand)
+				if err != nil {
+					return "", err
+				}
+			}
+			airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnURI, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
+			_, err = AirflowCommand(id, airflowCommand)
+			if err != nil {
+				return "", err
+			}
 			fmt.Printf("Added Connection: %s\n", conn.ConnID)
 		}
 	}
-	return nil
+	return "", nil
 }
 
 // AddPools  is a function to add Pools from settings.yaml
-func AddPools(id string) error {
+func AddPools(id string) (string, error) {
 	pools := settings.Airflow.Pools
-
 	for _, pool := range pools {
 		if len(pool.PoolName) == 0 && pool.PoolSlot > 0 {
 			fmt.Print("Skipping Pool Creation: No Pool Name Specified.")
 		} else {
 			airflowCommand := fmt.Sprintf("airflow pool -s \"%s\" \"%v\" \"%s\"", pool.PoolName, pool.PoolSlot, pool.PoolDescription)
-			AirflowCommand(id, airflowCommand)
+			_, err := AirflowCommand(id, airflowCommand)
+			if err != nil {
+				return "", err
+			}
 			fmt.Printf("Added Pool: %s\n", pool.PoolName)
 		}
 	}
-	return nil
+	return "", nil
 }
 
 // AirflowCommand is the main method of interaction with Airflow
-func AirflowCommand(id string, airflowCommand string) error {
+func AirflowCommand(id string, airflowCommand string) (string, error) {
 	cmd := exec.Command("docker", "exec", "-it", id, "bash", "-c", airflowCommand)
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if cmdErr := cmd.Run(); cmdErr != nil {
-		return errors.Wrap(cmdErr, "Error issuing airflow command")
+
+	out, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
 	}
-	return nil
+
+	stringOut := string(out)
+
+	return stringOut, err
 }
