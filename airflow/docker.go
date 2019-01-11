@@ -5,10 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -19,7 +16,6 @@ import (
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
 	"github.com/pkg/errors"
-	yaml "gopkg.in/yaml.v2"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
@@ -28,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/settings"
 )
 
 const (
@@ -56,32 +53,6 @@ type ComposeConfig struct {
 	AirflowHome          string
 	AirflowUser          string
 	AirflowWebserverPort string
-}
-
-// SettingsConfig is input data to generate connections, pools, and variables
-type SettingsConfig struct {
-	Airflow struct {
-		Connections []struct {
-			ConnID       string `yaml:"conn_id"`
-			ConnType     string `yaml:"conn_type"`
-			ConnHost     string `yaml:"conn_host"`
-			ConnSchema   string `yaml:"conn_schema"`
-			ConnLogin    string `yaml:"conn_login"`
-			ConnPassword string `yaml:"conn_password"`
-			ConnPort     int    `yaml:"conn_port"`
-			ConnUri      string `yaml:"conn_uri"`
-			ConnExtra    string `yaml:"conn_extra"`
-		} `yaml:"connections"`
-		Pools []struct {
-			PoolName        string `yaml:"pool_name"`
-			PoolSlot        int    `yaml:"pool_slot"`
-			PoolDescription string `yaml:"pool_description"`
-		} `yaml:"pools"`
-		Variables []struct {
-			VariableName  string `yaml:"variable_name"`
-			VariableValue string `yaml:"variable_value"`
-		} `yaml:"variables"`
-	} `yaml:"airflow"`
 }
 
 // repositoryName creates an airflow repository name
@@ -134,25 +105,6 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 	}
 
 	return buff.String(), nil
-}
-
-func generateSettings() (SettingsConfig, error) {
-	var settings SettingsConfig
-	file := filepath.Join(config.WorkingPath, "settings.yaml")
-
-	buff, err := ioutil.ReadFile(file)
-
-	if err != nil {
-		return settings, errors.Wrap(err, "failed to read settings file")
-	}
-
-	err = yaml.Unmarshal(buff, &settings)
-
-	if err != nil {
-		return settings, errors.Wrap(err, "failed to generate settings")
-	}
-
-	return settings, nil
 }
 
 func checkServiceState(serviceState, expectedState string) bool {
@@ -236,65 +188,18 @@ func Start(airflowHome string, envFile string) error {
 		}
 
 	}
-	settings, err := generateSettings()
-	if err != nil {
-		return errors.Wrap(err, "failed to create project")
-	}
+
 	psInfo, err = project.Ps(context.Background())
 	if err != nil {
 		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
+
 	for _, info := range psInfo {
 		if strings.Contains(info["Name"], "scheduler") {
-			for _, conn := range settings.Airflow.Connections {
-
-				if len(conn.ConnID) > 0 && len(conn.ConnType) == 0 && len(conn.ConnUri) == 0 {
-					fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
-				} else {
-					airflowCommand := fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra \"%s\" --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnUri, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
-					cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
-					cmd.Stdin = os.Stdin
-					cmd.Stderr = os.Stderr
-					if cmdErr := cmd.Run(); cmdErr != nil {
-						return errors.Wrapf(cmdErr, "Error adding %s Connection", conn.ConnID)
-					} else {
-						fmt.Printf("Added Connection: %s\n", conn.ConnID)
-					}
-				}
-			}
-			for _, variable := range settings.Airflow.Variables {
-				if len(variable.VariableName) == 0 && len(variable.VariableValue) > 0 {
-					fmt.Print("Skipping Variable Creation: No Variable Name Specified.")
-
-				} else {
-					airflowCommand := fmt.Sprintf("airflow variables -s \"%s\" \"%s\"", variable.VariableName, variable.VariableValue)
-					cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
-					cmd.Stdin = os.Stdin
-					cmd.Stderr = os.Stderr
-					if cmdErr := cmd.Run(); cmdErr != nil {
-						return errors.Wrapf(cmdErr, "Error adding %s Variable", variable.VariableName)
-					} else {
-						fmt.Printf("Added Variable: %s\n", variable.VariableName)
-					}
-				}
-			}
-			for _, pool := range settings.Airflow.Pools {
-				if len(pool.PoolName) == 0 && pool.PoolSlot > 0 {
-					fmt.Print("Skipping Pool Creation: No Pool Name Specified.")
-				} else {
-					airflowCommand := fmt.Sprintf("airflow pool -s \"%s\" \"%v\" \"%s\"", pool.PoolName, pool.PoolSlot, pool.PoolDescription)
-					cmd := exec.Command("docker", "exec", "-it", info["Id"], "bash", "-c", airflowCommand)
-					cmd.Stdin = os.Stdin
-					cmd.Stderr = os.Stderr
-					if cmdErr := cmd.Run(); cmdErr != nil {
-						return errors.Wrapf(cmdErr, "Error adding %s Pool", pool.PoolName)
-					} else {
-						fmt.Printf("Added Pool: %s\n", pool.PoolName)
-					}
-				}
-			}
+			settings.ConfigSettings(info["Id"])
 		}
 	}
+
 	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 	return nil
