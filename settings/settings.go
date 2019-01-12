@@ -2,7 +2,6 @@ package settings
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +53,7 @@ func InitSettings() {
 
 	// Read in project config
 	readErr := viperSettings.ReadInConfig()
-	// fmt.Println(viperSettings.Get("airflow"))
+
 	if readErr != nil {
 		fmt.Printf(messages.CONFIG_READ_ERROR, readErr)
 	}
@@ -71,13 +70,20 @@ func AddVariables(id string) {
 	variables := settings.Airflow.Variables
 
 	for _, variable := range variables {
-		if len(variable.VariableName) == 0 && len(variable.VariableValue) > 0 {
-			fmt.Print("Skipping Variable Creation: No Variable Name Specified.")
-
+		if !objectValidator(0, variable.VariableName) {
+			if objectValidator(0, variable.VariableValue) {
+				fmt.Print("Skipping Variable Creation: No Variable Name Specified.")
+			}
 		} else {
-			airflowCommand := fmt.Sprintf("airflow variables -s \"%s\" \"%s\"", variable.VariableName, variable.VariableValue)
-			AirflowCommand(id, airflowCommand)
-			fmt.Printf("Added Variable: %s\n", variable.VariableName)
+			if objectValidator(0, variable.VariableValue) {
+
+				airflowCommand := fmt.Sprintf("airflow variables -s %s ", variable.VariableName)
+
+				airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
+
+				AirflowCommand(id, airflowCommand)
+				fmt.Printf("Added Variable: %s\n", variable.VariableName)
+			}
 		}
 	}
 }
@@ -89,19 +95,47 @@ func AddConnections(id string) {
 	out := AirflowCommand(id, airflowCommand)
 
 	for _, conn := range connections {
-		if len(conn.ConnID) > 0 && len(conn.ConnType) == 0 && len(conn.ConnURI) == 0 {
-			fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
-		} else {
+		if objectValidator(0, conn.ConnID) {
 			quotedConnID := "'" + conn.ConnID + "'"
+
 			if strings.Contains(out, quotedConnID) {
 				fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
 				airflowCommand = fmt.Sprintf("airflow connections -d --conn_id \"%s\"", conn.ConnID)
 				AirflowCommand(id, airflowCommand)
 			}
-			airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\" --conn_type \"%s\" --conn_uri \"%s\" --conn_extra '%s' --conn_host  \"%s\" --conn_login \"%s\" --conn_password \"%s\" --conn_schema \"%s\" --conn_port \"%v\"", conn.ConnID, conn.ConnType, conn.ConnURI, conn.ConnExtra, conn.ConnHost, conn.ConnLogin, conn.ConnPassword, conn.ConnSchema, conn.ConnPort)
-			fmt.Println(airflowCommand)
-			AirflowCommand(id, airflowCommand)
-			fmt.Printf("Added Connection: %s\n", conn.ConnID)
+
+			if !objectValidator(1, conn.ConnType, conn.ConnURI) {
+				fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
+			} else {
+				airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\"", conn.ConnID)
+				if objectValidator(0, conn.ConnType) {
+					airflowCommand += fmt.Sprintf("--conn_type '%s' ", conn.ConnType)
+				}
+				if objectValidator(0, conn.ConnURI) {
+					airflowCommand += fmt.Sprintf("--conn_uri '%s' ", conn.ConnURI)
+				}
+				if objectValidator(0, conn.ConnExtra) {
+					airflowCommand += fmt.Sprintf("--conn_extra '%s' ", conn.ConnExtra)
+				}
+				if objectValidator(0, conn.ConnHost) {
+					airflowCommand += fmt.Sprintf("--conn_host '%s' ", conn.ConnHost)
+				}
+				if objectValidator(0, conn.ConnLogin) {
+					airflowCommand += fmt.Sprintf("--conn_login '%s' ", conn.ConnLogin)
+				}
+				if objectValidator(0, conn.ConnPassword) {
+					airflowCommand += fmt.Sprintf("--conn_password '%s' ", conn.ConnPassword)
+				}
+				if objectValidator(0, conn.ConnSchema) {
+					airflowCommand += fmt.Sprintf("--conn_schema '%s' ", conn.ConnSchema)
+				}
+				if conn.ConnPort != 0 {
+					airflowCommand += fmt.Sprintf("--conn_port %v", conn.ConnPort)
+				}
+
+				AirflowCommand(id, airflowCommand)
+				fmt.Printf("Added Connection: %s\n", conn.ConnID)
+			}
 		}
 	}
 }
@@ -110,10 +144,19 @@ func AddConnections(id string) {
 func AddPools(id string) {
 	pools := settings.Airflow.Pools
 	for _, pool := range pools {
-		if len(pool.PoolName) == 0 && pool.PoolSlot > 0 {
-			fmt.Print("Skipping Pool Creation: No Pool Name Specified.")
-		} else {
-			airflowCommand := fmt.Sprintf("airflow pool -s \"%s\" \"%v\" \"%s\"", pool.PoolName, pool.PoolSlot, pool.PoolDescription)
+		if objectValidator(0, pool.PoolName) {
+			airflowCommand := fmt.Sprintf("airflow pool -s %s", pool.PoolName)
+			if pool.PoolSlot != 0 {
+				airflowCommand += fmt.Sprintf(" %v", pool.PoolSlot)
+				if objectValidator(0, pool.PoolDescription) {
+					airflowCommand += " " + pool.PoolDescription
+				} else {
+					airflowCommand += "\" \""
+				}
+			} else {
+				fmt.Print("Pool Slot must be set")
+			}
+
 			AirflowCommand(id, airflowCommand)
 			fmt.Printf("Added Pool: %s\n", pool.PoolName)
 		}
@@ -127,11 +170,25 @@ func AirflowCommand(id string, airflowCommand string) string {
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
+
 	if err != nil {
-		log.Fatal(err)
+		errors.Wrapf(err, "error encountered")
 	}
 
 	stringOut := string(out)
 
 	return stringOut
+}
+
+func objectValidator(bound int, args ...string) bool {
+	count := 0
+	for _, arg := range args {
+		if len(arg) == 0 {
+			count++
+		}
+	}
+	if count > bound {
+		return false
+	}
+	return true
 }
