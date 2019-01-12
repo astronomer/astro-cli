@@ -145,20 +145,19 @@ func AddPools(id string) {
 	pools := settings.Airflow.Pools
 	for _, pool := range pools {
 		if objectValidator(0, pool.PoolName) {
-			airflowCommand := fmt.Sprintf("airflow pool -s %s", pool.PoolName)
+			airflowCommand := fmt.Sprintf("airflow pool -s %s ", pool.PoolName)
 			if pool.PoolSlot != 0 {
-				airflowCommand += fmt.Sprintf(" %v", pool.PoolSlot)
+				airflowCommand += fmt.Sprintf("%v ", pool.PoolSlot)
 				if objectValidator(0, pool.PoolDescription) {
-					airflowCommand += " " + pool.PoolDescription
+					airflowCommand += fmt.Sprintf("%s ", pool.PoolDescription)
 				} else {
-					airflowCommand += "\" \""
+					airflowCommand += fmt.Sprint("\"\"")
 				}
+				AirflowCommand(id, airflowCommand)
+				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
-				fmt.Print("Pool Slot must be set")
+				fmt.Printf("Pool Not Added: %s -- Pool Slot must be set\n", pool.PoolName)
 			}
-
-			AirflowCommand(id, airflowCommand)
-			fmt.Printf("Added Pool: %s\n", pool.PoolName)
 		}
 	}
 }
