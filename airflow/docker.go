@@ -200,7 +200,8 @@ func Start(airflowHome string, envFile string) error {
 		}
 	}
 
-	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
+	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
+	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", parts[len(parts)-1])
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 	return nil
 }
