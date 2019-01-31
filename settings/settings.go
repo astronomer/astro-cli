@@ -72,7 +72,7 @@ func AddVariables(id string) {
 	for _, variable := range variables {
 		if !objectValidator(0, variable.VariableName) {
 			if objectValidator(0, variable.VariableValue) {
-				fmt.Print("Skipping Variable Creation: No Variable Name Specified.")
+				fmt.Print("Skipping Variable Creation: No Variable Name Specified.\n")
 			}
 		} else {
 			if objectValidator(0, variable.VariableValue) {
@@ -105,7 +105,7 @@ func AddConnections(id string) {
 			}
 
 			if !objectValidator(1, conn.ConnType, conn.ConnURI) {
-				fmt.Printf("Skipping %s: ConnType or ConnUri must be specified.", conn.ConnID)
+				fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
 			} else {
 				airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\"", conn.ConnID)
 				if objectValidator(0, conn.ConnType) {
@@ -156,7 +156,7 @@ func AddPools(id string) {
 				AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
-				fmt.Printf("Pool Not Added: %s -- Pool Slot must be set\n", pool.PoolName)
+				fmt.Printf("Skipping %s: Pool Slot must be set.", pool.PoolName)
 			}
 		}
 	}
