@@ -49,3 +49,20 @@ func ExecLogin(registry, username, password string) error {
 
 	return cmd.Run()
 }
+
+// AirflowCommand is the main method of interaction with Airflow
+func AirflowCommand(id string, airflowCommand string) string {
+	cmd := exec.Command("docker", "exec", "-it", id, "bash", "-c", "airflow", airflowCommand)
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+
+	out, err := cmd.Output()
+
+	if err != nil {
+		errors.Wrapf(err, "error encountered")
+	}
+
+	stringOut := string(out)
+
+	return stringOut
+}

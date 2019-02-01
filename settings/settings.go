@@ -2,11 +2,10 @@ package settings
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
@@ -81,7 +80,7 @@ func AddVariables(id string) {
 
 				airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 
-				AirflowCommand(id, airflowCommand)
+				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Variable: %s\n", variable.VariableName)
 			}
 		}
@@ -92,7 +91,7 @@ func AddVariables(id string) {
 func AddConnections(id string) {
 	connections := settings.Airflow.Connections
 	airflowCommand := fmt.Sprintf("connections -l")
-	out := AirflowCommand(id, airflowCommand)
+	out := docker.AirflowCommand(id, airflowCommand)
 
 	for _, conn := range connections {
 		if objectValidator(0, conn.ConnID) {
@@ -101,7 +100,7 @@ func AddConnections(id string) {
 			if strings.Contains(out, quotedConnID) {
 				fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
 				airflowCommand = fmt.Sprintf("connections -d --conn_id \"%s\"", conn.ConnID)
-				AirflowCommand(id, airflowCommand)
+				docker.AirflowCommand(id, airflowCommand)
 			}
 
 			if !objectValidator(1, conn.ConnType, conn.ConnURI) {
@@ -133,7 +132,7 @@ func AddConnections(id string) {
 					airflowCommand += fmt.Sprintf("--conn_port %v", conn.ConnPort)
 				}
 
-				AirflowCommand(id, airflowCommand)
+				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Connection: %s\n", conn.ConnID)
 			}
 		}
@@ -153,30 +152,13 @@ func AddPools(id string) {
 				} else {
 					airflowCommand += fmt.Sprint("\"\"")
 				}
-				AirflowCommand(id, airflowCommand)
+				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.", pool.PoolName)
 			}
 		}
 	}
-}
-
-// AirflowCommand is the main method of interaction with Airflow
-func AirflowCommand(id string, airflowCommand string) string {
-	cmd := exec.Command("docker", "exec", "-it", id, "bash", "-c", "airflow", airflowCommand)
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-
-	out, err := cmd.Output()
-
-	if err != nil {
-		errors.Wrapf(err, "error encountered")
-	}
-
-	stringOut := string(out)
-
-	return stringOut
 }
 
 func objectValidator(bound int, args ...string) bool {
