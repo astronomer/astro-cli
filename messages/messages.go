@@ -42,7 +42,7 @@ var (
 	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:%s/admin/"
 	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:%s/postgres"
 
-	ENV_PATH      = "Error looking for .env"
+	ENV_PATH      = "Error looking for \"%s\""
 	ENV_FOUND     = "Env file \"%s\" found. Loading...\n"
 	ENV_NOT_FOUND = "Env file \"%s\" not found. Skipping...\n"
 

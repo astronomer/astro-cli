@@ -90,7 +90,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 	envExists, err := fileutil.Exists(envFile)
 
 	if err != nil {
-		return "", errors.Wrap(err, messages.ENV_PATH)
+		return "", errors.Wrap(err, fmt.Sprintf(messages.ENV_PATH, envFile))
 	}
 
 	if envFile != "" {
