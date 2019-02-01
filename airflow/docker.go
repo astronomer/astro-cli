@@ -87,6 +87,22 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 		return "", errors.Wrap(err, "failed to generate config")
 	}
 
+	envExists, err := fileutil.Exists(envFile)
+
+	if err != nil {
+		return "", errors.Wrap(err, messages.ENV_PATH)
+	}
+
+	if envFile != "" {
+		if !envExists {
+			fmt.Printf(messages.ENV_NOT_FOUND, envFile)
+			envFile = ""
+		} else {
+			fmt.Printf(messages.ENV_FOUND, envFile)
+			envFile = fmt.Sprintf("env_file: %s", envFile)
+		}
+	}
+
 	config := ComposeConfig{
 		PostgresUser:         config.CFG.PostgresUser.GetString(),
 		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
@@ -120,9 +136,6 @@ func checkServiceState(serviceState, expectedState string) bool {
 
 // createProject creates project with yaml config as context
 func createProject(projectName, airflowHome string, envFile string) (project.APIProject, error) {
-	if envFile == "" {
-		envFile = ".env"
-	}
 	// Generate the docker-compose yaml
 	yaml, err := generateConfig(projectName, airflowHome, envFile)
 	if err != nil {
@@ -278,7 +291,6 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 func Stop(airflowHome string) error {
 	// Get project name from config
 	projectName := config.CFG.ProjectName.GetString()
-
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, "")
 	if err != nil {
