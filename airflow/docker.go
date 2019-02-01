@@ -194,8 +194,10 @@ func Start(airflowHome string, envFile string) error {
 		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
 
+	fmt.Print()
+
 	for _, info := range psInfo {
-		if strings.Contains(info["Name"], "scheduler") {
+		if strings.Contains(info["Name"], fmt.Sprintf("%s_scheduler", projectName)) {
 			settings.ConfigSettings(info["Id"])
 		}
 	}
