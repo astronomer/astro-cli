@@ -58,5 +58,7 @@ var (
 	REGISTRY_AUTH_FAIL           = "Failed to authenticate to the registry, this can occur when registry is offline. Until authenticated you will not be able to push new images to your Airflow clusters\n"
 	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy."
 
+	SETTINGS_PATH = "Error looking for settings.yaml"
+
 	NA = "N/A"
 )

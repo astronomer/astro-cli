@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/settings"
@@ -194,12 +195,20 @@ func Start(airflowHome string, envFile string) error {
 		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
 
-	fmt.Print()
+	fileState, err := fileutil.Exists("settings.yaml")
 
-	for _, info := range psInfo {
-		if strings.Contains(info["Name"], fmt.Sprintf("%s_scheduler", projectName)) {
-			settings.ConfigSettings(info["Id"])
+	if err != nil {
+		return errors.Wrap(err, messages.SETTINGS_PATH)
+	}
+
+	if fileState {
+		for _, info := range psInfo {
+			if strings.Contains(info["Name"], fmt.Sprintf("%s_scheduler", projectName)) {
+				settings.ConfigSettings(info["Id"])
+			}
 		}
+	} else {
+		fmt.Println("Skipping Settings Creation: settings.yaml not found...")
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
