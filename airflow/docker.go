@@ -208,7 +208,7 @@ func Start(airflowHome string, envFile string) error {
 		return errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
 
-	fileState, err := fileutil.Exists("settings.yaml")
+	fileState, err := fileutil.Exists("airflow_settings.yaml")
 
 	if err != nil {
 		return errors.Wrap(err, messages.SETTINGS_PATH)
@@ -221,7 +221,7 @@ func Start(airflowHome string, envFile string) error {
 			}
 		}
 	} else {
-		fmt.Println("Skipping Settings Creation: settings.yaml not found...")
+		fmt.Println("Skipping Settings Creation: airflow_settings.yaml not found...")
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
