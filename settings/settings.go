@@ -76,7 +76,7 @@ func AddVariables(id string) {
 		} else {
 			if objectValidator(0, variable.VariableValue) {
 
-				airflowCommand := fmt.Sprintf("variables -s %s ", variable.VariableName)
+				airflowCommand := fmt.Sprintf("airflow variables -s %s ", variable.VariableName)
 
 				airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 
@@ -90,7 +90,7 @@ func AddVariables(id string) {
 // AddConnections is a function to add Connections from settings.yaml
 func AddConnections(id string) {
 	connections := settings.Airflow.Connections
-	airflowCommand := fmt.Sprintf("connections -l")
+	airflowCommand := fmt.Sprintf("airflow connections -l")
 	out := docker.AirflowCommand(id, airflowCommand)
 
 	for _, conn := range connections {
@@ -99,16 +99,16 @@ func AddConnections(id string) {
 
 			if strings.Contains(out, quotedConnID) {
 				fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
-				airflowCommand = fmt.Sprintf("connections -d --conn_id \"%s\"", conn.ConnID)
+				airflowCommand = fmt.Sprintf("airflow connections -d --conn_id \"%s\"", conn.ConnID)
 				docker.AirflowCommand(id, airflowCommand)
 			}
 
 			if !objectValidator(1, conn.ConnType, conn.ConnURI) {
 				fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
 			} else {
-				airflowCommand = fmt.Sprintf("connections -a --conn_id \"%s\"", conn.ConnID)
+				airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\" ", conn.ConnID)
 				if objectValidator(0, conn.ConnType) {
-					airflowCommand += fmt.Sprintf("--conn_type '%s' ", conn.ConnType)
+					airflowCommand += fmt.Sprintf("--conn_type \"%s\" ", conn.ConnType)
 				}
 				if objectValidator(0, conn.ConnURI) {
 					airflowCommand += fmt.Sprintf("--conn_uri '%s' ", conn.ConnURI)
@@ -144,7 +144,7 @@ func AddPools(id string) {
 	pools := settings.Airflow.Pools
 	for _, pool := range pools {
 		if objectValidator(0, pool.PoolName) {
-			airflowCommand := fmt.Sprintf("pool -s %s ", pool.PoolName)
+			airflowCommand := fmt.Sprintf("airflow pool -s %s ", pool.PoolName)
 			if pool.PoolSlot != 0 {
 				airflowCommand += fmt.Sprintf("%v ", pool.PoolSlot)
 				if objectValidator(0, pool.PoolDescription) {
