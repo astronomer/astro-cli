@@ -70,9 +70,9 @@ func Init(path string, airflowVersion string) error {
 
 	// Map of files to create
 	files := map[string]string{
-		".dockerignore": include.Dockerignore,
-		"Dockerfile": fmt.Sprintf(include.Dockerfile,
-			version.GetTagFromVersion(airflowVersion)),
+		".dockerignore":             include.Dockerignore,
+		"Dockerfile":                fmt.Sprintf(include.Dockerfile, version.GetTagFromVersion(airflowVersion)),
+		".gitignore":                include.Gitignore,
 		"packages.txt":              "",
 		"requirements.txt":          "",
 		".env":                      "",
