@@ -14,7 +14,7 @@ import (
 
 var (
 	// ConfigFileName is the name of the config files (home / project)
-	ConfigFileName = "settings"
+	ConfigFileName = "airflow_settings"
 	// ConfigFileType is the config file extension
 	ConfigFileType = "yaml"
 	// ConfigFileNameWithExt is the config filename with extension
