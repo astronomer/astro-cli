@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
@@ -87,6 +88,8 @@ func List(ws string, all bool) error {
 	}
 
 	deployments = r.Data.GetDeployments
+
+	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Label > deployments[j].Label })
 
 	// Build rows
 	for _, d := range deployments {
