@@ -64,6 +64,5 @@ func AirflowCommand(id string, airflowCommand string) string {
 	}
 
 	stringOut := string(out)
-
 	return stringOut
 }
