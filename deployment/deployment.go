@@ -20,7 +20,7 @@ var (
 func Create(label, ws string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
-		Variables: map[string]interface{}{"label": label, "workspaceUuid": ws},
+		Variables: map[string]interface{}{"label": label, "workspaceId": ws},
 	}
 
 	r, err := req.Do()
@@ -44,10 +44,10 @@ func Create(label, ws string) error {
 	return nil
 }
 
-func Delete(uuid string) error {
+func Delete(id string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentDeleteRequest,
-		Variables: map[string]interface{}{"deploymentUuid": uuid},
+		Variables: map[string]interface{}{"deploymentId": id},
 	}
 
 	_, err := req.Do()
@@ -56,7 +56,7 @@ func Delete(uuid string) error {
 	}
 
 	// TODO - add back in tab print once houston returns all relevant information
-	// tab.AddRow([]string{d.Label, d.ReleaseName, d.Id, d.Workspace.Uuid}, false)
+	// tab.AddRow([]string{d.Label, d.ReleaseName, d.Id, d.Workspace.Id}, false)
 	// tab.SuccessMsg = "\n Successfully deleted deployment"
 	// tab.Print()
 	fmt.Println("\n Successfully deleted deployment")
@@ -67,7 +67,7 @@ func Delete(uuid string) error {
 // List all airflow deployments
 func List(ws string, all bool) error {
 	var deployments []houston.Deployment
-	var r *houston.HoustonResponse
+	var r *houston.Response
 	var err error
 
 	req := houston.Request{
@@ -80,7 +80,7 @@ func List(ws string, all bool) error {
 			return err
 		}
 	} else {
-		req.Variables = map[string]interface{}{"workspaceUuid": ws}
+		req.Variables = map[string]interface{}{"workspaceId": ws}
 		r, err = req.Do()
 		if err != nil {
 			return err
@@ -94,7 +94,7 @@ func List(ws string, all bool) error {
 	// Build rows
 	for _, d := range deployments {
 		if all {
-			ws = d.Workspace.Uuid
+			ws = d.Workspace.Id
 		}
 		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id}, false)
 	}
@@ -105,10 +105,10 @@ func List(ws string, all bool) error {
 }
 
 // Update an airflow deployment
-func Update(uuid string, args map[string]string) error {
+func Update(id string, args map[string]string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentUpdateRequest,
-		Variables: map[string]interface{}{"deploymentUuid": uuid, "payload": args},
+		Variables: map[string]interface{}{"deploymentId": id, "payload": args},
 	}
 
 	r, err := req.Do()

@@ -1,7 +1,7 @@
 package houston
 
-// HoustonResponse wraps all houston response structs used for json marashalling
-type HoustonResponse struct {
+// Response wraps all houston response structs used for json marashalling
+type Response struct {
 	Data struct {
 		AddWorkspaceUser     *Workspace       `json:"workspaceAddUser,omitempty"`
 		RemoveWorkspaceUser  *Workspace       `json:"workspaceRemoveUser,omitempty"`
@@ -47,7 +47,7 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	Id             string         `json:"uuid"`
+	Id             string         `json:"id"`
 	Type           string         `json:"type"`
 	Label          string         `json:"label"`
 	ReleaseName    string         `json:"releaseName"`
@@ -89,12 +89,12 @@ type Status struct {
 
 // ServiceACcount defines a structure of a ServiceAccountResponse object
 type ServiceAccount struct {
-	Uuid       string `json:"uuid"`
+	Id         string `json:"id"`
 	ApiKey     string `json:"apiKey"`
 	Label      string `json:"label"`
 	Category   string `json:"category"`
 	EntityType string `json:"entityType"`
-	EntityUuid string `json:"entityUuid"`
+	EntityId   string `json:"entityId"`
 	LastUsedAt string `json:"lastUsedAt"`
 	Active     bool   `json:"active"`
 }
@@ -107,14 +107,14 @@ type Token struct {
 
 // TokenPayload contains components of a houston auth token
 type TokenPayload struct {
-	Uuid string `json:"uuid"`
+	Id   string `json:"id"`
 	Iat  int    `json:"iat"`
 	Exp  int    `json:"exp"`
 }
 
 // User contains all components of an Astronomer user
 type User struct {
-	Uuid     string  `json:"uuid"`
+	Id       string  `json:"id"`
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
@@ -125,7 +125,7 @@ type User struct {
 
 // Workspace contains all components of an Astronomer Workspace
 type Workspace struct {
-	Uuid        string `json:"uuid"`
+	Id          string `json:"id"`
 	Label       string `json:"label"`
 	Description string `json:"description"`
 	Active      bool   `json:"active"`

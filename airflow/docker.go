@@ -40,7 +40,7 @@ var (
 	tab = printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
-		Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT UUID"},
+		Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 	}
 )
 
@@ -385,13 +385,13 @@ func PS(airflowHome string) error {
 // Deploy pushes a new docker image
 func Deploy(path, name, wsId string, prompt bool) error {
 	if len(wsId) == 0 {
-		return errors.New("no workspace uuid provided")
+		return errors.New("no workspace id provided")
 	}
 
 	// Validate workspace
 	wsReq := houston.Request{
 		Query:     houston.WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceUuid": wsId},
+		Variables: map[string]interface{}{"workspaceId": wsId},
 	}
 
 	wsResp, err := wsReq.Do()
@@ -400,15 +400,15 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	if len(wsResp.Data.GetWorkspaces) == 0 {
-		return fmt.Errorf("no workspaces with uuid (%s) found", wsId)
+		return fmt.Errorf("no workspaces with id (%s) found", wsId)
 	}
 
 	w := wsResp.Data.GetWorkspaces[0]
 
-	// Get Deployments from workspace UUID
+	// Get Deployments from workspace ID
 	deReq := houston.Request{
 		Query:     houston.DeploymentsGetRequest,
-		Variables: map[string]interface{}{"workspaceUuid": w.Uuid},
+		Variables: map[string]interface{}{"workspaceId": w.Id},
 	}
 
 	deResp, err := deReq.Do()

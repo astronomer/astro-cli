@@ -185,7 +185,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 			fmt.Sprintf("%s \nYou are not in an empty directory. Are you sure you want to initialize a project?", config.WorkingPath))
 
 		if !i {
-			fmt.Println("Cancelling project initialization...\n")
+			fmt.Println("Cancelling project initialization...")
 			os.Exit(1)
 		}
 	}

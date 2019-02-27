@@ -16,7 +16,7 @@ var (
 	tab = printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "UUID"},
+		Header:         []string{"NAME", "ID"},
 		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
 	}
 )
@@ -35,7 +35,7 @@ func Create(label, desc string) error {
 
 	w := r.Data.CreateWorkspace
 
-	tab.AddRow([]string{w.Label, w.Uuid}, false)
+	tab.AddRow([]string{w.Label, w.Id}, false)
 	tab.SuccessMsg = "\n Successfully created workspace"
 	tab.Print()
 
@@ -59,11 +59,11 @@ func List() error {
 
 	for _, w := range ws {
 		name := w.Label
-		workspace := w.Uuid
+		workspace := w.Id
 
 		var color bool
 
-		if c.Workspace == w.Uuid {
+		if c.Workspace == w.Id {
 			color = true
 		} else {
 			color = false
@@ -76,11 +76,11 @@ func List() error {
 	return nil
 }
 
-// Delete a workspace by uuid
-func Delete(uuid string) error {
+// Delete a workspace by id
+func Delete(id string) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceDeleteRequest,
-		Variables: map[string]interface{}{"workspaceUuid": uuid},
+		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
 	_, err := req.Do()
@@ -89,7 +89,7 @@ func Delete(uuid string) error {
 	}
 
 	// TODO remove tab print until houston properly returns attrs on delete
-	// tab.AddRow([]string{w.Label, w.Uuid}, false)
+	// tab.AddRow([]string{w.Label, w.Id}, false)
 	// tab.SuccessMsg = "\n Successfully deleted workspace"
 	// tab.Print()
 	fmt.Println("\n Successfully deleted workspace")
@@ -130,11 +130,11 @@ func getWorkspaceSelection() (string, error) {
 
 	for _, w := range ws {
 		name := w.Label
-		workspace := w.Uuid
+		workspace := w.Id
 
 		var color bool
 
-		if c.Workspace == w.Uuid {
+		if c.Workspace == w.Id {
 			color = true
 		} else {
 			color = false
@@ -155,28 +155,28 @@ func getWorkspaceSelection() (string, error) {
 		return "", errors.Wrapf(err, "cannot parse %s to int", in)
 	}
 
-	return ws[i-1].Uuid, nil
+	return ws[i-1].Id, nil
 }
 
 // Switch switches workspaces
-func Switch(uuid string) error {
-	if len(uuid) == 0 {
-		_uuid, err := getWorkspaceSelection()
+func Switch(id string) error {
+	if len(id) == 0 {
+		_id, err := getWorkspaceSelection()
 		if err != nil {
 			return err
 		}
 
-		uuid = _uuid
+		id = _id
 	}
 	// validate workspace
 	req := houston.Request{
 		Query:     houston.WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceUuid": uuid},
+		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
 	_, err := req.Do()
 	if err != nil {
-		return errors.Wrap(err, "workspace uuid is not valid")
+		return errors.Wrap(err, "workspace id is not valid")
 	}
 
 	c, err := config.GetCurrentContext()
@@ -184,7 +184,7 @@ func Switch(uuid string) error {
 		return err
 	}
 
-	c.Workspace = uuid
+	c.Workspace = id
 	err = c.SetContext()
 	if err != nil {
 		return err
@@ -196,11 +196,11 @@ func Switch(uuid string) error {
 }
 
 // Update an astronomer workspace
-func Update(uuid string, args map[string]string) error {
+func Update(id string, args map[string]string) error {
 	// validate workspace
 	req := houston.Request{
 		Query:     houston.WorkspaceUpdateRequest,
-		Variables: map[string]interface{}{"workspaceUuid": uuid, "payload": args},
+		Variables: map[string]interface{}{"workspaceId": id, "payload": args},
 	}
 
 	r, err := req.Do()
@@ -210,7 +210,7 @@ func Update(uuid string, args map[string]string) error {
 
 	w := r.Data.UpdateWorkspace
 
-	tab.AddRow([]string{w.Label, w.Uuid}, false)
+	tab.AddRow([]string{w.Label, w.Id}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"
 	tab.Print()
 
