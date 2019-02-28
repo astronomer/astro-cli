@@ -12,6 +12,16 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
+
+// JWTTokenError records an error and the operation and file path that caused it.
+type JWTTokenError struct {
+	Err  error
+}
+
+func (e *JWTTokenError) Error() string { return "You do not have the appropriate permissions for that" }
+
+
+
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
 	HTTPClient *httputil.HTTPClient
@@ -85,7 +95,16 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*HoustonResponse, error) {
 
 	// Houston Specific Errors
 	if decode.Errors != nil {
-		return nil, errors.New(decode.Errors[0].Message)
+		err = errors.New(decode.Errors[0].Message)
+		if err != nil {
+			switch err.(type) {
+			case *JWTTokenError:
+				return nil, errors.New("unauthorized: please try to login again using \n astro auth login")
+			default:
+				return nil, err
+			}
+		}
+		return nil, err
 	}
 
 	return &decode, nil
