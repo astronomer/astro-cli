@@ -39,7 +39,7 @@ var (
 
 	DeploymentDeleteRequest = `
 	mutation DeleteDeployment($deploymentId: Uuid!) {
-		deleteDeployment(deploymentId: $deploymentId) {
+		deleteDeployment(deploymentUuid: $deploymentId) {
 			id
 			type
 			label
