@@ -13,13 +13,7 @@ import (
 )
 
 
-// JWTTokenError records an error and the operation and file path that caused it.
-type JWTTokenError struct {
-	Err  error
-}
-
-func (e *JWTTokenError) Error() string { return "You do not have the appropriate permissions for that" }
-
+var PermissionsError = errors.New("You do not have the appropriate permissions for that")
 
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
@@ -96,13 +90,8 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*HoustonResponse, error) {
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)
-		if err != nil {
-			switch err.(type) {
-			case *JWTTokenError:
-				return nil, errors.New("unauthorized: please try to login again using \n astro auth login")
-			default:
-				return nil, err
-			}
+		if err.Error() == PermissionsError.Error() {
+			return nil, errors.New("Your token has expired. Please log in again.")
 		}
 		return nil, err
 	}
