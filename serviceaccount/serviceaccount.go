@@ -11,15 +11,15 @@ var (
 	tab = printutil.Table{
 		Padding:        []int{40, 40, 50, 50},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "CATEGORY", "UUID", "APIKEY"},
+		Header:         []string{"NAME", "CATEGORY", "ID", "APIKEY"},
 	}
 )
 
-func Create(uuid, label, category, entityType string) error {
+func Create(id, label, category, entityType string) error {
 	req := houston.Request{
 		Query: houston.ServiceAccountCreateRequest,
 		Variables: map[string]interface{}{
-			"entityUuid": uuid,
+			"entityId":   id,
 			"label":      label,
 			"category":   category,
 			"entityType": entityType,
@@ -33,17 +33,17 @@ func Create(uuid, label, category, entityType string) error {
 
 	sa := resp.Data.CreateServiceAccount
 
-	tab.AddRow([]string{sa.Label, sa.Category, sa.Uuid, sa.ApiKey}, false)
+	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
 	tab.Print()
 	return nil
 }
 
-func Delete(uuid string) error {
+func Delete(id string) error {
 	req := houston.Request{
 		Query:     houston.ServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": uuid},
+		Variables: map[string]interface{}{"serviceAccountId": id},
 	}
 
 	resp, err := req.Do()
@@ -53,16 +53,16 @@ func Delete(uuid string) error {
 
 	sa := resp.Data.DeleteServiceAccount
 
-	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Uuid)
+	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
 	fmt.Println(msg)
 
 	return nil
 }
 
-func Get(entityType, uuid string) error {
+func Get(entityType, id string) error {
 	req := houston.Request{
 		Query:     houston.ServiceAccountsGetRequest,
-		Variables: map[string]interface{}{"entityUuid": uuid, "entityType": entityType},
+		Variables: map[string]interface{}{"entityId": id, "entityType": entityType},
 	}
 
 	resp, err := req.Do()
@@ -73,7 +73,7 @@ func Get(entityType, uuid string) error {
 	sas := resp.Data.GetServiceAccounts
 
 	for _, sa := range sas {
-		tab.AddRow([]string{sa.Label, sa.Category, sa.Uuid, sa.ApiKey}, false)
+		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	}
 
 	tab.Print()

@@ -39,7 +39,7 @@ type Request struct {
 }
 
 // Do (request) is a wrapper to more easily pass variables to a client.Do request
-func (r *Request) Do() (*HoustonResponse, error) {
+func (r *Request) Do() (*Response, error) {
 	api := NewHoustonClient(httputil.NewHTTPClient())
 
 	doOpts := httputil.DoOptions{
@@ -53,7 +53,7 @@ func (r *Request) Do() (*HoustonResponse, error) {
 }
 
 // Do executes a query against the Houston API, logging out any errors contained in the response object
-func (c *Client) Do(doOpts httputil.DoOptions) (*HoustonResponse, error) {
+func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	cl, err := cluster.GetCurrentCluster()
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*HoustonResponse, error) {
 		Raw:  httpResponse,
 		Body: string(body),
 	}
-	decode := HoustonResponse{}
+	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")

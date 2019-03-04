@@ -1,17 +1,12 @@
 package main
 
 import (
-	"os"
-
 	"github.com/astronomer/astro-cli/cmd"
+	"log"
 )
 
 func main() {
 	if err := cmd.RootCmd.Execute(); err != nil {
-		// if cmd.Debug {
-		// 	fmt.Printf("%+v", err)
-		// }
-
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }

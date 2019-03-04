@@ -187,11 +187,11 @@ func workspaceSwitch(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	uuid := ""
+	id := ""
 
 	if len(args) == 1 {
-		uuid = args[0]
+		id = args[0]
 	}
 
-	return workspace.Switch(uuid)
+	return workspace.Switch(id)
 }

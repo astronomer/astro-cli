@@ -19,15 +19,15 @@ var (
 		$label: String!
 		$type: String = "airflow"
 		$version: String = "0.7.5"
-		$workspaceUuid: Uuid!
+		$workspaceId: Uuid!
 	) {
 		createDeployment(
 			label: $label
 			type: $type
 			version: $version
-			workspaceUuid: $workspaceUuid
+			workspaceUuid: $workspaceId
 		) {
-			uuid
+			id
 			type
 			label
 			releaseName
@@ -38,16 +38,16 @@ var (
 	}`
 
 	DeploymentDeleteRequest = `
-	mutation DeleteDeployment($deploymentUuid: Uuid!) {
-		deleteDeployment(deploymentUuid: $deploymentUuid) {
-			uuid
+	mutation DeleteDeployment($deploymentId: Uuid!) {
+		deleteDeployment(deploymentUuid: $deploymentId) {
+			id
 			type
 			label
       description
 			releaseName
 			version
       workspace {
-        uuid
+        id
       }
 			createdAt
 			updatedAt
@@ -56,21 +56,21 @@ var (
 
 	DeploymentsGetRequest = `
 	query GetDeployment(
-		$deploymentUuid: Uuid
-		$workspaceUuid: Uuid
+		$deploymentId: Uuid
+		$workspaceId: Uuid
 		$releaseName: String
 	) {
 		deployments(
-			deploymentUuid: $deploymentUuid
-			workspaceUuid: $workspaceUuid
+			deploymentUuid: $deploymentId
+			workspaceUuid: $workspaceId
 			releaseName: $releaseName
 		) {
-			uuid
+			id
 			type
 			label
 			releaseName
 			workspace {
-				uuid
+				id
 			}
 			deployInfo {
 				latest
@@ -83,16 +83,16 @@ var (
 	}`
 
 	DeploymentUpdateRequest = `
-	mutation UpdateDeplomyent($deploymentUuid: Uuid!, $payload: JSON!) {
-		updateDeployment(deploymentUuid: $deploymentUuid, payload: $payload) {
-			uuid
+	mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!) {
+		updateDeployment(deploymentUuid: $deploymentId, payload: $payload) {
+			id
 			type
 			label
 			description
 			releaseName
 			version
 			workspace {
-				uuid
+				id
 			}
 			createdAt
 			updatedAt
@@ -101,18 +101,18 @@ var (
 
 	ServiceAccountCreateRequest = `
 		mutation CreateServiceAccount(
-			$entityUuid: Uuid!
+			$entityId: Uuid!
 			$label: String!
 			$category: String
 			$entityType: EntityType!
 		) {
 			createServiceAccount(
-				entityUuid: $entityUuid
+				entityUuid: $entityId
 				label: $label
 				category: $category
 				entityType: $entityType
 			) {
-				uuid
+				id
 				apiKey
 				label
 				category
@@ -126,9 +126,9 @@ var (
 		}`
 
 	ServiceAccountDeleteRequest = `
-	mutation DeleteServiceAccount($serviceAccountUuid: Uuid!) {
-		deleteServiceAccount(serviceAccountUuid: $serviceAccountUuid) {
-					uuid
+	mutation DeleteServiceAccount($serviceAccountId: Uuid!) {
+		deleteServiceAccount(serviceAccountUuid: $serviceAccountId) {
+					id
 					apiKey
 					label
 					category
@@ -143,16 +143,16 @@ var (
 
 	ServiceAccountsGetRequest = `
 	query GetServiceAccount(
-		$serviceAccountUuid: Uuid
-		$entityUuid: Uuid
+		$serviceAccountId: Uuid
+		$entityId: Uuid
 		$entityType: EntityType!
 	) {
 		serviceAccounts(
-			serviceAccountUuid: $serviceAccountUuid
+			serviceAccountUuid: $serviceAccountId
 			entityType: $entityType
-			entityUuid: $entityUuid
+			entityUuid: $entityId
 		) {
-			uuid
+			id
 			apiKey
 			label
 			category
@@ -169,7 +169,7 @@ var (
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {
 			user {
-				uuid
+				id
 				fullName
 				username
 				status
@@ -196,7 +196,7 @@ var (
 			inviteToken: $inviteToken
 		) {
 			user {
-				uuid
+				id
 				username
 				status
 				createdAt
@@ -208,33 +208,14 @@ var (
 		}
 	}`
 
-	UserGetAllRequest = `
-	query GetUsers($userUuid: Uuid, $username: String, $email: String) {
-		users(userUuid: $userUuid, username: $username, email: $email) {
-			uuid
-			emails {
-				address
-				verified
-				primary
-				createdAt
-				updatedAt
-			}
-			fullName
-			username
-			status
-			createdAt
-			updatedAt
-		}
-	}`
-
 	WorkspacesGetRequest = `
-	query GetWorkspaces($workspaceUuid: Uuid, $label: String, $userUuid: Uuid) {
+	query GetWorkspaces($workspaceId: Uuid, $label: String, $userId: Uuid) {
 		workspaces(
-			workspaceUuid: $workspaceUuid
+			workspaceUuid: $workspaceId
 			label: $label
-			userUuid: $userUuid
+			userUuid: $userId
 		) {
-			uuid
+			id
 			label
 			description
 			active
@@ -246,7 +227,7 @@ var (
 	WorkspaceCreateRequest = `
 	mutation CreateWorkspace($label: String!, $description: String = "N/A") {
 		createWorkspace(label: $label, description: $description) {
-			uuid
+			id
 			label
 			description
 			active
@@ -256,9 +237,9 @@ var (
 	}`
 
 	WorkspaceDeleteRequest = `
-	mutation DeleteWorkspace($workspaceUuid: Uuid!) {
-		deleteWorkspace(workspaceUuid: $workspaceUuid) {
-			uuid
+	mutation DeleteWorkspace($workspaceId: Uuid!) {
+		deleteWorkspace(workspaceUuid: $workspaceId) {
+			id
 			label
 			description
 			active
@@ -268,9 +249,9 @@ var (
 	}`
 
 	WorkspaceUpdateRequest = `
-	mutation UpdateWorkspace($workspaceUuid: Uuid!, $payload: JSON!) {
-		updateWorkspace(workspaceUuid: $workspaceUuid, payload: $payload) {
-			uuid
+	mutation UpdateWorkspace($workspaceId: Uuid!, $payload: JSON!) {
+		updateWorkspace(workspaceUuid: $workspaceId, payload: $payload) {
+			id
 			label
 			description
 			active
@@ -281,14 +262,14 @@ var (
 	}`
 
 	WorkspaceUserAddRequest = `
-	mutation AddWorkspaceUser($workspaceUuid: Uuid!, $email: String!) {
-		workspaceAddUser(workspaceUuid: $workspaceUuid, email: $email) {
-			uuid
+	mutation AddWorkspaceUser($workspaceId: Uuid!, $email: String!) {
+		workspaceAddUser(workspaceUuid: $workspaceId, email: $email) {
+			id
 			label
 			description
 			active
 			users {
-				uuid
+				id
 				username
 			}
 			createdAt
@@ -298,21 +279,21 @@ var (
 
 	WorkspaceUserRemoveRequest = `
 	mutation RemoveWorkspaceUser(
-		$workspaceUuid: Uuid!
-		$userUuid: Uuid
+		$workspaceId: Uuid!
+		$userId: Uuid
 		$email: String
 	  ) {
 		workspaceRemoveUser(
-		  workspaceUuid: $workspaceUuid
-		  userUuid: $userUuid
+		  workspaceUuid: $workspaceId
+		  userUuid: $userId
 		  email: $email
 		) {
-		  uuid
+		  id
 		  label
 		  description
 		  active
 		  users {
-			uuid
+			id
 			username
 		  }
 		  createdAt

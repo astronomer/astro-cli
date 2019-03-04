@@ -13,10 +13,10 @@ var (
 )
 
 // Add a user to a workspace
-func Add(workspaceUuid, email string) error {
+func Add(workspaceId, email string) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserAddRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUuid, "email": email},
+		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email},
 	}
 
 	r, err := req.Do()
@@ -25,7 +25,7 @@ func Add(workspaceUuid, email string) error {
 	}
 	w := r.Data.AddWorkspaceUser
 
-	utab.AddRow([]string{w.Label, w.Uuid, email}, false)
+	utab.AddRow([]string{w.Label, w.Id, email}, false)
 	utab.SuccessMsg = "Successfully added user to workspace"
 	utab.Print()
 
@@ -33,10 +33,10 @@ func Add(workspaceUuid, email string) error {
 }
 
 // Remove a user from a workspace
-func Remove(workspaceUuid, email string) error {
+func Remove(workspaceId, email string) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserRemoveRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUuid, "email": email},
+		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email},
 	}
 
 	r, err := req.Do()
@@ -45,7 +45,7 @@ func Remove(workspaceUuid, email string) error {
 	}
 	w := r.Data.RemoveWorkspaceUser
 
-	utab.AddRow([]string{w.Label, w.Uuid, email}, false)
+	utab.AddRow([]string{w.Label, w.Id, email}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print()
 	return nil

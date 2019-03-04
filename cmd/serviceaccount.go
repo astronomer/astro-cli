@@ -7,9 +7,8 @@ import (
 )
 
 var (
-	workspaceUuid  string
-	deploymentUuid string
-	userUuid       string
+	deploymentId string
+	userId       string
 	systemSA       bool
 	category       string
 	label          string
@@ -30,7 +29,7 @@ var (
 	}
 
 	saDeleteCmd = &cobra.Command{
-		Use:     "delete [SA-UUID]",
+		Use:     "delete [SA-ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete a service-account in the astronomer platform",
 		Long:    "Delete a service-account in the astronomer platform",
@@ -40,8 +39,8 @@ var (
 
 	saGetCmd = &cobra.Command{
 		Use:   "get",
-		Short: "Get a service-account by entity type and entity uuid",
-		Long:  "Get a service-account by entity type and entity uuid",
+		Short: "Get a service-account by entity type and entity id",
+		Long:  "Get a service-account by entity type and entity id",
 		RunE:  saGet,
 	}
 )
@@ -52,24 +51,24 @@ func init() {
 
 	// Service-account create
 	saRootCmd.AddCommand(saCreateCmd)
-	saCreateCmd.Flags().StringVarP(&workspaceUuid, "workspace-uuid", "w", "", "[UUID]")
-	saCreateCmd.Flags().StringVarP(&deploymentUuid, "deployment-uuid", "d", "", "[UUID]")
-	saCreateCmd.Flags().StringVarP(&userUuid, "user-uuid", "u", "", "[UUID]")
+	saCreateCmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	saCreateCmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	saCreateCmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
 	saCreateCmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
 	saCreateCmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
 	saCreateCmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
 
 	saRootCmd.AddCommand(saGetCmd)
-	saGetCmd.Flags().StringVarP(&workspaceUuid, "workspace-uuid", "w", "", "[UUID]")
-	saGetCmd.Flags().StringVarP(&deploymentUuid, "deployment-uuid", "d", "", "[UUID]")
-	saGetCmd.Flags().StringVarP(&userUuid, "user-uuid", "u", "", "[UUID]")
+	saGetCmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	saGetCmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	saGetCmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
 	saGetCmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
 
 	saRootCmd.AddCommand(saDeleteCmd)
 }
 
 func getValidEntity() (string, string, error) {
-	var uuid string
+	var id string
 	var entityType string
 	singleArgVerify := 0
 
@@ -78,21 +77,21 @@ func getValidEntity() (string, string, error) {
 		singleArgVerify++
 	}
 
-	if len(workspaceUuid) > 0 {
+	if len(workspaceId) > 0 {
 		entityType = "WORKSPACE"
-		uuid = workspaceUuid
+		id = workspaceId
 		singleArgVerify++
 	}
 
-	if len(deploymentUuid) > 0 {
+	if len(deploymentId) > 0 {
 		entityType = "DEPLOYMENT"
-		uuid = deploymentUuid
+		id = deploymentId
 		singleArgVerify++
 	}
 
-	if len(userUuid) > 0 {
+	if len(userId) > 0 {
 		entityType = "USER"
-		uuid = userUuid
+		id = userId
 		singleArgVerify++
 	}
 
@@ -100,12 +99,12 @@ func getValidEntity() (string, string, error) {
 		return "", "", errors.New("must specify exactly one service-account type (system, workspace deployment, user")
 	}
 
-	return entityType, uuid, nil
+	return entityType, id, nil
 }
 
 func saCreate(cmd *cobra.Command, args []string) error {
 	// Validation
-	entityType, uuid, err := getValidEntity()
+	entityType, id, err := getValidEntity()
 	if err != nil {
 		return err
 	}
@@ -117,7 +116,7 @@ func saCreate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Create(uuid, label, category, entityType)
+	return sa.Create(id, label, category, entityType)
 }
 
 func saDelete(cmd *cobra.Command, args []string) error {
@@ -128,7 +127,7 @@ func saDelete(cmd *cobra.Command, args []string) error {
 }
 
 func saGet(cmd *cobra.Command, args []string) error {
-	entityType, uuid, err := getValidEntity()
+	entityType, id, err := getValidEntity()
 	if err != nil {
 		return err
 	}
@@ -136,5 +135,5 @@ func saGet(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Get(entityType, uuid)
+	return sa.Get(entityType, id)
 }
