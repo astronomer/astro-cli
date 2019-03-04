@@ -12,6 +12,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
+
+var PermissionsError = errors.New("You do not have the appropriate permissions for that")
+
+
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
 	HTTPClient *httputil.HTTPClient
@@ -85,7 +89,11 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*HoustonResponse, error) {
 
 	// Houston Specific Errors
 	if decode.Errors != nil {
-		return nil, errors.New(decode.Errors[0].Message)
+		err = errors.New(decode.Errors[0].Message)
+		if err.Error() == PermissionsError.Error() {
+			return nil, errors.New("Your token has expired. Please log in again.")
+		}
+		return nil, err
 	}
 
 	return &decode, nil
