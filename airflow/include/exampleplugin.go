@@ -23,7 +23,7 @@ astro_docs_ml = MenuLink(
 astro_guides_ml = MenuLink(
     category='Astronomer',
     name='Airflow Guides',
-    url='https://www.astronomer.io/guides/'
+    url='https://www.astronomer.io/guides/')
 
 class AstroLinksPlugin(AirflowPlugin):
     name = 'astronomer_menu_links'
