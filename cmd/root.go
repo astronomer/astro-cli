@@ -1,15 +1,15 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
+	"os"
 )
 
-// RootCmd is the astro root command.
 var (
-	// Debug       bool
 	workspaceId string
-	RootCmd     = &cobra.Command{
+	rootCmd     = &cobra.Command{
 		Use:   "astro",
 		Short: "Astronomer - CLI",
 		Long:  "astro is a command line interface for working with the Astronomer Platform.",
@@ -18,5 +18,11 @@ var (
 
 func init() {
 	cobra.OnInitialize(config.InitConfig)
-	// RootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "debug output")
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

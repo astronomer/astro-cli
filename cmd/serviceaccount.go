@@ -47,7 +47,7 @@ var (
 
 func init() {
 	// User root
-	RootCmd.AddCommand(saRootCmd)
+	rootCmd.AddCommand(saRootCmd)
 
 	// Service-account create
 	saRootCmd.AddCommand(saCreateCmd)

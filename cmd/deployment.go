@@ -62,7 +62,7 @@ var (
 
 func init() {
 	// deployment root
-	RootCmd.AddCommand(deploymentRootCmd)
+	rootCmd.AddCommand(deploymentRootCmd)
 	deploymentRootCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 	// deploymentRootCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 

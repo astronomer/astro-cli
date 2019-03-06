@@ -35,7 +35,7 @@ var (
 
 func init() {
 	// Auth root
-	RootCmd.AddCommand(authRootCmd)
+	rootCmd.AddCommand(authRootCmd)
 
 	// Auth login
 	authRootCmd.AddCommand(authLoginCmd)

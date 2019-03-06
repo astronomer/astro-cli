@@ -28,27 +28,6 @@ func basicAuth(username string) (string, error) {
 	return resp.Data.CreateToken.Token.Value, nil
 }
 
-func getWorkspaceByLabel(label string) *houston.Workspace {
-
-	req := houston.Request{
-		Query: houston.WorkspacesGetRequest,
-	}
-
-	resp, err := req.Do()
-	if err != nil {
-		return nil
-	}
-	workspaces := resp.Data.GetWorkspaces
-
-	for _, ws := range workspaces {
-		if ws.Label == label {
-			return &ws
-		}
-	}
-
-	return nil
-}
-
 // oAuth handles oAuth with houston api
 func oAuth(oAuthUrl string) string {
 	fmt.Println("\n" + messages.HOUSTON_OAUTH_REDIRECT)

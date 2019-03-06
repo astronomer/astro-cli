@@ -1,12 +1,7 @@
 package main
 
-import (
-	"github.com/astronomer/astro-cli/cmd"
-	"log"
-)
+import "github.com/astronomer/astro-cli/cmd"
 
 func main() {
-	if err := cmd.RootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	cmd.Execute()
 }

@@ -99,7 +99,7 @@ var (
 
 func init() {
 	// Airflow root
-	RootCmd.AddCommand(airflowRootCmd)
+	rootCmd.AddCommand(airflowRootCmd)
 
 	// Airflow init
 	airflowInitCmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")

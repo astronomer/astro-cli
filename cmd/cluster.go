@@ -33,7 +33,7 @@ var (
 
 func init() {
 	// deployment root
-	RootCmd.AddCommand(clusterRootCmd)
+	rootCmd.AddCommand(clusterRootCmd)
 
 	clusterRootCmd.AddCommand(clusterListCmd)
 	clusterRootCmd.AddCommand(clusterSwitchCmd)

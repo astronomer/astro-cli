@@ -101,7 +101,7 @@ func getClusterSelection() (string, error) {
 		return "", err
 	}
 
-	contexts := []string{}
+	var contexts []string
 	for k, v := range c.Contexts {
 		if v.Domain != "" {
 			domain = v.Domain

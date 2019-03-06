@@ -27,13 +27,13 @@ type Context struct {
 	Token     string `mapstructure:"token"`
 }
 
-// GetCurrentContext looks up current context and gets cooresponding Context struct
+// GetCurrentContext looks up current context and gets corresponding Context struct
 func GetCurrentContext() (Context, error) {
 	c := Context{}
 
 	domain := CFG.Context.GetHomeString()
 	if len(domain) == 0 {
-		return Context{}, errors.New("No context set, have you authenticated to a cluster?")
+		return Context{}, errors.New("no context set, have you authenticated to a cluster?")
 	}
 
 	c.Domain = domain
@@ -83,7 +83,7 @@ func PrintCurrentContext() error {
 // with viper's dot (.) notation for fetching configs by replacing with underscores (_)
 func (c Context) GetContextKey() (string, error) {
 	if len(c.Domain) == 0 {
-		return "", errors.New("Cluster config invalid, no domain specified")
+		return "", errors.New("cluster config invalid, no domain specified")
 	}
 
 	return strings.Replace(c.Domain, ".", "_", -1), nil
@@ -110,7 +110,7 @@ func (c Context) GetContext() (Context, error) {
 	}
 
 	if !c.ContextExists() {
-		return c, errors.New("Cluster not set, have you authenticated to this cluster?")
+		return c, errors.New("cluster not set, have you authenticated to this cluster?")
 	}
 
 	err = viperHome.UnmarshalKey("contexts"+"."+key, &c)

@@ -22,8 +22,8 @@ var (
 )
 
 func init() {
-	RootCmd.AddCommand(versionCmd)
-	RootCmd.AddCommand(upgradeCmd)
+	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(upgradeCmd)
 }
 
 func printVersion(cmd *cobra.Command, args []string) error {

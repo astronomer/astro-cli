@@ -90,7 +90,7 @@ var (
 
 func init() {
 	// workspace root
-	RootCmd.AddCommand(workspaceRootCmd)
+	rootCmd.AddCommand(workspaceRootCmd)
 
 	// workspace list
 	workspaceRootCmd.AddCommand(workspaceListCmd)
@@ -161,7 +161,6 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
 	// Silence Usage as we have now validated command input
@@ -174,7 +173,6 @@ func workspaceUserRm(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
 	// Silence Usage as we have now validated command input

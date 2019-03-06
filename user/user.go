@@ -18,7 +18,7 @@ func Create(email string) error {
 
 	passwordVerify, _ := input.InputPassword("Re-enter Password: ")
 	if password != passwordVerify {
-		return errors.New("Passwords do not match")
+		return errors.New("passwords do not match")
 	}
 
 	req := houston.Request{

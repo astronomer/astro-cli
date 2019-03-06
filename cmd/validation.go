@@ -14,7 +14,7 @@ func argsToMap(args []string) (map[string]string, error) {
 	for _, kv := range args {
 		split := strings.Split(kv, "=")
 		if len(split) == 1 {
-			return nil, fmt.Errorf("Failed to parse key value pair (%s)", kv)
+			return nil, fmt.Errorf("failed to parse key value pair (%s)", kv)
 		}
 
 		argsMap[split[0]] = split[1]
@@ -39,7 +39,7 @@ func updateArgValidator(args, validArgs []string) error {
 	for _, kv := range args[1:] {
 		split := strings.Split(kv, "=")
 		if len(split) == 1 {
-			return fmt.Errorf("Failed to parse key value pair (%s)", kv)
+			return fmt.Errorf("failed to parse key value pair (%s)", kv)
 		}
 		k := split[0]
 		if !isValidUpdateAttr(k, validArgs) {
