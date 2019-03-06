@@ -152,7 +152,7 @@ func Login(domain string, oAuthOnly bool) error {
 
 	workspaces := wsResp.Data.GetWorkspaces
 
-	if len(workspaces) == 1 && len(c.Workspace) == 0 {
+	if len(workspaces) == 1 {
 		w := workspaces[0]
 		c.SetContextKey("workspace", w.Id)
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Id)
