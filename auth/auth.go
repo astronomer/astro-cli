@@ -158,7 +158,7 @@ func Login(domain string, oAuthOnly bool) error {
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Id)
 	}
 
-	if len(workspaces) != 1 && len(c.Workspace) == 0 {
+	if len(workspaces) > 1 {
 		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 	}
 
