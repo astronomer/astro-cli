@@ -43,12 +43,12 @@ var (
 			id
 			type
 			label
-      description
+			description
 			releaseName
 			version
-      workspace {
-        id
-      }
+			workspace {
+				id
+			}
 			createdAt
 			updatedAt
 		}
