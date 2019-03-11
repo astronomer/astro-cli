@@ -22,12 +22,13 @@ type Contexts struct {
 
 // Context represents a single cluster context
 type Context struct {
-	Domain    string `mapstructure:"domain"`
-	Workspace string `mapstructure:"workspace"`
-	Token     string `mapstructure:"token"`
+	Domain            string `mapstructure:"domain"`
+	Workspace         string `mapstructure:"workspace"`
+	LastUsedWorkspace string `mapstructure:"last_used_workspace"`
+	Token             string `mapstructure:"token"`
 }
 
-// GetCurrentContext looks up current context and gets cooresponding Context struct
+// GetCurrentContext looks up current context and gets corresponding Context struct
 func GetCurrentContext() (Context, error) {
 	c := Context{}
 
@@ -142,6 +143,7 @@ func (c Context) SetContext() error {
 		"token":     c.Token,
 		"domain":    c.Domain,
 		"workspace": c.Workspace,
+		"last_used_workspace": c.Workspace,
 	}
 
 	viperHome.Set("contexts"+"."+key, context)

@@ -12,7 +12,7 @@ var (
 
 	authRootCmd = &cobra.Command{
 		Use:   "auth",
-		Short: "Mangage astronomer identity",
+		Short: "Manage astronomer identity",
 		Long:  "Handles authentication to the Astronomer Platform",
 	}
 

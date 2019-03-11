@@ -2,12 +2,13 @@ package auth
 
 import (
 	"fmt"
-
 	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 )
 
@@ -47,6 +48,19 @@ func getWorkspaceByLabel(label string) *houston.Workspace {
 	}
 
 	return nil
+}
+
+func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace) bool {
+	if c.LastUsedWorkspace != "" {
+		for _, w := range workspaces {
+			if c.LastUsedWorkspace == w.Id {
+				fmt.Println(w.Id)
+				c.SetContextKey("workspace", w.Id)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // oAuth handles oAuth with houston api
@@ -152,14 +166,25 @@ func Login(domain string, oAuthOnly bool) error {
 
 	workspaces := wsResp.Data.GetWorkspaces
 
-	if len(workspaces) == 1 && len(c.Workspace) == 0 {
+	if len(workspaces) == 1 {
 		w := workspaces[0]
 		c.SetContextKey("workspace", w.Id)
+		// update last used workspace ID
+		c.SetContextKey("last_used_workspace", w.Id)
 		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Id)
 	}
 
-	if len(workspaces) != 1 && len(c.Workspace) == 0 {
-		fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
+	if len(workspaces) > 1 {
+		// try to switch to last used workspace in cluster
+		isSwitched := switchToLastUsedWorkspace(c, workspaces)
+
+		if !isSwitched {
+			// show switch menu with available workspace IDs
+			err := workspace.Switch("")
+			if err != nil {
+				fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
+			}
+		}
 	}
 
 	err = registryAuth()
