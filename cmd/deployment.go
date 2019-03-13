@@ -49,7 +49,7 @@ var (
 		Aliases: []string{"up"},
 		Short:   "Update airflow deployments",
 		Long:    "Update airflow deployments",
-		Example: "\n\tastro deployment update UUID label=Production-Airflow",
+		Example: "  astro deployment update UUID label=Production-Airflow description=example version=v1.0.0",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) <= 0 {
 				return errors.New("must specify a deployment ID and at least one attribute to update.")
