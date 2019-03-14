@@ -245,8 +245,6 @@ func Start(airflowHome string, envFile string) error {
 				settings.ConfigSettings(info["Id"])
 			}
 		}
-	} else {
-		fmt.Println("Skipping Settings Creation: airflow_settings.yaml not found...")
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
