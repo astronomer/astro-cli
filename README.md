@@ -1,32 +1,60 @@
-# Astronomer CLI
+# Astronomer CLI [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli)
 
 The Astronomer CLI can be used to build Airflow DAGs locally and run them via Docker-Compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
 
-## Install
+```
+astro is a command line interface for working with the Astronomer Platform.
+
+Usage:
+  astro [command]
+
+Available Commands:
+  airflow         Manage airflow projects and deployments
+  auth            Manage astronomer identity
+  cluster         Manage Astronomer EE clusters
+  config          Manage astro project configurations
+  deployment      Manage airflow deployments
+  help            Help about any command
+  service-account Manage astronomer service accounts
+  upgrade         Check for newer version of Astronomer CLI
+  user            Manage astronomer user
+  version         Astronomer CLI version
+  workspace       Manage Astronomer workspaces
+
+Flags:
+  -h, --help   help for astro
+
+Use "astro [command] --help" for more information about a command.
+```
+
+## Installing `astro`
 
 ### If you're using Astronomer Cloud or Astronomer Enterprise v0.7.x
-- via `curl`
-    ```
-    curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
-    ```
+
+via `curl`:
+
+```
+curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
+```
+
 ### If you're using Astronomer Enterprise v0.8
-- via `curl`
-    ```
-    curl -sSL https://install.astronomer.io | sudo bash
-    ```
+
+via `curl`
+```
+curl -sSL https://install.astronomer.io | sudo bash
+```
 
 ### Previous Versions
 
--via `curl`
-   ```
-   curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
-   ```
+via `curl`
+```
+curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
+```
    
-ie
-   ```
-   curl -sSL https://install.astronomer.io | sudo bash -s -- v0.3.1
-   ```
-
+ie:
+```
+curl -sSL https://install.astronomer.io | sudo bash -s -- v0.3.1
+```
 
 > Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally. 
 
@@ -36,18 +64,19 @@ ie
 
 1. Confirm the install worked:
 
-    ```
-    $ astro
-    ```
+```
+$ astro
+```
 
 2. Create a project:
 
-    ```
-    $ mkdir hello-astro && cd hello-astro
-    $ astro airflow init
-    ```
+```
+$ mkdir hello-astro && cd hello-astro
+$ astro airflow init
+```
     
 This will generate a skeleton project directory:
+
 ```
 .
 ├── dags
@@ -57,7 +86,6 @@ This will generate a skeleton project directory:
 ├── packages.txt
 ├── plugins
 └── requirements.txt
-
 ```
 
 Dags can go in the `dags` folder, custom airflow plugins in `plugins`, python packages needed can go in `requirements.txt`, and OS level packages can go in `packages.txt`.
@@ -93,23 +121,23 @@ How to get started as a developer.
 
 1. Build:
 
-    ```
-    $ git clone git@github.com:astronomerio/astro-cli.git
-    $ cd astro-cli
-    $ make build
-    ```
+```
+$ git clone git@github.com:astronomerio/astro-cli.git
+$ cd astro-cli
+$ make build
+```
 
 1. (Optional) Install to `$GOBIN`:
 
-    ```
-    $ make install
-    ```
+```
+$ make install
+```
 
 1. Run:
 
-    ```
-    $ astro
-    ```
+```
+$ astro
+```
 
 ### Testing Locally 
 astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to 

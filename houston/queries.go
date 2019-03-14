@@ -1,6 +1,5 @@
 package houston
 
-// "github.com/sirupsen/logrus"
 
 var (
 	AuthConfigGetRequest = `
@@ -300,4 +299,40 @@ var (
 		  updatedAt
 		}
 	  }`
+	DeploymentLogsGetRequest = `
+	query GetLogs(
+		$deploymentId: Uuid!
+		$component: String
+		$timestamp: DateTime
+		$search: String
+	) {
+		logs(
+			deploymentUuid: $deploymentId
+			component: $component
+			timestamp: $timestamp
+			search: $search
+		) {
+			id: uuid
+			createdAt: timestamp
+			log: message
+		}
+	}`
+	DeploymentLogsSubscribeRequest = `
+    subscription log(
+		$deploymentId: Uuid!
+		$component: String
+		$timestamp: DateTime
+		$search: String
+    ) {
+      	log(
+			deploymentUuid: $deploymentId
+			component: $component
+			timestamp: $timestamp
+			search: $search
+      ) {
+        	id: uuid
+        	createdAt: timestamp
+        	log: message
+      }
+    }`
 )
