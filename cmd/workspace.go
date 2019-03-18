@@ -76,6 +76,7 @@ var (
 		Use:   "add EMAIL",
 		Short: "Add a user to a workspace",
 		Long:  "Add a user to a workspace",
+		Args:  cobra.ExactArgs(1),
 		RunE:  workspaceUserAdd,
 	}
 
@@ -84,6 +85,7 @@ var (
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from a workspace",
 		Long:    "Remove a user from a workspace",
+		Args:    cobra.ExactArgs(1),
 		RunE:    workspaceUserRm,
 	}
 )
