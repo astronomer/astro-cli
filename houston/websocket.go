@@ -75,7 +75,7 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 		fmt.Printf("Could not subscribe to logs: %s", err.Error())
 	}
 
-	fmt.Println("Starting subscribing for logs:")
+	fmt.Println("Waiting for logs...")
 	done := make(chan struct{})
 
 	go func() {
@@ -96,7 +96,7 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 		case <-done:
 			return nil
 		case <-interrupt:
-			log.Println("Bye bye ... 👋")
+			log.Println("Bye bye ...")
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 			err := ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, `{"id":"1","type":"stop"}`))
