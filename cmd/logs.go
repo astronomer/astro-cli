@@ -59,17 +59,20 @@ func init() {
 	RootCmd.AddCommand(logsCmd)
 	webserverLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	webserverLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	webserverLogsCmd.Flags().BoolP("help", "h", false, "Help for " + webserverLogsCmd.Name())
 
 	// get airflow webserver logs
 	logsCmd.AddCommand(webserverLogsCmd)
 
 	workersLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	workersLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	workersLogsCmd.Flags().BoolP("help", "h", false, "Help for " + workersLogsCmd.Name())
 	// get airflow workers logs
 	logsCmd.AddCommand(workersLogsCmd)
 
 	schedulerLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	schedulerLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	schedulerLogsCmd.Flags().BoolP("help", "h", false, "Help for " + schedulerLogsCmd.Name())
 	// get airflow scheduler logs
 	logsCmd.AddCommand(schedulerLogsCmd)
 }
