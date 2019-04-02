@@ -10,6 +10,7 @@ type cfg struct {
 type cfgs struct {
 	CloudAPIProtocol  cfg
 	CloudAPIPort      cfg
+	CloudWSProtocol   cfg
 	CloudAPIToken     cfg
 	Context           cfg
 	Contexts          cfg

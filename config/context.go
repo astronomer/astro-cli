@@ -197,6 +197,20 @@ func (c Context) GetAPIURL() string {
 	)
 }
 
+// GetWebsocketURL returns full Houston websocket Url for the provided Context
+func (c Context) GetWebsocketURL() string {
+	if c.Domain == "localhost" {
+		return CFG.LocalHouston.GetString()
+	}
+
+	return fmt.Sprintf(
+		"%s://houston.%s:%s/ws",
+		CFG.CloudWSProtocol.GetString(),
+		c.Domain,
+		CFG.CloudAPIPort.GetString(),
+	)
+}
+
 // GetAppURL returns full Houston API Url for the provided Context
 func (c Context) GetAppURL() string {
 	if c.Domain == "localhost" {

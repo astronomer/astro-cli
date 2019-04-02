@@ -5,16 +5,14 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/pkg/errors"
-	// "github.com/sirupsen/logrus"
-
 	"github.com/astronomer/astro-cli/cluster"
+
+	"github.com/pkg/errors"
+
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-
 var PermissionsError = errors.New("You do not have the appropriate permissions for that")
-
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {

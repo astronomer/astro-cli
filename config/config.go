@@ -38,6 +38,7 @@ var (
 	CFG = cfgs{
 		CloudAPIProtocol:  newCfg("cloud.api.protocol", "https"),
 		CloudAPIPort:      newCfg("cloud.api.port", "443"),
+		CloudWSProtocol:   newCfg("cloud.api.ws_protocol", "wss"),
 		CloudAPIToken:     newCfg("cloud.api.token", ""),
 		Context:           newCfg("context", ""),
 		Contexts:          newCfg("contexts", ""),

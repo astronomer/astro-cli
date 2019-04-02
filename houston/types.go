@@ -20,6 +20,7 @@ type Response struct {
 		GetWorkspaces        []Workspace      `json:"workspaces,omitempty"`
 		UpdateDeployment     *Deployment      `json:"updateDeployment,omitempty"`
 		UpdateWorkspace      *Workspace       `json:"updateWorkspace,omitempty"`
+		DeploymentLog        []DeploymentLog  `json:"logs,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -107,9 +108,9 @@ type Token struct {
 
 // TokenPayload contains components of a houston auth token
 type TokenPayload struct {
-	Id   string `json:"id"`
-	Iat  int    `json:"iat"`
-	Exp  int    `json:"exp"`
+	Id  string `json:"id"`
+	Iat int    `json:"iat"`
+	Exp int    `json:"exp"`
 }
 
 // User contains all components of an Astronomer user
@@ -133,4 +134,12 @@ type Workspace struct {
 	// groups
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
+}
+
+// DeploymentLog contains all log related to deployment components
+type DeploymentLog struct {
+	Id        string `json:"id"`
+	Component string `json:"component"`
+	CreatedAt string `json:"createdAt"`
+	Log       string `json:"log"`
 }
