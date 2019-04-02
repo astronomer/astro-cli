@@ -10,14 +10,26 @@ var (
 	search string
 	follow bool
 	since  time.Duration
+	logsExample = `
+  # Return logs for last 5 minutes of webserver logs and output them.
+  astro logs webserver example-deployment-uuid
+
+  # Subscribe logs from airflow workers for last 5 min and specify search term, and subscribe to more.
+  astro logs workers example-deployment-uuid --follow --search "some search terms"
+  
+  # Return logs from airflow webserver for last 25 min.
+  astro logs webserver example-deployment-uuid --since 25m
+
+  # Subscribe logs from airflow scheduler.
+  astro logs scheduler example-deployment-uuid -f
+`
 
 	logsCmd = &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
 		Short:   "Stream logs from an Airflow deployment",
-		Long: `Stream logs from an Airflow deployment. For example:
-
-astro logs webserver YOU_DEPLOYMENT_ID -s string-to-find -f`,
+		Long: "Stream logs from an Airflow deployment",
+		Example: logsExample,
 	}
 
 	webserverLogsCmd = &cobra.Command{
