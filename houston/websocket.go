@@ -40,11 +40,11 @@ type WSResponse struct {
 	} `json:"payload"`
 }
 
-func BuildDeploymentLogsSubscribeRequest(deploymentId, component, search string) (string, error) {
+func BuildDeploymentLogsSubscribeRequest(deploymentId, component, search string, timestamp time.Time) (string, error) {
 	payload := Request{
 		Query: DeploymentLogsSubscribeRequest,
 		Variables: map[string]interface{}{
-			"component": component, "deploymentId": deploymentId, "search": search},
+			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp},
 	}
 	s := StartSubscription{Type: "start", Payload: payload}
 	b, _ := json.Marshal(s)
@@ -83,7 +83,13 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 		for {
 			_, message, err := ws.ReadMessage()
 			if err != nil {
-				return
+				switch err.(type) {
+				case *websocket.CloseError:
+					fmt.Println("Your token has expired. Please log in again.")
+					return
+				default:
+					log.Fatal(err)
+				}
 			}
 			var resp WSResponse
 			json.Unmarshal(message, &resp)
