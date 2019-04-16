@@ -148,7 +148,7 @@ func AddPools(id string) {
 			if pool.PoolSlot != 0 {
 				airflowCommand += fmt.Sprintf("%v ", pool.PoolSlot)
 				if objectValidator(0, pool.PoolDescription) {
-					airflowCommand += fmt.Sprintf("%s ", pool.PoolDescription)
+					airflowCommand += fmt.Sprintf("'%s' ", pool.PoolDescription)
 				} else {
 					airflowCommand += fmt.Sprint("\"\"")
 				}
