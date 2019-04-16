@@ -22,8 +22,10 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/settings"
 )
 
 const (
@@ -180,6 +182,24 @@ func Start(airflowHome string) error {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
 	}
+
+	psInfo, err = project.Ps(context.Background())
+
+	fileState, err := fileutil.Exists("airflow_settings.yaml")
+
+	if err != nil {
+		return errors.Wrap(err, messages.SETTINGS_PATH)
+	}
+
+	if fileState {
+		for _, info := range psInfo {
+			if strings.Contains(info["Name"], projectName) &&
+				strings.Contains(info["Name"], "webserver") {
+				settings.ConfigSettings(info["Id"])
+			}
+		}
+	}
+
 	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", config.CFG.WebserverPort.GetString())
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 	return nil
