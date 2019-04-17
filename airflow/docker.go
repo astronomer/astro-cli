@@ -139,6 +139,8 @@ func createProject(projectName, airflowHome string) (project.APIProject, error) 
 func Start(airflowHome string) error {
 	// Get project name from config
 	projectName := config.CFG.ProjectName.GetString()
+	replacer := strings.NewReplacer("_", "", "-", "")
+	strippedProjectName := replacer.Replace(projectName)
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome)
@@ -193,7 +195,7 @@ func Start(airflowHome string) error {
 
 	if fileState {
 		for _, info := range psInfo {
-			if strings.Contains(info["Name"], projectName) &&
+			if strings.Contains(info["Name"], strippedProjectName) &&
 				strings.Contains(info["Name"], "webserver") {
 				settings.ConfigSettings(info["Id"])
 			}
