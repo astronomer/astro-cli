@@ -177,7 +177,8 @@ func createProject(projectName, airflowHome string, envFile string) (project.API
 func Start(airflowHome string, envFile string) error {
 	// Get project name from config
 	projectName, err := projectNameUnique()
-	strippedProjectName := strings.Replace(projectName, "_", "", -1)
+	replacer := strings.NewReplacer("_", "", "-", "")
+	strippedProjectName := replacer.Replace(projectName)
 
 	if err != nil {
 		return errors.Wrap(err, "error retrieving working directory")
