@@ -56,6 +56,7 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
       - airflow_logs:/usr/local/airflow/logs
+    {{ .AirflowEnvFile }}
 
   webserver:
     image: {{ .AirflowImage }}
@@ -83,4 +84,5 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
       - airflow_logs:/usr/local/airflow/logs
+    {{ .AirflowEnvFile }}
 `)
