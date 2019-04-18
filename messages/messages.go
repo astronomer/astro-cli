@@ -41,6 +41,10 @@ var (
 	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:%s/admin/"
 	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:%s/postgres"
 
+	ENV_PATH      = "Error looking for \"%s\""
+	ENV_FOUND     = "Env file \"%s\" found. Loading...\n"
+	ENV_NOT_FOUND = "Env file \"%s\" not found. Skipping...\n"
+
 	HOUSTON_BASIC_AUTH_DISABLED      = "Basic authentication is disabled, conact administrator or defer back to oAuth"
 	HOUSTON_DEPLOYMENT_HEADER        = "Authenticated to %s \n\n"
 	HOUSTON_DEPLOYING_PROMPT         = "Deploying: %s\n"
@@ -56,6 +60,8 @@ var (
 	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s\n"
 	REGISTRY_AUTH_FAIL           = "Failed to authenticate to the registry, this can occur when registry is offline. Until authenticated you will not be able to push new images to your Airflow clusters\n"
 	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro airflow deploy [releaseName] -f` to force deploy."
+
+	SETTINGS_PATH = "Error looking for airflow_settings.yaml"
 
 	NA = "N/A"
 )
