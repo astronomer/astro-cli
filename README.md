@@ -60,6 +60,27 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.3.1
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
+### Installing on Windows
+
+> Note: Make sure you have Windows 10 and Docker installed
+
+1. Download latest release of astro-cli using this [astro_0.8.2_windows_386.zip](https://github.com/astronomer/astro-cli/releases/download/v0.8.2/astro_0.8.2_windows_386.zip)
+2. Extract `astro_0.8.2_windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
+3. Open cmd or PowerShell console and run:
+
+```
+C:\Windows\system32>astro version
+Astro CLI Version: 0.8.2
+Git Commit: f5cdab8f832da3c6184a7ac167b491e3bac3c022
+```
+
+#### Troubleshooting:
+
+1. Make sure you go through instruction to install Docker on windows properly https://docs.docker.com/docker-for-windows/install/
+2. Make sure you enabled Hyper-V, it's requre to Docker and Linux Containers, also plesae review this document
+https://docs.docker.com/docker-for-windows/troubleshoot/
+
+
 ## Getting Started
 
 1. Confirm the install worked:
@@ -74,13 +95,13 @@ $ astro
 $ mkdir hello-astro && cd hello-astro
 $ astro airflow init
 ```
-    
+
 This will generate a skeleton project directory:
 
 ```
 .
 ├── dags
-│   ├── example-dag.py
+│   ├── example-dag.py
 ├── Dockerfile
 ├── include
 ├── packages.txt
@@ -139,8 +160,8 @@ $ make install
 $ astro
 ```
 
-### Testing Locally 
-astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to 
+### Testing Locally
+astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to
 
 1. setup both [houston-api](https://github.com/astronomerio/houston-api) and [orbit-ui](https://github.com/astronomerio/orbit-ui).
 2. edit your global or project config to enable local development
