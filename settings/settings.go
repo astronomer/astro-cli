@@ -155,7 +155,7 @@ func AddPools(id string) {
 				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
-				fmt.Printf("Skipping %s: Pool Slot must be set.", pool.PoolName)
+				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
 			}
 		}
 	}
