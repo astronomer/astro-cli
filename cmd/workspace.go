@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -88,6 +89,13 @@ var (
 		Args:    cobra.ExactArgs(1),
 		RunE:    workspaceUserRm,
 	}
+
+	workspaceUserListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "Print list of user roles",
+		Long:  "Print list of user roles",
+		RunE:  workspaceUserList,
+	}
 )
 
 func init() {
@@ -120,6 +128,9 @@ func init() {
 	// workspace user remove
 	workspaceUserRootCmd.AddCommand(workspaceUserRmCmd)
 	workspaceUserRmCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+
+	// workspace user list
+	workspaceUserRootCmd.AddCommand(workspaceUserListCmd)
 }
 
 func workspaceCreate(cmd *cobra.Command, args []string) error {
@@ -196,4 +207,9 @@ func workspaceSwitch(cmd *cobra.Command, args []string) error {
 	}
 
 	return workspace.Switch(id)
+}
+
+func workspaceUserList(cmd *cobra.Command, args []string) error {
+	fmt.Println("user list")
+	return nil
 }
