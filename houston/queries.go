@@ -299,6 +299,13 @@ var (
 		  updatedAt
 		}
 	  }`
+	WorkspaceUserListRolesRequest = `
+	query GetUserRoles(
+	  ) {
+		getUserRoles(
+		) {
+		}
+	  }`
 	DeploymentLogsGetRequest = `
 	query GetLogs(
 		$deploymentId: Uuid!

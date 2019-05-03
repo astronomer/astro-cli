@@ -50,3 +50,15 @@ func Remove(workspaceId, email string) error {
 	utab.Print()
 	return nil
 }
+
+func ListRoles() error {
+	req := houston.Request{
+		Query:     houston.WorkspaceUserListRolesRequest,
+		Variables: map[string]interface{}{},
+	}
+	_, err := req.Do()
+	if err != nil {
+		return err
+	}
+	return nil
+}

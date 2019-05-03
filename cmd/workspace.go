@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -210,6 +209,5 @@ func workspaceSwitch(cmd *cobra.Command, args []string) error {
 }
 
 func workspaceUserList(cmd *cobra.Command, args []string) error {
-	fmt.Println("user list")
-	return nil
+	return workspace.ListRoles()
 }
