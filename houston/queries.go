@@ -1,6 +1,5 @@
 package houston
 
-
 var (
 	AuthConfigGetRequest = `
 	query GetAuthConfig($redirect: String) {
@@ -220,6 +219,13 @@ var (
 			active
 			createdAt
 			updatedAt
+			roleBindings {
+        		role
+  				user {
+                  id
+                  username
+        		}
+      		}
 		}
 	}`
 
@@ -297,13 +303,6 @@ var (
 		  }
 		  createdAt
 		  updatedAt
-		}
-	  }`
-	WorkspaceUserListRolesRequest = `
-	query GetUserRoles(
-	  ) {
-		getUserRoles(
-		) {
 		}
 	  }`
 	DeploymentLogsGetRequest = `

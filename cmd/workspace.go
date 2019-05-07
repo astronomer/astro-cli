@@ -209,5 +209,9 @@ func workspaceSwitch(cmd *cobra.Command, args []string) error {
 }
 
 func workspaceUserList(cmd *cobra.Command, args []string) error {
-	return workspace.ListRoles()
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+	return workspace.ListRoles(ws)
 }

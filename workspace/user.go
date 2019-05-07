@@ -51,14 +51,28 @@ func Remove(workspaceId, email string) error {
 	return nil
 }
 
-func ListRoles() error {
+func ListRoles(workspaceId string) error {
 	req := houston.Request{
-		Query:     houston.WorkspaceUserListRolesRequest,
-		Variables: map[string]interface{}{},
+		Query:     houston.WorkspacesGetRequest,
+		Variables: map[string]interface{}{"workspaceId": workspaceId},
 	}
-	_, err := req.Do()
+	r, err := req.Do()
+
 	if err != nil {
 		return err
 	}
+	workspace := r.Data.GetWorkspaces[0]
+
+	tab := printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         []string{"USERNAME", "ID", "ROLE"},
+	}
+	for _, role := range workspace.RoleBindings {
+		var color bool
+		tab.AddRow([]string{role.User.Username, role.User.Id, role.Role}, color)
+	}
+
+	tab.Print()
 	return nil
 }

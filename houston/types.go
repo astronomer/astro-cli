@@ -124,6 +124,14 @@ type User struct {
 	// profile
 }
 
+type RoleBinding struct {
+	Role string `json:"role"`
+	User struct {
+		Id       string `json:"id"`
+		Username string `json:"username"`
+	} `json:"user"`
+}
+
 // Workspace contains all components of an Astronomer Workspace
 type Workspace struct {
 	Id          string `json:"id"`
@@ -132,8 +140,9 @@ type Workspace struct {
 	Active      bool   `json:"active"`
 	Users       []User `json:"users"`
 	// groups
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // DeploymentLog contains all log related to deployment components
