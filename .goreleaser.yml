@@ -14,8 +14,8 @@ builds:
   - darwin
   - windows
   goarch:
+  - 386
   - amd64
-  - "386"
   goarm:
   - "6"
   main: .
@@ -25,12 +25,11 @@ builds:
     - goos: windows
       goarch: amd64
 archive:
-  format: tar.gz
+  name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{.Arm }}{{ end }}'
   format_overrides:
-    - goos: windows
-      format: zip
-  name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{
-    .Arm }}{{ end }}'
+  - goos: windows
+    format: zip
+
   files:
   - licence*
   - LICENCE*
