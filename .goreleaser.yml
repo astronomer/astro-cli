@@ -11,6 +11,8 @@ brew:
 build:
   main: main.go
   binary: astro
+  env:
+    - CGO_ENABLED=1
   goos:
     - linux
     - darwin
