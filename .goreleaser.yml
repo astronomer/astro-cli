@@ -12,7 +12,7 @@ build:
   main: main.go
   binary: astro
   env:
-    - CGO_ENABLED=1
+    - CGO_ENABLED=0
   goos:
     - linux
     - darwin
@@ -23,29 +23,22 @@ build:
   goarm:
     - 7
   ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
-archive:
-  format: tar.gz
-  format_overrides:
-    - goos: windows
-      format: zip
-  name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
-  replacements:
-    amd64: 64bit
-    386: 32bit
-    arm: ARM
-    arm64: ARM64
-    darwin: macOS
-    linux: Linux
-    windows: Windows
-  files:
-    - licence*
-    - LICENCE*
-    - license*
-    - LICENSE*
-    - readme*
-    - README*
-    - changelog*
-    - CHANGELOG*
+archives:
+  -
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - licence*
+      - LICENCE*
+      - license*
+      - LICENSE*
+      - readme*
+      - README*
+      - changelog*
+      - CHANGELOG*
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 checksum:

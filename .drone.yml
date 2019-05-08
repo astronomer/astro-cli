@@ -17,7 +17,7 @@ pipeline:
 
   # Cut releases with goreleaser when tagged
   push:
-    image: goreleaser/goreleaser:v0.106-cgo
+    image: goreleaser/goreleaser:v0.106
     secrets: [ github_token ]
     commands:
       - git fetch --no-tags origin +refs/tags/${DRONE_TAG}:refs/tags/${DRONE_TAG}
