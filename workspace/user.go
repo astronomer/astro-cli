@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"fmt"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -12,11 +14,11 @@ var (
 	}
 )
 
-// Add a user to a workspace
-func Add(workspaceId, email string) error {
+// Add a user to a workspace with specified role
+func Add(workspaceId, email, role string) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserAddRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email},
+		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email, "role": role},
 	}
 
 	r, err := req.Do()
@@ -25,9 +27,15 @@ func Add(workspaceId, email string) error {
 	}
 	w := r.Data.AddWorkspaceUser
 
-	utab.AddRow([]string{w.Label, w.Id, email}, false)
-	utab.SuccessMsg = "Successfully added user to workspace"
-	utab.Print()
+	tab := printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "WORKSPACE ID", "EMAIL", "ROLE"},
+	}
+
+	tab.AddRow([]string{w.Label, w.Id, email, role}, false)
+	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
+	tab.Print()
 
 	return nil
 }
@@ -51,6 +59,7 @@ func Remove(workspaceId, email string) error {
 	return nil
 }
 
+// ListRoles print users and roles from a workspace
 func ListRoles(workspaceId string) error {
 	req := houston.Request{
 		Query:     houston.WorkspacesGetRequest,

@@ -123,6 +123,7 @@ func init() {
 	// workspace user add
 	workspaceUserRootCmd.AddCommand(workspaceUserAddCmd)
 	workspaceUserAddCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	workspaceUserAddCmd.PersistentFlags().StringVar(&role, "role", "WORKSPACE_VIEWER", "role assigned to user")
 
 	// workspace user remove
 	workspaceUserRootCmd.AddCommand(workspaceUserRmCmd)
@@ -176,10 +177,13 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
+	if err := validateRole(role); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return workspace.Add(ws, args[0])
+	return workspace.Add(ws, args[0], role)
 }
 
 func workspaceUserRm(cmd *cobra.Command, args []string) error {

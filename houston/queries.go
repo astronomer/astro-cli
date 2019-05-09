@@ -267,8 +267,27 @@ var (
 	}`
 
 	WorkspaceUserAddRequest = `
-	mutation AddWorkspaceUser($workspaceId: Uuid!, $email: String!) {
-		workspaceAddUser(workspaceUuid: $workspaceId, email: $email) {
+	mutation AddWorkspaceUser($workspaceId: Uuid!, $email: String!, $role: Role!) {
+		workspaceAddUser(workspaceUuid: $workspaceId, email: $email, role: $role) {
+			id
+			label
+			description
+			active
+			users {
+				id
+				username
+				roleBindings {
+          			role
+        		}
+			}
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspaceUserUpdateRequest = `
+	mutation WorkspaceUpdateUserRole($workspaceId: Uuid!, $email: String!, $role: Role!) {
+		workspaceUpdateUserRole(workspaceUuid: $workspaceId, email: $email, role: $role) {
 			id
 			label
 			description
