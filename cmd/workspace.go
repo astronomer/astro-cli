@@ -82,8 +82,8 @@ var (
 
 	workspaceUserUpdateCmd = &cobra.Command{
 		Use:   "update user role",
-		Short: "Update a user to a workspace",
-		Long:  "Update a user to a workspace",
+		Short: "Update a user's role for a workspace",
+		Long:  "Update a user's role for a workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE:  workspaceUserUpdate,
 	}
@@ -99,8 +99,8 @@ var (
 
 	workspaceUserListCmd = &cobra.Command{
 		Use:   "list",
-		Short: "Print list of user roles",
-		Long:  "Print list of user roles",
+		Short: "List users in a workspace",
+		Long:  "List users in a workspace",
 		RunE:  workspaceUserList,
 	}
 )
@@ -202,7 +202,6 @@ func workspaceUserUpdate(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
 	if err := validateRole(role); err != nil {
