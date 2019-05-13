@@ -286,19 +286,12 @@ var (
 	}`
 
 	WorkspaceUserUpdateRequest = `
-	mutation WorkspaceUpdateUserRole($workspaceId: Uuid!, $email: String!, $role: Role!) {
-		workspaceUpdateUserRole(workspaceUuid: $workspaceId, email: $email, role: $role) {
-			id
-			label
-			description
-			active
-			users {
-				id
-				username
-			}
-			createdAt
-			updatedAt
-		}
+	mutation workspaceUpdateUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
+		workspaceUpdateUserRole(
+        	workspaceUuid: $workspaceUuid
+            email: $email
+            role: $role
+        )
 	}`
 
 	WorkspaceUserRemoveRequest = `

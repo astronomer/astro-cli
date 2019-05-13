@@ -89,25 +89,15 @@ func ListRoles(workspaceId string) error {
 func UpdateRole(workspaceId, email, role string) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserUpdateRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email, "role": role},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
 	}
 	r, err := req.Do()
 
 	if err != nil {
 		return err
 	}
-	workspace := r.Data.GetWorkspaces[0]
+	newRole := r.Data.WorkspaceUpdateUserRole
 
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"USERNAME", "ID", "ROLE"},
-	}
-	for _, role := range workspace.RoleBindings {
-		var color bool
-		tab.AddRow([]string{role.User.Username, role.User.Id, role.Role}, color)
-	}
-
-	tab.Print()
+	fmt.Printf("Role has been changed from %s to %s for user %s", role, newRole, email)
 	return nil
 }
