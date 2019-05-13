@@ -55,3 +55,13 @@ install: build
 uninstall:
 	$(eval DESTDIR ?= $(GOBIN))
 	rm $(GOBIN)/$(OUTPUT)
+
+ifeq (debug,$(firstword $(MAKECMDGOALS)))
+  # use the rest as arguments for "debug"
+  DEBUG_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(DEBUG_ARGS):;@:)
+endif
+
+debug:
+	echo $(RUN_ARGS)
+	dlv debug github.com/astronomer/astro-cli -- $(DEBUG_ARGS)

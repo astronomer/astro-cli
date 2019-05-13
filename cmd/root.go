@@ -9,6 +9,7 @@ import (
 var (
 	// Debug       bool
 	workspaceId string
+	role        string
 	RootCmd     = &cobra.Command{
 		Use:   "astro",
 		Short: "Astronomer - CLI",

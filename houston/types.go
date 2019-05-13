@@ -3,24 +3,25 @@ package houston
 // Response wraps all houston response structs used for json marashalling
 type Response struct {
 	Data struct {
-		AddWorkspaceUser     *Workspace       `json:"workspaceAddUser,omitempty"`
-		RemoveWorkspaceUser  *Workspace       `json:"workspaceRemoveUser,omitempty"`
-		CreateDeployment     *Deployment      `json:"createDeployment,omitempty"`
-		CreateToken          *AuthUser        `json:"createToken,omitempty"`
-		CreateServiceAccount *ServiceAccount  `json:"createServiceAccount,omitempty"`
-		CreateUser           *AuthUser        `json:"createUser,omitempty"`
-		CreateWorkspace      *Workspace       `json:"createWorkspace,omitempty"`
-		DeleteDeployment     *Deployment      `json:"deleteDeployment,omitempty"`
-		DeleteServiceAccount *ServiceAccount  `json:"deleteServiceAccount,omitempty"`
-		DeleteWorkspace      *Workspace       `json:"deleteWorkspace,omitempty"`
-		GetDeployments       []Deployment     `json:"deployments,omitempty"`
-		GetAuthConfig        *AuthConfig      `json:"authConfig,omitempty"`
-		GetServiceAccounts   []ServiceAccount `json:"serviceAccounts,omitempty"`
-		GetUsers             []User           `json:"users,omitempty"`
-		GetWorkspaces        []Workspace      `json:"workspaces,omitempty"`
-		UpdateDeployment     *Deployment      `json:"updateDeployment,omitempty"`
-		UpdateWorkspace      *Workspace       `json:"updateWorkspace,omitempty"`
-		DeploymentLog        []DeploymentLog  `json:"logs,omitempty"`
+		AddWorkspaceUser        *Workspace       `json:"workspaceAddUser,omitempty"`
+		RemoveWorkspaceUser     *Workspace       `json:"workspaceRemoveUser,omitempty"`
+		CreateDeployment        *Deployment      `json:"createDeployment,omitempty"`
+		CreateToken             *AuthUser        `json:"createToken,omitempty"`
+		CreateServiceAccount    *ServiceAccount  `json:"createServiceAccount,omitempty"`
+		CreateUser              *AuthUser        `json:"createUser,omitempty"`
+		CreateWorkspace         *Workspace       `json:"createWorkspace,omitempty"`
+		DeleteDeployment        *Deployment      `json:"deleteDeployment,omitempty"`
+		DeleteServiceAccount    *ServiceAccount  `json:"deleteServiceAccount,omitempty"`
+		DeleteWorkspace         *Workspace       `json:"deleteWorkspace,omitempty"`
+		GetDeployments          []Deployment     `json:"deployments,omitempty"`
+		GetAuthConfig           *AuthConfig      `json:"authConfig,omitempty"`
+		GetServiceAccounts      []ServiceAccount `json:"serviceAccounts,omitempty"`
+		GetUsers                []User           `json:"users,omitempty"`
+		GetWorkspaces           []Workspace      `json:"workspaces,omitempty"`
+		UpdateDeployment        *Deployment      `json:"updateDeployment,omitempty"`
+		UpdateWorkspace         *Workspace       `json:"updateWorkspace,omitempty"`
+		DeploymentLog           []DeploymentLog  `json:"logs,omitempty"`
+		WorkspaceUpdateUserRole string           `json:"workspaceUpdateUserRole,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -124,6 +125,14 @@ type User struct {
 	// profile
 }
 
+type RoleBinding struct {
+	Role string `json:"role"`
+	User struct {
+		Id       string `json:"id"`
+		Username string `json:"username"`
+	} `json:"user"`
+}
+
 // Workspace contains all components of an Astronomer Workspace
 type Workspace struct {
 	Id          string `json:"id"`
@@ -132,8 +141,9 @@ type Workspace struct {
 	Active      bool   `json:"active"`
 	Users       []User `json:"users"`
 	// groups
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // DeploymentLog contains all log related to deployment components

@@ -1,6 +1,5 @@
 package houston
 
-
 var (
 	AuthConfigGetRequest = `
 	query GetAuthConfig($redirect: String) {
@@ -220,6 +219,13 @@ var (
 			active
 			createdAt
 			updatedAt
+			roleBindings {
+        		role
+  				user {
+                  id
+                  username
+        		}
+      		}
 		}
 	}`
 
@@ -261,8 +267,8 @@ var (
 	}`
 
 	WorkspaceUserAddRequest = `
-	mutation AddWorkspaceUser($workspaceId: Uuid!, $email: String!) {
-		workspaceAddUser(workspaceUuid: $workspaceId, email: $email) {
+	mutation AddWorkspaceUser($workspaceId: Uuid!, $email: String!, $role: Role!) {
+		workspaceAddUser(workspaceUuid: $workspaceId, email: $email, role: $role) {
 			id
 			label
 			description
@@ -270,10 +276,22 @@ var (
 			users {
 				id
 				username
+				roleBindings {
+          			role
+        		}
 			}
 			createdAt
 			updatedAt
 		}
+	}`
+
+	WorkspaceUserUpdateRequest = `
+	mutation workspaceUpdateUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
+		workspaceUpdateUserRole(
+        	workspaceUuid: $workspaceUuid
+            email: $email
+            role: $role
+        )
 	}`
 
 	WorkspaceUserRemoveRequest = `

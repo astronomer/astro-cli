@@ -80,6 +80,14 @@ var (
 		RunE:  workspaceUserAdd,
 	}
 
+	workspaceUserUpdateCmd = &cobra.Command{
+		Use:   "update user role",
+		Short: "Update a user's role for a workspace",
+		Long:  "Update a user's role for a workspace",
+		Args:  cobra.ExactArgs(1),
+		RunE:  workspaceUserUpdate,
+	}
+
 	workspaceUserRmCmd = &cobra.Command{
 		Use:     "remove EMAIL",
 		Aliases: []string{"rm"},
@@ -87,6 +95,13 @@ var (
 		Long:    "Remove a user from a workspace",
 		Args:    cobra.ExactArgs(1),
 		RunE:    workspaceUserRm,
+	}
+
+	workspaceUserListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List users in a workspace",
+		Long:  "List users in a workspace",
+		RunE:  workspaceUserList,
 	}
 )
 
@@ -116,10 +131,18 @@ func init() {
 	// workspace user add
 	workspaceUserRootCmd.AddCommand(workspaceUserAddCmd)
 	workspaceUserAddCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	workspaceUserAddCmd.PersistentFlags().StringVar(&role, "role", "WORKSPACE_VIEWER", "role assigned to user")
+
+	// workspace user update
+	workspaceUserRootCmd.AddCommand(workspaceUserUpdateCmd)
+	workspaceUserUpdateCmd.PersistentFlags().StringVar(&role, "role", "WORKSPACE_VIEWER", "role assigned to user")
 
 	// workspace user remove
 	workspaceUserRootCmd.AddCommand(workspaceUserRmCmd)
 	workspaceUserRmCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+
+	// workspace user list
+	workspaceUserRootCmd.AddCommand(workspaceUserListCmd)
 }
 
 func workspaceCreate(cmd *cobra.Command, args []string) error {
@@ -163,13 +186,30 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
+	}
+
+	if err := validateRole(role); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	return workspace.Add(ws, args[0], role)
+}
 
-	return workspace.Add(ws, args[0])
+func workspaceUserUpdate(cmd *cobra.Command, args []string) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	if err := validateRole(role); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return workspace.UpdateRole(ws, args[0], role)
 }
 
 func workspaceUserRm(cmd *cobra.Command, args []string) error {
@@ -196,4 +236,12 @@ func workspaceSwitch(cmd *cobra.Command, args []string) error {
 	}
 
 	return workspace.Switch(id)
+}
+
+func workspaceUserList(cmd *cobra.Command, args []string) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+	return workspace.ListRoles(ws)
 }

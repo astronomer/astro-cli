@@ -171,7 +171,7 @@ ex.
 ```yaml
 local:
   enabled: true
-  houston: http://localhost:8870/v1
+  houston: http://localhost:8871/v1
   orbit: http://localhost:5000
 ```
 
