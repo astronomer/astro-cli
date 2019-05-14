@@ -1,7 +1,8 @@
 package docker
 
 import (
-	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 
@@ -40,14 +41,24 @@ func ExecLogin(registry, username, password string) error {
 		panic(lookErr)
 	}
 
-	loginCmd := fmt.Sprintf("echo '%s' | docker login %s -u %s --password-stdin", password, registry, username)
-	cmd := exec.Command("/usr/bin/env", "sh", "-c", loginCmd)
+	cmd := exec.Command("docker", "login", registry, "-u", username, "--password-stdin")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, password)
+	}()
+
+	_, err = cmd.CombinedOutput()
 
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	return err
 }
 
 // AirflowCommand is the main method of interaction with Airflow
