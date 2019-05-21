@@ -77,6 +77,7 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+      AIRFLOW__WEBSERVER__RBAC=true
     ports:
       - {{ .AirflowWebserverPort }}:8080
     volumes:
