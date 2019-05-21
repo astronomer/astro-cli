@@ -503,5 +503,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		return errors.Wrapf(err, "command 'docker rmi %s' failed", remoteImage)
 	}
 
+	fmt.Println("Deploy succeeded!")
+
 	return nil
 }
