@@ -95,6 +95,14 @@ var (
 		PreRunE: ensureProjectDir,
 		RunE:    airflowPS,
 	}
+
+	airflowCreateUserCmd = &cobra.Command{
+		Use:     "create_user",
+		Short:   "Create default for local for airflow",
+		Long:    "Create default for local for airflow",
+		PreRunE: ensureProjectDir,
+		RunE:    airflowCreateUser,
+	}
 )
 
 func init() {
@@ -131,6 +139,9 @@ func init() {
 
 	// Airflow PS
 	airflowRootCmd.AddCommand(airflowPSCmd)
+
+	// AirflowRun
+	airflowRootCmd.AddCommand(airflowCreateUserCmd)
 }
 
 func ensureProjectDir(cmd *cobra.Command, args []string) error {
@@ -289,6 +300,14 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	return airflow.PS(config.WorkingPath)
+}
+
+// airflowCreateUser
+func airflowCreateUser(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return airflow.CreateUser(config.WorkingPath)
 }
 
 func acceptableVersion(a string, list []string) bool {
