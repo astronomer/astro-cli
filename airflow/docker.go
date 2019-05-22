@@ -427,7 +427,7 @@ func CreateUser(airflowHome string) error {
 		Tty:          true,
 		Cmd:          strings.Split(airflowCreateUserCmd, " "),
 	}
-	fmt.Println(execConfig.Cmd)
+	fmt.Printf("%s", airflowCreateUserCmd)
 	containerID, err := getWebServerContainerId(airflowHome)
 	if err != nil {
 		return err
