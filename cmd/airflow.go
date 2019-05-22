@@ -173,7 +173,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
-	acceptableAirflowVersions := []string{"1.9.0", "1.10.2"}
+	acceptableAirflowVersions := []string{"1.9.0", "1.10.3"}
 
 	if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
 		return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
