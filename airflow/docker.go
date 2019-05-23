@@ -413,9 +413,9 @@ func getWebServerContainerId(airflowHome string) (string, error) {
 	return "", err
 }
 
-// CreateUser creates using docker exec
+// Run creates using docker exec
 // inspired from https://github.com/docker/cli/tree/master/cli/command/container
-func CreateUser(airflowHome string) error {
+func Run(airflowHome string, args []string) error {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 
 	if err != nil {
@@ -425,9 +425,9 @@ func CreateUser(airflowHome string) error {
 	execConfig := &types.ExecConfig{
 		AttachStdout: true,
 		Tty:          true,
-		Cmd:          strings.Split(airflowCreateUserCmd, " "),
+		Cmd:          args,
 	}
-	fmt.Printf("%s", airflowCreateUserCmd)
+	fmt.Printf("Running: %s", strings.Join(args, " "))
 	containerID, err := getWebServerContainerId(airflowHome)
 	if err != nil {
 		return err
