@@ -37,8 +37,6 @@ const (
 	deployTagPrefix   = "cli-"
 	dockerStateUp     = "Up"
 	dockerStateExited = "Exited"
-	// Default user/pass for local airflow, when RBAC enabled
-	airflowCreateUserCmd = "airflow create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin"
 )
 
 var (

@@ -33,8 +33,8 @@ var (
 	webserverLogs    bool
 
 	RunExample = `
-  # Create default admin user.
-  astro airflow run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+# Create default admin user.
+astro airflow run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
 
 	airflowRootCmd = &cobra.Command{
