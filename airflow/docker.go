@@ -425,7 +425,7 @@ func Run(airflowHome string, args []string) error {
 		Tty:          true,
 		Cmd:          args,
 	}
-	fmt.Printf("Running: %s", strings.Join(args, " "))
+	fmt.Printf("Running: %s\n", strings.Join(args, " "))
 	containerID, err := getWebServerContainerId(airflowHome)
 	if err != nil {
 		return err
@@ -434,7 +434,7 @@ func Run(airflowHome string, args []string) error {
 	response, err := cli.ContainerExecCreate(context.Background(), containerID, *execConfig)
 
 	if err != nil {
-		return err
+		return errors.New("airflow is not running, Start it with 'astro airflow start'")
 	}
 
 	execID := response.ID
