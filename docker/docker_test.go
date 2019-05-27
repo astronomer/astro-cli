@@ -2,7 +2,7 @@ package docker
 
 import "testing"
 
-func TestExecLogin(t *testing.T) {
+func TestExecVersion(t *testing.T) {
 	err := Exec("version")
 	if err != nil {
 		t.Error(err)
