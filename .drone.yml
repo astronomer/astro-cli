@@ -14,8 +14,8 @@ pipeline:
     image: asoldatenko/dnd-golang
     privileged: true
     volumes:
-      - name: dockersock
-        path: /var/run
+    - name: dockersock
+      path: /var/run
     commands:
       - make test
 
