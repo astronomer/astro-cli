@@ -1,11 +1,16 @@
 package docker
 
 import (
-	"io"
-	"log"
+	"context"
 	"os"
 	"os/exec"
 
+	"github.com/docker/docker/registry"
+
+	cliconfig "github.com/docker/cli/cli/config"
+	"github.com/docker/docker/api/types"
+	registrytypes "github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
 
@@ -13,6 +18,13 @@ const (
 	// Docker is the docker command.
 	Docker = "docker"
 )
+
+type loginOptions struct {
+	serverAddress string
+	user          string
+	password      string
+	passwordStdin bool
+}
 
 // Exec executes a docker command
 func Exec(args ...string) error {
@@ -33,32 +45,40 @@ func Exec(args ...string) error {
 	return nil
 }
 
-// ExecLogin executes a docker login
-// Is a workaround for submitting password to stdin without prompting user again
-func ExecLogin(registry, username, password string) error {
-	_, lookErr := exec.LookPath(Docker)
-	if lookErr != nil {
-		panic(lookErr)
-	}
+// ExecLogin executes a docker login similar to docker login command
+func ExecLogin(serverAddress, username, password string) error {
+	var response registrytypes.AuthenticateOKBody
+	ctx := context.Background()
 
-	cmd := exec.Command("docker", "login", registry, "-u", username, "--password-stdin")
-	stdin, err := cmd.StdinPipe()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	go func() {
-		defer stdin.Close()
-		io.WriteString(stdin, password)
-	}()
+	//
+	serverAddress = registry.ConvertToHostname(serverAddress)
 
-	_, err = cmd.CombinedOutput()
+	authConfig := &types.AuthConfig{
+		ServerAddress: serverAddress,
+		Username:      username,
+		Password:      password,
+	}
 
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
+	response, _ = cli.RegistryLogin(ctx, *authConfig)
 
-	return err
+	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+
+	creds := configFile.GetCredentialsStore(serverAddress)
+
+	if err := creds.Store(types.AuthConfig(*authConfig)); err != nil {
+		return errors.Errorf("Error saving credentials: %v", err)
+	}
+
+	if response.Status != "" {
+		return errors.Errorf("Error saving credentials: %v", response.Status)
+	}
+
+	return nil
 }
 
 // AirflowCommand is the main method of interaction with Airflow
@@ -71,7 +91,7 @@ func AirflowCommand(id string, airflowCommand string) string {
 	out, err := cmd.Output()
 
 	if err != nil {
-		errors.Wrapf(err, "error encountered")
+		_ = errors.Wrapf(err, "error encountered")
 	}
 
 	stringOut := string(out)
