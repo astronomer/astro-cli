@@ -13,7 +13,7 @@ pipeline:
   test:
     image: docker:dind
     commands:
-      - make test
+      - go test -v ./...
 
   # Cut releases with goreleaser when tagged
   push:
