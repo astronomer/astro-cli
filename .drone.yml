@@ -12,6 +12,7 @@ pipeline:
   # Test the code
   test:
     image: asoldatenko/dnd-golang
+    privileged: true
     commands:
       - make test
 
