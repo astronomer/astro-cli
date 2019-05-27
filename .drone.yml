@@ -11,9 +11,9 @@ pipeline:
 
   # Test the code
   test:
-    image: docker:dind
+    image: asoldatenko/dnd-golang
     commands:
-      - go test -v ./...
+      - make test
 
   # Cut releases with goreleaser when tagged
   push:
