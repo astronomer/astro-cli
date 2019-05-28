@@ -11,7 +11,9 @@ pipeline:
 
   # Test the code
   test:
-    image: golang
+    image: asoldatenko/dnd-golang
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     commands:
       - make test
 
