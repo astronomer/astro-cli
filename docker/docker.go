@@ -46,7 +46,7 @@ func Exec(args ...string) error {
 }
 
 // ExecLogin executes a docker login similar to docker login command
-func ExecLogin(serverAddress, username, password string) error {
+func ExecLogin(serverAddress, username, token string) error {
 	var response registrytypes.AuthenticateOKBody
 	ctx := context.Background()
 
@@ -61,7 +61,7 @@ func ExecLogin(serverAddress, username, password string) error {
 	authConfig := &types.AuthConfig{
 		ServerAddress: serverAddress,
 		Username:      username,
-		Password:      password,
+		RegistryToken: token,
 	}
 
 	response, _ = cli.RegistryLogin(ctx, *authConfig)
