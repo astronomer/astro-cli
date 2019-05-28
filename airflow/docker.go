@@ -256,7 +256,7 @@ func Start(airflowHome string, envFile string) error {
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
 
 	// Run create_user in separate goroutine to never block airflow start
-	func() {
+	go func() {
 		_ = Run(airflowHome, []string{"airflow", "create_user", "-r", "Admin", "-u", "admin", "-e", "admin@example.com", "-f", "admin", "-l", "user", "-p", "admin"})
 	}()
 
