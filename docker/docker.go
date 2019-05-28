@@ -55,7 +55,7 @@ func ExecLogin(serverAddress, username, password string) error {
 		panic(err)
 	}
 
-	//
+	// Remove http|https from serverAddress
 	serverAddress = registry.ConvertToHostname(serverAddress)
 
 	authConfig := &types.AuthConfig{

@@ -12,10 +12,8 @@ pipeline:
   # Test the code
   test:
     image: asoldatenko/dnd-golang
-    privileged: true
     volumes:
-    - name: dockersock
-      path: /var/run
+      - /var/run/docker.sock:/var/run/docker.sock
     commands:
       - make test
 
