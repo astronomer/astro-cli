@@ -88,7 +88,7 @@ func GetTagFromVersion(airflowVersion string) string {
 	version := CurrVersion
 
 	if !isValidVersion(version) || s.HasPrefix(version, "SNAPSHOT-") {
-		return fmt.Sprintf("master-onbuild-%s", airflowVersion)
+		return fmt.Sprintf("master-%s-onbuild", airflowVersion)
 	} else {
 		return fmt.Sprintf("%s-%s-onbuild", version, airflowVersion)
 	}
