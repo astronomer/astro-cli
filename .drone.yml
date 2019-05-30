@@ -5,7 +5,7 @@ workspace:
 pipeline:
   # Build binary
   build:
-    image: golang
+    image: golang:1.12.5
     commands:
       - make build
 
