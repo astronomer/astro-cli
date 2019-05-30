@@ -11,12 +11,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/docker/libcompose/cli/logger"
-	dockercompose "github.com/docker/libcompose/docker"
-	"github.com/docker/libcompose/docker/ctx"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
-	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
@@ -27,6 +26,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/settings"
+	"github.com/docker/libcompose/cli/logger"
+	dockercompose "github.com/docker/libcompose/docker"
+	"github.com/docker/libcompose/docker/ctx"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -251,6 +254,7 @@ func Start(airflowHome string, envFile string) error {
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 	fmt.Printf(messages.COMPOSE_LINK_WEBSERVER+"\n", parts[len(parts)-1])
 	fmt.Printf(messages.COMPOSE_LINK_POSTGRES+"\n", config.CFG.PostgresPort.GetString())
+
 	return nil
 }
 
@@ -379,6 +383,80 @@ func PS(airflowHome string) error {
 
 	// Flush to stdout
 	return tw.Flush()
+}
+
+// getWebServerContainerId return webserver container id
+func getWebServerContainerId(airflowHome string) (string, error) {
+	projectName, err := projectNameUnique()
+
+	project, err := createProject(projectName, airflowHome, "")
+	if err != nil {
+		return "", errors.Wrap(err, messages.COMPOSE_CREATE_ERROR)
+	}
+
+	psInfo, err := project.Ps(context.Background())
+
+	if err != nil {
+		return "", errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
+	}
+
+	replacer := strings.NewReplacer("_", "", "-", "")
+	strippedProjectName := replacer.Replace(projectName)
+
+	for _, info := range psInfo {
+		if strings.Contains(info["Name"], strippedProjectName) &&
+			strings.Contains(info["Name"], "webserver") {
+			return info["Id"], nil
+		}
+	}
+	return "", err
+}
+
+// Run creates using docker exec
+// inspired from https://github.com/docker/cli/tree/master/cli/command/container
+func Run(airflowHome string, args []string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+
+	if err != nil {
+		return err
+	}
+
+	execConfig := &types.ExecConfig{
+		AttachStdout: true,
+		Tty:          true,
+		Cmd:          args,
+	}
+	fmt.Printf("Running: %s\n", strings.Join(args, " "))
+	containerID, err := getWebServerContainerId(airflowHome)
+	if err != nil {
+		return err
+	}
+
+	response, err := cli.ContainerExecCreate(context.Background(), containerID, *execConfig)
+
+	if err != nil {
+		return errors.New("airflow is not running, Start it with 'astro airflow start'")
+	}
+
+	execID := response.ID
+	if execID == "" {
+		return errors.New("exec ID is empty")
+	}
+
+	execStartCheck := types.ExecStartCheck{
+		Detach: execConfig.Detach,
+		Tty:    execConfig.Tty,
+	}
+
+	resp, _ := cli.ContainerExecAttach(context.Background(), execID, execStartCheck)
+
+	// Read stdout response from container
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(resp.Reader)
+	s := buf.String()
+	fmt.Println(s)
+
+	return err
 }
 
 // Deploy pushes a new docker image

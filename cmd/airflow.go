@@ -32,6 +32,11 @@ var (
 	schedulerLogs    bool
 	webserverLogs    bool
 
+	RunExample = `
+# Create default admin user.
+astro airflow run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+`
+
 	airflowRootCmd = &cobra.Command{
 		Use:   "airflow",
 		Short: "Manage airflow projects and deployments",
@@ -95,6 +100,16 @@ var (
 		PreRunE: ensureProjectDir,
 		RunE:    airflowPS,
 	}
+
+	airflowRunCmd = &cobra.Command{
+		Use:                "run",
+		Short:              "Run any command inside airflow webserver",
+		Long:               "Run any command inside airflow webserver",
+		PreRunE:            ensureProjectDir,
+		RunE:               airflowRun,
+		Example:            RunExample,
+		DisableFlagParsing: true,
+	}
 )
 
 func init() {
@@ -131,6 +146,9 @@ func init() {
 
 	// Airflow PS
 	airflowRootCmd.AddCommand(airflowPSCmd)
+
+	// Airflow Run
+	airflowRootCmd.AddCommand(airflowRunCmd)
 }
 
 func ensureProjectDir(cmd *cobra.Command, args []string) error {
@@ -289,6 +307,16 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	return airflow.PS(config.WorkingPath)
+}
+
+// airflowRun
+func airflowRun(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// Add airflow command, to simplify astro cli usage
+	args = append([]string{"airflow"}, args...)
+	return airflow.Run(config.WorkingPath, args)
 }
 
 func acceptableVersion(a string, list []string) bool {

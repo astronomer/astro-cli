@@ -9,3 +9,4 @@ requirements.txt
 # IDEs
 .idea/
 .vscode/
+.DS_Store
