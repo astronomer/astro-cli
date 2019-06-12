@@ -19,12 +19,13 @@ var (
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
 		RunE:    deploy,
+		Aliases: []string{"airflow deploy"},
 	}
 )
 
 func init() {
 	RootCmd.AddCommand(deployCmd)
-	deployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommited changes")
+	deployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	deployCmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	deployCmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	deployCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
@@ -44,7 +45,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		releaseName = args[0]
 	}
 
-	// Save releasename in config if specified
+	// Save release name in config if specified
 	if len(releaseName) > 0 && saveDeployConfig {
 		config.CFG.ProjectDeployment.SetProjectString(releaseName)
 	}
