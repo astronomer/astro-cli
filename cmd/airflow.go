@@ -54,6 +54,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			deployCmd.Run(cmd, args)
 		},
+		Deprecated: "Please use new command instead `astro deploy DEPLOYMENT [flags]`",
 	}
 
 	airflowStartCmd = &cobra.Command{
