@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -112,7 +113,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 	envExists, err := fileutil.Exists(envFile)
 
 	if err != nil {
-		return "", errors.Wrap(err, fmt.Sprintf(messages.ENV_PATH, envFile))
+		return "", errors.Wrapf(err, messages.ENV_PATH, envFile)
 	}
 
 	if envFile != "" {
@@ -163,17 +164,29 @@ func createProject(projectName, airflowHome string, envFile string) (project.API
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
+	composeCtx := project.Context{
+		ComposeBytes:  [][]byte{[]byte(yaml)},
+		ProjectName:   projectName,
+		LoggerFactory: logger.NewColorLoggerFactory(),
+	}
+
+	// No need to stat then read, just try to read and ignore ENOENT error
+	composeFile := "docker-compose.override.yml"
+	composeBytes, err := ioutil.ReadFile(composeFile)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeFile)
+	}
+	if err == nil {
+		composeCtx.ComposeBytes = append(composeCtx.ComposeBytes, composeBytes)
+
+		// Even though these won't be loaded (as we have provided ComposeBytes) we
+		// need to specify this so that relative volume paths are resolved by
+		// libcompose
+		composeCtx.ComposeFiles = []string{composeFile}
+	}
 
 	// Create the project
-	project, err := dockercompose.NewProject(&ctx.Context{
-		Context: project.Context{
-			ComposeBytes:  [][]byte{[]byte(yaml)},
-			ProjectName:   projectName,
-			LoggerFactory: logger.NewColorLoggerFactory(),
-		},
-	}, nil)
-
-	return project, err
+	return dockercompose.NewProject(&ctx.Context{Context: composeCtx}, nil)
 }
 
 // Start starts a local airflow development cluster
