@@ -2,14 +2,18 @@ package docker
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"os"
 	"os/exec"
 
-	"github.com/docker/docker/registry"
+	"github.com/docker/docker/pkg/jsonmessage"
 
+	clicommand "github.com/docker/cli/cli/command"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/docker/api/types"
-	registrytypes "github.com/docker/docker/api/types/registry"
+
+	//registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
@@ -45,38 +49,74 @@ func Exec(args ...string) error {
 	return nil
 }
 
-// ExecLogin executes a docker login similar to docker login command
-func ExecLogin(serverAddress, username, token string) error {
-	var response registrytypes.AuthenticateOKBody
+// ExecPush does push image to registry using native docker client,
+// instead of using `docker push` in bash
+func ExecPush(serverAddress, token, image string) error {
+	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+
+	authConfig, err := configFile.GetAuthConfig(serverAddress)
+	// TODO: rethink how to reuse creds store
+	authConfig.Password = token
+
+	if err != nil {
+		return errors.Errorf("Error reading credentials: %v", err)
+	}
+
 	ctx := context.Background()
 
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		panic(err)
 	}
+	buf, err := json.Marshal(authConfig)
 
-	// Remove http|https from serverAddress
-	serverAddress = registry.ConvertToHostname(serverAddress)
-
-	authConfig := &types.AuthConfig{
-		ServerAddress: serverAddress,
-		Username:      username,
-		RegistryToken: token,
+	if err != nil {
+		return err
 	}
+	encodedAuth := base64.URLEncoding.EncodeToString(buf)
+	responseBody, err := cli.ImagePush(ctx, image, types.ImagePushOptions{RegistryAuth: encodedAuth})
 
-	response, _ = cli.RegistryLogin(ctx, *authConfig)
-
-	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
-
-	creds := configFile.GetCredentialsStore(serverAddress)
-
-	if err := creds.Store(types.AuthConfig(*authConfig)); err != nil {
-		return errors.Errorf("Error saving credentials: %v", err)
+	if err != nil {
+		return err
 	}
+	defer responseBody.Close()
+	out := clicommand.NewOutStream(os.Stdout)
+	return jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
+	return nil
+}
 
-	if response.Status != "" {
-		return errors.Errorf("Error saving credentials: %v", response.Status)
-	}
+// ExecLogin executes a docker login similar to docker login command
+func ExecLogin(serverAddress, username, token string) error {
+	//var response registrytypes.AuthenticateOKBody
+	//ctx := context.Background()
+	//
+	//cli, err := client.NewClientWithOpts(client.FromEnv)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//// Remove http|https from serverAddress
+	//serverAddress = registry.ConvertToHostname(serverAddress)
+	//
+	//authConfig := &types.AuthConfig{
+	//	ServerAddress: serverAddress,
+	//	Username:      username,
+	//	RegistryToken: token,
+	//}
+
+	//response, _ = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
+
+	//configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+
+	//creds := configFile.GetCredentialsStore(serverAddress)
+
+	//if err := creds.Store(*authConfig); err != nil {
+	//	return errors.Errorf("Error saving credentials: %v", err)
+	//}
+
+	//if response.Status != "" {
+	//	return errors.Errorf("Error saving credentials: %v", response.Status)
+	//}
 
 	return nil
 }
