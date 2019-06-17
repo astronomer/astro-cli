@@ -108,6 +108,9 @@ func ExecLogin(serverAddress, username, token string) error {
 
 	response, _ = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
 
+	// Get this idea from docker login cli
+	authConfig.RegistryToken = ""
+
 	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
 
 	creds := configFile.GetCredentialsStore(serverAddress)
