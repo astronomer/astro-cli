@@ -25,7 +25,7 @@
 [[override]]
   name = "github.com/docker/docker"
   source = "https://github.com/docker/engine.git"
-  revision = "200b524eff60a9c95a22bc2518042ac2ff617d07"
+  revision = "200b524eff60a9c95a22bc2518042ac2ff617d07" # 18.09 branch
 
 [[override]]
   name = "github.com/docker/distribution"
