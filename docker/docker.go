@@ -7,13 +7,15 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/docker/docker/registry"
+
 	"github.com/docker/docker/pkg/jsonmessage"
 
 	clicommand "github.com/docker/cli/cli/command"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/docker/api/types"
 
-	//registrytypes "github.com/docker/docker/api/types/registry"
+	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
@@ -87,36 +89,36 @@ func ExecPush(serverAddress, token, image string) error {
 
 // ExecLogin executes a docker login similar to docker login command
 func ExecLogin(serverAddress, username, token string) error {
-	//var response registrytypes.AuthenticateOKBody
-	//ctx := context.Background()
-	//
-	//cli, err := client.NewClientWithOpts(client.FromEnv)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//// Remove http|https from serverAddress
-	//serverAddress = registry.ConvertToHostname(serverAddress)
-	//
-	//authConfig := &types.AuthConfig{
-	//	ServerAddress: serverAddress,
-	//	Username:      username,
-	//	RegistryToken: token,
-	//}
+	var response registrytypes.AuthenticateOKBody
+	ctx := context.Background()
 
-	//response, _ = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		panic(err)
+	}
 
-	//configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+	// Remove http|https from serverAddress
+	serverAddress = registry.ConvertToHostname(serverAddress)
 
-	//creds := configFile.GetCredentialsStore(serverAddress)
+	authConfig := &types.AuthConfig{
+		ServerAddress: serverAddress,
+		Username:      username,
+		RegistryToken: token,
+	}
 
-	//if err := creds.Store(*authConfig); err != nil {
-	//	return errors.Errorf("Error saving credentials: %v", err)
-	//}
+	response, _ = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
 
-	//if response.Status != "" {
-	//	return errors.Errorf("Error saving credentials: %v", response.Status)
-	//}
+	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+
+	creds := configFile.GetCredentialsStore(serverAddress)
+
+	if err := creds.Store(*authConfig); err != nil {
+		return errors.Errorf("Error saving credentials: %v", err)
+	}
+
+	if response.Status != "" {
+		return errors.Errorf("Error saving credentials: %v", response.Status)
+	}
 
 	return nil
 }
