@@ -583,7 +583,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	// Push image to registry
 	fmt.Println(messages.COMPOSE_PUSHING_IMAGE_PROMPT)
-	err = docker.Exec("push", remoteImage)
+	err = docker.ExecPush(registry, c.Token, remoteImage)
 	if err != nil {
 		return errors.Wrapf(err, "command 'docker push %s' failed", remoteImage)
 	}

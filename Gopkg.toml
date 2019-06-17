@@ -4,11 +4,15 @@
 
 [[constraint]]
   name = "github.com/spf13/cobra"
-  version = "0.0.1"
+  version = "0.0.5"
 
 [[constraint]]
   name = "github.com/spf13/viper"
   revision = "aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5"
+
+[[override]]
+  name = "github.com/spf13/pflag"
+  version = "1.0.3"
 
 [[constraint]]
   branch = "master"
@@ -16,11 +20,12 @@
 
 [[constraint]]
   name = "github.com/docker/libcompose"
-  revision = "57bd716502dcbe1799f026148016022b0f3b989c"
+  revision = "213509acef0fe8f2358f4c0bb977eb3f4889ea15"
 
 [[override]]
   name = "github.com/docker/docker"
-  revision = "a68ae4a2d95b1ff143025a435195af0f1ab30ace"
+  source = "https://github.com/docker/engine.git"
+  revision = "200b524eff60a9c95a22bc2518042ac2ff617d07" # 18.09 branch
 
 [[override]]
   name = "github.com/docker/distribution"
@@ -28,7 +33,7 @@
 
 [[override]]
   name = "github.com/docker/cli"
-  revision = "ef7d8be86c96f48cd05ae692b4ad1c18aaac6940"
+  revision = "v18.09.6"
 
 [[override]]
   name = "github.com/docker/go-metrics"

@@ -30,6 +30,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:47ea4fbe2ab4aeb9808502c51e657041c2e49b36b83fc1c1a349135cdf16342f"
+  name = "github.com/agl/ed25519"
+  packages = [
+    ".",
+    "edwards25519",
+  ]
+  pruneopts = "UT"
+  revision = "5312a61534124124185d41f09206b9fef1d88403"
+
+[[projects]]
+  branch = "master"
   digest = "1:5bb36304653e73c2ced864d49c9f344e7141a7ceef852442edcea212094ebc3c"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
@@ -53,24 +64,38 @@
   version = "v1.0.8"
 
 [[projects]]
-  digest = "1:9bf78e4fb952a8f658f0dcdec30df30253f39d269323164c58e7fb4b42186158"
+  digest = "1:2a5beb63ff7492479d40515f18eb5cfc6b9f10bc1c7d809122006ec5762c0df7"
   name = "github.com/docker/cli"
   packages = [
+    "cli",
+    "cli/command",
     "cli/command/image/build",
     "cli/config",
     "cli/config/configfile",
     "cli/config/credentials",
+    "cli/connhelper",
+    "cli/connhelper/ssh",
+    "cli/debug",
+    "cli/flags",
+    "cli/manifest/store",
+    "cli/manifest/types",
+    "cli/registry/client",
+    "cli/trust",
     "opts",
+    "types",
   ]
   pruneopts = "UT"
-  revision = "ef7d8be86c96f48cd05ae692b4ad1c18aaac6940"
+  revision = "v18.09.6"
 
 [[projects]]
-  digest = "1:348ce79db75befa30c8940e83abfcdff24ebf430855bbc16c551b7af80a9f13c"
+  digest = "1:79dfb2404892354e2dae571e4e7a9977463b0837d7625adbfea360b3d0c44490"
   name = "github.com/docker/distribution"
   packages = [
     ".",
     "digestset",
+    "manifest",
+    "manifest/manifestlist",
+    "manifest/schema2",
     "metrics",
     "reference",
     "registry/api/errcode",
@@ -81,12 +106,13 @@
     "registry/client/transport",
     "registry/storage/cache",
     "registry/storage/cache/memory",
+    "uuid",
   ]
   pruneopts = "UT"
   revision = "6664ec703991875e14419ff4960921cce7678bab"
 
 [[projects]]
-  digest = "1:75e10d1b7ebb276697656a3bccf51fd974d2bbd633775f17e64989d7be93518f"
+  digest = "1:0053d2655a709fabcff3ce2ac19816ad522d094068fa6050daf8c0f6c6130e2e"
   name = "github.com/docker/docker"
   packages = [
     "api",
@@ -132,19 +158,27 @@
     "registry/resumable",
   ]
   pruneopts = "UT"
-  revision = "a68ae4a2d95b1ff143025a435195af0f1ab30ace"
+  revision = "200b524eff60a9c95a22bc2518042ac2ff617d07"
+  source = "https://github.com/docker/engine.git"
 
 [[projects]]
-  digest = "1:82d43dbea74bc51ed1a8beab6dc3ea09185da574e7ab6a96e3804e9b9d55fd2a"
+  digest = "1:8866486038791fe65ea1abf660041423954b1f3fb99ea6a0ad8424422e943458"
   name = "github.com/docker/docker-credential-helpers"
   packages = [
     "client",
     "credentials",
-    "pass",
   ]
   pruneopts = "UT"
   revision = "d68f9aeca33f5fd3f08eeae5e9d175edf4e731d1"
   version = "v0.6.0"
+
+[[projects]]
+  digest = "1:44fd27d0559326eb63ee0b7b5c80832c821761ff6d1b9cc4ad075783485a5837"
+  name = "github.com/docker/go"
+  packages = ["canonical/json"]
+  pruneopts = "UT"
+  revision = "62e5ec7cf43f795986ec658df7cb317255772993"
+  version = "v1.5.1-1"
 
 [[projects]]
   digest = "1:b6b5c3e8da0fb8073cd2886ba249a40f4402b4391ca6eba905a142cceea97a12"
@@ -174,7 +208,7 @@
   version = "v0.3.2"
 
 [[projects]]
-  digest = "1:8fa39293dc9896488c49626447b4bf76ce606ce6ada5536c03c12bc8dbd9f8dc"
+  digest = "1:8d708834282569ad053e76d2922b80edb5edb4fd51c4f53408c55941973e2065"
   name = "github.com/docker/libcompose"
   packages = [
     "cli/logger",
@@ -200,7 +234,7 @@
     "yaml",
   ]
   pruneopts = "UT"
-  revision = "57bd716502dcbe1799f026148016022b0f3b989c"
+  revision = "213509acef0fe8f2358f4c0bb977eb3f4889ea15"
 
 [[projects]]
   branch = "master"
@@ -217,14 +251,6 @@
   pruneopts = "UT"
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
   version = "v1.4.7"
-
-[[projects]]
-  digest = "1:9234b5f0816fc0375452528081d5caaf5891f8a5548acf424d57ac40e8811e26"
-  name = "github.com/gin-gonic/gin"
-  packages = ["json"]
-  pruneopts = "UT"
-  revision = "b869fe1415e4b9eb52f247441830d502aece2d4d"
-  version = "v1.3.0"
 
 [[projects]]
   digest = "1:9a688317f3231e0175b3429033f44411906c0ce119361b7b5019d01375f8cff7"
@@ -267,6 +293,14 @@
   version = "v1.4.0"
 
 [[projects]]
+  digest = "1:88e0b0baeb9072f0a4afbcf12dda615fc8be001d1802357538591155998da21b"
+  name = "github.com/hashicorp/go-version"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "ac23dc3fea5d1a983c43f6a0f6e2c13f0195d8bd"
+  version = "v1.2.0"
+
+[[projects]]
   branch = "master"
   digest = "1:466594e2922a8ca66af07370ea29726c0d40272baaad1158a36cd94baa6367d1"
   name = "github.com/hashicorp/hcl"
@@ -302,14 +336,6 @@
   version = "v1.0"
 
 [[projects]]
-  digest = "1:f5a2051c55d05548d2d4fd23d244027b59fbd943217df8aa3b5e170ac2fd6e1b"
-  name = "github.com/json-iterator/go"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "0ff49de124c6f76f8494e194af75bde0f1a49a29"
-  version = "v1.1.6"
-
-[[projects]]
   digest = "1:737b7bc969e207193639c1f96c7b9d0ed8d6c5b5fa33fa3e0c2adb899a02e388"
   name = "github.com/magiconair/properties"
   packages = ["."]
@@ -326,6 +352,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:12e040850c7c951d0fb7bf0300671f1f2e2aae3fc95c2817c2c01875322ebabc"
+  name = "github.com/miekg/pkcs11"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cb39313ec884f2cd77f4762875fe96aecf68f8e3"
+  version = "v1.0.2"
+
+[[projects]]
   branch = "master"
   digest = "1:12ae6210bdbdad658a9a67fd95cd9c99f7fdbf12f6d36eaf0af704e69dacf4f5"
   name = "github.com/mitchellh/go-homedir"
@@ -340,22 +374,6 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "a4e142e9c047c904fa2f1e144d9a84e6133024bc"
-
-[[projects]]
-  digest = "1:33422d238f147d247752996a26574ac48dcf472976eda7f5134015f06bf16563"
-  name = "github.com/modern-go/concurrent"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94"
-  version = "1.0.3"
-
-[[projects]]
-  digest = "1:e32bdbdb7c377a07a9a46378290059822efdce5c8d96fe71940d87cb4f918855"
-  name = "github.com/modern-go/reflect2"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
-  version = "1.0.1"
 
 [[projects]]
   digest = "1:ee4d4af67d93cc7644157882329023ce9a7bcfce956a079069a9405521c7cc8d"
@@ -488,15 +506,15 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:654214e86a044cfb1815afd41ff2a8e34402bdfafa0dd79fec5452ca1dc1f779"
+  digest = "1:abe9f3f23399646a6263682cacc9e86969f6c7e768f0ef036449926aa24cbbef"
   name = "github.com/spf13/cobra"
   packages = [
     ".",
     "doc",
   ]
   pruneopts = "UT"
-  revision = "7b2c5ac9fc04fc5efafb60700713d4fa609b777b"
-  version = "v0.0.1"
+  revision = "f2b07da1e2c38d5f12845a4f607e2e1018cbb1f5"
+  version = "v0.0.5"
 
 [[projects]]
   branch = "master"
@@ -507,12 +525,12 @@
   revision = "7c0cea34c8ece3fbeb2b27ab9b59511d360fb394"
 
 [[projects]]
-  digest = "1:1b21a2b4058a779f290c7341cd93267492e0ecea6c8b54f64a4a5fd7ff131034"
+  digest = "1:c1b1102241e7f645bc8e0c22ae352e8f0dc6484b6cb4d132fa9f24174e0119e2"
   name = "github.com/spf13/pflag"
   packages = ["."]
   pruneopts = "UT"
-  revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
-  version = "v1.0.0"
+  revision = "298182f68c66c05229eb03ac171abe6e309ee79a"
+  version = "v1.0.3"
 
 [[projects]]
   digest = "1:1c62a87f6a77def3be788ed3d4817731826913f02bad2558ae32010595ffa4c4"
@@ -520,6 +538,29 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5"
+
+[[projects]]
+  digest = "1:3b65d4044b1331df2a369f8e75eef5972eb0c28a90159d25e317db2cee95a3b6"
+  name = "github.com/theupdateframework/notary"
+  packages = [
+    ".",
+    "client",
+    "client/changelist",
+    "cryptoservice",
+    "passphrase",
+    "storage",
+    "trustmanager",
+    "trustmanager/yubikey",
+    "trustpinning",
+    "tuf",
+    "tuf/data",
+    "tuf/signed",
+    "tuf/utils",
+    "tuf/validation",
+  ]
+  pruneopts = "UT"
+  revision = "d6e1431feb32348e0650bf7551ac5cffd01d857b"
+  version = "v0.6.1"
 
 [[projects]]
   branch = "master"
@@ -546,9 +587,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:38cb27d3525635c34e84e2dbc2207c37d10832776997665bf0ddaeae2c861f1f"
+  digest = "1:7eb36c25be2c753fc9cc32929ce16355984cf78bec65069e6b46f11108cd2467"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "pbkdf2",
+    "ssh/terminal",
+  ]
   pruneopts = "UT"
   revision = "9de5f2eaf759b4c4550b3db39fed2e9e5f86f45c"
 
@@ -610,12 +654,16 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/docker/cli/cli/command",
+    "github.com/docker/cli/cli/config",
+    "github.com/docker/docker/api/types",
+    "github.com/docker/docker/client",
+    "github.com/docker/docker/pkg/jsonmessage",
     "github.com/docker/libcompose/cli/logger",
     "github.com/docker/libcompose/docker",
     "github.com/docker/libcompose/docker/ctx",
     "github.com/docker/libcompose/project",
     "github.com/docker/libcompose/project/options",
-    "github.com/gin-gonic/gin/json",
     "github.com/gorilla/websocket",
     "github.com/iancoleman/strcase",
     "github.com/mitchellh/go-homedir",
