@@ -39,7 +39,7 @@ var (
 	COMPOSE_PAUSE_ERROR          = "Error pausing project containers"
 	COMPOSE_RECREATE_ERROR       = "Error building, (re)creating or starting project containers"
 	COMPOSE_PUSHING_IMAGE_PROMPT = "Pushing image to Astronomer registry"
-	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:%s/home"
+	COMPOSE_LINK_WEBSERVER       = "Airflow Webserver: http://localhost:%s"
 	COMPOSE_LINK_POSTGRES        = "Postgres Database: localhost:%s/postgres"
 	COMPOSE_USER_PASSWORD        = "The default credentials are admin:admin"
 
