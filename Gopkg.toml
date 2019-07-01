@@ -28,6 +28,11 @@
   revision = "200b524eff60a9c95a22bc2518042ac2ff617d07" # 18.09 branch
 
 [[override]]
+  name = "github.com/Nvveen/Gotty"
+  source = "https://github.com/ijc25/Gotty"
+  revision = "a8b993ba6abdb0e0c12b0125c603323a71c7790c"
+
+[[override]]
   name = "github.com/docker/distribution"
   revision = "6664ec703991875e14419ff4960921cce7678bab"
 
