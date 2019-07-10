@@ -138,7 +138,6 @@ type Workspace struct {
 	Id          string `json:"id"`
 	Label       string `json:"label"`
 	Description string `json:"description"`
-	Active      bool   `json:"active"`
 	Users       []User `json:"users"`
 	// groups
 	CreatedAt    string        `json:"createdAt"`

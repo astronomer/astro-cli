@@ -214,7 +214,6 @@ var (
 			id
 			label
 			description
-			active
 			createdAt
 			updatedAt
 			roleBindings {
@@ -233,7 +232,6 @@ var (
 			id
 			label
 			description
-			active
 			createdAt
 			updatedAt
 		}
@@ -245,7 +243,6 @@ var (
 			id
 			label
 			description
-			active
 			createdAt
 			updatedAt
 		}
@@ -257,7 +254,6 @@ var (
 			id
 			label
 			description
-			active
 			deploymentCount
 			createdAt
 			updatedAt
@@ -270,7 +266,6 @@ var (
 			id
 			label
 			description
-			active
 			users {
 				id
 				username
@@ -306,7 +301,6 @@ var (
 		  id
 		  label
 		  description
-		  active
 		  users {
 			id
 			username
