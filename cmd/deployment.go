@@ -9,6 +9,13 @@ import (
 var (
 	allDeployments bool
 	executor       string
+	CreateExample = `
+# Create new deployment with Celery executor (default: celery without params).
+astro deployment create new-deployment-name --executor=celery
+
+# Create new deployment with Local executor.
+astro deployment create new-deployment-name-local --executor=local
+`
 
 	deploymentUpdateAttrs = []string{"label"}
 
@@ -24,6 +31,7 @@ var (
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astronomer Deployment",
 		Long:    "Create a new Astronomer Deployment",
+		Example: CreateExample,
 		Args:    cobra.ExactArgs(1),
 		RunE:    deploymentCreate,
 	}
@@ -68,7 +76,7 @@ func init() {
 	// deploymentRootCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment create
-	deploymentCreateCmd.Flags().StringVarP(&executor, "executor", "e", "", "executor")
+	deploymentCreateCmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
 	deploymentRootCmd.AddCommand(deploymentCreateCmd)
 
 	// deployment delete
@@ -101,8 +109,6 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 		executorValue = "LocalExecutor"
 	case "celery":
 		executorValue = "CeleryExecutor"
-	case "kubernetes":
-		executorValue = "KubernetesExecutor"
 	default:
 		executorValue = "CeleryExecutor"
 	}

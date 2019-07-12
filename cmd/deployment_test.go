@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"testing"
 )
 
 
-func TestDeploymentLogsCommand(t *testing.T) {
-	output, err := executeCommand(deploymentRootCmd, "logs")
+func TestDeploymentRootCommand(t *testing.T) {
+	output, err := executeCommand(deploymentRootCmd)
 	if output != "" {
 		t.Errorf("Unexpected output: %v", output)
 	}
@@ -17,12 +16,7 @@ func TestDeploymentLogsCommand(t *testing.T) {
 }
 
 func TestDeploymentCreateCommand(t *testing.T) {
-	var rootCmdArgs []string
-	rootCmd := &cobra.Command{
-		Use: "root",
-		Run: func(_ *cobra.Command, args []string) { rootCmdArgs = args },
-	}
-	output, err := executeCommand(rootCmd)
+	output, err := executeCommand(deploymentCreateCmd)
 	if output != "" {
 		t.Errorf("Unexpected output: %v", output)
 	}
