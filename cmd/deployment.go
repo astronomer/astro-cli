@@ -8,6 +8,7 @@ import (
 
 var (
 	allDeployments bool
+	executor       string
 
 	deploymentUpdateAttrs = []string{"label"}
 
@@ -67,6 +68,7 @@ func init() {
 	// deploymentRootCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
 
 	// deployment create
+	deploymentCreateCmd.Flags().StringVarP(&executor, "executor", "e", "", "executor")
 	deploymentRootCmd.AddCommand(deploymentCreateCmd)
 
 	// deployment delete
@@ -93,7 +95,19 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Create(args[0], ws)
+	var executorValue string
+	switch executor {
+	case "local":
+		executorValue = "LocalExecutor"
+	case "celery":
+		executorValue = "CeleryExecutor"
+	case "kubernetes":
+		executorValue = "KubernetesExecutor"
+	default:
+		executorValue = "CeleryExecutor"
+	}
+
+	return deployment.Create(args[0], ws, map[string]string{"executor": executorValue})
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
