@@ -38,7 +38,7 @@ via `curl`:
 curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 ```
 
-### If you're using Astronomer Enterprise v0.8
+### If you're using Astronomer Enterprise v0.8 or later
 
 via `curl`
 ```
@@ -75,12 +75,11 @@ Astro CLI Version: 0.8.2
 Git Commit: f5cdab8f832da3c6184a7ac167b491e3bac3c022
 ```
 
-#### Troubleshooting:
+#### Troubleshooting
 
 1. Make sure you go through instruction to install Docker on windows properly https://docs.docker.com/docker-for-windows/install/
 2. Make sure you enabled Hyper-V, it's requre to Docker and Linux Containers, also plesae review this document
 https://docs.docker.com/docker-for-windows/troubleshoot/
-
 
 ## Getting Started
 
@@ -139,7 +138,7 @@ $ astro deploy --help
 
 ## Development
 
-How to get started as a developer.
+How to get started as a developer:
 
 1. Build:
 
@@ -162,6 +161,7 @@ $ astro
 ```
 
 ### Testing Locally
+
 astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to
 
 1. setup both [houston-api](https://github.com/astronomerio/houston-api) and [orbit-ui](https://github.com/astronomerio/orbit-ui).
@@ -177,27 +177,21 @@ local:
 ```
 
 ## Docs
+
 Docs (/docs) are generated using the `github.com/spf13/cobra/doc` pkg. Currently this pkg is broken with go vendoring, the following instructions include a workaround
 
 1. Remove the `/vendor/github.com/spf13/cobra` pkg, forcing Go to search your go path for the package instead
 2. `go run gendocs/gendocs.go`
 3. restore `/vendor/github.com/spf13/cobra`
 
-## Versioning
+## Versions
 
-Astronomer Enterprise is under very active development. Because of this we cannot make backwards compatibility guarantees between versions.
+The Astronomer platform is under very active development. Because of this we cannot make backwards compatibility guarantees between versions.
 
-THe astro-cli is following a semantic versioning scheme
+The astro-cli is following a semantic versioning scheme
 
 `{MAJOR_RELEASE}.{MINOR_RELEASE}.{PATCH_RELEASE}`
 
 with all releases up until 1.0.0 considered beta.
 
-
-### Compatibility
-Starting with `v0.3.3` the astro-cli began tightly tracking the platform release versioning, this means that compatibility is only guaranteed between matching __minor__ versions of the platform and the astro-cli.
-
-ie. astro-cli `v0.4.0` is guaranteed to be compatible with houston-api `v0.4.x` but with houston-api `v0.5.x`
-
-### Note
-These changes were introduced platform wide with v0.4.0
+`astro-cli` tightly tracks the platform release versioning, this means that compatibility is only guaranteed between matching __minor__ versions of the platform and the astro-cli. ie. astro-cli `v0.9.0` is guaranteed to be compatible with houston-api `v0.9.x` but not houston-api `v0.10.x`
