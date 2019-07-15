@@ -94,7 +94,7 @@ $ astro
 
 ```
 $ mkdir hello-astro && cd hello-astro
-$ astro airflow init
+$ astro dev init
 ```
 
 This will generate a skeleton project directory:
@@ -114,7 +114,7 @@ Dags can go in the `dags` folder, custom airflow plugins in `plugins`, python pa
 
 1. Start airflow
 
-Run `astro airflow start` to start a local version of airflow on your machine. This will spin up a few locally running docker containers - one for the airflow scheduler, one for the webserver, and one for postgres.
+Run `astro dev start` to start a local version of airflow on your machine. This will spin up a few locally running docker containers - one for the airflow scheduler, one for the webserver, and one for postgres.
 (Run `docker ps` to verify)
 
 ## Help
