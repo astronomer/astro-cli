@@ -12,16 +12,16 @@ var (
 	since  time.Duration
 	logsExample = `
   # Return logs for last 5 minutes of webserver logs and output them.
-  astro logs webserver example-deployment-uuid
+  astro deployment logs webserver example-deployment-uuid
 
   # Subscribe logs from airflow workers for last 5 min and specify search term, and subscribe to more.
-  astro logs workers example-deployment-uuid --follow --search "some search terms"
+  astro deployment logs workers example-deployment-uuid --follow --search "some search terms"
   
   # Return logs from airflow webserver for last 25 min.
-  astro logs webserver example-deployment-uuid --since 25m
+  astro deployment logs webserver example-deployment-uuid --since 25m
 
   # Subscribe logs from airflow scheduler.
-  astro logs scheduler example-deployment-uuid -f
+  astro deployment logs scheduler example-deployment-uuid -f
 `
 
 	logsCmd = &cobra.Command{
@@ -32,13 +32,22 @@ var (
 		Example: logsExample,
 	}
 
+	logsDeprecatedCmd = &cobra.Command{
+		Use:     "logs",
+		Aliases: []string{"log", "l"},
+		Short:   "Stream logs from an Airflow deployment",
+		Long: "Stream logs from an Airflow deployment",
+		Example: logsExample,
+		Deprecated: "could please use new command instead `astro deployment logs [subcommands] [flags]`",
+	}
+
 	webserverLogsCmd = &cobra.Command{
 		Use:     "webserver",
 		Aliases: []string{"web", "w"},
 		Short:   "Stream logs from an Airflow webserver",
 		Long: `Stream logs from an Airflow webserver. For example:
 
-astro logs webserver YOU_DEPLOYMENT_ID -s string-to-find
+astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: webserverRemoteLogs,
@@ -50,7 +59,7 @@ astro logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 		Short:   "Stream logs from an Airflow scheduler",
 		Long: `Stream logs from an Airflow scheduler. For example:
 
-astro logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
+astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: schedulerRemoteLogs,
@@ -62,7 +71,7 @@ astro logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 		Short:   "Stream logs from Airflow workers",
 		Long: `Stream logs from Airflow workers. For example:
 
-astro logs workers YOU_DEPLOYMENT_ID -s string-to-find
+astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: workersRemoteLogs,
@@ -70,7 +79,7 @@ astro logs workers YOU_DEPLOYMENT_ID -s string-to-find
 )
 
 func init() {
-	RootCmd.AddCommand(logsCmd)
+	RootCmd.AddCommand(logsDeprecatedCmd)
 	webserverLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	webserverLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
 	webserverLogsCmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
@@ -78,6 +87,7 @@ func init() {
 
 	// get airflow webserver logs
 	logsCmd.AddCommand(webserverLogsCmd)
+	logsDeprecatedCmd.AddCommand(webserverLogsCmd)
 
 	workersLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	workersLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
@@ -85,6 +95,7 @@ func init() {
 	workersLogsCmd.Flags().BoolP("help", "h", false, "Help for " + workersLogsCmd.Name())
 	// get airflow workers logs
 	logsCmd.AddCommand(workersLogsCmd)
+	logsDeprecatedCmd.AddCommand(workersLogsCmd)
 
 	schedulerLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	schedulerLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
@@ -92,6 +103,7 @@ func init() {
 	schedulerLogsCmd.Flags().BoolP("help", "h", false, "Help for " + schedulerLogsCmd.Name())
 	// get airflow scheduler logs
 	logsCmd.AddCommand(schedulerLogsCmd)
+	logsDeprecatedCmd.AddCommand(schedulerLogsCmd)
 }
 
 func webserverRemoteLogs(cmd *cobra.Command, args []string) error {

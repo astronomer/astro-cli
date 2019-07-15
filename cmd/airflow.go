@@ -33,13 +33,22 @@ var (
 
 	RunExample = `
 # Create default admin user.
-astro airflow run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
 
 	airflowRootCmd = &cobra.Command{
-		Use:   "airflow",
-		Short: "Manage airflow projects and deployments",
-		Long:  "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
+		Use:     "airflow",
+		Aliases: []string{"a"},
+		Short:   "Manage airflow projects",
+		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
+		Deprecated: "could please use new command instead `astro dev [subcommands] [flags]`",
+	}
+
+	devRootCmd = &cobra.Command{
+		Use:     "dev",
+		Aliases: []string{"d"},
+		Short:   "Manage airflow projects",
+		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
 	}
 
 	airflowInitCmd = &cobra.Command{
@@ -116,15 +125,20 @@ astro airflow run create_user -r Admin -u admin -e admin@example.com -f admin -l
 
 func init() {
 	// Airflow root
+	// Make sure after 1.0 we have only devRootCmd
+	RootCmd.AddCommand(devRootCmd)
 	RootCmd.AddCommand(airflowRootCmd)
 
 	// Airflow init
 	airflowInitCmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
 	airflowInitCmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
+
 	airflowRootCmd.AddCommand(airflowInitCmd)
+	devRootCmd.AddCommand(airflowInitCmd)
 
 	// Airflow deploy
 	airflowRootCmd.AddCommand(airflowDeployCmd)
+	devRootCmd.AddCommand(airflowDeployCmd)
 	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	airflowDeployCmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	airflowDeployCmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
@@ -132,25 +146,31 @@ func init() {
 
 	// Airflow start
 	airflowRootCmd.AddCommand(airflowStartCmd)
+	devRootCmd.AddCommand(airflowStartCmd)
 	airflowStartCmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 
 	// Airflow kill
 	airflowRootCmd.AddCommand(airflowKillCmd)
+	devRootCmd.AddCommand(airflowKillCmd)
 
 	// Airflow logs
 	airflowRootCmd.AddCommand(airflowLogsCmd)
+	devRootCmd.AddCommand(airflowLogsCmd)
 	airflowLogsCmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
 	airflowLogsCmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
 	airflowLogsCmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
 
 	// Airflow stop
 	airflowRootCmd.AddCommand(airflowStopCmd)
+	devRootCmd.AddCommand(airflowStopCmd)
 
 	// Airflow PS
 	airflowRootCmd.AddCommand(airflowPSCmd)
+	devRootCmd.AddCommand(airflowPSCmd)
 
 	// Airflow Run
 	airflowRootCmd.AddCommand(airflowRunCmd)
+	devRootCmd.AddCommand(airflowRunCmd)
 }
 
 func ensureProjectDir(cmd *cobra.Command, args []string) error {
