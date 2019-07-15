@@ -9,11 +9,12 @@ Usage:
   astro [command]
 
 Available Commands:
-  airflow         Manage airflow projects and deployments
   auth            Manage astronomer identity
   cluster         Manage Astronomer EE clusters
   config          Manage astro project configurations
+  deploy          Deploy an airflow project
   deployment      Manage airflow deployments
+  dev             Manage airflow projects and deployments
   help            Help about any command
   service-account Manage astronomer service accounts
   upgrade         Check for newer version of Astronomer CLI
@@ -129,11 +130,11 @@ $ astro help
 Or for subcommands:
 
 ```
-$ astro airflow --help
+$ astro dev --help
 ```
 
 ```
-$ astro airflow deploy --help
+$ astro deploy --help
 ```
 
 ## Development
