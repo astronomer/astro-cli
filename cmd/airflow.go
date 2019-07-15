@@ -38,7 +38,7 @@ astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l use
 
 	airflowRootCmd = &cobra.Command{
 		Use:     "airflow",
-		Aliases: []string{"a", "dev"},
+		Aliases: []string{"a"},
 		Short:   "Manage airflow projects",
 		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
 		Deprecated: "could please use new command instead `astro dev [subcommands] [flags]`",
