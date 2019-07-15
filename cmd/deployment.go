@@ -78,6 +78,9 @@ func init() {
 
 	// deployment update
 	deploymentRootCmd.AddCommand(deploymentUpdateCmd)
+
+	// deployment logs
+	deploymentRootCmd.AddCommand(logsCmd)
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
