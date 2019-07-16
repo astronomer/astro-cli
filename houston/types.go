@@ -26,12 +26,18 @@ type Response struct {
 	Errors []Error `json:"errors,omitempty"`
 }
 
+type AuthProvider struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	Url         string `json:"url"`
+}
+
 // AuthConfig holds data related to oAuth and basic authentication
 type AuthConfig struct {
-	LocalEnabled  bool `json:"localEnabled"`
-	GoogleEnabled bool `json:"googleEnabled"`
-	GithubEnabled bool `json:"githubEnabled"`
-	Auth0Enabled  bool `json:"auth0Enabled"`
+	LocalEnabled  bool           `json:"localEnabled"`
+	PublicSignup  bool           `json:"publicSignup"`
+	InitialSignup bool           `json:"initialSignup"`
+	AuthProvider  []AuthProvider `json:"providers"`
 }
 
 type AuthUser struct {
