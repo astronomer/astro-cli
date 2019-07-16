@@ -5,10 +5,13 @@ var (
 	query GetAuthConfig($redirect: String) {
 		authConfig(redirect: $redirect) {
 			localEnabled
-			googleEnabled
-			githubEnabled
-			auth0Enabled
-			googleOAuthUrl
+			publicSignup
+			initialSignup
+			providers {
+				name
+        		displayName
+				url
+      		}
 		}
 	}`
 
