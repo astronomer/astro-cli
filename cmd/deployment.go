@@ -15,6 +15,9 @@ astro deployment create new-deployment-name --executor=celery
 
 # Create new deployment with Local executor.
 astro deployment create new-deployment-name-local --executor=local
+
+# Create new deployment with Kubernetes executor.
+astro deployment create new-deployment-name-k8s --executor=k8s
 `
 
 	deploymentUpdateAttrs = []string{"label"}
