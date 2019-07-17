@@ -37,7 +37,7 @@ type AuthConfig struct {
 	LocalEnabled  bool           `json:"localEnabled"`
 	PublicSignup  bool           `json:"publicSignup"`
 	InitialSignup bool           `json:"initialSignup"`
-	AuthProvider  []AuthProvider `json:"providers"`
+	AuthProviders  []AuthProvider `json:"providers"`
 }
 
 type AuthUser struct {
