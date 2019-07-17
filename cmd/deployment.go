@@ -109,6 +109,8 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 		executorValue = "LocalExecutor"
 	case "celery":
 		executorValue = "CeleryExecutor"
+	case "kubernetes", "k8s":
+		executorValue = "KubernetesExecutor"
 	default:
 		executorValue = "CeleryExecutor"
 	}
