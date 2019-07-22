@@ -28,7 +28,7 @@ func Create(email string) error {
 
 	resp, err := req.Do()
 	if err != nil {
-		return errors.New("user creation is disabled")
+		return errors.New("User creation is disabled")
 	}
 
 	authUser := resp.Data.CreateUser
