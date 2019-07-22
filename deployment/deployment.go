@@ -38,12 +38,11 @@ func Create(label, ws string, deploymentConfig map[string]string) error {
 	}
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
 
-	var splitted []string
+	splitted := []string{"Celery", ""}
+
 	if deploymentConfig["executor"] != "" {
 		// trim executor from console message
 		splitted = camelcase.Split(deploymentConfig["executor"])
-	} else {
-		splitted = []string{"Celery", ""}
 	}
 
 	tab.SuccessMsg =
