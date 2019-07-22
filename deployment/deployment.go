@@ -7,6 +7,8 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+
+	"github.com/fatih/camelcase"
 )
 
 var (
@@ -35,12 +37,24 @@ func Create(label, ws string, deploymentConfig map[string]string) error {
 		return err
 	}
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
-	tab.SuccessMsg =
-		fmt.Sprintf("\n Successfully created deployment with %s executor", deploymentConfig["executor"]) +
-			". Deployment can be accessed at the following URLs \n" +
-			fmt.Sprintf("\n Airflow Dashboard: https://%s-airflow.%s", d.ReleaseName, c.Domain) +
-			fmt.Sprintf("\n Flower Dashboard: https://%s-flower.%s", d.ReleaseName, c.Domain)
 
+	var splitted []string
+	if deploymentConfig["executor"] != "" {
+		// trim executor from console message
+		splitted = camelcase.Split(deploymentConfig["executor"])
+	} else {
+		splitted = []string{"Celery", ""}
+	}
+
+	tab.SuccessMsg =
+		fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
+			". Deployment can be accessed at the following URLs \n" +
+			fmt.Sprintf("\n Airflow Dashboard: https://%s-airflow.%s", d.ReleaseName, c.Domain)
+
+	// The Flower URL is specific to CeleryExecutor only
+	if deploymentConfig["executor"] == "CeleryExecutor" || deploymentConfig["executor"] == "" {
+		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: https://%s-flower.%s", d.ReleaseName, c.Domain)
+	}
 	tab.Print()
 
 	return nil

@@ -237,6 +237,14 @@
   revision = "213509acef0fe8f2358f4c0bb977eb3f4889ea15"
 
 [[projects]]
+  digest = "1:bbc4aacabe6880bdbce849c64cb061b7eddf39f132af4ea2853ddd32f85fbec3"
+  name = "github.com/fatih/camelcase"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "44e46d280b43ec1531bb25252440e34f1b800b65"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   digest = "1:50a46ab1d5edbbdd55125b4d37f1bf503d0807c26461f9ad7b358d6006641d09"
   name = "github.com/flynn/go-shlex"
@@ -666,6 +674,7 @@
     "github.com/docker/libcompose/docker/ctx",
     "github.com/docker/libcompose/project",
     "github.com/docker/libcompose/project/options",
+    "github.com/fatih/camelcase",
     "github.com/gorilla/websocket",
     "github.com/iancoleman/strcase",
     "github.com/mitchellh/go-homedir",
