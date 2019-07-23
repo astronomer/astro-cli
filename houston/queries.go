@@ -20,11 +20,13 @@ var (
 		$label: String!
 		$type: String = "airflow"
 		$workspaceId: Uuid!
+		$config: JSON!
 	) {
 		createDeployment(
 			label: $label
 			type: $type
 			workspaceUuid: $workspaceId
+            config: $config
 		) {
 			id
 			type
