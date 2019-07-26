@@ -271,7 +271,7 @@ var (
 			id
 			label
 			description
-			users {
+			systemUsers {
 				id
 				username
 				roleBindings {
@@ -306,7 +306,7 @@ var (
 		  id
 		  label
 		  description
-		  users {
+		  systemUsers {
 			id
 			username
 		  }
