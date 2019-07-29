@@ -6,5 +6,5 @@ import "strings"
 var Gitignore = strings.TrimSpace(`
 .git
 .env
-airflow_setttings.yaml
+airflow_settings.yaml
 `)
