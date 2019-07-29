@@ -7,5 +7,5 @@ var Dockerignore = strings.TrimSpace(`
 .astro
 .git
 .env
-airflow_setttings.yaml
+airflow_settings.yaml
 `)
