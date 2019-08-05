@@ -65,8 +65,8 @@ astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l use
 		Long:    "Deploy an airflow project to a given deployment",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
-		Run: func(cmd *cobra.Command, args []string) {
-			deployCmd.Run(cmd, args)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deployCmd.RunE(cmd, args)
 		},
 		Deprecated: "Please use new command instead `astro deploy DEPLOYMENT [flags]`",
 	}
