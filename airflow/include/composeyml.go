@@ -28,7 +28,7 @@ services:
     ports:
       - {{ .PostgresPort }}:5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data:Z
     environment:
       POSTGRES_USER: {{ .PostgresUser }}
       POSTGRES_PASSWORD: {{ .PostgresPassword }}
@@ -52,9 +52,9 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
     volumes:
-      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
-      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
-      - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:Z
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:Z
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:Z
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 
@@ -80,9 +80,9 @@ services:
     ports:
       - {{ .AirflowWebserverPort }}:8080
     volumes:
-      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
-      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
-      - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:Z
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:Z
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:Z
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 `)
