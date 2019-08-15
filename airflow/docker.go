@@ -137,7 +137,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 		AirflowUser:          "astro",
 		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
 		AirflowEnvFile:       envFile,
-		MountLabel:           "Z",
+		MountLabel:           "z",
 	}
 
 	buff := new(bytes.Buffer)
