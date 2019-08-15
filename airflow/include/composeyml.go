@@ -53,8 +53,8 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
-      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
-      - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 
@@ -82,9 +82,9 @@ services:
     ports:
       - {{ .AirflowWebserverPort }}:8080
     volumes:
-      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
-      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:ro
-      - {{ .AirflowHome }}/include:/usr/local/airflow/include:ro
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 `)

@@ -59,6 +59,7 @@ type ComposeConfig struct {
 	AirflowHome          string
 	AirflowUser          string
 	AirflowWebserverPort string
+	MountLabel           string
 }
 
 // projectNameUnique creates a reasonably unique project name based on the hashed
@@ -136,6 +137,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 		AirflowUser:          "astro",
 		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
 		AirflowEnvFile:       envFile,
+		MountLabel:           "Z",
 	}
 
 	buff := new(bytes.Buffer)
