@@ -210,12 +210,8 @@ var (
 	}`
 
 	WorkspacesGetRequest = `
-	query GetWorkspaces($workspaceId: Uuid, $label: String, $userId: Uuid) {
-		workspaces(
-			workspaceUuid: $workspaceId
-			label: $label
-			userUuid: $userId
-		) {
+	query GetWorkspaces {
+		workspaces {
 			id
 			label
 			description
