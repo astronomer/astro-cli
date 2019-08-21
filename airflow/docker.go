@@ -496,12 +496,18 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		return fmt.Errorf("no workspaces with id (%s) found", wsId)
 	}
 
-	w := wsResp.Data.GetWorkspaces[0]
+	var currentWorkspace houston.Workspace
+	for _, workspace := range wsResp.Data.GetWorkspaces {
+		if workspace.Id == wsId {
+			currentWorkspace = workspace
+			break
+		}
+	}
 
 	// Get Deployments from workspace ID
 	deReq := houston.Request{
 		Query:     houston.DeploymentsGetRequest,
-		Variables: map[string]interface{}{"workspaceId": w.Id},
+		Variables: map[string]interface{}{"workspaceId": currentWorkspace.Id},
 	}
 
 	deResp, err := deReq.Do()
@@ -538,7 +544,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		deployMap := map[string]houston.Deployment{}
 		for i, d := range deployments {
 			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), d.Label, d.ReleaseName, w.Label, d.Id}, false)
+			tab.AddRow([]string{strconv.Itoa(index), d.Label, d.ReleaseName, currentWorkspace.Label, d.Id}, false)
 
 			deployMap[strconv.Itoa(index)] = d
 		}
