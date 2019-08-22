@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -180,6 +181,7 @@ func Login(domain string, oAuthOnly bool) error {
 
 		if !isSwitched {
 			// show switch menu with available workspace IDs
+			fmt.Println("\n" + messages.CLI_CHOOSE_WORKSPACE)
 			err := workspace.Switch("")
 			if err != nil {
 				fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
