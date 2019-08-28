@@ -82,7 +82,7 @@ func isValidVersion(version string) bool {
 func GetTagFromVersion(airflowVersion string) string {
 
 	if airflowVersion == "" {
-		airflowVersion = "1.10.3"
+		airflowVersion = "1.10.4"
 	}
 
 	version := CurrVersion
