@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -46,25 +45,19 @@ func runCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 	return completionShells[args[0]](out, cmd)
 }
 
-func runCompletionBash(_ io.Writer, cmd *cobra.Command) error {
-	var buf bytes.Buffer
-	err := cmd.Root().GenBashCompletion(&buf)
+func runCompletionBash(w io.Writer, cmd *cobra.Command) error {
+	err := cmd.Root().GenBashCompletion(w)
 	if err != nil {
 		return fmt.Errorf("error while generating bash completion: %v", err)
 	}
-	code := buf.String()
-	fmt.Print(code)
 	return nil
 }
 
-func runCompletionZsh(_ io.Writer, cmd *cobra.Command) error {
-	var buf bytes.Buffer
-	err := cmd.Root().GenZshCompletion(&buf)
+func runCompletionZsh(w io.Writer, cmd *cobra.Command) error {
+	err := cmd.Root().GenZshCompletion(w)
 	if err != nil {
 		return fmt.Errorf("error while generating bash completion: %v", err)
 	}
-	code := buf.String()
-	fmt.Print(code)
 	return nil
 }
 
