@@ -188,7 +188,7 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
-	if err := validateRole(role); err != nil {
+	if err := validateWorkspaceRole(role); err != nil {
 		return errors.Wrap(err, "failed to find a valid role")
 	}
 
@@ -203,7 +203,7 @@ func workspaceUserUpdate(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
-	if err := validateRole(role); err != nil {
+	if err := validateWorkspaceRole(role); err != nil {
 		return errors.Wrap(err, "failed to find a valid role")
 	}
 
