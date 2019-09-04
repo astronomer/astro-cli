@@ -131,11 +131,11 @@ func init() {
 	// workspace user add
 	workspaceUserRootCmd.AddCommand(workspaceUserAddCmd)
 	workspaceUserAddCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-	workspaceUserAddCmd.PersistentFlags().StringVar(&role, "role", "WORKSPACE_VIEWER", "role assigned to user")
+	workspaceUserAddCmd.PersistentFlags().StringVar(&workspaceRole, "role", "WORKSPACE_VIEWER", "role assigned to user")
 
 	// workspace user update
 	workspaceUserRootCmd.AddCommand(workspaceUserUpdateCmd)
-	workspaceUserUpdateCmd.PersistentFlags().StringVar(&role, "role", "WORKSPACE_VIEWER", "role assigned to user")
+	workspaceUserUpdateCmd.PersistentFlags().StringVar(&workspaceRole, "role", "WORKSPACE_VIEWER", "role assigned to user")
 
 	// workspace user remove
 	workspaceUserRootCmd.AddCommand(workspaceUserRmCmd)
@@ -188,7 +188,7 @@ func workspaceUserAdd(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
-	if err := validateWorkspaceRole(role); err != nil {
+	if err := validateWorkspaceRole(workspaceRole); err != nil {
 		return errors.Wrap(err, "failed to find a valid role")
 	}
 
@@ -203,7 +203,7 @@ func workspaceUserUpdate(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
-	if err := validateWorkspaceRole(role); err != nil {
+	if err := validateWorkspaceRole(workspaceRole); err != nil {
 		return errors.Wrap(err, "failed to find a valid role")
 	}
 

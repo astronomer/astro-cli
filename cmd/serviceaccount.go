@@ -116,11 +116,11 @@ func saCreate(cmd *cobra.Command, args []string) error {
 		return errors.New("must provide a service-account label with the --label (-l) flag")
 	}
 
-	// Silence Usage as we have now validated command input
 	if err := validateRole(role); err != nil {
 		return errors.Wrap(err, "failed to find a valid role")
 	}
 	fullRole := strings.Join([]string{entityType, strings.ToUpper(role)}, "_")
+	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return sa.Create(id, label, category, entityType, fullRole)
 }
