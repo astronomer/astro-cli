@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -45,18 +44,7 @@ var (
 )
 
 func runCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return errors.New("shell not specified")
-	}
-	if len(args) > 1 {
-		return errors.New("too many arguments, expected only the shell type")
-	}
-	run, found := completionShells[args[0]]
-	if !found {
-		return errors.Errorf("unsupported shell type %q", args[0])
-	}
-
-	return run(out, cmd)
+	return completionShells[args[0]](out, cmd)
 }
 
 func runCompletionBash(_ io.Writer, cmd *cobra.Command) error {
@@ -257,6 +245,7 @@ func init() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCompletion(os.Stdout, cmd, args)
 		},
+		Args: cobra.ExactValidArgs(1),
 		ValidArgs: shells,
 	}
 
