@@ -22,16 +22,22 @@ Can be sourced as such
 
 Bash users can as well save it to the file and copy it to:
 	/etc/bash_completion.d/
+
 Correct arguments for SHELL are: "bash" and "zsh".
 Notes:
+
 1) zsh completions requires zsh 5.2 or newer.
 	
 2) macOS users have to install bash-completion framework to utilize
 completion features. This can be done using homebrew:
 	brew install bash-completion
+
 Once installed, you must load bash_completion by adding following
 line to your .profile or .bashrc/.zshrc:
 	source $(brew --prefix)/etc/bash_completion
+
+3) For oh-my-zsh users make sure you have added to your ~/.zshrc
+	autoload -Uz compinit && compinit -C
 `
 
 var (
