@@ -48,6 +48,7 @@ var (
 )
 
 func runCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
+	cmd.Hidden = true
 	return completionShells[args[0]](out, cmd)
 }
 
