@@ -7,9 +7,9 @@ import (
 
 // RootCmd is the astro root command.
 var (
-	// Debug       bool
-	workspaceId string
-	role        string
+	workspaceId   string
+	workspaceRole string
+	role          string
 	RootCmd     = &cobra.Command{
 		Use:   "astro",
 		Short: "Astronomer - CLI",

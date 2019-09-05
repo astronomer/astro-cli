@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"strings"
+
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -9,9 +11,9 @@ import (
 var (
 	deploymentId string
 	userId       string
-	systemSA       bool
-	category       string
-	label          string
+	systemSA     bool
+	category     string
+	label        string
 
 	saRootCmd = &cobra.Command{
 		Use:     "service-account",
@@ -57,6 +59,7 @@ func init() {
 	saCreateCmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
 	saCreateCmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
 	saCreateCmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
+	saCreateCmd.Flags().StringVarP(&role, "role", "r", "viewer", "ROLE")
 
 	saRootCmd.AddCommand(saGetCmd)
 	saGetCmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
@@ -113,10 +116,13 @@ func saCreate(cmd *cobra.Command, args []string) error {
 		return errors.New("must provide a service-account label with the --label (-l) flag")
 	}
 
+	if err := validateRole(role); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
+	}
+	fullRole := strings.Join([]string{entityType, strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return sa.Create(id, label, category, entityType)
+	return sa.Create(id, label, category, entityType, fullRole)
 }
 
 func saDelete(cmd *cobra.Command, args []string) error {

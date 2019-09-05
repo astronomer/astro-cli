@@ -15,7 +15,7 @@ var (
 	}
 )
 
-func Create(id, label, category, entityType string) error {
+func Create(id, label, category, entityType, role string) error {
 	req := houston.Request{
 		Query: houston.ServiceAccountCreateRequest,
 		Variables: map[string]interface{}{
@@ -23,6 +23,7 @@ func Create(id, label, category, entityType string) error {
 			"label":      label,
 			"category":   category,
 			"entityType": entityType,
+			"role":       role,
 		},
 	}
 

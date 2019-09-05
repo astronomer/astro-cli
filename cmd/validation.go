@@ -68,8 +68,20 @@ func coalesceWorkspace() (string, error) {
 	return "", errors.New("no valid workspace source found")
 }
 
-func validateRole(role string) error {
+func validateWorkspaceRole(role string) error {
 	validRoles := []string{"WORKSPACE_ADMIN", "WORKSPACE_EDITOR", "WORKSPACE_VIEWER"}
+
+	for _, validRole := range validRoles {
+		if role == validRole {
+			return nil
+		}
+	}
+	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+}
+
+
+func validateRole(role string) error {
+	validRoles := []string{"admin", "editor", "viewer"}
 
 	for _, validRole := range validRoles {
 		if role == validRole {

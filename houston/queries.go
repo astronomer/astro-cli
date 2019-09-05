@@ -106,12 +106,14 @@ var (
 			$label: String!
 			$category: String
 			$entityType: EntityType!
+			$role: Role!
 		) {
 			createServiceAccount(
 				entityUuid: $entityId
 				label: $label
 				category: $category
 				entityType: $entityType
+				role: $role
 			) {
 				id
 				apiKey
