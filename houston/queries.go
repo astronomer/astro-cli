@@ -113,7 +113,7 @@ var (
 				label: $label
 				category: $category
 				entityType: $entityType
-                role: $role
+				role: $role
 			) {
 				id
 				apiKey
