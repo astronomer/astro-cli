@@ -57,12 +57,10 @@ var (
 
 	DeploymentsGetRequest = `
 	query GetDeployment(
-		$deploymentId: Uuid
 		$workspaceId: Uuid
 		$releaseName: String
 	) {
-		deployments(
-			deploymentUuid: $deploymentId
+		workspaceDeployments(
 			workspaceUuid: $workspaceId
 			releaseName: $releaseName
 		) {
