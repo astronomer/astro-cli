@@ -23,9 +23,7 @@ pipeline:
     secrets: [ github_token ]
     commands:
       - git fetch --tags
-      - goreleaser release --rm-dist --debug
-    when:
-      event: tag
+      - goreleaser release --rm-dist --debug --skip-validate --skip-publish
 
   notify:
     image: plugins/slack
