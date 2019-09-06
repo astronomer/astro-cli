@@ -22,8 +22,8 @@ pipeline:
     image: goreleaser/goreleaser:v0.106
     secrets: [ github_token ]
     commands:
-      - git fetch --no-tags origin +refs/tags/${DRONE_TAG}:refs/tags/${DRONE_TAG}
-      - goreleaser release --rm-dist
+      - git fetch --tags
+      - goreleaser release --rm-dist --debug
     when:
       event: tag
 
