@@ -90,34 +90,35 @@ func ExecPush(serverAddress, token, image string) error {
 // ExecLogin executes a docker login similar to docker login command
 func ExecLogin(serverAddress, username, token string) error {
 	var response registrytypes.AuthenticateOKBody
-	ctx := context.Background()
-
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		panic(err)
-	}
+	// TODO: refactor this part according new docker/cli api
+	//ctx := context.Background()
+	//
+	//cli, err := client.NewClientWithOpts(client.FromEnv)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	// Remove http|https from serverAddress
 	serverAddress = registry.ConvertToHostname(serverAddress)
 
-	authConfig := &types.AuthConfig{
-		ServerAddress: serverAddress,
-		Username:      username,
-		RegistryToken: token,
-	}
-
-	response, _ = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
+	//authConfig := &types.AuthConfig{
+	//	ServerAddress: serverAddress,
+	//	Username:      username,
+	//	RegistryToken: token,
+	//}
+	//
+	//response, _ = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
 
 	// Get this idea from docker login cli
-	authConfig.RegistryToken = ""
+	//authConfig.RegistryToken = ""
 
-	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+	//configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
 
-	creds := configFile.GetCredentialsStore(serverAddress)
+	//creds := configFile.GetCredentialsStore(serverAddress)
 
-	if err := creds.Store(*authConfig); err != nil {
-		return errors.Errorf("Error saving credentials: %v", err)
-	}
+	//if err := creds.Store(*authConfig); err != nil {
+	//	return errors.Errorf("Error saving credentials: %v", err)
+	//}
 
 	if response.Status != "" {
 		return errors.Errorf("Error saving credentials: %v", response.Status)
