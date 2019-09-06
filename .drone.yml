@@ -19,11 +19,13 @@ pipeline:
 
   # Cut releases with goreleaser when tagged
   push:
-    image: goreleaser/goreleaser:v0.106
+    image: goreleaser/goreleaser:v0.113
     secrets: [ github_token ]
     commands:
       - git fetch --tags
-      - goreleaser release --rm-dist --debug --skip-validate --skip-publish
+      - goreleaser release --rm-dist
+    when:
+      event: tag
 
   notify:
     image: plugins/slack
