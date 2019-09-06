@@ -169,7 +169,10 @@ func CreateTar(contextDirectory, dockerfile string) (io.ReadCloser, error) {
 	}
 
 	// And canonicalize dockerfile name to a platform-independent one
-	dockerfileName = archive.CanonicalTarNameForPath(dockerfileName)
+	dockerfileName, err = archive.CanonicalTarNameForPath(dockerfileName)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot canonicalize dockerfile path %s: %v", dockerfileName, err)
+	}
 
 	if _, err = os.Lstat(filename); os.IsNotExist(err) {
 		return nil, fmt.Errorf("Cannot locate Dockerfile: %s", origDockerfile)
