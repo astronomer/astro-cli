@@ -57,7 +57,7 @@ var (
 
 	DeploymentsGetRequest = `
 	query GetDeployment(
-		$workspaceId: Uuid
+		$workspaceId: Uuid!
 		$releaseName: String
 	) {
 		workspaceDeployments(
