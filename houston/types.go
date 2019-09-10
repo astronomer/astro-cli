@@ -13,7 +13,7 @@ type Response struct {
 		DeleteDeployment        *Deployment      `json:"deleteDeployment,omitempty"`
 		DeleteServiceAccount    *ServiceAccount  `json:"deleteServiceAccount,omitempty"`
 		DeleteWorkspace         *Workspace       `json:"deleteWorkspace,omitempty"`
-		GetDeployments          []Deployment     `json:"deployments,omitempty"`
+		GetDeployments          []Deployment     `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig           *AuthConfig      `json:"authConfig,omitempty"`
 		GetServiceAccounts      []ServiceAccount `json:"serviceAccounts,omitempty"`
 		GetUsers                []User           `json:"users,omitempty"`
