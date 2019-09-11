@@ -191,6 +191,16 @@ func createProject(projectName, airflowHome string, envFile string) (project.API
 	return dockercompose.NewProject(&ctx.Context{Context: composeCtx}, nil)
 }
 
+// Find deployment name in deployments slice
+func deploymentNameExists(name string, deployments []houston.Deployment) bool {
+	for _, deployment := range deployments {
+		if deployment.ReleaseName == name {
+			return true
+		}
+	}
+	return false
+}
+
 // Start starts a local airflow development cluster
 func Start(airflowHome string, envFile string) error {
 	// Get project name from config
@@ -530,6 +540,10 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	// Use config deployment if provided
 	if len(name) == 0 {
 		name = config.CFG.ProjectDeployment.GetProjectString()
+	}
+
+	if len(name) != 0 && !deploymentNameExists(name, deployments) {
+		return errors.New(messages.HOUSTON_DEPLOYMENT_NAME_ERROR)
 	}
 
 	// Prompt user for deployment if no deployment passed in
