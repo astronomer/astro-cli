@@ -52,7 +52,7 @@ var (
 	HOUSTON_DEPLOYMENT_HEADER        = "Authenticated to %s \n\n"
 	HOUSTON_DEPLOYING_PROMPT         = "Deploying: %s\n"
 	HOUSTON_NO_DEPLOYMENTS_ERROR     = "No airflow deployments found"
-	HOUSTON_DEPLOYMENT_NAME_ERROR    = "Please specify correct deployment name"
+	HOUSTON_DEPLOYMENT_NAME_ERROR    = "Please specify a valid deployment name"
 	HOUSTON_SELECT_DEPLOYMENT_PROMPT = "Select which airflow deployment you want to deploy to:"
 	HOUSTON_OAUTH_REDIRECT           = "Please visit the following URL, authenticate and paste token in next prompt\n"
 	HOUSTON_INVALID_DEPLOYMENT_KEY   = "Invalid deployment selection\n"
