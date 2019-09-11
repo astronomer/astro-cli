@@ -532,12 +532,11 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		name = config.CFG.ProjectDeployment.GetProjectString()
 	}
 
-	if len(deployments) == 0 {
-		return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
-	}
-
 	// Prompt user for deployment if no deployment passed in
 	if len(name) == 0 || prompt {
+		if len(deployments) == 0 {
+			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
+		}
 
 		fmt.Printf(messages.HOUSTON_DEPLOYMENT_HEADER, cloudDomain)
 		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMPT)
