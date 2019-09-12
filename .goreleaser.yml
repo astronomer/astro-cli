@@ -42,4 +42,4 @@ archives:
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Timestamp }}_checksums.txt'
