@@ -51,13 +51,13 @@ via `curl`
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
 ```
-   
+
 ie:
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s -- v0.3.1
 ```
 
-> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally. 
+> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally.
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
@@ -195,3 +195,9 @@ The astro-cli is following a semantic versioning scheme
 with all releases up until 1.0.0 considered beta.
 
 `astro-cli` tightly tracks the platform release versioning, this means that compatibility is only guaranteed between matching __minor__ versions of the platform and the astro-cli. ie. astro-cli `v0.9.0` is guaranteed to be compatible with houston-api `v0.9.x` but not houston-api `v0.10.x`
+
+## Support
+
+If you need support, start with the [Astronomer documentation](https://www.astronomer.io/docs/).
+
+If you still have questions, you can post on the [Astronomer web forum](https://forum.astronomer.io) or if you are a customer, you can [open a support ticket](https://support.astronomer.io).
