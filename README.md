@@ -51,13 +51,13 @@ via `curl`
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
 ```
-   
+
 ie:
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s -- v0.3.1
 ```
 
-> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally. 
+> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally.
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
@@ -198,5 +198,6 @@ with all releases up until 1.0.0 considered beta.
 
 ## Support
 
-If you need support, start with the [astronomer documentation](https://www.astronomer.io/docs/),
-if you still have questions, or any issues, please create ticket in https://github.com/astronomer/astronomer/issues.
+If you need support, start with the [Astronomer documentation](https://www.astronomer.io/docs/).
+
+If you still have questions, you can post on the [Astronomer web forum](https://forum.astronomer.io) or if you are a customer, you can [open a support ticket](https://support.astronomer.io).
