@@ -19,7 +19,7 @@ pipeline:
 
   # Cut releases with goreleaser when tagged
   push:
-    image: goreleaser/goreleaser:v0.113
+    image: astronomerio/goreleaser:v0.0.1
     secrets: [ github_token ]
     commands:
       - git fetch --tags
