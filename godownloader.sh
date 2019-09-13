@@ -368,10 +368,10 @@ adjust_arch
 
 log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
 
-NAME=${BINARY}_${VERSION}_${OS}_${ARCH}_<no value>
+NAME=${BINARY}_${VERSION}_${OS}_${ARCH}_
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
-CHECKSUM=${PROJECT_NAME}_${VERSION}_<no value>_checksums.txt
+CHECKSUM=${PROJECT_NAME}_${VERSION}_checksums.txt
 CHECKSUM_URL=${GITHUB_DOWNLOAD}/${TAG}/${CHECKSUM}
 
 
