@@ -29,7 +29,7 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-    name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_{{ .Timestamp }}'
+    name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:
       - licence*
       - LICENCE*
@@ -42,4 +42,4 @@ archives:
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Timestamp }}_checksums.txt'
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
