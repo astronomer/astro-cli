@@ -195,3 +195,8 @@ The astro-cli is following a semantic versioning scheme
 with all releases up until 1.0.0 considered beta.
 
 `astro-cli` tightly tracks the platform release versioning, this means that compatibility is only guaranteed between matching __minor__ versions of the platform and the astro-cli. ie. astro-cli `v0.9.0` is guaranteed to be compatible with houston-api `v0.9.x` but not houston-api `v0.10.x`
+
+## Support
+
+If you need support, start with the [astronomer documentation](https://www.astronomer.io/docs/),
+if you still have questions, or any issues, please create ticket in https://github.com/astronomer/astronomer/issues.
