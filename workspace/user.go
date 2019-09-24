@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -15,13 +16,13 @@ var (
 )
 
 // Add a user to a workspace with specified role
-func Add(workspaceId, email, role string) error {
+func Add(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserAddRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email, "role": role},
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -35,19 +36,19 @@ func Add(workspaceId, email, role string) error {
 
 	tab.AddRow([]string{w.Label, w.Id, email, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
-	tab.Print()
+	tab.Print(out)
 
 	return nil
 }
 
 // Remove a user from a workspace
-func Remove(workspaceId, email string) error {
+func Remove(workspaceId, email string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserRemoveRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email},
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -55,17 +56,17 @@ func Remove(workspaceId, email string) error {
 
 	utab.AddRow([]string{w.Label, w.Id, email}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
-	utab.Print()
+	utab.Print(out)
 	return nil
 }
 
 // ListRoles print users and roles from a workspace
-func ListRoles(workspaceId string) error {
+func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceId},
 	}
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 
 	if err != nil {
 		return err
@@ -82,22 +83,22 @@ func ListRoles(workspaceId string) error {
 		tab.AddRow([]string{role.User.Username, role.User.Id, role.Role}, color)
 	}
 
-	tab.Print()
+	tab.Print(out)
 	return nil
 }
 
-func UpdateRole(workspaceId, email, role string) error {
+func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserUpdateRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
 	}
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 
 	if err != nil {
 		return err
 	}
 	newRole := r.Data.WorkspaceUpdateUserRole
 
-	fmt.Printf("Role has been changed from %s to %s for user %s", role, newRole, email)
+	fmt.Fprintf(out, "Role has been changed from %s to %s for user %s", role, newRole, email)
 	return nil
 }

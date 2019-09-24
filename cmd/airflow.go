@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
@@ -35,31 +37,65 @@ var (
 # Create default admin user.
 astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
+)
 
-	airflowRootCmd = &cobra.Command{
-		Use:     "airflow",
-		Aliases: []string{"a"},
-		Short:   "Manage airflow projects",
-		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
+func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:        "airflow",
+		Aliases:    []string{"a"},
+		Short:      "Manage airflow projects",
+		Long:       "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
 		Deprecated: "could please use new command instead `astro dev [subcommands] [flags]`",
 	}
+	cmd.AddCommand(
+		newAirflowInitCmd(client, out),
+		newAirflowDeployCmd(client, out),
+		newAirflowStartCmd(client, out),
+		newAirflowKillCmd(client, out),
+		newAirflowLogsCmd(client, out),
+		newAirflowStopCmd(client, out),
+		newAirflowPSCmd(client, out),
+		newAirflowRunCmd(client, out),
+	)
+	return cmd
+}
 
-	devRootCmd = &cobra.Command{
+func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
 		Short:   "Manage airflow projects",
 		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
 	}
+	cmd.AddCommand(
+		newAirflowInitCmd(client, out),
+		newAirflowDeployCmd(client, out),
+		newAirflowStartCmd(client, out),
+		newAirflowKillCmd(client, out),
+		newAirflowLogsCmd(client, out),
+		newAirflowStopCmd(client, out),
+		newAirflowPSCmd(client, out),
+		newAirflowRunCmd(client, out),
+	)
+	return cmd
+}
 
-	airflowInitCmd = &cobra.Command{
+func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold a new airflow project",
 		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  airflowInit,
 	}
+	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
+	return cmd
+}
 
-	airflowDeployCmd = &cobra.Command{
+func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	deployCmd := newDeployCmd(client, out)
+	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an airflow project",
 		Long:    "Deploy an airflow project to a given deployment",
@@ -70,8 +106,15 @@ astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l use
 		},
 		Deprecated: "Please use new command instead `astro deploy DEPLOYMENT [flags]`",
 	}
+	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
+	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
+	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
+	cmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	return cmd
+}
 
-	airflowStartCmd = &cobra.Command{
+func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "start",
 		Short:   "Start a development airflow cluster",
 		Long:    "Start a development airflow cluster",
@@ -79,40 +122,59 @@ astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l use
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStart,
 	}
+	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	return cmd
+}
 
-	airflowKillCmd = &cobra.Command{
+func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "kill",
 		Short:   "Kill a development airflow cluster",
 		Long:    "Kill a development airflow cluster",
 		PreRunE: ensureProjectDir,
 		RunE:    airflowKill,
 	}
+	return cmd
+}
 
-	airflowLogsCmd = &cobra.Command{
+func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "logs",
 		Short:   "Output logs for a development airflow cluster",
 		Long:    "Output logs for a development airflow cluster",
 		PreRunE: ensureProjectDir,
 		RunE:    airflowLogs,
 	}
+	cmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
+	cmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
+	cmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
+	return cmd
+}
 
-	airflowStopCmd = &cobra.Command{
+func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "stop",
 		Short:   "Stop a development airflow cluster",
 		Long:    "Stop a development airflow cluster",
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStop,
 	}
+	return cmd
+}
 
-	airflowPSCmd = &cobra.Command{
+func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "ps",
 		Short:   "List airflow containers",
 		Long:    "List airflow containers",
 		PreRunE: ensureProjectDir,
 		RunE:    airflowPS,
 	}
+	return cmd
+}
 
-	airflowRunCmd = &cobra.Command{
+func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:                "run",
 		Short:              "Run any command inside airflow webserver",
 		Long:               "Run any command inside airflow webserver",
@@ -121,56 +183,7 @@ astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l use
 		Example:            RunExample,
 		DisableFlagParsing: true,
 	}
-)
-
-func init() {
-	// Airflow root
-	// Make sure after 1.0 we have only devRootCmd
-	RootCmd.AddCommand(devRootCmd)
-	RootCmd.AddCommand(airflowRootCmd)
-
-	// Airflow init
-	airflowInitCmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
-	airflowInitCmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
-
-	airflowRootCmd.AddCommand(airflowInitCmd)
-	devRootCmd.AddCommand(airflowInitCmd)
-
-	// Airflow deploy
-	airflowRootCmd.AddCommand(airflowDeployCmd)
-	devRootCmd.AddCommand(airflowDeployCmd)
-	airflowDeployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
-	airflowDeployCmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
-	airflowDeployCmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
-	airflowDeployCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-
-	// Airflow start
-	airflowRootCmd.AddCommand(airflowStartCmd)
-	devRootCmd.AddCommand(airflowStartCmd)
-	airflowStartCmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
-
-	// Airflow kill
-	airflowRootCmd.AddCommand(airflowKillCmd)
-	devRootCmd.AddCommand(airflowKillCmd)
-
-	// Airflow logs
-	airflowRootCmd.AddCommand(airflowLogsCmd)
-	devRootCmd.AddCommand(airflowLogsCmd)
-	airflowLogsCmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
-	airflowLogsCmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
-	airflowLogsCmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
-
-	// Airflow stop
-	airflowRootCmd.AddCommand(airflowStopCmd)
-	devRootCmd.AddCommand(airflowStopCmd)
-
-	// Airflow PS
-	airflowRootCmd.AddCommand(airflowPSCmd)
-	devRootCmd.AddCommand(airflowPSCmd)
-
-	// Airflow Run
-	airflowRootCmd.AddCommand(airflowRunCmd)
-	devRootCmd.AddCommand(airflowRunCmd)
+	return cmd
 }
 
 func ensureProjectDir(cmd *cobra.Command, args []string) error {

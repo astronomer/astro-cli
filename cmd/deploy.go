@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/pkg/errors"
@@ -20,8 +22,10 @@ Deployment you would like to deploy to Airflow cluster:
 Menu will be presented if you do not specify a deployment name:
 
   $ astro deploy
-`
-	deployCmd = &cobra.Command{
+`)
+
+func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an airflow project",
 		Long:    "Deploy an airflow project to a given deployment",
@@ -31,14 +35,11 @@ Menu will be presented if you do not specify a deployment name:
 		Example: deployExample,
 		Aliases: []string{"airflow deploy"},
 	}
-)
-
-func init() {
-	RootCmd.AddCommand(deployCmd)
-	deployCmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
-	deployCmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
-	deployCmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
-	deployCmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
+	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
+	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
+	cmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	return cmd
 }
 
 func deploy(cmd *cobra.Command, args []string) error {

@@ -1,47 +1,52 @@
 package cmd
 
 import (
+	"io"
+
 	"github.com/astronomer/astro-cli/version"
 	"github.com/spf13/cobra"
 )
 
-var (
-	versionCmd = &cobra.Command{
+func newVersionCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Astronomer CLI version",
 		Long:  "The astro-cli semantic version and git commit tied to that release.",
-		RunE:  printVersion,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return printVersion(cmd, out, args)
+		},
 	}
+	return cmd
+}
 
-	upgradeCmd = &cobra.Command{
+func newUpgradeCheckCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "upgrade",
 		Short: "Check for newer version of Astronomer CLI",
 		Long:  "Check for newer version of Astronomer CLI",
-		RunE:  upgradeCheck,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return upgradeCheck(cmd, out, args)
+		},
 	}
-)
-
-func init() {
-	RootCmd.AddCommand(versionCmd)
-	RootCmd.AddCommand(upgradeCmd)
+	return cmd
 }
 
-func printVersion(cmd *cobra.Command, args []string) error {
+func printVersion(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	err := version.PrintVersion()
+	err := version.PrintVersion(out)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func upgradeCheck(cmd *cobra.Command, args []string) error {
+func upgradeCheck(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	err := version.CheckForUpdate()
+	err := version.CheckForUpdate(out)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"os"
 	"strconv"
 	"strings"
 
@@ -47,7 +48,7 @@ func List() error {
 		}
 	}
 
-	tab.Print()
+	tab.Print(os.Stdout)
 
 	return nil
 }
@@ -119,7 +120,7 @@ func getClusterSelection() (string, error) {
 		tab.AddRow([]string{domain}, colorRow)
 	}
 
-	tab.Print()
+	tab.Print(os.Stdout)
 
 	in := input.InputText("\n> ")
 	i, err := strconv.ParseInt(

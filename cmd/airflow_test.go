@@ -4,37 +4,31 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
-func executeCommandC(root *cobra.Command, args ...string) (c *cobra.Command, output string, err error) {
+func executeCommandC(client *houston.Client, args ...string) (c *cobra.Command, output string, err error) {
 	buf := new(bytes.Buffer)
-	root.SetArgs(args)
-	c, err = root.ExecuteC()
+	rootCmd := NewRootCmd(client, buf)
+	rootCmd.SetOut(buf)
+	rootCmd.SetArgs(args)
+	c, err = rootCmd.ExecuteC()
 	return c, buf.String(), err
 }
 
-func executeCommand(root *cobra.Command, args ...string) (output string, err error) {
-	_, output, err = executeCommandC(root, args...)
+func executeCommand(args ...string) (output string, err error) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	_, output, err = executeCommandC(client, args...)
 	return output, err
 }
 
-func TestDevCommand(t *testing.T) {
-	output, err := executeCommand(RootCmd, "dev")
-	if output != "" {
-		t.Errorf("Unexpected output: %v", output)
-	}
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-}
-
-func TestAirflowCommand(t *testing.T) {
-	output, err := executeCommand(RootCmd, "airflow")
-	if output != "" {
-		t.Errorf("Unexpected output: %v", output)
-	}
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+func TestDevRootCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	output, err := executeCommand("dev")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "astro dev", output)
 }

@@ -2,54 +2,59 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-var (
-	// Flags
-	globalFlag bool
-
-	//Commands
-	configRootCmd = &cobra.Command{
+func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	var globalFlag bool
+	cmd := &cobra.Command{
 		Use:              "config",
 		Short:            "Manage astro project configurations",
 		Long:             "Manage astro project configurations",
-		PersistentPreRun: ensureGlobalFlag,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			ensureGlobalFlag(cmd, args, globalFlag)
+		},
 	}
+	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
+	cmd.AddCommand(
+		newConfigGetCmd(client, out, globalFlag),
+		newConfigSetCmd(client, out, globalFlag),
+	)
+	return cmd
+}
 
-	configGetCmd = &cobra.Command{
+func newConfigGetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get astro project configuration",
 		Long:  "Get astro project configuration",
-		RunE:  configGet,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return configGet(cmd, args, globalFlag)
+		},
 	}
+	return cmd
+}
 
-	configSetCmd = &cobra.Command{
+func newConfigSetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "Set astro project configuration",
 		Long:  "Set astro project configuration",
-		RunE:  configSet,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return configSet(cmd, args, globalFlag)
+		},
 	}
-)
-
-func init() {
-	// Config root
-	RootCmd.AddCommand(configRootCmd)
-	configRootCmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
-
-	// Config get
-	configRootCmd.AddCommand(configGetCmd)
-
-	// Config set
-	configRootCmd.AddCommand(configSetCmd)
+	return cmd
 }
 
-func ensureGlobalFlag(cmd *cobra.Command, args []string) {
+func ensureGlobalFlag(cmd *cobra.Command, args []string, globalFlag bool) {
 	isProjectDir, _ := config.IsProjectDir(config.WorkingPath)
 
 	if !isProjectDir && !globalFlag {
@@ -59,7 +64,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) {
 	}
 }
 
-func configGet(cmd *cobra.Command, args []string) error {
+func configGet(cmd *cobra.Command, args []string, globalFlag bool) error {
 	if len(args) != 1 {
 		return errors.New(messages.CONFIG_PATH_KEY_MISSING_ERROR)
 	}
@@ -81,7 +86,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func configSet(cmd *cobra.Command, args []string) error {
+func configSet(cmd *cobra.Command, args []string, globalFlag bool) error {
 	if len(args) != 2 {
 		return errors.New(messages.CONFIG_INVALID_SET_ARGS)
 	}

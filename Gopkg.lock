@@ -64,6 +64,14 @@
   version = "v1.0.8"
 
 [[projects]]
+  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  pruneopts = "UT"
+  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
+  version = "v1.1.1"
+
+[[projects]]
   digest = "1:2a5beb63ff7492479d40515f18eb5cfc6b9f10bc1c7d809122006ec5762c0df7"
   name = "github.com/docker/cli"
   packages = [
@@ -430,6 +438,14 @@
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  pruneopts = "UT"
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:b6221ec0f8903b556e127c449e7106b63e6867170c2d10a7c058623d086f2081"
   name = "github.com/prometheus/client_golang"
   packages = ["prometheus"]
@@ -546,6 +562,18 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5"
+
+[[projects]]
+  digest = "1:0496f0e99014b7fd0a560c539f51d0882731137b85494142f47e550e4657176a"
+  name = "github.com/stretchr/testify"
+  packages = [
+    "assert",
+    "require",
+    "suite",
+  ]
+  pruneopts = "UT"
+  revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
+  version = "v1.4.0"
 
 [[projects]]
   digest = "1:3b65d4044b1331df2a369f8e75eef5972eb0c28a90159d25e317db2cee95a3b6"
@@ -680,9 +708,12 @@
     "github.com/mitchellh/go-homedir",
     "github.com/pkg/errors",
     "github.com/shurcooL/go/ctxhttp",
+    "github.com/spf13/afero",
     "github.com/spf13/cobra",
     "github.com/spf13/cobra/doc",
     "github.com/spf13/viper",
+    "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/suite",
     "golang.org/x/crypto/ssh/terminal",
   ]
   solver-name = "gps-cdcl"

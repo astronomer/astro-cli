@@ -3,6 +3,7 @@ package version
 import (
 	"errors"
 	"fmt"
+	"io"
 	s "strings"
 
 	"github.com/astronomer/astro-cli/messages"
@@ -16,7 +17,7 @@ var (
 )
 
 // PrintVersion outputs current cli version and git commit if exists
-func PrintVersion() error {
+func PrintVersion(out io.Writer) error {
 	version := CurrVersion
 	gitCommit := CurrCommit
 
@@ -24,33 +25,33 @@ func PrintVersion() error {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
 	}
 
-	fmt.Printf(messages.CLI_CURR_VERSION+"\n", version)
-	fmt.Printf(messages.CLI_CURR_COMMIT+"\n", gitCommit)
+	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)
+	fmt.Fprintf(out,messages.CLI_CURR_COMMIT+"\n", gitCommit)
 	return nil
 }
 
 // CheckForUpdate checks current version against latest on github
-func CheckForUpdate() error {
+func CheckForUpdate(out io.Writer) error {
 	version := CurrVersion
 
 	if !isValidVersion(version) {
-		fmt.Println(messages.CLI_UNTAGGED_PROMPT)
-		fmt.Println(messages.CLI_INSTALL_CMD)
+		fmt.Fprintf(out, messages.CLI_UNTAGGED_PROMPT)
+		fmt.Fprintf(out, messages.CLI_INSTALL_CMD)
 		return nil
 	}
 
 	// fetch latest cli version
 	latestTagResp, err := api.RepoLatestRequest("astronomer", "astro-cli")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(out, err)
 		latestTagResp.TagName = messages.NA
 	}
 
 	// fetch meta data around current cli version
 	currentTagResp, err := api.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
 	if err != nil {
-		fmt.Println("Release info not found, please upgrade.")
-		fmt.Println(messages.CLI_INSTALL_CMD)
+		fmt.Fprintln(out, "Release info not found, please upgrade.")
+		fmt.Fprintln(out, messages.CLI_INSTALL_CMD)
 		return nil
 	}
 
@@ -59,14 +60,14 @@ func CheckForUpdate() error {
 	latestPub := latestTagResp.PublishedAt.Format("2006.01.02")
 	latestTag := latestTagResp.TagName
 
-	fmt.Printf(messages.CLI_CURR_VERSION_DATE+"\n", currentTag, currentPub)
-	fmt.Printf(messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
+	fmt.Fprintf(out, messages.CLI_CURR_VERSION_DATE+"\n", currentTag, currentPub)
+	fmt.Fprintf(out, messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
 
 	if latestTag > currentTag {
-		fmt.Println(messages.CLI_UPGRADE_PROMPT)
-		fmt.Println(messages.CLI_INSTALL_CMD)
+		fmt.Fprintln(out, messages.CLI_UPGRADE_PROMPT)
+		fmt.Fprintln(out, messages.CLI_INSTALL_CMD)
 	} else {
-		fmt.Println(messages.CLI_RUNNING_LATEST)
+		fmt.Fprintln(out, messages.CLI_RUNNING_LATEST)
 	}
 
 	return nil

@@ -2,6 +2,8 @@ package deployment
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"sort"
 
 	"github.com/astronomer/astro-cli/config"
@@ -54,7 +56,7 @@ func Create(label, ws string, deploymentConfig map[string]string) error {
 	if deploymentConfig["executor"] == "CeleryExecutor" || deploymentConfig["executor"] == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: https://%s-flower.%s", d.ReleaseName, c.Domain)
 	}
-	tab.Print()
+	tab.Print(os.Stdout)
 
 	return nil
 }
@@ -73,14 +75,14 @@ func Delete(id string) error {
 	// TODO - add back in tab print once houston returns all relevant information
 	// tab.AddRow([]string{d.Label, d.ReleaseName, d.Id, d.Workspace.Id}, false)
 	// tab.SuccessMsg = "\n Successfully deleted deployment"
-	// tab.Print()
+	// tab.Print(os.Stdout)
 	fmt.Println("\n Successfully deleted deployment")
 
 	return nil
 }
 
 // List all airflow deployments
-func List(ws string, all bool) error {
+func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 	var deployments []houston.Deployment
 	var r *houston.Response
 	var err error
@@ -90,13 +92,13 @@ func List(ws string, all bool) error {
 	}
 
 	if all {
-		r, err = req.Do()
+		r, err = req.DoWithClient(client)
 		if err != nil {
 			return err
 		}
 	} else {
 		req.Variables = map[string]interface{}{"workspaceId": ws}
-		r, err = req.Do()
+		r, err = req.DoWithClient(client)
 		if err != nil {
 			return err
 		}
@@ -114,9 +116,7 @@ func List(ws string, all bool) error {
 		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id}, false)
 	}
 
-	tab.Print()
-
-	return nil
+	return tab.Print(out)
 }
 
 // Update an airflow deployment
@@ -135,7 +135,7 @@ func Update(id string, args map[string]string) error {
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
-	tab.Print()
+	tab.Print(os.Stdout)
 
 	return nil
 }

@@ -1,15 +1,17 @@
 package cmd
 
 import (
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/logs"
 	"github.com/spf13/cobra"
+	"io"
 	"time"
 )
 
 var (
-	search string
-	follow bool
-	since  time.Duration
+	search      string
+	follow      bool
+	since       time.Duration
 	logsExample = `
   # Return logs for last 5 minutes of webserver logs and output them.
   astro deployment logs webserver example-deployment-uuid
@@ -23,25 +25,43 @@ var (
   # Subscribe logs from airflow scheduler.
   astro deployment logs scheduler example-deployment-uuid -f
 `
+)
 
-	logsCmd = &cobra.Command{
+func newLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
 		Short:   "Stream logs from an Airflow deployment",
-		Long: "Stream logs from an Airflow deployment",
+		Long:    "Stream logs from an Airflow deployment",
 		Example: logsExample,
 	}
+	cmd.AddCommand(
+		newWebserverLogsCmd(client, out),
+		newSchedulerLogsCmd(client, out),
+		newWorkersLogsCmd(client, out),
+	)
+	return cmd
+}
 
-	logsDeprecatedCmd = &cobra.Command{
-		Use:     "logs",
-		Aliases: []string{"log", "l"},
-		Short:   "Stream logs from an Airflow deployment",
-		Long: "Stream logs from an Airflow deployment",
-		Example: logsExample,
+func newLogsDeprecatedCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:        "logs",
+		Aliases:    []string{"log", "l"},
+		Short:      "Stream logs from an Airflow deployment",
+		Long:       "Stream logs from an Airflow deployment",
+		Example:    logsExample,
 		Deprecated: "could please use new command instead `astro deployment logs [subcommands] [flags]`",
 	}
+	cmd.AddCommand(
+		newWebserverLogsCmd(client, out),
+		newSchedulerLogsCmd(client, out),
+		newWorkersLogsCmd(client, out),
+	)
+	return cmd
+}
 
-	webserverLogsCmd = &cobra.Command{
+func newWebserverLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "webserver",
 		Aliases: []string{"web", "w"},
 		Short:   "Stream logs from an Airflow webserver",
@@ -52,8 +72,15 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 		Args: cobra.ExactArgs(1),
 		RunE: webserverRemoteLogs,
 	}
+	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	return cmd
+}
 
-	schedulerLogsCmd = &cobra.Command{
+func newSchedulerLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "scheduler",
 		Aliases: []string{"sch", "s"},
 		Short:   "Stream logs from an Airflow scheduler",
@@ -64,8 +91,15 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 		Args: cobra.ExactArgs(1),
 		RunE: schedulerRemoteLogs,
 	}
+	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	return cmd
+}
 
-	workersLogsCmd = &cobra.Command{
+func newWorkersLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "workers",
 		Aliases: []string{"workers", "worker", "wrk"},
 		Short:   "Stream logs from Airflow workers",
@@ -76,34 +110,12 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 		Args: cobra.ExactArgs(1),
 		RunE: workersRemoteLogs,
 	}
-)
-
-func init() {
-	RootCmd.AddCommand(logsDeprecatedCmd)
-	webserverLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
-	webserverLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	webserverLogsCmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
-	webserverLogsCmd.Flags().BoolP("help", "h", false, "Help for " + webserverLogsCmd.Name())
-
-	// get airflow webserver logs
-	logsCmd.AddCommand(webserverLogsCmd)
-	logsDeprecatedCmd.AddCommand(webserverLogsCmd)
-
-	workersLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
-	workersLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	workersLogsCmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
-	workersLogsCmd.Flags().BoolP("help", "h", false, "Help for " + workersLogsCmd.Name())
+	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
 	// get airflow workers logs
-	logsCmd.AddCommand(workersLogsCmd)
-	logsDeprecatedCmd.AddCommand(workersLogsCmd)
-
-	schedulerLogsCmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
-	schedulerLogsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	schedulerLogsCmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
-	schedulerLogsCmd.Flags().BoolP("help", "h", false, "Help for " + schedulerLogsCmd.Name())
-	// get airflow scheduler logs
-	logsCmd.AddCommand(schedulerLogsCmd)
-	logsDeprecatedCmd.AddCommand(schedulerLogsCmd)
+	return cmd
 }
 
 func webserverRemoteLogs(cmd *cobra.Command, args []string) error {

@@ -59,3 +59,7 @@
 [[constraint]]
   name = "github.com/fatih/camelcase"
   version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "1.4.0"

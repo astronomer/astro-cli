@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/cluster"
-
-	"github.com/pkg/errors"
-
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/pkg/errors"
 )
 
 var PermissionsError = errors.New("You do not have the appropriate permissions for that")
@@ -36,10 +34,8 @@ type Request struct {
 	Variables map[string]interface{} `json:"variables"`
 }
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
-func (r *Request) Do() (*Response, error) {
-	api := NewHoustonClient(httputil.NewHTTPClient())
-
+//Do (request) is a wrapper to more easily pass variables to a client.Do request
+func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	doOpts := httputil.DoOptions{
 		Data: r,
 		Headers: map[string]string{
@@ -48,6 +44,11 @@ func (r *Request) Do() (*Response, error) {
 	}
 
 	return api.Do(doOpts)
+}
+
+// Do (request) is a wrapper to more easily pass variables to a client.Do request
+func (r *Request) Do() (*Response, error) {
+	return r.DoWithClient(NewHoustonClient(httputil.NewHTTPClient()))
 }
 
 // Do executes a query against the Houston API, logging out any errors contained in the response object

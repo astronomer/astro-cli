@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
@@ -14,8 +15,10 @@ import (
 )
 
 // basicAuth handles authentication with the houston api
-func basicAuth(username string) (string, error) {
-	password, _ := input.InputPassword(messages.INPUT_PASSWORD)
+func basicAuth(username, password string) (string, error) {
+	if password == "" {
+		password, _ = input.InputPassword(messages.INPUT_PASSWORD)
+	}
 
 	req := houston.Request{
 		Query:     houston.TokenBasicCreateRequest,
@@ -28,27 +31,6 @@ func basicAuth(username string) (string, error) {
 	}
 
 	return resp.Data.CreateToken.Token.Value, nil
-}
-
-func getWorkspaceByLabel(label string) *houston.Workspace {
-
-	req := houston.Request{
-		Query: houston.WorkspacesGetRequest,
-	}
-
-	resp, err := req.Do()
-	if err != nil {
-		return nil
-	}
-	workspaces := resp.Data.GetWorkspaces
-
-	for _, ws := range workspaces {
-		if ws.Label == label {
-			return &ws
-		}
-	}
-
-	return nil
 }
 
 func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace) bool {
@@ -78,7 +60,7 @@ func registryAuth() error {
 		return err
 	}
 
-	if c.Domain == "localhost" {
+	if c.Domain == "localhost" || c.Domain == "houston" {
 		return nil
 	}
 
@@ -95,7 +77,7 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool) error {
+func Login(domain string, oAuthOnly bool, username, password string, client *houston.Client, out io.Writer) error {
 	var token string
 	var err error
 
@@ -132,8 +114,7 @@ func Login(domain string, oAuthOnly bool) error {
 	}
 	authConfig := acResp.Data.GetAuthConfig
 
-	username := ""
-	if !oAuthOnly && authConfig.LocalEnabled {
+	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
 		username = input.InputText(messages.INPUT_USERNAME)
 	}
 
@@ -145,7 +126,7 @@ func Login(domain string, oAuthOnly bool) error {
 		}
 	} else {
 		if authConfig.LocalEnabled {
-			token, err = basicAuth(username)
+			token, err = basicAuth(username, password)
 			if err != nil {
 				return errors.Wrap(err, "local auth login failed")
 			}
@@ -182,7 +163,7 @@ func Login(domain string, oAuthOnly bool) error {
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + messages.CLI_CHOOSE_WORKSPACE)
-			err := workspace.Switch("")
+			err := workspace.Switch("", client, out)
 			if err != nil {
 				fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 			}

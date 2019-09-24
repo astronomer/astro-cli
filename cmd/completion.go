@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/spf13/cobra"
 )
 
@@ -68,22 +68,20 @@ func runCompletionZsh(w io.Writer, cmd *cobra.Command) error {
 	return nil
 }
 
-func init() {
+func newCompletionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	var shells []string
 	for s := range completionShells {
 		shells = append(shells, s)
 	}
-
 	cmd := &cobra.Command{
 		Use:   "completion SHELL",
 		Short: "Generate autocompletions script for the specified shell (bash or zsh)",
 		Long:  completionLong,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCompletion(os.Stdout, cmd, args)
+			return runCompletion(out, cmd, args)
 		},
 		Args: cobra.ExactValidArgs(1),
 		ValidArgs: shells,
 	}
-
-	RootCmd.AddCommand(cmd)
+	return cmd
 }

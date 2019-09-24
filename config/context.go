@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -43,7 +45,7 @@ func GetCurrentContext() (Context, error) {
 }
 
 // PrintContext prints current context to stdOut
-func (c Context) PrintContext() error {
+func (c Context) PrintContext(out io.Writer) error {
 	c, err := c.GetContext()
 	if err != nil {
 		return err
@@ -60,19 +62,19 @@ func (c Context) PrintContext() error {
 	}
 
 	tab.AddRow([]string{cluster, workspace}, false)
-	tab.Print()
+	tab.Print(out)
 
 	return nil
 }
 
 // PrintCurrentContext prints the current config context
-func PrintCurrentContext() error {
+func PrintCurrentContext(out io.Writer) error {
 	c, err := GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	err = c.PrintContext()
+	err = c.PrintContext(out)
 	if err != nil {
 		return err
 	}
@@ -178,14 +180,14 @@ func (c Context) SwitchContext() error {
 
 	tab.AddRow([]string{co.Domain, co.Workspace}, false)
 	tab.SuccessMsg = "\n Switched cluster"
-	tab.Print()
+	tab.Print(os.Stdout)
 
 	return nil
 }
 
 // GetAPIURL returns full Houston API Url for the provided Context
 func (c Context) GetAPIURL() string {
-	if c.Domain == "localhost" {
+	if c.Domain == "localhost" || c.Domain == "houston" {
 		return CFG.LocalHouston.GetString()
 	}
 
@@ -199,7 +201,7 @@ func (c Context) GetAPIURL() string {
 
 // GetWebsocketURL returns full Houston websocket Url for the provided Context
 func (c Context) GetWebsocketURL() string {
-	if c.Domain == "localhost" {
+	if c.Domain == "localhost" || c.Domain == "houston" {
 		return CFG.LocalHouston.GetString()
 	}
 
@@ -213,7 +215,7 @@ func (c Context) GetWebsocketURL() string {
 
 // GetAppURL returns full Houston API Url for the provided Context
 func (c Context) GetAppURL() string {
-	if c.Domain == "localhost" {
+	if c.Domain == "localhost" || c.Domain == "houston" {
 		return CFG.LocalOrbit.GetString()
 	}
 

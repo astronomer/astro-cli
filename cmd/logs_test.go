@@ -2,15 +2,14 @@ package cmd
 
 import (
 	"testing"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 )
 
-
-func TestLogsCommand(t *testing.T) {
-	output, err := executeCommand(RootCmd, "logs")
-	if output != "" {
-		t.Errorf("Unexpected output: %v", output)
-	}
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+func TestDeploymentLogsRootCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	output, err := executeCommand("deployment", "logs")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "astro deployment logs")
 }

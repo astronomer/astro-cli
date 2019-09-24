@@ -1,58 +1,68 @@
 package cmd
 
 import (
+	"io"
+
 	"github.com/astronomer/astro-cli/auth"
 	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/spf13/cobra"
 )
 
 var (
 	oAuthOnly bool
 	domain    string
+)
 
-	authRootCmd = &cobra.Command{
+func newAuthRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Manage astronomer identity",
 		Long:  "Handles authentication to the Astronomer Platform",
 	}
+	cmd.AddCommand(
+		newAuthLoginCmd(client, out),
+		newAuthLogoutCmd(client, out),
+	)
+	return cmd
+}
 
-	authLoginCmd = &cobra.Command{
+func newAuthLoginCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Login to Astronomer services",
 		Long:  "Authenticate to houston-api using oAuth or basic auth.",
-		RunE:  authLogin,
 		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return authLogin(cmd, args, client, out)
+		},
 	}
+	cmd.Flags().BoolVarP(&oAuthOnly, "oauth", "o", false, "do not prompt for local auth")
+	return cmd
+}
 
-	authLogoutCmd = &cobra.Command{
+func newAuthLogoutCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of Astronomer services",
 		Long:  "Logout of Astronomer services",
-		Run:   authLogout,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return authLogout(cmd, args)
+		},
 		Args:  cobra.MaximumNArgs(1),
 	}
-)
-
-func init() {
-	// Auth root
-	RootCmd.AddCommand(authRootCmd)
-
-	// Auth login
-	authRootCmd.AddCommand(authLoginCmd)
-	authLoginCmd.Flags().BoolVarP(&oAuthOnly, "oauth", "o", false, "do not prompt for local auth")
-	// Auth logout
-	authRootCmd.AddCommand(authLogoutCmd)
+	return cmd
 }
 
-func authLogin(cmd *cobra.Command, args []string) error {
+func authLogin(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	if len(args) == 1 {
 		domain = args[0]
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	err := auth.Login(domain, oAuthOnly)
+	// by using "" we are delegating username/password to Login by asking input
+	err := auth.Login(domain, oAuthOnly, "", "", client, out)
 	if err != nil {
 		return err
 	}
@@ -60,7 +70,7 @@ func authLogin(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func authLogout(cmd *cobra.Command, args []string) {
+func authLogout(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		domain = args[0]
 	} else {
@@ -72,4 +82,5 @@ func authLogout(cmd *cobra.Command, args []string) {
 	cmd.SilenceUsage = true
 
 	auth.Logout(domain)
+	return nil
 }

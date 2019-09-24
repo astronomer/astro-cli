@@ -1,6 +1,5 @@
 .astro/
 astro
-Dockerfile
 meta/
 dist/
 packages.txt
@@ -10,3 +9,7 @@ requirements.txt
 .idea/
 .vscode/
 .DS_Store
+coverage.txt
+cover.out
+astro-cli
+vendor/github.com/theupdateframework/notary/Dockerfile

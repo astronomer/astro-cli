@@ -3,22 +3,24 @@ package user
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // Create verifies input before sending a CreateUser API call to houston
-func Create(email string) error {
+func Create(email, password string, client *houston.Client, out io.Writer) error {
 	if len(email) == 0 {
 		email = input.InputText("Email: ")
 	}
-
-	password, _ := input.InputPassword("Password: ")
-
-	passwordVerify, _ := input.InputPassword("Re-enter Password: ")
-	if password != passwordVerify {
-		return errors.New("Passwords do not match")
+	if password == "" {
+		inputPassword, _ := input.InputPassword("Password: ")
+		inputPassword2, _ := input.InputPassword("Re-enter Password: ")
+		if inputPassword != inputPassword2 {
+			return errors.New("Passwords do not match")
+		}
+		password = inputPassword
 	}
 
 	req := houston.Request{
@@ -26,7 +28,7 @@ func Create(email string) error {
 		Variables: map[string]interface{}{"email": email, "password": password},
 	}
 
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return errors.New("User creation is disabled")
 	}
@@ -40,8 +42,7 @@ func Create(email string) error {
 		loginMsg = "Check your email for a verification."
 	}
 
-	msg = fmt.Sprintf(msg, email, loginMsg)
-	fmt.Println(msg)
+	_, err = fmt.Fprintln(out, fmt.Sprintf(msg, email, loginMsg))
 
-	return nil
+	return err
 }

@@ -563,7 +563,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 			deployMap[strconv.Itoa(index)] = d
 		}
 
-		tab.Print()
+		tab.Print(os.Stdout)
 		choice := input.InputText("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
