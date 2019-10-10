@@ -41,6 +41,52 @@ func Create(id, label, category, entityType, role string, client *houston.Client
 	return tab.Print(out)
 }
 
+func CreateUsingDeploymentUUID(deploymentUuid, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query: houston.CreateDeploymentServiceAccountRequest,
+		Variables: map[string]interface{}{
+			"label":          label,
+			"category":       category,
+			"deploymentUuid": deploymentUuid,
+			"role":           role,
+		},
+	}
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	sa := resp.Data.CreateServiceAccount
+
+	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	tab.SuccessMsg = "\n Service account successfully created."
+
+	return tab.Print(out)
+}
+
+func CreateUsingWorkspaceUUID(workspaceUuid, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query: houston.CreateDeploymentServiceAccountRequest,
+		Variables: map[string]interface{}{
+			"label":         label,
+			"category":      category,
+			"workspaceUuid": workspaceUuid,
+			"role":          role,
+		},
+	}
+	resp, err := req.Do()
+	if err != nil {
+		return err
+	}
+
+	sa := resp.Data.CreateServiceAccount
+
+	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	tab.SuccessMsg = "\n Service account successfully created."
+
+	return tab.Print(out)
+}
+
 func Delete(id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.ServiceAccountDeleteRequest,

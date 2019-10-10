@@ -165,7 +165,6 @@ func newWorkspaceUserRmCmd(client *houston.Client, out io.Writer) *cobra.Command
 			return workspaceUserRm(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
 

@@ -126,6 +126,58 @@ var (
 			}
 		}`
 
+	CreateDeploymentServiceAccountRequest = `
+	mutation createDeploymentServiceAccount(
+		$label: String!,
+		$category: String,
+		$deploymentUuid: Uuid!,
+		$role: Role!
+  	) {
+		createDeploymentServiceAccount(
+		  label: $label,
+		  category: $category,
+		  deploymentUuid: $deploymentUuid,
+		  role: $role
+    	) {
+		    id
+		    label
+		    apiKey
+		    entityType
+		    deploymentUuid
+		    category
+		    active
+		    lastUsedAt
+		    createdAt
+		    updatedAt
+    	}
+  	}`
+
+	CreateWorkspaceServiceAccountRequest = `
+	mutation createWorkspaceServiceAccount(
+		$label: String!,
+		$category: String,
+		$workspaceUuid: Uuid!,
+		$role: Role!
+	) {
+		createWorkspaceServiceAccount(
+		  label: $label,
+		  category: $category,
+		  workspaceUuid: $workspaceUuid,
+		  role: $role
+		) {
+			id
+			label
+			apiKey
+			entityType
+			workspaceUuid
+			category
+			active
+			lastUsedAt
+			createdAt
+			updatedAt
+		}
+    }`
+
 	ServiceAccountDeleteRequest = `
 	mutation DeleteServiceAccount($serviceAccountId: Uuid!) {
 		deleteServiceAccount(serviceAccountUuid: $serviceAccountId) {
