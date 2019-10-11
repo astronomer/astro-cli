@@ -19,11 +19,12 @@ astro_docs_ml = MenuLink(
     category='Astronomer',
     name='Astronomer Docs',
     url='https://www.astronomer.io/docs/')
-    
+
 astro_guides_ml = MenuLink(
     category='Astronomer',
     name='Airflow Guides',
     url='https://www.astronomer.io/guides/')
+
 
 class AstroLinksPlugin(AirflowPlugin):
     name = 'astronomer_menu_links'
@@ -33,4 +34,13 @@ class AstroLinksPlugin(AirflowPlugin):
     executors = []
     macros = []
     admin_views = []
-    menu_links = [airflow_plugins_ml, astro_docs_ml, astro_guides_ml]`)
+    menu_links = [airflow_plugins_ml, astro_docs_ml, astro_guides_ml]
+		appbuilder_views = []
+    appbuilder_menu_items = [
+        {
+            "name": ml.name,
+            "category": ml.category,
+            "category_icon": "fa-rocket",
+            "href": ml.url,
+        } for ml in menu_links
+    ]`)
