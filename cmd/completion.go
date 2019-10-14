@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 const completionLong = `
 Generate autocompletions script for Astro for the specified shell (bash or zsh).
 
@@ -80,7 +79,7 @@ func newCompletionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCompletion(out, cmd, args)
 		},
-		Args: cobra.ExactValidArgs(1),
+		Args:      cobra.ExactValidArgs(1),
 		ValidArgs: shells,
 	}
 	return cmd

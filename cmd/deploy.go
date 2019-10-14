@@ -22,7 +22,8 @@ Deployment you would like to deploy to Airflow cluster:
 Menu will be presented if you do not specify a deployment name:
 
   $ astro deploy
-`)
+`
+)
 
 func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

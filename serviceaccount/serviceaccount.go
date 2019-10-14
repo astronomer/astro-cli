@@ -16,32 +16,7 @@ var (
 	}
 )
 
-func Create(id, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.ServiceAccountCreateRequest,
-		Variables: map[string]interface{}{
-			"entityId":   id,
-			"label":      label,
-			"category":   category,
-			"entityType": entityType,
-			"role":       role,
-		},
-	}
-
-	resp, err := req.DoWithClient(client)
-	if err != nil {
-		return err
-	}
-
-	sa := resp.Data.CreateServiceAccount
-
-	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
-	tab.SuccessMsg = "\n Service account successfully created."
-
-	return tab.Print(out)
-}
-
-func CreateUsingDeploymentUUID(deploymentUuid, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
+func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.CreateDeploymentServiceAccountRequest,
 		Variables: map[string]interface{}{
@@ -51,12 +26,12 @@ func CreateUsingDeploymentUUID(deploymentUuid, label, category, entityType, role
 			"role":           role,
 		},
 	}
-	resp, err := req.DoWithClient(client)
+	resp, err := req.Do()
 	if err != nil {
 		return err
 	}
 
-	sa := resp.Data.CreateServiceAccount
+	sa := resp.Data.CreateDeploymentServiceAccount
 
 	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
@@ -64,9 +39,9 @@ func CreateUsingDeploymentUUID(deploymentUuid, label, category, entityType, role
 	return tab.Print(out)
 }
 
-func CreateUsingWorkspaceUUID(workspaceUuid, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
+func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
-		Query: houston.CreateDeploymentServiceAccountRequest,
+		Query: houston.CreateWorkspaceServiceAccountRequest,
 		Variables: map[string]interface{}{
 			"label":         label,
 			"category":      category,
@@ -74,12 +49,12 @@ func CreateUsingWorkspaceUUID(workspaceUuid, label, category, entityType, role s
 			"role":          role,
 		},
 	}
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
 
-	sa := resp.Data.CreateServiceAccount
+	sa := resp.Data.CreateWorkspaceServiceAccount
 
 	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
@@ -97,7 +72,6 @@ func Delete(id string, client *houston.Client, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
 	sa := resp.Data.DeleteServiceAccount
 
 	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)

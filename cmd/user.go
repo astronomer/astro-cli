@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",

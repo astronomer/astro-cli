@@ -2,16 +2,23 @@ package cmd
 
 import (
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
+	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var (
-	workspaceUpdateAttrs = []string{"label"}
-	createDesc           string
+	workspaceUpdateAttrs     = []string{"label"}
+	createDesc               string
+	workspaceUuid            string
+	workspaceSaCreateExample = `
+# Create service-account
+astro workspace service-account create --workspace-uuid=xxxxx --label=my_label --role=ROLE
+`
 )
 
 func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
@@ -182,6 +189,42 @@ func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Comma
 	return cmd
 }
 
+func newWorkspaceSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "service-account",
+		Aliases: []string{"sa"},
+		Short:   "Manage astronomer service accounts",
+		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
+	}
+	return cmd
+}
+
+func newWorkspaceSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create a service-account in the astronomer platform",
+		Long:    "Create a service-account in the astronomer platform",
+		Example: workspaceSaCreateExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSaCreate(cmd, args, client, out)
+		},
+	}
+	return cmd
+}
+
+func newWorkspaceSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get",
+		Short: "Get a service-account by entity type and entity id",
+		Long:  "Get a service-account by entity type and entity id",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSaGet(cmd, args, client, out)
+		},
+	}
+	return cmd
+}
+
 func workspaceCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	if len(createDesc) == 0 {
 		createDesc = "N/A"
@@ -280,4 +323,25 @@ func workspaceUserList(_ *cobra.Command, client *houston.Client, out io.Writer, 
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 	return workspace.ListRoles(ws, client, out)
+}
+
+func workspaceSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	if len(label) == 0 {
+		return errors.New("must provide a service-account label with the --label (-l) flag")
+	}
+
+	if err := validateRole(role); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
+	}
+	fullRole := strings.Join([]string{"WORKSPACE", strings.ToUpper(role)}, "_")
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return sa.CreateUsingWorkspaceUUID(workspaceUuid, label, category, fullRole, client, out)
+}
+
+func workspaceSaGet(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return sa.Get("WORKSPACE", workspaceUuid, client, out)
 }

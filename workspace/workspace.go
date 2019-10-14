@@ -14,7 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-func newTableOut() *printutil.Table{
+func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,

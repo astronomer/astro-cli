@@ -99,7 +99,7 @@ func (t *Table) PrintHeader(out io.Writer) {
 	header := strSliceToInterSlice(t.Header)
 	t.RenderedHeader = fmt.Sprintf(p, header...)
 
-	fmt.Fprintln(out, headerSelectPrefix + t.RenderedHeader)
+	fmt.Fprintln(out, headerSelectPrefix+t.RenderedHeader)
 }
 
 // PrintRows prints rows with an "S"
@@ -120,9 +120,9 @@ func (t *Table) PrintRows(out io.Writer) {
 			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
 		}
 		if r.Colored && len(t.ColorRowCode) == 2 {
-			fmt.Fprintln(out, rowSelectPrefix + t.ColorRowCode[0] + rr + t.ColorRowCode[1])
+			fmt.Fprintln(out, rowSelectPrefix+t.ColorRowCode[0]+rr+t.ColorRowCode[1])
 		} else {
-			fmt.Fprintln(out, rowSelectPrefix + rr)
+			fmt.Fprintln(out, rowSelectPrefix+rr)
 		}
 	}
 }

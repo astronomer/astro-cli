@@ -15,9 +15,9 @@ import (
 func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	var globalFlag bool
 	cmd := &cobra.Command{
-		Use:              "config",
-		Short:            "Manage astro project configurations",
-		Long:             "Manage astro project configurations",
+		Use:   "config",
+		Short: "Manage astro project configurations",
+		Long:  "Manage astro project configurations",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			ensureGlobalFlag(cmd, args, globalFlag)
 		},
