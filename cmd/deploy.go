@@ -13,17 +13,19 @@ import (
 
 var (
 	deployExample = `
-# Deployment you would like to deploy to Airflow cluster:
-astro deploy physical-diameter-1566
+Deployment you would like to deploy to Airflow cluster:
 
-# Deploy deployment using suggestion: 
-astro deploy
+  $ astro deploy physical-diameter-1566
 
-Select which airflow deployment you want to deploy to:
- #     LABEL                   DEPLOYMENT NAME            WORKSPACE     DEPLOYMENT ID
- 1     new-deployment-name     physical-diameter-1566     w1            ck1ryz2jd00430f50a5dmu7g9
+Deploy deployment using suggestion:
 
->1
+  $ astro deploy
+
+  Select which airflow deployment you want to deploy to:
+   #     LABEL                   DEPLOYMENT NAME            WORKSPACE     DEPLOYMENT ID
+   1     new-deployment-name     physical-diameter-1566     w1            ck1ryz2jd00430f50a5dmu7g9
+  
+  >1
 `
 	deployCmd = &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
