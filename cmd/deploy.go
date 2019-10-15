@@ -15,7 +15,7 @@ var (
 	deployExample = `
 Deployment you would like to deploy to Airflow cluster:
 
-  $ astro deploy physical-diameter-1566
+  $ astro deploy <deployment name>
 
 Deploy deployment using suggestion:
 
