@@ -17,15 +17,9 @@ Deployment you would like to deploy to Airflow cluster:
 
   $ astro deploy <deployment name>
 
-Deploy deployment using suggestion:
+Menu will be presented if you do not specify a deployment name:
 
   $ astro deploy
-
-  Select which airflow deployment you want to deploy to:
-   #     LABEL                   DEPLOYMENT NAME            WORKSPACE     DEPLOYMENT ID
-   1     new-deployment-name     physical-diameter-1566     w1            ck1ryz2jd00430f50a5dmu7g9
-  
-  >1
 `
 	deployCmd = &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
