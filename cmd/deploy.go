@@ -12,6 +12,15 @@ import (
 )
 
 var (
+	deployExample = `
+Deployment you would like to deploy to Airflow cluster:
+
+  $ astro deploy <deployment name>
+
+Menu will be presented if you do not specify a deployment name:
+
+  $ astro deploy
+`
 	deployCmd = &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an airflow project",
@@ -19,6 +28,7 @@ var (
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
 		RunE:    deploy,
+		Example: deployExample,
 		Aliases: []string{"airflow deploy"},
 	}
 )
