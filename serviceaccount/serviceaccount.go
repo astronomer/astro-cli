@@ -62,20 +62,38 @@ func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, clien
 	return tab.Print(out)
 }
 
-func Delete(id string, client *houston.Client, out io.Writer) error {
+func DeleteUsingWorkspaceUUID(serviceAccountId, workspaceId string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
-		Query:     houston.ServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountId": id},
+		Query:     houston.WorkspaceServiceAccountDeleteRequest,
+		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountId, "workspaceUuid": workspaceId},
 	}
 
 	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
-	sa := resp.Data.DeleteServiceAccount
+	sa := resp.Data.DeleteWorkspaceServiceAccount
 
 	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
-	fmt.Sprintln(out, msg)
+	fmt.Fprintln(out, msg)
+
+	return nil
+}
+
+func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.DeploymentServiceAccountDeleteRequest,
+		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountId, "deploymentUuid": deploymentId},
+	}
+
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+	sa := resp.Data.DeleteDeploymentServiceAccount
+
+	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
+	fmt.Fprintln(out, msg)
 
 	return nil
 }

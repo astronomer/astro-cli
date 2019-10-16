@@ -12,7 +12,8 @@ type Response struct {
 		CreateUser                     *AuthUser                 `json:"createUser,omitempty"`
 		CreateWorkspace                *Workspace                `json:"createWorkspace,omitempty"`
 		DeleteDeployment               *Deployment               `json:"deleteDeployment,omitempty"`
-		DeleteServiceAccount           *ServiceAccount           `json:"deleteServiceAccount,omitempty"`
+		DeleteWorkspaceServiceAccount  *ServiceAccount           `json:"deleteWorkspaceServiceAccount,omitempty"`
+		DeleteDeploymentServiceAccount *ServiceAccount           `json:"deleteDeploymentServiceAccount,omitempty"`
 		DeleteWorkspace                *Workspace                `json:"deleteWorkspace,omitempty"`
 		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
@@ -103,8 +104,10 @@ type ServiceAccount struct {
 	Label      string `json:"label"`
 	Category   string `json:"category"`
 	EntityType string `json:"entityType"`
-	EntityId   string `json:"entityId"`
+	EntityId   string `json:"entityUuid"`
 	LastUsedAt string `json:"lastUsedAt"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
 	Active     bool   `json:"active"`
 }
 

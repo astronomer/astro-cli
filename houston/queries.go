@@ -178,21 +178,49 @@ var (
 		}
     }`
 
-	ServiceAccountDeleteRequest = `
-	mutation DeleteServiceAccount($serviceAccountId: Uuid!) {
-		deleteServiceAccount(serviceAccountUuid: $serviceAccountId) {
-					id
-					apiKey
-					label
-					category
-					entityType
-					entityUuid
-					active
-					createdAt
-					updatedAt
-					lastUsedAt
+	DeploymentServiceAccountDeleteRequest = `
+	mutation deleteDeploymentServiceAccount(
+         $serviceAccountId: Uuid!
+         $deploymentUuid: Uuid!
+    ) {
+		deleteDeploymentServiceAccount(
+          serviceAccountUuid: $serviceAccountUuid
+          deploymentUuid: $deploymentUuid
+        ) {
+			id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
 		}
 	}`
+
+	WorkspaceServiceAccountDeleteRequest = `
+	mutation deleteWorkspaceServiceAccount(
+          $serviceAccountUuid: Uuid!
+          $workspaceUuid: Uuid!
+    ) {
+        deleteWorkspaceServiceAccount(
+          serviceAccountUuid: $serviceAccountUuid
+          workspaceUuid: $workspaceUuid
+        ) {
+            id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
+         }
+    }`
 
 	ServiceAccountsGetRequest = `
 	query GetServiceAccount(

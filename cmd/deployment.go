@@ -21,19 +21,21 @@ var (
 	label          string
 	CreateExample  = `
 # Create new deployment with Celery executor (default: celery without params).
-astro deployment create new-deployment-name --executor=celery
+  $ astro deployment create new-deployment-name --executor=celery
 
 # Create new deployment with Local executor.
-astro deployment create new-deployment-name-local --executor=local
+  $ astro deployment create new-deployment-name-local --executor=local
 
 # Create new deployment with Kubernetes executor.
-astro deployment create new-deployment-name-k8s --executor=k8s
+  $ astro deployment create new-deployment-name-k8s --executor=k8s
 `
 	deploymentSaCreateExample = `
 # Create service-account
-astro deployment service-account create --deployment-uuid=xxxxx --label=my_label --role=ROLE
+  $ astro deployment service-account create --deployment-uuid=xxxxx --label=my_label --role=ROLE
 `
-
+	deploymentSaDeleteExample = `
+  $ astro workspace service-account delete <service-account-id> --workspace-id=<workspace-id>
+`
 	deploymentUpdateAttrs = []string{"label"}
 )
 
@@ -124,7 +126,7 @@ func newDeploymentSaRootCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	cmd.AddCommand(
 		newDeploymentSaCreateCmd(client, out),
 		newDeploymentSaGetCmd(client, out),
-		newSaDeleteCmd(client, out),
+		newDeploymentSaDeleteCmd(client, out),
 	)
 	return cmd
 }
@@ -158,6 +160,23 @@ func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command
 			return deploymentSaGet(cmd, client, out)
 		},
 	}
+	return cmd
+}
+
+func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [SA-ID]",
+		Aliases: []string{"de"},
+		Short:   "Delete a service-account in the astronomer platform",
+		Long:    "Delete a service-account in the astronomer platform",
+		Example: deploymentSaDeleteExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentSaDelete(cmd, args, client, out)
+		},
+		Args: cobra.ExactArgs(1),
+	}
+	cmd.Flags().StringVarP(&workspaceId, "deployment-id", "w", "", "[ID]")
+	cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
 
@@ -240,4 +259,11 @@ func deploymentSaGet(cmd *cobra.Command, client *houston.Client, out io.Writer) 
 	cmd.SilenceUsage = true
 
 	return sa.Get("DEPLOYMENT", deploymentId, client, out)
+}
+
+func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return sa.DeleteUsingDeploymentUUID(args[0], deploymentId, client, out)
 }

@@ -202,7 +202,7 @@ func newWorkspaceSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd.AddCommand(
 		newWorkspaceSaCreateCmd(client, out),
 		newWorkspaceSaGetCmd(client, out),
-		newSaDeleteCmd(client, out),
+		newWorkspaceSaDeleteCmd(client, out),
 	)
 	return cmd
 }
@@ -236,6 +236,22 @@ func newWorkspaceSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaGet(cmd, args, client, out)
 		},
+	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.MarkFlagRequired("workspace-id")
+	return cmd
+}
+
+func newWorkspaceSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [SA-ID]",
+		Aliases: []string{"de"},
+		Short:   "Delete a service-account in the astronomer platform",
+		Long:    "Delete a service-account in the astronomer platform",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSaDelete(cmd, args, client, out)
+		},
+		Args: cobra.ExactArgs(1),
 	}
 	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
 	cmd.MarkFlagRequired("workspace-id")
@@ -361,4 +377,11 @@ func workspaceSaGet(cmd *cobra.Command, args []string, client *houston.Client, o
 	cmd.SilenceUsage = true
 
 	return sa.Get("WORKSPACE", workspaceId, client, out)
+}
+
+func workspaceSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return sa.DeleteUsingWorkspaceUUID(args[0], workspaceId, client, out)
 }
