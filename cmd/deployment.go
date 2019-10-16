@@ -140,6 +140,12 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 			return deploymentSaCreate(cmd, args, client, out)
 		},
 	}
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
+	cmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
+	cmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
+	cmd.Flags().StringVarP(&role, "role", "r", "viewer", "ROLE")
 	return cmd
 }
 

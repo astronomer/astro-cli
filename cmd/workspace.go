@@ -14,10 +14,12 @@ import (
 var (
 	workspaceUpdateAttrs     = []string{"label"}
 	createDesc               string
-	workspaceUuid            string
 	workspaceSaCreateExample = `
-# Create service-account
-astro workspace service-account create --workspace-uuid=xxxxx --label=my_label --role=ROLE
+  # Create service-account
+  $ astro workspace service-account create --workspace-id=<workspace-id> --label=my_label --role=ROLE
+`
+	workspaceSaGetExample = `
+$ astro workspace service-account get --workspace-id=<workspace-id>
 `
 )
 
@@ -216,6 +218,12 @@ func newWorkspaceSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comma
 			return workspaceSaCreate(cmd, args, client, out)
 		},
 	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
+	cmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
+	cmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
+	cmd.Flags().StringVarP(&role, "role", "r", "viewer", "ROLE")
 	return cmd
 }
 
@@ -224,10 +232,13 @@ func newWorkspaceSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		Use:   "get",
 		Short: "Get a service-account by entity type and entity id",
 		Long:  "Get a service-account by entity type and entity id",
+		Example: workspaceSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaGet(cmd, args, client, out)
 		},
 	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.MarkFlagRequired("workspace-id")
 	return cmd
 }
 
@@ -342,12 +353,12 @@ func workspaceSaCreate(cmd *cobra.Command, args []string, client *houston.Client
 	fullRole := strings.Join([]string{"WORKSPACE", strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return sa.CreateUsingWorkspaceUUID(workspaceUuid, label, category, fullRole, client, out)
+	return sa.CreateUsingWorkspaceUUID(workspaceId, label, category, fullRole, client, out)
 }
 
 func workspaceSaGet(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Get("WORKSPACE", workspaceUuid, client, out)
+	return sa.Get("WORKSPACE", workspaceId, client, out)
 }
