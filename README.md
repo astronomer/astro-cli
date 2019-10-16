@@ -12,12 +12,12 @@ Usage:
 Available Commands:
   auth            Manage astronomer identity
   cluster         Manage Astronomer EE clusters
+  completion      Generate autocompletions script for the specified shell (bash or zsh)
   config          Manage astro project configurations
   deploy          Deploy an airflow project
   deployment      Manage airflow deployments
-  dev             Manage airflow projects and deployments
+  dev             Manage airflow projects
   help            Help about any command
-  service-account Manage astronomer service accounts
   upgrade         Check for newer version of Astronomer CLI
   user            Manage astronomer user
   version         Astronomer CLI version
