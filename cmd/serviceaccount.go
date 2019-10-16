@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/houston"
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -14,60 +16,71 @@ var (
 	systemSA     bool
 	category     string
 	label        string
+)
 
-	saRootCmd = &cobra.Command{
+func newSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
 		Short:   "Manage astronomer service accounts",
 		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
 	}
+	cmd.AddCommand(
+		newSaCreateCmd(client, out),
+		newSaDeleteCmd(client, out),
+		newSaGetCmd(client, out),
+	)
+	return cmd
+}
 
-	saCreateCmd = &cobra.Command{
+func newSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a service-account in the astronomer platform",
 		Long:    "Create a service-account in the astronomer platform",
-		RunE:    saCreate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return saCreate(cmd, args, client, out)
+		},
 	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
+	cmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
+	cmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
+	cmd.Flags().StringVarP(&role, "role", "r", "viewer", "ROLE")
+	return cmd
+}
 
-	saDeleteCmd = &cobra.Command{
+func newSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "delete [SA-ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete a service-account in the astronomer platform",
 		Long:    "Delete a service-account in the astronomer platform",
-		RunE:    saDelete,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return saDelete(cmd, args, client, out)
+		},
 		Args:    cobra.ExactArgs(1),
 	}
+	return cmd
+}
 
-	saGetCmd = &cobra.Command{
+func newSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get a service-account by entity type and entity id",
 		Long:  "Get a service-account by entity type and entity id",
-		RunE:  saGet,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return saGet(cmd, args, client, out)
+		},
 	}
-)
-
-func init() {
-	// User root
-	RootCmd.AddCommand(saRootCmd)
-
-	// Service-account create
-	saRootCmd.AddCommand(saCreateCmd)
-	saCreateCmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
-	saCreateCmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
-	saCreateCmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
-	saCreateCmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
-	saCreateCmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
-	saCreateCmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
-	saCreateCmd.Flags().StringVarP(&role, "role", "r", "viewer", "ROLE")
-
-	saRootCmd.AddCommand(saGetCmd)
-	saGetCmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
-	saGetCmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
-	saGetCmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
-	saGetCmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
-
-	saRootCmd.AddCommand(saDeleteCmd)
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
+	return cmd
 }
 
 func getValidEntity() (string, string, error) {
@@ -105,7 +118,7 @@ func getValidEntity() (string, string, error) {
 	return entityType, id, nil
 }
 
-func saCreate(cmd *cobra.Command, args []string) error {
+func saCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Validation
 	entityType, id, err := getValidEntity()
 	if err != nil {
@@ -122,17 +135,17 @@ func saCreate(cmd *cobra.Command, args []string) error {
 	fullRole := strings.Join([]string{entityType, strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return sa.Create(id, label, category, entityType, fullRole)
+	return sa.Create(id, label, category, entityType, fullRole, client, out)
 }
 
-func saDelete(cmd *cobra.Command, args []string) error {
+func saDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Delete(args[0])
+	return sa.Delete(args[0], client, out)
 }
 
-func saGet(cmd *cobra.Command, args []string) error {
+func saGet(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	entityType, id, err := getValidEntity()
 	if err != nil {
 		return err
@@ -141,5 +154,5 @@ func saGet(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Get(entityType, id)
+	return sa.Get(entityType, id, client, out)
 }

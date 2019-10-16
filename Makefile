@@ -16,7 +16,16 @@ build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" main.go
 
 test:
-	go test -v ./...
+	go test -count=1 -cover ./...
+	go test -coverprofile=coverage.txt -covermode=atomic ./...
+
+codecov:
+	@eval $$(curl -s https://codecov.io/bash)
+
+cover:
+	rm -f cover.out
+	go test -coverprofile=cover.out ./...
+	go tool cover -func=cover.out
 
 format:
 	@echo "--> Running go fmt"

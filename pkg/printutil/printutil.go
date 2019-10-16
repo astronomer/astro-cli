@@ -2,6 +2,7 @@ package printutil
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 )
 
@@ -65,23 +66,23 @@ func (t *Table) AddRow(values []string, color bool) {
 }
 
 // Print header __as well as__ rows
-func (t *Table) Print() error {
+func (t *Table) Print(out io.Writer) error {
 	if len(t.Rows) == 0 && len(t.NoResultsMsg) != 0 {
-		fmt.Println(t.NoResultsMsg)
+		fmt.Fprintln(out, t.NoResultsMsg)
 		return nil
 	}
 
-	t.PrintHeader()
-	t.PrintRows()
+	t.PrintHeader(out)
+	t.PrintRows(out)
 
 	if len(t.SuccessMsg) != 0 {
-		fmt.Println(t.SuccessMsg)
+		fmt.Fprintln(out, t.SuccessMsg)
 	}
 	return nil
 }
 
 // PrintHeader prints header
-func (t *Table) PrintHeader() {
+func (t *Table) PrintHeader(out io.Writer) {
 	if t.DynamicPadding {
 		t.dynamicPadding(Row{Raw: t.Header, Colored: false})
 	} else {
@@ -98,11 +99,11 @@ func (t *Table) PrintHeader() {
 	header := strSliceToInterSlice(t.Header)
 	t.RenderedHeader = fmt.Sprintf(p, header...)
 
-	fmt.Println(headerSelectPrefix + t.RenderedHeader)
+	fmt.Fprintln(out, headerSelectPrefix + t.RenderedHeader)
 }
 
 // PrintRows prints rows with an "S"
-func (t *Table) PrintRows() {
+func (t *Table) PrintRows(out io.Writer) {
 
 	if len(t.RenderedPadding) == 0 {
 		p := t.GetPadding(t.altPadding)
@@ -119,9 +120,9 @@ func (t *Table) PrintRows() {
 			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
 		}
 		if r.Colored && len(t.ColorRowCode) == 2 {
-			fmt.Println(rowSelectPrefix + t.ColorRowCode[0] + rr + t.ColorRowCode[1])
+			fmt.Fprintln(out, rowSelectPrefix + t.ColorRowCode[0] + rr + t.ColorRowCode[1])
 		} else {
-			fmt.Println(rowSelectPrefix + rr)
+			fmt.Fprintln(out, rowSelectPrefix + rr)
 		}
 	}
 }

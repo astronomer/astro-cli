@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -15,7 +16,7 @@ var (
 	}
 )
 
-func Create(id, label, category, entityType, role string) error {
+func Create(id, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.ServiceAccountCreateRequest,
 		Variables: map[string]interface{}{
@@ -27,7 +28,7 @@ func Create(id, label, category, entityType, role string) error {
 		},
 	}
 
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -37,17 +38,16 @@ func Create(id, label, category, entityType, role string) error {
 	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
-	tab.Print()
-	return nil
+	return tab.Print(out)
 }
 
-func Delete(id string) error {
+func Delete(id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.ServiceAccountDeleteRequest,
 		Variables: map[string]interface{}{"serviceAccountId": id},
 	}
 
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -55,18 +55,18 @@ func Delete(id string) error {
 	sa := resp.Data.DeleteServiceAccount
 
 	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
-	fmt.Println(msg)
+	fmt.Sprintln(out, msg)
 
 	return nil
 }
 
-func Get(entityType, id string) error {
+func Get(entityType, id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.ServiceAccountsGetRequest,
 		Variables: map[string]interface{}{"entityId": id, "entityType": entityType},
 	}
 
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -77,6 +77,5 @@ func Get(entityType, id string) error {
 		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	}
 
-	tab.Print()
-	return nil
+	return tab.Print(out)
 }

@@ -2,8 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/astronomer/astro-cli/cmd"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra/doc"
 )
 
@@ -22,5 +27,9 @@ func main() {
 		return fmt.Sprintf(`{{< relref "docs/%s" >}}`, s)
 	}
 	emptyStr := func(s string) string { return "" }
-	doc.GenMarkdownTreeCustom(cmd.RootCmd, "./docs/", emptyStr, identity)
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	fs := afero.NewOsFs()
+	config.InitConfig(fs)
+	rootCmd := cmd.NewRootCmd(client, os.Stdout)
+	doc.GenMarkdownTreeCustom(rootCmd, "./docs/", emptyStr, identity)
 }

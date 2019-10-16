@@ -1,4 +1,5 @@
-# Astronomer CLI [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli)
+# Astronomer CLI [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
+
 
 The Astronomer CLI can be used to build Airflow DAGs locally and run them via Docker-Compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
 
@@ -174,6 +175,15 @@ local:
   enabled: true
   houston: http://localhost:8871/v1
   orbit: http://localhost:5000
+```
+
+### Run tests
+
+To run unit-tests you can run:
+> Note: Make sure you have running locally houston on http://localhost:8871/v1 it required for running tests
+
+```bash
+make test
 ```
 
 ## Docs

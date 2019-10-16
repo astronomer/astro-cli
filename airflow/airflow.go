@@ -4,15 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/pkg/errors"
 
-	"github.com/iancoleman/strcase"
-
 	"github.com/astronomer/astro-cli/airflow/include"
-	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/version"
 )
@@ -92,19 +87,4 @@ func Init(path string, airflowVersion string) error {
 	}
 
 	return nil
-}
-
-func validateOrCreateProjectName(path, projectName string) (string, error) {
-	if len(projectName) != 0 {
-		projectNameValid := regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).MatchString
-		if !projectNameValid(projectName) {
-			return "", errors.New(messages.CONFIG_PROJECT_NAME_ERROR)
-		}
-	} else {
-		projectDirectory := filepath.Base(path)
-
-		return strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1), nil
-	}
-
-	return projectName, nil
 }

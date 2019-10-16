@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -12,43 +14,44 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var (
-	tab = printutil.Table{
+func newTableOut() *printutil.Table{
+	return &printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "ID"},
 		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
 	}
-)
+}
 
 // Create a workspace
-func Create(label, desc string) error {
+func Create(label, desc string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceCreateRequest,
 		Variables: map[string]interface{}{"label": label, "description": desc},
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
 
 	w := r.Data.CreateWorkspace
 
+	tab := newTableOut()
 	tab.AddRow([]string{w.Label, w.Id}, false)
 	tab.SuccessMsg = "\n Successfully created workspace"
-	tab.Print()
+	tab.Print(out)
 
 	return nil
 }
 
 // List all workspaces
-func List() error {
+func List(client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.WorkspacesGetRequest,
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -56,7 +59,7 @@ func List() error {
 	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
-
+	tab := newTableOut()
 	for _, w := range ws {
 		name := w.Label
 		workspace := w.Id
@@ -71,19 +74,19 @@ func List() error {
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.Print()
+	tab.Print(out)
 
 	return nil
 }
 
 // Delete a workspace by id
-func Delete(id string) error {
+func Delete(id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceDeleteRequest,
 		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
-	_, err := req.Do()
+	_, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -92,7 +95,7 @@ func Delete(id string) error {
 	// tab.AddRow([]string{w.Label, w.Id}, false)
 	// tab.SuccessMsg = "\n Successfully deleted workspace"
 	// tab.Print()
-	fmt.Println("\n Successfully deleted workspace")
+	fmt.Fprintln(out, "\n Successfully deleted workspace")
 
 	return nil
 }
@@ -113,6 +116,7 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 func getWorkspaceSelection() (string, error) {
+	tab := newTableOut()
 	tab.GetUserInput = true
 
 	req := houston.Request{
@@ -142,7 +146,7 @@ func getWorkspaceSelection() (string, error) {
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.Print()
+	tab.Print(os.Stdout)
 
 	in := input.InputText("\n> ")
 	i, err := strconv.ParseInt(
@@ -159,7 +163,7 @@ func getWorkspaceSelection() (string, error) {
 }
 
 // Switch switches workspaces
-func Switch(id string) error {
+func Switch(id string, client *houston.Client, out io.Writer) error {
 	if len(id) == 0 {
 		_id, err := getWorkspaceSelection()
 		if err != nil {
@@ -174,7 +178,7 @@ func Switch(id string) error {
 		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
-	_, err := req.Do()
+	_, err := req.DoWithClient(client)
 	if err != nil {
 		return errors.Wrap(err, "workspace id is not valid")
 	}
@@ -190,29 +194,29 @@ func Switch(id string) error {
 		return err
 	}
 
-	config.PrintCurrentContext()
+	config.PrintCurrentContext(out)
 
 	return nil
 }
 
 // Update an astronomer workspace
-func Update(id string, args map[string]string) error {
+func Update(id string, client *houston.Client, out io.Writer, args map[string]string) error {
 	// validate workspace
 	req := houston.Request{
 		Query:     houston.WorkspaceUpdateRequest,
 		Variables: map[string]interface{}{"workspaceId": id, "payload": args},
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
 
 	w := r.Data.UpdateWorkspace
-
+	tab := newTableOut()
 	tab.AddRow([]string{w.Label, w.Id}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"
-	tab.Print()
+	tab.Print(out)
 
 	return nil
 }

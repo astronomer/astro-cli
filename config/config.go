@@ -8,6 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 )
 
@@ -61,14 +62,15 @@ var (
 )
 
 // InitConfig initializes the config files
-func InitConfig() {
-	initHome()
-	initProject()
+func InitConfig(fs afero.Fs) {
+	initHome(fs)
+	initProject(fs)
 }
 
 // Init viper for config file in home directory
-func initHome() {
+func initHome(fs afero.Fs) {
 	viperHome = viper.New()
+	viperHome.SetFs(fs)
 	viperHome.SetConfigName(ConfigFileName)
 	viperHome.SetConfigType(ConfigFileType)
 	viperHome.SetConfigFile(HomeConfigFile)
@@ -100,9 +102,10 @@ func initHome() {
 
 // Init viper for config file in project directory
 // If project config does not exist, just exit
-func initProject() {
+func initProject(fs afero.Fs) {
 	// Set up viper object for project config
 	viperProject = viper.New()
+	viperHome.SetFs(fs)
 	viperProject.SetConfigName(ConfigFileName)
 	viperProject.SetConfigType(ConfigFileType)
 

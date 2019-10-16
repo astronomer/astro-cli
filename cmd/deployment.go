@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"io"
+
 	"github.com/astronomer/astro-cli/deployment"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -9,7 +12,7 @@ import (
 var (
 	allDeployments bool
 	executor       string
-	CreateExample = `
+	CreateExample  = `
 # Create new deployment with Celery executor (default: celery without params).
 astro deployment create new-deployment-name --executor=celery
 
@@ -19,17 +22,29 @@ astro deployment create new-deployment-name-local --executor=local
 # Create new deployment with Kubernetes executor.
 astro deployment create new-deployment-name-k8s --executor=k8s
 `
-
 	deploymentUpdateAttrs = []string{"label"}
+)
 
-	deploymentRootCmd = &cobra.Command{
+func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de"},
 		Short:   "Manage airflow deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 	}
+	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	cmd.AddCommand(
+		newDeploymentCreateCmd(client, out),
+		newDeploymentListCmd(client, out),
+		newDeploymentUpdateCmd(client, out),
+		newDeploymentDeleteCmd(client, out),
+		newLogsCmd(client, out),
+	)
+	return cmd
+}
 
-	deploymentCreateCmd = &cobra.Command{
+func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "create DEPLOYMENT",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astronomer Deployment",
@@ -38,8 +53,12 @@ astro deployment create new-deployment-name-k8s --executor=k8s
 		Args:    cobra.ExactArgs(1),
 		RunE:    deploymentCreate,
 	}
+	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
+	return cmd
+}
 
-	deploymentDeleteCmd = &cobra.Command{
+func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "delete DEPLOYMENT",
 		Aliases: []string{"de"},
 		Short:   "Delete an airflow deployment",
@@ -47,16 +66,25 @@ astro deployment create new-deployment-name-k8s --executor=k8s
 		Args:    cobra.ExactArgs(1),
 		RunE:    deploymentDelete,
 	}
+	return cmd
+}
 
-	deploymentListCmd = &cobra.Command{
+func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List airflow deployments",
 		Long:    "List airflow deployments",
-		RunE:    deploymentList,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentList(cmd, args, client, out)
+		},
 	}
+	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
+	return cmd
+}
 
-	deploymentUpdateCmd = &cobra.Command{
+func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update airflow deployments",
@@ -70,30 +98,7 @@ astro deployment create new-deployment-name-k8s --executor=k8s
 		},
 		RunE: deploymentUpdate,
 	}
-)
-
-func init() {
-	// deployment root
-	RootCmd.AddCommand(deploymentRootCmd)
-	deploymentRootCmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
-	// deploymentRootCmd.Flags().StringVar(&workspaceId, "workspace", "", "workspace assigned to deployment")
-
-	// deployment create
-	deploymentCreateCmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
-	deploymentRootCmd.AddCommand(deploymentCreateCmd)
-
-	// deployment delete
-	deploymentRootCmd.AddCommand(deploymentDeleteCmd)
-
-	// deployment list
-	deploymentRootCmd.AddCommand(deploymentListCmd)
-	deploymentListCmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
-
-	// deployment update
-	deploymentRootCmd.AddCommand(deploymentUpdateCmd)
-
-	// deployment logs
-	deploymentRootCmd.AddCommand(logsCmd)
+	return cmd
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
@@ -126,7 +131,7 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 	return deployment.Delete(args[0])
 }
 
-func deploymentList(cmd *cobra.Command, args []string) error {
+func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -141,7 +146,7 @@ func deploymentList(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments)
+	return deployment.List(ws, allDeployments, client, out)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {

@@ -1,27 +1,40 @@
 package cmd
 
 import (
+	"io"
+
 	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/spf13/cobra"
 )
 
-var (
-	clusterRootCmd = &cobra.Command{
+func newClusterRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "cluster",
 		Aliases: []string{"cl"},
 		Short:   "Manage Astronomer EE clusters",
 		Long:    "Clusters represent a single installation of the Astronomer Enterprise platform",
 	}
+	cmd.AddCommand(
+		newClusterListCmd(client, out),
+		newClusterSwitchCmd(client, out),
+	)
+	return cmd
+}
 
-	clusterListCmd = &cobra.Command{
+func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List known Astronomer Enterprise clusters",
 		Long:    "List known Astronomer Enterprise clusters",
 		RunE:    clusterList,
 	}
+	return cmd
+}
 
-	clusterSwitchCmd = &cobra.Command{
+func newClusterSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:     "switch",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different cluster context",
@@ -29,14 +42,7 @@ var (
 		RunE:    clusterSwitch,
 		Args:    cobra.MaximumNArgs(1),
 	}
-)
-
-func init() {
-	// deployment root
-	RootCmd.AddCommand(clusterRootCmd)
-
-	clusterRootCmd.AddCommand(clusterListCmd)
-	clusterRootCmd.AddCommand(clusterSwitchCmd)
+	return cmd
 }
 
 func clusterList(cmd *cobra.Command, args []string) error {
