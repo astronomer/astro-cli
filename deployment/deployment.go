@@ -15,9 +15,9 @@ import (
 
 var (
 	tab = printutil.Table{
-		Padding:        []int{30, 30, 10, 50},
+		Padding:        []int{30, 30, 10, 50, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID"},
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG"},
 	}
 )
 
@@ -113,7 +113,12 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 		if all {
 			ws = d.Workspace.Id
 		}
-		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id}, false)
+
+		latestTag := d.DeploymentInfo.Latest
+		if latestTag == "" {
+			latestTag = "?"
+		}
+		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, latestTag}, false)
 	}
 
 	return tab.Print(out)
