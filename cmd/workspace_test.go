@@ -46,3 +46,10 @@ func TestWorkspaceList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output, err)
 }
+
+func TestWorkspaceSaRootCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	output, err := executeCommand("workspace", "service-account")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "astro workspace service-account")
+}

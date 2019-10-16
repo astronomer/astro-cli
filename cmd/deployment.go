@@ -51,6 +51,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		newDeploymentUpdateCmd(client, out),
 		newDeploymentDeleteCmd(client, out),
 		newLogsCmd(client, out),
+		newDeploymentSaRootCmd(client, out),
 	)
 	return cmd
 }
@@ -120,6 +121,11 @@ func newDeploymentSaRootCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		Short:   "Manage astronomer service accounts",
 		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
 	}
+	cmd.AddCommand(
+		newDeploymentSaCreateCmd(client, out),
+		newDeploymentSaGetCmd(client, out),
+		newSaDeleteCmd(client, out),
+	)
 	return cmd
 }
 

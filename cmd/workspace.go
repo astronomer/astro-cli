@@ -38,6 +38,7 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newWorkspaceSwitchCmd(client, out),
 		newWorkspaceUpdateCmd(client, out),
 		newWorkspaceUserRootCmd(client, out),
+		newWorkspaceSaRootCmd(client, out),
 	)
 	return cmd
 }
@@ -196,6 +197,11 @@ func newWorkspaceSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command
 		Short:   "Manage astronomer service accounts",
 		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
 	}
+	cmd.AddCommand(
+		newWorkspaceSaCreateCmd(client, out),
+		newWorkspaceSaGetCmd(client, out),
+		newSaDeleteCmd(client, out),
+	)
 	return cmd
 }
 

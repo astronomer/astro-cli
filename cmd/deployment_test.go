@@ -14,3 +14,10 @@ func TestDeploymentRootCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment")
 }
+
+func TestDeploymentSaRootCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	output, err := executeCommand("deployment", "service-account")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "astro deployment service-account")
+}
