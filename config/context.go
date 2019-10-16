@@ -142,9 +142,9 @@ func (c Context) SetContext() error {
 	}
 
 	context := map[string]string{
-		"token":     c.Token,
-		"domain":    c.Domain,
-		"workspace": c.Workspace,
+		"token":               c.Token,
+		"domain":              c.Domain,
+		"workspace":           c.Workspace,
 		"last_used_workspace": c.Workspace,
 	}
 

@@ -22,7 +22,7 @@ func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newUserCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	var (
-		userEmail string
+		userEmail    string
 		userPassword string
 	)
 	cmd := &cobra.Command{
