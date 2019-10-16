@@ -12,7 +12,7 @@ func newSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
-		Deprecated: `could you please use commands instead: 
+		Deprecated: `please use commands instead: 
   $ astro workspace service-account 
   or 
   $ astro deployment service-account
