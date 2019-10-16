@@ -8,6 +8,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func newSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "service-account",
+		Aliases: []string{"sa"},
+		Deprecated: `could you please use commands instead: 
+  $ astro workspace service-account 
+  or 
+  $ astro deployment service-account
+`,
+	}
+	return cmd
+}
+
 func newSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [SA-ID]",
