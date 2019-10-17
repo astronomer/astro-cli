@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -133,7 +134,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
 			Header:     make(http.Header),
 		}
 	})

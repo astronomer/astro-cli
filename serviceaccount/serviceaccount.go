@@ -8,13 +8,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var (
-	tab = printutil.Table{
+func newTableOut() *printutil.Table {
+	return &printutil.Table{
 		Padding:        []int{40, 40, 50, 50},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "CATEGORY", "ID", "APIKEY"},
 	}
-)
+}
 
 func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
@@ -32,7 +32,7 @@ func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, cli
 	}
 
 	sa := resp.Data.CreateDeploymentServiceAccount
-
+	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
@@ -55,7 +55,7 @@ func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, clien
 	}
 
 	sa := resp.Data.CreateWorkspaceServiceAccount
-
+	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
@@ -110,7 +110,7 @@ func Get(entityType, id string, client *houston.Client, out io.Writer) error {
 	}
 
 	sas := resp.Data.GetServiceAccounts
-
+	tab := newTableOut()
 	for _, sa := range sas {
 		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	}

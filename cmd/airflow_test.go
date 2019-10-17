@@ -17,6 +17,7 @@ func executeCommandC(client *houston.Client, args ...string) (c *cobra.Command, 
 	rootCmd.SetOut(buf)
 	rootCmd.SetArgs(args)
 	c, err = rootCmd.ExecuteC()
+	client.HTTPClient.HTTPClient.CloseIdleConnections()
 	return c, buf.String(), err
 }
 
