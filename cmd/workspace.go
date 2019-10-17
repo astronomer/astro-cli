@@ -2,16 +2,25 @@ package cmd
 
 import (
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
+	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var (
-	workspaceUpdateAttrs = []string{"label"}
-	createDesc           string
+	workspaceUpdateAttrs     = []string{"label"}
+	createDesc               string
+	workspaceSaCreateExample = `
+  # Create service-account
+  $ astro workspace service-account create --workspace-id=<workspace-id> --label=my_label --role=ROLE
+`
+	workspaceSaGetExample = `
+$ astro workspace service-account get --workspace-id=<workspace-id>
+`
 )
 
 func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
@@ -31,6 +40,7 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newWorkspaceSwitchCmd(client, out),
 		newWorkspaceUpdateCmd(client, out),
 		newWorkspaceUserRootCmd(client, out),
+		newWorkspaceSaRootCmd(client, out),
 	)
 	return cmd
 }
@@ -165,7 +175,6 @@ func newWorkspaceUserRmCmd(client *houston.Client, out io.Writer) *cobra.Command
 			return workspaceUserRm(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
 
@@ -180,6 +189,72 @@ func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Comma
 			return workspaceUserList(cmd, client, out, args)
 		},
 	}
+	return cmd
+}
+
+func newWorkspaceSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "service-account",
+		Aliases: []string{"sa"},
+		Short:   "Manage astronomer service accounts",
+		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
+	}
+	cmd.AddCommand(
+		newWorkspaceSaCreateCmd(client, out),
+		newWorkspaceSaGetCmd(client, out),
+		newWorkspaceSaDeleteCmd(client, out),
+	)
+	return cmd
+}
+
+func newWorkspaceSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create a service-account in the astronomer platform",
+		Long:    "Create a service-account in the astronomer platform",
+		Example: workspaceSaCreateExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSaCreate(cmd, args, client, out)
+		},
+	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
+	cmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
+	cmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
+	cmd.Flags().StringVarP(&role, "role", "r", "viewer", "ROLE")
+	return cmd
+}
+
+func newWorkspaceSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "get",
+		Short:   "Get a service-account by entity type and entity id",
+		Long:    "Get a service-account by entity type and entity id",
+		Example: workspaceSaGetExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSaGet(cmd, args, client, out)
+		},
+	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.MarkFlagRequired("workspace-id")
+	return cmd
+}
+
+func newWorkspaceSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [SA-ID]",
+		Aliases: []string{"de"},
+		Short:   "Delete a service-account in the astronomer platform",
+		Long:    "Delete a service-account in the astronomer platform",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSaDelete(cmd, args, client, out)
+		},
+		Args: cobra.ExactArgs(1),
+	}
+	cmd.Flags().StringVarP(&workspaceId, "workspace-id", "w", "", "[ID]")
+	cmd.MarkFlagRequired("workspace-id")
 	return cmd
 }
 
@@ -281,4 +356,32 @@ func workspaceUserList(_ *cobra.Command, client *houston.Client, out io.Writer, 
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 	return workspace.ListRoles(ws, client, out)
+}
+
+func workspaceSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	if len(label) == 0 {
+		return errors.New("must provide a service-account label with the --label (-l) flag")
+	}
+
+	if err := validateRole(role); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
+	}
+	fullRole := strings.Join([]string{"WORKSPACE", strings.ToUpper(role)}, "_")
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return sa.CreateUsingWorkspaceUUID(workspaceId, label, category, fullRole, client, out)
+}
+
+func workspaceSaGet(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return sa.Get("WORKSPACE", workspaceId, client, out)
+}
+
+func workspaceSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return sa.DeleteUsingWorkspaceUUID(args[0], workspaceId, client, out)
 }

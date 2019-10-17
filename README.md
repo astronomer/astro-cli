@@ -1,4 +1,4 @@
-# Astronomer CLI [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
+# Astronomer CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/astronomer/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
 
 
 The Astronomer CLI can be used to build Airflow DAGs locally and run them via Docker-Compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
@@ -12,12 +12,12 @@ Usage:
 Available Commands:
   auth            Manage astronomer identity
   cluster         Manage Astronomer EE clusters
+  completion      Generate autocompletions script for the specified shell (bash or zsh)
   config          Manage astro project configurations
   deploy          Deploy an airflow project
   deployment      Manage airflow deployments
-  dev             Manage airflow projects and deployments
+  dev             Manage airflow projects
   help            Help about any command
-  service-account Manage astronomer service accounts
   upgrade         Check for newer version of Astronomer CLI
   user            Manage astronomer user
   version         Astronomer CLI version

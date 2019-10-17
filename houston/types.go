@@ -3,25 +3,27 @@ package houston
 // Response wraps all houston response structs used for json marashalling
 type Response struct {
 	Data struct {
-		AddWorkspaceUser        *Workspace       `json:"workspaceAddUser,omitempty"`
-		RemoveWorkspaceUser     *Workspace       `json:"workspaceRemoveUser,omitempty"`
-		CreateDeployment        *Deployment      `json:"createDeployment,omitempty"`
-		CreateToken             *AuthUser        `json:"createToken,omitempty"`
-		CreateServiceAccount    *ServiceAccount  `json:"createServiceAccount,omitempty"`
-		CreateUser              *AuthUser        `json:"createUser,omitempty"`
-		CreateWorkspace         *Workspace       `json:"createWorkspace,omitempty"`
-		DeleteDeployment        *Deployment      `json:"deleteDeployment,omitempty"`
-		DeleteServiceAccount    *ServiceAccount  `json:"deleteServiceAccount,omitempty"`
-		DeleteWorkspace         *Workspace       `json:"deleteWorkspace,omitempty"`
-		GetDeployments          []Deployment     `json:"workspaceDeployments,omitempty"`
-		GetAuthConfig           *AuthConfig      `json:"authConfig,omitempty"`
-		GetServiceAccounts      []ServiceAccount `json:"serviceAccounts,omitempty"`
-		GetUsers                []User           `json:"users,omitempty"`
-		GetWorkspaces           []Workspace      `json:"workspaces,omitempty"`
-		UpdateDeployment        *Deployment      `json:"updateDeployment,omitempty"`
-		UpdateWorkspace         *Workspace       `json:"updateWorkspace,omitempty"`
-		DeploymentLog           []DeploymentLog  `json:"logs,omitempty"`
-		WorkspaceUpdateUserRole string           `json:"workspaceUpdateUserRole,omitempty"`
+		AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
+		RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
+		CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
+		CreateToken                    *AuthUser                 `json:"createToken,omitempty"`
+		CreateWorkspaceServiceAccount  *WorkspaceServiceAccount  `json:"createWorkspaceServiceAccount,omitempty"`
+		CreateDeploymentServiceAccount *DeploymentServiceAccount `json:"createDeploymentServiceAccount,omitempty"`
+		CreateUser                     *AuthUser                 `json:"createUser,omitempty"`
+		CreateWorkspace                *Workspace                `json:"createWorkspace,omitempty"`
+		DeleteDeployment               *Deployment               `json:"deleteDeployment,omitempty"`
+		DeleteWorkspaceServiceAccount  *ServiceAccount           `json:"deleteWorkspaceServiceAccount,omitempty"`
+		DeleteDeploymentServiceAccount *ServiceAccount           `json:"deleteDeploymentServiceAccount,omitempty"`
+		DeleteWorkspace                *Workspace                `json:"deleteWorkspace,omitempty"`
+		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
+		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
+		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
+		GetUsers                       []User                    `json:"users,omitempty"`
+		GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
+		UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
+		UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
+		DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
+		WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -37,7 +39,7 @@ type AuthConfig struct {
 	LocalEnabled  bool           `json:"localEnabled"`
 	PublicSignup  bool           `json:"publicSignup"`
 	InitialSignup bool           `json:"initialSignup"`
-	AuthProviders  []AuthProvider `json:"providers"`
+	AuthProviders []AuthProvider `json:"providers"`
 }
 
 type AuthUser struct {
@@ -95,16 +97,46 @@ type Status struct {
 	Id      string `json:"id"`
 }
 
-// ServiceACcount defines a structure of a ServiceAccountResponse object
+// ServiceAccount defines a structure of a ServiceAccountResponse object
 type ServiceAccount struct {
 	Id         string `json:"id"`
 	ApiKey     string `json:"apiKey"`
 	Label      string `json:"label"`
 	Category   string `json:"category"`
 	EntityType string `json:"entityType"`
-	EntityId   string `json:"entityId"`
+	EntityId   string `json:"entityUuid"`
 	LastUsedAt string `json:"lastUsedAt"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
 	Active     bool   `json:"active"`
+}
+
+// WorkspaceServiceAccount defines a structure of a WorkspaceServiceAccountResponse object
+type WorkspaceServiceAccount struct {
+	Id            string `json:"id"`
+	ApiKey        string `json:"apiKey"`
+	Label         string `json:"label"`
+	Category      string `json:"category"`
+	EntityType    string `json:"entityType"`
+	WorkspaceUuid string `json:"workspaceUuid"`
+	LastUsedAt    string `json:"lastUsedAt"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+	Active        bool   `json:"active"`
+}
+
+// DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object
+type DeploymentServiceAccount struct {
+	Id             string `json:"id"`
+	ApiKey         string `json:"apiKey"`
+	Label          string `json:"label"`
+	Category       string `json:"category"`
+	EntityType     string `json:"entityType"`
+	DeploymentUuid string `json:"deploymentUuid"`
+	LastUsedAt     string `json:"lastUsedAt"`
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
+	Active         bool   `json:"active"`
 }
 
 // Token contains a houston auth token as well as it's payload of components

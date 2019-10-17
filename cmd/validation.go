@@ -79,7 +79,6 @@ func validateWorkspaceRole(role string) error {
 	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
 }
 
-
 func validateRole(role string) error {
 	validRoles := []string{"admin", "editor", "viewer"}
 

@@ -126,21 +126,101 @@ var (
 			}
 		}`
 
-	ServiceAccountDeleteRequest = `
-	mutation DeleteServiceAccount($serviceAccountId: Uuid!) {
-		deleteServiceAccount(serviceAccountUuid: $serviceAccountId) {
-					id
-					apiKey
-					label
-					category
-					entityType
-					entityUuid
-					active
-					createdAt
-					updatedAt
-					lastUsedAt
+	CreateDeploymentServiceAccountRequest = `
+	mutation createDeploymentServiceAccount(
+		$label: String!,
+		$category: String,
+		$deploymentUuid: Uuid!,
+		$role: Role!
+  	) {
+		createDeploymentServiceAccount(
+		  label: $label,
+		  category: $category,
+		  deploymentUuid: $deploymentUuid,
+		  role: $role
+    	) {
+		    id
+		    label
+		    apiKey
+		    entityType
+		    deploymentUuid
+		    category
+		    active
+		    lastUsedAt
+		    createdAt
+		    updatedAt
+    	}
+  	}`
+
+	CreateWorkspaceServiceAccountRequest = `
+	mutation createWorkspaceServiceAccount(
+		$label: String!,
+		$category: String,
+		$workspaceUuid: Uuid!,
+		$role: Role!
+	) {
+		createWorkspaceServiceAccount(
+		  label: $label,
+		  category: $category,
+		  workspaceUuid: $workspaceUuid,
+		  role: $role
+		) {
+			id
+			label
+			apiKey
+			entityType
+			workspaceUuid
+			category
+			active
+			lastUsedAt
+			createdAt
+			updatedAt
+		}
+    }`
+
+	DeploymentServiceAccountDeleteRequest = `
+	mutation deleteDeploymentServiceAccount(
+         $serviceAccountId: Uuid!
+         $deploymentUuid: Uuid!
+    ) {
+		deleteDeploymentServiceAccount(
+          serviceAccountUuid: $serviceAccountUuid
+          deploymentUuid: $deploymentUuid
+        ) {
+			id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
 		}
 	}`
+
+	WorkspaceServiceAccountDeleteRequest = `
+	mutation deleteWorkspaceServiceAccount(
+          $serviceAccountUuid: Uuid!
+          $workspaceUuid: Uuid!
+    ) {
+        deleteWorkspaceServiceAccount(
+          serviceAccountUuid: $serviceAccountUuid
+          workspaceUuid: $workspaceUuid
+        ) {
+            id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
+         }
+    }`
 
 	ServiceAccountsGetRequest = `
 	query GetServiceAccount(

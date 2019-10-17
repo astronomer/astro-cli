@@ -90,7 +90,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)
 		if err.Error() == PermissionsError.Error() {
-			return nil, errors.New("Your token has expired. Please log in again.")
+			return nil, errors.Wrap(errors.New("Your token has expired. Please log in again."), err.Error())
 		}
 		return nil, err
 	}

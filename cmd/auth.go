@@ -49,7 +49,7 @@ func newAuthLogoutCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return authLogout(cmd, args)
 		},
-		Args:  cobra.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(1),
 	}
 	return cmd
 }

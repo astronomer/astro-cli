@@ -8,54 +8,92 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var (
-	tab = printutil.Table{
+func newTableOut() *printutil.Table {
+	return &printutil.Table{
 		Padding:        []int{40, 40, 50, 50},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "CATEGORY", "ID", "APIKEY"},
 	}
-)
+}
 
-func Create(id, label, category, entityType, role string, client *houston.Client, out io.Writer) error {
+func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
-		Query: houston.ServiceAccountCreateRequest,
+		Query: houston.CreateDeploymentServiceAccountRequest,
 		Variables: map[string]interface{}{
-			"entityId":   id,
-			"label":      label,
-			"category":   category,
-			"entityType": entityType,
-			"role":       role,
+			"label":          label,
+			"category":       category,
+			"deploymentUuid": deploymentUuid,
+			"role":           role,
 		},
 	}
-
 	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
 
-	sa := resp.Data.CreateServiceAccount
-
+	sa := resp.Data.CreateDeploymentServiceAccount
+	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
 	return tab.Print(out)
 }
 
-func Delete(id string, client *houston.Client, out io.Writer) error {
+func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
-		Query:     houston.ServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountId": id},
+		Query: houston.CreateWorkspaceServiceAccountRequest,
+		Variables: map[string]interface{}{
+			"label":         label,
+			"category":      category,
+			"workspaceUuid": workspaceUuid,
+			"role":          role,
+		},
+	}
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	sa := resp.Data.CreateWorkspaceServiceAccount
+	tab := newTableOut()
+	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	tab.SuccessMsg = "\n Service account successfully created."
+
+	return tab.Print(out)
+}
+
+func DeleteUsingWorkspaceUUID(serviceAccountId, workspaceId string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.WorkspaceServiceAccountDeleteRequest,
+		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountId, "workspaceUuid": workspaceId},
 	}
 
 	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
-
-	sa := resp.Data.DeleteServiceAccount
+	sa := resp.Data.DeleteWorkspaceServiceAccount
 
 	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
-	fmt.Sprintln(out, msg)
+	fmt.Fprintln(out, msg)
+
+	return nil
+}
+
+func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.DeploymentServiceAccountDeleteRequest,
+		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountId, "deploymentUuid": deploymentId},
+	}
+
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+	sa := resp.Data.DeleteDeploymentServiceAccount
+
+	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
+	fmt.Fprintln(out, msg)
 
 	return nil
 }
@@ -72,7 +110,7 @@ func Get(entityType, id string, client *houston.Client, out io.Writer) error {
 	}
 
 	sas := resp.Data.GetServiceAccounts
-
+	tab := newTableOut()
 	for _, sa := range sas {
 		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
 	}

@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
@@ -23,7 +22,7 @@ func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newUserCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	var (
-		userEmail string
+		userEmail    string
 		userPassword string
 	)
 	cmd := &cobra.Command{

@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/auth"
 	_ "github.com/astronomer/astro-cli/cluster"
-	_ "github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -22,13 +21,13 @@ import (
 
 type IntegrationTestSuite struct {
 	suite.Suite
-	TestEmail string
-	TestPassword string
+	TestEmail     string
+	TestPassword  string
 	TestWorkspace string
-	TestDomain string
-	Temp string
-	Client *houston.Client
-	Fs afero.Fs
+	TestDomain    string
+	Temp          string
+	Client        *houston.Client
+	Fs            afero.Fs
 }
 
 func (suite *IntegrationTestSuite) SetupSuite() {

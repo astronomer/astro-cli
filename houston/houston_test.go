@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewHoustonClient(t *testing.T){
+func TestNewHoustonClient(t *testing.T) {
 	client := NewHoustonClient(httputil.NewHTTPClient())
 	assert.NotNil(t, client, "Can't create new houston client")
 }

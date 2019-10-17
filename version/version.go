@@ -26,7 +26,7 @@ func PrintVersion(out io.Writer) error {
 	}
 
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)
-	fmt.Fprintf(out,messages.CLI_CURR_COMMIT+"\n", gitCommit)
+	fmt.Fprintf(out, messages.CLI_CURR_COMMIT+"\n", gitCommit)
 	return nil
 }
 
