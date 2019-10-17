@@ -26,7 +26,7 @@ func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, cli
 			"role":           role,
 		},
 	}
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
