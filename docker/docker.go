@@ -70,6 +70,7 @@ func ExecPush(serverAddress, token, image string) error {
 	if err != nil {
 		panic(err)
 	}
+	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
 
 	if err != nil {
@@ -96,6 +97,7 @@ func ExecLogin(serverAddress, username, token string) error {
 	if err != nil {
 		panic(err)
 	}
+	cli.NegotiateAPIVersion(ctx)
 
 	// Remove http|https from serverAddress
 	serverAddress = registry.ConvertToHostname(serverAddress)
