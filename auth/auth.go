@@ -37,7 +37,6 @@ func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace)
 	if c.LastUsedWorkspace != "" {
 		for _, w := range workspaces {
 			if c.LastUsedWorkspace == w.Id {
-				fmt.Println(w.Id)
 				c.SetContextKey("workspace", w.Id)
 				return true
 			}
