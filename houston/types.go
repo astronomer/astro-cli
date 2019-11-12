@@ -37,7 +37,7 @@ type AuthConfig struct {
 	LocalEnabled  bool           `json:"localEnabled"`
 	PublicSignup  bool           `json:"publicSignup"`
 	InitialSignup bool           `json:"initialSignup"`
-	AuthProviders  []AuthProvider `json:"providers"`
+	AuthProviders []AuthProvider `json:"providers"`
 }
 
 type AuthUser struct {
@@ -68,8 +68,8 @@ type Deployment struct {
 
 // DeploymentInfo contains registry related information for a deployment
 type DeploymentInfo struct {
-	Latest string `json:"latest"`
-	Next   string `json:"next"`
+	NextCli string `json:"NextCli"`
+	Current string `json:"current"`
 }
 
 // Email contains various pieces of a users email

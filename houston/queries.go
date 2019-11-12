@@ -72,8 +72,8 @@ var (
 				id
 			}
 			deployInfo {
-				latest
-				next
+				nextCli
+				current
 			}
 			version
 			createdAt

@@ -575,7 +575,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	nextTag := ""
 	for _, deployment := range deployments {
 		if deployment.ReleaseName == name {
-			nextTag = deployment.DeploymentInfo.Next
+			nextTag = deployment.DeploymentInfo.NextCli
 		}
 	}
 

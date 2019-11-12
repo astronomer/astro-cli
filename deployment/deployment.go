@@ -114,11 +114,11 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 			ws = d.Workspace.Id
 		}
 
-		latestTag := d.DeploymentInfo.Latest
-		if latestTag == "" {
-			latestTag = "?"
+		currentTag := d.DeploymentInfo.Current
+		if currentTag == "" {
+			currentTag = "?"
 		}
-		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, latestTag}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, currentTag}, false)
 	}
 
 	return tab.Print(out)
