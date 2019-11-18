@@ -35,7 +35,7 @@ class AstroLinksPlugin(AirflowPlugin):
     macros = []
     admin_views = []
     menu_links = [airflow_plugins_ml, astro_docs_ml, astro_guides_ml]
-		appbuilder_views = []
+    appbuilder_views = []
     appbuilder_menu_items = [
         {
             "name": ml.name,
