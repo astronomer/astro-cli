@@ -35,7 +35,8 @@ services:
 
   scheduler:
     image: {{ .AirflowImage }}
-    command: ["airflow", "scheduler"]
+    command: command: >
+      bash -c "airflow upgradedb && airflow scheduler"
     restart: unless-stopped
     networks:
       - airflow
