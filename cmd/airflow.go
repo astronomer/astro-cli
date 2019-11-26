@@ -86,7 +86,9 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short: "Scaffold a new airflow project",
 		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
 		Args:  cobra.MaximumNArgs(1),
-		RunE:  airflowInit,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return airflowInit(cmd, args, client, out)
+		},
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
@@ -211,7 +213,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string) error {
+func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Validate project name
 	if len(projectName) != 0 {
 		projectNameValid := regexp.
@@ -226,10 +228,18 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
-	acceptableAirflowVersions := []string{"1.9.0", "1.10.5"}
+	r := houston.Request{
+		Query:     houston.DeploymentConfigRequest,
+	}
 
-	if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-		return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
+	wsResp, err := r.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	airflowImageTag := wsResp.Data.DeploymentConfig.AirflowImageTag
+	if len(airflowImageTag) == 0 {
+		airflowImageTag = "latest"
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
@@ -252,7 +262,10 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	airflow.Init(config.WorkingPath, airflowVersion)
+	err = airflow.Init(config.WorkingPath, airflowImageTag)
+	if err != nil {
+		return err
+	}
 
 	if exists {
 		fmt.Printf(messages.CONFIG_REINIT_PROJECT_CONFIG+"\n", config.WorkingPath)

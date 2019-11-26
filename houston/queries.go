@@ -426,4 +426,10 @@ var (
         	log: message
       }
     }`
+	DeploymentConfigRequest = `
+	query DeploymentInfo {
+		deploymentConfig {
+			airflowImageTag
+		}
+	}`
 )

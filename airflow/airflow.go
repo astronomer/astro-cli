@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/version"
 )
 
 func initDirs(root string, dirs []string) error {
@@ -59,14 +58,14 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path string, airflowVersion string) error {
+func Init(path string, airflowImageTag string) error {
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 
 	// Map of files to create
 	files := map[string]string{
 		".dockerignore":             include.Dockerignore,
-		"Dockerfile":                fmt.Sprintf(include.Dockerfile, version.GetTagFromVersion(airflowVersion)),
+		"Dockerfile":                fmt.Sprintf(include.Dockerfile, fmt.Sprintf("%s-onbuild", airflowImageTag)),
 		".gitignore":                include.Gitignore,
 		"packages.txt":              "",
 		"requirements.txt":          "",
