@@ -334,12 +334,3 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 	args = append([]string{"airflow"}, args...)
 	return airflow.Run(config.WorkingPath, args)
 }
-
-func acceptableVersion(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
-}
