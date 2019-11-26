@@ -24,7 +24,6 @@ import (
 
 var (
 	projectName      string
-	airflowVersion   string
 	envFile          string
 	followLogs       bool
 	forceDeploy      bool
@@ -91,7 +90,6 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
 	return cmd
 }
 
