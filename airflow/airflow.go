@@ -65,7 +65,7 @@ func Init(path string, airflowImageTag string) error {
 	// Map of files to create
 	files := map[string]string{
 		".dockerignore":             include.Dockerignore,
-		"Dockerfile":                fmt.Sprintf(include.Dockerfile, fmt.Sprintf("%s-onbuild", airflowImageTag)),
+		"Dockerfile":                fmt.Sprintf(include.Dockerfile, airflowImageTag),
 		".gitignore":                include.Gitignore,
 		"packages.txt":              "",
 		"requirements.txt":          "",

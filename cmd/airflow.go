@@ -232,19 +232,20 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		Query: houston.DeploymentInfoRequest,
 	}
 
+	defaultImageTag := ""
 	wsResp, err := r.DoWithClient(client)
-	if err != nil {
-		return errors.Wrap(err, "unable to ask houston api for airflow versions")
+	if err == nil {
+		defaultImageTag = wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
 	}
 
-	acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
-	if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-		return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
-	}
+	// TODO: @andriisoldatenko rethink or remove this logic
+	// acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
+	// if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
+	//  	return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
+	// }
 
-	defaultImageTag := wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
 	if len(defaultImageTag) == 0 {
-		defaultImageTag = "latest"
+		defaultImageTag = "latest-onbuild"
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
