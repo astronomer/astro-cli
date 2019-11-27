@@ -192,7 +192,16 @@ type DeploymentLog struct {
 	Log       string `json:"log"`
 }
 
+// AirflowImage contains all airflow image attributes
+type AirflowImage struct {
+	Version   string `json:"version"`
+	Distro    string `json:"distro"`
+	IsDefault bool   `json:"isDefault"`
+}
+
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
-	AirflowImageTag string `json:"airflowImageTag"`
+	AirflowImages              []AirflowImage `json:"airflowImages"`
+	DefaultAirflowImageTag     string         `json:"defaultAirflowImageTag"`
+	DefaultAirflowChartVersion string         `json:"defaultAirflowChartVersion"`
 }

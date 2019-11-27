@@ -227,17 +227,17 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	}
 
 	r := houston.Request{
-		Query:     houston.DeploymentConfigRequest,
+		Query:     houston.DeploymentInfoRequest,
 	}
 
 	wsResp, err := r.DoWithClient(client)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to ask houston api for airflow versions")
 	}
 
-	airflowImageTag := wsResp.Data.DeploymentConfig.AirflowImageTag
-	if len(airflowImageTag) == 0 {
-		airflowImageTag = "latest"
+	defaultImageTag := wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
+	if len(defaultImageTag) == 0 {
+		defaultImageTag = "latest"
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
@@ -260,7 +260,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, airflowImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageTag)
 	if err != nil {
 		return err
 	}

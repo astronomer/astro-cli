@@ -426,10 +426,17 @@ var (
         	log: message
       }
     }`
-	DeploymentConfigRequest = `
+	DeploymentInfoRequest = `
 	query DeploymentInfo {
 		deploymentConfig {
-			airflowImageTag
+			airflowImages {
+			version
+			distro
+			isDefault
+		}
+		airflowVersions
+		defaultAirflowImageTag
+		defaultAirflowChartVersion
 		}
 	}`
 )
