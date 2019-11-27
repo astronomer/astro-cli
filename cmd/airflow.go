@@ -24,6 +24,7 @@ import (
 
 var (
 	projectName      string
+	airflowVersion   string
 	envFile          string
 	followLogs       bool
 	forceDeploy      bool
@@ -90,6 +91,7 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
 	return cmd
 }
 
@@ -227,12 +229,17 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	}
 
 	r := houston.Request{
-		Query:     houston.DeploymentInfoRequest,
+		Query: houston.DeploymentInfoRequest,
 	}
 
 	wsResp, err := r.DoWithClient(client)
 	if err != nil {
 		return errors.Wrap(err, "unable to ask houston api for airflow versions")
+	}
+
+	acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
+	if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
+		return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
 	}
 
 	defaultImageTag := wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
@@ -333,4 +340,13 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
 	return airflow.Run(config.WorkingPath, args)
+}
+
+func acceptableVersion(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
