@@ -426,4 +426,14 @@ var (
         	log: message
       }
     }`
+	DeploymentInfoRequest = `
+	query DeploymentInfo {
+		deploymentConfig {
+			airflowImages {
+			version
+			isDefault
+		}
+		defaultAirflowImageTag
+		}
+	}`
 )

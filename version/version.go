@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	s "strings"
 
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
@@ -78,19 +77,4 @@ func isValidVersion(version string) bool {
 		return false
 	}
 	return true
-}
-
-func GetTagFromVersion(airflowVersion string) string {
-
-	if airflowVersion == "" {
-		airflowVersion = "1.10.5"
-	}
-
-	version := CurrVersion
-
-	if !isValidVersion(version) || s.HasPrefix(version, "SNAPSHOT-") {
-		return fmt.Sprintf("master-%s-onbuild", airflowVersion)
-	} else {
-		return fmt.Sprintf("%s-%s-onbuild", version, airflowVersion)
-	}
 }

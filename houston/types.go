@@ -24,6 +24,7 @@ type Response struct {
 		UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
 		DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
 		WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
+		DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
@@ -189,4 +190,17 @@ type DeploymentLog struct {
 	Component string `json:"component"`
 	CreatedAt string `json:"createdAt"`
 	Log       string `json:"log"`
+}
+
+// AirflowImage contains all airflow image attributes
+type AirflowImage struct {
+	Version   string `json:"version"`
+	Distro    string `json:"distro"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// DeploymentConfig contains current airflow image tag
+type DeploymentConfig struct {
+	AirflowImages              []AirflowImage `json:"airflowImages"`
+	DefaultAirflowImageTag     string         `json:"defaultAirflowImageTag"`
 }
