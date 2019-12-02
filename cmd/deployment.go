@@ -198,6 +198,8 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 		deploymentConfig["executor"] = "CeleryExecutor"
 	case "kubernetes", "k8s":
 		deploymentConfig["executor"] = "KubernetesExecutor"
+	default:
+		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
 
 	return deployment.Create(args[0], ws, deploymentConfig)
