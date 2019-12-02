@@ -202,7 +202,5 @@ type AirflowImage struct {
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
 	AirflowImages              []AirflowImage `json:"airflowImages"`
-	AirflowVersions            []string       `json:"airflowVersions"`
 	DefaultAirflowImageTag     string         `json:"defaultAirflowImageTag"`
-	DefaultAirflowChartVersion string         `json:"defaultAirflowChartVersion"`
 }

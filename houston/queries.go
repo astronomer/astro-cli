@@ -431,12 +431,9 @@ var (
 		deploymentConfig {
 			airflowImages {
 			version
-			distro
 			isDefault
 		}
-		airflowVersions
 		defaultAirflowImageTag
-		defaultAirflowChartVersion
 		}
 	}`
 )
