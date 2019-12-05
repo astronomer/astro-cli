@@ -78,7 +78,7 @@ Git Commit: f5cdab8f832da3c6184a7ac167b491e3bac3c022
 #### Troubleshooting
 
 1. Make sure you go through instruction to install Docker on windows properly https://docs.docker.com/docker-for-windows/install/
-2. Make sure you enabled Hyper-V, it's requre to Docker and Linux Containers, also plesae review this document
+2. Make sure you enabled Hyper-V, it's required for Docker and Linux Containers, also please review this document
 https://docs.docker.com/docker-for-windows/troubleshoot/
 
 ## Getting Started
