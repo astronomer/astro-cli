@@ -313,7 +313,7 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 	s := make([]string, 0)
 
 	// Get project name from config
-	projectName := config.CFG.ProjectName.GetString()
+	projectName, err := projectNameUnique()
 
 	// Create libcompose project
 	project, err := createProject(projectName, airflowHome, "")
