@@ -31,31 +31,30 @@ Use "astro [command] --help" for more information about a command.
 
 ## Installing `astro`
 
-### If you're using Astronomer Cloud or Astronomer Enterprise v0.7.x
+The Astronomer CLI is an open-source project. Installing it to your machine allows you to easily spin up a local instance of Apache Airflow and allows you to easily deploy code to remote Airflow environments if you are an Astronomer customer.
+
+> Note: If you are an Astronomer customer, your CLI version _must_ match the version of Astronomer you are running. If you are using Astronomer Cloud, the latest version should always be correct. If you have a custom Astronomer Enterprise installation, you may be on a different version, which means you may need to ensure that your CLI and platform match up; you can check which version of Astronomer you're running by clicking the user icon in the top right corner of our UI.
+
+### Latest Version
 
 via `curl`:
 
 ```
-curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
-```
-
-### If you're using Astronomer Enterprise v0.8 or later
-
-via `curl`
-```
-curl -sSL https://install.astronomer.io | sudo bash
+curl -sSL https://install.astronomer.io | sudo bash -s
 ```
 
 ### Previous Versions
 
-via `curl`
+
+To install a previous version of Astronomer, you can add the tag at the end of your `curl` command via the following syntax:
+
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
 ```
 
 ie:
 ```
-curl -sSL https://install.astronomer.io | sudo bash -s -- v0.3.1
+curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 ```
 
 > Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally.
@@ -110,7 +109,7 @@ This will generate a skeleton project directory:
 └── requirements.txt
 ```
 
-Dags can go in the `dags` folder, custom airflow plugins in `plugins`, python packages needed can go in `requirements.txt`, and OS level packages can go in `packages.txt`.
+DAGs can go in the `dags` folder, custom Airflow plugins in `plugins`, python packages needed can go in `requirements.txt`, and OS level packages can go in `packages.txt`.
 
 1. Start airflow
 
