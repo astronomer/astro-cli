@@ -431,7 +431,6 @@ var (
 		deploymentConfig {
 			airflowImages {
 			version
-			isDefault
 		}
 		defaultAirflowImageTag
 		}
