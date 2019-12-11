@@ -596,19 +596,25 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, "Dockerfile"))
 	}
 
-	tag := docker.GetTagFromParsedFile(cmds)
+	image, tag := docker.GetImageTagFromParsedFile(cmds)
+	if image != messages.VALID_DOCKERFILE_BASE_IMAGE {
+		fmt.Printf("WARNING!!! You are using invalid image name '%s' in your Dockerfile, please replace to %s\n", image, messages.VALID_DOCKERFILE_BASE_IMAGE)
+	}
 
 	// Get valid image tags for platform using Deployment Info request
 	diReq := houston.Request{
 		Query: houston.DeploymentInfoRequest,
 	}
 
-	deResp, err := diReq.Do()
+	diResp, err := diReq.Do()
 	if err != nil {
 		return err
 	}
 
-	deployments := deResp.Data.DeploymentConfig.AirflowImages
+	if !diResp.Data.DeploymentConfig.IsValidTag(tag) {
+		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(), ",")
+		fmt.Printf("WARNING!!! You are going to push an image using the '%s' tag. This is not recommended. Please base your image off to one of valid image tags: %s\n", tag, validTags)
+	}
 
 	err = imageBuild(path, deployImage)
 	if err != nil {

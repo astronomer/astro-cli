@@ -67,5 +67,6 @@ var (
 
 	SETTINGS_PATH = "Error looking for settings.yaml"
 
-	NA = "N/A"
+	NA                          = "N/A"
+	VALID_DOCKERFILE_BASE_IMAGE = "astronomerinc/ap-airflow"
 )

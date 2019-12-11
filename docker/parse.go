@@ -97,14 +97,15 @@ func ParseFile(filename string) ([]Command, error) {
 }
 
 // Parse tag from parsed dockerfile:
-// e.g. FROM ubuntu:xenial returns "xenial"
-func GetTagFromParsedFile(cmds []Command) string {
+// e.g. FROM ubuntu:xenial returns "ubuntu", "xenial"
+func GetImageTagFromParsedFile(cmds []Command) (baseImage, tag string) {
 	for _, cmd := range cmds {
 		if cmd.Cmd == command.From {
 			from := cmd.Value[0]
-			tag := strings.Split(from, ":")[1]
-			return tag
+			splittedFrom := strings.Split(from, ":")
+			baseImage, tag := splittedFrom[0], splittedFrom[1]
+			return baseImage, tag
 		}
 	}
-	return ""
+	return "", ""
 }

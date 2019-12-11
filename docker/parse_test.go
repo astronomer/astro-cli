@@ -57,8 +57,7 @@ func TestParseFile(t *testing.T) {
 	assert.Equal(t, expected, cmds)
 }
 
-func TestGetTagFromParsedFile(t *testing.T) {
-	expected := "latest-onbuild"
+func TestGetImageTagFromParsedFile(t *testing.T) {
 	cmds := []Command{
 		{
 			Cmd:       "from",
@@ -69,7 +68,7 @@ func TestGetTagFromParsedFile(t *testing.T) {
 			Value:     []string{"astronomerinc/ap-airflow:latest-onbuild"},
 		},
 	}
-	tag, err := GetTagFromParsedFile(cmds)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, tag)
+	image, tag := GetImageTagFromParsedFile(cmds)
+	assert.Equal(t, "astronomerinc/ap-airflow", image)
+	assert.Equal(t, "latest-onbuild", tag)
 }
