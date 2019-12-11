@@ -246,6 +246,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 
 	if len(defaultImageTag) == 0 {
 		defaultImageTag = "latest-onbuild"
+		fmt.Printf("Failed to get list of supported tags from Astonomer, falling back to %s\n", defaultImageTag)
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
