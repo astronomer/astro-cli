@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -588,6 +589,26 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	// Build our image
 	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
+
+	// parse dockerfile
+	cmds, err := docker.ParseFile(filepath.Join(path, "Dockerfile"))
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, "Dockerfile"))
+	}
+
+	tag := docker.GetTagFromParsedFile(cmds)
+
+	// Get valid image tags for platform using Deployment Info request
+	diReq := houston.Request{
+		Query: houston.DeploymentInfoRequest,
+	}
+
+	deResp, err := diReq.Do()
+	if err != nil {
+		return err
+	}
+
+	deployments := deResp.Data.DeploymentConfig.AirflowImages
 
 	err = imageBuild(path, deployImage)
 	if err != nil {

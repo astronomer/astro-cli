@@ -63,3 +63,7 @@
 [[constraint]]
   name = "github.com/stretchr/testify"
   version = "1.4.0"
+
+[[constraint]]
+  name = "github.com/moby/buildkit"
+  version = "0.6.3"
