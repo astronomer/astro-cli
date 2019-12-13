@@ -25,6 +25,7 @@ type cfgs struct {
 	ProjectDeployment cfg
 	ProjectWorkspace  cfg
 	WebserverPort     cfg
+	ShowWarnings      cfg
 }
 
 // Creates a new cfg struct
@@ -58,6 +59,14 @@ func (c cfg) GetString() string {
 		return c.GetProjectString()
 	}
 	return c.GetHomeString()
+}
+
+// GetBool will return the requested config, check working dir and fallback to home
+func (c cfg) GetBool() bool {
+	if configExists(viperProject) && viperProject.IsSet(c.Path) {
+		return viperProject.GetBool(c.Path)
+	}
+	return viperHome.GetBool(c.Path)
 }
 
 // GetProjectString will return a project config

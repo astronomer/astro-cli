@@ -392,6 +392,17 @@
   revision = "a4e142e9c047c904fa2f1e144d9a84e6133024bc"
 
 [[projects]]
+  digest = "1:f45e9e5da51a291e35f72dee3e729bf703b260dd10a5571108b08c1c32b32363"
+  name = "github.com/moby/buildkit"
+  packages = [
+    "frontend/dockerfile/command",
+    "frontend/dockerfile/parser",
+  ]
+  pruneopts = "UT"
+  revision = "928f3b480d7460aacb401f68610058ffdb549aca"
+  version = "v0.6.3"
+
+[[projects]]
   digest = "1:ee4d4af67d93cc7644157882329023ce9a7bcfce956a079069a9405521c7cc8d"
   name = "github.com/opencontainers/go-digest"
   packages = ["."]
@@ -704,8 +715,11 @@
     "github.com/docker/libcompose/project/options",
     "github.com/fatih/camelcase",
     "github.com/gorilla/websocket",
+    "github.com/hashicorp/hcl/hcl/parser",
     "github.com/iancoleman/strcase",
     "github.com/mitchellh/go-homedir",
+    "github.com/moby/buildkit/frontend/dockerfile/command",
+    "github.com/moby/buildkit/frontend/dockerfile/parser",
     "github.com/pkg/errors",
     "github.com/shurcooL/go/ctxhttp",
     "github.com/spf13/afero",

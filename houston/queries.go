@@ -430,7 +430,8 @@ var (
 	query DeploymentInfo {
 		deploymentConfig {
 			airflowImages {
-			version
+				version
+				tag
 		}
 		defaultAirflowImageTag
 		}

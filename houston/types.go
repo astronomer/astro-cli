@@ -194,13 +194,28 @@ type DeploymentLog struct {
 
 // AirflowImage contains all airflow image attributes
 type AirflowImage struct {
-	Version   string `json:"version"`
-	Distro    string `json:"distro"`
-	IsDefault bool   `json:"isDefault"`
+	Version string `json:"version"`
+	Tag     string `json:"tag"`
 }
 
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
-	AirflowImages              []AirflowImage `json:"airflowImages"`
-	DefaultAirflowImageTag     string         `json:"defaultAirflowImageTag"`
+	AirflowImages          []AirflowImage `json:"airflowImages"`
+	DefaultAirflowImageTag string         `json:"defaultAirflowImageTag"`
+}
+
+func (config *DeploymentConfig) GetValidTags() (tags []string) {
+	for _, image := range config.AirflowImages {
+		tags = append(tags, image.Tag)
+	}
+	return
+}
+
+func (config *DeploymentConfig) IsValidTag(tag string) bool {
+	for _, validTag := range config.GetValidTags() {
+		if tag == validTag {
+			return true
+		}
+	}
+	return false
 }

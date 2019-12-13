@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -588,6 +589,40 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	// Build our image
 	fmt.Println(messages.COMPOSE_IMAGE_BUILDING_PROMT)
+
+	// parse dockerfile
+	cmds, err := docker.ParseFile(filepath.Join(path, "Dockerfile"))
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, "Dockerfile"))
+	}
+
+	image, tag := docker.GetImageTagFromParsedFile(cmds)
+	if config.CFG.ShowWarnings.GetBool() && image != messages.VALID_DOCKERFILE_BASE_IMAGE {
+		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_NAME, image, messages.VALID_DOCKERFILE_BASE_IMAGE))
+		if !i {
+			fmt.Println("Cancelling deploy...")
+			os.Exit(1)
+		}
+	}
+
+	// Get valid image tags for platform using Deployment Info request
+	diReq := houston.Request{
+		Query: houston.DeploymentInfoRequest,
+	}
+
+	diResp, err := diReq.Do()
+	if err != nil {
+		return err
+	}
+
+	if config.CFG.ShowWarnings.GetBool() && !diResp.Data.DeploymentConfig.IsValidTag(tag) {
+		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(), ",")
+		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_TAG, tag, validTags))
+		if !i {
+			fmt.Println("Cancelling deploy...")
+			os.Exit(1)
+		}
+	}
 
 	err = imageBuild(path, deployImage)
 	if err != nil {

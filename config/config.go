@@ -53,6 +53,7 @@ var (
 		ProjectName:       newCfg("project.name", ""),
 		ProjectWorkspace:  newCfg("project.workspace", ""),
 		WebserverPort:     newCfg("webserver.port", "8080"),
+		ShowWarnings:      newCfg("show_warnings", "true"),
 	}
 
 	// viperHome is the viper object in the users home directory
