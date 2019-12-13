@@ -70,5 +70,5 @@ var (
 	NA                          = "N/A"
 	VALID_DOCKERFILE_BASE_IMAGE = "astronomerinc/ap-airflow"
 	WARNING_INVALID_IMAGE_NAME  = "WARNING! You are using invalid image name '%s' in your Dockerfile, please replace to %s. Are you sure you want to continue?\n"
-	WARNING_INVALID_IMAGE_TAG   = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease base your image off to one of valid image tags: %s. Are you sure you want to continue?\n"
+	WARNING_INVALID_IMAGE_TAG   = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease base your image off to one of valid image tags: %s.\nAre you sure you want to continue?"
 )
