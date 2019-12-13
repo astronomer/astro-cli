@@ -598,7 +598,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	image, tag := docker.GetImageTagFromParsedFile(cmds)
 	if config.CFG.ShowWarnings.GetBool() && image != messages.VALID_DOCKERFILE_BASE_IMAGE {
-		i, _ := input.InputConfirm(fmt.Sprintf("WARNING! You are using invalid image name '%s' in your Dockerfile, please replace to %s. Are you sure you want to continue?\n", image, messages.VALID_DOCKERFILE_BASE_IMAGE))
+		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_NAME, image, messages.VALID_DOCKERFILE_BASE_IMAGE))
 		if !i {
 			fmt.Println("Cancelling deploy...")
 			os.Exit(1)
@@ -617,7 +617,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	if config.CFG.ShowWarnings.GetBool() && !diResp.Data.DeploymentConfig.IsValidTag(tag) {
 		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(), ",")
-		i, _ := input.InputConfirm(fmt.Sprintf("WARNING! You are going to push an image using the '%s' tag. This is not recommended. Please base your image off to one of valid image tags: %s. Are you sure you want to continue?\n", tag, validTags))
+		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_TAG, tag, validTags))
 		if !i {
 			fmt.Println("Cancelling deploy...")
 			os.Exit(1)
