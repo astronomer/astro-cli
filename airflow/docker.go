@@ -616,7 +616,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && !diResp.Data.DeploymentConfig.IsValidTag(tag) {
-		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(), ",")
+		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(), ", ")
 		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_TAG, tag, validTags))
 		if !i {
 			fmt.Println("Cancelling deploy...")
