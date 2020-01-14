@@ -29,9 +29,6 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Aliases: []string{"wo"},
 		Short:   "Manage Astronomer workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
-		RunE: func(_ *cobra.Command, args []string) error {
-			return nil
-		},
 	}
 	cmd.AddCommand(
 		newWorkspaceListCmd(client, out),
@@ -180,10 +177,10 @@ func newWorkspaceUserRmCmd(client *houston.Client, out io.Writer) *cobra.Command
 
 func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove EMAIL",
-		Aliases: []string{"rm"},
-		Short:   "Remove a user from a workspace",
-		Long:    "Remove a user from a workspace",
+		Use:   "list",
+		Aliases: []string{"ls"},
+		Short: "List Astronomer workspaces",
+		Long:  "List Astronomer workspaces",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, client, out, args)
