@@ -7,15 +7,10 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: astronomerio/goreleaser:v0.0.2
+      - image: circleci/golang:1.13
     steps:
       - checkout
-      - run:
-          name: Release to GitHub
-          command: |
-            set -xe
-            git fetch --tags
-            goreleaser release --rm-dist
+      - run: curl -sL https://git.io/goreleaser | bash
 workflows:
   version: 2.1
   build-images:
