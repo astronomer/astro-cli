@@ -1,7 +1,7 @@
 project_name: astro
 release:
   github:
-    owner: astronomer
+    owner: sjmiller609
     name: astro-cli
   # If set to auto, will mark the release as not ready for production
   # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
@@ -22,7 +22,7 @@ build:
     - amd64
   goarm:
     - 7
-  ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
+  ldflags: -s -w -X github.com/sjmiller609/astro-cli/version.CurrVersion={{ .Version }} -X github.com/sjmiller609/astro-cli/version.CurrCommit={{ .Commit }}
 archives:
   -
     format: tar.gz
