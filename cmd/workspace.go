@@ -29,9 +29,6 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Aliases: []string{"wo"},
 		Short:   "Manage Astronomer workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
-		RunE: func(_ *cobra.Command, args []string) error {
-			return nil
-		},
 	}
 	cmd.AddCommand(
 		newWorkspaceListCmd(client, out),
