@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/sjmiller609/astro-cli/config"
+	"github.com/sjmiller609/astro-cli/pkg/httputil"
 	"github.com/spf13/afero"
 )
 

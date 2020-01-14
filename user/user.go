@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/sjmiller609/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/pkg/input"
 )
 
 // Create verifies input before sending a CreateUser API call to houston

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/messages"
-	"github.com/astronomer/astro-cli/pkg/github"
+	"github.com/sjmiller609/astro-cli/messages"
+	"github.com/sjmiller609/astro-cli/pkg/github"
 )
 
 var (

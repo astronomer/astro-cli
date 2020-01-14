@@ -1,4 +1,4 @@
-# Astronomer CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/astronomer/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
+# Astronomer CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/sjmiller609/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/sjmiller609/astro-cli?status.svg)](https://godoc.org/github.com/sjmiller609/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/sjmiller609/astro-cli)](https://goreportcard.com/report/github.com/sjmiller609/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/master/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
 
 
 The Astronomer CLI can be used to build Airflow DAGs locally and run them via Docker-Compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
@@ -65,7 +65,7 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 
 > Note: Make sure you have Windows 10 and Docker installed
 
-1. Download latest release of astro-cli using this [astro_0.8.2_windows_386.zip](https://github.com/astronomer/astro-cli/releases/download/v0.8.2/astro_0.8.2_windows_386.zip)
+1. Download latest release of astro-cli using this [astro_0.8.2_windows_386.zip](https://github.com/sjmiller609/astro-cli/releases/download/v0.8.2/astro_0.8.2_windows_386.zip)
 2. Extract `astro_0.8.2_windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
 3. Open cmd or PowerShell console and run:
 

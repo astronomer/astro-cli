@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/sjmiller609/astro-cli/config"
+	"github.com/sjmiller609/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/pkg/input"
+	"github.com/sjmiller609/astro-cli/pkg/printutil"
 )
 
 func newTableOut() *printutil.Table {

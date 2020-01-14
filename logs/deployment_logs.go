@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/astronomer/astro-cli/cluster"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/cluster"
+	"github.com/sjmiller609/astro-cli/houston"
 )
 
 func DeploymentLog(deploymentId, component, search string, since time.Duration) error {

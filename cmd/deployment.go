@@ -4,9 +4,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/astronomer/astro-cli/deployment"
-	"github.com/astronomer/astro-cli/houston"
-	sa "github.com/astronomer/astro-cli/serviceaccount"
+	"github.com/sjmiller609/astro-cli/deployment"
+	"github.com/sjmiller609/astro-cli/houston"
+	sa "github.com/sjmiller609/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

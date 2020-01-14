@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/houston"
 	"github.com/spf13/cobra"
 )
 

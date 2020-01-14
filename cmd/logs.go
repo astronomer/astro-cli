@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/logs"
+	"github.com/sjmiller609/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/logs"
 	"github.com/spf13/cobra"
 	"io"
 	"time"

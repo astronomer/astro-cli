@@ -3,7 +3,7 @@ package airflow
 import (
 	"testing"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/houston"
 )
 
 func TestDeploymentNameExists(t *testing.T) {

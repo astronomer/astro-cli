@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	testUtil "github.com/sjmiller609/astro-cli/pkg/testing"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/houston"
 	"github.com/stretchr/testify/assert"
 )
 

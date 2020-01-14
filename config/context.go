@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/sjmiller609/astro-cli/pkg/printutil"
 )
 
 var (

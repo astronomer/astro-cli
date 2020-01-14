@@ -3,8 +3,8 @@ package cmd
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/user"
+	"github.com/sjmiller609/astro-cli/houston"
+	"github.com/sjmiller609/astro-cli/user"
 	"github.com/spf13/cobra"
 )
 

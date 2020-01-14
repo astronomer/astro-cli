@@ -3,7 +3,7 @@ package cmd
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/version"
+	"github.com/sjmiller609/astro-cli/version"
 	"github.com/spf13/cobra"
 )
 
