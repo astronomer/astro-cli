@@ -1,0 +1,145 @@
+version: 2.1
+jobs:
+  release:
+    executor: docker-executor
+    steps:
+      - checkout
+      - get-next-tag
+      # Publish a GitHub release on this repository,
+      # automatically generating a change log.
+      - publish-github-release
+workflows:
+  version: 2.1
+  build-images:
+    jobs:
+      - approve-release:
+          type: approval
+          filters:
+            branches:
+              only: '/release-.*/'
+      - release:
+          requires:
+            - approve-release
+          filters:
+            branches:
+              only: '/release-.*/'
+executors:
+  docker-executor:
+    environment:
+      GIT_ORG: astronomer
+      DOCKER_REPO: astronomerinc
+    docker:
+      - image: circleci/python:3
+commands:
+  publish-github-release:
+    description: "Create a release on GitHub"
+    parameters:
+      tag:
+        type: string
+        default:  "$NEXT_TAG"
+      ghr_version:
+        type: string
+        default:  "0.13.0"
+    steps:
+      - run:
+          name: Create a release on GitHub
+          command: |
+            set -xe
+            # Install ghr, a CLI tool for doing GitHub releases
+            WORK_DIR=$(pwd)
+            cd /tmp
+            wget https://github.com/tcnksm/ghr/releases/download/v<< parameters.ghr_version >>/ghr_v<< parameters.ghr_version >>_linux_amd64.tar.gz
+            tar -xvf ./ghr_v<< parameters.ghr_version >>_linux_amd64.tar.gz
+            mkdir -p /tmp/bin
+            mv ghr_v<< parameters.ghr_version >>_linux_amd64/ghr /tmp/bin/
+            export PATH=/tmp/bin:$PATH
+            cd $WORK_DIR
+
+            # Generate release notes in Markdown format
+            COMMITS=$(git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"* %ai %h: %s" | awk '{$4=""; print $0}')
+            AUTHORS=$(git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%aE" | awk '!a[$0]++')
+            cat \<<EOT > /tmp/release_notes.md
+
+            ## Changes:
+
+            $COMMITS
+
+            ## Authors:
+
+            $AUTHORS
+            EOT
+
+            echo "==================="
+            cat /tmp/release_notes.md
+            echo "==================="
+
+            ghr \
+              -t $GITHUB_TOKEN \
+              -c $CIRCLE_SHA1 \
+              -n v<< parameters.tag>> \
+              -b "$(cat /tmp/release_notes.md)" \
+              v<< parameters.tag>>
+  get-next-tag:
+    description: "Set an environment variable to the release branch major.minor with the patch number incremented by one"
+    parameters:
+      organization:
+        type: string
+        default: $GIT_ORG
+      repository:
+        type: string
+        default: $CIRCLE_PROJECT_REPONAME
+    steps:
+      - run:
+          name: Determine the next version
+          command: |
+            set -e
+            pip install --user PyGithub packaging
+            cat > /tmp/next_version.py \<<- EOM
+            import os
+            import re
+            import sys
+            import json
+            from github import Github
+            from packaging.version import parse as semver
+
+            branch = os.environ['CIRCLE_BRANCH']
+            github = Github()
+            repo = github.get_repo('<< parameters.organization >>/<< parameters.repository >>')
+
+            release_regex = re.compile("release-(\d*\.\d*)")
+            major_minor_version = release_regex.findall(branch)
+            most_recent_tag = None
+
+            if not len(major_minor_version):
+                raise Exception("ERROR: we are not on a release branch. Branch should be named release-X.Y where X and Y are positive integers")
+            major_minor_version = major_minor_version[0]
+            print(f"We are on a release branch: {branch}, detected major.minor version {major_minor_version}", file=sys.stderr)
+            print(f"We will find the most recent patch version of {major_minor_version} and return it incremented by one", file=sys.stderr)
+            for release in repo.get_releases():
+                version = semver(release.tag_name).release
+                this_major_minor = f"{version[0]}.{version[1]}"
+                if this_major_minor == major_minor_version:
+                    most_recent_tag = release.tag_name
+                    print(f"The most recent tag matching this release is {most_recent_tag}", file=sys.stderr)
+                    break
+
+            if most_recent_tag:
+                base_version = semver(most_recent_tag).base_version
+                print(f"Parsed base version as {base_version}", file=sys.stderr)
+                base_version = semver(base_version)
+                major, minor, patch = base_version.release
+                patch += 1
+                new_version = ".".join(str(i) for i in [major, minor, patch])
+            else:
+                print("Did not detect a most recent version. Setting patch number to zero.", file=sys.stderr)
+                new_version = major_minor_version + ".0"
+
+            new_tag_regex = re.compile('\d*\.\d*\.\d*')
+            assert len(new_tag_regex.findall(new_version)), \
+                f"Error, did not produce a new tag in the form {new_tag_regex.pattern}"
+            print(f"Calculated new version as {new_version}", file=sys.stderr)
+            sys.stdout.write(new_version)
+            EOM
+            NEXT_TAG=$(python /tmp/next_version.py)
+            # Make this environment variable available to following steps
+            echo "export NEXT_TAG=${NEXT_TAG}" >> $BASH_ENV
