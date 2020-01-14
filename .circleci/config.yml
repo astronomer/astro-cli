@@ -8,6 +8,7 @@ jobs:
   release:
     docker:
       - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/sjmiller609/astro-cli
     steps:
       - checkout
       - run: curl -sL https://git.io/goreleaser | bash
