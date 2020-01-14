@@ -179,7 +179,7 @@ func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:   "list",
 		Aliases: []string{"ls"},
-		Short: "List astronomer workspaces",
+		Short: "List Astronomer workspaces",
 		Long:  "List astronomer workspaces",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
