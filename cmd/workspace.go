@@ -177,10 +177,10 @@ func newWorkspaceUserRmCmd(client *houston.Client, out io.Writer) *cobra.Command
 
 func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove EMAIL",
-		Aliases: []string{"rm"},
-		Short:   "Remove a user from a workspace",
-		Long:    "Remove a user from a workspace",
+		Use:   "list",
+		Aliases: []string{"ls"},
+		Short: "List astronomer workspaces",
+		Long:  "List astronomer workspaces",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, client, out, args)
