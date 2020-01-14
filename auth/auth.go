@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/sjmiller609/astro-cli/cluster"
-	"github.com/sjmiller609/astro-cli/config"
-	"github.com/sjmiller609/astro-cli/docker"
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/messages"
-	"github.com/sjmiller609/astro-cli/pkg/input"
-	"github.com/sjmiller609/astro-cli/workspace"
+	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 )
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sjmiller609/astro-cli/messages"
-	"github.com/sjmiller609/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 )
 

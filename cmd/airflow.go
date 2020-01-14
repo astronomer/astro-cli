@@ -8,18 +8,18 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
 
-	"github.com/sjmiller609/astro-cli/messages"
+	"github.com/astronomer/astro-cli/messages"
 
 	"github.com/spf13/cobra"
 
-	"github.com/sjmiller609/astro-cli/airflow"
-	"github.com/sjmiller609/astro-cli/config"
-	"github.com/sjmiller609/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 var (

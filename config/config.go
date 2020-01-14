@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sjmiller609/astro-cli/messages"
-	"github.com/sjmiller609/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
@@ -174,7 +174,7 @@ func ProjectConfigExists() bool {
 
 // ProjectRoot returns the path to the nearest project root
 // TODO Deprecate if remains unused, removed due to
-// https://github.com/sjmiller609/astro-cli/issues/103
+// https://github.com/astronomer/astro-cli/issues/103
 func ProjectRoot() (string, error) {
 	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
 	if searchErr != nil {

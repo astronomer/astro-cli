@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/sjmiller609/astro-cli/config"
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/messages"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

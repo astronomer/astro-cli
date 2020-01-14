@@ -6,9 +6,9 @@ import (
 	"os"
 	"sort"
 
-	"github.com/sjmiller609/astro-cli/config"
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 
 	"github.com/fatih/camelcase"
 )

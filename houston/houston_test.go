@@ -3,7 +3,7 @@ package houston
 import (
 	"testing"
 
-	"github.com/sjmiller609/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/stretchr/testify/assert"
 )
 

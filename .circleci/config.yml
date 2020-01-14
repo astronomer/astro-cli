@@ -8,7 +8,7 @@ jobs:
   release:
     docker:
       - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/sjmiller609/astro-cli
+    working_directory: /go/src/github.com/astronomer/astro-cli
     steps:
       - checkout
       - run: curl -sL https://git.io/goreleaser | bash
@@ -37,7 +37,7 @@ workflows:
 executors:
   docker-executor:
     environment:
-      GIT_ORG: sjmiller609
+      GIT_ORG: astronomer
     docker:
       - image: circleci/python:3
 commands:

@@ -3,7 +3,7 @@ package cluster
 import (
 	"testing"
 
-	testUtil "github.com/sjmiller609/astro-cli/pkg/testing"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
 

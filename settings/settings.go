@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sjmiller609/astro-cli/docker"
-	"github.com/sjmiller609/astro-cli/messages"
-	"github.com/sjmiller609/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )

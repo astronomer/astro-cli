@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sjmiller609/astro-cli/workspace"
+	"github.com/astronomer/astro-cli/workspace"
 
 	"github.com/pkg/errors"
 )

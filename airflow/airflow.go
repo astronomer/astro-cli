@@ -7,8 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/sjmiller609/astro-cli/airflow/include"
-	"github.com/sjmiller609/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/airflow/include"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 func initDirs(root string, dirs []string) error {

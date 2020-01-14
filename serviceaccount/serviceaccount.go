@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 func newTableOut() *printutil.Table {

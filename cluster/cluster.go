@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sjmiller609/astro-cli/config"
-	"github.com/sjmiller609/astro-cli/pkg/input"
-	"github.com/sjmiller609/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/pkg/errors"
 )
 

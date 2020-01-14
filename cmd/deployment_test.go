@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sjmiller609/astro-cli/houston"
-	testUtil "github.com/sjmiller609/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/houston"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/stretchr/testify/assert"
 )

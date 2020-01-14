@@ -2,10 +2,10 @@ package main
 
 import (
 	"os"
-	"github.com/sjmiller609/astro-cli/cmd"
-	"github.com/sjmiller609/astro-cli/config"
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/cmd"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/spf13/afero"
 )
 

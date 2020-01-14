@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/sjmiller609/astro-cli/houston"
-	"github.com/sjmiller609/astro-cli/pkg/httputil"
-	testUtil "github.com/sjmiller609/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )

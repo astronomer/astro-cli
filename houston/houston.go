@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/sjmiller609/astro-cli/cluster"
-	"github.com/sjmiller609/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 )
 

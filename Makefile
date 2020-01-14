@@ -4,8 +4,8 @@ GIT_COMMIT=$(shell git rev-parse HEAD)
 GIT_COMMIT_SHORT=$(shell git rev-parse --short HEAD)
 VERSION ?= SNAPSHOT-${GIT_COMMIT_SHORT}
 
-LDFLAGS_VERSION=-X github.com/sjmiller609/astro-cli/version.CurrVersion=${VERSION} 
-LDFLAGS_GIT_COMMIT=-X github.com/sjmiller609/astro-cli/version.CurrCommit=${GIT_COMMIT}
+LDFLAGS_VERSION=-X github.com/astronomer/astro-cli/version.CurrVersion=${VERSION} 
+LDFLAGS_GIT_COMMIT=-X github.com/astronomer/astro-cli/version.CurrCommit=${GIT_COMMIT}
 
 .DEFAULT_GOAL := build
 
@@ -73,4 +73,4 @@ endif
 
 debug:
 	echo $(RUN_ARGS)
-	dlv debug github.com/sjmiller609/astro-cli -- $(DEBUG_ARGS)
+	dlv debug github.com/astronomer/astro-cli -- $(DEBUG_ARGS)
