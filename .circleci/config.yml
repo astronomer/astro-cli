@@ -41,7 +41,7 @@ workflows:
 executors:
   docker-executor:
     environment:
-      GIT_ORG: astronomer
+      GIT_ORG: sjmiller609
       DOCKER_REPO: astronomerinc
     docker:
       - image: circleci/python:3
