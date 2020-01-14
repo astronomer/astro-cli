@@ -42,7 +42,6 @@ executors:
   docker-executor:
     environment:
       GIT_ORG: sjmiller609
-      DOCKER_REPO: astronomerinc
     docker:
       - image: circleci/python:3
 commands:
@@ -68,5 +67,7 @@ commands:
           name: Tag the Git commit
           command: |
             set -xe
+            git remote rm origin
+            git remote add origin https://sjmiller609:${GITHUB_TOKEN}@github.com/${GIT_ORG}/${CIRCLE_PROJECT_REPONAME}.git
             git tag $NEXT_TAG
             git push origin $NEXT_TAG
