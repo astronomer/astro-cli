@@ -3,6 +3,7 @@
 
 The Astronomer CLI can be used to build Airflow DAGs locally and run them via Docker-Compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
 
+
 ```
 astro is a command line interface for working with the Astronomer Platform.
 
