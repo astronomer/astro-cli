@@ -50,11 +50,11 @@ func Create(label, ws string, deploymentConfig map[string]string) error {
 	tab.SuccessMsg =
 		fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
 			". Deployment can be accessed at the following URLs \n" +
-			fmt.Sprintf("\n Airflow Dashboard: https://%s-airflow.%s", d.ReleaseName, c.Domain)
+			fmt.Sprintf("\n Airflow Dashboard: https://%s/deployments/%s/airflow/", c.Domain, d.ReleaseName)
 
 	// The Flower URL is specific to CeleryExecutor only
 	if deploymentConfig["executor"] == "CeleryExecutor" || deploymentConfig["executor"] == "" {
-		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: https://%s-flower.%s", d.ReleaseName, c.Domain)
+		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: https://%s/deployments/%s/flower/", c.Domain, d.ReleaseName)
 	}
 	tab.Print(os.Stdout)
 
