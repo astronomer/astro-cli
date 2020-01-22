@@ -6,7 +6,7 @@ import "strings"
 var Settingsyml = strings.TrimSpace(`
 # This feature is in Beta.
 
-# Please report any bugs to https://github.com/astronomer/astro-cli/issues
+# Please report any bugs to support@astronomer.io
 
 # NOTE: If putting a dict in conn_extra, please wrap in single quotes.
 
