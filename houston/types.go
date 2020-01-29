@@ -58,15 +58,22 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	Id             string         `json:"id"`
-	Type           string         `json:"type"`
-	Label          string         `json:"label"`
-	ReleaseName    string         `json:"releaseName"`
-	Version        string         `json:"version"`
-	DeploymentInfo DeploymentInfo `json:"deployInfo"`
-	Workspace      Workspace      `json:"workspace"`
-	CreatedAt      string         `json:"createdAt"`
-	UpdatedAt      string         `json:"updatedAt"`
+	Id             string          `json:"id"`
+	Type           string          `json:"type"`
+	Label          string          `json:"label"`
+	ReleaseName    string          `json:"releaseName"`
+	Version        string          `json:"version"`
+	DeploymentInfo DeploymentInfo  `json:"deployInfo"`
+	Workspace      Workspace       `json:"workspace"`
+	Urls           []DeploymentUrl `json:"urls"`
+	CreatedAt      string          `json:"createdAt"`
+	UpdatedAt      string          `json:"updatedAt"`
+}
+
+// DeploymentUrl defines structure of a houston response DeploymentUrl object
+type DeploymentUrl struct {
+	Type string `json:"type"`
+	Url  string `json:"url"`
 }
 
 // DeploymentInfo contains registry related information for a deployment
