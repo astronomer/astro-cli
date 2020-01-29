@@ -33,6 +33,10 @@ var (
 			label
 			releaseName
 			version
+			urls {
+				type
+				url
+			}
 			createdAt
 			updatedAt
 		}
