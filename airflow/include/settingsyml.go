@@ -17,6 +17,7 @@ airflow:
     - conn_id:
       conn_type:
       conn_host:
+      conn_schema: 
       conn_login:
       conn_password:
       conn_port:
