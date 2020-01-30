@@ -31,6 +31,10 @@ func Create(label, ws string, deploymentConfig map[string]string) error {
 		return err
 	}
 
+	d := r.Data.CreateDeployment
+
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
+
 	splitted := []string{"Celery", ""}
 
 	if deploymentConfig["executor"] != "" {
