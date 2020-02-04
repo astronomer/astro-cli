@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+
 	"github.com/astronomer/astro-cli/cmd"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
