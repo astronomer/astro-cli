@@ -328,8 +328,6 @@ var (
 			id
 			label
 			description
-			createdAt
-			updatedAt
 		}
 	}`
 
