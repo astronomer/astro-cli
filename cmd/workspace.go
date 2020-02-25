@@ -14,6 +14,10 @@ import (
 var (
 	workspaceUpdateAttrs     = []string{"label"}
 	createDesc               string
+	workspaceDeleteExample = `
+  $ astro workspace delete <workspace-id>
+`
+
 	workspaceSaCreateExample = `
   # Create service-account
   $ astro workspace service-account create --workspace-id=<workspace-id> --label=my_label --role=ROLE
@@ -76,6 +80,7 @@ func newWorkspaceDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command
 		Aliases: []string{"de"},
 		Short:   "Delete an astronomer workspace",
 		Long:    "Delete an astronomer workspace",
+		Example: workspaceDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(cmd, args, client, out)
