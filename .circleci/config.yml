@@ -1,0 +1,69 @@
+version: 2.1
+jobs:
+  new-tag:
+    executor: docker-executor
+    steps:
+      - checkout
+      - commit-next-tag
+  release:
+    docker:
+      - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/astronomer/astro-cli
+    steps:
+      - checkout
+      - run: curl -sL https://git.io/goreleaser | bash
+workflows:
+  version: 2.1
+  build-images:
+    jobs:
+      - approve-release:
+          type: approval
+          filters:
+            branches:
+              only: '/release-.*/'
+      - new-tag:
+          requires:
+            - approve-release
+          filters:
+            branches:
+              only: '/release-.*/'
+      - release:
+          # Only run this job on git tag pushes
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+executors:
+  docker-executor:
+    environment:
+      GIT_ORG: astronomer
+    docker:
+      - image: circleci/python:3
+commands:
+  commit-next-tag:
+    description: "Tag the commit to the release branch major.minor with the patch number incremented by one"
+    parameters:
+      organization:
+        type: string
+        default: $GIT_ORG
+      repository:
+        type: string
+        default: $CIRCLE_PROJECT_REPONAME
+    steps:
+      - run:
+          name: Determine the next version
+          command: |
+            set -e
+            pip install --user PyGithub packaging
+            NEXT_TAG=$(python .circleci/next_version.py)
+            # Make this environment variable available to following steps
+            echo "export NEXT_TAG=v${NEXT_TAG}" >> $BASH_ENV
+      - run:
+          name: Tag the Git commit
+          command: |
+            set -xe
+            git remote rm origin
+            git remote add origin https://sjmiller609:${GITHUB_TOKEN}@github.com/${GIT_ORG}/${CIRCLE_PROJECT_REPONAME}.git
+            git tag $NEXT_TAG
+            git push origin $NEXT_TAG
