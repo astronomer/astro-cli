@@ -119,7 +119,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	if len(username) == 0 {
 		if len(authConfig.AuthProviders) > 0 {
-			token = oAuth(c.GetAppURL() + "/login?source=cli")
+			token = oAuth(c.GetAppURL() + "/token")
 		} else {
 			return errors.New("cannot authenticate, oauth is disabled")
 		}
