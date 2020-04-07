@@ -57,7 +57,7 @@ ie:
 curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 ```
 
-> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomerio/astro-cli/master/godownloader.sh) script locally.
+> Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/master/godownloader.sh) script locally.
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
@@ -143,7 +143,7 @@ How to get started as a developer:
 1. Build:
 
 ```
-$ git clone git@github.com:astronomerio/astro-cli.git
+$ git clone git@github.com:astronomer/astro-cli.git
 $ cd astro-cli
 $ make build
 ```
@@ -164,7 +164,7 @@ $ astro
 
 astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to
 
-1. setup both [houston-api](https://github.com/astronomerio/houston-api) and [orbit-ui](https://github.com/astronomerio/orbit-ui).
+1. setup both [houston-api](https://github.com/astronomer/houston-api) and [astro-ui](https://github.com/astronomer/astro-ui).
 2. edit your global or project config to enable local development
 
 ex.
