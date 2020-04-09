@@ -110,7 +110,7 @@ func ExecLogin(serverAddress, username, token string) error {
 
 	response, err = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
 	if err != nil {
-		return errors.Errorf("Error saving credentials: %v", err)
+		return errors.Errorf("error saving credentials: %v", err)
 	}
 
 	// Get this idea from docker login cli
