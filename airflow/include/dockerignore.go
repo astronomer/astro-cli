@@ -8,4 +8,5 @@ var Dockerignore = strings.TrimSpace(`
 .git
 .env
 airflow_settings.yaml
+logs/
 `)
