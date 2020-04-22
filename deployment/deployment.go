@@ -20,10 +20,10 @@ var (
 	}
 )
 
-func Create(label, ws string, deploymentConfig map[string]string) error {
+func Create(label, ws, releaseName string, deploymentConfig map[string]string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
-		Variables: map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig},
+		Variables: map[string]interface{}{"label": label, "releaseName": releaseName, "workspaceId": ws, "config": deploymentConfig},
 	}
 
 	r, err := req.Do()

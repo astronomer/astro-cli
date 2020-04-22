@@ -19,6 +19,7 @@ var (
 	mutation CreateDeployment(
 		$label: String!
 		$type: String = "airflow"
+		$releaseName: String!
 		$workspaceId: Uuid!
 		$config: JSON!
 	) {

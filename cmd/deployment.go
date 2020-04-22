@@ -19,6 +19,7 @@ var (
 	systemSA       bool
 	category       string
 	label          string
+	releaseName    string
 	CreateExample  = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create new-deployment-name --executor=celery
@@ -69,6 +70,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		RunE:    deploymentCreate,
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
+	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name: my-awesome-release")
 	return cmd
 }
 
@@ -202,7 +204,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
 
-	return deployment.Create(args[0], ws, deploymentConfig)
+	return deployment.Create(args[0], ws, releaseName, deploymentConfig)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
