@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-import json
 from github import Github
 from packaging.version import parse as semver
 
@@ -22,6 +21,8 @@ print(f"We are on a release branch: {branch}, detected major.minor version {majo
 print(f"We will find the most recent patch version of {major_minor_version} and return it incremented by one", file=sys.stderr)
 for release in repo.get_releases():
     version = semver(release.tag_name).release
+    if not version:
+        continue
     this_major_minor = f"{version[0]}.{version[1]}"
     if this_major_minor == major_minor_version:
         most_recent_tag = release.tag_name
