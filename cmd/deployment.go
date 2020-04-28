@@ -70,7 +70,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		RunE:    deploymentCreate,
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
-	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name: my-awesome-release")
+	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	return cmd
 }
 

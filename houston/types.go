@@ -17,6 +17,7 @@ type Response struct {
 		DeleteWorkspace                *Workspace                `json:"deleteWorkspace,omitempty"`
 		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
+		GetAppConfig                   *AppConfig                `json:"appConfig,omitempty"`
 		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
 		GetUsers                       []User                    `json:"users,omitempty"`
 		GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
@@ -225,4 +226,12 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 		}
 	}
 	return false
+}
+
+// AppConfig contains current houston config
+type AppConfig struct {
+	Version            string `json:"version"`
+	BaseDomain         string `json:"baseDomain"`
+	SmtpConfigured     bool   `json:"smtpConfigured"`
+	ManualReleaseNames bool   `json:"manualReleaseNames"`
 }

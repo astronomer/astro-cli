@@ -19,7 +19,7 @@ var (
 	mutation CreateDeployment(
 		$label: String!
 		$type: String = "airflow"
-		$releaseName: String!
+		$releaseName: String
 		$workspaceId: Uuid!
 		$config: JSON!
 	) {
@@ -437,6 +437,15 @@ var (
 				tag
 		}
 		defaultAirflowImageTag
+		}
+	}`
+	AppConfigRequest = `
+	query AppConfig {
+		appConfig {
+			version
+			baseDomain: String
+			smtpConfigured: Boolean
+			manualReleaseNames: Boolean
 		}
 	}`
 )
