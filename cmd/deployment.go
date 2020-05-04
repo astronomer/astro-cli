@@ -34,9 +34,10 @@ var (
   $ astro deployment service-account create --deployment-uuid=xxxxx --label=my_label --role=ROLE
 `
 	deploymentSaGetExample = `
-# Get deployment service-account
+  # Get deployment service-account
   $ astro deployment service-account get <service-account-id> --deployment-id=<deployment-id>
-# or
+
+  # or using deployment-id
   $ astro deployment service-account get --deployment-id=<deployment-id>
 `
 	deploymentSaDeleteExample = `
@@ -162,6 +163,7 @@ func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command
 		Use:   "get",
 		Short: "Get a service-account by entity type and entity id",
 		Long:  "Get a service-account by entity type and entity id",
+		Example: deploymentSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaGet(cmd, client, out)
 		},
