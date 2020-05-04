@@ -33,8 +33,14 @@ var (
 # Create service-account
   $ astro deployment service-account create --deployment-uuid=xxxxx --label=my_label --role=ROLE
 `
+	deploymentSaGetExample = `
+# Get deployment service-account
+  $ astro deployment service-account get <service-account-id> --deployment-id=<deployment-id>
+# or
+  $ astro deployment service-account get --deployment-id=<deployment-id>
+`
 	deploymentSaDeleteExample = `
-  $ astro workspace service-account delete <service-account-id> --workspace-id=<workspace-id>
+  $ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
 `
 	deploymentUpdateAttrs = []string{"label"}
 )
@@ -160,6 +166,8 @@ func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command
 			return deploymentSaGet(cmd, client, out)
 		},
 	}
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
 
@@ -175,7 +183,7 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 		},
 		Args: cobra.ExactArgs(1),
 	}
-	cmd.Flags().StringVarP(&workspaceId, "deployment-id", "w", "", "[ID]")
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
 	cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
