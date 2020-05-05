@@ -27,6 +27,7 @@ var (
 			label: $label
 			type: $type
 			workspaceUuid: $workspaceId
+			releaseName: $releaseName
             config: $config
 		) {
 			id
@@ -443,9 +444,9 @@ var (
 	query AppConfig {
 		appConfig {
 			version
-			baseDomain: String
-			smtpConfigured: Boolean
-			manualReleaseNames: Boolean
+			baseDomain
+			smtpConfigured
+			manualReleaseNames
 		}
 	}`
 )
