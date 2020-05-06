@@ -20,10 +20,28 @@ var (
 	}
 )
 
-func Create(label, ws string, deploymentConfig map[string]string) error {
+func checkManualReleaseNames() bool {
+	req := houston.Request{
+		Query:     houston.AppConfigRequest,
+	}
+	r, err := req.Do()
+	if err != nil {
+		return false
+	}
+
+	return r.Data.GetAppConfig.ManualReleaseNames
+}
+
+func Create(label, ws, releaseName string, deploymentConfig map[string]string) error {
+	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig}
+
+	if releaseName != "" && checkManualReleaseNames() {
+		vars["releaseName"] = releaseName
+	}
+
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
-		Variables: map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig},
+		Variables: vars,
 	}
 
 	r, err := req.Do()
