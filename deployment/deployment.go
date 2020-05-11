@@ -32,8 +32,8 @@ func checkManualReleaseNames() bool {
 	return r.Data.GetAppConfig.ManualReleaseNames
 }
 
-func Create(label, ws, releaseName string, deploymentConfig map[string]string) error {
-	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig}
+func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string) error {
+	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig, "cloudRole": cloudRole}
 
 	if releaseName != "" && checkManualReleaseNames() {
 		vars["releaseName"] = releaseName
@@ -148,10 +148,10 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id string, args map[string]string) error {
+func Update(id, cloudRole string, args map[string]string) error {
 	req := houston.Request{
 		Query:     houston.DeploymentUpdateRequest,
-		Variables: map[string]interface{}{"deploymentId": id, "payload": args},
+		Variables: map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole},
 	}
 
 	r, err := req.Do()

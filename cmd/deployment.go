@@ -216,11 +216,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-	if cloudRole != "" {
-		deploymentConfig["cloudRole"] = cloudRole
-	}
-
-	return deployment.Create(args[0], ws, releaseName, deploymentConfig)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, deploymentConfig)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -257,7 +253,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Update(args[0], argsMap)
+	return deployment.Update(args[0], cloudRole, argsMap)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {

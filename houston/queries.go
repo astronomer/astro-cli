@@ -22,13 +22,15 @@ var (
 		$releaseName: String
 		$workspaceId: Uuid!
 		$config: JSON!
+		$cloudRole: String
 	) {
 		createDeployment(
 			label: $label
 			type: $type
 			workspaceUuid: $workspaceId
 			releaseName: $releaseName
-            config: $config
+			config: $config
+			cloudRole: $cloudRole
 		) {
 			id
 			type
@@ -88,8 +90,8 @@ var (
 	}`
 
 	DeploymentUpdateRequest = `
-	mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!) {
-		updateDeployment(deploymentUuid: $deploymentId, payload: $payload) {
+	mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String) {
+		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole) {
 			id
 			type
 			label
