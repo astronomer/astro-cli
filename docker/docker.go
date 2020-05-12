@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -110,7 +111,8 @@ func ExecLogin(serverAddress, username, token string) error {
 
 	response, err = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
 	if err != nil {
-		return errors.Errorf("error saving credentials: %v", err)
+		fmt.Println("Possible Error:", err)
+		// return errors.Errorf("error saving credentials: %v", err)
 	}
 
 	// Get this idea from docker login cli
