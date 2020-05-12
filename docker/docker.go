@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	//"fmt"
 	"os"
 	"os/exec"
 
@@ -16,7 +16,6 @@ import (
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/docker/api/types"
 
-	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
@@ -91,7 +90,6 @@ func ExecPush(serverAddress, token, image string) error {
 
 // ExecLogin executes a docker login similar to docker login command
 func ExecLogin(serverAddress, username, token string) error {
-	var responseOk registrytypes.AuthenticateOKBody
 	ctx := context.Background()
 
 	cli, err := client.NewClientWithOpts(client.FromEnv)
@@ -109,7 +107,7 @@ func ExecLogin(serverAddress, username, token string) error {
 		Password:      token,
 	}
 
-	responseOk, err = cli.RegistryLogin(ctx, *authConfig)
+	_, err = cli.RegistryLogin(ctx, *authConfig)
 	if err != nil {
 		return errors.Errorf("registry login error: %v", err)
 	}
@@ -124,9 +122,6 @@ func ExecLogin(serverAddress, username, token string) error {
 	if err := creds.Store(*authConfig); err != nil {
 		return errors.Errorf("Error saving credentials: %v", err)
 	}
-
-	fmt.Println(responseOk.Status)
-
 	return nil
 }
 
