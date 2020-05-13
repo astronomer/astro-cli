@@ -103,7 +103,7 @@ func TestDeploymentSaGetCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "service-account", "get", "q1w2e3r4t5y6u7i8o9p0")
+	_, output, err := executeCommandC(api, "deployment", "service-account", "get", "--deployment-id=q1w2e3r4t5y6u7i8o9p0")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
