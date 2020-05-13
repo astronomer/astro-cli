@@ -19,6 +19,7 @@ var (
 	systemSA       bool
 	category       string
 	label          string
+	cloudRole      string
 	releaseName    string
 	CreateExample  = `
 # Create new deployment with Celery executor (default: celery without params).
@@ -78,6 +79,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
+	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
 }
 
@@ -122,6 +124,7 @@ func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 		RunE: deploymentUpdate,
 	}
+	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
 }
 
@@ -213,8 +216,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-
-	return deployment.Create(args[0], ws, releaseName, deploymentConfig)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, deploymentConfig)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -251,7 +253,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Update(args[0], argsMap)
+	return deployment.Update(args[0], cloudRole, argsMap)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
