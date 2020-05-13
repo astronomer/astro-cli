@@ -15,7 +15,6 @@ import (
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/docker/api/types"
 
-	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
@@ -90,7 +89,6 @@ func ExecPush(serverAddress, token, image string) error {
 
 // ExecLogin executes a docker login similar to docker login command
 func ExecLogin(serverAddress, username, token string) error {
-	var response registrytypes.AuthenticateOKBody
 	ctx := context.Background()
 
 	cli, err := client.NewClientWithOpts(client.FromEnv)
@@ -105,12 +103,12 @@ func ExecLogin(serverAddress, username, token string) error {
 	authConfig := &types.AuthConfig{
 		ServerAddress: serverAddress,
 		Username:      username,
-		RegistryToken: token,
+		Password:      token,
 	}
 
-	response, err = cli.RegistryLogin(ctx, types.AuthConfig(*authConfig))
+	_, err = cli.RegistryLogin(ctx, *authConfig)
 	if err != nil {
-		return errors.Errorf("error saving credentials: %v", err)
+		return errors.Errorf("registry login error: %v", err)
 	}
 
 	// Get this idea from docker login cli
@@ -123,11 +121,6 @@ func ExecLogin(serverAddress, username, token string) error {
 	if err := creds.Store(*authConfig); err != nil {
 		return errors.Errorf("Error saving credentials: %v", err)
 	}
-
-	if response.Status != "" {
-		return errors.Errorf("Error saving credentials: %v", response.Status)
-	}
-
 	return nil
 }
 
