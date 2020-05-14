@@ -341,7 +341,6 @@ var (
 			id
 			label
 			description
-			deploymentCount
 			createdAt
 			updatedAt
 		}
