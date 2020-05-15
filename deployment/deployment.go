@@ -149,9 +149,16 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 
 // Update an airflow deployment
 func Update(id, cloudRole string, args map[string]string) error {
+	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
+
+	// sync with commander only when we have cloudRole
+	if cloudRole != "" {
+		vars["sync"] = true
+	}
+
 	req := houston.Request{
 		Query:     houston.DeploymentUpdateRequest,
-		Variables: map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole},
+		Variables: vars,
 	}
 
 	r, err := req.Do()
