@@ -35,16 +35,27 @@ The Astronomer CLI is an open-source project. Installing it to your machine allo
 
 > Note: If you are an Astronomer customer, your CLI version _must_ match the version of Astronomer you are running. If you are using Astronomer Cloud, the latest version should always be correct. If you have a custom Astronomer Enterprise installation, you may be on a different version, which means you may need to ensure that your CLI and platform match up; you can check which version of Astronomer you're running by clicking the user icon in the top right corner of our UI.
 
-### Latest Version
+### Mac OSX
 
-via `curl`:
+If you are running homebrew:
+
+```sh
+brew install astronomer/tap/astro
+```
+
+To install a specific version Astro CLI use @major.minor.patch for example, to install v0.13.0 run:
+
+```sh
+brew install astronomer/tap/astro@0.13.1
+```
+
+### Via `curl`
+
+> Note: If you are a Mac user on Catalina make sure you are using the latest version of `curl` or you may receive certificate errors.
 
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s
 ```
-
-### Previous Versions
-
 
 To install a previous version of Astronomer, you can add the tag at the end of your `curl` command via the following syntax:
 
