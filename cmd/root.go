@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +20,18 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:   "astro",
 		Short: "Astronomer - CLI",
 		Long:  "astro is a command line interface for working with the Astronomer Platform.",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("Inside rootCmd PersistentPreRun with args: %v\n", args)
+
+			// TODO: API Request here
+			if len(args) < 1 {
+				color.Yellow("Not so fast!")
+			}
+		},
 	}
+
+	fmt.Printf("adding commands...")
+
 	rootCmd.AddCommand(
 		newAuthRootCmd(client, out),
 		newWorkspaceCmd(client, out),
