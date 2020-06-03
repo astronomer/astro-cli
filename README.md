@@ -33,15 +33,27 @@ Use "astro [command] --help" for more information about a command.
 
 The Astronomer CLI is an open-source project. Installing it to your machine allows you to easily spin up a local instance of Apache Airflow and allows you to easily deploy code to remote Airflow environments if you are an Astronomer customer.
 
-> Note: If you are an Astronomer customer, your CLI version _must_ match the version of Astronomer you are running. If you are using Astronomer Cloud, the latest version should always be correct. If you have a custom Astronomer Enterprise installation, you may be on a different version, which means you may need to ensure that your CLI and platform match up; you can check which version of Astronomer you're running by clicking the user icon in the top right corner of our UI.
+> **Note:** If you are an Astronomer customer, your CLI version _must_ match the version of Astronomer you are running. If you are using Astronomer Cloud, the latest version should always be correct. If you have a custom Astronomer Enterprise installation, you may be on a different version, which means you may need to ensure that your CLI and platform match up; you can check which version of Astronomer you're running by clicking the user icon in the top right corner of our UI.
 
-### Mac OSX
+### Latest Version
 
-If you are running homebrew:
+#### Via `Homebrew`
 
 ```sh
 brew install astronomer/tap/astro
 ```
+
+#### Via `curl`
+
+> Note: If you are a Mac user on Catalina make sure you are using the latest version of `curl` or you may receive certificate errors.
+
+```
+curl -sSL https://install.astronomer.io | sudo bash -s
+```
+
+### Previous Versions
+
+#### Via `Homebrew`
 
 To install a specific version Astro CLI use @major.minor.patch for example, to install v0.13.1 run:
 
@@ -49,13 +61,7 @@ To install a specific version Astro CLI use @major.minor.patch for example, to i
 brew install astronomer/tap/astro@0.13.1
 ```
 
-### Via `curl`
-
-> Note: If you are a Mac user on Catalina make sure you are using the latest version of `curl` or you may receive certificate errors.
-
-```
-curl -sSL https://install.astronomer.io | sudo bash -s
-```
+#### Via `curl`
 
 To install a previous version of Astronomer, you can add the tag at the end of your `curl` command via the following syntax:
 
@@ -72,18 +78,19 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
+
 ### Installing on Windows
 
 > Note: Make sure you have Windows 10 and Docker installed
 
-1. Download latest release of astro-cli using this [astro_0.8.2_windows_386.zip](https://github.com/astronomer/astro-cli/releases/download/v0.8.2/astro_0.8.2_windows_386.zip)
-2. Extract `astro_0.8.2_windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
+1. Download latest release of astro-cli using this [astro_0.13.1_windows_386.zip](https://github.com/astronomer/astro-cli/releases/download/v0.13.1/astro_0.13.1_windows_386.zip)
+2. Extract `astro_0.13.1_windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
 3. Open cmd or PowerShell console and run:
 
 ```
 C:\Windows\system32>astro version
-Astro CLI Version: 0.8.2
-Git Commit: f5cdab8f832da3c6184a7ac167b491e3bac3c022
+Astro CLI Version: 0.13.1
+Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
 ```
 
 #### Troubleshooting
