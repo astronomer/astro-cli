@@ -33,7 +33,7 @@ func getConstraint(c string) *semver.Constraints {
 func getVersion(cv string) *semver.Version {
 	v, err := semver.NewVersion(cv)
 	if err != nil {
-		color.Red("Error with %s", err)
+		// TODO: Handle cv not being parsable.
 		return nil
 	}
 	return v
