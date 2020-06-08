@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"io"
+	"time"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/logs"
 	"github.com/spf13/cobra"
-	"io"
-	"time"
 )
 
 var (
@@ -34,6 +35,9 @@ func newLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short:   "Stream logs from an Airflow deployment",
 		Long:    "Stream logs from an Airflow deployment",
 		Example: logsExample,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			PersistentPreRunCheck(client, cmd, out)
+		},
 	}
 	cmd.AddCommand(
 		newWebserverLogsCmd(client, out),

@@ -54,6 +54,9 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		Aliases: []string{"de"},
 		Short:   "Manage airflow deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			PersistentPreRunCheck(client, cmd, out)
+		},
 	}
 	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
 	cmd.AddCommand(
@@ -165,9 +168,9 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 
 func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get",
-		Short: "Get a service-account by entity type and entity id",
-		Long:  "Get a service-account by entity type and entity id",
+		Use:     "get",
+		Short:   "Get a service-account by entity type and entity id",
+		Long:    "Get a service-account by entity type and entity id",
 		Example: deploymentSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaGet(cmd, client, out)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
 )
@@ -17,11 +18,16 @@ var (
 
 // PrintVersion outputs current cli version and git commit if exists
 func PrintVersion(out io.Writer) error {
+	ac := deployment.GetAppConfig()
 	version := CurrVersion
 	gitCommit := CurrCommit
 
 	if !isValidVersion(version) {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
+	}
+
+	if ac != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", ac.Version)
 	}
 
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)

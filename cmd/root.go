@@ -19,9 +19,6 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:   "astro",
 		Short: "Astronomer - CLI",
 		Long:  "astro is a command line interface for working with the Astronomer Platform.",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			PersistentPreRunCheck(client, cmd, out)
-		},
 	}
 
 	rootCmd.AddCommand(

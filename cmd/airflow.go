@@ -45,7 +45,10 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Aliases:    []string{"a"},
 		Short:      "Manage airflow projects",
 		Long:       "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
-		Deprecated: "could please use new command instead `astro dev [subcommands] [flags]`",
+		Deprecated: "Please use new command instead `astro dev [subcommands] [flags]`",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			PersistentPreRunCheck(client, cmd, out)
+		},
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
@@ -66,6 +69,9 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Aliases: []string{"d"},
 		Short:   "Manage airflow projects",
 		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			PersistentPreRunCheck(client, cmd, out)
+		},
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),

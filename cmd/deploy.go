@@ -35,6 +35,9 @@ func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		RunE:    deploy,
 		Example: deployExample,
 		Aliases: []string{"airflow deploy"},
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			PersistentPreRunCheck(client, cmd, out)
+		},
 	}
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")

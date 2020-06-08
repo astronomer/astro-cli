@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/version"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -57,11 +58,11 @@ func PersistentPreRunCheck(client *houston.Client, cmd *cobra.Command, out io.Wr
 		v := getVersion(cv)
 
 		if m.Check(v) {
-			color.Red("There is a major update for astro-cli. You're using %s and %s is the latest.  Please upgrade to the latest before continuing..", cv, dv)
-			// TODO: don't exit on auth commands logout or login
+			color.Red(messages.ERROR_NEW_MAJOR_VERSION, cv, dv)
+			// Exit for commands that require matching major versions
 			os.Exit(1)
 		} else if p.Check(v) {
-			color.Yellow("A new patch of Astronomer is available. Your version is %s and %s is the latest.", cv, dv)
+			color.Yellow(messages.WARNING_NEW_PATCH_VERSION, cv, dv)
 		}
 	}
 }
