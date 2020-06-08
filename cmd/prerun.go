@@ -14,8 +14,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func formatConstraint(c string) string {
-	return "<" + c
+func formatLtConstraint(c string) string {
+	return "< " + c
+}
+
+func formatDowngradeConstraint(c string) string {
+	return "> " + formatMajor(c)
 }
 
 func formatMajor(l string) string {
@@ -40,29 +44,48 @@ func getVersion(cv string) *semver.Version {
 	return v
 }
 
+func isBehindMajor(cv string, dv string) bool {
+	fm := formatMajor(dv)
+	fc := formatLtConstraint(fm)
+	m := getConstraint(fc)
+	v := getVersion(cv)
+
+	return m.Check(v)
+}
+
+func isBehindPatch(cv string, dv string) bool {
+	fc := formatLtConstraint(dv)
+	p := getConstraint(fc)
+	v := getVersion(cv)
+
+	return p.Check(v)
+}
+
+func isAheadMajor(cv string, dv string) bool {
+	fc := formatDowngradeConstraint(dv)
+	s := getConstraint(fc)
+	v := getVersion(cv)
+
+	return s.Check(v)
+}
+
 // PersistentPreRunCheck for validation of the CLI vs Deployment Version
 func PersistentPreRunCheck(client *houston.Client, cmd *cobra.Command, out io.Writer) {
 	ac := deployment.GetAppConfig()
 
-	// Skip check if AppConfig doesn't exist
+	// Skip check if AppConfig ia nil
 	if ac != nil {
 		dv := ac.Version
 		cv := version.CurrVersion
-		fc := formatConstraint(dv)
-		p := getConstraint(fc)
 
-		fm := formatMajor(dv)
-		fc = formatConstraint(fm)
-		m := getConstraint(fc)
-
-		v := getVersion(cv)
-
-		if m.Check(v) {
+		if isBehindMajor(cv, dv) {
 			color.Red(messages.ERROR_NEW_MAJOR_VERSION, cv, dv)
 			// Exit for commands that require matching major versions
 			os.Exit(1)
-		} else if p.Check(v) {
+		} else if isBehindPatch(cv, dv) {
 			color.Yellow(messages.WARNING_NEW_PATCH_VERSION, cv, dv)
+		} else if isAheadMajor(cv, dv) {
+			color.Yellow(messages.WARNING_DOWNGRADE_VERSION, cv, dv)
 		}
 	}
 }
