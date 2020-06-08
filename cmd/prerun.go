@@ -14,34 +14,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func formatLtConstraint(c string) string {
-	return "< " + c
-}
+// PersistentPreRunCheck for validation of the CLI vs Deployment Version
+func PersistentPreRunCheck(client *houston.Client, cmd *cobra.Command, out io.Writer) {
+	ac := deployment.GetAppConfig()
 
-func formatDowngradeConstraint(c string) string {
-	return "> " + formatMajor(c)
-}
+	// Skip check if AppConfig ia nil
+	if ac != nil {
+		dv := ac.Version
+		cv := version.CurrVersion
 
-func formatMajor(l string) string {
-	return l[:strings.LastIndex(l, ".")]
-}
-
-func getConstraint(c string) *semver.Constraints {
-	nc, err := semver.NewConstraint(c)
-	if err != nil {
-		// TODO: Handle constraint not being parsable.
-		return nil
+		validateVersions(cv, dv)
 	}
-	return nc
 }
 
-func getVersion(cv string) *semver.Version {
-	v, err := semver.NewVersion(cv)
-	if err != nil {
-		// TODO: Handle cv not being parsable.
-		return nil
+func validateVersions(cv string, dv string) {
+	if isBehindMajor(cv, dv) {
+		color.Red(messages.ERROR_NEW_MAJOR_VERSION, cv, dv)
+		// Exit for commands that require matching major versions
+		os.Exit(1)
+	} else if isBehindPatch(cv, dv) {
+		color.Yellow(messages.WARNING_NEW_PATCH_VERSION, cv, dv)
+	} else if isAheadMajor(cv, dv) {
+		color.Yellow(messages.WARNING_DOWNGRADE_VERSION, cv, dv)
 	}
-	return v
 }
 
 func isBehindMajor(cv string, dv string) bool {
@@ -69,23 +64,32 @@ func isAheadMajor(cv string, dv string) bool {
 	return s.Check(v)
 }
 
-// PersistentPreRunCheck for validation of the CLI vs Deployment Version
-func PersistentPreRunCheck(client *houston.Client, cmd *cobra.Command, out io.Writer) {
-	ac := deployment.GetAppConfig()
+func formatMajor(l string) string {
+	return l[:strings.LastIndex(l, ".")]
+}
 
-	// Skip check if AppConfig ia nil
-	if ac != nil {
-		dv := ac.Version
-		cv := version.CurrVersion
+func formatLtConstraint(c string) string {
+	return "< " + c
+}
 
-		if isBehindMajor(cv, dv) {
-			color.Red(messages.ERROR_NEW_MAJOR_VERSION, cv, dv)
-			// Exit for commands that require matching major versions
-			os.Exit(1)
-		} else if isBehindPatch(cv, dv) {
-			color.Yellow(messages.WARNING_NEW_PATCH_VERSION, cv, dv)
-		} else if isAheadMajor(cv, dv) {
-			color.Yellow(messages.WARNING_DOWNGRADE_VERSION, cv, dv)
-		}
+func formatDowngradeConstraint(c string) string {
+	return "> " + formatMajor(c)
+}
+
+func getConstraint(c string) *semver.Constraints {
+	nc, err := semver.NewConstraint(c)
+	if err != nil {
+		// TODO: Handle constraint not being parsable.
+		return nil
 	}
+	return nc
+}
+
+func getVersion(cv string) *semver.Version {
+	v, err := semver.NewVersion(cv)
+	if err != nil {
+		// TODO: Handle cv not being parsable.
+		return nil
+	}
+	return v
 }
