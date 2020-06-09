@@ -14,7 +14,7 @@ func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short: "Manage astronomer user",
 		Long:  "Users represents a human who has authenticated with the Astronomer platform",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			PersistentPreRunCheck(client, cmd, out)
+			CheckDeploymentVersion(client, cmd, out)
 		},
 	}
 	cmd.AddCommand(

@@ -36,7 +36,7 @@ func newLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Long:    "Stream logs from an Airflow deployment",
 		Example: logsExample,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			PersistentPreRunCheck(client, cmd, out)
+			CheckDeploymentVersion(client, cmd, out)
 		},
 	}
 	cmd.AddCommand(

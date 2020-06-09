@@ -55,7 +55,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		Short:   "Manage airflow deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			PersistentPreRunCheck(client, cmd, out)
+			CheckDeploymentVersion(client, cmd, out)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")

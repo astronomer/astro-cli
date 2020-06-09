@@ -261,14 +261,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:bde2a1ce1de28312f165a88926c12f4acd19dc4d7da96a445dfa5a29eae07a93"
-  name = "github.com/fatih/color"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "daf2830f2741ebb735b21709a520c5f37d642d85"
-  version = "v1.9.0"
-
-[[projects]]
   branch = "master"
   digest = "1:50a46ab1d5edbbdd55125b4d37f1bf503d0807c26461f9ad7b358d6006641d09"
   name = "github.com/flynn/go-shlex"
@@ -374,22 +366,6 @@
   pruneopts = "UT"
   revision = "d419a98cdbed11a922bf76f257b7c4be79b50e73"
   version = "v1.7.4"
-
-[[projects]]
-  digest = "1:0109cf4321a15313ec895f42e723e1f76121c6975ea006abfa20012272ec0937"
-  name = "github.com/mattn/go-colorable"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "68e95eba382c972aafde02ead2cd2426a8a92480"
-  version = "v0.1.6"
-
-[[projects]]
-  digest = "1:0c58d31abe2a2ccb429c559b6292e7df89dcda675456fecc282fa90aa08273eb"
-  name = "github.com/mattn/go-isatty"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "7b513a986450394f7bbf1476909911b3aa3a55ce"
-  version = "v0.0.12"
 
 [[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
@@ -746,7 +722,6 @@
     "github.com/docker/libcompose/project",
     "github.com/docker/libcompose/project/options",
     "github.com/fatih/camelcase",
-    "github.com/fatih/color",
     "github.com/gorilla/websocket",
     "github.com/iancoleman/strcase",
     "github.com/mitchellh/go-homedir",

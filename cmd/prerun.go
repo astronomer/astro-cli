@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -10,32 +11,31 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/version"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
-// PersistentPreRunCheck for validation of the CLI vs Deployment Version
-func PersistentPreRunCheck(client *houston.Client, cmd *cobra.Command, out io.Writer) {
-	ac := deployment.GetAppConfig()
+// CheckDeploymentVersion for validation of the CLI vs Deployment Version
+func CheckDeploymentVersion(client *houston.Client, cmd *cobra.Command, out io.Writer) {
+	appCfg := deployment.GetAppConfig()
 
 	// Skip check if AppConfig is nil
-	if ac != nil {
-		dv := ac.Version
+	if appCfg != nil {
+		dv := appCfg.Version
 		cv := version.CurrVersion
 
-		validateVersions(cv, dv)
+		validateVersions(cv, dv, out)
 	}
 }
 
-func validateVersions(cv string, dv string) {
+func validateVersions(cv string, dv string, out io.Writer) {
 	if isBehindMajor(cv, dv) {
-		color.Red(messages.ERROR_NEW_MAJOR_VERSION, cv, dv)
+		fmt.Fprintln(out, messages.ERROR_NEW_MAJOR_VERSION, cv, dv)
 		// Exit for commands that require matching major versions
 		os.Exit(1)
 	} else if isBehindPatch(cv, dv) {
-		color.Yellow(messages.WARNING_NEW_PATCH_VERSION, cv, dv)
+		fmt.Fprintln(out, messages.WARNING_NEW_PATCH_VERSION, cv, dv)
 	} else if isAheadMajor(cv, dv) {
-		color.Yellow(messages.WARNING_DOWNGRADE_VERSION, cv, dv)
+		fmt.Fprintln(out, messages.WARNING_DOWNGRADE_VERSION, cv, dv)
 	}
 }
 

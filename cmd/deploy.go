@@ -36,7 +36,7 @@ func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Example: deployExample,
 		Aliases: []string{"airflow deploy"},
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			PersistentPreRunCheck(client, cmd, out)
+			CheckDeploymentVersion(client, cmd, out)
 		},
 	}
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")

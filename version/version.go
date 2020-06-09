@@ -18,7 +18,7 @@ var (
 
 // PrintVersion outputs current cli version and git commit if exists
 func PrintVersion(out io.Writer) error {
-	ac := deployment.GetAppConfig()
+	appCfg := deployment.GetAppConfig()
 	version := CurrVersion
 	gitCommit := CurrCommit
 
@@ -26,8 +26,8 @@ func PrintVersion(out io.Writer) error {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
 	}
 
-	if ac != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", ac.Version)
+	if appCfg != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
 	}
 
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)

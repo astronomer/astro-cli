@@ -34,7 +34,7 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short:   "Manage Astronomer workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			PersistentPreRunCheck(client, cmd, out)
+			CheckDeploymentVersion(client, cmd, out)
 		},
 	}
 	cmd.AddCommand(
