@@ -408,7 +408,7 @@ var (
 			timestamp: $timestamp
 			search: $search
 		) {
-			id: uuid
+			id
 			createdAt: timestamp
 			log: message
 		}
@@ -426,7 +426,7 @@ var (
 			timestamp: $timestamp
 			search: $search
       ) {
-        	id: uuid
+        	id
         	createdAt: timestamp
         	log: message
       }
