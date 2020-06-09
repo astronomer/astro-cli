@@ -6,6 +6,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestIsBehindMajor(t *testing.T) {
+	assert := assert.New(t)
+	cv := "0.17.0"
+	dv := "0.18.0"
+	act := isBehindMajor(cv, dv)
+
+	assert.True(act)
+}
+func TestIsBehindPatch(t *testing.T) {
+	assert := assert.New(t)
+	cv := "0.17.0"
+	dv := "0.17.1"
+	act := isBehindPatch(cv, dv)
+
+	assert.True(act)
+}
+
+func TestIsAheadMajor(t *testing.T) {
+	assert := assert.New(t)
+	cv := "0.18.0"
+	dv := "0.17.0"
+	act := isAheadMajor(cv, dv)
+
+	assert.True(act)
+}
+
 func TestFormatMajor(t *testing.T) {
 	assert := assert.New(t)
 	ver := "0.17.0"
@@ -36,22 +62,22 @@ func TestFormatDowngradeConstraint(t *testing.T) {
 func TestGetConstraint(t *testing.T) {
 	assert := assert.New(t)
 	ver := getVersion("0.17.1")
-	gt := getConstraint("> 0.18.0")
-	lt := getConstraint("> 0.16.0")
-	plt := getConstraint("< 0.17")
-	pgt := getConstraint("< 0.18")
+	majGt := getConstraint("> 0.18.0")
+	majLt := getConstraint("> 0.16.0")
+	patchLt := getConstraint("< 0.17")
+	patchGt := getConstraint("< 0.18")
 
-	assert.NotNil(gt)
-	assert.False(gt.Validate(ver))
+	assert.NotNil(majGt)
+	assert.False(majGt.Validate(ver))
 
-	assert.NotNil(lt)
-	assert.True(lt.Validate(ver))
+	assert.NotNil(majLt)
+	assert.True(majLt.Validate(ver))
 
-	assert.NotNil(plt)
-	assert.False(plt.Validate(ver))
+	assert.NotNil(patchLt)
+	assert.False(patchLt.Validate(ver))
 
-	assert.NotNil(pgt)
-	assert.True(pgt.Validate(ver))
+	assert.NotNil(patchGt)
+	assert.True(patchGt.Validate(ver))
 }
 
 func TestGetVersion(t *testing.T) {
