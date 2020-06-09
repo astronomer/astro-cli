@@ -18,7 +18,7 @@ import (
 func PersistentPreRunCheck(client *houston.Client, cmd *cobra.Command, out io.Writer) {
 	ac := deployment.GetAppConfig()
 
-	// Skip check if AppConfig ia nil
+	// Skip check if AppConfig is nil
 	if ac != nil {
 		dv := ac.Version
 		cv := version.CurrVersion
