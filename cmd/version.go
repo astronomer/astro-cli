@@ -3,17 +3,20 @@ package cmd
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/version"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/version"
+
 )
 
-func newVersionCmd(out io.Writer) *cobra.Command {
+func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Astronomer CLI version",
 		Long:  "The astro-cli semantic version and git commit tied to that release.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printVersion(cmd, out, args)
+			return printVersion(client, cmd, out, args)
 		},
 	}
 	return cmd
@@ -31,11 +34,11 @@ func newUpgradeCheckCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func printVersion(cmd *cobra.Command, out io.Writer, args []string) error {
+func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	err := version.PrintVersion(out)
+	err := version.PrintVersion(client, out)
 	if err != nil {
 		return err
 	}

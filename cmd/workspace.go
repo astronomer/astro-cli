@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	workspaceUpdateAttrs     = []string{"label"}
-	createDesc               string
+	workspaceUpdateAttrs   = []string{"label"}
+	createDesc             string
 	workspaceDeleteExample = `
   $ astro workspace delete <workspace-id>
 `
@@ -182,10 +182,10 @@ func newWorkspaceUserRmCmd(client *houston.Client, out io.Writer) *cobra.Command
 
 func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:     "list",
 		Aliases: []string{"ls"},
-		Short: "List Astronomer workspaces",
-		Long:  "List Astronomer workspaces",
+		Short:   "List Astronomer workspaces",
+		Long:    "List Astronomer workspaces",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, client, out, args)
