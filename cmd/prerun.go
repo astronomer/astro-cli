@@ -42,26 +42,26 @@ func validateVersions(cv string, dv string, out io.Writer) {
 func isBehindMajor(cv string, dv string) bool {
 	fm := formatMajor(dv)
 	fc := formatLtConstraint(fm)
-	m := getConstraint(fc)
-	v := getVersion(cv)
+	maj := getConstraint(fc)
+	ver := getVersion(cv)
 
-	return m.Check(v)
+	return maj.Check(ver)
 }
 
 func isBehindPatch(cv string, dv string) bool {
 	fc := formatLtConstraint(dv)
-	p := getConstraint(fc)
-	v := getVersion(cv)
+	patch := getConstraint(fc)
+	ver := getVersion(cv)
 
-	return p.Check(v)
+	return patch.Check(ver)
 }
 
 func isAheadMajor(cv string, dv string) bool {
 	fc := formatDowngradeConstraint(dv)
-	s := getConstraint(fc)
-	v := getVersion(cv)
+	ahead := getConstraint(fc)
+	ver := getVersion(cv)
 
-	return s.Check(v)
+	return ahead.Check(ver)
 }
 
 func formatMajor(l string) string {
