@@ -18,10 +18,10 @@ import (
 func CheckDeploymentVersion(client *houston.Client, cmd *cobra.Command, out io.Writer) {
 	appCfg := deployment.GetAppConfig()
 	cv := version.CurrVersion
+
 	// Skip check if AppConfig is nil or is cv is empty
 	if appCfg != nil && cv != "" {
 		dv := appCfg.Version
-
 		validateVersions(cv, dv, out)
 	}
 }
@@ -52,8 +52,6 @@ func isBehindPatch(cv string, dv string) bool {
 	patch := getConstraint(fc)
 	ver := getVersion(cv)
 
-	fmt.Println("patch.Check(ver)", patch.Check(ver))
-
 	return patch.Check(ver)
 }
 
@@ -61,8 +59,6 @@ func isAheadMajor(cv string, dv string) bool {
 	fc := formatDowngradeConstraint(dv)
 	ahead := getConstraint(fc)
 	ver := getVersion(cv)
-
-	fmt.Println("ahead.Check(ver)", ahead.Check(ver))
 
 	return ahead.Check(ver)
 }
