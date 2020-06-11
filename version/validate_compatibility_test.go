@@ -63,7 +63,7 @@ func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer, false)
 	assert.NoError(t, err)
-	expected := "Your Astro CLI Version (0.17.1) is ahead of the server version (0.15.1). Consider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	expected := "Your Astro CLI Version (0.17.1) is ahead of the server version (0.15.1).\nConsider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	// check that user can see correct message
 	assert.Equal(t, expected, output.String())
 }
@@ -92,7 +92,7 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer, false)
 	assert.Error(t, err)
-	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 1.0.0 is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 1.0.0 is the server version.\nPlease upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\nTo skip this check use the --skip-version-check flag.\n"
 	// check that user can see correct message
 	assert.EqualError(t, err, expected)
 
