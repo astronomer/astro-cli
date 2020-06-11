@@ -65,7 +65,7 @@ func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
 	assert.NoError(t, err)
 	expected := "Your Astro CLI Version (0.17.1) is ahead of the server version (0.15.1). Consider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	// check that user can see correct message
-	assert.Equal(t, output.String(), expected)
+	assert.Equal(t, expected, output.String())
 }
 
 func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
@@ -91,10 +91,10 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	output := new(bytes.Buffer)
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer)
-	assert.NoError(t, err)
-	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 0.19.1 is the latest. Please upgrade to the latest version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	assert.Error(t, err)
+	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 0.19.1 is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	// check that user can see correct message
-	assert.Equal(t, output.String(), expected)
+	assert.EqualError(t, err, expected)
 }
 
 func TestIsBehindMajor(t *testing.T) {

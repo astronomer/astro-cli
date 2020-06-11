@@ -4,7 +4,7 @@ var (
 	ERROR_INVALID_CLI_VERSION     = "Astronomer CLI version is not valid"
 	ERROR_GITHUB_JSON_MARSHALLING = "Failed to JSON decode Github response from %s"
 	ERROR_INVALID_AIRFLOW_VERSION = "Unsupported Airflow Version specified. Please choose from: %s \n"
-	ERROR_NEW_MAJOR_VERSION       = "There is an update for Astro CLI. You're using version %s, but %s is the latest. Please upgrade to the latest version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	ERROR_NEW_MAJOR_VERSION       = "There is an update for Astro CLI. You're using version %s, but %s is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 
 	CLI_CMD_DEPRECATE         = "Deprecated in favor of %s\n"
 	CLI_CURR_VERSION          = "Astro CLI Version: %s "

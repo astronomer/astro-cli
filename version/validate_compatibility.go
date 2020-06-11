@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/deployment"
+	"github.com/pkg/errors"
 
 	"github.com/Masterminds/semver"
 	"github.com/astronomer/astro-cli/houston"
@@ -25,9 +26,9 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string)
 	return nil
 }
 
-func compareVersions(serverVer, cliVer string, out io.Writer) error {
+func compareVersions(serverVer string, cliVer string, out io.Writer) error {
 	if isBehindMajor(serverVer, cliVer) {
-		fmt.Fprintf(out, messages.ERROR_NEW_MAJOR_VERSION, cliVer, serverVer)
+		return errors.Errorf(messages.ERROR_NEW_MAJOR_VERSION, cliVer, serverVer)
 	} else if isBehindPatch(serverVer, cliVer) {
 		fmt.Fprintf(out, messages.WARNING_NEW_PATCH_VERSION, cliVer, serverVer)
 	} else if isAheadMajor(serverVer, cliVer) {
@@ -36,7 +37,7 @@ func compareVersions(serverVer, cliVer string, out io.Writer) error {
 	return nil
 }
 
-func isBehindMajor(serverVer, cliVer string) bool {
+func isBehindMajor(serverVer string, cliVer string) bool {
 	fm := formatMajor(serverVer)
 	fc := formatLtConstraint(fm)
 	maj := getConstraint(fc)
@@ -48,7 +49,7 @@ func isBehindMajor(serverVer, cliVer string) bool {
 	return maj.Check(ver)
 }
 
-func isBehindPatch(serverVer, cliVer string) bool {
+func isBehindPatch(serverVer string, cliVer string) bool {
 	fc := formatLtConstraint(serverVer)
 	patch := getConstraint(fc)
 	ver, err := parseVersion(cliVer)
@@ -60,7 +61,7 @@ func isBehindPatch(serverVer, cliVer string) bool {
 	return patch.Check(ver)
 }
 
-func isAheadMajor(serverVer, cliVer string) bool {
+func isAheadMajor(serverVer string, cliVer string) bool {
 	fc := formatDowngradeConstraint(serverVer)
 	ahead := getConstraint(fc)
 	ver, err := parseVersion(cliVer)
