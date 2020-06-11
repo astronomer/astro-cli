@@ -13,6 +13,7 @@ var (
 	workspaceId   string
 	workspaceRole string
 	role          string
+	skipVerCheck  bool
 )
 
 // NewRootCmd adds all of the primary commands for the cli
@@ -22,10 +23,11 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short: "Astronomer - CLI",
 		Long:  "astro is a command line interface for working with the Astronomer Platform.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return version.ValidateCompatibility(client, out, version.CurrVersion)
+			return version.ValidateCompatibility(client, out, version.CurrVersion, skipVerCheck)
 		},
 	}
 
+	rootCmd.PersistentFlags().BoolVarP(&skipVerCheck, "skip-version-check", "", false, "skip version compatibility check")
 	rootCmd.AddCommand(
 		newAuthRootCmd(client, out),
 		newWorkspaceCmd(client, out),

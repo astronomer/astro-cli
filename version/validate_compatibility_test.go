@@ -33,7 +33,7 @@ func TestValidateCompatibilityVersionsMatched(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.15.1"
-	err := ValidateCompatibility(api, output, cliVer)
+	err := ValidateCompatibility(api, output, cliVer, false)
 	assert.NoError(t, err)
 	// check that there is no output because version matched
 	assert.Equal(t, output, &bytes.Buffer{})
@@ -61,7 +61,7 @@ func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.17.1"
-	err := ValidateCompatibility(api, output, cliVer)
+	err := ValidateCompatibility(api, output, cliVer, false)
 	assert.NoError(t, err)
 	expected := "Your Astro CLI Version (0.17.1) is ahead of the server version (0.15.1). Consider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	// check that user can see correct message
@@ -73,7 +73,7 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	okResponse := `{
 		"data": {
 			"appConfig": {
-				"version": "0.19.1",
+				"version": "1.0.0",
 				"baseDomain": "local.astronomer.io",
 				"smtpConfigured": true,
 				"manualReleaseNames": false
@@ -90,25 +90,46 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.17.1"
-	err := ValidateCompatibility(api, output, cliVer)
+	err := ValidateCompatibility(api, output, cliVer, false)
 	assert.Error(t, err)
-	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 0.19.1 is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 1.0.0 is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	// check that user can see correct message
 	assert.EqualError(t, err, expected)
+
+	output = new(bytes.Buffer)
+	err = ValidateCompatibility(api, output, cliVer, true)
+	assert.NoError(t, err)
+	expected = ""
+	// check that user can bypass major version check
+	assert.Equal(t, expected, output.String())
 }
 
 func TestIsBehindMajor(t *testing.T) {
 	cliVer := "0.17.1"
 	serverVer := "0.18.0"
-	assert.True(t, isBehindMajor(serverVer, cliVer))
+	assert.False(t, isBehindMajor(serverVer, cliVer))
 
 	cliVer = "1.0.0"
 	serverVer = "1.1.0"
-	assert.True(t, isBehindMajor(serverVer, cliVer))
+	assert.False(t, isBehindMajor(serverVer, cliVer))
 
 	cliVer = "1.0.0"
 	serverVer = "2.0.0"
 	assert.True(t, isBehindMajor(serverVer, cliVer))
+}
+
+func TestIsBehindMinor(t *testing.T) {
+	cliVer := "0.17.1"
+	serverVer := "0.17.8"
+	assert.False(t, isBehindMinor(serverVer, cliVer))
+
+	cliVer = "1.1.0"
+	serverVer = "1.2.0"
+	assert.True(t, isBehindMinor(serverVer, cliVer))
+
+	cliVer = "1.0.0"
+	serverVer = "2.0.0"
+	assert.True(t, isBehindMinor(serverVer, cliVer))
 }
 
 func TestIsBehindPatch(t *testing.T) {
@@ -117,15 +138,22 @@ func TestIsBehindPatch(t *testing.T) {
 	assert.True(t, isBehindPatch(serverVer, cliVer))
 }
 
-func TestIsAheadMajor(t *testing.T) {
+func TestIsAheadMinor(t *testing.T) {
 	cliVer := "0.18.0"
 	serverVer := "0.17.0"
-	assert.True(t, isAheadMajor(serverVer, cliVer))
+	assert.True(t, isAheadMinor(serverVer, cliVer))
 }
 
 func TestFormatMajor(t *testing.T) {
+	exp := "1"
+	act := formatMajor("1.1.0")
+
+	assert.Equal(t, exp, act)
+}
+
+func TestFormatMinor(t *testing.T) {
 	exp := "0.17"
-	act := formatMajor("0.17.0")
+	act := formatMinor("0.17.0")
 
 	assert.Equal(t, exp, act)
 }
@@ -137,11 +165,27 @@ func TestFormatLtConstraint(t *testing.T) {
 	assert.Equal(t, exp, act)
 }
 
-func TestFormatDowngradeConstraint(t *testing.T) {
-	exp := "> 0.17"
-	act := formatDowngradeConstraint("0.17.0")
+func TestFormatGtConstraint(t *testing.T) {
+	exp := "> 0.17.0"
+	act := formatGtConstraint("0.17.0")
 
 	assert.Equal(t, exp, act)
+}
+
+func TestCheckFormattedConstraint(t *testing.T) {
+	cliBehind := checkFormattedConstraint("< 1.1.2", "1.1.1")
+	cliAhead := checkFormattedConstraint("> 1.1.1", "1.1.2")
+	cliMinorBehind := checkFormattedConstraint("< 1.1", "1.0")
+	cliMinorAhead := checkFormattedConstraint("> 1.1", "1.2")
+	cliMajorBehind := checkFormattedConstraint("< 1", "0")
+	cliMajorAhead := checkFormattedConstraint("> 1", "2")
+
+	assert.True(t, cliBehind)
+	assert.True(t, cliAhead)
+	assert.True(t, cliMinorBehind)
+	assert.True(t, cliMinorAhead)
+	assert.True(t, cliMajorBehind)
+	assert.True(t, cliMajorAhead)
 }
 
 func TestGetConstraint(t *testing.T) {

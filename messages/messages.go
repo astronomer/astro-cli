@@ -4,7 +4,7 @@ var (
 	ERROR_INVALID_CLI_VERSION     = "Astronomer CLI version is not valid"
 	ERROR_GITHUB_JSON_MARSHALLING = "Failed to JSON decode Github response from %s"
 	ERROR_INVALID_AIRFLOW_VERSION = "Unsupported Airflow Version specified. Please choose from: %s \n"
-	ERROR_NEW_MAJOR_VERSION       = "There is an update for Astro CLI. You're using version %s, but %s is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	ERROR_NEW_MAJOR_VERSION       = "There is an update for Astro CLI. You're using version %s, but %s is the server version. Please upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information. To skip this check use the --skip-version-check flag.\n"
 
 	CLI_CMD_DEPRECATE         = "Deprecated in favor of %s\n"
 	CLI_CURR_VERSION          = "Astro CLI Version: %s "
@@ -75,5 +75,6 @@ var (
 	WARNING_DOWNGRADE_VERSION  = "Your Astro CLI Version (%s) is ahead of the server version (%s). Consider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	WARNING_INVALID_IMAGE_NAME = "WARNING! You are using an invalid image name '%s' in your Dockerfile, please use %s. Are you sure you want to continue?\n"
 	WARNING_INVALID_IMAGE_TAG  = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
+	WARNING_NEW_MINOR_VERSION  = "A new minor version of Astro CLI is available. Your version is %s and %s is the latest. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	WARNING_NEW_PATCH_VERSION  = "A new patch for Astro CLI is available. Your version is %s and %s is the latest. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 )

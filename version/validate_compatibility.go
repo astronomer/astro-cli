@@ -14,7 +14,11 @@ import (
 )
 
 // ValidateCompatibility print message if astro-cli version is not compatible with platform version
-func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string) error {
+func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string, skipVerCheck bool) error {
+	if skipVerCheck {
+		return nil
+	}
+
 	serverCfg, err := deployment.AppConfig(client)
 	if err != nil {
 		return err
@@ -29,51 +33,56 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string)
 func compareVersions(serverVer string, cliVer string, out io.Writer) error {
 	if isBehindMajor(serverVer, cliVer) {
 		return errors.Errorf(messages.ERROR_NEW_MAJOR_VERSION, cliVer, serverVer)
+	} else if isBehindMinor(serverVer, cliVer) {
+		fmt.Fprintf(out, messages.WARNING_NEW_MINOR_VERSION, cliVer, serverVer)
 	} else if isBehindPatch(serverVer, cliVer) {
 		fmt.Fprintf(out, messages.WARNING_NEW_PATCH_VERSION, cliVer, serverVer)
-	} else if isAheadMajor(serverVer, cliVer) {
+	} else if isAheadMinor(serverVer, cliVer) {
 		fmt.Fprintf(out, messages.WARNING_DOWNGRADE_VERSION, cliVer, serverVer)
 	}
 	return nil
 }
 
 func isBehindMajor(serverVer string, cliVer string) bool {
-	fm := formatMajor(serverVer)
-	fc := formatLtConstraint(fm)
-	maj := getConstraint(fc)
-	ver, err := parseVersion(cliVer)
-	if err != nil {
-		// TODO: add error message
-		return false
-	}
-	return maj.Check(ver)
+	fMaj := formatMajor(serverVer)
+	return checkBehindVersion(fMaj, cliVer)
+}
+
+func isBehindMinor(serverVer string, cliVer string) bool {
+	fMin := formatMinor(serverVer)
+	return checkBehindVersion(fMin, cliVer)
 }
 
 func isBehindPatch(serverVer string, cliVer string) bool {
-	fc := formatLtConstraint(serverVer)
-	patch := getConstraint(fc)
-	ver, err := parseVersion(cliVer)
-	if err != nil {
-		// TODO: add error message
-		return false
-	}
-
-	return patch.Check(ver)
+	return checkBehindVersion(serverVer, cliVer)
 }
 
-func isAheadMajor(serverVer string, cliVer string) bool {
-	fc := formatDowngradeConstraint(serverVer)
-	ahead := getConstraint(fc)
+func checkBehindVersion(serverVer string, cliVer string) bool {
+	fCon := formatLtConstraint(serverVer)
+	return checkFormattedConstraint(fCon, cliVer)
+}
+
+func isAheadMinor(serverVer string, cliVer string) bool {
+	fMaj := formatMinor(serverVer)
+	fCon := formatGtConstraint(fMaj)
+	return checkFormattedConstraint(fCon, cliVer)
+}
+
+func checkFormattedConstraint(fCon string, cliVer string) bool {
+	con := getConstraint(fCon)
 	ver, err := parseVersion(cliVer)
 	if err != nil {
 		// TODO: add error message
 		return false
 	}
-
-	return ahead.Check(ver)
+	return con.Check(ver)
 }
 
 func formatMajor(l string) string {
+	return l[:strings.Index(l, ".")]
+}
+
+func formatMinor(l string) string {
 	return l[:strings.LastIndex(l, ".")]
 }
 
@@ -81,8 +90,8 @@ func formatLtConstraint(c string) string {
 	return "< " + c
 }
 
-func formatDowngradeConstraint(c string) string {
-	return "> " + formatMajor(c)
+func formatGtConstraint(c string) string {
+	return "> " + c
 }
 
 func getConstraint(c string) *semver.Constraints {
