@@ -92,7 +92,7 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer)
 	assert.NoError(t, err)
-	expected := "There is an update for astro-cli. You're using version 0.17.1, but 0.19.1 is the latest. Please upgrade to the latest version before continuing.\n"
+	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 0.19.1 is the latest. Please upgrade to the latest version before continuing.\n"
 	// check that user can see correct message
 	assert.Equal(t, output.String(), expected)
 }
