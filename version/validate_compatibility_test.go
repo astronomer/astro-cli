@@ -2,26 +2,27 @@ package version
 
 import (
 	"bytes"
-	"github.com/astronomer/astro-cli/houston"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/astronomer/astro-cli/houston"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateCompatibilityVersionsMatched(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
- "data": {
-   "appConfig": {
-     "version": "0.15.1",
-     "baseDomain": "local.astronomer.io",
-     "smtpConfigured": true,
-     "manualReleaseNames": false
-   }
- }
-}`
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -41,15 +42,15 @@ func TestValidateCompatibilityVersionsMatched(t *testing.T) {
 func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
- "data": {
-   "appConfig": {
-     "version": "0.15.1",
-     "baseDomain": "local.astronomer.io",
-     "smtpConfigured": true,
-     "manualReleaseNames": false
-   }
- }
-}`
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -70,15 +71,15 @@ func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
 func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
- "data": {
-   "appConfig": {
-     "version": "0.19.1",
-     "baseDomain": "local.astronomer.io",
-     "smtpConfigured": true,
-     "manualReleaseNames": false
-   }
- }
-}`
+		"data": {
+			"appConfig": {
+				"version": "0.19.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -100,6 +101,14 @@ func TestIsBehindMajor(t *testing.T) {
 	cliVer := "0.17.1"
 	serverVer := "0.18.0"
 	assert.True(t, isBehindMajor(serverVer, cliVer))
+
+	cliVer = "1.0.0"
+	serverVer = "1.1.0"
+	assert.True(t, isBehindMajor(serverVer, cliVer))
+
+	cliVer = "1.0.0"
+	serverVer = "2.0.0"
+	assert.True(t, isBehindMajor(serverVer, cliVer))
 }
 
 func TestIsBehindPatch(t *testing.T) {
@@ -114,14 +123,12 @@ func TestIsAheadMajor(t *testing.T) {
 	assert.True(t, isAheadMajor(serverVer, cliVer))
 }
 
-
 func TestFormatMajor(t *testing.T) {
 	exp := "0.17"
 	act := formatMajor("0.17.0")
 
 	assert.Equal(t, exp, act)
 }
-
 
 func TestFormatLtConstraint(t *testing.T) {
 	exp := "< 0.17.0"
@@ -130,14 +137,12 @@ func TestFormatLtConstraint(t *testing.T) {
 	assert.Equal(t, exp, act)
 }
 
-
 func TestFormatDowngradeConstraint(t *testing.T) {
 	exp := "> 0.17"
 	act := formatDowngradeConstraint("0.17.0")
 
 	assert.Equal(t, exp, act)
 }
-
 
 func TestGetConstraint(t *testing.T) {
 	ver, err := parseVersion("0.17.1")
@@ -164,7 +169,6 @@ func TestGetConstraint(t *testing.T) {
 		assert.True(t, patchGt.Check(ver))
 	}
 }
-
 
 func TestGetVersion(t *testing.T) {
 	ver, err := parseVersion("0.17.1")

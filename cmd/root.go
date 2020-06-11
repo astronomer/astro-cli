@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -26,8 +25,6 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 			return version.ValidateCompatibility(client, out, version.CurrVersion)
 		},
 	}
-
-	fmt.Printf("adding commands...")
 
 	rootCmd.AddCommand(
 		newAuthRootCmd(client, out),

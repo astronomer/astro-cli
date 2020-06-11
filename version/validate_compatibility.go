@@ -2,9 +2,10 @@ package version
 
 import (
 	"fmt"
-	"github.com/astronomer/astro-cli/deployment"
 	"io"
 	"strings"
+
+	"github.com/astronomer/astro-cli/deployment"
 
 	"github.com/Masterminds/semver"
 	"github.com/astronomer/astro-cli/houston"
@@ -41,7 +42,7 @@ func isBehindMajor(serverVer, cliVer string) bool {
 	maj := getConstraint(fc)
 	ver, err := parseVersion(cliVer)
 	if err != nil {
-		// add error message
+		// TODO: add error message
 		return false
 	}
 	return maj.Check(ver)
@@ -52,7 +53,7 @@ func isBehindPatch(serverVer, cliVer string) bool {
 	patch := getConstraint(fc)
 	ver, err := parseVersion(cliVer)
 	if err != nil {
-		// add error message
+		// TODO: add error message
 		return false
 	}
 
@@ -64,7 +65,7 @@ func isAheadMajor(serverVer, cliVer string) bool {
 	ahead := getConstraint(fc)
 	ver, err := parseVersion(cliVer)
 	if err != nil {
-		// add error message
+		// TODO: add error message
 		return false
 	}
 
