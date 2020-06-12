@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"io"
+	"time"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/logs"
 	"github.com/spf13/cobra"
-	"io"
-	"time"
 )
 
 var (

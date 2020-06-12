@@ -20,9 +20,22 @@ var (
 	}
 )
 
+// AppConfig returns application config from houston-api
+func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
+	req := houston.Request{
+		Query: houston.AppConfigRequest,
+	}
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Data.GetAppConfig, nil
+}
+
 func checkManualReleaseNames() bool {
 	req := houston.Request{
-		Query:     houston.AppConfigRequest,
+		Query: houston.AppConfigRequest,
 	}
 	r, err := req.Do()
 	if err != nil {
@@ -32,6 +45,7 @@ func checkManualReleaseNames() bool {
 	return r.Data.GetAppConfig.ManualReleaseNames
 }
 
+// Create airflow deployment
 func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig, "cloudRole": cloudRole}
 
