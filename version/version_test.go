@@ -24,15 +24,15 @@ func TestIsValidVersionValid(t *testing.T) {
 func TestPrintVersionError(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
- "data": {
-   "appConfig": {
-     "version": "0.19.1",
-     "baseDomain": "local.astronomer.io",
-     "smtpConfigured": true,
-     "manualReleaseNames": false
-   }
- }
-}`
+		"data": {
+			"appConfig": {
+				"version": "0.19.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,

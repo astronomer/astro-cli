@@ -76,5 +76,4 @@ var (
 	WARNING_INVALID_IMAGE_NAME = "WARNING! You are using an invalid image name '%s' in your Dockerfile, please use %s. Are you sure you want to continue?\n"
 	WARNING_INVALID_IMAGE_TAG  = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
 	WARNING_NEW_MINOR_VERSION  = "A new minor version of Astro CLI is available. Your version is %s and %s is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"
-	WARNING_NEW_PATCH_VERSION  = "A new patch for Astro CLI is available. Your version is %s and %s is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 )
