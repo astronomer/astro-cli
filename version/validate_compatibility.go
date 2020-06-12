@@ -43,18 +43,14 @@ func compareVersions(serverVer string, cliVer string, out io.Writer) error {
 
 	cliMajor := semVerCli.Major()
 	cliMinor := semVerCli.Minor()
-	cliPatch := semVerCli.Patch()
 
 	serverMajor := semVerServer.Major()
 	serverMinor := semVerServer.Minor()
-	serverPatch := semVerServer.Patch()
 
 	if cliMajor < serverMajor {
 		return errors.Errorf(messages.ERROR_NEW_MAJOR_VERSION, cliVer, serverVer)
 	} else if cliMinor < serverMinor {
 		fmt.Fprintf(out, messages.WARNING_NEW_MINOR_VERSION, cliVer, serverVer)
-	} else if cliPatch < serverPatch {
-		fmt.Fprintf(out, messages.WARNING_NEW_PATCH_VERSION, cliVer, serverVer)
 	} else if cliMinor > serverMinor {
 		fmt.Fprintf(out, messages.WARNING_DOWNGRADE_VERSION, cliVer, serverVer)
 	}

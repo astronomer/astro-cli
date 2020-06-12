@@ -184,35 +184,6 @@ func TestValidateCompatibilityVersionsMinorWarning(t *testing.T) {
 	assert.Equal(t, expected, output.String())
 }
 
-func TestValidateCompatibilityVersionsPatchWarning(t *testing.T) {
-	testUtil.InitTestConfig()
-	okResponse := `{
-		"data": {
-			"appConfig": {
-				"version": "0.17.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false
-			}
-		}
-	}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(client)
-	output := new(bytes.Buffer)
-	cliVer := "0.17.0"
-	err := ValidateCompatibility(api, output, cliVer, false)
-	assert.NoError(t, err)
-	expected := "A new patch for Astro CLI is available. Your version is 0.17.0 and 0.17.1 is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"
-	// check that user can see correct warning message
-	assert.Equal(t, expected, output.String())
-}
-
 func TestValidateCompatibilityClientFailure(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
@@ -257,6 +228,5 @@ func TestParseVersion(t *testing.T) {
 	if assert.NotNil(t, ver) {
 		assert.Equal(t, uint64(0), ver.Major())
 		assert.Equal(t, uint64(17), ver.Minor())
-		assert.Equal(t, uint64(1), ver.Patch())
 	}
 }
