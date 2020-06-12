@@ -37,6 +37,42 @@ func TestValidateCompatibilityVersionsMatched(t *testing.T) {
 	assert.NoError(t, err)
 	// check that there is no output because version matched
 	assert.Equal(t, output, &bytes.Buffer{})
+
+	output = new(bytes.Buffer)
+	cliVer = ""
+	err = ValidateCompatibility(api, output, cliVer, false)
+
+	assert.NoError(t, err)
+	// check that there is no output because version matched
+	assert.Equal(t, output, &bytes.Buffer{})
+}
+
+func TestValidateCompatibilityMissingCliVersion(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	output := new(bytes.Buffer)
+	cliVer := ""
+	err := ValidateCompatibility(api, output, cliVer, false)
+	assert.NoError(t, err)
+	// check that there is no output because cli version is missing
+	assert.Equal(t, output, &bytes.Buffer{})
 }
 
 func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
@@ -95,126 +131,109 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 	expected := "There is an update for Astro CLI. You're using version 0.17.1, but 1.0.0 is the server version.\nPlease upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\nTo skip this check use the --skip-version-check flag.\n"
 	// check that user can see correct message
 	assert.EqualError(t, err, expected)
+}
 
-	output = new(bytes.Buffer)
-	err = ValidateCompatibility(api, output, cliVer, true)
+func TestValidateCompatibilityVersionBypass(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "1.0.0",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	output := new(bytes.Buffer)
+	cliVer := "0.17.1"
+	err := ValidateCompatibility(api, output, cliVer, true)
+	expected := ""
+
 	assert.NoError(t, err)
-	expected = ""
 	// check that user can bypass major version check
 	assert.Equal(t, expected, output.String())
 }
 
-func TestIsBehindMajor(t *testing.T) {
-	cliVer := "0.17.1"
-	serverVer := "0.18.0"
-	assert.False(t, isBehindMajor(serverVer, cliVer))
-
-	cliVer = "1.0.0"
-	serverVer = "1.1.0"
-	assert.False(t, isBehindMajor(serverVer, cliVer))
-
-	cliVer = "1.0.0"
-	serverVer = "2.0.0"
-	assert.True(t, isBehindMajor(serverVer, cliVer))
-}
-
-func TestIsBehindMinor(t *testing.T) {
-	cliVer := "0.17.1"
-	serverVer := "0.17.8"
-	assert.False(t, isBehindMinor(serverVer, cliVer))
-
-	cliVer = "1.1.0"
-	serverVer = "1.2.0"
-	assert.True(t, isBehindMinor(serverVer, cliVer))
-
-	cliVer = "1.0.0"
-	serverVer = "2.0.0"
-	assert.True(t, isBehindMinor(serverVer, cliVer))
-}
-
-func TestIsBehindPatch(t *testing.T) {
+func TestValidateCompatibilityVersionsMinorWarning(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.18.0",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	output := new(bytes.Buffer)
 	cliVer := "0.17.0"
-	serverVer := "0.17.1"
-	assert.True(t, isBehindPatch(serverVer, cliVer))
-}
-
-func TestIsAheadMinor(t *testing.T) {
-	cliVer := "0.18.0"
-	serverVer := "0.17.0"
-	assert.True(t, isAheadMinor(serverVer, cliVer))
-}
-
-func TestFormatMajor(t *testing.T) {
-	exp := "1"
-	act := formatMajor("1.1.0")
-
-	assert.Equal(t, exp, act)
-}
-
-func TestFormatMinor(t *testing.T) {
-	exp := "0.17"
-	act := formatMinor("0.17.0")
-
-	assert.Equal(t, exp, act)
-}
-
-func TestFormatLtConstraint(t *testing.T) {
-	exp := "< 0.17.0"
-	act := formatLtConstraint("0.17.0")
-
-	assert.Equal(t, exp, act)
-}
-
-func TestFormatGtConstraint(t *testing.T) {
-	exp := "> 0.17.0"
-	act := formatGtConstraint("0.17.0")
-
-	assert.Equal(t, exp, act)
-}
-
-func TestCheckFormattedConstraint(t *testing.T) {
-	cliBehind := checkFormattedConstraint("< 1.1.2", "1.1.1")
-	cliAhead := checkFormattedConstraint("> 1.1.1", "1.1.2")
-	cliMinorBehind := checkFormattedConstraint("< 1.1", "1.0")
-	cliMinorAhead := checkFormattedConstraint("> 1.1", "1.2")
-	cliMajorBehind := checkFormattedConstraint("< 1", "0")
-	cliMajorAhead := checkFormattedConstraint("> 1", "2")
-
-	assert.True(t, cliBehind)
-	assert.True(t, cliAhead)
-	assert.True(t, cliMinorBehind)
-	assert.True(t, cliMinorAhead)
-	assert.True(t, cliMajorBehind)
-	assert.True(t, cliMajorAhead)
-}
-
-func TestGetConstraint(t *testing.T) {
-	ver, err := parseVersion("0.17.1")
+	err := ValidateCompatibility(api, output, cliVer, false)
 	assert.NoError(t, err)
-
-	majGt := getConstraint("> 0.18.0")
-	majLt := getConstraint("> 0.16.0")
-	patchLt := getConstraint("< 0.17")
-	patchGt := getConstraint("< 0.18")
-
-	if assert.NotNil(t, majGt) {
-		assert.False(t, majGt.Check(ver))
-	}
-
-	if assert.NotNil(t, majLt) {
-		assert.True(t, majLt.Check(ver))
-	}
-
-	if assert.NotNil(t, patchLt) {
-		assert.False(t, patchLt.Check(ver))
-	}
-
-	if assert.NotNil(t, patchGt) {
-		assert.True(t, patchGt.Check(ver))
-	}
+	expected := "A new minor version of Astro CLI is available. Your version is 0.17.0 and 0.18.0 is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	// check that user can see correct warning message
+	assert.Equal(t, expected, output.String())
 }
 
-func TestGetVersion(t *testing.T) {
+func TestValidateCompatibilityVersionsPatchWarning(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.17.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	output := new(bytes.Buffer)
+	cliVer := "0.17.0"
+	err := ValidateCompatibility(api, output, cliVer, false)
+	assert.NoError(t, err)
+	expected := "A new patch for Astro CLI is available. Your version is 0.17.0 and 0.17.1 is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"
+	// check that user can see correct warning message
+	assert.Equal(t, expected, output.String())
+}
+
+func TestCompareVersionsInvalidServerVer(t *testing.T) {
+	output := new(bytes.Buffer)
+	err := compareVersions("INVALID VERSION", "0.17.1", output)
+	assert.Error(t, err)
+}
+
+func TestCompareVersionsInvalidCliVer(t *testing.T) {
+	output := new(bytes.Buffer)
+	err := compareVersions("0.17.1", "INVALID VERSION", output)
+	assert.Error(t, err)
+}
+
+func TestParseVersion(t *testing.T) {
 	ver, err := parseVersion("0.17.1")
 	assert.NoError(t, err)
 	if assert.NotNil(t, ver) {
