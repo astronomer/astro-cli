@@ -37,14 +37,6 @@ func TestValidateCompatibilityVersionsMatched(t *testing.T) {
 	assert.NoError(t, err)
 	// check that there is no output because version matched
 	assert.Equal(t, output, &bytes.Buffer{})
-
-	output = new(bytes.Buffer)
-	cliVer = ""
-	err = ValidateCompatibility(api, output, cliVer, false)
-
-	assert.NoError(t, err)
-	// check that there is no output because version matched
-	assert.Equal(t, output, &bytes.Buffer{})
 }
 
 func TestValidateCompatibilityMissingCliVersion(t *testing.T) {
@@ -219,6 +211,32 @@ func TestValidateCompatibilityVersionsPatchWarning(t *testing.T) {
 	expected := "A new patch for Astro CLI is available. Your version is 0.17.0 and 0.17.1 is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	// check that user can see correct warning message
 	assert.Equal(t, expected, output.String())
+}
+
+func TestValidateCompatibilityClientFailure(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	output := new(bytes.Buffer)
+	cliVer := "0.15.1"
+	err := ValidateCompatibility(api, output, cliVer, false)
+	assert.Error(t, err)
 }
 
 func TestCompareVersionsInvalidServerVer(t *testing.T) {
