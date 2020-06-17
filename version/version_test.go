@@ -70,16 +70,21 @@ func TestCheckForUpdate(t *testing.T) {
 	})
 	CurrVersion = "0.13.0"
 	houston.NewHoustonClient(client)
-	github.NewGithubClient(client)
-	output := new(bytes.Buffer) // new(bytes.Buffer)
-	err := CheckForUpdate(output)
+	githubClient := github.NewGithubClient(client)
+	output := new(bytes.Buffer)
+	CheckForUpdate(githubClient, output)
+	expected := "Astro CLI Version:   (0001.01.01)\nAstro CLI Latest:   (0001.01.01)\nYou are running the latest version.\n"
 	actual := output.Bytes()
+	actualOut := ""
 
+	// TODO: Clean up this for loop
 	for a := range actual {
-		t.Log(output.ReadString(actual[a]))
+		o, err := output.ReadString(actual[a])
+		if err != nil {
+			assert.Fail(t, err.Error())
+		}
+		actualOut += o
 	}
 
-	// if assert.Error(t, err, "An error was expected") {
-	// 	assert.EqualError(t, err, messages.ERROR_INVALID_CLI_VERSION)
-	// }
+	assert.Equal(t, expected, actualOut)
 }
