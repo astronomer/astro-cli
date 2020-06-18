@@ -75,10 +75,8 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 	okGitHubResponse := `{
 		"url": "https://api.github.com/repos/astronomer/astro-cli/releases/27102579",
 		"tag_name": "v0.15.0",
-		"name": "v0.15.0",
 		"draft": false,
 		"prerelease": false,
-		"created_at": "2020-05-15T19:10:21Z",
 		"published_at": "2020-06-01T16:27:05Z"
 	}`
 	gitHubClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
