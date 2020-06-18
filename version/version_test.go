@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,20 +72,10 @@ func TestCheckForUpdate(t *testing.T) {
 	CurrVersion = "0.13.0"
 	houston.NewHoustonClient(client)
 	githubClient := github.NewGithubClient(client)
-	output := new(bytes.Buffer)
+	output := new(strings.Builder)
 	CheckForUpdate(githubClient, output)
 	expected := "Astro CLI Version:   (0001.01.01)\nAstro CLI Latest:   (0001.01.01)\nYou are running the latest version.\n"
-	actual := output.Bytes()
-	actualOut := ""
+	actual := output.String()
 
-	// TODO: Clean up this for loop
-	for a := range actual {
-		o, err := output.ReadString(actual[a])
-		if err != nil {
-			assert.Fail(t, err.Error())
-		}
-		actualOut += o
-	}
-
-	assert.Equal(t, expected, actualOut)
+	assert.Equal(t, expected, actual)
 }
