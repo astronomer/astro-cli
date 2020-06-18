@@ -15,7 +15,6 @@ import (
 var (
 	CurrVersion string
 	CurrCommit  string
-	api         = github.NewGithubClient()
 )
 
 // PrintVersion outputs current cli version and git commit if exists
@@ -41,7 +40,7 @@ func PrintVersion(client *houston.Client, out io.Writer) error {
 }
 
 // CheckForUpdate checks current version against latest on github
-func CheckForUpdate(out io.Writer) error {
+func CheckForUpdate(client *github.Client, out io.Writer) error {
 	version := CurrVersion
 
 	if !isValidVersion(version) {
@@ -51,14 +50,14 @@ func CheckForUpdate(out io.Writer) error {
 	}
 
 	// fetch latest cli version
-	latestTagResp, err := api.RepoLatestRequest("astronomer", "astro-cli")
+	latestTagResp, err := client.RepoLatestRequest("astronomer", "astro-cli")
 	if err != nil {
 		fmt.Fprintln(out, err)
 		latestTagResp.TagName = messages.NA
 	}
 
 	// fetch meta data around current cli version
-	currentTagResp, err := api.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
+	currentTagResp, err := client.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
 	if err != nil {
 		fmt.Fprintln(out, "Release info not found, please upgrade.")
 		fmt.Fprintln(out, messages.CLI_INSTALL_CMD)
