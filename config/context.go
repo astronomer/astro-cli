@@ -86,7 +86,7 @@ func PrintCurrentContext(out io.Writer) error {
 // with viper's dot (.) notation for fetching configs by replacing with underscores (_)
 func (c Context) GetContextKey() (string, error) {
 	if len(c.Domain) == 0 {
-		return "", errors.New("Cluster config invalid, no domain specified")
+		return "", errors.New("cluster config invalid, no domain specified")
 	}
 
 	return strings.Replace(c.Domain, ".", "_", -1), nil

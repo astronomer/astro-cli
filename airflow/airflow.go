@@ -24,7 +24,7 @@ func initDirs(root string, dirs []string) error {
 		}
 
 		// Create directory
-		if err := os.MkdirAll(dir, 0777); err != nil {
+		if err := os.MkdirAll(fullpath, 0777); err != nil {
 			return errors.Wrapf(err, "failed to create dir '%s'", dir)
 		}
 	}

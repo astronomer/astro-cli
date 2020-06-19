@@ -28,7 +28,9 @@ func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List known Astronomer Enterprise clusters",
 		Long:    "List known Astronomer Enterprise clusters",
-		RunE:    clusterList,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return clusterList(cmd, args, out)
+		},
 	}
 	return cmd
 }
@@ -45,11 +47,11 @@ func newClusterSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func clusterList(cmd *cobra.Command, args []string) error {
+func clusterList(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return cluster.List()
+	return cluster.List(out)
 }
 
 func clusterSwitch(cmd *cobra.Command, args []string) error {
