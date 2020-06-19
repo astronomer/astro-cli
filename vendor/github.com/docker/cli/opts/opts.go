@@ -293,7 +293,7 @@ func ValidateSysctl(val string) (string, error) {
 	}
 	arr := strings.Split(val, "=")
 	if len(arr) < 2 {
-		return "", fmt.Errorf("sysctl '%s' is not whitelisted", val)
+		return "", fmt.Errorf("sysctl '%s' is not allowlisted", val)
 	}
 	if validSysctlMap[arr[0]] {
 		return val, nil
@@ -304,7 +304,7 @@ func ValidateSysctl(val string) (string, error) {
 			return val, nil
 		}
 	}
-	return "", fmt.Errorf("sysctl '%s' is not whitelisted", val)
+	return "", fmt.Errorf("sysctl '%s' is not allowlisted", val)
 }
 
 // ValidateProgressOutput errors out if an invalid value is passed to --progress

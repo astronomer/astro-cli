@@ -74,7 +74,7 @@ func IsDelegation(role RoleName) bool {
 	strRole := role.String()
 	targetsBase := CanonicalTargetsRole + "/"
 
-	whitelistedChars := delegationRegexp.MatchString(strRole)
+	allowlistedChars := delegationRegexp.MatchString(strRole)
 
 	// Limit size of full role string to 255 chars for db column size limit
 	correctLength := len(role) < 256
@@ -82,7 +82,7 @@ func IsDelegation(role RoleName) bool {
 	// Removes ., .., extra slashes, and trailing slash
 	isClean := path.Clean(strRole) == strRole
 	return strings.HasPrefix(strRole, targetsBase.String()) &&
-		whitelistedChars &&
+		allowlistedChars &&
 		correctLength &&
 		isClean
 }

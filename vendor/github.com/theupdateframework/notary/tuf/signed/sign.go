@@ -23,14 +23,14 @@ import (
 // Sign takes a data.Signed and a cryptoservice containing private keys,
 // calculates and adds at least minSignature signatures using signingKeys the
 // data.Signed.  It will also clean up any signatures that are not in produced
-// by either a signingKey or an otherWhitelistedKey.
-// Note that in most cases, otherWhitelistedKeys should probably be null. They
+// by either a signingKey or an otherAllowlistedKey.
+// Note that in most cases, otherAllowlistedKeys should probably be null. They
 // are for keys you don't want to sign with, but you also don't want to remove
 // existing signatures by those keys.  For instance, if you want to call Sign
 // multiple times with different sets of signing keys without undoing removing
 // signatures produced by the previous call to Sign.
 func Sign(service CryptoService, s *data.Signed, signingKeys []data.PublicKey,
-	minSignatures int, otherWhitelistedKeys []data.PublicKey) error {
+	minSignatures int, otherAllowlistedKeys []data.PublicKey) error {
 
 	logrus.Debugf("sign called with %d/%d required keys", minSignatures, len(signingKeys))
 	signatures := make([]data.Signature, 0, len(s.Signatures)+1)
@@ -58,8 +58,8 @@ func Sign(service CryptoService, s *data.Signed, signingKeys []data.PublicKey,
 		privKeys[key.ID()] = k
 	}
 
-	// include the list of otherWhitelistedKeys
-	for _, key := range otherWhitelistedKeys {
+	// include the list of otherAllowlistedKeys
+	for _, key := range otherAllowlistedKeys {
 		if _, ok := tufIDs[key.ID()]; !ok {
 			tufIDs[key.ID()] = key
 		}
