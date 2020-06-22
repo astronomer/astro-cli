@@ -6,8 +6,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/github"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
-
 )
 
 func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
@@ -48,8 +49,9 @@ func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, arg
 func upgradeCheck(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	client := github.NewGithubClient(httputil.NewHTTPClient())
 
-	err := version.CheckForUpdate(out)
+	err := version.CheckForUpdate(client, out)
 	if err != nil {
 		return err
 	}

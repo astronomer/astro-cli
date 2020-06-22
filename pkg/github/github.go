@@ -25,14 +25,15 @@ type RepoLatestResponse struct {
 	PublishedAt time.Time `json:"published_at"`
 }
 
+// Client contains the HTTPClient used to communicate with the GitHubAPI
 type Client struct {
 	HTTPClient *httputil.HTTPClient
 }
 
 // NewGithubClient returns a HTTP client for interfacing with github
-func NewGithubClient() *Client {
+func NewGithubClient(c *httputil.HTTPClient) *Client {
 	return &Client{
-		HTTPClient: httpclient,
+		HTTPClient: c,
 	}
 }
 
