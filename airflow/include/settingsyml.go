@@ -10,14 +10,14 @@ var Settingsyml = strings.TrimSpace(`
 
 # NOTE: If putting a dict in conn_extra, please wrap in single quotes.
 
-# More details you can find https://github.com/astronomer/docs/blob/master/v0.10/cli-airflow-configuration.md
+# More details you can find https://github.com/astronomer/docs/blob/main/v0.10/cli-airflow-configuration.md
 
 airflow:
   connections:
     - conn_id:
       conn_type:
       conn_host:
-      conn_schema: 
+      conn_schema:
       conn_login:
       conn_password:
       conn_port:
