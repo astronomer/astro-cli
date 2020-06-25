@@ -33,11 +33,11 @@ func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 	return r.Data.GetAppConfig, nil
 }
 
-func checkManualReleaseNames() bool {
+func checkManualReleaseNames(client *houston.Client) bool {
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return false
 	}
@@ -46,10 +46,10 @@ func checkManualReleaseNames() bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string) error {
+func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig, "cloudRole": cloudRole}
 
-	if releaseName != "" && checkManualReleaseNames() {
+	if releaseName != "" && checkManualReleaseNames(client) {
 		vars["releaseName"] = releaseName
 	}
 
@@ -58,7 +58,7 @@ func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[strin
 		Variables: vars,
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[strin
 	if deploymentConfig["executor"] == "CeleryExecutor" || deploymentConfig["executor"] == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerUrl)
 	}
-	tab.Print(os.Stdout)
+	tab.Print(out)
 
 	return nil
 }

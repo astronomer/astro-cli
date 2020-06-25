@@ -75,7 +75,9 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		Long:    "Create a new Astronomer Deployment",
 		Example: CreateExample,
 		Args:    cobra.ExactArgs(1),
-		RunE:    deploymentCreate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentCreate(cmd, args, client, out)
+		},
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -195,7 +197,7 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
-func deploymentCreate(cmd *cobra.Command, args []string) error {
+func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -216,7 +218,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, deploymentConfig)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, deploymentConfig, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
