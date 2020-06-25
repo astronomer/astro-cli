@@ -92,7 +92,9 @@ func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		Short:   "Delete an airflow deployment",
 		Long:    "Delete an airflow deployment",
 		Args:    cobra.ExactArgs(1),
-		RunE:    deploymentDelete,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentDelete(cmd, args, client, out)
+		},
 	}
 	return cmd
 }
@@ -124,7 +126,9 @@ func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			}
 			return updateArgValidator(args[1:], deploymentUpdateAttrs)
 		},
-		RunE: deploymentUpdate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentUpdate(cmd, args, client, out)
+		},
 	}
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
@@ -221,11 +225,11 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	return deployment.Create(args[0], ws, releaseName, cloudRole, deploymentConfig, client, out)
 }
 
-func deploymentDelete(cmd *cobra.Command, args []string) error {
+func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Delete(args[0])
+	return deployment.Delete(args[0], client, out)
 }
 
 func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -246,7 +250,7 @@ func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, o
 	return deployment.List(ws, allDeployments, client, out)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	argsMap, err := argsToMap(args[1:])
 	if err != nil {
 		return err
@@ -255,7 +259,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.Update(args[0], cloudRole, argsMap)
+	return deployment.Update(args[0], cloudRole, argsMap, client, out)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
