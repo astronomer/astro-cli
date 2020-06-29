@@ -10,12 +10,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var (
-	tab = printutil.Table{
+// newTableOut construct new printutil.Table
+func newTableOut() *printutil.Table {
+	return &printutil.Table{
 		Padding: []int{36, 36},
 		Header:  []string{"CLUSTER", "WORKSPACE"},
 	}
-)
+}
+
 
 // Contexts holds all available Context structs in a map
 type Contexts struct {
@@ -60,7 +62,7 @@ func (c Context) PrintContext(out io.Writer) error {
 	if len(workspace) == 0 {
 		workspace = "N/A"
 	}
-
+	tab := newTableOut()
 	tab.AddRow([]string{cluster, workspace}, false)
 	tab.Print(out)
 
@@ -177,7 +179,7 @@ func (c Context) SwitchContext() error {
 		viperHome.Set("context", c.Domain)
 		saveConfig(viperHome, HomeConfigFile)
 	}
-
+	tab := newTableOut()
 	tab.AddRow([]string{co.Domain, co.Workspace}, false)
 	tab.SuccessMsg = "\n Switched cluster"
 	tab.Print(os.Stdout)
