@@ -8,13 +8,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var (
-	utab = printutil.Table{
-		Padding: []int{30, 50, 50},
-		Header:  []string{"NAME", "WORKSPACE ID", "EMAIL"},
-	}
-)
-
 // Add a user to a workspace with specified role
 func Add(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
@@ -54,6 +47,11 @@ func Remove(workspaceId, email string, client *houston.Client, out io.Writer) er
 	}
 	w := r.Data.RemoveWorkspaceUser
 
+	utab := printutil.Table{
+		Padding: []int{30, 50, 50},
+		Header:  []string{"NAME", "WORKSPACE ID", "EMAIL"},
+	}
+
 	utab.AddRow([]string{w.Label, w.Id, email}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print(out)
@@ -87,6 +85,7 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 	return nil
 }
 
+// Update workspace user role
 func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserUpdateRequest,
