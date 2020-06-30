@@ -16,10 +16,15 @@ var (
 
 func newAuthRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		Use:   "auth",
 		Short: "Manage astronomer identity",
 		Long:  "Handles authentication to the Astronomer Platform",
 	}
+
 	cmd.AddCommand(
 		newAuthLoginCmd(client, out),
 		newAuthLogoutCmd(client, out),
