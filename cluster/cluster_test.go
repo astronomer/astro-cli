@@ -15,7 +15,6 @@ func TestExists(t *testing.T) {
 	assert.False(t, Exists("localhost123"))
 }
 
-
 func TestList(t *testing.T) {
 	testUtil.InitTestConfig()
 	buf := new(bytes.Buffer)
@@ -23,7 +22,6 @@ func TestList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), testUtil.GetEnv("HOUSTON_HOST", "localhost"))
 }
-
 
 func TestGetCurrentCluster(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -34,7 +32,6 @@ func TestGetCurrentCluster(t *testing.T) {
 	assert.Equal(t, cluster.LastUsedWorkspace, "ck05r3bor07h40d02y2hw4n4v")
 	assert.Equal(t, cluster.Token, "token")
 }
-
 
 func TestPrintContext(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -53,7 +50,6 @@ func TestGetContextKeyValidClusterConfig(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, key, "test_com")
 }
-
 
 func TestGetContextKeyInvalidClusterConfig(t *testing.T) {
 	c := config.Context{}

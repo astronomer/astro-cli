@@ -31,7 +31,6 @@ contexts:
 	initHome(fs)
 }
 
-
 func TestInitProject(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
@@ -63,7 +62,7 @@ func TestIsProjectDir(t *testing.T) {
 	homeDir, _ := fileutil.GetHomeDir()
 	tests := []struct {
 		name string
-		in    string
+		in   string
 		out  bool
 	}{
 		{"False", "", false},
@@ -78,8 +77,7 @@ func TestIsProjectDir(t *testing.T) {
 	}
 }
 
-
-func TestConfigExists( t *testing.T) {
+func TestConfigExists(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:
@@ -103,7 +101,7 @@ contexts:
 	viperWOConfig := viper.New()
 	tests := []struct {
 		name string
-		in    *viper.Viper
+		in   *viper.Viper
 		out  bool
 	}{
 		{"exists", viperHome, true},

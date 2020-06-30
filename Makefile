@@ -29,7 +29,7 @@ cover:
 
 format:
 	@echo "--> Running go fmt"
-	@go fmt $(GOFILES)
+	@go fmt ./...
 
 vet:
 	@echo "--> Running go vet"

@@ -31,7 +31,6 @@ func TestDeploymentNameDoesntExists(t *testing.T) {
 	}
 }
 
-
 func TestRepositoryName(t *testing.T) {
 	assert.Equal(t, repositoryName("test-repo"), "test-repo/airflow")
 }
@@ -141,7 +140,6 @@ services:
     `
 	assert.Equal(t, cfg, expectedCfg)
 }
-
 
 func TestCreateProject(t *testing.T) {
 	fs := afero.NewMemMapFs()

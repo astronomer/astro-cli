@@ -18,7 +18,6 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-
 // Contexts holds all available Context structs in a map
 type Contexts struct {
 	Contexts map[string]Context `mapstructure:"contexts"`

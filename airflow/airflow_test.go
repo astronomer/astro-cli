@@ -62,7 +62,6 @@ func TestInitFiles(t *testing.T) {
 
 }
 
-
 func TestInit(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "temp")
 	if err != nil {

@@ -35,8 +35,8 @@ import (
 )
 
 const (
-	componentName     = "airflow"
-	dockerStateUp     = "Up"
+	componentName = "airflow"
+	dockerStateUp = "Up"
 )
 
 var (

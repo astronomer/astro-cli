@@ -247,7 +247,7 @@ func TestList(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := List(ws, false, api, buf)
 	assert.NoError(t, err)
-	expected :=` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     
+	expected := ` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     
  test     burning-terrestrial-5940     v         ckbv801t300qh0760pck7ea0c     ?       
 `
 	assert.Equal(t, buf.String(), expected)
@@ -306,7 +306,7 @@ func TestUpdate(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := Update(id, role, deploymentConfig, api, buf)
 	assert.NoError(t, err)
-	expected :=` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG      
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG      
  test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     %!s(MISSING)
 
  Successfully updated deployment
