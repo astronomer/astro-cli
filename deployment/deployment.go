@@ -3,7 +3,6 @@ package deployment
 import (
 	"fmt"
 	"io"
-	"os"
 	"sort"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -12,13 +11,13 @@ import (
 	"github.com/fatih/camelcase"
 )
 
-var (
-	tab = printutil.Table{
+func newTableOut() *printutil.Table {
+	return &printutil.Table{
 		Padding:        []int{30, 30, 10, 50, 10},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG"},
 	}
-)
+}
 
 // AppConfig returns application config from houston-api
 func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
@@ -33,11 +32,11 @@ func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 	return r.Data.GetAppConfig, nil
 }
 
-func checkManualReleaseNames() bool {
+func checkManualReleaseNames(client *houston.Client) bool {
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return false
 	}
@@ -46,10 +45,10 @@ func checkManualReleaseNames() bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string) error {
+func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig, "cloudRole": cloudRole}
 
-	if releaseName != "" && checkManualReleaseNames() {
+	if releaseName != "" && checkManualReleaseNames(client) {
 		vars["releaseName"] = releaseName
 	}
 
@@ -58,13 +57,13 @@ func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[strin
 		Variables: vars,
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
 
 	d := r.Data.CreateDeployment
-
+	tab := newTableOut()
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
 
 	splitted := []string{"Celery", ""}
@@ -93,18 +92,18 @@ func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[strin
 	if deploymentConfig["executor"] == "CeleryExecutor" || deploymentConfig["executor"] == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerUrl)
 	}
-	tab.Print(os.Stdout)
+	tab.Print(out)
 
 	return nil
 }
 
-func Delete(id string) error {
+func Delete(id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.DeploymentDeleteRequest,
 		Variables: map[string]interface{}{"deploymentId": id},
 	}
 
-	_, err := req.Do()
+	_, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -113,7 +112,7 @@ func Delete(id string) error {
 	// tab.AddRow([]string{d.Label, d.ReleaseName, d.Id, d.Workspace.Id}, false)
 	// tab.SuccessMsg = "\n Successfully deleted deployment"
 	// tab.Print(os.Stdout)
-	fmt.Println("\n Successfully deleted deployment")
+	fmt.Fprintln(out, "\n Successfully deleted deployment")
 
 	return nil
 }
@@ -145,6 +144,8 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 
 	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Label > deployments[j].Label })
 
+	tab := newTableOut()
+
 	// Build rows
 	for _, d := range deployments {
 		if all {
@@ -162,7 +163,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string) error {
+func Update(id, cloudRole string, args map[string]string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -175,16 +176,16 @@ func Update(id, cloudRole string, args map[string]string) error {
 		Variables: vars,
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
 
 	d := r.Data.UpdateDeployment
-
+	tab := newTableOut()
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
-	tab.Print(os.Stdout)
+	tab.Print(out)
 
 	return nil
 }

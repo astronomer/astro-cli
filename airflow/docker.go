@@ -35,10 +35,8 @@ import (
 )
 
 const (
-	componentName     = "airflow"
-	deployTagPrefix   = "cli-"
-	dockerStateUp     = "Up"
-	dockerStateExited = "Exited"
+	componentName = "airflow"
+	dockerStateUp = "Up"
 )
 
 var (
@@ -128,7 +126,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 		}
 	}
 
-	config := ComposeConfig{
+	cfg := ComposeConfig{
 		PostgresUser:         config.CFG.PostgresUser.GetString(),
 		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
 		PostgresHost:         config.CFG.PostgresHost.GetString(),
@@ -142,7 +140,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 	}
 
 	buff := new(bytes.Buffer)
-	err = tmpl.Execute(buff, config)
+	err = tmpl.Execute(buff, cfg)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
 	}

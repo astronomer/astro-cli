@@ -172,20 +172,6 @@ func ProjectConfigExists() bool {
 	return configExists(viperProject)
 }
 
-// ProjectRoot returns the path to the nearest project root
-// TODO Deprecate if remains unused, removed due to
-// https://github.com/astronomer/astro-cli/issues/103
-func ProjectRoot() (string, error) {
-	configPath, searchErr := fileutil.FindDirInPath(ConfigDir)
-	if searchErr != nil {
-		return "", searchErr
-	}
-	if len(configPath) == 0 {
-		return "", nil
-	}
-	return filepath.Dir(configPath), nil
-}
-
 // IsProjectDir returns a boolean depending on if path is a valid project dir
 func IsProjectDir(path string) (bool, error) {
 	configPath := filepath.Join(path, ConfigDir)

@@ -3,7 +3,6 @@ package workspace
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -115,7 +114,7 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-func getWorkspaceSelection() (string, error) {
+func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error) {
 	tab := newTableOut()
 	tab.GetUserInput = true
 
@@ -123,7 +122,7 @@ func getWorkspaceSelection() (string, error) {
 		Query: houston.WorkspacesGetRequest,
 	}
 
-	r, err := req.Do()
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +145,7 @@ func getWorkspaceSelection() (string, error) {
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(out)
 
 	in := input.InputText("\n> ")
 	i, err := strconv.ParseInt(
@@ -165,7 +164,7 @@ func getWorkspaceSelection() (string, error) {
 // Switch switches workspaces
 func Switch(id string, client *houston.Client, out io.Writer) error {
 	if len(id) == 0 {
-		_id, err := getWorkspaceSelection()
+		_id, err := getWorkspaceSelection(client, out)
 		if err != nil {
 			return err
 		}

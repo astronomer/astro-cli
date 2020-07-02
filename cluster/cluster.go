@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -21,7 +22,7 @@ var (
 
 // List all available clusters a user has previously authenticated to
 // Returns error
-func List() error {
+func List(out io.Writer) error {
 	var domain string
 
 	c, err := GetClusters()
@@ -48,7 +49,7 @@ func List() error {
 		}
 	}
 
-	tab.Print(os.Stdout)
+	tab.Print(out)
 
 	return nil
 }
