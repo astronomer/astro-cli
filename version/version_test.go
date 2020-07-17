@@ -23,6 +23,24 @@ func TestIsValidVersionValid(t *testing.T) {
 	assert.True(t, isValidVersion("0.0.1"))
 }
 
+func TestPrintVersionHoustonError(t *testing.T) {
+	testUtil.InitTestConfig()
+	badResponse := "Internal Server Error"
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(badResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	output := new(bytes.Buffer)
+	CurrVersion = "0.15.0"
+	err := PrintVersion(api, output)
+	assert.NoError(t, err)
+	assert.Equal(t, output.String(), "Astro CLI Version: 0.15.0 \nGit Commit: \nAstro Server Version: Please authenticate to a cluster to see server version\n")
+}
+
 func TestPrintVersionError(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
@@ -44,6 +62,7 @@ func TestPrintVersionError(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
+	CurrVersion = ""
 	err := PrintVersion(api, output)
 	if assert.Error(t, err, "An error was expected") {
 		assert.EqualError(t, err, messages.ERROR_INVALID_CLI_VERSION)

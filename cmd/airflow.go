@@ -86,6 +86,10 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short: "Scaffold a new airflow project",
 		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
 		Args:  cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowInit(cmd, args, client, out)
 		},
@@ -121,6 +125,10 @@ func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short:   "Start a development airflow cluster",
 		Long:    "Start a development airflow cluster",
 		Args:    cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStart,
 	}
@@ -133,6 +141,10 @@ func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:     "kill",
 		Short:   "Kill a development airflow cluster",
 		Long:    "Kill a development airflow cluster",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowKill,
 	}
@@ -144,6 +156,10 @@ func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:     "logs",
 		Short:   "Output logs for a development airflow cluster",
 		Long:    "Output logs for a development airflow cluster",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowLogs,
 	}
@@ -158,6 +174,10 @@ func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:     "stop",
 		Short:   "Stop a development airflow cluster",
 		Long:    "Stop a development airflow cluster",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStop,
 	}
@@ -169,6 +189,10 @@ func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:     "ps",
 		Short:   "List airflow containers",
 		Long:    "List airflow containers",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowPS,
 	}
@@ -180,6 +204,10 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Use:                "run",
 		Short:              "Run any command inside airflow webserver",
 		Long:               "Run any command inside airflow webserver",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowRun,
 		Example:            RunExample,

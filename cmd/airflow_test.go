@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -32,4 +33,46 @@ func TestDevRootCommand(t *testing.T) {
 	output, err := executeCommand("dev")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro dev", output)
+}
+
+func TestNewAirflowInitCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowInitCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowStartCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowStartCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowKillCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowKillCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowLogsCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowLogsCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowStopCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowStopCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowPSCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowPSCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowRunCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowRunCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }

@@ -2,6 +2,7 @@ package version
 
 import (
 	"fmt"
+
 	"io"
 
 	"github.com/pkg/errors"
@@ -19,10 +20,6 @@ var (
 
 // PrintVersion outputs current cli version and git commit if exists
 func PrintVersion(client *houston.Client, out io.Writer) error {
-	appCfg, err := deployment.AppConfig(client)
-	if err != nil {
-		return errors.Wrap(err, "can't get app config from houston api")
-	}
 	version := CurrVersion
 	gitCommit := CurrCommit
 
@@ -30,12 +27,18 @@ func PrintVersion(client *houston.Client, out io.Writer) error {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
 	}
 
+	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)
+	fmt.Fprintf(out, messages.CLI_CURR_COMMIT+"\n", gitCommit)
+
+	appCfg, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
+	}
+
 	if appCfg != nil {
 		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
 	}
 
-	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)
-	fmt.Fprintf(out, messages.CLI_CURR_COMMIT+"\n", gitCommit)
 	return nil
 }
 
