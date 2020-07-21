@@ -7,7 +7,7 @@ var (
 	ERROR_NEW_MAJOR_VERSION       = "There is an update for Astro CLI. You're using version %s, but %s is the server version.\nPlease upgrade to the matching version before continuing. See https://www.astronomer.io/docs/cli-quickstart for more information.\nTo skip this check use the --skip-version-check flag.\n"
 
 	CLI_CMD_DEPRECATE         = "Deprecated in favor of %s\n"
-	CLI_CURR_VERSION          = "Astro CLI Version: %s "
+	CLI_CURR_VERSION          = "Astro CLI Version: %s"
 	CLI_CURR_COMMIT           = "Git Commit: %s"
 	CLI_CURR_VERSION_DATE     = CLI_CURR_VERSION + " (%s)"
 	CLI_LATEST_VERSION        = "Astro CLI Latest: %s "
