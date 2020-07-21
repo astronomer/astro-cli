@@ -27,7 +27,7 @@ func PrintVersion(client *houston.Client, out io.Writer) error {
 		return errors.New(messages.ERROR_INVALID_CLI_VERSION)
 	}
 
-	fmt.Fprintf(out, messages.CLI_CURR_VERSION+"\n", version)
+	fmt.Fprintf(out, messages.CLI_CURR_VERSION+", ", version)
 	fmt.Fprintf(out, messages.CLI_CURR_COMMIT+"\n", gitCommit)
 
 	appCfg, err := deployment.AppConfig(client)
