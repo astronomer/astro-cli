@@ -38,7 +38,7 @@ func TestPrintVersionHoustonError(t *testing.T) {
 	CurrVersion = "0.15.0"
 	err := PrintVersion(api, output)
 	assert.NoError(t, err)
-	assert.Equal(t, output.String(), "Astro CLI Version: 0.15.0 \nGit Commit: \nAstro Server Version: Please authenticate to a cluster to see server version\n")
+	assert.Equal(t, output.String(), "Astro CLI Version: 0.15.0, Git Commit: \nAstro Server Version: Please authenticate to a cluster to see server version\n")
 }
 
 func TestPrintVersionError(t *testing.T) {
@@ -108,7 +108,7 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 	githubClient := github.NewGithubClient(gitHubClient)
 	output := new(strings.Builder)
 	CheckForUpdate(githubClient, output)
-	expected := "Astro CLI Version: v0.15.0  (2020.06.01)\nAstro CLI Latest: v0.15.0  (2020.06.01)\nYou are running the latest version.\n"
+	expected := "Astro CLI Version: v0.15.0 (2020.06.01)\nAstro CLI Latest: v0.15.0  (2020.06.01)\nYou are running the latest version.\n"
 	actual := output.String()
 
 	assert.Equal(t, expected, actual)
