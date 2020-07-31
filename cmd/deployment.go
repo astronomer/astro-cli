@@ -211,7 +211,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var executorType string;
+	var executorType string
 	switch executor {
 	case "local":
 		executorType = "LocalExecutor"
