@@ -115,10 +115,8 @@ func TestCreate(t *testing.T) {
   "data": {
     "createDeployment": {
       "id": "ckbv818oa00r107606ywhoqtw",
-      "config": {
-        "executor": "CeleryExecutor"
-      },
-      "urls": [
+			"executor": "CeleryExecutor",
+			"urls": [
         {
           "type": "airflow",
           "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
@@ -159,11 +157,10 @@ func TestCreate(t *testing.T) {
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
-	deploymentConfig["executor"] = "CeleryExecutor"
+	executor := "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, deploymentConfig, api, buf)
+	err := Create(label, ws, releaseName, role, executor, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -182,11 +179,10 @@ func TestCreateHoustonError(t *testing.T) {
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
-	deploymentConfig["executor"] = "CeleryExecutor"
+	executor := "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, deploymentConfig, api, buf)
+	err := Create(label, ws, releaseName, role, executor, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -226,9 +222,7 @@ func TestList(t *testing.T) {
           "id": "ckbv7zvb100pe0760xp98qnh9",
           "label": "w1"
         },
-        "config": {
-          "executor": "CeleryExecutor"
-        }
+        "executor": "CeleryExecutor"
       }
     ]
   }
@@ -259,9 +253,7 @@ func TestUpdate(t *testing.T) {
   "data": {
     "updateDeployment": {
       "id": "ckbv801t300qh0760pck7ea0c",
-      "config": {
-        "executor": "CeleryExecutor"
-      },
+			"executor": "CeleryExecutor",
       "urls": [
         {
           "type": "airflow",

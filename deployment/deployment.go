@@ -45,8 +45,9 @@ func checkManualReleaseNames(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[string]string, client *houston.Client, out io.Writer) error {
-	vars := map[string]interface{}{"label": label, "workspaceId": ws, "config": deploymentConfig, "cloudRole": cloudRole}
+func Create(label, ws, releaseName, cloudRole string, executor string, client *houston.Client, out io.Writer) error {
+
+	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if releaseName != "" && checkManualReleaseNames(client) {
 		vars["releaseName"] = releaseName
@@ -68,9 +69,9 @@ func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[strin
 
 	splitted := []string{"Celery", ""}
 
-	if deploymentConfig["executor"] != "" {
+	if executor != "" {
 		// trim executor from console message
-		splitted = camelcase.Split(deploymentConfig["executor"])
+		splitted = camelcase.Split(executor)
 	}
 
 	var airflowUrl, flowerUrl string
@@ -89,7 +90,7 @@ func Create(label, ws, releaseName, cloudRole string, deploymentConfig map[strin
 			fmt.Sprintf("\n Airflow Dashboard: %s", airflowUrl)
 
 	// The Flower URL is specific to CeleryExecutor only
-	if deploymentConfig["executor"] == "CeleryExecutor" || deploymentConfig["executor"] == "" {
+	if executor == "CeleryExecutor" || executor == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerUrl)
 	}
 	tab.Print(out)
