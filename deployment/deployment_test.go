@@ -114,7 +114,7 @@ func TestCreate(t *testing.T) {
 	okResponse := `{
   "data": {
     "createDeployment": {
-      "id": "ckbv818oa00r107606ywhoqtw",
+			"id": "ckbv818oa00r107606ywhoqtw",
 			"executor": "CeleryExecutor",
 			"urls": [
         {
@@ -221,8 +221,8 @@ func TestList(t *testing.T) {
         "workspace": {
           "id": "ckbv7zvb100pe0760xp98qnh9",
           "label": "w1"
-        },
-        "executor": "CeleryExecutor"
+				},
+				"executor": "CeleryExecutor"
       }
     ]
   }
@@ -252,9 +252,9 @@ func TestUpdate(t *testing.T) {
 	okResponse := `{
   "data": {
     "updateDeployment": {
-      "id": "ckbv801t300qh0760pck7ea0c",
+			"id": "ckbv801t300qh0760pck7ea0c",
 			"executor": "CeleryExecutor",
-      "urls": [
+			"urls": [
         {
           "type": "airflow",
           "url": "https://deployments.local.astronomer.io/burning-terrestrial-5940/airflow"
