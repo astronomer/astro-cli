@@ -2,12 +2,13 @@ package deployment
 
 import (
 	"bytes"
-	"github.com/astronomer/astro-cli/houston"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/astronomer/astro-cli/houston"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAppConfig(t *testing.T) {
