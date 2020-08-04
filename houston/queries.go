@@ -21,7 +21,8 @@ var (
 		$type: String = "airflow"
 		$releaseName: String
 		$workspaceId: Uuid!
-		$config: JSON!
+		$executor: ExecutorType!
+		$config: JSON
 		$cloudRole: String
 	) {
 		createDeployment(
@@ -29,6 +30,7 @@ var (
 			type: $type
 			workspaceUuid: $workspaceId
 			releaseName: $releaseName
+			executor: $executor
 			config: $config
 			cloudRole: $cloudRole
 		) {

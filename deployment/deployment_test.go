@@ -2,12 +2,13 @@ package deployment
 
 import (
 	"bytes"
-	"github.com/astronomer/astro-cli/houston"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/astronomer/astro-cli/houston"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAppConfig(t *testing.T) {
@@ -114,11 +115,9 @@ func TestCreate(t *testing.T) {
 	okResponse := `{
   "data": {
     "createDeployment": {
-      "id": "ckbv818oa00r107606ywhoqtw",
-      "config": {
-        "executor": "CeleryExecutor"
-      },
-      "urls": [
+			"id": "ckbv818oa00r107606ywhoqtw",
+			"executor": "CeleryExecutor",
+			"urls": [
         {
           "type": "airflow",
           "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
@@ -159,11 +158,10 @@ func TestCreate(t *testing.T) {
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
-	deploymentConfig["executor"] = "CeleryExecutor"
+	executor := "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, deploymentConfig, api, buf)
+	err := Create(label, ws, releaseName, role, executor, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -182,11 +180,10 @@ func TestCreateHoustonError(t *testing.T) {
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
-	deploymentConfig["executor"] = "CeleryExecutor"
+	executor := "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, deploymentConfig, api, buf)
+	err := Create(label, ws, releaseName, role, executor, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -225,10 +222,8 @@ func TestList(t *testing.T) {
         "workspace": {
           "id": "ckbv7zvb100pe0760xp98qnh9",
           "label": "w1"
-        },
-        "config": {
-          "executor": "CeleryExecutor"
-        }
+				},
+				"executor": "CeleryExecutor"
       }
     ]
   }
@@ -258,11 +253,9 @@ func TestUpdate(t *testing.T) {
 	okResponse := `{
   "data": {
     "updateDeployment": {
-      "id": "ckbv801t300qh0760pck7ea0c",
-      "config": {
-        "executor": "CeleryExecutor"
-      },
-      "urls": [
+			"id": "ckbv801t300qh0760pck7ea0c",
+			"executor": "CeleryExecutor",
+			"urls": [
         {
           "type": "airflow",
           "url": "https://deployments.local.astronomer.io/burning-terrestrial-5940/airflow"
