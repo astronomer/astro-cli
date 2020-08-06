@@ -308,7 +308,7 @@ func workspaceUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer,
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.Add(ws, args[0], role, client, out)
+	return workspace.Add(ws, args[0], workspaceRole, client, out)
 }
 
 func workspaceUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
