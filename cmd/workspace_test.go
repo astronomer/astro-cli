@@ -53,3 +53,19 @@ func TestWorkspaceSaRootCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro workspace service-account")
 }
+
+func TestNewWorkspaceUserListCmd(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString("")),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	buf := new(bytes.Buffer)
+	cmd := newWorkspaceUserListCmd(api, buf)
+	assert.NotNil(t, cmd)
+	assert.Nil(t, cmd.Args)
+}
