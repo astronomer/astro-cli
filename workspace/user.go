@@ -35,10 +35,10 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 }
 
 // Remove a user from a workspace
-func Remove(workspaceId, email string, client *houston.Client, out io.Writer) error {
+func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserRemoveRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email},
+		Variables: map[string]interface{}{"workspaceId": workspaceId, "userId": userId},
 	}
 
 	r, err := req.DoWithClient(client)
@@ -52,7 +52,7 @@ func Remove(workspaceId, email string, client *houston.Client, out io.Writer) er
 		Header:  []string{"NAME", "WORKSPACE ID", "EMAIL"},
 	}
 
-	utab.AddRow([]string{w.Label, w.Id, email}, false)
+	utab.AddRow([]string{w.Label, w.Id, userId}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print(out)
 	return nil

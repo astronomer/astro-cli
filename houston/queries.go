@@ -378,13 +378,11 @@ var (
 	WorkspaceUserRemoveRequest = `
 	mutation RemoveWorkspaceUser(
 		$workspaceId: Uuid!
-		$userId: Uuid
-		$email: String
+		$userId: Uuid!
 	  ) {
 		workspaceRemoveUser(
 		  workspaceUuid: $workspaceId
 		  userUuid: $userId
-		  email: $email
 		) {
 		  id
 		  label
