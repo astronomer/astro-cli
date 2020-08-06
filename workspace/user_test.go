@@ -69,13 +69,13 @@ func TestRemove(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
-	email := "andrii@test.com"
+	userId := "ckc0eir8e01gj07608ajmvia1"
 
 	buf := new(bytes.Buffer)
-	err := Remove(id, email, api, buf)
+	err := Remove(id, userId, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME                          WORKSPACE ID                                      EMAIL                                             
-                               ckc0eir8e01gj07608ajmvia1                         andrii@test.com                                   
+	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
+                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
 Successfully removed user from workspace
 `
 	assert.Equal(t, buf.String(), expected)

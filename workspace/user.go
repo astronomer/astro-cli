@@ -49,7 +49,7 @@ func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) e
 
 	utab := printutil.Table{
 		Padding: []int{30, 50, 50},
-		Header:  []string{"NAME", "WORKSPACE ID", "EMAIL"},
+		Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
 	}
 
 	utab.AddRow([]string{w.Label, w.Id, userId}, false)

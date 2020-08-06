@@ -69,3 +69,25 @@ func TestNewWorkspaceUserListCmd(t *testing.T) {
 	assert.NotNil(t, cmd)
 	assert.Nil(t, cmd.Args)
 }
+
+func TestWorkspaceUserRm(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{"data":{"workspaceRemoveUser":{"id":"ckc0eir8e01gj07608ajmvia1"}}}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
+                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
+Successfully removed user from workspace
+`
+	api := houston.NewHoustonClient(client)
+	buf := new(bytes.Buffer)
+	cmd := newWorkspaceUserRmCmd(api, buf)
+	err := cmd.RunE(cmd, []string{"ckc0eir8e01gj07608ajmvia1"})
+	assert.NoError(t, err)
+	assert.Equal(t, expected, buf.String())
+}
