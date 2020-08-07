@@ -33,7 +33,7 @@ var (
 `
 	deploymentSaCreateExample = `
 # Create service-account
-  $ astro deployment service-account create --deployment-uuid=xxxxx --label=my_label --role=ROLE
+  $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
 `
 	deploymentSaGetExample = `
   # Get deployment service-account
