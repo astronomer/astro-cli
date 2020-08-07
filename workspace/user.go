@@ -8,13 +8,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var (
-	utab = printutil.Table{
-		Padding: []int{30, 50, 50},
-		Header:  []string{"NAME", "WORKSPACE ID", "EMAIL"},
-	}
-)
-
 // Add a user to a workspace with specified role
 func Add(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
@@ -42,10 +35,10 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 }
 
 // Remove a user from a workspace
-func Remove(workspaceId, email string, client *houston.Client, out io.Writer) error {
+func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserRemoveRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email},
+		Variables: map[string]interface{}{"workspaceId": workspaceId, "userId": userId},
 	}
 
 	r, err := req.DoWithClient(client)
@@ -54,7 +47,12 @@ func Remove(workspaceId, email string, client *houston.Client, out io.Writer) er
 	}
 	w := r.Data.RemoveWorkspaceUser
 
-	utab.AddRow([]string{w.Label, w.Id, email}, false)
+	utab := printutil.Table{
+		Padding: []int{30, 50, 50},
+		Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
+	}
+
+	utab.AddRow([]string{w.Label, w.Id, userId}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print(out)
 	return nil
@@ -87,6 +85,7 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 	return nil
 }
 
+// Update workspace user role
 func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserUpdateRequest,
