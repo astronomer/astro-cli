@@ -32,6 +32,10 @@ func newUpgradeCheckCmd(out io.Writer) *cobra.Command {
 		Use:   "upgrade",
 		Short: "Check for newer version of Astronomer CLI",
 		Long:  "Check for newer version of Astronomer CLI",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return upgradeCheck(cmd, out, args)
 		},
