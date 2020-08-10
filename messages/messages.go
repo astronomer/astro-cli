@@ -16,7 +16,7 @@ var (
 	CLI_RUNNING_LATEST        = "You are running the latest version."
 	CLI_CHOOSE_WORKSPACE      = "Please choose a workspace:"
 	CLI_SET_WORKSPACE_EXAMPLE = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
-	CLI_UPGRADE_PROMPT        = "A newer version of the Astronomer CLI is available.\nTo install the latest release run either of the following commands:"
+	CLI_UPGRADE_PROMPT        = "A newer version of the Astronomer CLI is available.\nTo upgrade to latest, run:"
 	CLI_UNTAGGED_PROMPT       = "Your current Astronomer CLI is not tagged.\nThis is likely the result of building from source. You can install the latest tagged release with the following command"
 
 	CONFIG_CREATE_DIR_ERROR        = "Error creating config directory\n"
