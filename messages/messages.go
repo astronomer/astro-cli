@@ -10,7 +10,7 @@ var (
 	CLI_CURR_VERSION          = "Astro CLI Version: %s"
 	CLI_CURR_COMMIT           = "Git Commit: %s"
 	CLI_CURR_VERSION_DATE     = CLI_CURR_VERSION + " (%s)"
-	CLI_LATEST_VERSION        = "Astro CLI Latest: %s "
+	CLI_LATEST_VERSION        = "Astro CLI Latest: %s"
 	CLI_LATEST_VERSION_DATE   = CLI_LATEST_VERSION + " (%s)"
 	CLI_INSTALL_CMD           = "\t$ curl -sL https://install.astronomer.io | sudo bash \nOR for homebrew users:\n\t$ brew install astronomer/tap/astro"
 	CLI_RUNNING_LATEST        = "You are running the latest version."

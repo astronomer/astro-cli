@@ -2,15 +2,13 @@ package version
 
 import (
 	"fmt"
-
 	"io"
-
-	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -30,21 +28,7 @@ func PrintVersion(client *houston.Client, out io.Writer) error {
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION+", ", version)
 	fmt.Fprintf(out, messages.CLI_CURR_COMMIT+"\n", gitCommit)
 
-	PrintServerVersion(client, out)
-
-	return nil
-}
-
-// PrintServerVersion outputs current server version
-func PrintServerVersion(client *houston.Client, out io.Writer) error {
-	appCfg, err := deployment.AppConfig(client)
-	if err != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
-	}
-
-	if appCfg != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
-	}
+	printServerVersion(client, out)
 
 	return nil
 }
@@ -82,7 +66,7 @@ func CheckForUpdate(client *houston.Client, ghClient *github.Client, out io.Writ
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION_DATE+"\n", currentTag, currentPub)
 	fmt.Fprintf(out, messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
 
-	PrintServerVersion(client, out)
+	printServerVersion(client, out)
 
 	if latestTag > currentTag {
 		fmt.Fprintln(out, messages.CLI_UPGRADE_PROMPT)
@@ -99,4 +83,18 @@ func isValidVersion(version string) bool {
 		return false
 	}
 	return true
+}
+
+// printServerVersion outputs current server version
+func printServerVersion(client *houston.Client, out io.Writer) error {
+	appCfg, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
+	}
+
+	if appCfg != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
+	}
+
+	return nil
 }

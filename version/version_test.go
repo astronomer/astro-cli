@@ -88,7 +88,7 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	houston.NewHoustonClient(client)
+	houstonClient := houston.NewHoustonClient(client)
 
 	CurrVersion = "0.15.0"
 	okGitHubResponse := `{
@@ -107,8 +107,8 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 	})
 	githubClient := github.NewGithubClient(gitHubClient)
 	output := new(strings.Builder)
-	CheckForUpdate(githubClient, output)
-	expected := "Astro CLI Version: v0.15.0 (2020.06.01)\nAstro CLI Latest: v0.15.0  (2020.06.01)\nYou are running the latest version.\n"
+	CheckForUpdate(houstonClient, githubClient, output)
+	expected := "Astro CLI Version: v0.15.0 (2020.06.01)\nAstro CLI Latest: v0.15.0 (2020.06.01)\nAstro Server Version: 0.13.0\nYou are running the latest version.\n"
 	actual := output.String()
 
 	assert.Equal(t, expected, actual)
