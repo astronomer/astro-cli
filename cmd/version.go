@@ -57,9 +57,9 @@ func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, arg
 func upgradeCheck(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ghClient := github.NewGithubClient(httputil.NewHTTPClient())
+	ghc := github.NewGithubClient(httputil.NewHTTPClient())
 
-	err := version.CheckForUpdate(client, ghClient, out)
+	err := version.CheckForUpdate(client, ghc, out)
 	if err != nil {
 		return err
 	}

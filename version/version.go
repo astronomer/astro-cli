@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/pkg/errors"
+
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -34,7 +35,7 @@ func PrintVersion(client *houston.Client, out io.Writer) error {
 }
 
 // CheckForUpdate checks current version against latest on github
-func CheckForUpdate(client *houston.Client, ghClient *github.Client, out io.Writer) error {
+func CheckForUpdate(client *houston.Client, ghc *github.Client, out io.Writer) error {
 	version := CurrVersion
 
 	if !isValidVersion(version) {
@@ -44,14 +45,14 @@ func CheckForUpdate(client *houston.Client, ghClient *github.Client, out io.Writ
 	}
 
 	// fetch latest cli version
-	latestTagResp, err := ghClient.RepoLatestRequest("astronomer", "astro-cli")
+	latestTagResp, err := ghc.RepoLatestRequest("astronomer", "astro-cli")
 	if err != nil {
 		fmt.Fprintln(out, err)
 		latestTagResp.TagName = messages.NA
 	}
 
 	// fetch meta data around current cli version
-	currentTagResp, err := ghClient.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
+	currentTagResp, err := ghc.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
 	if err != nil {
 		fmt.Fprintln(out, "Release info not found, please upgrade.")
 		fmt.Fprintln(out, messages.CLI_INSTALL_CMD)
