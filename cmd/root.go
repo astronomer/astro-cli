@@ -32,7 +32,7 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newAuthRootCmd(client, out),
 		newWorkspaceCmd(client, out),
 		newVersionCmd(client, out),
-		newUpgradeCheckCmd(out),
+		newUpgradeCheckCmd(client, out),
 		newUserCmd(client, out),
 		newClusterRootCmd(client, out),
 		newDevRootCmd(client, out),

@@ -2,7 +2,6 @@ package version
 
 import (
 	"fmt"
-
 	"io"
 
 	"github.com/pkg/errors"
@@ -30,20 +29,13 @@ func PrintVersion(client *houston.Client, out io.Writer) error {
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION+", ", version)
 	fmt.Fprintf(out, messages.CLI_CURR_COMMIT+"\n", gitCommit)
 
-	appCfg, err := deployment.AppConfig(client)
-	if err != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
-	}
-
-	if appCfg != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
-	}
+	printServerVersion(client, out)
 
 	return nil
 }
 
 // CheckForUpdate checks current version against latest on github
-func CheckForUpdate(client *github.Client, out io.Writer) error {
+func CheckForUpdate(client *houston.Client, ghc *github.Client, out io.Writer) error {
 	version := CurrVersion
 
 	if !isValidVersion(version) {
@@ -53,14 +45,14 @@ func CheckForUpdate(client *github.Client, out io.Writer) error {
 	}
 
 	// fetch latest cli version
-	latestTagResp, err := client.RepoLatestRequest("astronomer", "astro-cli")
+	latestTagResp, err := ghc.RepoLatestRequest("astronomer", "astro-cli")
 	if err != nil {
 		fmt.Fprintln(out, err)
 		latestTagResp.TagName = messages.NA
 	}
 
 	// fetch meta data around current cli version
-	currentTagResp, err := client.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
+	currentTagResp, err := ghc.RepoTagRequest("astronomer", "astro-cli", string("v")+version)
 	if err != nil {
 		fmt.Fprintln(out, "Release info not found, please upgrade.")
 		fmt.Fprintln(out, messages.CLI_INSTALL_CMD)
@@ -74,6 +66,8 @@ func CheckForUpdate(client *github.Client, out io.Writer) error {
 
 	fmt.Fprintf(out, messages.CLI_CURR_VERSION_DATE+"\n", currentTag, currentPub)
 	fmt.Fprintf(out, messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
+
+	printServerVersion(client, out)
 
 	if latestTag > currentTag {
 		fmt.Fprintln(out, messages.CLI_UPGRADE_PROMPT)
@@ -90,4 +84,18 @@ func isValidVersion(version string) bool {
 		return false
 	}
 	return true
+}
+
+// printServerVersion outputs current server version
+func printServerVersion(client *houston.Client, out io.Writer) error {
+	appCfg, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
+	}
+
+	if appCfg != nil {
+		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
+	}
+
+	return nil
 }

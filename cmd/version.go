@@ -27,13 +27,17 @@ func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newUpgradeCheckCmd(out io.Writer) *cobra.Command {
+func newUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
 		Short: "Check for newer version of Astronomer CLI",
 		Long:  "Check for newer version of Astronomer CLI",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return upgradeCheck(cmd, out, args)
+			return upgradeCheck(client, cmd, out, args)
 		},
 	}
 	return cmd
@@ -50,12 +54,12 @@ func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, arg
 	return nil
 }
 
-func upgradeCheck(cmd *cobra.Command, out io.Writer, args []string) error {
+func upgradeCheck(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	client := github.NewGithubClient(httputil.NewHTTPClient())
+	ghc := github.NewGithubClient(httputil.NewHTTPClient())
 
-	err := version.CheckForUpdate(client, out)
+	err := version.CheckForUpdate(client, ghc, out)
 	if err != nil {
 		return err
 	}
