@@ -2,12 +2,14 @@ package workspace
 
 import (
 	"bytes"
-	"github.com/astronomer/astro-cli/houston"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/astronomer/astro-cli/houston"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 func TestAdd(t *testing.T) {
@@ -24,14 +26,14 @@ func TestAdd(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	email := "andrii@test.com"
+	email := "andrii@apple.com"
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     WORKSPACE ID                  EMAIL               ROLE          
-          ckc0eir8e01gj07608ajmvia1     andrii@test.com     test-role     
-Successfully added andrii@test.com to 
+	expected := ` NAME     WORKSPACE ID                  EMAIL                ROLE          
+          ckc0eir8e01gj07608ajmvia1     andrii@apple.com     test-role     
+Successfully added andrii@apple.com to 
 `
 	assert.Equal(t, buf.String(), expected)
 }
@@ -49,7 +51,7 @@ func TestAddError(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	email := "andrii@test.com"
+	email := "andrii@apple.com"
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
@@ -93,7 +95,7 @@ func TestRemoveError(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
-	email := "andrii@test.com"
+	email := "andrii@apple.com"
 
 	buf := new(bytes.Buffer)
 	err := Remove(id, email, api, buf)
@@ -188,12 +190,12 @@ func TestUpdateRole(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	email := "andrii@test.com"
+	email := "andrii@apple.com"
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
 	assert.NoError(t, err)
-	expected := `Role has been changed from andrii@test.com to WORKSPACE_VIEWER for user test-role`
+	expected := `Role has been changed from andrii@apple.com to WORKSPACE_VIEWER for user test-role`
 	assert.Equal(t, buf.String(), expected)
 }
 
@@ -208,7 +210,7 @@ func TestUpdateRoleError(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	email := "andrii@test.com"
+	email := "andrii@apple.com"
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)

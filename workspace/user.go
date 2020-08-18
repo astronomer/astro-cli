@@ -4,15 +4,22 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/pkg/errors"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/user"
 )
 
 // Add a user to a workspace with specified role
-func Add(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
+func Add(workspaceID string, email, role string, client *houston.Client, out io.Writer) error {
+	if !user.IsValidEmail(email) {
+		return errors.New(email + " is an invalid email address")
+	}
+
 	req := houston.Request{
 		Query:     houston.WorkspaceUserAddRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email, "role": role},
+		Variables: map[string]interface{}{"workspaceId": workspaceID, "email": email, "role": role},
 	}
 
 	r, err := req.DoWithClient(client)
@@ -35,10 +42,10 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 }
 
 // Remove a user from a workspace
-func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) error {
+func Remove(workspaceID, userID string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserRemoveRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "userId": userId},
+		Variables: map[string]interface{}{"workspaceId": workspaceID, "userId": userID},
 	}
 
 	r, err := req.DoWithClient(client)
@@ -52,17 +59,17 @@ func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) e
 		Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
 	}
 
-	utab.AddRow([]string{w.Label, w.Id, userId}, false)
+	utab.AddRow([]string{w.Label, w.Id, userID}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print(out)
 	return nil
 }
 
 // ListRoles print users and roles from a workspace
-func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error {
+func ListRoles(workspaceID string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId},
+		Variables: map[string]interface{}{"workspaceId": workspaceID},
 	}
 	r, err := req.DoWithClient(client)
 
@@ -85,11 +92,11 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 	return nil
 }
 
-// Update workspace user role
-func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
+// UpdateRole workspace user role
+func UpdateRole(workspaceID string, email string, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserUpdateRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email, "role": role},
 	}
 	r, err := req.DoWithClient(client)
 
