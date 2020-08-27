@@ -68,7 +68,7 @@ func CheckForUpdate(client *houston.Client, ghc *github.Client, out io.Writer) e
 	fmt.Fprintf(out, messages.CLI_LATEST_VERSION_DATE+"\n", latestTag, latestPub)
 
 	printServerVersion(client, out)
-	CompareVersions(latestTag, currentTag, out)
+	compareVersions(latestTag, currentTag, out)
 
 	return nil
 }

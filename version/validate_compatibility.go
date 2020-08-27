@@ -24,22 +24,22 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string,
 	}
 	// Skip check if AppConfig is nil or is cv is empty
 	if serverCfg != nil && cliVer != "" {
-		return CompareVersions(serverCfg.Version, cliVer, out)
+		return compareVersions(serverCfg.Version, cliVer, out)
 	}
 
 	return nil
 }
 
-// CompareVersions print warning message if astro-cli has a variation in the minor version.  Errors if major version is behind.
-func CompareVersions(compareVer string, currentVer string, out io.Writer) error {
+// compareVersions print warning message if astro-cli has a variation in the minor version.  Errors if major version is behind.
+func compareVersions(compareVer string, currentVer string, out io.Writer) error {
 	semCompareVer, err := parseVersion(compareVer)
-	if compareErr != nil {
-		return compareErr
+	if err != nil {
+		return err
 	}
 
 	semCurrVer, err := parseVersion(currentVer)
-	if currErr != nil {
-		return currErr
+	if err != nil {
+		return err
 	}
 
 	currMajor := semCurrVer.Major()

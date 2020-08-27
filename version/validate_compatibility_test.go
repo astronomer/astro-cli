@@ -212,13 +212,13 @@ func TestValidateCompatibilityClientFailure(t *testing.T) {
 
 func TestCompareVersionsInvalidServerVer(t *testing.T) {
 	output := new(bytes.Buffer)
-	err := CompareVersions("INVALID VERSION", "0.17.1", output)
+	err := compareVersions("INVALID VERSION", "0.17.1", output)
 	assert.Error(t, err)
 }
 
 func TestCompareVersionsInvalidCliVer(t *testing.T) {
 	output := new(bytes.Buffer)
-	err := CompareVersions("0.17.1", "INVALID VERSION", output)
+	err := compareVersions("0.17.1", "INVALID VERSION", output)
 	assert.Error(t, err)
 }
 
