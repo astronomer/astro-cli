@@ -30,7 +30,7 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string,
 	return nil
 }
 
-// compareVersions print warning message if astro-cli has a variation in the minor version.  Errors if major version is behind.
+// compareVersions print warning message if astro-cli has a variation in the minor version. Errors if major version is behind.
 func compareVersions(compareVer string, currentVer string, out io.Writer) error {
 	semCompareVer, err := parseVersion(compareVer)
 	if err != nil {
