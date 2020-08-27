@@ -24,35 +24,36 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string,
 	}
 	// Skip check if AppConfig is nil or is cv is empty
 	if serverCfg != nil && cliVer != "" {
-		return compareVersions(serverCfg.Version, cliVer, out)
+		return CompareVersions(serverCfg.Version, cliVer, out)
 	}
 
 	return nil
 }
 
-func compareVersions(serverVer string, cliVer string, out io.Writer) error {
-	semVerServer, serverErr := parseVersion(serverVer)
-	if serverErr != nil {
-		return serverErr
+// CompareVersions print warning message if astro-cli has a variation in the minor version.  Errors if major version is behind.
+func CompareVersions(compareVer string, currentVer string, out io.Writer) error {
+	semCompareVer, compareErr := parseVersion(compareVer)
+	if compareErr != nil {
+		return compareErr
 	}
 
-	semVerCli, cliErr := parseVersion(cliVer)
-	if cliErr != nil {
-		return cliErr
+	semCurrVer, currErr := parseVersion(currentVer)
+	if currErr != nil {
+		return currErr
 	}
 
-	cliMajor := semVerCli.Major()
-	cliMinor := semVerCli.Minor()
+	currMajor := semCurrVer.Major()
+	currMinor := semCurrVer.Minor()
 
-	serverMajor := semVerServer.Major()
-	serverMinor := semVerServer.Minor()
+	compareMajor := semCompareVer.Major()
+	compareMinor := semCompareVer.Minor()
 
-	if cliMajor < serverMajor {
-		return errors.Errorf(messages.ERROR_NEW_MAJOR_VERSION, cliVer, serverVer)
-	} else if cliMinor < serverMinor {
-		fmt.Fprintf(out, messages.WARNING_NEW_MINOR_VERSION, cliVer, serverVer)
-	} else if cliMinor > serverMinor {
-		fmt.Fprintf(out, messages.WARNING_DOWNGRADE_VERSION, cliVer, serverVer)
+	if currMajor < compareMajor {
+		return errors.Errorf(messages.ERROR_NEW_MAJOR_VERSION, currentVer, compareVer)
+	} else if currMinor < compareMinor {
+		fmt.Fprintf(out, messages.WARNING_NEW_MINOR_VERSION, currentVer, compareVer)
+	} else if currMinor > compareMinor {
+		fmt.Fprintf(out, messages.WARNING_DOWNGRADE_VERSION, currentVer, compareVer)
 	}
 
 	return nil
