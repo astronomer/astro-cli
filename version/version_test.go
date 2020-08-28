@@ -108,7 +108,36 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 	githubClient := github.NewGithubClient(gitHubClient)
 	output := new(strings.Builder)
 	CheckForUpdate(houstonClient, githubClient, output)
-	expected := "Astro CLI Version: v0.15.0 (2020.06.01)\nAstro CLI Latest: v0.15.0 (2020.06.01)\nAstro Server Version: 0.13.0\nYou are running the latest version.\n"
+	expected := "Astro CLI Version: v0.15.0 (2020.06.01)\nAstro CLI Latest: v0.15.0 (2020.06.01)\nAstro Server Version: 0.13.0\n"
+	actual := output.String()
+
+	assert.Equal(t, expected, actual)
+}
+
+func TestPrintServerVersion(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.18.0",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+			}
+		}
+	}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	houstonClient := houston.NewHoustonClient(client)
+
+	output := new(strings.Builder)
+	printServerVersion(houstonClient, output)
+	expected := "Astro Server Version: 0.18.0\n"
 	actual := output.String()
 
 	assert.Equal(t, expected, actual)
