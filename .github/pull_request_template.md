@@ -21,4 +21,4 @@ Resolves astronomer/issues#XXXX
 - [ ] Added/updated applicable tests
 - [ ] Tested against [Houston-API](https://github.com/astronomer/houston-api/) and [Astronomer](https://github.com/astronomer/astronomer/) (if necessary).
 - [ ] Communicated to/tagged owners of respective clients potentially impacted by these changes.
-- [ ] Updated any related [documentation](https://github.com/astronomer/astro-docs/)
+- [ ] Updated any related [documentation](https://github.com/astronomer/docs/)
