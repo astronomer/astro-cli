@@ -16,7 +16,7 @@ jobs:
           NODE_ENV: "development"
           WEBSERVER__PORT: "8871"
           ORBIT__PORT: "8080"
-          DATABASE_URL: "postgres://postgres:postgres@postgres:5432/postgres"
+          DATABASE_URL: "postgres://postgres:postgres@postgres:5432/postgres?schema=houston%24default"
           PUBLIC_SIGNUPS: "true"
           EMAIL_CONFIRMATION: "false"
           EMAIL__ENABLED: "false"
