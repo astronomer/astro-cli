@@ -11,7 +11,9 @@ jobs:
           POSTGRES_PASSWORD: postgres
       - image: astronomerinc/ap-houston-api:latest
         name: houston
-        entrypoint: ["yarn migrate", "&&", "yarn serve"]
+        command: 
+          - "yarn migrate"
+          - "yarn serve"
         environment:
           NODE_ENV: "development"
           WEBSERVER__PORT: "8871"
