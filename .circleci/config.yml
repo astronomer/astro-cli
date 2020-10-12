@@ -31,6 +31,7 @@ jobs:
           PRISMA__DEBUG: "false"
           ORBIT__PORT: "8080"
           DATABASE__CONNECTION: "postgres://postgres:postgres@postgres:5432/postgres"
+          DATABASE_URL: "postgres://postgres:postgres@postgres:5432/postgres?schema=houston%24default"
           PUBLIC_SIGNUPS: "true"
           EMAIL_CONFIRMATION: "false"
           EMAIL__ENABLED: "false"
