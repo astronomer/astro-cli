@@ -17,6 +17,7 @@ jobs:
           WEBSERVER__PORT: "8871"
           ORBIT__PORT: "8080"
           DATABASE_URL: "postgres://postgres:postgres@postgres:5432/postgres"
+          DATABASE__CONNECTION: "postgresql://postgres:postgres@localhost:5432/postgres"
           DATABASE__SCHEMA: "public"
           PUBLIC_SIGNUPS: "true"
           EMAIL_CONFIRMATION: "false"
