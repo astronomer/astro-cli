@@ -86,7 +86,7 @@ commands:
           command: dockerize -wait tcp://postgres:5432 -timeout 1m
       - run:
           name: Wait for houston
-          command: dockerize -wait tcp://houston:8871 -timeout 1m
+          command: dockerize -wait tcp://houston:8871 -timeout 2m
       - run:
           name: Run unit tests
           environment:
