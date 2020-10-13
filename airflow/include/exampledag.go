@@ -8,6 +8,7 @@ from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
+from airflow.version import version
 from datetime import datetime, timedelta
 
 
@@ -56,16 +57,23 @@ with DAG('example_dag',
 
     # generate tasks with a loop. task_id must be unique
     for task in range(5):
-        tn = PythonOperator(
-            task_id=f'python_print_date_{task}',
-            python_callable=my_custom_function,  # make sure you don't include the () of the function
-            op_kwargs={'task_number': task},
-            provide_context=True
-        )
+        if version.startswith('2'):
+            tn = PythonOperator(
+                task_id=f'python_print_date_{task}',
+                python_callable=my_custom_function,  # make sure you don't include the () of the function
+                op_kwargs={'task_number': task},
+            )
+        else:
+            tn = PythonOperator(
+                task_id=f'python_print_date_{task}',
+                python_callable=my_custom_function,  # make sure you don't include the () of the function
+                op_kwargs={'task_number': task},
+                provide_context=True,
+            )
 
 
         t0 >> tn # indented inside for loop so each task is added downstream of t0
 
     t0 >> t1
-    t1 >> [t2, t3] # lists can be used to specify mutliple tasks
+    t1 >> [t2, t3] # lists can be used to specify multiple tasks
 `)
