@@ -68,7 +68,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:10.1-alpine
+    image: postgres:12.2
     restart: unless-stopped
     networks:
       - airflow
@@ -86,7 +86,7 @@ services:
   scheduler:
     image: test-project-name/airflow:latest
     command: >
-      bash -c "airflow upgradedb && airflow scheduler"
+      bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
     restart: unless-stopped
     networks:
       - airflow
@@ -112,7 +112,7 @@ services:
   webserver:
     image: test-project-name/airflow:latest
     command: >
-      bash -c "airflow create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin && airflow webserver"
+      bash -c 'airflow create_user "$$@" || airflow users create "$$@"' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin && airflow webserver
     restart: unless-stopped
     networks:
       - airflow
