@@ -44,7 +44,7 @@ if version.startswith("2"):
         macros = []
         admin_views = []
         appbuilder_views = []
-        appbuilder_menu_items = [airflow_plugins_ml, astro_docs_ml, astro_guides_ml]
+        appbuilder_menu_items = _appbuilder_menu_items
 else:
     # Airflow < 2.0
     from flask_admin.base import MenuLink
