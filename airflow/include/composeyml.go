@@ -62,7 +62,7 @@ services:
   webserver:
     image: {{ .AirflowImage }}
     command: >
-      bash -c 'airflow create_user "$$@" && airflow webserver || airflow users create "$$@" && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+      bash -c '{ airflow create_user "$$@" || airflow users create "$$@"; } && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
     restart: unless-stopped
     networks:
       - airflow
