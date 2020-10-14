@@ -5,7 +5,6 @@ import "strings"
 // ExamplePlugin created with astro airflow init
 var ExamplePlugin = strings.TrimSpace(`
 from airflow.plugins_manager import AirflowPlugin
-from airflow.version import version
 
 """
 Look for the Astronomer tab in the UI.
