@@ -31,39 +31,14 @@ astro_guides_ml = {
     "href": "https://www.astronomer.io/guides/"
 }
 
-_appbuilder_menu_items = [airflow_plugins_ml, astro_docs_ml, astro_guides_ml]
-
-# Airflow >= 2.0
-if version.startswith("2"):
-    class AstroLinksPlugin(AirflowPlugin):
-        name = 'astronomer_menu_links'
-        operators = []
-        flask_blueprints = []
-        hooks = []
-        executors = []
-        macros = []
-        admin_views = []
-        appbuilder_views = []
-        appbuilder_menu_items = _appbuilder_menu_items
-else:
-    # Airflow < 2.0
-    from flask_admin.base import MenuLink
-
-    class AstroLinksPlugin(AirflowPlugin):
-        name = 'astronomer_menu_links'
-        operators = []
-        flask_blueprints = []
-        hooks = []
-        executors = []
-        macros = []
-        admin_views = []
-        menu_links = [
-            MenuLink(
-                category=ml.get("category"),
-                name=ml.get("name"),
-                url=ml.get("href")
-            ) for ml in _appbuilder_menu_items
-        ]
-        appbuilder_views = []
-        appbuilder_menu_items = _appbuilder_menu_items
+class AstroLinksPlugin(AirflowPlugin):
+    name = 'astronomer_menu_links'
+    operators = []
+    flask_blueprints = []
+    hooks = []
+    executors = []
+    macros = []
+    admin_views = []
+    appbuilder_views = []
+    appbuilder_menu_items = [airflow_plugins_ml, astro_docs_ml, astro_guides_ml]
 `)
