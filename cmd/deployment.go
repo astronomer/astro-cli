@@ -63,6 +63,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		newDeploymentDeleteCmd(client, out),
 		newLogsCmd(client, out),
 		newDeploymentSaRootCmd(client, out),
+		newDeploymentUserRootCmd(client, out),
 	)
 	return cmd
 }
@@ -131,6 +132,34 @@ func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 	}
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+	return cmd
+}
+
+func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "user",
+		Short: "Manage deployment user resources",
+		Long:  "Users can be added or removed from deployment",
+	}
+	cmd.AddCommand(
+		newDeploymentUserAddCmd(client, out),
+	)
+	return cmd
+}
+
+func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add EMAIL",
+		Short: "Add a user to a deployment",
+		Long:  "Add a user to a deployment",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentUserAdd(cmd, client, out, args)
+		},
+	}
+	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to deployment")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", "DEPLOYMENT_VIEWER", "role assigned to user")
+	// TODO: add new deploymentRole and figure out role types "DEPLOYMENT_VIEWER", etc.
 	return cmd
 }
 
@@ -260,6 +289,21 @@ func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client,
 	cmd.SilenceUsage = true
 
 	return deployment.Update(args[0], cloudRole, argsMap, client, out)
+}
+
+func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+	_, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	if err := validateDeploymentRole(deploymentRole); err != nil {
+		return errors.Wrap(err, "failed to find a valid role")
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return deployment.Add(deploymentId, args[0], deploymentRole, client, out)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {

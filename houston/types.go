@@ -3,6 +3,7 @@ package houston
 // Response wraps all houston response structs used for json marashalling
 type Response struct {
 	Data struct {
+		AddDeploymentUser              *RoleBinding              `json:"deploymentAddUserRole,omitempty"`
 		AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
 		RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
 		CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
@@ -178,6 +179,7 @@ type RoleBinding struct {
 		Id       string `json:"id"`
 		Username string `json:"username"`
 	} `json:"user"`
+	Deployment Deployment `json:"deployment"`
 }
 
 // Workspace contains all components of an Astronomer Workspace
