@@ -81,7 +81,7 @@ func validateWorkspaceRole(role string) error {
 }
 
 func validateDeploymentRole(role string) error {
-	validRoles := []string{houston.DEPLOYMENT_ADMIN, houston.DEPLOYMENT_EDITOR, houston.DEPLOYMENT_VIEWER}
+	validRoles := []string{houston.DeploymentAdmin, houston.DeploymentEditor, houston.DeploymentViewer}
 
 	for _, validRole := range validRoles {
 		if role == validRole {

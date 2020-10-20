@@ -1,5 +1,6 @@
 package houston
 
+// TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
 	AuthConfigGetRequest = `
 	query GetAuthConfig($redirect: String) {

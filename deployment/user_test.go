@@ -63,11 +63,7 @@ func TestAdd(t *testing.T) {
 					"exception": {
 						"message": "A duplicate role binding already exists",
 						"stacktrace": [
-							"UserInputError: A duplicate role binding already exists",
-							"    at deploymentAddUserRole (/Users/adamvandover/Documents/GitHub/houston-api/src/resolvers/mutation/deployment-add-user-role/index.js:69:11)",
-							"    at runMicrotasks (<anonymous>)",
-							"    at processTicksAndRejections (internal/process/task_queues.js:97:5)",
-							"    at middleware (/Users/adamvandover/Documents/GitHub/houston-api/node_modules/graphql-shield/src/generator.ts:70:16)"
+							"UserInputError: A duplicate role binding already exists"
 						]
 					}
 				}

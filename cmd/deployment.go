@@ -31,6 +31,10 @@ var (
 # Create new deployment with Kubernetes executor.
   $ astro deployment create new-deployment-name-k8s --executor=k8s
 `
+	deploymentUserCreateExample = `
+# Add a workspace user to a deployment with a particular role
+  $ astro deployment user add --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
+`
 	deploymentSaCreateExample = `
 # Create service-account
   $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
@@ -149,15 +153,16 @@ func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Comm
 
 func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "add EMAIL",
-		Short: "Add a user to a deployment",
-		Long:  "Add a user to a deployment",
-		Args:  cobra.ExactArgs(1),
+		Use:     "add EMAIL",
+		Short:   "Add a user to a deployment",
+		Long:    "Add a user to a deployment",
+		Args:    cobra.ExactArgs(1),
+		Example: deploymentUserCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUserAdd(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to deployment")
+	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", "DEPLOYMENT_VIEWER", "role assigned to user")
 	// TODO: add new deploymentRole and figure out role types "DEPLOYMENT_VIEWER", etc.
 	return cmd
