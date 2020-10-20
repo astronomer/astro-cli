@@ -144,3 +144,40 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
+
+func TestDeploymentUserAddCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := ` DEPLOYMENT NAME              DEPLOYMENT ID                 USER                        ROLE                  
+ prehistoric-gravity-9229     ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER     
+
+ Successfully added somebody@astronomer.com as a DEPLOYMENT_VIEWER
+`
+	okResponse := `{
+		"data": {
+			"deploymentAddUserRole": {
+				"id": "ckggzqj5f4157qtc9lescmehm",
+				"user": {
+					"username": "somebody@astronomer.com"
+				},
+				"role": "DEPLOYMENT_VIEWER",
+				"deployment": {
+					"id": "ckggvxkw112212kc9ebv8vu6p",
+					"releaseName": "prehistoric-gravity-9229"
+				}
+			}
+		}
+	}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOut, output)
+}

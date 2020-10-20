@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	workspaceId   string
-	workspaceRole string
-	role          string
-	skipVerCheck  bool
+	workspaceId    string
+	workspaceRole  string
+	deploymentRole string
+	role           string
+	skipVerCheck   bool
 )
 
 // NewRootCmd adds all of the primary commands for the cli

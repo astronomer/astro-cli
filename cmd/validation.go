@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
 
 	"github.com/pkg/errors"
@@ -70,6 +71,17 @@ func coalesceWorkspace() (string, error) {
 
 func validateWorkspaceRole(role string) error {
 	validRoles := []string{"WORKSPACE_ADMIN", "WORKSPACE_EDITOR", "WORKSPACE_VIEWER"}
+
+	for _, validRole := range validRoles {
+		if role == validRole {
+			return nil
+		}
+	}
+	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+}
+
+func validateDeploymentRole(role string) error {
+	validRoles := []string{houston.DeploymentAdmin, houston.DeploymentEditor, houston.DeploymentViewer}
 
 	for _, validRole := range validRoles {
 		if role == validRole {
