@@ -84,7 +84,6 @@ func ExecPush(serverAddress, token, image string) error {
 	defer responseBody.Close()
 	out := clicommand.NewOutStream(os.Stdout)
 	return jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
-	return nil
 }
 
 // ExecLogin executes a docker login similar to docker login command
