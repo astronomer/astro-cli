@@ -218,3 +218,36 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
+
+func TestDeploymentUserUpdateCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `Successfully updated somebody@astronomer.com to a DEPLOYMENT_ADMIN`
+	okResponse := `{
+		"data": {
+			"deploymentUpdateUserRole": {
+				"id": "ckggzqj5f4157qtc9lescmehm",
+				"user": {
+					"username": "somebody@astronomer.com"
+				},
+				"role": "DEPLOYMENT_ADMIN",
+				"deployment": {
+					"id": "ckggvxkw112212kc9ebv8vu6p",
+					"releaseName": "prehistoric-gravity-9229"
+				}
+			}
+		}
+	}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}

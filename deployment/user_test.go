@@ -155,11 +155,11 @@ func TestDeleteUser(t *testing.T) {
 			"deploymentRemoveUserRole": null
 		}
 	}
-	`
+`
 
 	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: 400,
 			Body:       ioutil.NopCloser(bytes.NewBufferString(errResponse)),
 			Header:     make(http.Header),
 		}
@@ -172,4 +172,81 @@ func TestDeleteUser(t *testing.T) {
 	err = DeleteUser(deploymentId, email, api, buf)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "The role binding does not exist for this user")
+}
+
+func TestUpdateUser(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"deploymentUpdateUserRole": {
+				"id": "ckggzqj5f4157qtc9lescmehm",
+				"user": {
+					"username": "somebody@astronomer.com"
+				},
+				"role": "DEPLOYMENT_EDITOR",
+				"deployment": {
+					"releaseName": "prehistoric-gravity-9229"
+				}
+			}
+		}
+	}
+`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	email := "somebody@astronomer.com"
+	role := houston.DeploymentEditor
+
+	buf := new(bytes.Buffer)
+	err := UpdateUser(deploymentId, email, role, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Successfully updated somebody@astronomer.com to a DEPLOYMENT_EDITOR")
+
+	errResponse := `{
+		"error": {
+			"errors": [
+				{
+					"message": "Variable \"$role\" got invalid value \"DEPLOYMENT_FAKE_ROLE\"; Expected type Role. Did you mean DEPLOYMENT_ADMIN, DEPLOYMENT_EDITOR, or DEPLOYMENT_VIEWER?",
+					"locations": [
+						{
+							"line": 1,
+							"column": 85
+						}
+					],
+					"extensions": {
+						"code": "INTERNAL_SERVER_ERROR",
+						"exception": {
+							"stacktrace": [
+								"GraphQLError: Variable \"$role\" got invalid value \"DEPLOYMENT_FAKE_ROLE\"; Expected type Role. Did you mean DEPLOYMENT_ADMIN, DEPLOYMENT_EDITOR, or DEPLOYMENT_VIEWER?"
+							]
+						}
+					}
+				}
+			]
+		}
+	}
+	`
+
+	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 400,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(errResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api = houston.NewHoustonClient(client)
+	deploymentId = "ckggzqj5f4157qtc9lescmehm"
+	email = "somebody@astronomer.com"
+	role = "DEPLOYMENT_FAKE_ROLE"
+
+	buf = new(bytes.Buffer)
+	err = UpdateUser(deploymentId, email, role, api, buf)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Expected type Role. Did you mean DEPLOYMENT_ADMIN, DEPLOYMENT_EDITOR, or DEPLOYMENT_VIEWER")
 }
