@@ -5,15 +5,15 @@ var (
 	// DeploymentUserAddRequest Mutation for AddDeploymentUser
 	DeploymentUserAddRequest = `
 	mutation AddDeploymentUser(
-		$userId: Uuid
+		$userId: Id
 		$email: String!
-		$deploymentId: Uuid!
+		$deploymentId: Id!
 		$role: Role!
 	) {
 		deploymentAddUserRole(
-			userUuid: $userId
+			userId: $userId
 			email: $email
-			deploymentUuid: $deploymentId
+			deploymentId: $deploymentId
 			role: $role
 		) {
 			id
@@ -25,6 +25,24 @@ var (
 				id
 				releaseName
 			}
+		}
+	}
+	`
+
+	// DeploymentUserDeleteRequest Mutation for AddDeploymentUser
+	DeploymentUserDeleteRequest = `
+	mutation DeleteDeploymentUser(
+		$userId: Id
+		$email: String!
+		$deploymentId: Id!
+	) {
+		deploymentRemoveUserRole(
+			userId: $userId
+			email: $email
+			deploymentId: $deploymentId
+		) {
+			id
+			role
 		}
 	}
 	`
