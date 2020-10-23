@@ -39,3 +39,34 @@ func Add(deploymentId string, email string, role string, client *houston.Client,
 
 	return nil
 }
+
+// DeleteUser removes user access for a deployment
+func DeleteUser(deploymentId string, email string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query: houston.DeploymentUserDeleteRequest,
+		Variables: map[string]interface{}{
+			"email":        email,
+			"deploymentId": deploymentId,
+		},
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	d := r.Data.DeleteDeploymentUser
+	header := []string{"DEPLOYMENT ID", "USER", "ROLE"}
+
+	tab := printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         header,
+	}
+
+	tab.AddRow([]string{deploymentId, email, d.Role}, false)
+	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", d.Role, email, deploymentId)
+	tab.Print(out)
+
+	return nil
+}
