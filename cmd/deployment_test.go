@@ -181,3 +181,40 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
+
+func TestDeploymentUserDeleteCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := ` DEPLOYMENT ID                 USER                        ROLE                  
+ ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER     
+
+ Successfully removed the DEPLOYMENT_VIEWER role for somebody@astronomer.com from deployment ckggvxkw112212kc9ebv8vu6p
+`
+	okResponse := `{
+		"data": {
+			"deploymentRemoveUserRole": {
+				"id": "ckggzqj5f4157qtc9lescmehm",
+				"user": {
+					"username": "somebody@astronomer.com"
+				},
+				"role": "DEPLOYMENT_VIEWER",
+				"deployment": {
+					"id": "ckggvxkw112212kc9ebv8vu6p",
+					"releaseName": "prehistoric-gravity-9229"
+				}
+			}
+		}
+	}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOut, output)
+}

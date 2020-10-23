@@ -4,6 +4,7 @@ package houston
 type Response struct {
 	Data struct {
 		AddDeploymentUser              *RoleBinding              `json:"deploymentAddUserRole,omitempty"`
+		DeleteDeploymentUser           *RoleBinding              `json:"deploymentRemoveUserRole,omitempty"`
 		AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
 		RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
 		CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`

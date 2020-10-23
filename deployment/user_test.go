@@ -92,3 +92,84 @@ func TestAdd(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "A duplicate role binding already exists")
 }
+
+func TestDeleteUser(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"deploymentRemoveUserRole": {
+				"id": "ckggzqj5f4157qtc9lescmehm",
+				"user": {
+					"username": "somebody@astronomer.com"
+				},
+				"role": "DEPLOYMENT_ADMIN",
+				"deployment": {
+					"releaseName": "prehistoric-gravity-9229"
+				}
+			}
+		}
+	}
+`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	email := "somebody@astronomer.com"
+
+	buf := new(bytes.Buffer)
+	err := DeleteUser(deploymentId, email, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Successfully removed the DEPLOYMENT_ADMIN role for somebody@astronomer.com from deployment ckggzqj5f4157qtc9lescmehm")
+
+	// Test that an error message appears when a user is not deleted
+	errResponse := `{
+		"errors": [
+			{
+				"message": "The role binding does not exist for this user",
+				"locations": [
+					{
+						"line": 2,
+						"column": 3
+					}
+				],
+				"path": [
+					"deploymentRemoveUserRole"
+				],
+				"extensions": {
+					"code": "BAD_USER_INPUT",
+					"exception": {
+						"message": "The role binding does not exist for this user",
+						"stacktrace": [
+							"UserInputError: The role binding does not exist for this user"
+						]
+					}
+				}
+			}
+		],
+		"data": {
+			"deploymentRemoveUserRole": null
+		}
+	}
+	`
+
+	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(errResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api = houston.NewHoustonClient(client)
+	deploymentId = "ckggzqj5f4157qtc9lescmehm"
+	email = "somebody@astronomer.com"
+
+	buf = new(bytes.Buffer)
+	err = DeleteUser(deploymentId, email, api, buf)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "The role binding does not exist for this user")
+}

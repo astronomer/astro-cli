@@ -28,4 +28,22 @@ var (
 		}
 	}
 	`
+
+	// DeploymentUserDeleteRequest Mutation for AddDeploymentUser
+	DeploymentUserDeleteRequest = `
+	mutation DeleteDeploymentUser(
+		$userId: Id
+		$email: String!
+		$deploymentId: Id!
+	) {
+		deploymentRemoveUserRole(
+			userId: $userId
+			email: $email
+			deploymentId: $deploymentId
+		) {
+			id
+			role
+		}
+	}
+	`
 )

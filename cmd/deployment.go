@@ -35,6 +35,10 @@ var (
 # Add a workspace user to a deployment with a particular role
   $ astro deployment user add --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
 `
+	deploymentUserDeleteExample = `
+# Delete user access to a deployment
+	$ astro deployment user delete --deployment-id=xxxxx <user-email-address>
+`
 	deploymentSaCreateExample = `
 # Create service-account
   $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
@@ -147,6 +151,7 @@ func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	}
 	cmd.AddCommand(
 		newDeploymentUserAddCmd(client, out),
+		newDeploymentUserDeleteCmd(client, out),
 	)
 	return cmd
 }
@@ -165,6 +170,21 @@ func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comma
 	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
 
+	return cmd
+}
+
+func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete EMAIL",
+		Short:   "Delete a user from a deployment",
+		Long:    "Delete a user from a deployment",
+		Args:    cobra.ExactArgs(1),
+		Example: deploymentUserDeleteExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentUserDelete(cmd, client, out, args)
+		},
+	}
+	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment to remove user access")
 	return cmd
 }
 
@@ -309,6 +329,17 @@ func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return deployment.Add(deploymentId, args[0], deploymentRole, client, out)
+}
+
+func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+	_, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return deployment.DeleteUser(deploymentId, args[0], client, out)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
