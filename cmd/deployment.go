@@ -163,8 +163,8 @@ func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comma
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", "DEPLOYMENT_VIEWER", "role assigned to user")
-	// TODO: add new deploymentRole and figure out role types "DEPLOYMENT_VIEWER", etc.
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
+
 	return cmd
 }
 

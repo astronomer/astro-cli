@@ -5,15 +5,15 @@ var (
 	// DeploymentUserAddRequest Mutation for AddDeploymentUser
 	DeploymentUserAddRequest = `
 	mutation AddDeploymentUser(
-		$userId: Uuid
+		$userId: Id
 		$email: String!
-		$deploymentId: Uuid!
+		$deploymentId: Id!
 		$role: Role!
 	) {
 		deploymentAddUserRole(
-			userUuid: $userId
+			userId: $userId
 			email: $email
-			deploymentUuid: $deploymentId
+			deploymentId: $deploymentId
 			role: $role
 		) {
 			id
