@@ -64,7 +64,7 @@ var (
 	INPUT_OAUTH_TOKEN = "oAuth Token: "
 
 	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s\n"
-	REGISTRY_AUTH_FAIL           = "Failed to authenticate to the registry, this can occur when registry is offline. Until authenticated you will not be able to push new images to your Airflow clusters\n"
+	RegistryAuthFail             = "\nFailed to authenticate to the registry, do you have docker running?\nThis error can occur when docker is not running or the registry is offline.\nUntil authenticated you will not be able to push new images to your Airflow clusters\n"
 	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro deploy [releaseName] -f` to force deploy."
 
 	SETTINGS_PATH = "Error looking for settings.yaml"
