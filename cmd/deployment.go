@@ -16,6 +16,8 @@ var (
 	executor       string
 	deploymentId   string
 	userId         string
+	email          string
+	fullName       string
 	systemSA       bool
 	category       string
 	label          string
@@ -30,6 +32,10 @@ var (
 
 # Create new deployment with Kubernetes executor.
   $ astro deployment create new-deployment-name-k8s --executor=k8s
+`
+	deploymentUserListExample = `
+# Search for deployment users
+  $ astro deployment user list <deployment-id> --email=EMAIL_ADDRESS --user-id=ID --name=NAME
 `
 	deploymentUserCreateExample = `
 # Add a workspace user to a deployment with a particular role
@@ -154,10 +160,30 @@ func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Comm
 		Long:  "Users can be added or removed from deployment",
 	}
 	cmd.AddCommand(
+		newDeploymentUserListCmd(client, out),
 		newDeploymentUserAddCmd(client, out),
 		newDeploymentUserDeleteCmd(client, out),
 		newDeploymentUserUpdateCmd(client, out),
 	)
+	return cmd
+}
+
+func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list USERS",
+		Short:   "Search for deployment user's",
+		Long:    "Search for deployment user's",
+		Args:    cobra.ExactArgs(1),
+		Example: deploymentUserListExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentUserList(cmd, client, out, args)
+		},
+	}
+	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
+	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().StringVarP(&email, "email", "e", "", "[EMAIL]")
+	cmd.Flags().StringVarP(&fullName, "name", "n", "", "[NAME]")
+
 	return cmd
 }
 
@@ -334,6 +360,17 @@ func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client,
 	cmd.SilenceUsage = true
 
 	return deployment.Update(args[0], cloudRole, argsMap, client, out)
+}
+
+func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+	_, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return deployment.UserList(args[0], email, userId, fullName, client, out)
 }
 
 func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {

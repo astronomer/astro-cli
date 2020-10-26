@@ -7,9 +7,137 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestUserList(t *testing.T) {
+	testUtil.InitTestConfig()
+	// Test that UserList returns a single deployment user correctly
+	okResponse := `{
+		"data": {
+			"deploymentUsers": [
+				{
+					"id": "ckgqw2k2600081qc90nbamgno",
+					"fullName": "Some Person",
+					"username": "somebody@astronomer.io",
+					"roleBindings": [
+						{
+							"role": "SYSTEM_ADMIN"
+						},
+						{
+							"role": "WORKSPACE_ADMIN"
+						},
+						{
+							"role": "WORKSPACE_VIEWER"
+						},
+						{
+							"role": "DEPLOYMENT_ADMIN"
+						}
+					]
+				}
+			]
+		}
+	}
+`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckgqw2k2600081qc90nbamgno"
+	email := "somebody@astronomer.io"
+	userId := "somebody@astronomer.io"
+	fullName := "Some Person"
+
+	buf := new(bytes.Buffer)
+	err := UserList(deploymentId, email, userId, fullName, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person     somebody@astronomer.io     DEPLOYMENT_ADMIN`)
+
+	// Test that UserList returns a list of deployment users correctly
+	okResponse = `{
+		"data": {
+			"deploymentUsers": [
+				{
+					"id": "ckgqw2k2600081qc90nbamgno",
+					"fullName": "Some Person",
+					"username": "somebody@astronomer.io",
+					"roleBindings": [
+						{
+							"role": "SYSTEM_ADMIN"
+						},
+						{
+							"role": "WORKSPACE_ADMIN"
+						},
+						{
+							"role": "WORKSPACE_VIEWER"
+						},
+						{
+							"role": "DEPLOYMENT_ADMIN"
+						}
+					]
+				},
+				{
+					"id": "ckgqw2k2600081qc90nbamgno",
+					"fullName": "Another Person",
+					"username": "somebody+1@astronomer.io",
+					"roleBindings": [
+						{
+							"role": "WORKSPACE_VIEWER"
+						},
+						{
+							"role": "DEPLOYMENT_EDITOR"
+						}
+					]
+				}
+			]
+		}
+	}
+`
+	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api = houston.NewHoustonClient(client)
+	deploymentId = "ckgqw2k2600081qc90nbamgno"
+
+	buf = new(bytes.Buffer)
+	err = UserList(deploymentId, "", "", "", api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person        somebody@astronomer.io       DEPLOYMENT_ADMIN`)
+	assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Another Person     somebody+1@astronomer.io     DEPLOYMENT_EDITOR`)
+
+	// Test that UserList returns an empty list when deployment does not exist
+	// TODO: @adam2k update this test with the correct error response once the Houston API work is completed
+	okResponse = `{
+		"data": {
+			"deploymentUsers": []
+		}
+	}
+`
+	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api = houston.NewHoustonClient(client)
+	deploymentId = "ckgqw2k2600081qc90nbamgno"
+
+	buf = new(bytes.Buffer)
+	err = UserList(deploymentId, "", "", "", api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), messages.HoustonInvalidDeploymentUsers)
+}
 
 func TestAdd(t *testing.T) {
 	testUtil.InitTestConfig()
