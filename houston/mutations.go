@@ -46,4 +46,31 @@ var (
 		}
 	}
 	`
+
+	// DeploymentUserUpdateRequest Mutation for UpdateDeploymentUser
+	DeploymentUserUpdateRequest = `
+	mutation UpdateDeploymentUser(
+		$userId: Id
+		$email: String!
+		$deploymentId: Id!
+		$role: Role!
+	) {
+		deploymentUpdateUserRole(
+			userId: $userId
+			email: $email
+			deploymentId: $deploymentId
+			role: $role
+		) {
+			id
+			user {
+				username
+			}
+			role
+			deployment {
+				id
+				releaseName
+			}
+		}
+	}
+	`
 )
