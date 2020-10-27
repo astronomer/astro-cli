@@ -159,9 +159,9 @@ func TestCreate(t *testing.T) {
 	releaseName := ""
 	role := "test-role"
 	executor := "CeleryExecutor"
-
+	airflowVersion := "1.10.5"
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -181,9 +181,9 @@ func TestCreateHoustonError(t *testing.T) {
 	releaseName := ""
 	role := "test-role"
 	executor := "CeleryExecutor"
-
+	airflowVersion := "1.10.5"
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
