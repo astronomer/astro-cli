@@ -45,11 +45,15 @@ func checkManualReleaseNames(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole string, executor string, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if releaseName != "" && checkManualReleaseNames(client) {
 		vars["releaseName"] = releaseName
+	}
+
+	if airflowVersion != "" {
+		vars["airflowVersion"] = airflowVersion
 	}
 
 	req := houston.Request{

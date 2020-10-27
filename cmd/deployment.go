@@ -30,6 +30,9 @@ var (
 
 # Create new deployment with Kubernetes executor.
   $ astro deployment create new-deployment-name-k8s --executor=k8s
+
+# Create new deployment with Kubernetes executor.
+  $ astro deployment create new-deployment-1-10-10-airflow-k8s --executor=k8s --airflowVersion=1.10.10
 `
 	deploymentUserCreateExample = `
 # Add a workspace user to a deployment with a particular role
@@ -93,6 +96,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
+	cmd.Flags().StringVarP(&airflowVersion, "airflowVersion", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
@@ -296,7 +300,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, client, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {

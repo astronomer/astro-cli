@@ -23,6 +23,7 @@ var (
 		$releaseName: String
 		$workspaceId: Uuid!
 		$executor: ExecutorType!
+		$airflowVersion: String
 		$config: JSON
 		$cloudRole: String
 	) {
@@ -32,6 +33,7 @@ var (
 			workspaceUuid: $workspaceId
 			releaseName: $releaseName
 			executor: $executor
+		        airflowVersion: $airflowVersion
 			config: $config
 			cloudRole: $cloudRole
 		) {
