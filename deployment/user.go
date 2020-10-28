@@ -3,8 +3,10 @@ package deployment
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -16,6 +18,63 @@ var (
 		Header:         header,
 	}
 )
+
+// UserList returns a list of user with deployment access
+func UserList(deploymentId string, email string, userId string, fullName string, client *houston.Client, out io.Writer) error {
+	user := map[string]interface{}{
+		"userId":   userId,
+		"email":    email,
+		"fullName": fullName,
+	}
+	variables := map[string]interface{}{
+		"user":         user,
+		"deploymentId": deploymentId,
+	}
+	req := houston.Request{
+		Query:     houston.DeploymentUserListRequest,
+		Variables: variables,
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	deploymentUsers := r.Data.DeploymentUserList
+
+	if len(deploymentUsers) < 1 {
+		out.Write([]byte(messages.HoustonInvalidDeploymentUsers))
+		return nil
+	}
+
+	header = []string{"USER ID", "NAME", "EMAIL", "ROLE"}
+	tab := printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         header,
+	}
+
+	// Build rows
+	for _, d := range deploymentUsers {
+		role := filterByRoleType(d.RoleBindings, houston.DeploymentRole)
+		tab.AddRow([]string{d.Id, d.FullName, d.Username, role}, false)
+	}
+
+	tab.Print(out)
+
+	return nil
+}
+
+// filterByRoleType selects the type of role from a list of roles
+func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) string {
+	for _, roleBinding := range roleBindings {
+		if strings.Contains(roleBinding.Role, roleType) {
+			return roleBinding.Role
+		}
+	}
+
+	return ""
+}
 
 // Add a user to a deployment with specified role
 func Add(deploymentId string, email string, role string, client *houston.Client, out io.Writer) error {

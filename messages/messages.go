@@ -58,6 +58,8 @@ var (
 	HOUSTON_SELECT_DEPLOYMENT_PROMPT = "Select which airflow deployment you want to deploy to:"
 	HOUSTON_OAUTH_REDIRECT           = "Please visit the following URL, authenticate and paste token in next prompt\n"
 	HOUSTON_INVALID_DEPLOYMENT_KEY   = "Invalid deployment selection\n"
+	// TODO: @adam2k remove this message once the Houston API work is completed that will surface a similar error message
+	HoustonInvalidDeploymentUsers = "No users were found for this deployment.  Check the deploymentId and try again.\n"
 
 	INPUT_PASSWORD    = "Password: "
 	INPUT_USERNAME    = "Username (leave blank for oAuth): "

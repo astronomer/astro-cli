@@ -6,6 +6,7 @@ type Response struct {
 		AddDeploymentUser              *RoleBinding              `json:"deploymentAddUserRole,omitempty"`
 		DeleteDeploymentUser           *RoleBinding              `json:"deploymentRemoveUserRole,omitempty"`
 		UpdateDeploymentUser           *RoleBinding              `json:"deploymentUpdateUserRole,omitempty"`
+		DeploymentUserList             []DeploymentUser          `json:"deploymentUsers,omitempty"`
 		AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
 		RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
 		CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
@@ -135,6 +136,15 @@ type WorkspaceServiceAccount struct {
 	CreatedAt     string `json:"createdAt"`
 	UpdatedAt     string `json:"updatedAt"`
 	Active        bool   `json:"active"`
+}
+
+// DeploymentUser defines a structure of RBAC deployment users
+type DeploymentUser struct {
+	Id           string        `json:"id"`
+	Emails       []Email       `json:"emails"`
+	FullName     string        `json:"fullName"`
+	Username     string        `json:"username"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object
