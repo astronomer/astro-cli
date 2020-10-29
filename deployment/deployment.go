@@ -2,13 +2,14 @@ package deployment
 
 import (
 	"fmt"
+	"io"
+	"sort"
+	"strconv"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/fatih/camelcase"
-	"io"
-	"sort"
-	"strconv"
 )
 
 func newTableOut() *printutil.Table {
@@ -222,21 +223,21 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "AIRFLOW VERSION"},
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName,"v"+d.Version, d.Id, d.DesiredAirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, d.DesiredAirflowVersion}, false)
 
-	tab.SuccessMsg =
-		fmt.Sprintf("\n Update deployment from version %s to %s has been started", d.AirflowVersion, d.DesiredAirflowVersion)
+	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started.", d.AirflowVersion, d.DesiredAirflowVersion) +
+		"To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.\n" +
+		"To cancel, run: \n `$ astro deployment airflow upgrade --cancel\n"
 
 	tab.Print(out)
 
 	return nil
 }
 
-
 func getAirflowVersionSelection(client *houston.Client, out io.Writer) (string, error) {
 	// prepare list of AC airflow versions
 	dReq := houston.Request{
-		Query:     houston.DeploymentInfoRequest,
+		Query: houston.DeploymentInfoRequest,
 	}
 
 	resp, err := dReq.DoWithClient(client)
