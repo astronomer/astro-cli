@@ -12,16 +12,17 @@ import (
 )
 
 var (
-	allDeployments bool
-	executor       string
-	deploymentId   string
-	userId         string
-	systemSA       bool
-	category       string
-	label          string
-	cloudRole      string
-	releaseName    string
-	CreateExample  = `
+	allDeployments        bool
+	executor              string
+	deploymentId          string
+	desiredAirflowVersion string
+	userId                string
+	systemSA              bool
+	category              string
+	label                 string
+	cloudRole             string
+	releaseName           string
+	CreateExample         = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create new-deployment-name --executor=celery
 
@@ -60,6 +61,10 @@ var (
 	deploymentSaDeleteExample = `
   $ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
 `
+	deploymentAirflowUpgradeExample = `
+  $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
+`
+
 	deploymentUpdateAttrs = []string{"label"}
 )
 
@@ -79,6 +84,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		newLogsCmd(client, out),
 		newDeploymentSaRootCmd(client, out),
 		newDeploymentUserRootCmd(client, out),
+		newDeploymentAirflowRootCmd(client, out),
 	)
 	return cmd
 }
@@ -279,6 +285,37 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
+func newDeploymentAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "airflow",
+		Aliases: []string{"ai"},
+		Short:   "Manage airflow deployments",
+		Long:    "Manage airflow deployments",
+	}
+	cmd.AddCommand(
+		newDeploymentAirflowUpgradeCmd(client, out),
+	)
+	return cmd
+}
+
+func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Aliases: []string{"up"},
+		Short:   "Upgrade Airflow version",
+		Long:    "Upgrade Airflow version",
+		Example: deploymentAirflowUpgradeExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentAirflowUpgrade(cmd, args, client, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
+	cmd.MarkFlagRequired("deployment-id")
+	cmd.MarkFlagRequired("desired-airflow-version")
+	return cmd
+}
+
 func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -407,4 +444,11 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Clien
 	cmd.SilenceUsage = true
 
 	return sa.DeleteUsingDeploymentUUID(args[0], deploymentId, client, out)
+}
+
+func deploymentAirflowUpgrade(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return deployment.AirflowUpgrade(deploymentId, desiredAirflowVersion, client, out)
 }

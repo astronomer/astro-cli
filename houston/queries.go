@@ -89,6 +89,7 @@ var (
 				current
 			}
 			version
+			airflowVersion
 			createdAt
 			updatedAt
 		}
@@ -108,6 +109,18 @@ var (
 			}
 			createdAt
 			updatedAt
+		}
+	}`
+
+	UpdateDeploymentAirflowRequest = `
+	mutation updateDeploymentAirflow($deploymentId: Uuid!, $desiredAirflowVersion: String!) {
+		updateDeploymentAirflow(deploymentUuid: $deploymentId, desiredAirflowVersion: $desiredAirflowVersion) {
+			id
+			label
+			version
+			releaseName
+			airflowVersion
+			desiredAirflowVersion
 		}
 	}`
 

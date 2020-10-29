@@ -25,6 +25,7 @@ type Response struct {
 		GetUsers                       []User                    `json:"users,omitempty"`
 		GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
 		UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
+		UpdateDeploymentAirflow        *Deployment               `json:"updateDeploymentAirflow,omitempty"`
 		UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
 		DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
 		WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
@@ -62,16 +63,18 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	Id             string          `json:"id"`
-	Type           string          `json:"type"`
-	Label          string          `json:"label"`
-	ReleaseName    string          `json:"releaseName"`
-	Version        string          `json:"version"`
-	DeploymentInfo DeploymentInfo  `json:"deployInfo"`
-	Workspace      Workspace       `json:"workspace"`
-	Urls           []DeploymentUrl `json:"urls"`
-	CreatedAt      string          `json:"createdAt"`
-	UpdatedAt      string          `json:"updatedAt"`
+	Id                    string          `json:"id"`
+	Type                  string          `json:"type"`
+	Label                 string          `json:"label"`
+	ReleaseName           string          `json:"releaseName"`
+	Version               string          `json:"version"`
+	AirflowVersion        string          `json:"airflowVersion"`
+	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
+	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
+	Workspace             Workspace       `json:"workspace"`
+	Urls                  []DeploymentUrl `json:"urls"`
+	CreatedAt             string          `json:"createdAt"`
+	UpdatedAt             string          `json:"updatedAt"`
 }
 
 // DeploymentUrl defines structure of a houston response DeploymentUrl object

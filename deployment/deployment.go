@@ -193,3 +193,33 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 
 	return nil
 }
+
+// Upgrade airflow deployment
+func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, out io.Writer) error {
+	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
+
+	req := houston.Request{
+		Query:     houston.UpdateDeploymentAirflowRequest,
+		Variables: vars,
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	d := r.Data.UpdateDeploymentAirflow
+	tab := &printutil.Table{
+		Padding:        []int{30, 30, 10, 50, 10},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "AIRFLOW VERSION"},
+	}
+	tab.AddRow([]string{d.Label, d.ReleaseName,"v"+d.Version, d.Id, d.DesiredAirflowVersion}, false)
+
+	tab.SuccessMsg =
+		fmt.Sprintf("\n Update deployment from version %s to %s has been started", d.AirflowVersion, d.DesiredAirflowVersion)
+
+	tab.Print(out)
+
+	return nil
+}
