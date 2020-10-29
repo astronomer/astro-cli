@@ -453,8 +453,9 @@ var (
 			airflowImages {
 				version
 				tag
-		}
-		defaultAirflowImageTag
+			}
+			airflowVersions
+			defaultAirflowImageTag
 		}
 	}`
 	AppConfigRequest = `

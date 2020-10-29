@@ -312,7 +312,6 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
 	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
 	cmd.MarkFlagRequired("deployment-id")
-	cmd.MarkFlagRequired("desired-airflow-version")
 	return cmd
 }
 

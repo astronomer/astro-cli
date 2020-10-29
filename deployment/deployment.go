@@ -2,13 +2,13 @@ package deployment
 
 import (
 	"fmt"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/fatih/camelcase"
 	"io"
 	"sort"
-
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/fatih/camelcase"
+	"strconv"
 )
 
 func newTableOut() *printutil.Table {
@@ -196,6 +196,14 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 
 // Upgrade airflow deployment
 func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, out io.Writer) error {
+	if desiredAirflowVersion == "" {
+		airflowVersion, err := getAirflowVersionSelection(client, out)
+		if err != nil {
+			return err
+		}
+		desiredAirflowVersion = airflowVersion
+	}
+
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
 
 	req := houston.Request{
@@ -222,4 +230,40 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 	tab.Print(out)
 
 	return nil
+}
+
+
+func getAirflowVersionSelection(client *houston.Client, out io.Writer) (string, error) {
+	// prepare list of AC airflow versions
+	dReq := houston.Request{
+		Query:     houston.DeploymentInfoRequest,
+	}
+
+	resp, err := dReq.DoWithClient(client)
+	if err != nil {
+		return "", err
+	}
+	airflowVersions := resp.Data.DeploymentConfig.AirflowVersions
+
+	t := &printutil.Table{
+		Padding:        []int{10},
+		DynamicPadding: true,
+		Header:         []string{"AIRFLOW VERSION"},
+	}
+	t.GetUserInput = true
+
+	for _, v := range airflowVersions {
+		// false means no colors
+		t.AddRow([]string{v}, false)
+	}
+
+	t.Print(out)
+
+	in := input.InputText("\n> ")
+	i, err := strconv.ParseInt(
+		in,
+		10,
+		64,
+	)
+	return airflowVersions[i-1], nil
 }

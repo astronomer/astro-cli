@@ -217,6 +217,7 @@ type AirflowImage struct {
 type DeploymentConfig struct {
 	AirflowImages          []AirflowImage `json:"airflowImages"`
 	DefaultAirflowImageTag string         `json:"defaultAirflowImageTag"`
+	AirflowVersions        []string       `json:"airflowVersions"`
 }
 
 func (config *DeploymentConfig) GetValidTags() (tags []string) {
