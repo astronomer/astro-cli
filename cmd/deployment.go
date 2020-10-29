@@ -16,6 +16,8 @@ var (
 	executor              string
 	deploymentId          string
 	desiredAirflowVersion string
+	email                 string
+	fullName              string
 	userId                string
 	systemSA              bool
 	category              string
