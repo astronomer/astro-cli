@@ -22,8 +22,8 @@ var (
 	label                 string
 	cloudRole             string
 	releaseName           string
-)
-	CreateExample  = `
+
+	CreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create new-deployment-name --executor=celery
 
