@@ -171,7 +171,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	err = registryAuth()
 	if err != nil {
-		fmt.Printf(messages.REGISTRY_AUTH_FAIL)
+		fmt.Printf(messages.RegistryAuthFail)
 	}
 
 	return nil

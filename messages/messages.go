@@ -58,13 +58,15 @@ var (
 	HOUSTON_SELECT_DEPLOYMENT_PROMPT = "Select which airflow deployment you want to deploy to:"
 	HOUSTON_OAUTH_REDIRECT           = "Please visit the following URL, authenticate and paste token in next prompt\n"
 	HOUSTON_INVALID_DEPLOYMENT_KEY   = "Invalid deployment selection\n"
+	// TODO: @adam2k remove this message once the Houston API work is completed that will surface a similar error message
+	HoustonInvalidDeploymentUsers = "No users were found for this deployment.  Check the deploymentId and try again.\n"
 
 	INPUT_PASSWORD    = "Password: "
 	INPUT_USERNAME    = "Username (leave blank for oAuth): "
 	INPUT_OAUTH_TOKEN = "oAuth Token: "
 
 	REGISTRY_AUTH_SUCCESS        = "Successfully authenticated to %s\n"
-	REGISTRY_AUTH_FAIL           = "Failed to authenticate to the registry, this can occur when registry is offline. Until authenticated you will not be able to push new images to your Airflow clusters\n"
+	RegistryAuthFail             = "\nFailed to authenticate to the registry. Do you have Docker running?\nYou will not be able to push new images to your Airflow Deployment unless Docker is running.\nIf Docker is running and you are seeing this message, the registry is down or cannot be reached.\n"
 	REGISTRY_UNCOMMITTED_CHANGES = "Project directory has uncommmited changes, use `astro deploy [releaseName] -f` to force deploy."
 
 	SETTINGS_PATH = "Error looking for settings.yaml"

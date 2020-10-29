@@ -248,6 +248,25 @@ var (
          }
     }`
 
+	// DeploymentUserListRequest return the users for a specific deployment by ID
+	DeploymentUserListRequest = `
+	query deploymentUsers(
+    $deploymentId: Id!
+    $user: UserSearch
+  ) {
+    deploymentUsers(
+      deploymentId: $deploymentId
+      user: $user
+    ) {
+      id
+      fullName
+      username
+      roleBindings {
+        role
+      }
+    }
+  }`
+
 	ServiceAccountsGetRequest = `
 	query GetServiceAccount(
 		$serviceAccountId: Uuid
