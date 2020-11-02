@@ -227,7 +227,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started.", d.AirflowVersion, d.DesiredAirflowVersion) +
 		"To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.\n" +
-		"To cancel, run: \n `$ astro deployment airflow upgrade --cancel\n"
+		"To cancel, run: \n $ astro deployment airflow upgrade --cancel\n"
 
 	tab.Print(out)
 
