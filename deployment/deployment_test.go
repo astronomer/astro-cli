@@ -326,3 +326,40 @@ func TestUpdateError(t *testing.T) {
 	err := Update(id, role, deploymentConfig, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
+
+func TestAirflowUpgrade(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{"data": {
+					"updateDeploymentAirflow": {
+						"id": "ckggzqj5f4157qtc9lescmehm",
+						"label": "test",
+						"airflowVersion": "1.10.5",
+						"desiredAirflowVersion": "1.10.10"
+					}
+				}
+			}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	desiredAirflowVersion := "1.10.10"
+
+	buf := new(bytes.Buffer)
+	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
+	assert.NoError(t, err)
+	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
+ test                         v         ckggzqj5f4157qtc9lescmehm     1.10.10             
+
+The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.
+To cancel, run: 
+ $ astro deployment airflow upgrade --cancel
+
+`
+
+	assert.Equal(t, buf.String(), expected)
+}
