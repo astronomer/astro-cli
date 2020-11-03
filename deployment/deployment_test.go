@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -384,6 +385,55 @@ func TestAirflowUpgradeError(t *testing.T) {
 	assert.Error(t, err, "API error (500):")
 }
 
+
+func TestAirflowUpgradeCancel(t *testing.T) {
+	testUtil.InitTestConfig()
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+
+	okResponse := `{"data": {
+					"deployment": {
+						"id": "ckggzqj5f4157qtc9lescmehm",
+						"label": "test",
+						"airflowVersion": "1.10.5",
+						"desiredAirflowVersion": "1.10.10"
+					}
+				}
+			}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	buf := new(bytes.Buffer)
+	err := AirflowUpgradeCancel(deploymentId, api, buf)
+	assert.NoError(t, err)
+	expected := `
+Airflow upgrade process has been successfully canceled. You are using right now 1.10.5
+`
+	assert.Equal(t, buf.String(), expected)
+}
+
+
+func TestAirflowUpgradeCancelError(t *testing.T) {
+	testUtil.InitTestConfig()
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(strings.NewReader(``)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	buf := new(bytes.Buffer)
+	err := AirflowUpgradeCancel(deploymentId, api, buf)
+	assert.Error(t, err, "API error (500):")
+}
 func Test_getDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{"data": {
