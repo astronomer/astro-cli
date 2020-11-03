@@ -13,6 +13,7 @@ import (
 
 var (
 	allDeployments        bool
+	cancel                bool
 	executor              string
 	deploymentId          string
 	desiredAirflowVersion string
@@ -70,6 +71,9 @@ var (
 `
 	deploymentAirflowUpgradeExample = `
   $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
+  
+# Abort the initial airflow upgrade step: 
+  $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
 `
 
 	deploymentUpdateAttrs = []string{"label"}
@@ -338,6 +342,7 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 	}
 	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
 	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
+	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
 	cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
@@ -486,6 +491,8 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Clien
 func deploymentAirflowUpgrade(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
+	if cancel {
+		return deployment.AirflowUpgradeCancel(deploymentId, client, out)
+	}
 	return deployment.AirflowUpgrade(deploymentId, desiredAirflowVersion, client, out)
 }

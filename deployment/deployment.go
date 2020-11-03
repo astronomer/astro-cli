@@ -16,7 +16,7 @@ func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 30, 10, 50, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG"},
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG", "AIRFLOW VERSION"},
 	}
 }
 
@@ -69,7 +69,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, 
 
 	d := r.Data.CreateDeployment
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id, d.AirflowVersion}, false)
 
 	splitted := []string{"Celery", ""}
 
@@ -161,7 +161,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 		if currentTag == "" {
 			currentTag = "?"
 		}
-		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, currentTag}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, currentTag, d.AirflowVersion}, false)
 	}
 
 	return tab.Print(out)
@@ -188,7 +188,7 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 
 	d := r.Data.UpdateDeployment
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id, d.AirflowVersion}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
 	tab.Print(out)
 
@@ -223,7 +223,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "AIRFLOW VERSION"},
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, d.DesiredAirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, d.AirflowVersion}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started.", d.AirflowVersion, d.DesiredAirflowVersion) +
 		"To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.\n" +
@@ -231,6 +231,45 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 
 	tab.Print(out)
 
+	return nil
+}
+
+// Upgrade airflow deployment
+func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) error {
+	vars := map[string]interface{}{"id": id}
+
+	req := houston.Request{
+		Query:     houston.DeploymentGetRequest,
+		Variables: vars,
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	deployment := r.Data.GetDeployment
+
+	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
+		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
+
+		req := houston.Request{
+			Query:     houston.UpdateDeploymentAirflowRequest,
+			Variables: vars,
+		}
+
+		_, err := req.DoWithClient(client)
+		if err != nil {
+			return err
+		}
+
+		text := "\nAirflow upgrade process has been successfully canceled. You are using right now %s\n"
+		fmt.Fprintf(out, text, deployment.AirflowVersion)
+		return nil
+	}
+
+	text := "\nNothing to cancel. You are currently using airflow version %s and desired airflow version is %s\n"
+	fmt.Fprintf(out, text, deployment.AirflowVersion, deployment.DesiredAirflowVersion)
 	return nil
 }
 

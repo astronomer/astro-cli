@@ -95,6 +95,19 @@ var (
 		}
 	}`
 
+	DeploymentGetRequest = `
+	query GetDeployment(
+		$id: String!
+	) {
+		deployment(
+			where: {id: $id}
+		) {
+			id
+			airflowVersion
+			desiredAirflowVersion
+		}
+	}`
+
 	DeploymentUpdateRequest = `
 	mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String) {
 		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole) {
