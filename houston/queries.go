@@ -42,6 +42,7 @@ var (
 			label
 			releaseName
 			version
+			airflowVersion
 			urls {
 				type
 				url
@@ -117,6 +118,7 @@ var (
 			description
 			releaseName
 			version
+			airflowVersion
 			workspace {
 				id
 			}

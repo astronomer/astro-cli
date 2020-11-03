@@ -14,7 +14,7 @@ import (
 
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
-		Padding:        []int{30, 30, 10, 50, 10},
+		Padding:        []int{30, 30, 10, 50, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG", "AIRFLOW VERSION"},
 	}
@@ -69,7 +69,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, 
 
 	d := r.Data.CreateDeployment
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id, d.AirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id, "-", d.AirflowVersion}, false)
 
 	splitted := []string{"Celery", ""}
 
