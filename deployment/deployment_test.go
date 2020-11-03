@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -365,7 +366,6 @@ To cancel, run:
 	assert.Equal(t, buf.String(), expected)
 }
 
-
 func TestAirflowUpgradeError(t *testing.T) {
 	testUtil.InitTestConfig()
 	response := ``
@@ -384,7 +384,6 @@ func TestAirflowUpgradeError(t *testing.T) {
 	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
 	assert.Error(t, err, "API error (500):")
 }
-
 
 func TestAirflowUpgradeCancel(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -416,7 +415,6 @@ Airflow upgrade process has been successfully canceled. You are using right now 
 `
 	assert.Equal(t, buf.String(), expected)
 }
-
 
 func TestAirflowUpgradeCancelError(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -460,7 +458,6 @@ func Test_getDeployment(t *testing.T) {
 	assert.Equal(t, deployment, &houston.Deployment{Id: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
 }
 
-
 func Test_getDeploymentError(t *testing.T) {
 	testUtil.InitTestConfig()
 	response := ``
@@ -476,4 +473,72 @@ func Test_getDeploymentError(t *testing.T) {
 
 	_, err := getDeployment(deploymentId, api)
 	assert.Error(t, err, "tes")
+}
+
+func Test_getAirflowVersionSelection(t *testing.T) {
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	testUtil.InitTestConfig()
+	okResponse := `{"data": {
+					"deployment": {
+						"id": "ckggzqj5f4157qtc9lescmehm",
+						"label": "test",
+						"airflowVersion": "1.10.7",
+						"desiredAirflowVersion": "1.10.10"
+					},
+					"deploymentConfig": {
+							"airflowVersions": [
+							  "1.10.7",
+							  "1.10.10",
+							  "1.10.12"
+							]
+						}
+					}
+				}
+			}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	buf := new(bytes.Buffer)
+
+	// mock os.Stdin
+	input := []byte("3")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
+	assert.NoError(t, err)
+	assert.Equal(t, airflowVersion, "1.10.12")
+}
+
+func Test_getAirflowVersionSelectionError(t *testing.T) {
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(``)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	buf := new(bytes.Buffer)
+	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
+	assert.Error(t, err, "API error (500):")
+	assert.Equal(t, airflowVersion, "")
 }
