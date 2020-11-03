@@ -364,6 +364,26 @@ To cancel, run:
 	assert.Equal(t, buf.String(), expected)
 }
 
+
+func TestAirflowUpgradeError(t *testing.T) {
+	testUtil.InitTestConfig()
+	response := ``
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(response)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	desiredAirflowVersion := "1.10.10"
+
+	buf := new(bytes.Buffer)
+	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
+	assert.Error(t, err, "API error (500):")
+}
+
 func Test_getDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{"data": {
@@ -385,6 +405,25 @@ func Test_getDeployment(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 
-	deployment := getDeployment(deploymentId, api)
+	deployment, err := getDeployment(deploymentId, api)
+	assert.NoError(t, err)
 	assert.Equal(t, deployment, &houston.Deployment{Id: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
+}
+
+
+func Test_getDeploymentError(t *testing.T) {
+	testUtil.InitTestConfig()
+	response := ``
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(response)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckbv818oa00r107606ywhoqtw"
+
+	_, err := getDeployment(deploymentId, api)
+	assert.Error(t, err, "tes")
 }

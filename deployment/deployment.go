@@ -237,7 +237,10 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 
 // Upgrade airflow deployment
 func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) error {
-	deployment := getDeployment(id, client)
+	deployment, err := getDeployment(id, client)
+	if err != nil {
+		return err
+	}
 
 	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
 		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
@@ -263,7 +266,10 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 }
 
 func getAirflowVersionSelection(deploymentId string, client *houston.Client, out io.Writer) (string, error) {
-	deployment := getDeployment(deploymentId, client)
+	deployment, err := getDeployment(deploymentId, client)
+	if err != nil {
+		return "", err
+	}
 	currentAirflowVersion, err := semver.NewVersion(deployment.AirflowVersion)
 	if err != nil {
 		return "", err
@@ -306,7 +312,7 @@ func getAirflowVersionSelection(deploymentId string, client *houston.Client, out
 }
 
 
-func getDeployment(deploymentId string, client *houston.Client) *houston.Deployment {
+func getDeployment(deploymentId string, client *houston.Client) (*houston.Deployment, error) {
 	vars := map[string]interface{}{"id": deploymentId}
 
 	req := houston.Request{
@@ -316,8 +322,8 @@ func getDeployment(deploymentId string, client *houston.Client) *houston.Deploym
 
 	r, err := req.DoWithClient(client)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	return &r.Data.GetDeployment
+	return &r.Data.GetDeployment, nil
 }
