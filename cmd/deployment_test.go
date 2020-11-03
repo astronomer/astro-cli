@@ -279,3 +279,32 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
+
+
+func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `Airflow upgrade process has been successfully canceled. You are using right now 1.10.5`
+
+	okResponse := `{"data": {
+					"deployment": {
+						"id": "ckggzqj5f4157qtc9lescmehm",
+						"label": "test",
+						"airflowVersion": "1.10.5",
+						"desiredAirflowVersion": "1.10.10"
+					}
+				}
+			}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
