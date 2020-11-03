@@ -363,3 +363,28 @@ To cancel, run:
 
 	assert.Equal(t, buf.String(), expected)
 }
+
+func Test_getDeployment(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{"data": {
+					"deployment": {
+						"id": "ckggzqj5f4157qtc9lescmehm",
+						"label": "test",
+						"airflowVersion": "1.10.5",
+						"desiredAirflowVersion": "1.10.10"
+					}
+				}
+			}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckbv818oa00r107606ywhoqtw"
+
+	deployment := getDeployment(deploymentId, api)
+	assert.Equal(t, deployment, &houston.Deployment{Id: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
+}
