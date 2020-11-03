@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"github.com/Masterminds/semver"
 	"io"
 	"sort"
 	"strconv"
@@ -198,11 +199,11 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 // Upgrade airflow deployment
 func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, out io.Writer) error {
 	if desiredAirflowVersion == "" {
-		airflowVersion, err := getAirflowVersionSelection(client, out)
+		selectedVersion, err := getAirflowVersionSelection(id, client, out)
 		if err != nil {
 			return err
 		}
-		desiredAirflowVersion = airflowVersion
+		desiredAirflowVersion = selectedVersion
 	}
 
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
@@ -236,19 +237,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 
 // Upgrade airflow deployment
 func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) error {
-	vars := map[string]interface{}{"id": id}
-
-	req := houston.Request{
-		Query:     houston.DeploymentGetRequest,
-		Variables: vars,
-	}
-
-	r, err := req.DoWithClient(client)
-	if err != nil {
-		return err
-	}
-
-	deployment := r.Data.GetDeployment
+	deployment := getDeployment(id, client)
 
 	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
 		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
@@ -273,7 +262,12 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 	return nil
 }
 
-func getAirflowVersionSelection(client *houston.Client, out io.Writer) (string, error) {
+func getAirflowVersionSelection(deploymentId string, client *houston.Client, out io.Writer) (string, error) {
+	deployment := getDeployment(deploymentId, client)
+	currentAirflowVersion, err := semver.NewVersion(deployment.AirflowVersion)
+	if err != nil {
+		return "", err
+	}
 	// prepare list of AC airflow versions
 	dReq := houston.Request{
 		Query: houston.DeploymentInfoRequest,
@@ -293,8 +287,11 @@ func getAirflowVersionSelection(client *houston.Client, out io.Writer) (string, 
 	t.GetUserInput = true
 
 	for _, v := range airflowVersions {
+		vv, _ := semver.NewVersion(v)
 		// false means no colors
-		t.AddRow([]string{v}, false)
+		if currentAirflowVersion.LessThan(vv) {
+			t.AddRow([]string{v}, false)
+		}
 	}
 
 	t.Print(out)
@@ -306,4 +303,21 @@ func getAirflowVersionSelection(client *houston.Client, out io.Writer) (string, 
 		64,
 	)
 	return airflowVersions[i-1], nil
+}
+
+
+func getDeployment(deploymentId string, client *houston.Client) *houston.Deployment {
+	vars := map[string]interface{}{"id": deploymentId}
+
+	req := houston.Request{
+		Query:     houston.DeploymentGetRequest,
+		Variables: vars,
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return nil
+	}
+
+	return &r.Data.GetDeployment
 }
