@@ -37,7 +37,7 @@ var (
   $ astro deployment create new-deployment-name-k8s --executor=k8s
 
 # Create new deployment with Kubernetes executor.
-  $ astro deployment create my-new-deployment --executor=k8s --airflowVersion=1.10.10
+  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10
 `
 	deploymentUserListExample = `
 # Search for deployment users
@@ -113,7 +113,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
-	cmd.Flags().StringVarP(&airflowVersion, "airflowVersion", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
