@@ -506,7 +506,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// mock os.Stdin
-	input := []byte("3")
+	input := []byte("2")
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)

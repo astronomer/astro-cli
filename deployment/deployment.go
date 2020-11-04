@@ -2,10 +2,11 @@ package deployment
 
 import (
 	"fmt"
-	"github.com/Masterminds/semver"
 	"io"
 	"sort"
 	"strconv"
+
+	"github.com/Masterminds/semver"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -292,12 +293,16 @@ func getAirflowVersionSelection(deploymentId string, client *houston.Client, out
 	}
 	t.GetUserInput = true
 
+	var filteredVersions []string
+
 	for _, v := range airflowVersions {
 		vv, _ := semver.NewVersion(v)
 		// false means no colors
 		if currentAirflowVersion.LessThan(vv) {
+			filteredVersions = append(filteredVersions, v)
 			t.AddRow([]string{v}, false)
 		}
+
 	}
 
 	t.Print(out)
@@ -308,9 +313,8 @@ func getAirflowVersionSelection(deploymentId string, client *houston.Client, out
 		10,
 		64,
 	)
-	return airflowVersions[i-1], nil
+	return filteredVersions[i-1], nil
 }
-
 
 func getDeployment(deploymentId string, client *houston.Client) (*houston.Deployment, error) {
 	vars := map[string]interface{}{"id": deploymentId}
