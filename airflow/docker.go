@@ -650,7 +650,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		return errors.Wrapf(err, "command 'docker rmi %s' failed", remoteImage)
 	}
 
-	fmt.Println("Deploy succeeded!")
+	fmt.Println("Successfully pushed Docker image to Astronomer registry. You could navigate to Astronomer UI for confirmation your deploy was successful.")
 
 	return nil
 }
