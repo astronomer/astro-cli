@@ -12,18 +12,21 @@ import (
 )
 
 var (
-	allDeployments bool
-	executor       string
-	deploymentId   string
-	userId         string
-	email          string
-	fullName       string
-	systemSA       bool
-	category       string
-	label          string
-	cloudRole      string
-	releaseName    string
-	CreateExample  = `
+	allDeployments        bool
+	cancel                bool
+	executor              string
+	deploymentId          string
+	desiredAirflowVersion string
+	email                 string
+	fullName              string
+	userId                string
+	systemSA              bool
+	category              string
+	label                 string
+	cloudRole             string
+	releaseName           string
+
+	CreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create new-deployment-name --executor=celery
 
@@ -32,6 +35,9 @@ var (
 
 # Create new deployment with Kubernetes executor.
   $ astro deployment create new-deployment-name-k8s --executor=k8s
+
+# Create new deployment with Kubernetes executor.
+  $ astro deployment create my-new-deployment --executor=k8s --airflowVersion=1.10.10
 `
 	deploymentUserListExample = `
 # Search for deployment users
@@ -63,6 +69,13 @@ var (
 	deploymentSaDeleteExample = `
   $ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
 `
+	deploymentAirflowUpgradeExample = `
+  $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
+  
+# Abort the initial airflow upgrade step: 
+  $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
+`
+
 	deploymentUpdateAttrs = []string{"label"}
 )
 
@@ -82,6 +95,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		newLogsCmd(client, out),
 		newDeploymentSaRootCmd(client, out),
 		newDeploymentUserRootCmd(client, out),
+		newDeploymentAirflowRootCmd(client, out),
 	)
 	return cmd
 }
@@ -99,6 +113,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local or celery")
+	cmd.Flags().StringVarP(&airflowVersion, "airflowVersion", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
@@ -301,6 +316,37 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
+func newDeploymentAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "airflow",
+		Aliases: []string{"ai"},
+		Short:   "Manage airflow deployments",
+		Long:    "Manage airflow deployments",
+	}
+	cmd.AddCommand(
+		newDeploymentAirflowUpgradeCmd(client, out),
+	)
+	return cmd
+}
+
+func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Aliases: []string{"up"},
+		Short:   "Upgrade Airflow version",
+		Long:    "Upgrade Airflow version",
+		Example: deploymentAirflowUpgradeExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentAirflowUpgrade(cmd, args, client, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
+	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
+	cmd.MarkFlagRequired("deployment-id")
+	return cmd
+}
+
 func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -322,7 +368,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, client, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -440,4 +486,13 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Clien
 	cmd.SilenceUsage = true
 
 	return sa.DeleteUsingDeploymentUUID(args[0], deploymentId, client, out)
+}
+
+func deploymentAirflowUpgrade(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	if cancel {
+		return deployment.AirflowUpgradeCancel(deploymentId, client, out)
+	}
+	return deployment.AirflowUpgrade(deploymentId, desiredAirflowVersion, client, out)
 }

@@ -23,6 +23,7 @@ var (
 		$releaseName: String
 		$workspaceId: Uuid!
 		$executor: ExecutorType!
+		$airflowVersion: String
 		$config: JSON
 		$cloudRole: String
 	) {
@@ -32,6 +33,7 @@ var (
 			workspaceUuid: $workspaceId
 			releaseName: $releaseName
 			executor: $executor
+		        airflowVersion: $airflowVersion
 			config: $config
 			cloudRole: $cloudRole
 		) {
@@ -40,6 +42,7 @@ var (
 			label
 			releaseName
 			version
+			airflowVersion
 			urls {
 				type
 				url
@@ -87,8 +90,22 @@ var (
 				current
 			}
 			version
+			airflowVersion
 			createdAt
 			updatedAt
+		}
+	}`
+
+	DeploymentGetRequest = `
+	query GetDeployment(
+		$id: String!
+	) {
+		deployment(
+			where: {id: $id}
+		) {
+			id
+			airflowVersion
+			desiredAirflowVersion
 		}
 	}`
 
@@ -101,11 +118,24 @@ var (
 			description
 			releaseName
 			version
+			airflowVersion
 			workspace {
 				id
 			}
 			createdAt
 			updatedAt
+		}
+	}`
+
+	UpdateDeploymentAirflowRequest = `
+	mutation updateDeploymentAirflow($deploymentId: Uuid!, $desiredAirflowVersion: String!) {
+		updateDeploymentAirflow(deploymentUuid: $deploymentId, desiredAirflowVersion: $desiredAirflowVersion) {
+			id
+			label
+			version
+			releaseName
+			airflowVersion
+			desiredAirflowVersion
 		}
 	}`
 
@@ -457,8 +487,9 @@ var (
 			airflowImages {
 				version
 				tag
-		}
-		defaultAirflowImageTag
+			}
+			airflowVersions
+			defaultAirflowImageTag
 		}
 	}`
 	AppConfigRequest = `
