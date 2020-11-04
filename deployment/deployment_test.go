@@ -357,7 +357,7 @@ func TestAirflowUpgrade(t *testing.T) {
 	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
  test                         v         ckggzqj5f4157qtc9lescmehm     1.10.5              
 
-The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
+The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
 To cancel, run: 
  $ astro deployment airflow upgrade --cancel
 

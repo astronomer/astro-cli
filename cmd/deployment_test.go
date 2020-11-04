@@ -254,7 +254,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 
 func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
+	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
 	okResponse := `{"data": {
 					"updateDeploymentAirflow": {
