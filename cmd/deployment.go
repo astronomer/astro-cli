@@ -37,7 +37,7 @@ var (
   $ astro deployment create new-deployment-name-k8s --executor=k8s
 
 # Create new deployment with Kubernetes executor.
-  $ astro deployment create new-deployment-1-10-10-airflow-k8s --executor=k8s --airflowVersion=1.10.10
+  $ astro deployment create my-new-deployment --executor=k8s --airflowVersion=1.10.10
 `
 	deploymentUserListExample = `
 # Search for deployment users
