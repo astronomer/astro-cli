@@ -227,7 +227,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, d.AirflowVersion}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started.", d.AirflowVersion, d.DesiredAirflowVersion) +
-		"To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.\n" +
+		fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to Astronomer.\n", d.DesiredAirflowVersion) +
 		"To cancel, run: \n $ astro deployment airflow upgrade --cancel\n"
 
 	tab.Print(out)
@@ -255,13 +255,13 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 			return err
 		}
 
-		text := "\nAirflow upgrade process has been successfully canceled. You are using right now %s\n"
+		text := "\nAirflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow %s.\n"
 		fmt.Fprintf(out, text, deployment.AirflowVersion)
 		return nil
 	}
 
-	text := "\nNothing to cancel. You are currently using airflow version %s and desired airflow version is %s\n"
-	fmt.Fprintf(out, text, deployment.AirflowVersion, deployment.DesiredAirflowVersion)
+	text := "\nNothing to cancel. You are currently running Airflow %s and you have not indicated that you want to upgrade."
+	fmt.Fprintf(out, text, deployment.AirflowVersion)
 	return nil
 }
 

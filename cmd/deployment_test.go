@@ -254,7 +254,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 
 func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.`
+	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
 	okResponse := `{"data": {
 					"updateDeploymentAirflow": {
@@ -283,7 +283,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 
 func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `Airflow upgrade process has been successfully canceled. You are using right now 1.10.5`
+	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
 	okResponse := `{"data": {
 					"deployment": {

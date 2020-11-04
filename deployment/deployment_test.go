@@ -357,7 +357,7 @@ func TestAirflowUpgrade(t *testing.T) {
 	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
  test                         v         ckggzqj5f4157qtc9lescmehm     1.10.5              
 
-The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, replace the image referenced in your Dockerfile and deploy to Astronomer.
+The upgrade from Airflow 1.10.5 to 1.10.10 has been started.To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
 To cancel, run: 
  $ astro deployment airflow upgrade --cancel
 
@@ -411,7 +411,7 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 	err := AirflowUpgradeCancel(deploymentId, api, buf)
 	assert.NoError(t, err)
 	expected := `
-Airflow upgrade process has been successfully canceled. You are using right now 1.10.5
+Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.
 `
 	assert.Equal(t, buf.String(), expected)
 }
