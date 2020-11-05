@@ -29,9 +29,9 @@ func TestAdd(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     WORKSPACE ID                  EMAIL               ROLE
-          ckc0eir8e01gj07608ajmvia1     andrii@test.com     test-role
-Successfully added andrii@test.com to
+	expected := ` NAME     WORKSPACE ID                  EMAIL               ROLE          
+          ckc0eir8e01gj07608ajmvia1     andrii@test.com     test-role     
+Successfully added andrii@test.com to 
 `
 	assert.Equal(t, buf.String(), expected)
 }
@@ -74,8 +74,8 @@ func TestRemove(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := Remove(id, userId, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME                          WORKSPACE ID                                      USER_ID
-                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1
+	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
+                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
 Successfully removed user from workspace
 `
 	assert.Equal(t, buf.String(), expected)
@@ -152,8 +152,8 @@ func TestListRoles(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsId, api, buf)
 	assert.NoError(t, err)
-	expected := ` USERNAME                 ID                            ROLE
- andrii@astronomer.io     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN
+	expected := ` USERNAME                 ID                            ROLE                
+ andrii@astronomer.io     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
 	assert.Equal(t, buf.String(), expected)
 }

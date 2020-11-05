@@ -38,8 +38,8 @@ func TestCreate(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := Create(label, description, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     ID
- test     ckc0j8y1101xo0760or02jdi7
+	expected := ` NAME     ID                            
+ test     ckc0j8y1101xo0760or02jdi7     
 
  Successfully created workspace
 `
@@ -135,10 +135,10 @@ func TestList(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     ID
- w1       ckbv7zvb100pe0760xp98qnh9
- wwww     ckbv8pwbq00wk0760us7ktcgd
- test     ckc0j8y1101xo0760or02jdi7
+	expected := ` NAME     ID                            
+ w1       ckbv7zvb100pe0760xp98qnh9     
+ wwww     ckbv8pwbq00wk0760us7ktcgd     
+ test     ckc0j8y1101xo0760or02jdi7     
 `
 	assert.Equal(t, buf.String(), expected)
 }
