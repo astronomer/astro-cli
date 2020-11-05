@@ -1,0 +1,17 @@
+---
+# https://yamllint.readthedocs.io/en/stable/configuration.html#default-configuration
+extends: default
+
+ignore: |
+  vendor
+
+rules:
+  braces:
+    max-spaces-inside: 1
+    level: error
+  brackets:
+    max-spaces-inside: 1
+    level: error
+  line-length: disable
+  truthy: disable
+  comments-indentation: disable

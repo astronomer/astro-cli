@@ -1,3 +1,4 @@
+---
 project_name: astro
 release:
   github:
@@ -26,7 +27,7 @@ brews:
       owner: astronomer
       name: homebrew-tap
     folder: Formula
-    homepage:  https://astronomer.io
+    homepage: https://astronomer.io
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
     test: |
       system "#{bin}/astro version"

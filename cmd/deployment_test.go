@@ -280,7 +280,6 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	assert.Contains(t, output, expectedOut)
 }
 
-
 func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`

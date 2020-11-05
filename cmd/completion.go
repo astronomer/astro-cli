@@ -26,7 +26,7 @@ Correct arguments for SHELL are: "bash" and "zsh".
 Notes:
 
 1) zsh completions requires zsh 5.2 or newer.
-	
+
 2) macOS users have to install bash-completion framework to utilize
 completion features. This can be done using homebrew:
 	brew install bash-completion

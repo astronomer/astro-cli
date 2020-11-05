@@ -1,0 +1,55 @@
+---
+exclude: '(vendor|.vscode)'  # regex
+repos:
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        types: [go]
+        language: system
+        entry: 'gofmt -w -s'
+  - repo: https://github.com/psf/black
+    rev: 20.8b1
+    hooks:
+      - id: black
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.3.0
+    hooks:
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+        args: ['--allow-multiple-documents']
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: file-contents-sorter
+        args: ['--ignore-case']
+        files: '^\.gitignore$'  # regex
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: no-commit-to-branch
+        args: ['-b', 'main']
+      - id: pretty-format-json
+        args: ['--autofix', '--no-ensure-ascii']
+      - id: sort-simple-yaml
+      - id: trailing-whitespace
+        exclude: '.*_test.go$'  # regex
+  - repo: https://github.com/detailyang/pre-commit-shell
+    rev: 1.0.5
+    hooks:
+      - id: shell-lint
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.25.0
+    hooks:
+      - id: yamllint
+  - repo: https://github.com/astronomer/pre-commit-hooks
+    rev: fdcede7a5c8ea762c903f242279112161cf35d9f
+    hooks:
+      - id: CVE-2017-18342
+      - id: remove-en-dashes
+      - id: remove-unicode-non-breaking-spaces
+      - id: remove-unicode-zero-width-non-breaking-spaces
+      - id: remove-unicode-zero-width-space
