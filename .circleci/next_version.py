@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+
 from github import Github
 from packaging.version import parse as semver
 
@@ -8,9 +9,9 @@ branch = os.environ["CIRCLE_BRANCH"]
 org = os.environ["GIT_ORG"]
 repository = os.environ["CIRCLE_PROJECT_REPONAME"]
 github = Github()
-repo = github.get_repo(f"{ org }/{ repository }")
+repo = github.get_repo(f"{org}/{repository}")
 
-release_regex = re.compile("release-(\d*\.\d*)")
+release_regex = re.compile(r"release-(\d*\.\d*)")
 major_minor_version = release_regex.findall(branch)
 most_recent_tag = None
 
@@ -54,7 +55,7 @@ else:
     )
     new_version = major_minor_version + ".0"
 
-new_tag_regex = re.compile("\d*\.\d*\.\d*")
+new_tag_regex = re.compile(r"\d*\.\d*\.\d*")
 assert len(
     new_tag_regex.findall(new_version)
 ), f"Error, did not produce a new tag in the form {new_tag_regex.pattern}"
