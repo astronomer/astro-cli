@@ -13,23 +13,23 @@ func TestAllCmds(t *testing.T) {
 }
 
 func TestParseReaderParseError(t *testing.T) {
-	dockerfile := "FROM astronomerinc/ap-airflow:latest-onbuild\nCMD [\"echo\", 1]"
+	dockerfile := "FROM quay.io/astronomer/ap-airflow:latest-onbuild\nCMD [\"echo\", 1]"
 	_, err := ParseReader(bytes.NewBufferString(dockerfile))
 	assert.IsType(t, ParseError{}, err)
 }
 
 func TestParseReader(t *testing.T) {
-	dockerfile := `FROM astronomerinc/ap-airflow:latest-onbuild`
+	dockerfile := `FROM quay.io/astronomer/ap-airflow:latest-onbuild`
 	cmds, err := ParseReader(bytes.NewBufferString(dockerfile))
 	assert.Nil(t, err)
 	expected := []Command{
 		{
 			Cmd:       "from",
-			Original:  "FROM astronomerinc/ap-airflow:latest-onbuild",
+			Original:  "FROM quay.io/astronomer/ap-airflow:latest-onbuild",
 			StartLine: 1,
 			EndLine:   1,
 			Flags:     []string{},
-			Value:     []string{"astronomerinc/ap-airflow:latest-onbuild"},
+			Value:     []string{"quay.io/astronomer/ap-airflow:latest-onbuild"},
 		},
 	}
 	assert.Equal(t, expected, cmds)
@@ -47,11 +47,11 @@ func TestParseFile(t *testing.T) {
 	expected := []Command{
 		{
 			Cmd:       "from",
-			Original:  "FROM astronomerinc/ap-airflow:latest-onbuild",
+			Original:  "FROM quay.io/astronomer/ap-airflow:latest-onbuild",
 			StartLine: 1,
 			EndLine:   1,
 			Flags:     []string{},
-			Value:     []string{"astronomerinc/ap-airflow:latest-onbuild"},
+			Value:     []string{"quay.io/astronomer/ap-airflow:latest-onbuild"},
 		},
 	}
 	assert.Equal(t, expected, cmds)
@@ -61,14 +61,14 @@ func TestGetImageTagFromParsedFile(t *testing.T) {
 	cmds := []Command{
 		{
 			Cmd:       "from",
-			Original:  "FROM astronomerinc/ap-airflow:latest-onbuild",
+			Original:  "FROM quay.io/astronomer/ap-airflow:latest-onbuild",
 			StartLine: 1,
 			EndLine:   1,
 			Flags:     []string{},
-			Value:     []string{"astronomerinc/ap-airflow:latest-onbuild"},
+			Value:     []string{"quay.io/astronomer/ap-airflow:latest-onbuild"},
 		},
 	}
 	image, tag := GetImageTagFromParsedFile(cmds)
-	assert.Equal(t, "astronomerinc/ap-airflow", image)
+	assert.Equal(t, "quay.io/astronomer/ap-airflow", image)
 	assert.Equal(t, "latest-onbuild", tag)
 }
