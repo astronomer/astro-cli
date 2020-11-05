@@ -72,7 +72,7 @@ var (
 	SETTINGS_PATH = "Error looking for settings.yaml"
 
 	NA                          = "N/A"
-	VALID_DOCKERFILE_BASE_IMAGE = "astronomerinc/ap-airflow"
+	VALID_DOCKERFILE_BASE_IMAGE = "quay.io/astronomer/ap-airflow"
 
 	WARNING_DOWNGRADE_VERSION  = "Your Astro CLI Version (%s) is ahead of the server version (%s).\nConsider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	WARNING_INVALID_IMAGE_NAME = "WARNING! You are using an invalid image name '%s' in your Dockerfile, please use %s. Are you sure you want to continue?\n"
