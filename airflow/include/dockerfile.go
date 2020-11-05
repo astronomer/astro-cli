@@ -4,5 +4,5 @@ import "strings"
 
 // Dockerfile is the Dockerfile template
 var Dockerfile = strings.TrimSpace(`
-FROM astronomerinc/ap-airflow:%s
+FROM quay.io/astronomer/ap-airflow:%s
 `)
