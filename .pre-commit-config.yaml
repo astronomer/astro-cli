@@ -45,7 +45,7 @@ repos:
     rev: v1.25.0
     hooks:
       - id: yamllint
-  - repo: https://github.com/danielhoherd/pre-commit-hooks
+  - repo: https://github.com/astronomer/pre-commit-hooks
     rev: fdcede7a5c8ea762c903f242279112161cf35d9f
     hooks:
       - id: CVE-2017-18342
