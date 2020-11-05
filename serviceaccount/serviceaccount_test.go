@@ -43,8 +43,8 @@ func TestCreateUsingDeploymentUUID(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := CreateUsingDeploymentUUID(deploymentUuid, label, category, role, api, buf)
 	assert.NoError(t, err)
-	expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
- test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
+	expectedOut := ` NAME     CATEGORY     ID                            APIKEY
+ test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84
 
  Service account successfully created.
 `
@@ -84,8 +84,8 @@ func TestCreateUsingWorkspaceUUID(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := CreateUsingDeploymentUUID(workspaceUuid, label, category, role, api, buf)
 	assert.NoError(t, err)
-	expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
- test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
+	expectedOut := ` NAME     CATEGORY     ID                            APIKEY
+ test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84
 
  Service account successfully created.
 `

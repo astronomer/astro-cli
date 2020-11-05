@@ -244,8 +244,8 @@ func TestList(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := List(ws, false, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
- test     burning-terrestrial-5940     v         ckbv801t300qh0760pck7ea0c     ?                           
+	expected := ` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION
+ test     burning-terrestrial-5940     v         ckbv801t300qh0760pck7ea0c     ?
 `
 	assert.Equal(t, buf.String(), expected)
 }
@@ -301,7 +301,7 @@ func TestUpdate(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := Update(id, role, deploymentConfig, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION
  test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c             %!s(MISSING)
 
  Successfully updated deployment
@@ -354,11 +354,11 @@ func TestAirflowUpgrade(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
- test                         v         ckggzqj5f4157qtc9lescmehm     1.10.5              
+	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION
+ test                         v         ckggzqj5f4157qtc9lescmehm     1.10.5
 
 The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
-To cancel, run: 
+To cancel, run:
  $ astro deployment airflow upgrade --cancel
 
 `

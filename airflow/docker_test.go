@@ -107,7 +107,7 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
-    
+
 
   webserver:
     image: test-project-name/airflow:latest

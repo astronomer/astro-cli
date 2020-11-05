@@ -80,8 +80,8 @@ func TestWorkspaceUserRm(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
-                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
+	expected := ` NAME                          WORKSPACE ID                                      USER_ID
+                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1
 Successfully removed user from workspace
 `
 	api := houston.NewHoustonClient(client)

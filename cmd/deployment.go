@@ -71,8 +71,8 @@ var (
 `
 	deploymentAirflowUpgradeExample = `
   $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
-  
-# Abort the initial airflow upgrade step: 
+
+# Abort the initial airflow upgrade step:
   $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
 `
 
