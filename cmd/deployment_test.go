@@ -75,8 +75,8 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 
 func TestDeploymentSaGetCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` NAME         CATEGORY     ID                       APIKEY
- my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000
+	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
+ my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
 `
 	okResponse := `{
   "data": {
@@ -110,8 +110,8 @@ func TestDeploymentSaGetCommand(t *testing.T) {
 
 func TestDeploymentSaCreateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` NAME         CATEGORY     ID                       APIKEY
- my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000
+	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
+ my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
 
  Service account successfully created.
 `
@@ -147,8 +147,8 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 
 func TestDeploymentUserAddCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` DEPLOYMENT NAME              DEPLOYMENT ID                 USER                        ROLE
- prehistoric-gravity-9229     ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER
+	expectedOut := ` DEPLOYMENT NAME              DEPLOYMENT ID                 USER                        ROLE                  
+ prehistoric-gravity-9229     ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER     
 
  Successfully added somebody@astronomer.com as a DEPLOYMENT_VIEWER
 `
@@ -184,8 +184,8 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 
 func TestDeploymentUserDeleteCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` DEPLOYMENT ID                 USER                        ROLE
- ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER
+	expectedOut := ` DEPLOYMENT ID                 USER                        ROLE                  
+ ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER     
 
  Successfully removed the DEPLOYMENT_VIEWER role for somebody@astronomer.com from deployment ckggvxkw112212kc9ebv8vu6p
 `

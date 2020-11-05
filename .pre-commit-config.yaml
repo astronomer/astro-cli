@@ -36,7 +36,7 @@ repos:
         args: ['--autofix', '--no-ensure-ascii']
       - id: sort-simple-yaml
       - id: trailing-whitespace
-        exclude: '^workspace/.*_test.go$'  # regex
+        exclude: '.*_test.go$'  # regex
   - repo: https://github.com/detailyang/pre-commit-shell
     rev: 1.0.5
     hooks:
