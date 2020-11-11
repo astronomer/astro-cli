@@ -80,6 +80,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
+      AIRFLOW__WEBSERVER__UPDATE_FAB_PERMS: "True"
     ports:
       - {{ .AirflowWebserverPort }}:8080
     volumes:
