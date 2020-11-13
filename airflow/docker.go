@@ -595,7 +595,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	image, tag := docker.GetImageTagFromParsedFile(cmds)
-	if config.CFG.ShowWarnings.GetBool() && image != messages.VALID_DOCKERFILE_BASE_IMAGE {
+	if config.CFG.ShowWarnings.GetBool() && !validImageRepo(image) {
 		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_NAME, image, messages.VALID_DOCKERFILE_BASE_IMAGE))
 		if !i {
 			fmt.Println("Cancelling deploy...")
@@ -653,4 +653,16 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful.")
 
 	return nil
+}
+
+func validImageRepo(image string) bool {
+	validDockerfileBaseImages := map[string]bool{
+		"quay.io/astronomer/ap-airflow": true,
+		"astronomerinc/ap-airflow": true,
+	}
+	result, ok := validDockerfileBaseImages[image]
+	if !ok {
+		return false
+	}
+	return result
 }

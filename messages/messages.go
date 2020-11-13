@@ -73,7 +73,6 @@ var (
 
 	NA                          = "N/A"
 	VALID_DOCKERFILE_BASE_IMAGE = "quay.io/astronomer/ap-airflow"
-
 	WARNING_DOWNGRADE_VERSION  = "Your Astro CLI Version (%s) is ahead of the server version (%s).\nConsider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
 	WARNING_INVALID_IMAGE_NAME = "WARNING! You are using an invalid image name '%s' in your Dockerfile, please use %s. Are you sure you want to continue?\n"
 	WARNING_INVALID_IMAGE_TAG  = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
