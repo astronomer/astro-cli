@@ -151,3 +151,9 @@ func TestCreateProject(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, project)
 }
+
+func Test_validImageRepo(t *testing.T) {
+	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
+	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
+	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
+}
