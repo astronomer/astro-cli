@@ -614,7 +614,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && !diResp.Data.DeploymentConfig.IsValidTag(tag) {
-		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(), ", ")
+		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(tag), ", ")
 		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_TAG, tag, validTags))
 		if !i {
 			fmt.Println("Cancelling deploy...")
@@ -658,7 +658,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 func validImageRepo(image string) bool {
 	validDockerfileBaseImages := map[string]bool{
 		"quay.io/astronomer/ap-airflow": true,
-		"astronomerinc/ap-airflow": true,
+		"astronomerinc/ap-airflow":      true,
 	}
 	result, ok := validDockerfileBaseImages[image]
 	if !ok {
