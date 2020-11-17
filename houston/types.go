@@ -1,5 +1,11 @@
 package houston
 
+import (
+	"fmt"
+
+	"github.com/Masterminds/semver"
+)
+
 // Response wraps all houston response structs used for json marashalling
 type Response struct {
 	Data struct {
@@ -212,15 +218,20 @@ type DeploymentConfig struct {
 	DefaultAirflowImageTag string         `json:"defaultAirflowImageTag"`
 }
 
-func (config *DeploymentConfig) GetValidTags() (tags []string) {
+func (config *DeploymentConfig) GetValidTags(tag string) (tags []string) {
 	for _, image := range config.AirflowImages {
-		tags = append(tags, image.Tag)
+		tagVersion := coerce(tag)
+		imageTagVersion := coerce(image.Version)
+		// i = 1 means version greater than
+		if i := imageTagVersion.Compare(tagVersion); i >= 0 {
+			tags = append(tags, image.Tag)
+		}
 	}
 	return
 }
 
 func (config *DeploymentConfig) IsValidTag(tag string) bool {
-	for _, validTag := range config.GetValidTags() {
+	for _, validTag := range config.GetValidTags(tag) {
 		if tag == validTag {
 			return true
 		}
@@ -234,4 +245,17 @@ type AppConfig struct {
 	BaseDomain         string `json:"baseDomain"`
 	SmtpConfigured     bool   `json:"smtpConfigured"`
 	ManualReleaseNames bool   `json:"manualReleaseNames"`
+}
+
+// coerce a string into SemVer if possible
+func coerce(version string) *semver.Version {
+	v, err := semver.NewVersion(version)
+	if err != nil {
+		fmt.Println(err)
+	}
+	coerceVer, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	return coerceVer
 }
