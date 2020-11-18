@@ -13,6 +13,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/Masterminds/semver"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 
@@ -211,6 +212,22 @@ func Start(airflowHome string, envFile string) error {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
 
+	// parse dockerfile
+	cmd, err := docker.ParseFile(filepath.Join(airflowHome, "Dockerfile"))
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, "Dockerfile"))
+	}
+
+	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
+
+	semVer, err := semver.NewVersion(airflowTag)
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse dockerfile Airflow tag: %s", airflowTag)
+	}
+
+	airflowDockerVersion := semVer.Major()
+
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, envFile)
 	if err != nil {
@@ -270,7 +287,7 @@ func Start(airflowHome string, envFile string) error {
 		for _, info := range psInfo {
 			if strings.Contains(info["Name"], strippedProjectName) &&
 				strings.Contains(info["Name"], "webserver") {
-				settings.ConfigSettings(info["Id"])
+				settings.ConfigSettings(info["Id"], airflowDockerVersion)
 			}
 		}
 	}
