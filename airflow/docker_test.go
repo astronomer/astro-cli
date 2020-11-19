@@ -112,7 +112,7 @@ services:
   webserver:
     image: test-project-name/airflow:latest
     command: >
-      bash -c '{ airflow create_user "$$@" || airflow users create "$$@"; } && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+      bash -c '{ airflow create_user "$$@" || airflow users create "$$@"; } && { airflow sync_perm || airflow sync-perm; } && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
     restart: unless-stopped
     networks:
       - airflow
@@ -130,6 +130,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
+      AIRFLOW__API__AUTH_BACKEND: "airflow.api.auth.backend.default"
     ports:
       - 8080:8080
     volumes:
@@ -149,4 +150,10 @@ func TestCreateProject(t *testing.T) {
 	project, err := createProject("test-project-name", "airflow_home", ".env")
 	assert.NoError(t, err)
 	assert.NotNil(t, project)
+}
+
+func Test_validImageRepo(t *testing.T) {
+	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
+	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
+	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
 }
