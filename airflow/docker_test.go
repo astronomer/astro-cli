@@ -178,15 +178,18 @@ func Test_airflowVersionFromDockerFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, version)
 
+	// Default to Airflow 1 when there is an invalid Tag
+	expected = uint64(0x1)
+	dockerfile = "Dockerfile.tag.invalid"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, version)
+
 	// Invalid Dockerfile
 	dockerfile = "Dockerfile.not.real"
 	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
 
 	assert.Error(t, err)
 
-	// Invalid Airflow Tag
-	dockerfile = "Dockerfile.tag.invalid"
-	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.Error(t, err)
 }
