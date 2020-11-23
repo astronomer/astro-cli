@@ -1,11 +1,12 @@
 package airflow
 
 import (
+	"testing"
+
 	"github.com/astronomer/astro-cli/config"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 )
@@ -156,4 +157,36 @@ func Test_validImageRepo(t *testing.T) {
 	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
 	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
 	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
+}
+
+func Test_airflowVersionFromDockerFile(t *testing.T) {
+	airflowHome := config.WorkingPath + "/testfiles"
+
+	// Version 1
+	expected := uint64(0x1)
+	dockerfile := "Dockerfile.Airflow1.ok"
+	version, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, version)
+
+	// Version 2
+	expected = uint64(0x2)
+	dockerfile = "Dockerfile.Airflow2.ok"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, version)
+
+	// Invalid Dockerfile
+	dockerfile = "Dockerfile.not.real"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.Error(t, err)
+
+	// Invalid Airflow Tag
+	dockerfile = "Dockerfile.tag.invalid"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.Error(t, err)
 }

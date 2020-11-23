@@ -30,14 +30,17 @@ var (
 	viperSettings *viper.Viper
 
 	settings Config
+
+	// Version 2.0.0
+	newAirflowVersion uint64 = 2
 )
 
 // ConfigSettings is the main builder of the settings package
-func ConfigSettings(id string) {
+func ConfigSettings(id string, version uint64) {
 	InitSettings()
 	AddConnections(id)
 	AddPools(id)
-	AddVariables(id)
+	AddVariables(id, version)
 }
 
 // InitSettings initializes settings file
@@ -65,7 +68,7 @@ func InitSettings() {
 }
 
 // AddVariables is a function to add Variables from settings.yaml
-func AddVariables(id string) {
+func AddVariables(id string, version uint64) {
 	variables := settings.Airflow.Variables
 
 	for _, variable := range variables {
@@ -76,7 +79,14 @@ func AddVariables(id string) {
 		} else {
 			if objectValidator(0, variable.VariableValue) {
 
-				airflowCommand := fmt.Sprintf("airflow variables -s %s ", variable.VariableName)
+				baseCmd := "airflow variables "
+				if version >= newAirflowVersion {
+					baseCmd += "set %s " // Airflow 2.0.0 command
+				} else {
+					baseCmd += "-s %s " // Airflow 1.0.0 command
+				}
+
+				airflowCommand := fmt.Sprintf(baseCmd, variable.VariableName)
 
 				airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 
