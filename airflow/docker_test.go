@@ -1,11 +1,12 @@
 package airflow
 
 import (
+	"testing"
+
 	"github.com/astronomer/astro-cli/config"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 )
@@ -156,4 +157,13 @@ func Test_validImageRepo(t *testing.T) {
 	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
 	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
 	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
+}
+
+func TestStart(t *testing.T) {
+	envFile := ".env"
+	airflowHome := config.WorkingPath + "/testfiles"
+
+	err := Start(airflowHome, "Dockerfile.ok", envFile)
+
+	assert.NoError(t, err)
 }

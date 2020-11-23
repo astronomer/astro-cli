@@ -313,6 +313,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 
 // Start an airflow cluster
 func airflowStart(cmd *cobra.Command, args []string) error {
+	dockerfile := "Dockerfile"
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -321,7 +322,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	return airflow.Start(config.WorkingPath, envFile)
+	return airflow.Start(config.WorkingPath, envFile, dockerfile)
 }
 
 // Kill an airflow cluster

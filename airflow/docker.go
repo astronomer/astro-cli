@@ -202,7 +202,7 @@ func deploymentNameExists(name string, deployments []houston.Deployment) bool {
 }
 
 // Start starts a local airflow development cluster
-func Start(airflowHome string, envFile string) error {
+func Start(airflowHome string, dockerfile string, envFile string) error {
 	// Get project name from config
 	projectName, err := projectNameUnique()
 	replacer := strings.NewReplacer("_", "", "-", "")
@@ -213,7 +213,7 @@ func Start(airflowHome string, envFile string) error {
 	}
 
 	// parse dockerfile
-	cmd, err := docker.ParseFile(filepath.Join(airflowHome, "Dockerfile"))
+	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, "Dockerfile"))
 	}
