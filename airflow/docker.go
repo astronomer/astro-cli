@@ -212,21 +212,10 @@ func Start(airflowHome string, dockerfile string, envFile string) error {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
 
-	// parse dockerfile
-	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
+	airflowDockerVersion, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
 	if err != nil {
-		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, "Dockerfile"))
+		return errors.Wrap(err, "error parsing airflow version from dockerfile")
 	}
-
-	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
-
-	semVer, err := semver.NewVersion(airflowTag)
-
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse dockerfile Airflow tag: %s", airflowTag)
-	}
-
-	airflowDockerVersion := semVer.Major()
 
 	// Create a libcompose project
 	project, err := createProject(projectName, airflowHome, envFile)
@@ -682,4 +671,22 @@ func validImageRepo(image string) bool {
 		return false
 	}
 	return result
+}
+
+func airflowVersionFromDockerFile(airflowHome string, dockerfile string) (uint64, error) {
+	// parse dockerfile
+	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, dockerfile))
+	}
+
+	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
+
+	semVer, err := semver.NewVersion(airflowTag)
+
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to parse dockerfile Airflow tag: %s", airflowTag)
+	}
+
+	return semVer.Major(), nil
 }

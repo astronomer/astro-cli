@@ -1,0 +1,1 @@
+FROM quay.io/astronomer/ap-airflow-dev:1.10.12-THIS_IS_INVALID

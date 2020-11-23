@@ -159,11 +159,34 @@ func Test_validImageRepo(t *testing.T) {
 	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
 }
 
-func TestStart(t *testing.T) {
-	envFile := ".env"
+func Test_airflowVersionFromDockerFile(t *testing.T) {
 	airflowHome := config.WorkingPath + "/testfiles"
 
-	err := Start(airflowHome, "Dockerfile.ok", envFile)
+	// Version 1
+	expected := uint64(0x1)
+	dockerfile := "Dockerfile.Airflow1.ok"
+	version, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
 
 	assert.NoError(t, err)
+	assert.Equal(t, expected, version)
+
+	// Version 2
+	expected = uint64(0x2)
+	dockerfile = "Dockerfile.Airflow2.ok"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, version)
+
+	// Invalid Dockerfile
+	dockerfile = "Dockerfile.not.real"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.Error(t, err)
+
+	// Invalid Airflow Tag
+	dockerfile = "Dockerfile.tag.invalid"
+	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
+
+	assert.Error(t, err)
 }

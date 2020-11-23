@@ -322,7 +322,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	return airflow.Start(config.WorkingPath, envFile, dockerfile)
+	return airflow.Start(config.WorkingPath, dockerfile, envFile)
 }
 
 // Kill an airflow cluster
