@@ -2,7 +2,151 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.23.1] - 2020-11-25
+
+- Fix/airflow settings update (#389)
+- Fix/airflow settings update (#388)
+
+## [0.23.0] - 2020-11-23
+
+- Shorten list of recommended tags/images in CLI to 1 AC version #2166 (#386)
+
+## [0.22.2] - 2020-11-17
+
+- Use default as API Auth Backend (#387)
+
+## [0.22.1] - 2020-11-16
+
+- Fix message typo (#385)
+- Hotfix warning when user push astronomerinc image repo (#384)
+- Use basic-auth as API Auth Backend (#383)
+- Run sync_perm / sync-perm command in Webserver (#381)
+
+## [0.22.0] - 2020-11-05
+
+- Add pre commit (#380)
+- Switch docker hub references to quay.io (#379)
+- change wording after astro deploy (#378)
+- fix get selection airflow version (#377)
+- s/airflowVersion/airflow-version (#376)
+- Add --airflowVersion flag to $ astro deployment create and add astro deployment airflow upgrade --cancel
+- Add deployment user list (#371)
+- Add new codeowners (#374)
+- Update codecov (#373)
+- Update RegistryAuthFail message (#370)
+- Update deployment user role (#367)
+- Use Constant Instead of String (#369)
+- Add feature Delete Deployment User Role (#368)
+- Remove extra return (#366)
+- Add RBAC Deployment User (#365)
+
+## [0.21.0] - 2020-10-14
+
+- Fix webserver command in docker-compose (#364)
+- Make Example Plugin 2.0 compatible (#363)
+- Make example-dag Airflow 2.0 compatible (#362)
+- Add support for Airflow 2.0 (#361)
+- Remove prisma1 (#360)
+
+## [0.20.0] - 2020-09-16
+
+- Update link to reference new repo name (#358)
+- Update airflow dev init message (#356)
+- Add compare versions to astro upgrade (#357)
+
+## [0.16.4] - 2020-08-20
+
+- Update airflow dev init message (#356)
+- Add compare versions to astro upgrade (#357)
+- Remove Houston version check on upgrade (#353)
+- Fix incorrect hint flag
+- hotfix: workspace user remove (#351)
+- fix astro workspace user add (#350)
+- Improve astro-cli UX when user trying to work locally without access houston (#347)
+
+## [0.19.0] - 2020-08-20
+
+- Remove Houston version check on upgrade (#353)
+- Add pull request template (#354)
+- Fix incorrect hint flag (#352)
+- Workspace user remove (#351)
+- fix astro workspace user add (#350)
+
+## [0.18.0] - 2020-08-07
+
+- Workspace user remove (#351)
+- Fix astro workspace user add (#350)
+- Deployment config schema change (#349)
+- Remove update deployment sync flag (#348)
+
+## [0.16.3] - 2020-08-07
+
+- hotfix: workspace user remove (#351)
+- fix astro workspace user add (#350)
+
+## [0.16.2] - 2020-07-28
+
+- Improve astro-cli UX when user trying to work locally without access houston (#347)
+
+## [0.17.0] - 2020-07-24
+
+- Improve astro-cli UX when user trying to work locally without access houston (#347)
+- Increase code coverage to 50% (#342)
+- Avoid validate compatibility during astro auth (#345)
+
+## [0.16.1] - 2020-06-30
+
+- Avoid validate compatibility during astro auth (#345)
+
+## [0.16.0] - 2020-06-29
+
+- Enforce Platform<->CLI 1:1 version mapping and display CLI upgrade/downgrade notice. (#339)
+- Remove aliases no longer in schema (#336)
+- Update README.md. Add brew to goreleaser. (#335)
+
+## [0.15.0] - 2020-06-01
+
+- Add missing sync=true during cloud role update (#334)
+- Remove field no longer provided by Houston (#333)
+- allow annotations to be applied to service account (#330)
+- Registry Error on 'astro auth login' (#331)
+- Add ability to manually set releaseName during create deployment (#327)
+- Fix missing deployment service account (#329)
+- Don't copy logs folder into built images (#326)
+- Add missing check on error return from docker log in step (#325)
+
+## [0.14.0] - 2020-05-13
+
+- Add ability to manually set releaseName during create deployment (#327)
+- Fix missing deployment service account (#329)
+- Don't copy logs folder into built images (#326)
+- Add missing check on error return from docker log in step (#325)
+
+## [0.13.1] - 2020-05-13
+
+- Registry Error on 'astro auth login' (#331)
+
+## [0.13.0] - 2020-04-27
+
+- Don't copy logs folder into built images (#326)
+- Add missing check on error return from docker log in step (#325)
+
+## [0.12.0] - 2020-03-09
+
+- Add `conn_schema:` param to default airflow_settings.yaml file (#320)
+- Remove brew (#322)
+- Change link to get oauth token (#323)
+
+## [0.11.0] - 2020-01-19
+
+- Add column with tag name (#303)
+- Add airflow upgradedb (#307)
+- Query Houston for Airflow Image Tag (#308)
+- Update example dag file (#315)
+- Implement warning messages during airflow deploy (#314) 
+
 ## [0.10.3] - 2019-10-28
+
 - Negotiate docker api version (#304)
 - Update Service Account Queries/Mutations (#300)
 - Add initial integrations tests (#298)
@@ -10,12 +154,15 @@ All notable changes to this project will be documented in this file.
 - Update example plugin to work with RBAC UI (#301)
 
 ## [0.10.2] - 2019-10-03
+
 - bump gorelesaer fork version (#299)
 
 ## [0.10.1] - 2019-10-01
+
 - Bump airflow version astronomer/issues#377 (#297)
 
 ## [0.10.0] - 2019-08-22
+
 - Bump airflow version astronomer/issues#377 (#297)
 - Change strategy of how goreleaser get last tag (#296)
 - Add support section in README.md
@@ -34,6 +181,7 @@ All notable changes to this project will be documented in this file.
 - Update version.go
 
 ## [0.9.0] - 2019-08-22
+
 - Add helpful message when logging in with multiple workspaces
 - Astro deploy not showing correct deployments (#276)
 - Update workspace query (#274)
@@ -94,6 +242,7 @@ All notable changes to this project will be documented in this file.
 - Add success message after pushing all layers
 
 ## [0.8.x]
+
 - Remove hard-coded deployment version
 - Merge pull request #219 from astronomer/windows-astro-auth-login-issue
 - Refactor using golang std lib
@@ -118,6 +267,7 @@ All notable changes to this project will be documented in this file.
 - Fix workspace switch workflow (#188)
 
 ## [0.7.x]
+
 - Add missing parent to menu link plugin (#187)
 - Switch wording from UUID to ID (#184)
 - Add possible fix of error handling (#185)
