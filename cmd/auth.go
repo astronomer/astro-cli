@@ -21,8 +21,8 @@ func newAuthRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 			return nil
 		},
 		Use:   "auth",
-		Short: "Manage astronomer identity",
-		Long:  "Handles authentication to the Astronomer Platform",
+		Short: "Authenticate with an Astronomer Cluster",
+		Long:  "Handles authentication to an Astronomer Cluster",
 	}
 
 	cmd.AddCommand(
@@ -35,7 +35,7 @@ func newAuthRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAuthLoginCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
-		Short: "Login to Astronomer services",
+		Short: "Login to Astronomer",
 		Long:  "Authenticate to houston-api using oAuth or basic auth.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -49,8 +49,8 @@ func newAuthLoginCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAuthLogoutCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Short: "Logout of Astronomer services",
-		Long:  "Logout of Astronomer services",
+		Short: "Logout of Astronomer",
+		Long:  "Logout of Astronomer",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return authLogout(cmd, args)
 		},

@@ -16,8 +16,8 @@ func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	var globalFlag bool
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Manage astro project configurations",
-		Long:  "Manage astro project configurations",
+		Short: "Manage project configuration",
+		Long:  "Manage project configuration",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			ensureGlobalFlag(cmd, args, globalFlag)
 		},
@@ -33,8 +33,8 @@ func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newConfigGetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "Get astro project configuration",
-		Long:  "Get astro project configuration",
+		Short: "Get project configuration",
+		Long:  "Get project configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return configGet(cmd, args, globalFlag)
 		},
@@ -45,8 +45,8 @@ func newConfigGetCmd(client *houston.Client, out io.Writer, globalFlag bool) *co
 func newConfigSetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
-		Short: "Set astro project configuration",
-		Long:  "Set astro project configuration",
+		Short: "Set project configuration",
+		Long:  "Set project configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return configSet(cmd, args, globalFlag)
 		},
