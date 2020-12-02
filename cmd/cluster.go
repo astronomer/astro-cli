@@ -12,7 +12,7 @@ func newClusterRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cluster",
 		Aliases: []string{"cl"},
-		Short:   "Manage Astronomer EE clusters",
+		Short:   "Manage Astronomer Clusters",
 		Long:    "Clusters represent a single installation of the Astronomer Enterprise platform",
 	}
 	cmd.AddCommand(
@@ -26,8 +26,8 @@ func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List known Astronomer Enterprise clusters",
-		Long:    "List known Astronomer Enterprise clusters",
+		Short:   "List known Astronomer Clusters",
+		Long:    "List known Astronomer Clusters",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return clusterList(cmd, args, out)
 		},
@@ -39,8 +39,8 @@ func newClusterSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch",
 		Aliases: []string{"sw"},
-		Short:   "Switch to a different cluster context",
-		Long:    "Switch to a different cluster context",
+		Short:   "Switch to a different Cluster context",
+		Long:    "Switch to a different Cluster context",
 		RunE:    clusterSwitch,
 		Args:    cobra.MaximumNArgs(1),
 	}

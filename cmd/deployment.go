@@ -83,7 +83,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de"},
-		Short:   "Manage airflow deployments",
+		Short:   "Manage Astronomer Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 	}
 	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")

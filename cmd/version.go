@@ -14,7 +14,7 @@ import (
 func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Astronomer CLI version",
+		Short: "astro CLI version",
 		Long:  "The astro-cli semantic version and git commit tied to that release.",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

@@ -28,8 +28,8 @@ Menu will be presented if you do not specify a deployment name:
 func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
-		Short:   "Deploy an airflow project",
-		Long:    "Deploy an airflow project to a given deployment",
+		Short:   "Deploy an Airflow project",
+		Long:    "Deploy an Airflow project to an Astronomer Cluster",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
 		RunE:    deploy,

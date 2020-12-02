@@ -11,7 +11,7 @@ import (
 func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
-		Short: "Manage astronomer user",
+		Short: "Manage Astronomer user",
 		Long:  "Users represents a human who has authenticated with the Astronomer platform",
 	}
 	cmd.AddCommand(

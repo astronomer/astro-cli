@@ -43,9 +43,9 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "airflow",
 		Aliases:    []string{"a"},
-		Short:      "Manage airflow projects",
-		Long:       "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
-		Deprecated: "could please use new command instead `astro dev [subcommands] [flags]`",
+		Short:      "Manage Airflow projects",
+		Long:       "Airflow projects contain Airflow code and Deployment configuration",
+		Deprecated: "please use `astro dev [subcommands] [flags]` instead",
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
@@ -64,8 +64,8 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
-		Short:   "Manage airflow projects",
-		Long:    "Airflow projects are a single top-level directory which represents a single production Airflow deployment",
+		Short:   "Manage Airflow projects",
+		Long:    "Airflow projects contain Airflow code and Deployment configuration",
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
@@ -83,8 +83,8 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Scaffold a new airflow project",
-		Long:  "Scaffold a new airflow project directory. Will create the necessary files to begin development locally as well as be deployed to the Astronomer Platform.",
+		Short: "Scaffold a new Airflow project",
+		Long:  "Scaffold a new Airflow project directory. Will create the necessary files to begin development locally as well as be deployed to Astronomer.",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -103,8 +103,8 @@ func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	deployCmd := newDeployCmd(client, out)
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
-		Short:   "Deploy an airflow project",
-		Long:    "Deploy an airflow project to a given deployment",
+		Short:   "Deploy an Airflow project",
+		Long:    "Deploy an Airflow project to a given Deployment",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -122,8 +122,8 @@ func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "Start a development airflow cluster",
-		Long:  "Start a development airflow cluster",
+		Short: "Start an Airflow cluster locally using docker-compose",
+		Long:  "Start an Airflow cluster locally using docker-compose",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -139,8 +139,8 @@ func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill",
-		Short: "Kill a development airflow cluster",
-		Long:  "Kill a development airflow cluster",
+		Short: "Kill a locally running Airflow cluster",
+		Long:  "Kill a locally running Airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -154,8 +154,8 @@ func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
-		Short: "Output logs for a development airflow cluster",
-		Long:  "Output logs for a development airflow cluster",
+		Short: "Output logs for a locally running Airflow cluster",
+		Long:  "Output logs for a locally running Airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -172,8 +172,8 @@ func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop",
-		Short: "Stop a development airflow cluster",
-		Long:  "Stop a development airflow cluster",
+		Short: "Stop a locally running Airflow cluster",
+		Long:  "Stop a locally running Airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -187,8 +187,8 @@ func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
-		Short: "List airflow containers",
-		Long:  "List airflow containers",
+		Short: "List locally running Airflow containers",
+		Long:  "List locally running Airflow containers",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -202,8 +202,8 @@ func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run any command inside airflow webserver",
-		Long:  "Run any command inside airflow webserver",
+		Short: "Run a command inside locally running Airflow webserver",
+		Long:  "Run a command inside locally running Airflow webserver",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil

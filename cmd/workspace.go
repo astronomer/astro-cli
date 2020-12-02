@@ -31,7 +31,7 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"wo"},
-		Short:   "Manage Astronomer workspaces",
+		Short:   "Manage Astronomer Workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 	}
 	cmd.AddCommand(
@@ -50,8 +50,8 @@ func newWorkspaceListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List astronomer workspaces",
-		Long:    "List astronomer workspaces",
+		Short:   "List Astronomer Workspaces",
+		Long:    "List Astronomer Workspaces",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, args, client, out)
 		},
@@ -63,8 +63,8 @@ func newWorkspaceCreateCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd := &cobra.Command{
 		Use:     "create WORKSPACE",
 		Aliases: []string{"cr"},
-		Short:   "Create an astronomer workspaces",
-		Long:    "Create an astronomer workspaces",
+		Short:   "Create an Astronomer Workspace",
+		Long:    "Create an Astronomer Workspace",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceCreate(cmd, args, client, out)
@@ -78,8 +78,8 @@ func newWorkspaceDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd := &cobra.Command{
 		Use:     "delete WORKSPACE",
 		Aliases: []string{"de"},
-		Short:   "Delete an astronomer workspace",
-		Long:    "Delete an astronomer workspace",
+		Short:   "Delete an Astronomer Workspace",
+		Long:    "Delete an Astronomer Workspace",
 		Example: workspaceDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -93,8 +93,8 @@ func newWorkspaceSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd := &cobra.Command{
 		Use:     "switch WORKSPACE",
 		Aliases: []string{"sw"},
-		Short:   "Switch to a different astronomer workspace",
-		Long:    "Switch to a different astronomer workspace",
+		Short:   "Switch to a different Astronomer Workspace",
+		Long:    "Switch to a different Astronomer Workspace",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(cmd, client, out, args)
@@ -107,8 +107,8 @@ func newWorkspaceUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update an Astronomer workspace",
-		Long:    "Update a workspace name, as well as users and roles assigned to a workspace",
+		Short:   "Update an Astronomer Workspace",
+		Long:    "Update a Workspace name, as well as users and roles assigned to a Workspace",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) <= 1 {
 				return errors.New("must specify a workspace ID and at least one attribute to update.")
@@ -125,8 +125,8 @@ func newWorkspaceUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command
 func newWorkspaceUserRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
-		Short: "Manage workspace user resources",
-		Long:  "Users can be added or removed from workspaces",
+		Short: "Manage Workspace User resources",
+		Long:  "Users can be added or removed from Workspaces",
 	}
 	cmd.AddCommand(
 		newWorkspaceUserAddCmd(client, out),
@@ -140,8 +140,8 @@ func newWorkspaceUserRootCmd(client *houston.Client, out io.Writer) *cobra.Comma
 func newWorkspaceUserAddCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add EMAIL",
-		Short: "Add a user to a workspace",
-		Long:  "Add a user to a workspace",
+		Short: "Add a User to a Workspace",
+		Long:  "Add a User to a Workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserAdd(cmd, client, out, args)
@@ -155,8 +155,8 @@ func newWorkspaceUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comman
 func newWorkspaceUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update user role",
-		Short: "Update a user's role for a workspace",
-		Long:  "Update a user's role for a workspace",
+		Short: "Update a User's Role for a Workspace",
+		Long:  "Update a User's Role for a Workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserUpdate(cmd, client, out, args)
@@ -170,8 +170,8 @@ func newWorkspaceUserRmCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd := &cobra.Command{
 		Use:     "remove EMAIL",
 		Aliases: []string{"rm"},
-		Short:   "Remove a user from a workspace",
-		Long:    "Remove a user from a workspace",
+		Short:   "Remove a User from a Workspace",
+		Long:    "Remove a User from a Workspace",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserRm(cmd, client, out, args)
@@ -184,8 +184,8 @@ func newWorkspaceUserListCmd(client *houston.Client, out io.Writer) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Astronomer workspaces",
-		Long:    "List Astronomer workspaces",
+		Short:   "List Astronomer Workspaces",
+		Long:    "List Astronomer Workspaces",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, client, out, args)
 		},
@@ -197,8 +197,8 @@ func newWorkspaceSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command
 	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
-		Short:   "Manage astronomer service accounts",
-		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
+		Short:   "Manage Astronomer Service Accounts",
+		Long:    "Service Accounts represent a revokable token with access to an Astronomer Cluster",
 	}
 	cmd.AddCommand(
 		newWorkspaceSaCreateCmd(client, out),
@@ -212,8 +212,8 @@ func newWorkspaceSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a service-account in the astronomer platform",
-		Long:    "Create a service-account in the astronomer platform",
+		Short:   "Create a Service Account in an Astronomer Cluster",
+		Long:    "Create a Service Account in an Astronomer Cluster",
 		Example: workspaceSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaCreate(cmd, args, client, out)
@@ -231,8 +231,8 @@ func newWorkspaceSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comma
 func newWorkspaceSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get",
-		Short:   "Get a service-account by entity type and entity id",
-		Long:    "Get a service-account by entity type and entity id",
+		Short:   "Get a Service Account by entity type and entity id",
+		Long:    "Get a Service Account by entity type and entity id",
 		Example: workspaceSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaGet(cmd, args, client, out)
@@ -247,8 +247,8 @@ func newWorkspaceSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:     "delete [SA-ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete a service-account in the astronomer platform",
-		Long:    "Delete a service-account in the astronomer platform",
+		Short:   "Delete a Service Account in the astronomer platform",
+		Long:    "Delete a Service Account in the astronomer platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaDelete(cmd, args, client, out)
 		},
