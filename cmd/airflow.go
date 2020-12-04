@@ -388,7 +388,8 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
-	return airflow.Run(config.WorkingPath, args)
+	// ignore last user parameter
+	return airflow.Run(config.WorkingPath, args, "")
 }
 
 // airflowUpgradeCheck
@@ -397,8 +398,8 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Add airflow command, to simplify astro cli usage
-	args = append([]string{"bash", "-c", "pip install --user astro 'apache-airflow-upgrade-check'; airflow upgrade_check"})
-	return airflow.Run(config.WorkingPath, args)
+	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; airflow upgrade_check"})
+	return airflow.Run(config.WorkingPath, args, "root")
 }
 
 func acceptableVersion(a string, list []string) bool {
