@@ -454,7 +454,6 @@ func Run(airflowHome string, args []string, user string) error {
 
 	execConfig := &types.ExecConfig{
 		AttachStdout: true,
-		Tty:          true,
 		Cmd:          args,
 	}
 	if user != "" {
