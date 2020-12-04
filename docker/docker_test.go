@@ -26,3 +26,12 @@ func TestExecPipe(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestExecPipeNils(t *testing.T) {
+	data := ""
+	resp := &types.HijackedResponse{Reader: bufio.NewReader(strings.NewReader(data))}
+	err := ExecPipe(*resp, nil, nil, nil)
+	if err != nil {
+		t.Error(err)
+	}
+}
