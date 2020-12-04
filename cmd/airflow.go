@@ -219,7 +219,7 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "upgrade_check",
+		Use:   "upgrade-check",
 		Short: "Run the Airflow CLI command under the hood in a containerized way",
 		Long:  "Run the Airflow CLI command under the hood in a containerized way",
 		// ignore PersistentPreRunE of root command
