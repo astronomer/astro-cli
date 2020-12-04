@@ -228,3 +228,7 @@ with all releases up until 1.0.0 considered beta.
 If you need support, start with the [Astronomer documentation](https://www.astronomer.io/docs/).
 
 If you still have questions, you can post on the [Astronomer web forum](https://forum.astronomer.io) or if you are a customer, you can [open a support ticket](https://support.astronomer.io).
+
+## License
+
+Apache 2.0 with Commons Clause
