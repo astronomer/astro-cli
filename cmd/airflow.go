@@ -397,7 +397,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Add airflow command, to simplify astro cli usage
-	args = append([]string{"airflow", "upgrade_check"})
+	args = append([]string{"bash", "-c", "pip install --user astro 'apache-airflow-upgrade-check'; airflow upgrade_check"})
 	return airflow.Run(config.WorkingPath, args)
 }
 
