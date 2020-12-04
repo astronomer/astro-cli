@@ -220,8 +220,8 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-check",
-		Short: "Run the Airflow CLI command under the hood in a containerized way",
-		Long:  "Run the Airflow CLI command under the hood in a containerized way",
+		Short: "List DAG and config-level changes required to upgrade to Airflow 2.0",
+		Long:  "List DAG and config-level changes required to upgrade to Airflow 2.0",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -398,7 +398,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Add airflow command, to simplify astro cli usage
-	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; airflow upgrade_check"})
+	args = append([]string{"bash", "-c", "pip install --user astro --no-deps 'apache-airflow-upgrade-check'; airflow upgrade_check"})
 	return airflow.Run(config.WorkingPath, args, "root")
 }
 
