@@ -142,6 +142,8 @@ func AirflowCommand(id string, airflowCommand string) string {
 	return stringOut
 }
 
+// ExecPipe does pipe stream into stdout/stdin and stderr
+// so now we can pipe out during exec'ing any commands inside container
 func ExecPipe(resp types.HijackedResponse, inStream io.Reader, outStream, errorStream io.Writer) error {
 	var err error
 	receiveStdout := make(chan error, 1)
