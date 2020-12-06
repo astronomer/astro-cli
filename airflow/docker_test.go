@@ -113,7 +113,12 @@ services:
   webserver:
     image: test-project-name/airflow:latest
     command: >
-      bash -c '{ airflow create_user "$$@" || airflow users create "$$@"; } && { airflow sync_perm || airflow sync-perm; } && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+      bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(airflow version | tail -1) =~ "2."[0-9]+\.[0.9]+.* ]];
+        then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
+        else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
+        { airflow create_user "$$@" || airflow users create "$$@" ; } &&
+        { airflow sync_perm || airflow sync-perm ;} &&
+        airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
     restart: unless-stopped
     networks:
       - airflow
@@ -131,7 +136,6 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
-      AIRFLOW__API__AUTH_BACKEND: "airflow.api.auth.backend.basic_auth"
     ports:
       - 8080:8080
     volumes:
