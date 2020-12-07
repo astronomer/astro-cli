@@ -341,7 +341,7 @@ func getDeployment(deploymentId string, client *houston.Client) (*houston.Deploy
 }
 
 func meetsAirflowUpgradeReqs(airflowVersion string, desiredAirflowVersion string) error {
-	upgradeVersion := strconv.FormatUint(settings.NewAirflowVersion, 10)
+	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10)
 	minRequiredVersion := "1.10.14"
 	airflowUpgradeVersion, err := semver.NewVersion(upgradeVersion)
 	if err != nil {
