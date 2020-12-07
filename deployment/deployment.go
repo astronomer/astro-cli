@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/settings"
 	"github.com/fatih/camelcase"
 )
 
@@ -199,12 +201,22 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 
 // Upgrade airflow deployment
 func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, out io.Writer) error {
+	deployment, err := getDeployment(id, client)
+	if err != nil {
+		return err
+	}
+
 	if desiredAirflowVersion == "" {
-		selectedVersion, err := getAirflowVersionSelection(id, client, out)
+		selectedVersion, err := getAirflowVersionSelection(deployment.AirflowVersion, client, out)
 		if err != nil {
 			return err
 		}
 		desiredAirflowVersion = selectedVersion
+	}
+
+	err = meetsAirflowUpgradeReqs(deployment.AirflowVersion, desiredAirflowVersion)
+	if err != nil {
+		return err
 	}
 
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
@@ -266,12 +278,8 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 	return nil
 }
 
-func getAirflowVersionSelection(deploymentId string, client *houston.Client, out io.Writer) (string, error) {
-	deployment, err := getDeployment(deploymentId, client)
-	if err != nil {
-		return "", err
-	}
-	currentAirflowVersion, err := semver.NewVersion(deployment.AirflowVersion)
+func getAirflowVersionSelection(airflowVersion string, client *houston.Client, out io.Writer) (string, error) {
+	currentAirflowVersion, err := semver.NewVersion(airflowVersion)
 	if err != nil {
 		return "", err
 	}
@@ -330,4 +338,37 @@ func getDeployment(deploymentId string, client *houston.Client) (*houston.Deploy
 	}
 
 	return &r.Data.GetDeployment, nil
+}
+
+func meetsAirflowUpgradeReqs(airflowVersion string, desiredAirflowVersion string) error {
+	upgradeVersion := strconv.FormatUint(settings.NewAirflowVersion, 10)
+	minRequiredVersion := "1.10.14"
+	airflowUpgradeVersion, err := semver.NewVersion(upgradeVersion)
+	if err != nil {
+		return err
+	}
+
+	desiredVersion, err := semver.NewVersion(desiredAirflowVersion)
+	if err != nil {
+		return err
+	}
+
+	if airflowUpgradeVersion.Compare(desiredVersion) < 1 {
+		minUpgrade, err := semver.NewVersion(minRequiredVersion)
+		if err != nil {
+			return err
+		}
+
+		currentVersion, err := semver.NewVersion(airflowVersion)
+		if err != nil {
+			return err
+		}
+
+		if currentVersion.Compare(minUpgrade) < 0 {
+			errorMessage := fmt.Sprintf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minRequiredVersion)
+			return errors.New(errorMessage)
+		}
+	}
+
+	return nil
 }
