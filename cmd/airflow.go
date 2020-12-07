@@ -76,6 +76,7 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newAirflowStopCmd(client, out),
 		newAirflowPSCmd(client, out),
 		newAirflowRunCmd(client, out),
+		newAirflowUpgradeCheckCmd(client, out),
 	)
 	return cmd
 }
@@ -210,6 +211,23 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowRun,
+		Example:            RunExample,
+		DisableFlagParsing: true,
+	}
+	return cmd
+}
+
+func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "upgrade-check",
+		Short: "List DAG and config-level changes required to upgrade to Airflow 2.0",
+		Long:  "List DAG and config-level changes required to upgrade to Airflow 2.0",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE:            ensureProjectDir,
+		RunE:               airflowUpgradeCheck,
 		Example:            RunExample,
 		DisableFlagParsing: true,
 	}
@@ -370,7 +388,18 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
-	return airflow.Run(config.WorkingPath, args)
+	// ignore last user parameter
+	return airflow.Run(config.WorkingPath, args, "")
+}
+
+// airflowUpgradeCheck
+func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// Add airflow command, to simplify astro cli usage
+	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; airflow upgrade_check"})
+	return airflow.Run(config.WorkingPath, args, "root")
 }
 
 func acceptableVersion(a string, list []string) bool {
