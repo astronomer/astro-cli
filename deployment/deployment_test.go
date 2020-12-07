@@ -476,7 +476,6 @@ func Test_getDeploymentError(t *testing.T) {
 }
 
 func Test_getAirflowVersionSelection(t *testing.T) {
-	deploymentId := "ckggzqj5f4157qtc9lescmehm"
 	testUtil.InitTestConfig()
 	okResponse := `{"data": {
 					"deployment": {
@@ -521,7 +520,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
+	airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
 	assert.NoError(t, err)
 	assert.Equal(t, airflowVersion, "1.10.12")
 }
@@ -541,4 +540,20 @@ func Test_getAirflowVersionSelectionError(t *testing.T) {
 	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
 	assert.Error(t, err, "API error (500):")
 	assert.Equal(t, airflowVersion, "")
+}
+
+func Test_meetsAirflowUpgradeReqs(t *testing.T) {
+	airflowVersion := "1.10.12"
+	desiredAirflowVersion := "2.0.0"
+	err := meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
+	assert.Error(t, err)
+
+	airflowVersion = "1.10.14"
+	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
+	assert.NoError(t, err)
+
+	airflowVersion = "1.10.7"
+	desiredAirflowVersion = "1.10.10"
+	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
+	assert.NoError(t, err)
 }

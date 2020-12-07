@@ -32,7 +32,7 @@ var (
 	settings Config
 
 	// Version 2.0.0
-	newAirflowVersion uint64 = 2
+	AirflowVersionTwo uint64 = 2
 )
 
 // ConfigSettings is the main builder of the settings package
@@ -80,7 +80,7 @@ func AddVariables(id string, version uint64) {
 			if objectValidator(0, variable.VariableValue) {
 
 				baseCmd := "airflow variables "
-				if version >= newAirflowVersion {
+				if version >= AirflowVersionTwo {
 					baseCmd += "set %s " // Airflow 2.0.0 command
 				} else {
 					baseCmd += "-s %s " // Airflow 1.0.0 command
