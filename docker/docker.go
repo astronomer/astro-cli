@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/registry"
 
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -139,4 +141,44 @@ func AirflowCommand(id string, airflowCommand string) string {
 
 	stringOut := string(out)
 	return stringOut
+}
+
+// ExecPipe does pipe stream into stdout/stdin and stderr
+// so now we can pipe out during exec'ing any commands inside container
+func ExecPipe(resp types.HijackedResponse, inStream io.Reader, outStream, errorStream io.Writer) error {
+	var err error
+	receiveStdout := make(chan error, 1)
+	if outStream != nil || errorStream != nil {
+		go func() {
+			// always do this because we are never tty
+			_, err = stdcopy.StdCopy(outStream, errorStream, resp.Reader)
+			receiveStdout <- err
+		}()
+	}
+
+	stdinDone := make(chan struct{})
+	go func() {
+		if inStream != nil {
+			io.Copy(resp.Conn, inStream)
+		}
+
+		if err := resp.CloseWrite(); err != nil {
+		}
+		close(stdinDone)
+	}()
+
+	select {
+	case err := <-receiveStdout:
+		if err != nil {
+			return err
+		}
+	case <-stdinDone:
+		if outStream != nil || errorStream != nil {
+			if err := <-receiveStdout; err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
