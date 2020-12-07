@@ -445,7 +445,7 @@ func getWebServerContainerId(airflowHome string) (string, error) {
 
 // Run creates using docker exec
 // inspired from https://github.com/docker/cli/tree/master/cli/command/container
-func Run(airflowHome string, args []string) error {
+func Run(airflowHome string, args []string, user string) error {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 
 	if err != nil {
@@ -454,9 +454,12 @@ func Run(airflowHome string, args []string) error {
 
 	execConfig := &types.ExecConfig{
 		AttachStdout: true,
-		Tty:          true,
 		Cmd:          args,
 	}
+	if user != "" {
+		execConfig.User = user
+	}
+
 	fmt.Printf("Running: %s\n", strings.Join(args, " "))
 	containerID, err := getWebServerContainerId(airflowHome)
 	if err != nil {
@@ -476,18 +479,11 @@ func Run(airflowHome string, args []string) error {
 
 	execStartCheck := types.ExecStartCheck{
 		Detach: execConfig.Detach,
-		Tty:    execConfig.Tty,
 	}
 
 	resp, _ := cli.ContainerExecAttach(context.Background(), execID, execStartCheck)
 
-	// Read stdout response from container
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(resp.Reader)
-	s := buf.String()
-	fmt.Println(s)
-
-	return err
+	return docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // Deploy pushes a new docker image

@@ -76,3 +76,9 @@ func TestNewAirflowRunCmd(t *testing.T) {
 	cmd := newAirflowRunCmd(client, os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
+
+func TestNewAirflowUpgradeCheckCmd(t *testing.T) {
+	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	cmd := newAirflowUpgradeCheckCmd(client, os.Stdout)
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
