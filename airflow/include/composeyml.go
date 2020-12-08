@@ -62,7 +62,7 @@ services:
   webserver:
     image: {{ .AirflowImage }}
     command: >
-      bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(airflow version | tail -1) =~ "2."[0-9]+\.[0.9]+.* ]];
+      bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
         else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
         { airflow create_user "$$@" || airflow users create "$$@" ; } &&
