@@ -398,7 +398,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Add airflow command, to simplify astro cli usage
-	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; airflow upgrade_check"})
+	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"})
 	return airflow.Run(config.WorkingPath, args, "root")
 }
 
