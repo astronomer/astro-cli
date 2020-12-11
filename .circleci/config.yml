@@ -53,6 +53,8 @@ workflows:
             branches:
               only: '/release-.*/'
       - new-tag:
+          context:
+            - github-repo
           requires:
             - approve-release
           filters:
@@ -117,7 +119,6 @@ commands:
           name: Tag the Git commit
           command: |
             set -xe
-            git remote rm origin
-            git remote add origin https://sjmiller609:${GITHUB_TOKEN}@github.com/${GIT_ORG}/${CIRCLE_PROJECT_REPONAME}.git
+            git remote set-url origin "https://astro-astronomer:${GITHUB_TOKEN}@github.com/${GIT_ORG}/${CIRCLE_PROJECT_REPONAME}.git"
             git tag $NEXT_TAG
             git push origin $NEXT_TAG
