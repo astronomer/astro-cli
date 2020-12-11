@@ -121,10 +121,10 @@ func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "start",
-		Short:   "Start a development airflow cluster",
-		Long:    "Start a development airflow cluster",
-		Args:    cobra.MaximumNArgs(1),
+		Use:   "start",
+		Short: "Start a development airflow cluster",
+		Long:  "Start a development airflow cluster",
+		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -138,9 +138,9 @@ func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "kill",
-		Short:   "Kill a development airflow cluster",
-		Long:    "Kill a development airflow cluster",
+		Use:   "kill",
+		Short: "Kill a development airflow cluster",
+		Long:  "Kill a development airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -153,9 +153,9 @@ func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "logs",
-		Short:   "Output logs for a development airflow cluster",
-		Long:    "Output logs for a development airflow cluster",
+		Use:   "logs",
+		Short: "Output logs for a development airflow cluster",
+		Long:  "Output logs for a development airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -171,9 +171,9 @@ func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "stop",
-		Short:   "Stop a development airflow cluster",
-		Long:    "Stop a development airflow cluster",
+		Use:   "stop",
+		Short: "Stop a development airflow cluster",
+		Long:  "Stop a development airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -186,9 +186,9 @@ func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "ps",
-		Short:   "List airflow containers",
-		Long:    "List airflow containers",
+		Use:   "ps",
+		Short: "List airflow containers",
+		Long:  "List airflow containers",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -201,9 +201,9 @@ func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                "run",
-		Short:              "Run any command inside airflow webserver",
-		Long:               "Run any command inside airflow webserver",
+		Use:   "run",
+		Short: "Run any command inside airflow webserver",
+		Long:  "Run any command inside airflow webserver",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -369,7 +369,18 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
-	return airflow.Run(config.WorkingPath, args)
+	// ignore last user parameter
+	return airflow.Run(config.WorkingPath, args, "")
+}
+
+// airflowUpgradeCheck
+func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// Add airflow command, to simplify astro cli usage
+	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"})
+	return airflow.Run(config.WorkingPath, args, "root")
 }
 
 func acceptableVersion(a string, list []string) bool {
