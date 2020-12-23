@@ -21,7 +21,7 @@ jobs:
                 uri: postgres://postgres:postgres@postgres:5432/postgres
                 migrations: true
                 rawAccess: true
-      - image: astronomerinc/ap-houston-api:latest
+      - image: astronomerinc/ap-houston-api:0.16.16
         name: houston
         entrypoint: "npm run serve"
         environment:
