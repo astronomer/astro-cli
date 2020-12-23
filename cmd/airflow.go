@@ -369,8 +369,7 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
-	// ignore last user parameter
-	return airflow.Run(config.WorkingPath, args, "")
+	return airflow.Run(config.WorkingPath, args)
 }
 
 // airflowUpgradeCheck
@@ -380,7 +379,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"})
-	return airflow.Run(config.WorkingPath, args, "root")
+	return airflow.Run(config.WorkingPath, args)
 }
 
 func acceptableVersion(a string, list []string) bool {
