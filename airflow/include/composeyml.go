@@ -5,20 +5,17 @@ import "strings"
 // Composeyml is the docker-compose template
 var Composeyml = strings.TrimSpace(`
 version: '2'
-
 networks:
   airflow:
     driver: bridge
-
 volumes:
   postgres_data:
     driver: local
   airflow_logs:
     driver: local
-
 services:
   postgres:
-    image: postgres:10.1-alpine
+    image: postgres:12.2
     restart: unless-stopped
     networks:
       - airflow
@@ -32,11 +29,10 @@ services:
     environment:
       POSTGRES_USER: {{ .PostgresUser }}
       POSTGRES_PASSWORD: {{ .PostgresPassword }}
-
   scheduler:
     image: {{ .AirflowImage }}
     command: >
-      bash -c "airflow upgradedb && airflow scheduler"
+      bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
     restart: unless-stopped
     networks:
       - airflow
@@ -58,11 +54,15 @@ services:
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
-
   webserver:
     image: {{ .AirflowImage }}
     command: >
-      bash -c "airflow create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin && airflow webserver"
+      bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
+        then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
+        else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
+        { airflow create_user "$$@" || airflow users create "$$@" ; } &&
+        { airflow sync_perm || airflow sync-perm ;} &&
+        airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
     restart: unless-stopped
     networks:
       - airflow

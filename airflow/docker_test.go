@@ -5,6 +5,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,17 +55,14 @@ func TestGenerateConfig(t *testing.T) {
 	cfg, err := generateConfig("test-project-name", "airflow_home", ".env")
 	assert.NoError(t, err)
 	expectedCfg := `version: '2'
-
 networks:
   airflow:
     driver: bridge
-
 volumes:
   postgres_data:
     driver: local
   airflow_logs:
     driver: local
-
 services:
   postgres:
     image: postgres:12.2
@@ -81,7 +79,6 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-
   scheduler:
     image: test-project-name/airflow:latest
     command: >
@@ -107,11 +104,15 @@ services:
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
     
-
   webserver:
     image: test-project-name/airflow:latest
     command: >
-      bash -c '{ airflow create_user "$$@" || airflow users create "$$@"; } && { airflow sync_perm || airflow sync-perm; } && airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+      bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
+        then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
+        else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
+        { airflow create_user "$$@" || airflow users create "$$@" ; } &&
+        { airflow sync_perm || airflow sync-perm ;} &&
+        airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
     restart: unless-stopped
     networks:
       - airflow
@@ -129,7 +130,6 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
-      AIRFLOW__API__AUTH_BACKEND: "airflow.api.auth.backend.basic_auth"
     ports:
       - 8080:8080
     volumes:
