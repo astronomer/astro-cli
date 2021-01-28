@@ -38,8 +38,8 @@ var (
 // ConfigSettings is the main builder of the settings package
 func ConfigSettings(id string, version uint64) {
 	InitSettings()
-	AddConnections(id)
-	AddPools(id)
+	AddConnections(id, version)
+	AddPools(id, version)
 	AddVariables(id, version)
 }
 
@@ -98,9 +98,45 @@ func AddVariables(id string, version uint64) {
 }
 
 // AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string) {
+func AddConnections(id string, airflowVersion uint64) {
 	connections := settings.Airflow.Connections
-	airflowCommand := fmt.Sprintf("airflow connections -l")
+	baseCmd := "airflow connections "
+	var (
+		baseAddCmd, baseRmCmd, baseListCmd, connIdArg, connTypeArg, connUriArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
+	)
+	if airflowVersion >= AirflowVersionTwo {
+		// Airflow 2.0.0 command
+		// based on TODO: add link
+		baseAddCmd = baseCmd + "add "
+		baseRmCmd = baseCmd + "delete "
+		baseListCmd = baseCmd + "list "
+		connIdArg = ""
+		connTypeArg = "--conn-type"
+		connUriArg = "--conn-uri"
+		connExtraArg = "--conn-extra"
+		connHostArg = "--conn-host"
+		connLoginArg = "--conn-login"
+		connPasswordArg = "--conn-password"
+		connSchemaArg = "--conn-schema"
+		connPortArg = "--conn-port"
+	} else {
+		// Airflow 1.0.0 command based on
+		// https://airflow.readthedocs.io/en/1.10.12/cli-ref.html#connections
+		baseAddCmd = baseCmd + "-a "
+		baseRmCmd = baseCmd + "-d "
+		baseListCmd = baseCmd + "-l "
+		connIdArg = "--conn_id"
+		connTypeArg = "--conn_type"
+		connUriArg = "--conn_uri"
+		connExtraArg = "--conn_extra"
+		connHostArg = "--conn_host"
+		connLoginArg = "--conn_login"
+		connPasswordArg = "--conn_password"
+		connSchemaArg = "--conn_schema"
+		connPortArg = "--conn_port"
+	}
+
+	airflowCommand := fmt.Sprintf("%s", baseListCmd)
 	out := docker.AirflowCommand(id, airflowCommand)
 
 	for _, conn := range connections {
@@ -109,39 +145,39 @@ func AddConnections(id string) {
 
 			if strings.Contains(out, quotedConnID) {
 				fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
-				airflowCommand = fmt.Sprintf("airflow connections -d --conn_id \"%s\"", conn.ConnID)
+				airflowCommand = fmt.Sprintf("%s %s \"%s\"", baseRmCmd, connIdArg, conn.ConnID)
 				docker.AirflowCommand(id, airflowCommand)
 			}
 
 			if !objectValidator(1, conn.ConnType, conn.ConnURI) {
 				fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
 			} else {
-				airflowCommand = fmt.Sprintf("airflow connections -a --conn_id \"%s\" ", conn.ConnID)
+				airflowCommand = fmt.Sprintf("%s %s \"%s\" ", baseAddCmd, connIdArg, conn.ConnID)
 				if objectValidator(0, conn.ConnType) {
-					airflowCommand += fmt.Sprintf("--conn_type \"%s\" ", conn.ConnType)
+					airflowCommand += fmt.Sprintf("%s \"%s\" ", connTypeArg, conn.ConnType)
 				}
 				if objectValidator(0, conn.ConnURI) {
-					airflowCommand += fmt.Sprintf("--conn_uri '%s' ", conn.ConnURI)
+					airflowCommand += fmt.Sprintf("%s '%s' ", connUriArg, conn.ConnURI)
 				}
 				if objectValidator(0, conn.ConnExtra) {
-					airflowCommand += fmt.Sprintf("--conn_extra '%s' ", conn.ConnExtra)
+					airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, conn.ConnExtra)
 				}
 				if objectValidator(0, conn.ConnHost) {
-					airflowCommand += fmt.Sprintf("--conn_host '%s' ", conn.ConnHost)
+					airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
 				}
 				if objectValidator(0, conn.ConnLogin) {
-					airflowCommand += fmt.Sprintf("--conn_login '%s' ", conn.ConnLogin)
+					airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
 				}
 				if objectValidator(0, conn.ConnPassword) {
-					airflowCommand += fmt.Sprintf("--conn_password '%s' ", conn.ConnPassword)
+					airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
 				}
 				if objectValidator(0, conn.ConnSchema) {
-					airflowCommand += fmt.Sprintf("--conn_schema '%s' ", conn.ConnSchema)
+					airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
 				}
 				if conn.ConnPort != 0 {
-					airflowCommand += fmt.Sprintf("--conn_port %v", conn.ConnPort)
+					airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
 				}
-
+				fmt.Println(airflowCommand)
 				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Connection: %s\n", conn.ConnID)
 			}
@@ -150,11 +186,20 @@ func AddConnections(id string) {
 }
 
 // AddPools  is a function to add Pools from settings.yaml
-func AddPools(id string) {
+func AddPools(id string, airflowVersion uint64) {
 	pools := settings.Airflow.Pools
+	baseCmd := "airflow "
+	if airflowVersion >= AirflowVersionTwo {
+		// Airflow 2.0.0 command
+		baseCmd += "pools set "
+	} else {
+		// Airflow 1.0.0 command
+		baseCmd += "pool -s "
+	}
+
 	for _, pool := range pools {
 		if objectValidator(0, pool.PoolName) {
-			airflowCommand := fmt.Sprintf("airflow pool -s %s ", pool.PoolName)
+			airflowCommand := fmt.Sprintf("%s %s ", baseCmd, pool.PoolName)
 			if pool.PoolSlot != 0 {
 				airflowCommand += fmt.Sprintf("%v ", pool.PoolSlot)
 				if objectValidator(0, pool.PoolDescription) {
