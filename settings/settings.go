@@ -106,7 +106,7 @@ func AddConnections(id string, airflowVersion uint64) {
 	)
 	if airflowVersion >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
-		// based on TODO: add link
+		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
 		baseAddCmd = baseCmd + "add "
 		baseRmCmd = baseCmd + "delete "
 		baseListCmd = baseCmd + "list "
@@ -177,7 +177,6 @@ func AddConnections(id string, airflowVersion uint64) {
 				if conn.ConnPort != 0 {
 					airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
 				}
-				fmt.Println(airflowCommand)
 				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Connection: %s\n", conn.ConnID)
 			}
@@ -191,9 +190,11 @@ func AddPools(id string, airflowVersion uint64) {
 	baseCmd := "airflow "
 	if airflowVersion >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
+		//  bassed on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
 		baseCmd += "pools set "
 	} else {
 		// Airflow 1.0.0 command
+		// based on https://airflow.apache.org/docs/apache-airflow/1.10.12/usage-cli.html
 		baseCmd += "pool -s "
 	}
 
