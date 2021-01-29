@@ -190,7 +190,8 @@ func AddPools(id string, airflowVersion uint64) {
 	baseCmd := "airflow "
 	if airflowVersion >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
-		//  bassed on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
+
+		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
 		baseCmd += "pools set "
 	} else {
 		// Airflow 1.0.0 command
