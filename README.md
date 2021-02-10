@@ -89,7 +89,7 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 
     ```
     C:\Windows\system32>astro version
-    Astro CLI Version: 0.13.1
+    Astro CLI Version: x.y.z
     Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
     ```
 
