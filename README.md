@@ -55,7 +55,7 @@ curl -sSL https://install.astronomer.io | sudo bash -s
 
 #### Via `Homebrew`
 
-To install a specific version Astro CLI use @major.minor.patch for example, to install v0.13.1 run:
+To install a specific version Astro CLI use @major.minor.patch. For example, to install v0.13.1 run:
 
 ```sh
 brew install astronomer/tap/astro@0.13.1
@@ -83,15 +83,15 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 
 > Note: Make sure you have Windows 10 and Docker installed
 
-1. Download latest release of astro-cli using this [astro_0.13.1_windows_386.zip](https://github.com/astronomer/astro-cli/releases/download/v0.13.1/astro_0.13.1_windows_386.zip)
-2. Extract `astro_0.13.1_windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
-3. Open cmd or PowerShell console and run:
+1. Download the latest release of the Astro CLI from [this page](https://github.com/astronomer/astro-cli/releases/)
+2. Extract the file ending in `windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
+3. Open cmd or PowerShell console and run the `astro version` command. Your output should look something like this:
 
-```
-C:\Windows\system32>astro version
-Astro CLI Version: 0.13.1
-Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
-```
+    ```
+    C:\Windows\system32>astro version
+    Astro CLI Version: x.y.z
+    Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
+    ```
 
 #### Troubleshooting
 
