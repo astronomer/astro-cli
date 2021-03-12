@@ -291,7 +291,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	// }
 
 	if len(defaultImageTag) == 0 {
-		defaultImageTag = "latest-onbuild"
+		defaultImageTag = "2.0.0-buster-onbuild"
 		fmt.Printf("Initializing Airflow project\nNot connected to Astronomer, pulling Airflow development files from %s\n", defaultImageTag)
 	}
 
