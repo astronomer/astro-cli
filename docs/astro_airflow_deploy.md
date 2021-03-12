@@ -13,7 +13,7 @@ astro airflow deploy [flags]
 ### Options
 
 ```
-  -f, --force   Force deploy if uncommited changes
+  -f, --force   Force deploy if uncommitted changes
   -h, --help    help for deploy
 ```
 
