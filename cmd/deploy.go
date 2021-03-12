@@ -62,7 +62,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		config.CFG.ProjectDeployment.SetProjectString(releaseName)
 	}
 
-	if git.HasUncommitedChanges() && !forceDeploy {
+	if git.HasUncommittedChanges() && !forceDeploy {
 		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
 		return nil
 	}
