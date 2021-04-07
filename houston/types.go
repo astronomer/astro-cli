@@ -28,6 +28,7 @@ type Response struct {
 		GetDeployment                  Deployment                `json:"deployment,omitempty"`
 		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
+		GetAuth0Config                 *Auth0Config              `json:"auth0Config,omitempty"`
 		GetAppConfig                   *AppConfig                `json:"appConfig,omitempty"`
 		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
 		GetUsers                       []User                    `json:"users,omitempty"`
@@ -54,6 +55,13 @@ type AuthConfig struct {
 	PublicSignup  bool           `json:"publicSignup"`
 	InitialSignup bool           `json:"initialSignup"`
 	AuthProviders []AuthProvider `json:"providers"`
+}
+
+// Auth0Config holds data related to oAuth and basic authentication
+type Auth0Config struct {
+	ClientId  string           `json:"clientId"`
+	Audience  string           `json:"audience"`
+	DomainUrl string           `json:"domainUrl"`
 }
 
 type AuthUser struct {

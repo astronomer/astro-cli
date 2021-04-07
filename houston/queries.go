@@ -16,6 +16,15 @@ var (
 		}
 	}`
 
+	Auth0ConfigGetRequest = `
+	query GetAuth0Config {
+		auth0Config {
+			domainUrl
+  		clientId
+  		audience
+		}
+	}`
+
 	DeploymentCreateRequest = `
 	mutation CreateDeployment(
 		$label: String!

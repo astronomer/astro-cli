@@ -3,6 +3,11 @@ package auth
 import (
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"log"
+	"encoding/json"
 
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
@@ -13,6 +18,14 @@ import (
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 )
+
+type postTokenResponse struct {
+	AccessToken  string    `json:"access_token"`
+	IdToken 		 string    `json:"id_token"`
+	ExpiresIn    int       `json:"expires_in"`
+	TokenType    string    `json:"token_type"`
+	Scope        string    `json:"scope"`
+}
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string) (string, error) {
@@ -31,6 +44,44 @@ func basicAuth(username, password string) (string, error) {
 	}
 
 	return resp.Data.CreateToken.Token.Value, nil
+}
+
+// handles authentication with auth0
+func auth0Login(authConfig *houston.Auth0Config, username, password string) (string, error) {
+	if password == "" {
+		password, _ = input.InputPassword(messages.INPUT_PASSWORD)
+	}
+
+	addr := authConfig.DomainUrl + "oauth/token";
+	form := url.Values{}
+	form.Set("grant_type", "password")
+	form.Set("username", username)
+	form.Set("password", password)
+	form.Set("audience", authConfig.Audience)
+	form.Set("scope", "openid profile email")
+	form.Set("client_id", authConfig.ClientId)
+
+	client := &http.Client{}
+	r, err := http.NewRequest("POST", addr, strings.NewReader(form.Encode())) // URL-encoded payload
+	if err != nil {
+		log.Fatal(err)
+	}
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	res, err := client.Do(r)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	var decode postTokenResponse
+	err = json.NewDecoder(res.Body).Decode(&decode);
+	if err != nil {
+		return "", fmt.Errorf("unable to decode token response: %s", err)
+	}
+
+	return decode.AccessToken, nil
 }
 
 func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace) bool {
@@ -104,33 +155,29 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 	}
 
 	acReq := houston.Request{
-		Query: houston.AuthConfigGetRequest,
+		Query: houston.Auth0ConfigGetRequest,
 	}
 
-	acResp, err := acReq.Do()
+	acResp, err := acReq.DoWithClient(client)
 	if err != nil {
 		return err
 	}
-	authConfig := acResp.Data.GetAuthConfig
 
-	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
+	authConfig := acResp.Data.GetAuth0Config
+
+	if username == "" && !oAuthOnly {
 		username = input.InputText(messages.INPUT_USERNAME)
 	}
 
 	if len(username) == 0 {
-		if len(authConfig.AuthProviders) > 0 {
-			token = oAuth(c.GetAppURL() + "/token")
-		} else {
-			return errors.New("cannot authenticate, oauth is disabled")
-		}
+		token = oAuth(c.GetAppURL() + "/token")
 	} else {
-		if authConfig.LocalEnabled {
-			token, err = basicAuth(username, password)
-			if err != nil {
-				return errors.Wrap(err, "local auth login failed")
-			}
-		} else {
-			fmt.Println(messages.HOUSTON_BASIC_AUTH_DISABLED)
+		token, err = auth0Login(authConfig, username, password)
+		if token == "" {
+			return errors.New("Username/Password is incorrect")
+		}
+		if err != nil {
+			return errors.Wrap(err, "local auth login failed")
 		}
 	}
 
