@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/astrohub"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
@@ -50,10 +49,9 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
-	astrohubApi := astrohub.NewAstrohubClient(client)
+	api := astrohub.NewAstrohubClient(client)
 
-	_, output, err := executeCommandC(api, astrohubApi, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	_, output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -88,10 +86,9 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
-	astrohubApi := astrohub.NewAstrohubClient(client)
+	api := astrohub.NewAstrohubClient(client)
 
-	_, output, err := executeCommandC(api, astrohubApi, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	_, output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -122,10 +119,9 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
-	astrohubApi := astrohub.NewAstrohubClient(client)
+	api := astrohub.NewAstrohubClient(client)
 
-	_, output, err := executeCommandC(api, astrohubApi, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
+	_, output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -151,10 +147,9 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
-	astrohubApi := astrohub.NewAstrohubClient(client)
+	api := astrohub.NewAstrohubClient(client)
 
-	_, output, err := executeCommandC(api, astrohubApi, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
+	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -180,10 +175,9 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
-	astrohubApi := astrohub.NewAstrohubClient(client)
+	api := astrohub.NewAstrohubClient(client)
 
-	_, output, err := executeCommandC(api, astrohubApi, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
+	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

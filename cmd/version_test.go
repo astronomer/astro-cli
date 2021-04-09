@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/spf13/cobra"
 	"os"
@@ -20,7 +20,7 @@ func TestVersionRootCommand(t *testing.T) {
 }
 
 func TestNewVersionCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	client := astrohub.NewAstrohubClient(httputil.NewHTTPClient())
 	cmd := newVersionCmd(client, os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }

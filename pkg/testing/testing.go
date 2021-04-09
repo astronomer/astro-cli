@@ -33,7 +33,7 @@ func GetEnv(key, fallback string) string {
 }
 
 func NewTestConfig() []byte {
-	houstonHost := GetEnv("HOUSTON_HOST", "localhost")
+	houstonHost := GetEnv("ASTROHUB_HOST", "localhost")
 	configRaw := []byte(`cloud:
   api:
     port: "443"
@@ -41,16 +41,16 @@ func NewTestConfig() []byte {
     ws_protocol: wss
 local:
   enabled: true
-  houston: http://HOUSTON_HOST:8871/v1
-context: HOUSTON_HOST
+  houston: http://ASTROHUB_HOST:8871/v1
+context: ASTROHUB_HOST
 contexts:
-  HOUSTON_HOST:
-    domain: HOUSTON_HOST
+  ASTROHUB_HOST:
+    domain: ASTROHUB_HOST
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	config := strings.ReplaceAll(string(configRaw), "HOUSTON_HOST", houstonHost)
+	config := strings.ReplaceAll(string(configRaw), "ASTROHUB_HOST", houstonHost)
 	return []byte(config)
 }
 

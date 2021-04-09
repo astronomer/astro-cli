@@ -10,8 +10,7 @@ import (
 	// "github.com/astronomer/astro-cli/auth"
 	_ "github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
-	// "github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/user"
@@ -27,7 +26,7 @@ type IntegrationTestSuite struct {
 	TestWorkspace string
 	TestDomain    string
 	Temp          string
-	Client        *houston.Client
+	Client        *astrohub.Client
 	Fs            afero.Fs
 }
 
@@ -38,8 +37,8 @@ func (suite *IntegrationTestSuite) SetupSuite() {
 	config.InitConfig(fs)
 	rand.Seed(time.Now().UnixNano())
 	suite.Fs = fs
-	suite.Client = houston.NewHoustonClient(httputil.NewHTTPClient())
-	suite.TestDomain = testUtils.GetEnv("HOUSTON_HOST", "localhost")
+	suite.Client = astrohub.NewAstrohubClient(httputil.NewHTTPClient())
+	suite.TestDomain = testUtils.GetEnv("ASTROHUB_HOST", "localhost")
 	suite.TestEmail = fmt.Sprintf("test%d@astronomer.io", rand.Intn(100))
 	suite.TestPassword = "pass"
 	suite.TestWorkspace = "test-workspace"

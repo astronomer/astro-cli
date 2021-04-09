@@ -9,7 +9,7 @@ import (
 
 	"github.com/Masterminds/semver"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/settings"
@@ -25,9 +25,9 @@ func newTableOut() *printutil.Table {
 }
 
 // AppConfig returns application config from houston-api
-func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
-	req := houston.Request{
-		Query: houston.AppConfigRequest,
+func AppConfig(client *astrohub.Client) (*astrohub.AppConfig, error) {
+	req := astrohub.Request{
+		Query: astrohub.AppConfigRequest,
 	}
 	r, err := req.DoWithClient(client)
 	if err != nil {
@@ -37,9 +37,9 @@ func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 	return r.Data.GetAppConfig, nil
 }
 
-func checkManualReleaseNames(client *houston.Client) bool {
-	req := houston.Request{
-		Query: houston.AppConfigRequest,
+func checkManualReleaseNames(client *astrohub.Client) bool {
+	req := astrohub.Request{
+		Query: astrohub.AppConfigRequest,
 	}
 	r, err := req.DoWithClient(client)
 	if err != nil {
@@ -50,7 +50,7 @@ func checkManualReleaseNames(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, client *astrohub.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if releaseName != "" && checkManualReleaseNames(client) {
@@ -61,8 +61,8 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, 
 		vars["airflowVersion"] = airflowVersion
 	}
 
-	req := houston.Request{
-		Query:     houston.DeploymentCreateRequest,
+	req := astrohub.Request{
+		Query:     astrohub.DeploymentCreateRequest,
 		Variables: vars,
 	}
 
@@ -106,9 +106,9 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, 
 	return nil
 }
 
-func Delete(id string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.DeploymentDeleteRequest,
+func Delete(id string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.DeploymentDeleteRequest,
 		Variables: map[string]interface{}{"deploymentId": id},
 	}
 
@@ -127,13 +127,13 @@ func Delete(id string, client *houston.Client, out io.Writer) error {
 }
 
 // List all airflow deployments
-func List(ws string, all bool, client *houston.Client, out io.Writer) error {
-	var deployments []houston.Deployment
-	var r *houston.Response
+func List(ws string, all bool, client *astrohub.Client, out io.Writer) error {
+	var deployments []astrohub.Deployment
+	var r *astrohub.Response
 	var err error
 
-	req := houston.Request{
-		Query: houston.DeploymentsGetRequest,
+	req := astrohub.Request{
+		Query: astrohub.DeploymentsGetRequest,
 	}
 
 	if all {
@@ -172,7 +172,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, client *astrohub.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -180,8 +180,8 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 		vars["sync"] = true
 	}
 
-	req := houston.Request{
-		Query:     houston.DeploymentUpdateRequest,
+	req := astrohub.Request{
+		Query:     astrohub.DeploymentUpdateRequest,
 		Variables: vars,
 	}
 
@@ -200,7 +200,7 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 }
 
 // Upgrade airflow deployment
-func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, out io.Writer) error {
+func AirflowUpgrade(id, desiredAirflowVersion string, client *astrohub.Client, out io.Writer) error {
 	deployment, err := getDeployment(id, client)
 	if err != nil {
 		return err
@@ -221,8 +221,8 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
 
-	req := houston.Request{
-		Query:     houston.UpdateDeploymentAirflowRequest,
+	req := astrohub.Request{
+		Query:     astrohub.UpdateDeploymentAirflowRequest,
 		Variables: vars,
 	}
 
@@ -249,7 +249,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 }
 
 // Upgrade airflow deployment
-func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) error {
+func AirflowUpgradeCancel(id string, client *astrohub.Client, out io.Writer) error {
 	deployment, err := getDeployment(id, client)
 	if err != nil {
 		return err
@@ -258,8 +258,8 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
 		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
 
-		req := houston.Request{
-			Query:     houston.UpdateDeploymentAirflowRequest,
+		req := astrohub.Request{
+			Query:     astrohub.UpdateDeploymentAirflowRequest,
 			Variables: vars,
 		}
 
@@ -278,14 +278,14 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 	return nil
 }
 
-func getAirflowVersionSelection(airflowVersion string, client *houston.Client, out io.Writer) (string, error) {
+func getAirflowVersionSelection(airflowVersion string, client *astrohub.Client, out io.Writer) (string, error) {
 	currentAirflowVersion, err := semver.NewVersion(airflowVersion)
 	if err != nil {
 		return "", err
 	}
 	// prepare list of AC airflow versions
-	dReq := houston.Request{
-		Query: houston.DeploymentInfoRequest,
+	dReq := astrohub.Request{
+		Query: astrohub.DeploymentInfoRequest,
 	}
 
 	resp, err := dReq.DoWithClient(client)
@@ -324,11 +324,11 @@ func getAirflowVersionSelection(airflowVersion string, client *houston.Client, o
 	return filteredVersions[i-1], nil
 }
 
-func getDeployment(deploymentId string, client *houston.Client) (*houston.Deployment, error) {
+func getDeployment(deploymentId string, client *astrohub.Client) (*astrohub.Deployment, error) {
 	vars := map[string]interface{}{"id": deploymentId}
 
-	req := houston.Request{
-		Query:     houston.DeploymentGetRequest,
+	req := astrohub.Request{
+		Query:     astrohub.DeploymentGetRequest,
 		Variables: vars,
 	}
 

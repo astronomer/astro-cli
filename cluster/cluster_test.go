@@ -20,14 +20,14 @@ func TestList(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := List(buf)
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), testUtil.GetEnv("HOUSTON_HOST", "localhost"))
+	assert.Contains(t, buf.String(), testUtil.GetEnv("ASTROHUB_HOST", "localhost"))
 }
 
 func TestGetCurrentCluster(t *testing.T) {
 	testUtil.InitTestConfig()
 	cluster, err := GetCurrentCluster()
 	assert.NoError(t, err)
-	assert.Equal(t, cluster.Domain, testUtil.GetEnv("HOUSTON_HOST", "localhost"))
+	assert.Equal(t, cluster.Domain, testUtil.GetEnv("ASTROHUB_HOST", "localhost"))
 	assert.Equal(t, cluster.Workspace, "ck05r3bor07h40d02y2hw4n4v")
 	assert.Equal(t, cluster.LastUsedWorkspace, "ck05r3bor07h40d02y2hw4n4v")
 	assert.Equal(t, cluster.Token, "token")
@@ -41,7 +41,7 @@ func TestPrintContext(t *testing.T) {
 
 	err = cluster.PrintContext(buf)
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), testUtil.GetEnv("HOUSTON_HOST", "localhost"))
+	assert.Contains(t, buf.String(), testUtil.GetEnv("ASTROHUB_HOST", "localhost"))
 }
 
 func TestGetContextKeyValidClusterConfig(t *testing.T) {

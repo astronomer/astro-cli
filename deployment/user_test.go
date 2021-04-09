@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/messages"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -48,7 +48,7 @@ func TestUserList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	deploymentId := "ckgqw2k2600081qc90nbamgno"
 	email := "somebody@astronomer.io"
 	userId := "somebody@astronomer.io"
@@ -106,7 +106,7 @@ func TestUserList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = astrohub.NewAstrohubClient(client)
 	deploymentId = "ckgqw2k2600081qc90nbamgno"
 
 	buf = new(bytes.Buffer)
@@ -130,7 +130,7 @@ func TestUserList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = astrohub.NewAstrohubClient(client)
 	deploymentId = "ckgqw2k2600081qc90nbamgno"
 
 	buf = new(bytes.Buffer)
@@ -163,7 +163,7 @@ func TestAdd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	deploymentId := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
 	role := "DEPLOYMENT_ADMIN"
@@ -210,7 +210,7 @@ func TestAdd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = astrohub.NewAstrohubClient(client)
 	deploymentId = "ckggzqj5f4157qtc9lescmehm"
 	email = "somebody@astronomer.com"
 	role = "DEPLOYMENT_ADMIN"
@@ -245,7 +245,7 @@ func TestDeleteUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	deploymentId := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
 
@@ -292,7 +292,7 @@ func TestDeleteUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = astrohub.NewAstrohubClient(client)
 	deploymentId = "ckggzqj5f4157qtc9lescmehm"
 	email = "somebody@astronomer.com"
 
@@ -326,10 +326,10 @@ func TestUpdateUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	deploymentId := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
-	role := houston.DeploymentEditor
+	role := astrohub.DeploymentEditor
 
 	buf := new(bytes.Buffer)
 	err := UpdateUser(deploymentId, email, role, api, buf)
@@ -368,7 +368,7 @@ func TestUpdateUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = astrohub.NewAstrohubClient(client)
 	deploymentId = "ckggzqj5f4157qtc9lescmehm"
 	email = "somebody@astronomer.com"
 	role = "DEPLOYMENT_FAKE_ROLE"

@@ -5,13 +5,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/github"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
 )
 
-func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newVersionCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "astro CLI version",
@@ -27,7 +27,7 @@ func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newUpgradeCheckCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
 		Short: "Check for newer version of Astronomer CLI",
@@ -43,7 +43,7 @@ func newUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
+func printVersion(client *astrohub.Client, cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -54,7 +54,7 @@ func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, arg
 	return nil
 }
 
-func upgradeCheck(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
+func upgradeCheck(client *astrohub.Client, cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	ghc := github.NewGithubClient(httputil.NewHTTPClient())

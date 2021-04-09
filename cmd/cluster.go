@@ -4,11 +4,11 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/cluster"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/spf13/cobra"
 )
 
-func newClusterRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newClusterRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cluster",
 		Aliases: []string{"cl"},
@@ -22,7 +22,7 @@ func newClusterRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newClusterListCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -35,7 +35,7 @@ func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newClusterSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newClusterSwitchCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch",
 		Aliases: []string{"sw"},

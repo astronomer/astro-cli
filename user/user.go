@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // Create verifies input before sending a CreateUser API call to houston
-func Create(email, password string, client *houston.Client, out io.Writer) error {
+func Create(email, password string, client *astrohub.Client, out io.Writer) error {
 	if len(email) == 0 {
 		email = input.InputText("Email: ")
 	}
@@ -23,8 +23,8 @@ func Create(email, password string, client *houston.Client, out io.Writer) error
 		password = inputPassword
 	}
 
-	req := houston.Request{
-		Query:     houston.UserCreateRequest,
+	req := astrohub.Request{
+		Query:     astrohub.UserCreateRequest,
 		Variables: map[string]interface{}{"email": email, "password": password},
 	}
 

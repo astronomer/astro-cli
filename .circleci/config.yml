@@ -88,12 +88,12 @@ commands:
           name: Wait for db
           command: dockerize -wait tcp://postgres:5432 -timeout 1m
       - run:
-          name: Wait for houston
-          command: dockerize -wait tcp://houston:8871 -timeout 2m
+          name: Wait for astrohub
+          command: dockerize -wait tcp://astrohub:8871 -timeout 2m
       - run:
           name: Run unit tests
           environment:
-            HOUSTON_HOST: houston
+            ASTROHUB_HOST: astrohub
           command: |
             make test
             bash -c "bash <(curl -s https://codecov.io/bash)"

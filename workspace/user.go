@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 // Add a user to a workspace with specified role
-func Add(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceUserAddRequest,
+func Add(workspaceId, email, role string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.WorkspaceUserAddRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email, "role": role},
 	}
 
@@ -35,9 +35,9 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 }
 
 // Remove a user from a workspace
-func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceUserRemoveRequest,
+func Remove(workspaceId, userId string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.WorkspaceUserRemoveRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceId, "userId": userId},
 	}
 
@@ -59,9 +59,9 @@ func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) e
 }
 
 // ListRoles print users and roles from a workspace
-func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspacesGetRequest,
+func ListRoles(workspaceId string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceId},
 	}
 	r, err := req.DoWithClient(client)
@@ -86,9 +86,9 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 }
 
 // Update workspace user role
-func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceUserUpdateRequest,
+func UpdateRole(workspaceId, email, role string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.WorkspaceUserUpdateRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
 	}
 	r, err := req.DoWithClient(client)

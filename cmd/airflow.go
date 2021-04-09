@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
@@ -39,7 +39,7 @@ astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l use
 `
 )
 
-func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "airflow",
 		Aliases:    []string{"a"},
@@ -60,7 +60,7 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDevRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -81,7 +81,7 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowInitCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold a new Airflow project",
@@ -100,7 +100,7 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowDeployCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	deployCmd := newDeployCmd(client, out)
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
@@ -120,7 +120,7 @@ func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowStartCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start an Airflow cluster locally using docker-compose",
@@ -137,7 +137,7 @@ func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowKillCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill",
 		Short: "Kill a locally running Airflow cluster",
@@ -152,7 +152,7 @@ func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowLogsCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Output logs for a locally running Airflow cluster",
@@ -170,7 +170,7 @@ func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowStopCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a locally running Airflow cluster",
@@ -185,7 +185,7 @@ func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowPSCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List locally running Airflow containers",
@@ -200,7 +200,7 @@ func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowRunCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a command inside locally running Airflow webserver",
@@ -217,7 +217,7 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowUpgradeCheckCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-check",
 		Short: "List DAG and config-level changes required to upgrade to Airflow 2.0",
@@ -259,7 +259,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func airflowInit(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
 	// Validate project name
 	if len(projectName) != 0 {
 		projectNameValid := regexp.
@@ -274,8 +274,8 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
-	r := houston.Request{
-		Query: houston.DeploymentInfoRequest,
+	r := astrohub.Request{
+		Query: astrohub.DeploymentInfoRequest,
 	}
 
 	defaultImageTag := ""

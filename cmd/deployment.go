@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/deployment"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +63,7 @@ var (
 	deploymentUpdateAttrs = []string{"label"}
 )
 
-func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de"},
@@ -82,7 +82,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 	return cmd
 }
 
-func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentCreateCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create DEPLOYMENT",
 		Aliases: []string{"cr"},
@@ -101,7 +101,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	return cmd
 }
 
-func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentDeleteCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete DEPLOYMENT",
 		Aliases: []string{"de"},
@@ -115,7 +115,7 @@ func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	return cmd
 }
 
-func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentListCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -129,7 +129,7 @@ func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command 
 	return cmd
 }
 
-func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUpdateCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
@@ -150,7 +150,7 @@ func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	return cmd
 }
 
-func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
 		Short: "Manage deployment user resources",
@@ -165,7 +165,7 @@ func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
-func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserListCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list USERS",
 		Short:   "Search for deployment user's",
@@ -184,7 +184,7 @@ func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
-func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserAddCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add EMAIL",
 		Short:   "Add a user to a deployment",
@@ -196,11 +196,11 @@ func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comma
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", astrohub.DeploymentViewer, "role assigned to user")
 	return cmd
 }
 
-func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserDeleteCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete EMAIL",
 		Short:   "Delete a user from a deployment",
@@ -215,7 +215,7 @@ func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Co
 	return cmd
 }
 
-func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserUpdateCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update EMAIL",
 		Short:   "Update a user's role for a deployment",
@@ -227,11 +227,11 @@ func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Co
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", astrohub.DeploymentViewer, "role assigned to user")
 	return cmd
 }
 
-func newDeploymentAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentAirflowRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "airflow",
 		Aliases: []string{"ai"},
@@ -244,7 +244,7 @@ func newDeploymentAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.C
 	return cmd
 }
 
-func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentAirflowUpgradeCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"up"},
@@ -262,7 +262,7 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 	return cmd
 }
 
-func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentCreate(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -286,14 +286,14 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, client, out)
 }
 
-func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentDelete(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	return deployment.Delete(args[0], client, out)
 }
 
-func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentList(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -311,7 +311,7 @@ func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, o
 	return deployment.List(ws, allDeployments, client, out)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
 	argsMap, err := argsToMap(args[1:])
 	if err != nil {
 		return err
@@ -323,7 +323,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client,
 	return deployment.Update(args[0], cloudRole, argsMap, client, out)
 }
 
-func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func deploymentUserList(cmd *cobra.Command, client *astrohub.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -334,7 +334,7 @@ func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Write
 	return deployment.UserList(args[0], email, userId, fullName, client, out)
 }
 
-func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func deploymentUserAdd(cmd *cobra.Command, client *astrohub.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -349,7 +349,7 @@ func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer
 	return deployment.Add(deploymentId, args[0], deploymentRole, client, out)
 }
 
-func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func deploymentUserDelete(cmd *cobra.Command, client *astrohub.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -360,7 +360,7 @@ func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Wri
 	return deployment.DeleteUser(deploymentId, args[0], client, out)
 }
 
-func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func deploymentUserUpdate(cmd *cobra.Command, client *astrohub.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -375,7 +375,7 @@ func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Wri
 	return deployment.UpdateUser(deploymentId, args[0], deploymentRole, client, out)
 }
 
-func deploymentAirflowUpgrade(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentAirflowUpgrade(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if cancel {

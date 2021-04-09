@@ -2,7 +2,7 @@ package workspace
 
 import (
 	"bytes"
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -21,7 +21,7 @@ func TestAdd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -46,7 +46,7 @@ func TestAddError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -67,7 +67,7 @@ func TestRemove(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	userId := "ckc0eir8e01gj07608ajmvia1"
 
@@ -91,7 +91,7 @@ func TestRemoveError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	email := "andrii@test.com"
 
@@ -146,7 +146,7 @@ func TestListRoles(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	wsId := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
@@ -168,7 +168,7 @@ func TestListRolesError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	wsId := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
@@ -185,7 +185,7 @@ func TestUpdateRole(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -205,7 +205,7 @@ func TestUpdateRoleError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := astrohub.NewAstrohubClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"

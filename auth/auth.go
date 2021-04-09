@@ -12,7 +12,6 @@ import (
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -109,7 +108,7 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password string, client *astrohub.Client, out io.Writer) error {
 	var token string
 	var err error
 
@@ -140,7 +139,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 		Query: astrohub.AuthConfigGetRequest,
 	}
 
-	acResp, err := acReq.DoWithClient(astrohubClient)
+	acResp, err := acReq.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -191,7 +190,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + messages.CLI_CHOOSE_WORKSPACE)
-			err := workspace.Switch("", client, astrohubClient, out)
+			err := workspace.Switch("", client, out)
 			if err != nil {
 				fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 			}

@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -24,9 +23,9 @@ func newTableOut() *printutil.Table {
 }
 
 // Create a workspace
-func Create(label, desc string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceCreateRequest,
+func Create(label, desc string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.WorkspaceCreateRequest,
 		Variables: map[string]interface{}{"label": label, "description": desc},
 	}
 
@@ -46,12 +45,12 @@ func Create(label, desc string, client *houston.Client, out io.Writer) error {
 }
 
 // List all workspaces
-func List(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
+func List(client *astrohub.Client, out io.Writer) error {
 	req := astrohub.Request{
 		Query: astrohub.WorkspacesGetRequest,
 	}
 
-	r, err := req.DoWithClient(astrohubClient)
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
 	}
@@ -80,9 +79,9 @@ func List(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer
 }
 
 // Delete a workspace by id
-func Delete(id string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceDeleteRequest,
+func Delete(id string, client *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query:     astrohub.WorkspaceDeleteRequest,
 		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
@@ -115,7 +114,7 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-func getWorkspaceSelection(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) (string, error) {
+func getWorkspaceSelection(client *astrohub.Client, out io.Writer) (string, error) {
 	tab := newTableOut()
 	tab.GetUserInput = true
 
@@ -123,7 +122,7 @@ func getWorkspaceSelection(client *houston.Client, astrohubClient *astrohub.Clie
 		Query: astrohub.WorkspacesGetRequest,
 	}
 
-	r, err := req.DoWithClient(astrohubClient)
+	r, err := req.DoWithClient(client)
 	if err != nil {
 		return "", err
 	}
@@ -163,9 +162,9 @@ func getWorkspaceSelection(client *houston.Client, astrohubClient *astrohub.Clie
 }
 
 // Switch switches workspaces
-func Switch(id string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
+func Switch(id string, client *astrohub.Client, out io.Writer) error {
 	if len(id) == 0 {
-		_id, err := getWorkspaceSelection(client, astrohubClient, out)
+		_id, err := getWorkspaceSelection(client, out)
 		if err != nil {
 			return err
 		}
@@ -178,7 +177,7 @@ func Switch(id string, client *houston.Client, astrohubClient *astrohub.Client, 
 		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
-	_, err := req.DoWithClient(astrohubClient)
+	_, err := req.DoWithClient(client)
 	if err != nil {
 		return errors.Wrap(err, "workspace id is not valid")
 	}
@@ -200,10 +199,10 @@ func Switch(id string, client *houston.Client, astrohubClient *astrohub.Client, 
 }
 
 // Update an astronomer workspace
-func Update(id string, client *houston.Client, out io.Writer, args map[string]string) error {
+func Update(id string, client *astrohub.Client, out io.Writer, args map[string]string) error {
 	// validate workspace
-	req := houston.Request{
-		Query:     houston.WorkspaceUpdateRequest,
+	req := astrohub.Request{
+		Query:     astrohub.WorkspaceUpdateRequest,
 		Variables: map[string]interface{}{"workspaceId": id, "payload": args},
 	}
 

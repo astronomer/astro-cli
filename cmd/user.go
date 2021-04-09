@@ -3,12 +3,12 @@ package cmd
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/user"
 	"github.com/spf13/cobra"
 )
 
-func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newUserCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
 		Short: "Manage Astronomer user",
@@ -20,7 +20,7 @@ func newUserCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newUserCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newUserCreateCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	var (
 		userEmail    string
 		userPassword string
