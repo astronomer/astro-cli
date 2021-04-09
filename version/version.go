@@ -84,11 +84,11 @@ func isValidVersion(version string) bool {
 func printServerVersion(client *astrohub.Client, out io.Writer) error {
 	appCfg, err := deployment.AppConfig(client)
 	if err != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
+		fmt.Fprintf(out, messages.ASTROHUB_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
 	}
 
 	if appCfg != nil {
-		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", appCfg.Version)
+		fmt.Fprintf(out, messages.ASTROHUB_CURRENT_VERSION+"\n", appCfg.Version)
 	}
 
 	return nil

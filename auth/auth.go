@@ -79,7 +79,7 @@ func switchToLastUsedWorkspace(c config.Context, workspaces []astrohub.Workspace
 
 // oAuth handles oAuth with houston api
 func oAuth(oAuthUrl string) string {
-	fmt.Println("\n" + messages.HOUSTON_OAUTH_REDIRECT)
+	fmt.Println("\n" + messages.ASTROHUB_OAUTH_REDIRECT)
 	fmt.Println(oAuthUrl + "\n")
 	return input.InputText(messages.INPUT_OAUTH_TOKEN)
 }
