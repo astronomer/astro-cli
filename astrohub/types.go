@@ -6,7 +6,7 @@ import (
 	"github.com/Masterminds/semver"
 )
 
-// Response wraps all houston response structs used for json marashalling
+// Response wraps all astrohub response structs used for json marashalling
 type Response struct {
 	Data struct {
 		AddDeploymentUser              *RoleBinding              `json:"deploymentAddUserRole,omitempty"`
@@ -54,7 +54,7 @@ type AuthUser struct {
 	Token Token `json:"token"`
 }
 
-// Decoded defines structure of a houston response Decoded object
+// Decoded defines structure of a astrohub response Decoded object
 type Decoded struct {
 	ID  string `json:"id"`
 	SU  bool   `json:"sU"`
@@ -62,7 +62,7 @@ type Decoded struct {
 	Exp int    `json:"exp"`
 }
 
-// Deployment defines structure of a houston response Deployment object
+// Deployment defines structure of a astrohub response Deployment object
 type Deployment struct {
 	Id                    string          `json:"id"`
 	Type                  string          `json:"type"`
@@ -78,7 +78,7 @@ type Deployment struct {
 	UpdatedAt             string          `json:"updatedAt"`
 }
 
-// DeploymentUrl defines structure of a houston response DeploymentUrl object
+// DeploymentUrl defines structure of a astrohub response DeploymentUrl object
 type DeploymentUrl struct {
 	Type string `json:"type"`
 	Url  string `json:"url"`
@@ -99,13 +99,13 @@ type Email struct {
 	// updated at
 }
 
-// Error defines struct of a houston response Error object
+// Error defines struct of a astrohub response Error object
 type Error struct {
 	Message string `json:"message"`
 	Name    string `json:"name"`
 }
 
-// Status defines structure of a houston response StatusResponse object
+// Status defines structure of a astrohub response StatusResponse object
 type Status struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
@@ -122,13 +122,13 @@ type DeploymentUser struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
-// Token contains a houston auth token as well as it's payload of components
+// Token contains a astrohub auth token as well as it's payload of components
 type Token struct {
 	Value   string       `json:"value"`
 	Payload TokenPayload `json:"payload"`
 }
 
-// TokenPayload contains components of a houston auth token
+// TokenPayload contains components of a astrohub auth token
 type TokenPayload struct {
 	Id  string `json:"id"`
 	Iat int    `json:"iat"`
@@ -201,7 +201,7 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 	return false
 }
 
-// AppConfig contains current houston config
+// AppConfig contains current astrohub config
 type AppConfig struct {
 	Version            string `json:"version"`
 	BaseDomain         string `json:"baseDomain"`
