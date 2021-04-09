@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/workspace"
@@ -33,7 +34,7 @@ func basicAuth(username, password string) (string, error) {
 		password, _ = input.InputPassword(messages.INPUT_PASSWORD)
 	}
 
-	req := houston.Request{
+	req := astrohub.Request{
 		Query:     houston.TokenBasicCreateRequest,
 		Variables: map[string]interface{}{"identity": username, "password": password},
 	}
@@ -47,7 +48,7 @@ func basicAuth(username, password string) (string, error) {
 }
 
 // handles authentication with auth0
-func auth0Login(authConfig *houston.Auth0Config, username, password string) (string, error) {
+func authLogin(authConfig *astrohub.AuthConfig, username, password string) (string, error) {
 	if password == "" {
 		password, _ = input.InputPassword(messages.INPUT_PASSWORD)
 	}
@@ -84,7 +85,7 @@ func auth0Login(authConfig *houston.Auth0Config, username, password string) (str
 	return decode.AccessToken, nil
 }
 
-func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace) bool {
+func switchToLastUsedWorkspace(c config.Context, workspaces []astrohub.Workspace) bool {
 	if c.LastUsedWorkspace != "" {
 		for _, w := range workspaces {
 			if c.LastUsedWorkspace == w.Id {
@@ -127,7 +128,7 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client *houston.Client, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
 	var token string
 	var err error
 
@@ -154,16 +155,16 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 		return err
 	}
 
-	acReq := houston.Request{
-		Query: houston.Auth0ConfigGetRequest,
+	acReq := astrohub.Request{
+		Query: astrohub.AuthConfigGetRequest,
 	}
 
-	acResp, err := acReq.DoWithClient(client)
+	acResp, err := acReq.DoWithClient(astrohubClient)
 	if err != nil {
 		return err
 	}
 
-	authConfig := acResp.Data.GetAuth0Config
+	authConfig := acResp.Data.GetAuthConfig
 
 	if username == "" && !oAuthOnly {
 		username = input.InputText(messages.INPUT_USERNAME)
@@ -172,7 +173,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 	if len(username) == 0 {
 		token = oAuth(c.GetAppURL() + "/token")
 	} else {
-		token, err = auth0Login(authConfig, username, password)
+		token, err = authLogin(authConfig, username, password)
 		if token == "" {
 			return errors.New("Username/Password is incorrect")
 		}
@@ -183,8 +184,8 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	c.SetContextKey("token", token)
 
-	wsReq := houston.Request{
-		Query: houston.WorkspacesGetRequest,
+	wsReq := astrohub.Request{
+		Query: astrohub.WorkspacesGetRequest,
 	}
 
 	wsResp, err := wsReq.Do()
@@ -209,7 +210,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + messages.CLI_CHOOSE_WORKSPACE)
-			err := workspace.Switch("", client, out)
+			err := workspace.Switch("", client, astrohubClient, out)
 			if err != nil {
 				fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 			}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
@@ -27,7 +28,7 @@ $ astro workspace service-account get --workspace-id=<workspace-id>
 `
 )
 
-func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newWorkspaceCmd(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"wo"},
@@ -35,10 +36,10 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 	}
 	cmd.AddCommand(
-		newWorkspaceListCmd(client, out),
+		newWorkspaceListCmd(client, astrohubClient, out),
 		newWorkspaceCreateCmd(client, out),
 		newWorkspaceDeleteCmd(client, out),
-		newWorkspaceSwitchCmd(client, out),
+		newWorkspaceSwitchCmd(client, astrohubClient, out),
 		newWorkspaceUpdateCmd(client, out),
 		newWorkspaceUserRootCmd(client, out),
 		newWorkspaceSaRootCmd(client, out),
@@ -46,14 +47,14 @@ func newWorkspaceCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newWorkspaceListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newWorkspaceListCmd(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List Astronomer Workspaces",
 		Long:    "List Astronomer Workspaces",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceList(cmd, args, client, out)
+			return workspaceList(cmd, args, client, astrohubClient, out)
 		},
 	}
 	return cmd
@@ -89,7 +90,7 @@ func newWorkspaceDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command
 	return cmd
 }
 
-func newWorkspaceSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newWorkspaceSwitchCmd(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch WORKSPACE",
 		Aliases: []string{"sw"},
@@ -97,7 +98,7 @@ func newWorkspaceSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command
 		Long:    "Switch to a different Astronomer Workspace",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSwitch(cmd, client, out, args)
+			return workspaceSwitch(cmd, client, astrohubClient, out, args)
 		},
 	}
 	return cmd
@@ -270,10 +271,10 @@ func workspaceCreate(cmd *cobra.Command, args []string, client *houston.Client, 
 	return workspace.Create(args[0], createDesc, client, out)
 }
 
-func workspaceList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func workspaceList(cmd *cobra.Command, args []string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.List(client, out)
+	return workspace.List(client, astrohubClient, out)
 }
 
 func workspaceDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -338,7 +339,7 @@ func workspaceUserRm(cmd *cobra.Command, client *houston.Client, out io.Writer, 
 	return workspace.Remove(ws, args[0], client, out)
 }
 
-func workspaceSwitch(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func workspaceSwitch(cmd *cobra.Command, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -348,7 +349,7 @@ func workspaceSwitch(cmd *cobra.Command, client *houston.Client, out io.Writer, 
 		id = args[0]
 	}
 
-	return workspace.Switch(id, client, out)
+	return workspace.Switch(id, client, astrohubClient, out)
 }
 
 func workspaceUserList(_ *cobra.Command, client *houston.Client, out io.Writer, args []string) error {

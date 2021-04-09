@@ -1,4 +1,4 @@
-package houston
+package astrohub
 
 import (
 	"fmt"
@@ -50,14 +50,6 @@ type AuthProvider struct {
 
 // AuthConfig holds data related to oAuth and basic authentication
 type AuthConfig struct {
-	LocalEnabled  bool           `json:"localEnabled"`
-	PublicSignup  bool           `json:"publicSignup"`
-	InitialSignup bool           `json:"initialSignup"`
-	AuthProviders []AuthProvider `json:"providers"`
-}
-
-// Auth0Config holds data related to oAuth and basic authentication
-type Auth0Config struct {
 	ClientId  string           `json:"clientId"`
 	Audience  string           `json:"audience"`
 	DomainUrl string           `json:"domainUrl"`

@@ -1,18 +1,13 @@
-package houston
+package astrohub
 
 // TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
 	AuthConfigGetRequest = `
-	query GetAuthConfig($redirect: String) {
-		authConfig(redirect: $redirect) {
-			localEnabled
-			publicSignup
-			initialSignup
-			providers {
-				name
-        		displayName
-				url
-      		}
+	query GetAuthConfig {
+		authConfig {
+			domainUrl
+  		clientId
+  		audience
 		}
 	}`
 

@@ -9,6 +9,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,8 +42,9 @@ func TestWorkspaceList(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
-	_, output, err := executeCommandC(api, "workspace", "list")
+	_, output, err := executeCommandC(api, astrohubApi, "workspace", "list")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output, err)
 }
@@ -64,6 +66,7 @@ func TestNewWorkspaceUserListCmd(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
+	
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceUserListCmd(api, buf)
 	assert.NotNil(t, cmd)

@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/version"
 )
 
@@ -18,7 +19,7 @@ var (
 )
 
 // NewRootCmd adds all of the primary commands for the cli
-func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func NewRootCmd(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "astro",
 		Short: "Astronomer - CLI",
@@ -30,8 +31,8 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 	rootCmd.PersistentFlags().BoolVarP(&skipVerCheck, "skip-version-check", "", false, "skip version compatibility check")
 	rootCmd.AddCommand(
-		newAuthRootCmd(client, out),
-		newWorkspaceCmd(client, out),
+		newAuthRootCmd(client, astrohubClient, out),
+		newWorkspaceCmd(client, astrohubClient, out),
 		newVersionCmd(client, out),
 		newUpgradeCheckCmd(client, out),
 		newUserCmd(client, out),

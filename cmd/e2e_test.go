@@ -7,15 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/astronomer/astro-cli/auth"
+	// "github.com/astronomer/astro-cli/auth"
 	_ "github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	// "github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/user"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
+	// "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -45,15 +46,16 @@ func (suite *IntegrationTestSuite) SetupSuite() {
 	user.Create(suite.TestEmail, suite.TestPassword, suite.Client, new(bytes.Buffer))
 }
 
-func (suite *IntegrationTestSuite) Test2CreateWorkspace() {
-	output := new(bytes.Buffer)
-	err := auth.Login(suite.TestDomain, true, suite.TestEmail, suite.TestPassword, suite.Client, output)
-	assert.NoError(suite.T(), err)
-	_, out, err := executeCommandC(suite.Client, "workspace", "create", suite.TestWorkspace)
-	assert.NoError(suite.T(), err)
-	expectedOut := "Successfully created workspace"
-	assert.Contains(suite.T(), out, expectedOut)
-}
+// func (suite *IntegrationTestSuite) Test2CreateWorkspace() {
+// 	output := new(bytes.Buffer)
+// 	astrohubApi := astrohub.NewAstrohubClient(httputil.NewHTTPClient());
+// 	err := auth.Login(suite.TestDomain, true, suite.TestEmail, suite.TestPassword, suite.Client, astrohubApi, output)
+// 	assert.NoError(suite.T(), err)
+// 	_, out, err := executeCommandC(suite.Client, astrohubApi, "workspace", "create", suite.TestWorkspace)
+// 	assert.NoError(suite.T(), err)
+// 	expectedOut := "Successfully created workspace"
+// 	assert.Contains(suite.T(), out, expectedOut)
+// }
 
 func TestCreateWorkspaceSuite(t *testing.T) {
 	suite.Run(t, new(IntegrationTestSuite))

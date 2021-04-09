@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -45,12 +46,12 @@ func Create(label, desc string, client *houston.Client, out io.Writer) error {
 }
 
 // List all workspaces
-func List(client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.WorkspacesGetRequest,
+func List(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
+	req := astrohub.Request{
+		Query: astrohub.WorkspacesGetRequest,
 	}
 
-	r, err := req.DoWithClient(client)
+	r, err := req.DoWithClient(astrohubClient)
 	if err != nil {
 		return err
 	}
@@ -114,15 +115,15 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error) {
+func getWorkspaceSelection(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) (string, error) {
 	tab := newTableOut()
 	tab.GetUserInput = true
 
-	req := houston.Request{
-		Query: houston.WorkspacesGetRequest,
+	req := astrohub.Request{
+		Query: astrohub.WorkspacesGetRequest,
 	}
 
-	r, err := req.DoWithClient(client)
+	r, err := req.DoWithClient(astrohubClient)
 	if err != nil {
 		return "", err
 	}
@@ -162,9 +163,9 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 }
 
 // Switch switches workspaces
-func Switch(id string, client *houston.Client, out io.Writer) error {
+func Switch(id string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
 	if len(id) == 0 {
-		_id, err := getWorkspaceSelection(client, out)
+		_id, err := getWorkspaceSelection(client, astrohubClient, out)
 		if err != nil {
 			return err
 		}
@@ -172,12 +173,12 @@ func Switch(id string, client *houston.Client, out io.Writer) error {
 		id = _id
 	}
 	// validate workspace
-	req := houston.Request{
-		Query:     houston.WorkspacesGetRequest,
+	req := astrohub.Request{
+		Query:     astrohub.WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceId": id},
 	}
 
-	_, err := req.DoWithClient(client)
+	_, err := req.DoWithClient(astrohubClient)
 	if err != nil {
 		return errors.Wrap(err, "workspace id is not valid")
 	}
