@@ -56,13 +56,6 @@ type AuthConfig struct {
 	AuthProviders []AuthProvider `json:"providers"`
 }
 
-// Auth0Config holds data related to oAuth and basic authentication
-type Auth0Config struct {
-	ClientId  string           `json:"clientId"`
-	Audience  string           `json:"audience"`
-	DomainUrl string           `json:"domainUrl"`
-}
-
 type AuthUser struct {
 	User  User  `json:"user"`
 	Token Token `json:"token"`
