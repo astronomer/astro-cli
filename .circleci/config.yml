@@ -28,23 +28,6 @@ jobs:
           DEPLOYMENTS__DATABASE__ENABLED: "true"
           DEPLOYMENTS__LOG_HELM_VALUES: "true"
           HELM__RELEASE_VERSION: "0.7.5"
-      - image: quay.io/astronomer/astrohub-api:latest
-        name: astrohub
-        entrypoint: "yarn start"
-        environment:
-          NODE_ENV: "development"
-          WEBSERVER__PORT: "8871"
-          DATABASE_URL: "postgres://postgres:postgres@postgres:5432/postgres"
-          DATABASE__CONNECTION: "postgresql://postgres:postgres@postgres:5432/postgres"
-          DATABASE__SCHEMA: "public"
-          PUBLIC_SIGNUPS: "true"
-          EMAIL_CONFIRMATION: "false"
-          EMAIL__ENABLED: "false"
-          JWT__PASSPHRASE: "secretpassword"
-          DEPLOYMENTS__DATABASE__CONNECTION: "postgres://postgres:postgres@postgres:5432/postgres"
-          DEPLOYMENTS__DATABASE__ENABLED: "true"
-          DEPLOYMENTS__LOG_HELM_VALUES: "true"
-          HELM__RELEASE_VERSION: "0.7.5"
     steps:
       - test
   new-tag:
@@ -108,13 +91,9 @@ commands:
           name: Wait for houston
           command: dockerize -wait tcp://houston:8871 -timeout 2m
       - run:
-          name: Wait for astrohub
-          command: dockerize -wait tcp://astrohub:8871 -timeout 2m
-      - run:
           name: Run unit tests
           environment:
             HOUSTON_HOST: houston
-            ASTROHUB_HOST: astrohub
           command: |
             make test
             bash -c "bash <(curl -s https://codecov.io/bash)"
