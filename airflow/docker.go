@@ -23,7 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -192,7 +192,7 @@ func createProject(projectName, airflowHome string, envFile string) (project.API
 }
 
 // Find deployment name in deployments slice
-func deploymentNameExists(name string, deployments []astrohub.Deployment) bool {
+func deploymentNameExists(name string, deployments []houston.Deployment) bool {
 	for _, deployment := range deployments {
 		if deployment.ReleaseName == name {
 			return true
@@ -493,8 +493,8 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	// Validate workspace
-	wsReq := astrohub.Request{
-		Query:     astrohub.WorkspacesGetRequest,
+	wsReq := houston.Request{
+		Query:     houston.WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceId": wsId},
 	}
 
@@ -507,7 +507,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		return fmt.Errorf("no workspaces with id (%s) found", wsId)
 	}
 
-	var currentWorkspace astrohub.Workspace
+	var currentWorkspace houston.Workspace
 	for _, workspace := range wsResp.Data.GetWorkspaces {
 		if workspace.Id == wsId {
 			currentWorkspace = workspace
@@ -516,8 +516,8 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	// Get Deployments from workspace ID
-	deReq := astrohub.Request{
-		Query:     astrohub.DeploymentsGetRequest,
+	deReq := houston.Request{
+		Query:     houston.DeploymentsGetRequest,
 		Variables: map[string]interface{}{"workspaceId": currentWorkspace.Id},
 	}
 
@@ -544,19 +544,19 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	if len(name) != 0 && !deploymentNameExists(name, deployments) {
-		return errors.New(messages.ASTROHUB_DEPLOYMENT_NAME_ERROR)
+		return errors.New(messages.HOUSTON_DEPLOYMENT_NAME_ERROR)
 	}
 
 	// Prompt user for deployment if no deployment passed in
 	if len(name) == 0 || prompt {
 		if len(deployments) == 0 {
-			return errors.New(messages.ASTROHUB_NO_DEPLOYMENTS_ERROR)
+			return errors.New(messages.HOUSTON_NO_DEPLOYMENTS_ERROR)
 		}
 
-		fmt.Printf(messages.ASTROHUB_DEPLOYMENT_HEADER, cloudDomain)
-		fmt.Println(messages.ASTROHUB_SELECT_DEPLOYMENT_PROMPT)
+		fmt.Printf(messages.HOUSTON_DEPLOYMENT_HEADER, cloudDomain)
+		fmt.Println(messages.HOUSTON_SELECT_DEPLOYMENT_PROMPT)
 
-		deployMap := map[string]astrohub.Deployment{}
+		deployMap := map[string]houston.Deployment{}
 		for i, d := range deployments {
 			index := i + 1
 			tab.AddRow([]string{strconv.Itoa(index), d.Label, d.ReleaseName, currentWorkspace.Label, d.Id}, false)
@@ -568,7 +568,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		choice := input.InputText("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
-			return errors.New(messages.ASTROHUB_INVALID_DEPLOYMENT_KEY)
+			return errors.New(messages.HOUSTON_INVALID_DEPLOYMENT_KEY)
 		}
 		name = selected.ReleaseName
 	}
@@ -580,7 +580,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		}
 	}
 
-	fmt.Printf(messages.ASTROHUB_DEPLOYING_PROMPT, name)
+	fmt.Printf(messages.HOUSTON_DEPLOYING_PROMPT, name)
 	fmt.Println(repositoryName(name))
 
 	// Build the image to deploy
@@ -606,8 +606,8 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	}
 
 	// Get valid image tags for platform using Deployment Info request
-	diReq := astrohub.Request{
-		Query: astrohub.DeploymentInfoRequest,
+	diReq := houston.Request{
+		Query: houston.DeploymentInfoRequest,
 	}
 
 	diResp, err := diReq.Do()

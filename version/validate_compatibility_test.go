@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +30,7 @@ func TestValidateCompatibilityVersionsMatched(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.15.1"
 	err := ValidateCompatibility(api, output, cliVer, false)
@@ -58,7 +58,7 @@ func TestValidateCompatibilityMissingCliVersion(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := ""
 	err := ValidateCompatibility(api, output, cliVer, false)
@@ -86,7 +86,7 @@ func TestValidateCompatibilityVersionsCliDowngrade(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer, false)
@@ -115,7 +115,7 @@ func TestValidateCompatibilityVersionsCliUpgrade(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer, false)
@@ -144,7 +144,7 @@ func TestValidateCompatibilityVersionBypass(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.17.1"
 	err := ValidateCompatibility(api, output, cliVer, true)
@@ -174,7 +174,7 @@ func TestValidateCompatibilityVersionsMinorWarning(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.17.0"
 	err := ValidateCompatibility(api, output, cliVer, false)
@@ -203,7 +203,7 @@ func TestValidateCompatibilityClientFailure(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	output := new(bytes.Buffer)
 	cliVer := "0.15.1"
 	err := ValidateCompatibility(api, output, cliVer, false)

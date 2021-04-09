@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +32,7 @@ func TestAppConfig(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 
 	config, err := AppConfig(api)
 	assert.NoError(t, err)
@@ -50,7 +50,7 @@ func TestAppConfigError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 
 	_, err := AppConfig(api)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
@@ -72,7 +72,7 @@ func TestCheckManualReleaseNamesTrue(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 
 	assert.True(t, checkManualReleaseNames(api))
 }
@@ -93,7 +93,7 @@ func TestCheckManualReleaseNamesFalse(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 
 	assert.False(t, checkManualReleaseNames(api))
 }
@@ -107,7 +107,7 @@ func TestCheckManualReleaseNamesError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 
 	assert.False(t, checkManualReleaseNames(api))
 }
@@ -155,7 +155,7 @@ func TestCreate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -177,7 +177,7 @@ func TestCreateHoustonError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -200,7 +200,7 @@ func TestDelete(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
@@ -238,7 +238,7 @@ func TestList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	ws := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
@@ -292,7 +292,7 @@ func TestUpdate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	deploymentConfig := make(map[string]string)
@@ -318,7 +318,7 @@ func TestUpdateError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	deploymentConfig := make(map[string]string)
@@ -347,7 +347,7 @@ func TestAirflowUpgrade(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 	desiredAirflowVersion := "1.10.10"
 
@@ -376,7 +376,7 @@ func TestAirflowUpgradeError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 	desiredAirflowVersion := "1.10.10"
 
@@ -406,7 +406,7 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
 	err := AirflowUpgradeCancel(deploymentId, api, buf)
 	assert.NoError(t, err)
@@ -427,7 +427,7 @@ func TestAirflowUpgradeCancelError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
 	err := AirflowUpgradeCancel(deploymentId, api, buf)
 	assert.Error(t, err, "API error (500):")
@@ -450,12 +450,12 @@ func Test_getDeployment(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 
 	deployment, err := getDeployment(deploymentId, api)
 	assert.NoError(t, err)
-	assert.Equal(t, deployment, &astrohub.Deployment{Id: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
+	assert.Equal(t, deployment, &houston.Deployment{Id: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
 }
 
 func Test_getDeploymentError(t *testing.T) {
@@ -468,7 +468,7 @@ func Test_getDeploymentError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 
 	_, err := getDeployment(deploymentId, api)
@@ -501,7 +501,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
 
 	// mock os.Stdin
@@ -535,7 +535,7 @@ func Test_getAirflowVersionSelectionError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
 	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
 	assert.Error(t, err, "API error (500):")

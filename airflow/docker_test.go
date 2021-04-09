@@ -8,11 +8,11 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 )
 
 func TestDeploymentNameExists(t *testing.T) {
-	deployments := []astrohub.Deployment{
+	deployments := []houston.Deployment{
 		{ReleaseName: "dev"},
 		{ReleaseName: "dev1"},
 	}
@@ -23,7 +23,7 @@ func TestDeploymentNameExists(t *testing.T) {
 }
 
 func TestDeploymentNameDoesntExists(t *testing.T) {
-	deployments := []astrohub.Deployment{
+	deployments := []houston.Deployment{
 		{ReleaseName: "dummy"},
 	}
 	exists := deploymentNameExists("dev", deployments)

@@ -1,6 +1,6 @@
-package astrohub
+package houston
 
-// Astrohub Constants
+// Houston Constants
 const (
 	// Deployment Level Role Based Access
 	DeploymentRole   = "DEPLOYMENT"

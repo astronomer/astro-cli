@@ -1,4 +1,4 @@
-package astrohub
+package houston
 
 import (
 	"github.com/stretchr/testify/assert"

@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -25,6 +26,25 @@ type postTokenResponse struct {
 	ExpiresIn    int       `json:"expires_in"`
 	TokenType    string    `json:"token_type"`
 	Scope        string    `json:"scope"`
+}
+
+// basicAuth handles authentication with the houston api
+func basicAuth(username, password string) (string, error) {
+	if password == "" {
+		password, _ = input.InputPassword(messages.INPUT_PASSWORD)
+	}
+
+	req := astrohub.Request{
+		Query:     houston.TokenBasicCreateRequest,
+		Variables: map[string]interface{}{"identity": username, "password": password},
+	}
+
+	resp, err := req.Do()
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Data.CreateToken.Token.Value, nil
 }
 
 // handles authentication with auth0
@@ -79,7 +99,7 @@ func switchToLastUsedWorkspace(c config.Context, workspaces []astrohub.Workspace
 
 // oAuth handles oAuth with houston api
 func oAuth(oAuthUrl string) string {
-	fmt.Println("\n" + messages.ASTROHUB_OAUTH_REDIRECT)
+	fmt.Println("\n" + messages.HOUSTON_OAUTH_REDIRECT)
 	fmt.Println(oAuthUrl + "\n")
 	return input.InputText(messages.INPUT_OAUTH_TOKEN)
 }
@@ -108,7 +128,7 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client *astrohub.Client, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
 	var token string
 	var err error
 
@@ -139,7 +159,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *ast
 		Query: astrohub.AuthConfigGetRequest,
 	}
 
-	acResp, err := acReq.DoWithClient(client)
+	acResp, err := acReq.DoWithClient(astrohubClient)
 	if err != nil {
 		return err
 	}
@@ -190,7 +210,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *ast
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + messages.CLI_CHOOSE_WORKSPACE)
-			err := workspace.Switch("", client, out)
+			err := workspace.Switch("", client, astrohubClient, out)
 			if err != nil {
 				fmt.Printf(messages.CLI_SET_WORKSPACE_EXAMPLE)
 			}

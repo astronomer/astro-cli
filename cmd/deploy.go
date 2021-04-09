@@ -6,7 +6,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/pkg/errors"
@@ -25,7 +25,7 @@ Menu will be presented if you do not specify a deployment name:
 `
 )
 
-func newDeployCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
+func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an Airflow project",

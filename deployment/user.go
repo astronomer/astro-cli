@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -20,7 +20,7 @@ var (
 )
 
 // UserList returns a list of user with deployment access
-func UserList(deploymentId string, email string, userId string, fullName string, client *astrohub.Client, out io.Writer) error {
+func UserList(deploymentId string, email string, userId string, fullName string, client *houston.Client, out io.Writer) error {
 	user := map[string]interface{}{
 		"userId":   userId,
 		"email":    email,
@@ -30,8 +30,8 @@ func UserList(deploymentId string, email string, userId string, fullName string,
 		"user":         user,
 		"deploymentId": deploymentId,
 	}
-	req := astrohub.Request{
-		Query:     astrohub.DeploymentUserListRequest,
+	req := houston.Request{
+		Query:     houston.DeploymentUserListRequest,
 		Variables: variables,
 	}
 
@@ -56,7 +56,7 @@ func UserList(deploymentId string, email string, userId string, fullName string,
 
 	// Build rows
 	for _, d := range deploymentUsers {
-		role := filterByRoleType(d.RoleBindings, astrohub.DeploymentRole)
+		role := filterByRoleType(d.RoleBindings, houston.DeploymentRole)
 		tab.AddRow([]string{d.Id, d.FullName, d.Username, role}, false)
 	}
 
@@ -66,7 +66,7 @@ func UserList(deploymentId string, email string, userId string, fullName string,
 }
 
 // filterByRoleType selects the type of role from a list of roles
-func filterByRoleType(roleBindings []astrohub.RoleBinding, roleType string) string {
+func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) string {
 	for _, roleBinding := range roleBindings {
 		if strings.Contains(roleBinding.Role, roleType) {
 			return roleBinding.Role
@@ -77,9 +77,9 @@ func filterByRoleType(roleBindings []astrohub.RoleBinding, roleType string) stri
 }
 
 // Add a user to a deployment with specified role
-func Add(deploymentId string, email string, role string, client *astrohub.Client, out io.Writer) error {
-	req := astrohub.Request{
-		Query: astrohub.DeploymentUserAddRequest,
+func Add(deploymentId string, email string, role string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query: houston.DeploymentUserAddRequest,
 		Variables: map[string]interface{}{
 			"email":        email,
 			"deploymentId": deploymentId,
@@ -101,9 +101,9 @@ func Add(deploymentId string, email string, role string, client *astrohub.Client
 }
 
 // UpdateUser updates a user's deployment role
-func UpdateUser(deploymentId string, email string, role string, client *astrohub.Client, out io.Writer) error {
-	req := astrohub.Request{
-		Query: astrohub.DeploymentUserUpdateRequest,
+func UpdateUser(deploymentId string, email string, role string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query: houston.DeploymentUserUpdateRequest,
 		Variables: map[string]interface{}{
 			"email":        email,
 			"deploymentId": deploymentId,
@@ -125,9 +125,9 @@ func UpdateUser(deploymentId string, email string, role string, client *astrohub
 }
 
 // DeleteUser removes user access for a deployment
-func DeleteUser(deploymentId string, email string, client *astrohub.Client, out io.Writer) error {
-	req := astrohub.Request{
-		Query: astrohub.DeploymentUserDeleteRequest,
+func DeleteUser(deploymentId string, email string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query: houston.DeploymentUserDeleteRequest,
 		Variables: map[string]interface{}{
 			"email":        email,
 			"deploymentId": deploymentId,

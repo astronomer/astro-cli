@@ -5,6 +5,7 @@ import (
 
 	"github.com/astronomer/astro-cli/auth"
 	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/astrohub"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +15,7 @@ var (
 	domain    string
 )
 
-func newAuthRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
+func newAuthRootCmd(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -26,27 +27,27 @@ func newAuthRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		newAuthLoginCmd(client, out),
+		newAuthLoginCmd(client, astrohubClient, out),
 		newAuthLogoutCmd(client, out),
 	)
 	return cmd
 }
 
-func newAuthLoginCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
+func newAuthLoginCmd(client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Login to Astronomer",
 		Long:  "Authenticate to houston-api using oAuth or basic auth.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return authLogin(cmd, args, client, out)
+			return authLogin(cmd, args, client, astrohubClient, out)
 		},
 	}
 	cmd.Flags().BoolVarP(&oAuthOnly, "oauth", "o", false, "do not prompt for local auth")
 	return cmd
 }
 
-func newAuthLogoutCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
+func newAuthLogoutCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of Astronomer",
@@ -59,7 +60,7 @@ func newAuthLogoutCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func authLogin(cmd *cobra.Command, args []string, client *astrohub.Client, out io.Writer) error {
+func authLogin(cmd *cobra.Command, args []string, client *houston.Client, astrohubClient *astrohub.Client, out io.Writer) error {
 	if len(args) == 1 {
 		domain = args[0]
 	}
@@ -67,7 +68,7 @@ func authLogin(cmd *cobra.Command, args []string, client *astrohub.Client, out i
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	// by using "" we are delegating username/password to Login by asking input
-	err := auth.Login(domain, oAuthOnly, "", "", client, out)
+	err := auth.Login(domain, oAuthOnly, "", "", client, astrohubClient, out)
 	if err != nil {
 		return err
 	}

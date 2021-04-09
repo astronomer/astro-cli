@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
 
 	"github.com/pkg/errors"
@@ -81,7 +81,7 @@ func validateWorkspaceRole(role string) error {
 }
 
 func validateDeploymentRole(role string) error {
-	validRoles := []string{astrohub.DeploymentAdmin, astrohub.DeploymentEditor, astrohub.DeploymentViewer}
+	validRoles := []string{houston.DeploymentAdmin, houston.DeploymentEditor, houston.DeploymentViewer}
 
 	for _, validRole := range validRoles {
 		if role == validRole {

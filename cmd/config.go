@@ -6,13 +6,13 @@ import (
 	"os"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-func newConfigRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
+func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	var globalFlag bool
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -30,7 +30,7 @@ func newConfigRootCmd(client *astrohub.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newConfigGetCmd(client *astrohub.Client, out io.Writer, globalFlag bool) *cobra.Command {
+func newConfigGetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get project configuration",
@@ -42,7 +42,7 @@ func newConfigGetCmd(client *astrohub.Client, out io.Writer, globalFlag bool) *c
 	return cmd
 }
 
-func newConfigSetCmd(client *astrohub.Client, out io.Writer, globalFlag bool) *cobra.Command {
+func newConfigSetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "Set project configuration",

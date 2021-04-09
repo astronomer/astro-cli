@@ -18,11 +18,11 @@ func TestInitHome(t *testing.T) {
     ws_protocol: wss
 local:
   enabled: true
-  astrohub: http://ASTROHUB_HOST:8871/v1
-context: ASTROHUB_HOST
+  houston: http://HOUSTON_HOST:8871/v1
+context: HOUSTON_HOST
 contexts:
-  ASTROHUB_HOST:
-    domain: ASTROHUB_HOST
+  HOUSTON_HOST:
+    domain: HOUSTON_HOST
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
@@ -40,11 +40,11 @@ func TestInitProject(t *testing.T) {
     ws_protocol: wss
 local:
   enabled: true
-  houston: http://ASTROHUB_HOST:8871/v1
-context: ASTROHUB_HOST
+  houston: http://HOUSTON_HOST:8871/v1
+context: HOUSTON_HOST
 contexts:
-  ASTROHUB_HOST:
-    domain: ASTROHUB_HOST
+  HOUSTON_HOST:
+    domain: HOUSTON_HOST
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
@@ -86,11 +86,11 @@ func TestConfigExists(t *testing.T) {
     ws_protocol: wss
 local:
   enabled: true
-  houston: http://ASTROHUB_HOST:8871/v1
-context: ASTROHUB_HOST
+  houston: http://HOUSTON_HOST:8871/v1
+context: HOUSTON_HOST
 contexts:
-  ASTROHUB_HOST:
-    domain: ASTROHUB_HOST
+  HOUSTON_HOST:
+    domain: HOUSTON_HOST
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v

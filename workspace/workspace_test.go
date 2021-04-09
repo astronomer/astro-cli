@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/astrohub"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
@@ -31,7 +32,7 @@ func TestCreate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	label := "test"
 	description := "description"
 
@@ -56,7 +57,7 @@ func TestCreateError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	label := "test"
 	description := "description"
 
@@ -130,10 +131,11 @@ func TestList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
 	buf := new(bytes.Buffer)
-	err := List(api, buf)
+	err := List(api, astrohubApi, buf)
 	assert.NoError(t, err)
 	expected := ` NAME     ID                            
  w1       ckbv7zvb100pe0760xp98qnh9     
@@ -208,10 +210,11 @@ func TestListActiveWorkspace(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
 	buf := new(bytes.Buffer)
-	err := List(api, buf)
+	err := List(api, astrohubApi, buf)
 	assert.NoError(t, err)
 	expected := " NAME     ID                            \n\x1b[1;32m w1       ck05r3bor07h40d02y2hw4n4v     \x1b[0m\n wwww     ckbv8pwbq00wk0760us7ktcgd     \n test     ckc0j8y1101xo0760or02jdi7     \n"
 	assert.Equal(t, expected, buf.String())
@@ -227,10 +230,11 @@ func TestListError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
 	buf := new(bytes.Buffer)
-	err := List(api, buf)
+	err := List(api, astrohubApi, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -251,7 +255,7 @@ func TestDelete(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	wsId := "ckc0j8y1101xo0760or02jdi7"
 
 	buf := new(bytes.Buffer)
@@ -271,7 +275,7 @@ func TestDeleteError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	wsId := "ckc0j8y1101xo0760or02jdi7"
 
 	buf := new(bytes.Buffer)
@@ -327,10 +331,11 @@ func TestGetWorkspaceSelectionError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
 	buf := new(bytes.Buffer)
-	_, err := getWorkspaceSelection(api, buf)
+	_, err := getWorkspaceSelection(api, astrohubApi, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -388,12 +393,13 @@ contexts:
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
 	wsId := "ckbv7zvb100pe0760xp98qnh9"
 
 	buf := new(bytes.Buffer)
-	err = Switch(wsId, api, buf)
+	err = Switch(wsId, api, astrohubApi, buf)
 	assert.NoError(t, err)
 	expected := " CLUSTER                             WORKSPACE                           \n localhost                           ckbv7zvb100pe0760xp98qnh9           \n"
 	assert.Equal(t, expected, buf.String())
@@ -426,12 +432,13 @@ contexts:
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
+	astrohubApi := astrohub.NewAstrohubClient(client)
 
 	wsId := "ckbv7zvb100pe0760xp98qnh9"
 
 	buf := new(bytes.Buffer)
-	err = Switch(wsId, api, buf)
+	err = Switch(wsId, api, astrohubApi, buf)
 	assert.EqualError(t, err, "workspace id is not valid: API error (500): Internal Server Error")
 }
 
@@ -455,7 +462,7 @@ func TestUpdate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	id := "test"
 	args := map[string]string{"1": "2"}
 
@@ -477,7 +484,7 @@ func TestUpdateError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := astrohub.NewAstrohubClient(client)
+	api := houston.NewHoustonClient(client)
 	id := "test"
 	args := map[string]string{"1": "2"}
 

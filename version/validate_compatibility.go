@@ -8,12 +8,12 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Masterminds/semver"
-	"github.com/astronomer/astro-cli/astrohub"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 )
 
 // ValidateCompatibility print message if astro-cli version is not compatible with platform version
-func ValidateCompatibility(client *astrohub.Client, out io.Writer, cliVer string, skipVerCheck bool) error {
+func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string, skipVerCheck bool) error {
 	if skipVerCheck {
 		return nil
 	}
