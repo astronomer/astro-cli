@@ -28,25 +28,6 @@ type postTokenResponse struct {
 	Scope        string    `json:"scope"`
 }
 
-// basicAuth handles authentication with the houston api
-func basicAuth(username, password string) (string, error) {
-	if password == "" {
-		password, _ = input.InputPassword(messages.INPUT_PASSWORD)
-	}
-
-	req := astrohub.Request{
-		Query:     houston.TokenBasicCreateRequest,
-		Variables: map[string]interface{}{"identity": username, "password": password},
-	}
-
-	resp, err := req.Do()
-	if err != nil {
-		return "", err
-	}
-
-	return resp.Data.CreateToken.Token.Value, nil
-}
-
 // handles authentication with auth0
 func authLogin(authConfig *astrohub.AuthConfig, username, password string) (string, error) {
 	if password == "" {

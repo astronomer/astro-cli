@@ -11,7 +11,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
       - image: quay.io/astronomer/astrohub-api:latest
-        name: houston
+        name: astrohub
         entrypoint: "yarn start"
         environment:
           NODE_ENV: "development"

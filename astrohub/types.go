@@ -17,19 +17,14 @@ type Response struct {
 		RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
 		CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
 		CreateToken                    *AuthUser                 `json:"createToken,omitempty"`
-		CreateWorkspaceServiceAccount  *WorkspaceServiceAccount  `json:"createWorkspaceServiceAccount,omitempty"`
-		CreateDeploymentServiceAccount *DeploymentServiceAccount `json:"createDeploymentServiceAccount,omitempty"`
 		CreateUser                     *AuthUser                 `json:"createUser,omitempty"`
 		CreateWorkspace                *Workspace                `json:"createWorkspace,omitempty"`
 		DeleteDeployment               *Deployment               `json:"deleteDeployment,omitempty"`
-		DeleteWorkspaceServiceAccount  *ServiceAccount           `json:"deleteWorkspaceServiceAccount,omitempty"`
-		DeleteDeploymentServiceAccount *ServiceAccount           `json:"deleteDeploymentServiceAccount,omitempty"`
 		DeleteWorkspace                *Workspace                `json:"deleteWorkspace,omitempty"`
 		GetDeployment                  Deployment                `json:"deployment,omitempty"`
 		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
 		GetAppConfig                   *AppConfig                `json:"appConfig,omitempty"`
-		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
 		GetUsers                       []User                    `json:"users,omitempty"`
 		GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
 		UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
@@ -119,34 +114,6 @@ type Status struct {
 	Id      string `json:"id"`
 }
 
-// ServiceAccount defines a structure of a ServiceAccountResponse object
-type ServiceAccount struct {
-	Id         string `json:"id"`
-	ApiKey     string `json:"apiKey"`
-	Label      string `json:"label"`
-	Category   string `json:"category"`
-	EntityType string `json:"entityType"`
-	EntityId   string `json:"entityUuid"`
-	LastUsedAt string `json:"lastUsedAt"`
-	CreatedAt  string `json:"createdAt"`
-	UpdatedAt  string `json:"updatedAt"`
-	Active     bool   `json:"active"`
-}
-
-// WorkspaceServiceAccount defines a structure of a WorkspaceServiceAccountResponse object
-type WorkspaceServiceAccount struct {
-	Id            string `json:"id"`
-	ApiKey        string `json:"apiKey"`
-	Label         string `json:"label"`
-	Category      string `json:"category"`
-	EntityType    string `json:"entityType"`
-	WorkspaceUuid string `json:"workspaceUuid"`
-	LastUsedAt    string `json:"lastUsedAt"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
-	Active        bool   `json:"active"`
-}
-
 // DeploymentUser defines a structure of RBAC deployment users
 type DeploymentUser struct {
 	Id           string        `json:"id"`
@@ -154,20 +121,6 @@ type DeploymentUser struct {
 	FullName     string        `json:"fullName"`
 	Username     string        `json:"username"`
 	RoleBindings []RoleBinding `json:"roleBindings"`
-}
-
-// DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object
-type DeploymentServiceAccount struct {
-	Id             string `json:"id"`
-	ApiKey         string `json:"apiKey"`
-	Label          string `json:"label"`
-	Category       string `json:"category"`
-	EntityType     string `json:"entityType"`
-	DeploymentUuid string `json:"deploymentUuid"`
-	LastUsedAt     string `json:"lastUsedAt"`
-	CreatedAt      string `json:"createdAt"`
-	UpdatedAt      string `json:"updatedAt"`
-	Active         bool   `json:"active"`
 }
 
 // Token contains a houston auth token as well as it's payload of components
