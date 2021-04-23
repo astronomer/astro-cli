@@ -26,6 +26,7 @@ var (
 	cloudRole             string
 	releaseName           string
 	nfsLocation           string
+	dagDeploymentType     string
 
 	CreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
@@ -115,7 +116,8 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	}
 
 	if deployment.CheckNFSMountDagDeployment(client) {
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "[NFS_LOCATION]")
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount: <IP>:/<path>")
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
@@ -372,6 +374,10 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 		executorType = "KubernetesExecutor"
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+	}
+
+	if dagDeploymentType != "image" && dagDeploymentType != "volume" {
+		return errors.New("please specify correct dag deployment type, one of: image, volume")
 	}
 	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, client, out)
 }
