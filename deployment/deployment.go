@@ -63,7 +63,7 @@ func CheckNFSMountDagDeployment(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if releaseName != "" && checkManualReleaseNames(client) {
@@ -74,6 +74,9 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion string, 
 		vars["airflowVersion"] = airflowVersion
 	}
 
+	if dagDeploymentType == "volume" && nfsLocation != "" {
+		vars["nfsLocation"] = nfsLocation
+	}
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
 		Variables: vars,

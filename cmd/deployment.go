@@ -379,7 +379,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	if dagDeploymentType != "image" && dagDeploymentType != "volume" {
 		return errors.New("please specify correct dag deployment type, one of: image, volume")
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, client, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {

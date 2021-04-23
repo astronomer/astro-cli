@@ -10,7 +10,7 @@ jobs:
         environment:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-      - image: quay.io/astronomer/ap-houston-api:0.23.15
+      - image: quay.io/astronomer/ap-houston-api:0.25.0
         name: houston
         entrypoint: "yarn start"
         environment:
