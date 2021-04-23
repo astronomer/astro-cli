@@ -499,6 +499,8 @@ var (
 			baseDomain
 			smtpConfigured
 			manualReleaseNames
+			configureDagDeployment
+			nfsMountDagDeployment
 		}
 	}`
 )

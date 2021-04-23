@@ -25,6 +25,7 @@ var (
 	label                 string
 	cloudRole             string
 	releaseName           string
+	nfsLocation           string
 
 	CreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
@@ -111,6 +112,10 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, args, client, out)
 		},
+	}
+
+	if deployment.CheckNFSMountDagDeployment(client) {
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "[NFS_LOCATION]")
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
