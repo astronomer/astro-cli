@@ -112,8 +112,8 @@ var (
 	}`
 
 	DeploymentUpdateRequest = `
-	mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String) {
-		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole) {
+mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String, $dagDeployment: DagDeployment) {
+		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole, dagDeployment: $dagDeployment) {
 			id
 			type
 			label
