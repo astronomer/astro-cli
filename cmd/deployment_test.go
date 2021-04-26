@@ -150,6 +150,55 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	assert.Contains(t, output, "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
 
+func TestDeploymentUpdateCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": true},
+    "updateDeployment": {
+      "createdAt": "2021-04-23T14:29:28.497Z",
+      "dagDeployment": {
+        "nfsLocation": "test:/test",
+        "type": "volume"
+      },
+      "description": "",
+      "id": "cknuetusw0018yqxto2jzxjqq",
+      "label": "test_dima22asdasd",
+      "releaseName": "amateur-instrument-9515",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T21:42:35.361Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Successfully updated deployment")
+}
+
 func TestDeploymentSaRootCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	output, err := executeCommand("deployment", "service-account")
