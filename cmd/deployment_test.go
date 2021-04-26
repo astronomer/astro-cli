@@ -45,6 +45,7 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
     "deleteDeploymentServiceAccount": {
       "id": "q1w2e3r4t5y6u7i8o9p0",
       "apiKey": "000000000000000000000000",
@@ -80,6 +81,7 @@ func TestDeploymentSaGetCommand(t *testing.T) {
 `
 	okResponse := `{
   "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
     "serviceAccounts": [{
       "id": "q1w2e3r4t5y6u7i8o9p0",
       "apiKey": "000000000000000000000000",
@@ -117,6 +119,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 `
 	okResponse := `{
   "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
     "createDeploymentServiceAccount": {
       "id": "q1w2e3r4t5y6u7i8o9p0",
       "apiKey": "000000000000000000000000",
@@ -154,6 +157,7 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 `
 	okResponse := `{
 		"data": {
+		        "appConfig": {"nfsMountDagDeployment": false},
 			"deploymentAddUserRole": {
 				"id": "ckggzqj5f4157qtc9lescmehm",
 				"user": {
@@ -191,6 +195,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 `
 	okResponse := `{
 		"data": {
+		        "appConfig": {"nfsMountDagDeployment": false},
 			"deploymentRemoveUserRole": {
 				"id": "ckggzqj5f4157qtc9lescmehm",
 				"user": {
@@ -224,6 +229,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 	expectedOut := `Successfully updated somebody@astronomer.com to a DEPLOYMENT_ADMIN`
 	okResponse := `{
 		"data": {
+			"appConfig": {"nfsMountDagDeployment": false},
 			"deploymentUpdateUserRole": {
 				"id": "ckggzqj5f4157qtc9lescmehm",
 				"user": {
@@ -257,6 +263,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
 	okResponse := `{"data": {
+					"appConfig": {"nfsMountDagDeployment": false},
 					"updateDeploymentAirflow": {
 						"id": "ckggzqj5f4157qtc9lescmehm",
 						"label": "test",
@@ -285,6 +292,7 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
 	okResponse := `{"data": {
+                                        "appConfig": {"nfsMountDagDeployment": false},
 					"deployment": {
 						"id": "ckggzqj5f4157qtc9lescmehm",
 						"label": "test",

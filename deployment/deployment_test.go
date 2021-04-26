@@ -162,8 +162,10 @@ func TestCreate(t *testing.T) {
 	role := "test-role"
 	executor := "CeleryExecutor"
 	airflowVersion := "1.10.5"
+	dagDeploymentType := "image"
+	nfsLocation := ""
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -184,8 +186,10 @@ func TestCreateHoustonError(t *testing.T) {
 	role := "test-role"
 	executor := "CeleryExecutor"
 	airflowVersion := "1.10.5"
+	dagDeploymentType := "image"
+	nfsLocation := ""
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -432,6 +436,7 @@ func TestAirflowUpgradeCancelError(t *testing.T) {
 	err := AirflowUpgradeCancel(deploymentId, api, buf)
 	assert.Error(t, err, "API error (500):")
 }
+
 func Test_getDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{"data": {
