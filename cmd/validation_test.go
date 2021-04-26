@@ -42,8 +42,8 @@ func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 		expectedOutput                 string
 		expectedError                  string
 	}{
-		{dagDeploymentType: "volume", expectedError: "please specify nfs location via --nfs-location flag"},
-		{dagDeploymentType: "unknown", expectedError: "please specify correct dag deployment type, one of: image, volume"},
+		{dagDeploymentType: "volume", expectedError: "please specify the nfs location via --nfs-location flag"},
+		{dagDeploymentType: "unknown", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
 	}
 
 	for _, tt := range myTests {
