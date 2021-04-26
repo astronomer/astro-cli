@@ -162,7 +162,7 @@ func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command 
 
 func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	example := ` 
-# update lables and description for given deployment
+# update labels and description for given deployment
 $ astro deployment update UUID label=Production-Airflow description=example version=v1.0.0`
 	updateExampleDagDeployment := `
 
