@@ -26,6 +26,7 @@ var (
 		$airflowVersion: String
 		$config: JSON
 		$cloudRole: String
+		$dagDeployment: DagDeployment
 	) {
 		createDeployment(
 			label: $label
@@ -36,6 +37,7 @@ var (
 		        airflowVersion: $airflowVersion
 			config: $config
 			cloudRole: $cloudRole
+			dagDeployment: $dagDeployment
 		) {
 			id
 			type

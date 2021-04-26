@@ -75,7 +75,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	}
 
 	if dagDeploymentType == "volume" && nfsLocation != "" {
-		vars["nfsLocation"] = nfsLocation
+		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
 	}
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
