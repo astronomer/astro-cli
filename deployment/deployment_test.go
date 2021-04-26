@@ -170,6 +170,64 @@ func TestCreate(t *testing.T) {
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
 
+func TestCreateWithNFSLocation(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "createDeployment": {
+			"id": "ckbv818oa00r107606ywhoqtw",
+			"executor": "CeleryExecutor",
+			"urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/flower"
+        }
+      ],
+      "properties": {
+        "component_version": "0.0.0",
+        "alert_emails": []
+      },
+      "description": "",
+      "label": "test2",
+      "releaseName": "boreal-penumbra-1102",
+      "status": null,
+      "type": "airflow",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9",
+        "label": "w1"
+      },
+      "createdAt": "2020-06-25T20:10:33.898Z",
+      "updatedAt": "2020-06-25T20:10:33.898Z"
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	label := "label"
+	ws := "ck1qg6whg001r08691y117hub"
+	releaseName := ""
+	role := "test-role"
+	executor := "CeleryExecutor"
+	airflowVersion := "1.10.5"
+	dagDeploymentType := "volume"
+	nfsLocation := "test:/test"
+	buf := new(bytes.Buffer)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+}
+
 func TestCreateHoustonError(t *testing.T) {
 	testUtil.InitTestConfig()
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
