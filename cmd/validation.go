@@ -104,7 +104,7 @@ func validateRole(role string) error {
 
 func validateDagDeploymentArgs(dagDeploymentType, nfsLocation string) error {
 	if dagDeploymentType != "image" && dagDeploymentType != "volume" {
-		return errors.New("please specify correct dag deployment type, one of: image, volume")
+ 		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume")
 	}
 	if dagDeploymentType == "volume" && nfsLocation == "" {
 		return errors.New("please specify nfs location via --nfs-location flag")
