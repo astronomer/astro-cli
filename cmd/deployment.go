@@ -43,7 +43,7 @@ var (
 `
 	createExampleDagDeployment = `
 # Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
-  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10 --nfs-location=test:/test --dag-deployment-type=volume
+  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10 --dag-deployment-type=volume --nfs-location=test:/test
 `
 	deploymentUserListExample = `
 # Search for deployment users
