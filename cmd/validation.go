@@ -107,7 +107,7 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation string) error {
  		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume")
 	}
 	if dagDeploymentType == "volume" && nfsLocation == "" {
-		return errors.New("please specify nfs location via --nfs-location flag")
+ 		return errors.New("please specify the nfs location via --nfs-location flag")
 	}
 	return nil
 }
