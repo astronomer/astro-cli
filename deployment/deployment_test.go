@@ -584,8 +584,8 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 				"version": "0.15.1",
 				"baseDomain": "local.astronomer.io",
 				"smtpConfigured": true,
-				"manualReleaseNames": false
-                                "fsMountDagDeployment": false
+				"manualReleaseNames": false,
+                                "nfsMountDagDeployment": true
 			}
 		}
 }`
@@ -598,5 +598,5 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	assert.Equal(t, CheckNFSMountDagDeployment(api), false)
+	assert.Equal(t, CheckNFSMountDagDeployment(api), true)
 }
