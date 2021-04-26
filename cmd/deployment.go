@@ -41,6 +41,10 @@ var (
 # Create new deployment with Kubernetes executor.
   $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10
 `
+	createExampleDagDeployment = `
+# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
+  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10 --nfs-location=test:/test --dag-deployment-type=volume
+`
 	deploymentUserListExample = `
 # Search for deployment users
   $ astro deployment user list <deployment-id> --email=EMAIL_ADDRESS --user-id=ID --name=NAME
@@ -116,7 +120,8 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	}
 
 	if deployment.CheckNFSMountDagDeployment(client) {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism")
+		cmd.Example = cmd.Example + createExampleDagDeployment
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount: <IP>:/<path>")
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
@@ -378,6 +383,9 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 
 	if dagDeploymentType != "image" && dagDeploymentType != "volume" {
 		return errors.New("please specify correct dag deployment type, one of: image, volume")
+	}
+	if dagDeploymentType == "volume" && nfsLocation == "" {
+		return errors.New("please specify nfs location via --nfs-location flag")
 	}
 	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, client, out)
 }
