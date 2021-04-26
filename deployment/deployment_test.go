@@ -562,3 +562,41 @@ func Test_meetsAirflowUpgradeReqs(t *testing.T) {
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	assert.NoError(t, err)
 }
+
+func TestCheckNFSMountDagDeploymentError(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(``)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	assert.Equal(t, CheckNFSMountDagDeployment(api), false)
+}
+
+func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false
+                                "fsMountDagDeployment": false
+			}
+		}
+}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	assert.Equal(t, CheckNFSMountDagDeployment(api), false)
+}
