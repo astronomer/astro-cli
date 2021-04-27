@@ -123,7 +123,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	if deployment.CheckNFSMountDagDeployment(client) {
 		cmd.Example = cmd.Example + createExampleDagDeployment
 		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism: image, volume")
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount: <IP>:/<path>. nfs:// protocol is assumed, don't include it.")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://'")
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
@@ -189,7 +189,7 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 	if deployment.CheckNFSMountDagDeployment(client) {
 		cmd.Example = cmd.Example + updateExampleDagDeployment
 		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism: image, volume")
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount: <IP>:/<path>. nfs:// protocol is assumed, don't include it.")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://'")
 	}
 
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
