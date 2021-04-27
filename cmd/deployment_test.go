@@ -20,6 +20,185 @@ func TestDeploymentRootCommand(t *testing.T) {
 	assert.Contains(t, output, "astro deployment")
 }
 
+func TestDeploymentCreateCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "create", "new-deployment-name", "--executor=celery")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+}
+
+func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": true},
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+}
+
+func TestDeploymentUpdateCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": true},
+    "updateDeployment": {
+      "createdAt": "2021-04-23T14:29:28.497Z",
+      "dagDeployment": {
+        "nfsLocation": "test:/test",
+        "type": "volume"
+      },
+      "description": "",
+      "id": "cknuetusw0018yqxto2jzxjqq",
+      "label": "test_dima22asdasd",
+      "releaseName": "amateur-instrument-9515",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T21:42:35.361Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Successfully updated deployment")
+}
+
 func TestDeploymentSaRootCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	output, err := executeCommand("deployment", "service-account")
@@ -45,6 +224,7 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
     "deleteDeploymentServiceAccount": {
       "id": "q1w2e3r4t5y6u7i8o9p0",
       "apiKey": "000000000000000000000000",
@@ -80,6 +260,7 @@ func TestDeploymentSaGetCommand(t *testing.T) {
 `
 	okResponse := `{
   "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
     "serviceAccounts": [{
       "id": "q1w2e3r4t5y6u7i8o9p0",
       "apiKey": "000000000000000000000000",
@@ -117,6 +298,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 `
 	okResponse := `{
   "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
     "createDeploymentServiceAccount": {
       "id": "q1w2e3r4t5y6u7i8o9p0",
       "apiKey": "000000000000000000000000",
@@ -154,6 +336,7 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 `
 	okResponse := `{
 		"data": {
+		        "appConfig": {"nfsMountDagDeployment": false},
 			"deploymentAddUserRole": {
 				"id": "ckggzqj5f4157qtc9lescmehm",
 				"user": {
@@ -191,6 +374,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 `
 	okResponse := `{
 		"data": {
+		        "appConfig": {"nfsMountDagDeployment": false},
 			"deploymentRemoveUserRole": {
 				"id": "ckggzqj5f4157qtc9lescmehm",
 				"user": {
@@ -224,6 +408,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 	expectedOut := `Successfully updated somebody@astronomer.com to a DEPLOYMENT_ADMIN`
 	okResponse := `{
 		"data": {
+			"appConfig": {"nfsMountDagDeployment": false},
 			"deploymentUpdateUserRole": {
 				"id": "ckggzqj5f4157qtc9lescmehm",
 				"user": {
@@ -257,6 +442,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
 	okResponse := `{"data": {
+					"appConfig": {"nfsMountDagDeployment": false},
 					"updateDeploymentAirflow": {
 						"id": "ckggzqj5f4157qtc9lescmehm",
 						"label": "test",
@@ -285,6 +471,7 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
 	okResponse := `{"data": {
+                                        "appConfig": {"nfsMountDagDeployment": false},
 					"deployment": {
 						"id": "ckggzqj5f4157qtc9lescmehm",
 						"label": "test",

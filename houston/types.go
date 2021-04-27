@@ -260,10 +260,12 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 
 // AppConfig contains current houston config
 type AppConfig struct {
-	Version            string `json:"version"`
-	BaseDomain         string `json:"baseDomain"`
-	SmtpConfigured     bool   `json:"smtpConfigured"`
-	ManualReleaseNames bool   `json:"manualReleaseNames"`
+	Version                string `json:"version"`
+	BaseDomain             string `json:"baseDomain"`
+	SmtpConfigured         bool   `json:"smtpConfigured"`
+	ManualReleaseNames     bool   `json:"manualReleaseNames"`
+	ConfigureDagDeployment bool   `json:"configureDagDeployment"`
+	NfsMountDagDeployment  bool   `json:"nfsMountDagDeployment"`
 }
 
 // coerce a string into SemVer if possible

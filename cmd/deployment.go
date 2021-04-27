@@ -25,6 +25,8 @@ var (
 	label                 string
 	cloudRole             string
 	releaseName           string
+	nfsLocation           string
+	dagDeploymentType     string
 
 	CreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
@@ -38,6 +40,10 @@ var (
 
 # Create new deployment with Kubernetes executor.
   $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10
+`
+	createExampleDagDeployment = `
+# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
+  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10 --dag-deployment-type=volume --nfs-location=test:/test
 `
 	deploymentUserListExample = `
 # Search for deployment users
@@ -112,6 +118,13 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			return deploymentCreate(cmd, args, client, out)
 		},
 	}
+
+	// let's hide under feature flag
+	if deployment.CheckNFSMountDagDeployment(client) {
+		cmd.Example = cmd.Example + createExampleDagDeployment
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism: image, volume")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
+	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -148,12 +161,19 @@ func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command 
 }
 
 func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+	example := ` 
+# update labels and description for given deployment
+$ astro deployment update UUID label=Production-Airflow description=example version=v1.0.0`
+	updateExampleDagDeployment := `
+
+# update dag deployment strategy
+$ astro deployment update UUID label=Production-Airflow --dag-deployment-type=volume --nfs-location=test:/test`
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update airflow deployments",
 		Long:    "Update airflow deployments",
-		Example: "  astro deployment update UUID label=Production-Airflow description=example version=v1.0.0",
+		Example: example,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) <= 0 {
 				return errors.New("must specify a deployment ID and at least one attribute to update.")
@@ -161,9 +181,17 @@ func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			return updateArgValidator(args[1:], deploymentUpdateAttrs)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUpdate(cmd, args, client, out)
+			return deploymentUpdate(cmd, args, dagDeploymentType, nfsLocation, client, out)
 		},
 	}
+
+	// let's hide under feature flag
+	if deployment.CheckNFSMountDagDeployment(client) {
+		cmd.Example = cmd.Example + updateExampleDagDeployment
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "image", "DAG Deployment mechanism: image, volume")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
+	}
+
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
 }
@@ -368,7 +396,8 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, client, out)
+	validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -396,7 +425,7 @@ func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, o
 	return deployment.List(ws, allDeployments, client, out)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	argsMap, err := argsToMap(args[1:])
 	if err != nil {
 		return err
@@ -404,7 +433,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, client *houston.Client,
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
+	validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
 	return deployment.Update(args[0], cloudRole, argsMap, client, out)
 }
 

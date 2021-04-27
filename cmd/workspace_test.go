@@ -19,6 +19,7 @@ func TestWorkspaceList(t *testing.T) {
 		"airflow123     XXXXXXXXXXXXXXX               \n"
 
 	okResponse := `{"data":{
+    "appConfig": {"nfsMountDagDeployment": false},
     "workspaces": [
       {
         "id": "ck05r3bor07h40d02y2hw4n4v",
@@ -72,7 +73,7 @@ func TestNewWorkspaceUserListCmd(t *testing.T) {
 
 func TestWorkspaceUserRm(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{"data":{"workspaceRemoveUser":{"id":"ckc0eir8e01gj07608ajmvia1"}}}`
+	okResponse := `{"data":{"appConfig": {"nfsMountDagDeployment": false},"workspaceRemoveUser":{"id":"ckc0eir8e01gj07608ajmvia1"}}}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
