@@ -85,6 +85,27 @@ func TestDeploymentCreateCommand(t *testing.T) {
 	assert.Contains(t, output, "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
 
+func TestDeploymentCreateCommandFailsValidation(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": true}
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy")
+	assert.Error(t, err, "please specify the correct DAG deployment type, one of the following: image, volume")
+	assert.Contains(t, output, "please specify the correct DAG deployment type, one of the following: image, volume")
+}
+
 func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
