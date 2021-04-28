@@ -396,7 +396,10 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
-	validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	if err != nil {
+		return err
+	}
 	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, client, out)
 }
 
@@ -433,7 +436,10 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	if err != nil {
+		return err
+	}
 	return deployment.Update(args[0], cloudRole, argsMap, client, out)
 }
 
