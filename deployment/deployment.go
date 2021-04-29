@@ -204,7 +204,6 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		Query:     houston.DeploymentUpdateRequest,
 		Variables: vars,
 	}
-	fmt.Println(vars)
 	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
