@@ -20,6 +20,85 @@ func TestDeploymentRootCommand(t *testing.T) {
 	assert.Contains(t, output, "astro deployment")
 }
 
+func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "unknown flag: --dag-deployment-type"},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
 func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
@@ -80,9 +159,24 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
 }
 
 func TestDeploymentUpdateCommand(t *testing.T) {
