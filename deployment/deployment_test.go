@@ -361,7 +361,7 @@ func TestUpdate(t *testing.T) {
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, api, buf)
+	err := Update(id, role, deploymentConfig, "", "", api, buf)
 	assert.NoError(t, err)
 	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
  test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c             %!s(MISSING)
@@ -387,7 +387,8 @@ func TestUpdateError(t *testing.T) {
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, api, buf)
+	err := Update(id, role, deploymentConfig, "", "", api, buf)
+
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
