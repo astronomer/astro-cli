@@ -44,10 +44,16 @@ func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 	}{
 		{dagDeploymentType: "volume", expectedError: "please specify the nfs location via --nfs-location flag"},
 		{dagDeploymentType: "unknown", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
+		{dagDeploymentType: "image", expectedError: ""},
 	}
 
 	for _, tt := range myTests {
 		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation)
-		assert.EqualError(t, actualError, tt.expectedError, "optional message here")
+		if tt.expectedError != "" {
+			assert.EqualError(t, actualError, tt.expectedError, "optional message here")
+		} else {
+			assert.NoError(t, actualError)
+		}
+
 	}
 }
