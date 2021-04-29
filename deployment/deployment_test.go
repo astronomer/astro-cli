@@ -357,18 +357,26 @@ func TestUpdate(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
-	deploymentConfig := make(map[string]string)
-	deploymentConfig["executor"] = "CeleryExecutor"
 
-	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, "", "", api, buf)
-	assert.NoError(t, err)
 	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
  test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c             %!s(MISSING)
 
  Successfully updated deployment
 `
-	assert.Equal(t, buf.String(), expected)
+	myTests := []struct {
+		deploymentConfig  map[string]string
+		dagDeploymentType string
+		expectedOutput    string
+	}{
+		{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "", expectedOutput: expected},
+		{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "image", expectedOutput: expected},
+	}
+	for _, tt := range myTests {
+		buf := new(bytes.Buffer)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", api, buf)
+		assert.NoError(t, err)
+		assert.Equal(t, buf.String(), expected)
+	}
 }
 
 func TestUpdateError(t *testing.T) {
