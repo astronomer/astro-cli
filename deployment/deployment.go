@@ -188,7 +188,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -196,11 +196,15 @@ func Update(id, cloudRole string, args map[string]string, client *houston.Client
 		vars["sync"] = true
 	}
 
+	if dagDeploymentType != "" {
+		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	}
+
 	req := houston.Request{
 		Query:     houston.DeploymentUpdateRequest,
 		Variables: vars,
 	}
-
+	fmt.Println(vars)
 	r, err := req.DoWithClient(client)
 	if err != nil {
 		return err
