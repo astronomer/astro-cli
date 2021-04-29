@@ -223,9 +223,23 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "Successfully updated deployment")
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
 }
 
 func TestDeploymentSaRootCommand(t *testing.T) {
