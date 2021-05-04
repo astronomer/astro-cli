@@ -494,6 +494,14 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			defaultAirflowImageTag
 		}
 	}`
+	AppVersionRequest = `
+	query AppConfig {
+		appConfig {
+			version
+			baseDomain
+		}
+	}
+	`
 	AppConfigRequest = `
 	query AppConfig {
 		appConfig {

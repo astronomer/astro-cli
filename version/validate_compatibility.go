@@ -18,7 +18,7 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string,
 		return nil
 	}
 
-	serverCfg, err := deployment.AppConfig(client)
+	serverCfg, err := deployment.AppVersion(client)
 	if err != nil {
 		return err
 	}
