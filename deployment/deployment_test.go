@@ -19,7 +19,7 @@ func TestAppVersion(t *testing.T) {
 		"data": {
 			"appConfig": {
 				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
+				"baseDomain": "local.astronomer.io"
 			}
 		}
 }`
