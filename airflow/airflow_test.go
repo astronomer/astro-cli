@@ -81,7 +81,6 @@ func TestInit(t *testing.T) {
 		".env",
 		"airflow_settings.yaml",
 		"dags/example-dag.py",
-		"plugins/example-plugin.py",
 	}
 	for _, file := range expectedFiles {
 		exist, err := fileutil.Exists(filepath.Join(tmpDir, file))
