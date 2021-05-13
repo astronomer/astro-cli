@@ -4,13 +4,12 @@ import "strings"
 
 // Settingsyml is the settings template
 var Settingsyml = strings.TrimSpace(`
-# This feature is in Beta.
 
 # Please report any bugs to support@astronomer.io
 
 # NOTE: If putting a dict in conn_extra, please wrap in single quotes.
 
-# More details you can find https://github.com/astronomer/docs/blob/main/v0.10/cli-airflow-configuration.md
+# For more information, refer to our docs: https://www.astronomer.io/docs/cloud/stable/develop/customize-image#configure-airflowsettingsyaml
 
 airflow:
   connections:
