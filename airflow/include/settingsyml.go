@@ -5,11 +5,11 @@ import "strings"
 // Settingsyml is the settings template
 var Settingsyml = strings.TrimSpace(`
 
-# Please report any bugs to support@astronomer.io
-
+# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
 # NOTE: If putting a dict in conn_extra, please wrap in single quotes.
 
 # For more information, refer to our docs: https://www.astronomer.io/docs/cloud/stable/develop/customize-image#configure-airflowsettingsyaml
+# For issues or questions, reach out to support@astronomer.io
 
 airflow:
   connections:
