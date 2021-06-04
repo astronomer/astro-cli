@@ -1,73 +1,62 @@
 package airflowversions
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"strings"
+	"fmt"
+	"regexp"
+	"sort"
 
+	"github.com/Masterminds/semver"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/pkg/errors"
 )
 
-// Client containers the logger and HTTPClient used to communicate with the HoustonAPI
-type Client struct {
-	HTTPClient *httputil.HTTPClient
-}
+var AirflowVersionReg = regexp.MustCompile(`v?` +
+	`(?:` +
+	// epoch
+	`(?:(?P<epoch>[0-9]+)!)?` +
+	`(?P<release>[0-9]+(?:\.[0-9]+)*)` +
+	`(?P<pre>                          
+	[-_\.]?
+	(?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+	[-_\.]?
+	(?P<pre_n>[0-9]+)?
+         )?` +
+	`(?P<post>
+            (?:-(?P<post_n1>[0-9]+))
+            |
+            (?:
+                [-_\.]?
+                (?P<post_l>post|rev|r)
+                [-_\.]?
+                (?P<post_n2>[0-9]+)?
+            )
+        )?` +
+	`(?P<dev>
+            [-_\.]?
+            (?P<dev_l>dev)
+            [-_\.]?
+            (?P<dev_n>[0-9]+)?
+        )?` +
+	`)` + `(?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?`,
+)
 
-// NewClient returns a new Client with the logger and HTTP client setup.
-func NewClient(c *httputil.HTTPClient) *Client {
-	return &Client{
-		HTTPClient: c,
-	}
-}
+// GetDefaultImageTag returns default airflow image tag
+func GetDefaultImageTag(airflowVersion string) (string, error) {
+	client := NewClient(httputil.NewHTTPClient())
+	r := Request{}
 
+	// defaultImageTag := ""
+	resp, err := r.DoWithClient(client)
+	fmt.Println(resp.AvailableReleases)
 
-type Request struct {
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
-}
-
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
-func (r *Request) DoWithClient(api *Client) (*Response, error) {
-	doOpts := httputil.DoOptions{
-		Data: r,
-		Headers: map[string]string{
-			"Accept": "application/json",
-		},
-	}
-
-	return api.Do(doOpts)
-}
-
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
-func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(NewClient(httputil.NewHTTPClient()))
-}
-
-// Do executes a query against the updates astronomer API, logging out any errors contained in the response object
-func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
-	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", "https://updates.astronomer.io/astronomer-certified", &doOpts)
-	if err != nil {
-		return nil, err
-	}
-	defer httpResponse.Body.Close()
-
-	// strings.NewReader(jsonStream)
-	body, err := ioutil.ReadAll(httpResponse.Body)
-	if err != nil {
-		return nil, err
+	vs := make([]*semver.Version, len(resp.AvailableReleases))
+	for i, r := range resp.AvailableReleases {
+		v, _ := semver.NewVersion(r.Version)
+		vs[i] = v
 	}
 
-	response = httputil.HTTPResponse{
-		Raw:  httpResponse,
-		Body: string(body),
-	}
-	decode := Response{}
-	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
-	}
+	sort.Sort(semver.Collection(vs))
+	fmt.Println(vs)
 
-	return &decode, nil
+	fmt.Println(AirflowVersionReg.MatchString("2.0.0-1"))
+	return "", err
 }
