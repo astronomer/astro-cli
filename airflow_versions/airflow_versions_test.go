@@ -1,12 +1,12 @@
 package airflowversions
 
-import (
-	"testing"
+// import (
+// 	"testing"
 
-	"github.com/stretchr/testify/assert"
-)
+// 	"github.com/stretchr/testify/assert"
+// )
 
-func TestGetDefaultImageTag(t *testing.T) {
-	_, err := GetDefaultImageTag("test")
-	assert.NoError(t, err)
-}
+// func TestGetDefaultImageTag(t *testing.T) {
+// 	_, err := GetDefaultImageTag("test")
+// 	assert.NoError(t, err)
+// }

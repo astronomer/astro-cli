@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/airflow"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
@@ -274,15 +275,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 
-	r := houston.Request{
-		Query: houston.DeploymentInfoRequest,
-	}
-
-	defaultImageTag := ""
-	wsResp, err := r.DoWithClient(client)
-	if err == nil {
-		defaultImageTag = wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
-	}
+	defaultImageTag, _ := airflowversions.GetDefaultImageTag("")
 
 	// TODO: @andriisoldatenko rethink or remove this logic
 	// acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
@@ -315,7 +308,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageTag)
+	err := airflow.Init(config.WorkingPath, defaultImageTag)
 	if err != nil {
 		return err
 	}

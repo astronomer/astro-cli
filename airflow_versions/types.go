@@ -1,16 +1,121 @@
 package airflowversions
 
+import (
+	"regexp"
+	"strconv"
+
+	"github.com/Masterminds/semver"
+)
+
+// Translated python regexpr to JS from https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+// only fixed: error parsing regexp: invalid or unsupported Perl syntax: `(?<` via replace `?<` with `?P<`
+var AirflowVersionReg = regexp.MustCompile(`v?(?:(?:(?P<epoch>[0-9]+)!)?(?P<release>[0-9]+(?:\.[0-9]+)*)(?P<pre>[-_.]?(?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))[-_.]?(?P<pre_n>[0-9]+)?)?(?P<post>(?:-(?P<post_n1>[0-9]+))|(?:[-_.]?(?P<post_l>post|rev|r)[-_.]?(?P<post_n2>[0-9]+)?))?(?P<dev>[-_.]?(?P<dev_l>dev)[-_.]?(?P<dev_n>[0-9]+)?)?)(?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?`)
+
 // Response wraps all houston response structs used for json marashalling
 type Response struct {
-	AvailableReleases []AirflowVersion `json:"available_releases"`
-	Version           string           `json:"version"`
+	AvailableReleases []AirflowVersionRaw `json:"available_releases"`
+	Version           string              `json:"version"`
 }
 
-// AirflowVersion
-type AirflowVersion struct {
+// AirflowVersion represents a single ariflow version.
+type AirflowVersionRaw struct {
 	Version     string   `json:"version"`
 	Level       string   `json:"level"`
 	ReleaseDate string   `json:"release_date"`
 	Tags        []string `json:"tags"`
 	Channel     string   `json:"channel"`
+}
+
+type AirflowVersion struct {
+	semver.Version
+	post_n1 uint64
+	tags    []string
+}
+
+func NewAirflowVersion(v string, tags []string) (*AirflowVersion, error) {
+	semV, err := semver.NewVersion(v)
+	if err != nil {
+		return nil, err
+	}
+
+	// get post_n1
+	m := AirflowVersionReg.FindStringSubmatch(v)
+	post_n1, err := strconv.ParseUint(m[8], 10, 64)
+
+	av := AirflowVersion{
+		*semV,
+		post_n1,
+		tags,
+	}
+	return &av, nil
+}
+
+// LessThan tests if one version is less than another one.
+func (v *AirflowVersion) LessThan(o *AirflowVersion) bool {
+	return v.Compare(o) < 0
+}
+
+// GreaterThan tests if one version is greater than another one.
+func (v *AirflowVersion) GreaterThan(o *AirflowVersion) bool {
+	return v.Compare(o) > 0
+}
+
+func compareSegment(v, o uint64) int {
+	if v < o {
+		return -1
+	}
+	if v > o {
+		return 1
+	}
+
+	return 0
+}
+
+// Compare compares this version to another one. It returns -1, 0, or 1 if
+// the version smaller, equal, or larger than the other version.
+func (v *AirflowVersion) Compare(o *AirflowVersion) int {
+	// Compare the major, minor, and patch version for differences. If a
+	// difference is found return the comparison.
+	if d := compareSegment(v.Major(), o.Major()); d != 0 {
+		return d
+	}
+	if d := compareSegment(v.Minor(), o.Minor()); d != 0 {
+		return d
+	}
+	if d := compareSegment(v.Patch(), o.Patch()); d != 0 {
+		return d
+	}
+
+	// At this point the major, minor, and patch versions are the same.
+	if v.post_n1 > o.post_n1 {
+		return 1
+	}
+
+	if v.post_n1 < o.post_n1 {
+		return -1
+	}
+	return 0
+}
+
+// AvailableReleases is a collection of AriflowVersion instances and implements the sort
+// interface. See the sort package for more details.
+// https://golang.org/pkg/sort/
+type AirflowVersions []*AirflowVersion
+
+// Len returns the length of a collection. The number of Version instances
+// on the slice.
+func (c AirflowVersions) Len() int {
+	return len(c)
+}
+
+// Less is needed for the sort interface to compare two Version objects on the
+// slice. If checks if one is less than the other.
+func (c AirflowVersions) Less(i, j int) bool {
+	return c[i].LessThan(c[j])
+}
+
+// Swap is needed for the sort interface to replace the Version objects
+// at two different positions in the slice.
+func (c AirflowVersions) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
 }
