@@ -2,16 +2,13 @@ package airflowversions
 
 import (
 	"sort"
-
-	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(airflowVersion string) (string, error) {
-	client := NewClient(httputil.NewHTTPClient())
+func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, error) {
 	r := Request{}
 
-	resp, err := r.DoWithClient(client)
+	resp, err := r.DoWithClient(httpClient)
 	if err != nil {
 		return "", err
 	}

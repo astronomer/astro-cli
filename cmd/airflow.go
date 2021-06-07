@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
@@ -274,8 +275,8 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		projectDirectory := filepath.Base(config.WorkingPath)
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
-
-	defaultImageTag, _ := airflowversions.GetDefaultImageTag("")
+	httpClient := airflowversions.NewClient(httputil.NewHTTPClient())
+	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, "")
 
 	// TODO: @andriisoldatenko rethink or remove this logic
 	// acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
