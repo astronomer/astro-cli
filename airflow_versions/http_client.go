@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 )
@@ -42,8 +43,8 @@ func (r *Request) Do() (*Response, error) {
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
 func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	var response httputil.HTTPResponse
-	// FIXME: move to config file
-	httpResponse, err := c.HTTPClient.Do("GET", "https://updates.astronomer.io/astronomer-certified", &doOpts)
+	url := config.CFG.AirflowReleasesURL.GetString()
+	httpResponse, err := c.HTTPClient.Do("GET", url, &doOpts)
 	if err != nil {
 		return nil, err
 	}
