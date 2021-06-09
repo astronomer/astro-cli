@@ -11,6 +11,7 @@ import (
 )
 
 func TestGetDefaultImageTag(t *testing.T) {
+	testUtil.InitTestConfig()
 	okResponse := `{
   "version": "1.0",
   "available_releases": [
