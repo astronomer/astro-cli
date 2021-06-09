@@ -53,5 +53,5 @@ func TestGetDefaultImageTag(t *testing.T) {
 
 	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
 	assert.NoError(t, err)
-	assert.Equal(t, defaultImageTag, "1.10.5-11-alpine3.10-onbuild")
+	assert.Equal(t, defaultImageTag, "1.10.5-buster-onbuild")
 }

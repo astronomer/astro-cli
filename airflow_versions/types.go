@@ -1,6 +1,8 @@
 package airflowversions
 
 import (
+	"bytes"
+	"fmt"
 	"regexp"
 	"strconv"
 
@@ -48,6 +50,14 @@ func NewAirflowVersion(v string, tags []string) (*AirflowVersion, error) {
 		tags,
 	}
 	return &av, nil
+}
+
+func (v *AirflowVersion) Coalesce() string {
+	var buf bytes.Buffer
+
+	fmt.Fprintf(&buf, "%d.%d.%d", v.Major(), v.Minor(), v.Patch())
+
+	return buf.String()
 }
 
 // LessThan tests if one version is less than another one.
