@@ -56,3 +56,20 @@ func TestGetDefaultImageTag(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, defaultImageTag, "1.10.5-buster-onbuild")
 }
+
+func TestGetDefaultImageTagError(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `Page not found`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 404,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	httpClient := NewClient(client)
+
+	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+	assert.Error(t, err)
+	assert.Equal(t, defaultImageTag, "")
+}
