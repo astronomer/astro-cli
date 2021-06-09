@@ -12,7 +12,7 @@ func TestNewAirflowVersion(t *testing.T) {
 	assert.Equal(t, av.Major(), uint64(2))
 	assert.Equal(t, av.Minor(), uint64(0))
 	assert.Equal(t, av.Patch(), uint64(0))
-	assert.Equal(t, av.post_n1, uint64(1))
+	assert.Equal(t, av.postN1, uint64(1))
 }
 
 func TestNewAirflowVersionWithoutPostN1(t *testing.T) {
@@ -21,7 +21,7 @@ func TestNewAirflowVersionWithoutPostN1(t *testing.T) {
 	assert.Equal(t, av.Major(), uint64(2))
 	assert.Equal(t, av.Minor(), uint64(0))
 	assert.Equal(t, av.Patch(), uint64(0))
-	assert.Equal(t, av.post_n1, uint64(0))
+	assert.Equal(t, av.postN1, uint64(0))
 }
 
 func TestNewAirflowVersionWithPostN1(t *testing.T) {
@@ -30,7 +30,7 @@ func TestNewAirflowVersionWithPostN1(t *testing.T) {
 	assert.Equal(t, av.Major(), uint64(1))
 	assert.Equal(t, av.Minor(), uint64(10))
 	assert.Equal(t, av.Patch(), uint64(5))
-	assert.Equal(t, av.post_n1, uint64(11))
+	assert.Equal(t, av.postN1, uint64(11))
 }
 
 func TestCompareAirflowVersions(t *testing.T) {

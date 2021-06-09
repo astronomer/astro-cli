@@ -2,6 +2,7 @@ package airflowversions
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -50,7 +51,6 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	}
 	defer httpResponse.Body.Close()
 
-	// strings.NewReader(jsonStream)
 	body, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
+		return nil, errors.Wrap(err, fmt.Sprintf("Failed to JSON decode %s response", url))
 	}
 
 	return &decode, nil

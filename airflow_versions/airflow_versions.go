@@ -22,5 +22,5 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 
 	sort.Sort(vs)
 	maxAvailableVersion := vs[len(vs)-1]
-	return fmt.Sprintf("%s-buster-onbuild", maxAvailableVersion.Coalesce()), nil
+	return fmt.Sprintf("%s-buster-onbuild", maxAvailableVersion.Coerce()), nil
 }

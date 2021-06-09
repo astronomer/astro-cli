@@ -9,17 +9,17 @@ import (
 	"github.com/Masterminds/semver"
 )
 
-// Translated python regexpr to JS from https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+// AirflowVersionReg represents translated python regexpr to JS from https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
 // only fixed: error parsing regexp: invalid or unsupported Perl syntax: `(?<` via replace `?<` with `?P<`
 var AirflowVersionReg = regexp.MustCompile(`v?(?:(?:(?P<epoch>[0-9]+)!)?(?P<release>[0-9]+(?:\.[0-9]+)*)(?P<pre>[-_.]?(?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))[-_.]?(?P<pre_n>[0-9]+)?)?(?P<post>(?:-(?P<post_n1>[0-9]+))|(?:[-_.]?(?P<post_l>post|rev|r)[-_.]?(?P<post_n2>[0-9]+)?))?(?P<dev>[-_.]?(?P<dev_l>dev)[-_.]?(?P<dev_n>[0-9]+)?)?)(?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?`)
 
-// Response wraps all houston response structs used for json marashalling
+// Response wraps all updates.astronomer.io response structs used for json marashalling
 type Response struct {
 	AvailableReleases []AirflowVersionRaw `json:"available_releases"`
 	Version           string              `json:"version"`
 }
 
-// AirflowVersion represents a single ariflow version.
+// AirflowVersionRaw represents a single ariflow version.
 type AirflowVersionRaw struct {
 	Version     string   `json:"version"`
 	Level       string   `json:"level"`
@@ -28,12 +28,15 @@ type AirflowVersionRaw struct {
 	Channel     string   `json:"channel"`
 }
 
+// AirflowVersion represents semver with extra postN1 attribute and image tags
 type AirflowVersion struct {
 	semver.Version
-	post_n1 uint64
-	tags    []string
+	postN1 uint64
+	tags   []string
 }
 
+// NewAirflowVersion parses a given version and returns an instance of AirflowVersion or
+// an error if unable to parse the version.
 func NewAirflowVersion(v string, tags []string) (*AirflowVersion, error) {
 	semV, err := semver.NewVersion(v)
 	if err != nil {
@@ -42,17 +45,19 @@ func NewAirflowVersion(v string, tags []string) (*AirflowVersion, error) {
 
 	// get post_n1
 	m := AirflowVersionReg.FindStringSubmatch(v)
-	post_n1, err := strconv.ParseUint(m[8], 10, 64)
+	postN1, err := strconv.ParseUint(m[8], 10, 64)
 
 	av := AirflowVersion{
 		*semV,
-		post_n1,
+		postN1,
 		tags,
 	}
 	return &av, nil
 }
 
-func (v *AirflowVersion) Coalesce() string {
+// Coerce aims to provide a very forgiving translation of a non-semver string to semver.
+// Longer versions are simply truncated (2.0.1-2 becomes 2.0.0)
+func (v *AirflowVersion) Coerce() string {
 	var buf bytes.Buffer
 
 	fmt.Fprintf(&buf, "%d.%d.%d", v.Major(), v.Minor(), v.Patch())
@@ -97,17 +102,17 @@ func (v *AirflowVersion) Compare(o *AirflowVersion) int {
 	}
 
 	// At this point the major, minor, and patch versions are the same.
-	if v.post_n1 > o.post_n1 {
+	if v.postN1 > o.postN1 {
 		return 1
 	}
 
-	if v.post_n1 < o.post_n1 {
+	if v.postN1 < o.postN1 {
 		return -1
 	}
 	return 0
 }
 
-// AvailableReleases is a collection of AriflowVersion instances and implements the sort
+// AirflowVersions is a collection of AriflowVersion instances and implements the sort
 // interface. See the sort package for more details.
 // https://golang.org/pkg/sort/
 type AirflowVersions []*AirflowVersion
