@@ -23,9 +23,10 @@ func NewClient(c *httputil.HTTPClient) *Client {
 	}
 }
 
+// Request represents empty request
 type Request struct{}
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
+// DoWithClient (request) is a wrapper to more easily pass variables to a client.Do request
 func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	doOpts := httputil.DoOptions{
 		Headers: map[string]string{
@@ -36,7 +37,7 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	return api.Do(doOpts)
 }
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
+// Do executes the given HTTP request and returns the HTTP Response
 func (r *Request) Do() (*Response, error) {
 	return r.DoWithClient(NewClient(httputil.NewHTTPClient()))
 }
