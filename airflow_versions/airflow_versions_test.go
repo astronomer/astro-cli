@@ -16,19 +16,6 @@ func TestGetDefaultImageTag(t *testing.T) {
   "version": "1.0",
   "available_releases": [
     {
-      "version": "1.10.4-11",
-      "level": "bug_fix",
-      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.4-11",
-      "release_date": "2020-9-05T20:03:00+00:00",
-      "tags": [
-        "1.10.4-11-alpine3.10-onbuild",
-        "1.10.4-11-buster-onbuild",
-        "1.10.4-11-alpine3.10",
-        "1.10.4-11-buster"
-      ],
-      "channel": "stable"
-    },
-    {
       "version": "1.10.5",
       "level": "new_feature",
       "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
@@ -51,6 +38,19 @@ func TestGetDefaultImageTag(t *testing.T) {
         "1.10.5-11-buster-onbuild",
         "1.10.5-11-alpine3.10",
         "1.10.5-11-buster"
+      ],
+      "channel": "stable"
+    },
+    {
+      "version": "1.10.4-11",
+      "level": "bug_fix",
+      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.4-11",
+      "release_date": "2020-9-05T20:03:00+00:00",
+      "tags": [
+        "1.10.4-11-alpine3.10-onbuild",
+        "1.10.4-11-buster-onbuild",
+        "1.10.4-11-alpine3.10",
+        "1.10.4-11-buster"
       ],
       "channel": "stable"
     }
