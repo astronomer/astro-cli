@@ -282,7 +282,6 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		Query: houston.DeploymentInfoRequest,
 	}
 
-	defaultImageTag := ""
 	wsResp, err := r.DoWithClient(client)
 	if err == nil {
 		defaultImageTag = wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
@@ -323,7 +322,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err := airflow.Init(config.WorkingPath, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageTag)
 	if err != nil {
 		return err
 	}
