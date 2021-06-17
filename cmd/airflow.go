@@ -278,11 +278,25 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	httpClient := airflowversions.NewClient(httputil.NewHTTPClient())
 	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, "")
 
-	// TODO: @andriisoldatenko rethink or remove this logic
-	// acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
-	// if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-	//  	return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
-	// }
+	r := houston.Request{
+		Query: houston.DeploymentInfoRequest,
+	}
+
+	defaultImageTag := ""
+	wsResp, err := r.DoWithClient(client)
+	if err == nil {
+		defaultImageTag = wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
+	}
+
+	if err == nil {
+		acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
+		if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
+			return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
+		}
+		defaultImageTag = fmt.Sprintf("%s-buster-onbuild", airflowVersion)
+	} else if airflowVersion != "" {
+		return errors.New("you can't use --airflow-version option while not authenticated to a cluster")
+	}
 
 	if len(defaultImageTag) == 0 {
 		defaultImageTag = "2.0.0-buster-onbuild"
