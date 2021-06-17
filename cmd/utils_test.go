@@ -72,7 +72,24 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 
 	output := new(bytes.Buffer)
 
-	defaultTag, err := prepareDefaultAirflowImageTag("1.10.14", httpClient, api, output)
-	assert.NoError(t, err)
-	assert.Equal(t, defaultTag, "1.10.14-buster-onbuild")
+	myTests := []struct {
+		airflowVersion   string
+		expectedImageTag string
+		expectedError    string
+	}{
+		{airflowVersion: "1.10.14", expectedImageTag: "1.10.14-buster-onbuild", expectedError: ""},
+		{airflowVersion: "1.10.15", expectedImageTag: "1.10.15-buster-onbuild", expectedError: ""},
+		{airflowVersion: "", expectedImageTag: "2.0.0-buster-onbuild", expectedError: ""},
+		{airflowVersion: "2.0.2", expectedImageTag: "2.0.2-buster-onbuild", expectedError: ""},
+		{airflowVersion: "9.9.9", expectedImageTag: "", expectedError: "Unsupported Airflow Version specified. Please choose from: 2.1.0, 2.0.2, 2.0.0, 1.10.15, 1.10.14, 1.10.12, 1.10.10, 1.10.7, 1.10.5 \n"},
+	}
+	for _, tt := range myTests {
+		defaultTag, err := prepareDefaultAirflowImageTag(tt.airflowVersion, httpClient, api, output)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, tt.expectedImageTag, defaultTag)
+	}
 }
