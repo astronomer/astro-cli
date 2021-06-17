@@ -283,9 +283,6 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	}
 
 	wsResp, err := r.DoWithClient(client)
-	if err == nil {
-		defaultImageTag = wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
-	}
 
 	if err == nil {
 		acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
