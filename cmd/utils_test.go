@@ -93,3 +93,52 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 		assert.Equal(t, tt.expectedImageTag, defaultTag)
 	}
 }
+
+func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	// prepare fake response from updates.astronomer.io
+	okResponse := `{
+  "version": "1.0",
+  "available_releases": [
+    {
+      "version": "1.10.5",
+      "level": "new_feature",
+      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
+      "release_date": "2020-10-05T20:03:00+00:00",
+      "tags": [
+        "1.10.5-alpine3.10-onbuild",
+        "1.10.5-buster-onbuild",
+        "1.10.5-alpine3.10",
+        "1.10.5-buster"
+      ],
+      "channel": "stable"
+    }
+  ]
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	httpClient := airflowversions.NewClient(client)
+
+	// prepare fake response from houston
+	emptyResp := ``
+	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 400,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(emptyResp)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(houstonClient)
+
+	output := new(bytes.Buffer)
+
+	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
+	assert.Error(t, err, "you can't use --airflow-version option while not authenticated to a cluster")
+	assert.Equal(t, "", defaultTag)
+}
