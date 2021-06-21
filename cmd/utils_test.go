@@ -139,6 +139,6 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	output := new(bytes.Buffer)
 
 	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-	assert.Error(t, err, "you can't use --airflow-version option while not authenticated to a cluster")
+	assert.Error(t, err, "An Error occurred: Are you authenticated? If not - you can't use the --airflow-version option")
 	assert.Equal(t, "", defaultTag)
 }

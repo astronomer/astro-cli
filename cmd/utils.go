@@ -31,7 +31,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 			defaultImageTag = fmt.Sprintf("%s-buster-onbuild", airflowVersion)
 		}
 	} else if airflowVersion != "" {
-		return "", errors.New("you can't use --airflow-version option while not authenticated to a cluster")
+		return "", errors.New("An Error occurred: Are you authenticated? If not - you can't use the --airflow-version option")
 	}
 
 	if len(defaultImageTag) == 0 {
