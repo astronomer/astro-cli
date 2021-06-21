@@ -276,17 +276,9 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 	httpClient := airflowversions.NewClient(httputil.NewHTTPClient())
-	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, "")
-
-	// TODO: @andriisoldatenko rethink or remove this logic
-	// acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
-	// if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-	//  	return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
-	// }
-
-	if len(defaultImageTag) == 0 {
-		defaultImageTag = "2.0.0-buster-onbuild"
-		fmt.Printf("Initializing Airflow project\nNot connected to Astronomer, pulling Airflow development files from %s\n", defaultImageTag)
+	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, httpClient, client, out)
+	if err != nil {
+		return err
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
@@ -309,7 +301,7 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err := airflow.Init(config.WorkingPath, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageTag)
 	if err != nil {
 		return err
 	}
