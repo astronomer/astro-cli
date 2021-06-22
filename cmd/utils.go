@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"io"
 	"strings"
 
@@ -31,7 +32,17 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 			defaultImageTag = fmt.Sprintf("%s-buster-onbuild", airflowVersion)
 		}
 	} else if airflowVersion != "" {
-		return "", errors.New("An Error occurred: Are you authenticated? If not - you can't use the --airflow-version option")
+		switch t := err.(type) {
+		default:
+			return "", errors.New(fmt.Sprintf("An Unexpected Error occurred: %s", err.Error()))
+		case *httputil.Error:
+			switch s := t.Status; s {
+			default:
+				return "", errors.New(fmt.Sprintf("An error occurred when trying to connect to the sever Status Code: %d, Error: %s", t.Status, t.Message))
+			case 400:
+				return "", errors.New("Error: The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again.")
+			}
+		}
 	}
 
 	if len(defaultImageTag) == 0 {

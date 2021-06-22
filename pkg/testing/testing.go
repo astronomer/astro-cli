@@ -1,13 +1,13 @@
 package testing
 
 import (
-	"net/http"
-	"os"
-	"strings"
-
+	"errors"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/spf13/afero"
+	"net/http"
+	"os"
+	"strings"
 )
 
 // RoundTripFunc
@@ -22,6 +22,21 @@ func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 func NewTestClient(fn RoundTripFunc) *httputil.HTTPClient {
 	testClient := httputil.NewHTTPClient()
 	testClient.HTTPClient.Transport = RoundTripFunc(fn)
+	return testClient
+}
+
+// ErroringRoundTripFunc
+type ErroringRoundTripFunc func(req *http.Request) *http.Response
+
+// RoundTrip
+func (g ErroringRoundTripFunc) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	return resp, errors.New("An error in a test")
+}
+
+// NewErrorTestClient returns *httputil.HTTPClient with Transport replaced to avoid making real calls. the transport will always throw an error
+func NewErroringTestClient(fn ErroringRoundTripFunc) *httputil.HTTPClient {
+	testClient := httputil.NewHTTPClient()
+	testClient.HTTPClient.Transport = ErroringRoundTripFunc(fn)
 	return testClient
 }
 

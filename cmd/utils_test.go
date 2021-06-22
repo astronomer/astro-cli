@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -96,6 +97,7 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 
 func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	testUtil.InitTestConfig()
+	mockErrorResponse := `An error occured`
 
 	// prepare fake response from updates.astronomer.io
 	okResponse := `{
@@ -116,29 +118,87 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
     }
   ]
 }`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
+	myTests := []struct {
+		responseCode   int
+		expectedErrorMessage    string
+	}{
+		{400, "Error: The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again."},
+		{500, fmt.Sprintf("An error occurred when trying to connect to the sever Status Code: %d, Error: %s",500, mockErrorResponse)},
+	}
+	for _, tt := range myTests {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		httpClient := airflowversions.NewClient(client)
+
+		// prepare fake response from houston
+		houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: tt.responseCode,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := houston.NewHoustonClient(houstonClient)
+
+		output := new(bytes.Buffer)
+
+		defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
+		assert.Equal(t, err.Error(), tt.expectedErrorMessage)
+		assert.Equal(t, "", defaultTag)
+	}
+}
+func Test_prepareDefaultAirflowImageTagHoustonBadRequest2(t *testing.T) {
+	testUtil.InitTestConfig()
+	// prepare fake response from updates.astronomer.io
+	okResponse := `{
+	  "version": "1.0",
+	  "available_releases": [
+		{
+		  "version": "1.10.5",
+		  "level": "new_feature",
+		  "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
+		  "release_date": "2020-10-05T20:03:00+00:00",
+		  "tags": [
+			"1.10.5-alpine3.10-onbuild",
+			"1.10.5-buster-onbuild",
+			"1.10.5-alpine3.10",
+			"1.10.5-buster"
+		  ],
+		  "channel": "stable"
 		}
-	})
-	httpClient := airflowversions.NewClient(client)
+	  ]
+	}`
 
-	// prepare fake response from houston
-	emptyResp := ``
-	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 400,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(emptyResp)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(houstonClient)
+	myTests := []struct {
+		expectedErrorMessage    string
+	}{
+		{"An Unexpected Error occurred: HTTP DO Failed: Post \"http://localhost:8871/v1\": An error in a test"},
+	}
+	for _, tt := range myTests {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		httpClient := airflowversions.NewClient(client)
 
-	output := new(bytes.Buffer)
+		// prepare fake response from houston
+		houstonClient := testUtil.NewErroringTestClient(func(req *http.Request) (resp *http.Response) {
+			return resp
+		})
+		api := houston.NewHoustonClient(houstonClient)
 
-	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-	assert.Error(t, err, "An Error occurred: Are you authenticated? If not - you can't use the --airflow-version option")
-	assert.Equal(t, "", defaultTag)
+		output := new(bytes.Buffer)
+
+		defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
+		assert.Equal(t, tt.expectedErrorMessage, err.Error())
+		assert.Equal(t, "", defaultTag)
+	}
 }
