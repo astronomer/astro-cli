@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"io"
 	"strings"
 
@@ -32,12 +31,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 			defaultImageTag = fmt.Sprintf("%s-buster-onbuild", airflowVersion)
 		}
 	} else if airflowVersion != "" {
-		switch t := err.(type) {
-		default:
-			return "", errors.New(fmt.Sprintf("An Unexpected Error occurred: %s", err.Error()))
-		case *httputil.Error:
-			return "", errors.New(fmt.Sprintf("An error occurred when trying to connect to the houston sever Status Code: %d, Error: %s", t.Status, t.Message))
-		}
+		return "", err
 	}
 
 	if len(defaultImageTag) == 0 {

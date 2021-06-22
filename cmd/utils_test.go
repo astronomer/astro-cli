@@ -97,7 +97,7 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 
 func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	testUtil.InitTestConfig()
-	mockErrorResponse := `An error occured`
+	mockErrorResponse := `An error occurred`
 
 	// prepare fake response from updates.astronomer.io
 	okResponse := `{
@@ -122,7 +122,7 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 		responseCode   int
 		expectedErrorMessage    string
 	}{
-		{500, fmt.Sprintf("An error occurred when trying to connect to the houston sever Status Code: %d, Error: %s",500, mockErrorResponse)},
+		{400, fmt.Sprintf("API error (400): %s", mockErrorResponse)},
 	}
 	for _, tt := range myTests {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -148,56 +148,6 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 
 		defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
 		assert.Equal(t, err.Error(), tt.expectedErrorMessage)
-		assert.Equal(t, "", defaultTag)
-	}
-}
-func Test_prepareDefaultAirflowImageTagHoustonUnexpectedError(t *testing.T) {
-	testUtil.InitTestConfig()
-	// prepare fake response from updates.astronomer.io
-	okResponse := `{
-	  "version": "1.0",
-	  "available_releases": [
-		{
-		  "version": "1.10.5",
-		  "level": "new_feature",
-		  "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
-		  "release_date": "2020-10-05T20:03:00+00:00",
-		  "tags": [
-			"1.10.5-alpine3.10-onbuild",
-			"1.10.5-buster-onbuild",
-			"1.10.5-alpine3.10",
-			"1.10.5-buster"
-		  ],
-		  "channel": "stable"
-		}
-	  ]
-	}`
-
-	myTests := []struct {
-		expectedErrorMessagePrefix    string
-	}{
-		{"An Unexpected Error occurred"},
-	}
-	for _, tt := range myTests {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		httpClient := airflowversions.NewClient(client)
-
-		// prepare fake response from houston
-		houstonClient := testUtil.NewErroringTestClient(func(req *http.Request) (resp *http.Response) {
-			return resp
-		})
-		api := houston.NewHoustonClient(houstonClient)
-
-		output := new(bytes.Buffer)
-
-		defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-		assert.Contains(t, err.Error(), tt.expectedErrorMessagePrefix)
 		assert.Equal(t, "", defaultTag)
 	}
 }
