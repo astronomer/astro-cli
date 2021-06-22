@@ -122,8 +122,7 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 		responseCode   int
 		expectedErrorMessage    string
 	}{
-		{400, "Error: The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again."},
-		{500, fmt.Sprintf("An error occurred when trying to connect to the sever Status Code: %d, Error: %s",500, mockErrorResponse)},
+		{500, fmt.Sprintf("An error occurred when trying to connect to the houston sever Status Code: %d, Error: %s",500, mockErrorResponse)},
 	}
 	for _, tt := range myTests {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -175,9 +174,9 @@ func Test_prepareDefaultAirflowImageTagHoustonUnexpectedError(t *testing.T) {
 	}`
 
 	myTests := []struct {
-		expectedErrorMessage    string
+		expectedErrorMessagePrefix    string
 	}{
-		{"An Unexpected Error occurred: HTTP DO Failed: Post \"http://localhost:8871/v1\": An error in a test"},
+		{"An Unexpected Error occurred"},
 	}
 	for _, tt := range myTests {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -198,7 +197,7 @@ func Test_prepareDefaultAirflowImageTagHoustonUnexpectedError(t *testing.T) {
 		output := new(bytes.Buffer)
 
 		defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-		assert.Equal(t, tt.expectedErrorMessage, err.Error())
+		assert.Contains(t, err.Error(), tt.expectedErrorMessagePrefix)
 		assert.Equal(t, "", defaultTag)
 	}
 }

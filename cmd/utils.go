@@ -36,12 +36,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		default:
 			return "", errors.New(fmt.Sprintf("An Unexpected Error occurred: %s", err.Error()))
 		case *httputil.Error:
-			switch s := t.Status; s {
-			default:
-				return "", errors.New(fmt.Sprintf("An error occurred when trying to connect to the sever Status Code: %d, Error: %s", t.Status, t.Message))
-			case 400:
-				return "", errors.New("Error: The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again.")
-			}
+			return "", errors.New(fmt.Sprintf("An error occurred when trying to connect to the houston sever Status Code: %d, Error: %s", t.Status, t.Message))
 		}
 	}
 
