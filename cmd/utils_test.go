@@ -144,7 +144,6 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	assert.Equal(t, "", defaultTag)
 }
 
-
 func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 	testUtil.InitTestConfig()
 	mockErrorResponse := `{
