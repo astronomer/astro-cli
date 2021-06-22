@@ -152,7 +152,7 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 		assert.Equal(t, "", defaultTag)
 	}
 }
-func Test_prepareDefaultAirflowImageTagHoustonBadRequest2(t *testing.T) {
+func Test_prepareDefaultAirflowImageTagHoustonUnexpectedError(t *testing.T) {
 	testUtil.InitTestConfig()
 	// prepare fake response from updates.astronomer.io
 	okResponse := `{
