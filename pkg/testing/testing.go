@@ -1,12 +1,13 @@
 package testing
 
 import (
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/spf13/afero"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/spf13/afero"
 )
 
 // RoundTripFunc
