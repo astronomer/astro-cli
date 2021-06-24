@@ -31,7 +31,12 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 			defaultImageTag = fmt.Sprintf("%s-buster-onbuild", airflowVersion)
 		}
 	} else if airflowVersion != "" {
-		return "", errors.New("An Error occurred: Are you authenticated? If not - you can't use the --airflow-version option")
+		switch t := err; t {
+		default:
+			return "", err
+		case houston.PermissionsErrorVerbose:
+			return "", errors.New("The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again.")
+		}
 	}
 
 	if len(defaultImageTag) == 0 {

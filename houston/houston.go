@@ -11,6 +11,7 @@ import (
 )
 
 var PermissionsError = errors.New("You do not have the appropriate permissions for that")
+var PermissionsErrorVerbose = errors.New("You do not have the appropriate permissions for that: Your token has expired. Please log in again.")
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
@@ -85,12 +86,11 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
-
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)
 		if err.Error() == PermissionsError.Error() {
-			return nil, errors.Wrap(errors.New("Your token has expired. Please log in again."), err.Error())
+			return nil, PermissionsErrorVerbose
 		}
 		return nil, err
 	}

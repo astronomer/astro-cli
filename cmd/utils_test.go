@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -96,26 +97,27 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 
 func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	testUtil.InitTestConfig()
-
+	mockErrorResponse := `An error occurred`
 	// prepare fake response from updates.astronomer.io
 	okResponse := `{
-  "version": "1.0",
-  "available_releases": [
-    {
-      "version": "1.10.5",
-      "level": "new_feature",
-      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
-      "release_date": "2020-10-05T20:03:00+00:00",
-      "tags": [
-        "1.10.5-alpine3.10-onbuild",
-        "1.10.5-buster-onbuild",
-        "1.10.5-alpine3.10",
-        "1.10.5-buster"
-      ],
-      "channel": "stable"
-    }
-  ]
-}`
+	  "version": "1.0",
+	  "available_releases": [
+		{
+		  "version": "1.10.5",
+		  "level": "new_feature",
+		  "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
+		  "release_date": "2020-10-05T20:03:00+00:00",
+		  "tags": [
+			"1.10.5-alpine3.10-onbuild",
+			"1.10.5-buster-onbuild",
+			"1.10.5-alpine3.10",
+			"1.10.5-buster"
+		  ],
+		  "channel": "stable"
+		}
+	  ]
+	}`
+
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -126,11 +128,10 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	emptyResp := ``
 	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 400,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(emptyResp)),
+			Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
 			Header:     make(http.Header),
 		}
 	})
@@ -139,6 +140,79 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	output := new(bytes.Buffer)
 
 	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-	assert.Error(t, err, "An Error occurred: Are you authenticated? If not - you can't use the --airflow-version option")
+	assert.Equal(t, err.Error(), fmt.Sprintf("API error (400): %s", mockErrorResponse))
+	assert.Equal(t, "", defaultTag)
+}
+
+func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
+	testUtil.InitTestConfig()
+	mockErrorResponse := `{
+	  "errors": [
+		{
+		  "message": "You do not have the appropriate permissions for that",
+		  "locations": [
+			{
+			  "line": 2,
+			  "column": 3
+			}
+		  ],
+		  "path": [
+			"deploymentConfig"
+		  ],
+		  "extensions": {
+			"code": "FORBIDDEN",
+			"exception": {
+			  "message": "You do not have the appropriate permissions for that"
+			}
+		  }
+		}
+	  ],
+	  "data": {
+		"deploymentConfig": null
+	  }
+	}`
+	// prepare fake response from updates.astronomer.io
+	okResponse := `{
+	  "version": "1.0",
+	  "available_releases": [
+		{
+		  "version": "1.10.5",
+		  "level": "new_feature",
+		  "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
+		  "release_date": "2020-10-05T20:03:00+00:00",
+		  "tags": [
+			"1.10.5-alpine3.10-onbuild",
+			"1.10.5-buster-onbuild",
+			"1.10.5-alpine3.10",
+			"1.10.5-buster"
+		  ],
+		  "channel": "stable"
+		}
+	  ]
+	}`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	httpClient := airflowversions.NewClient(client)
+
+	// prepare fake response from houston
+	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(houstonClient)
+
+	output := new(bytes.Buffer)
+
+	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
+	assert.Equal(t, "The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again.", err.Error())
 	assert.Equal(t, "", defaultTag)
 }
