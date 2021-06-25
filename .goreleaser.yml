@@ -23,7 +23,7 @@ build:
     - 7
   ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
 brews:
-  - github:
+  - tap:
       owner: astronomer
       name: homebrew-tap
     folder: Formula
