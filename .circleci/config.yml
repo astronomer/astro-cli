@@ -41,7 +41,9 @@ jobs:
     working_directory: /go/src/github.com/astronomer/astro-cli
     steps:
       - checkout
-      - run: curl -sL https://git.io/goreleaser | bash
+      - run:
+          name: goreleaser
+          command: curl -sL https://git.io/goreleaser | bash
 workflows:
   version: 2.1
   build-images:
@@ -51,7 +53,7 @@ workflows:
           type: approval
           filters:
             branches:
-              only: '/release-.*/'
+              only: "/release-.*/"
       - new-tag:
           context:
             - github-repo
@@ -59,8 +61,10 @@ workflows:
             - approve-release
           filters:
             branches:
-              only: '/release-.*/'
+              only: "/release-.*/"
       - release:
+          context:
+            - github-repo
           # Only run this job on git tag pushes
           filters:
             branches:
