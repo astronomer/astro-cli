@@ -24,6 +24,19 @@ func newTableOut() *printutil.Table {
 	}
 }
 
+// AppVersion returns application version from houston-api
+func AppVersion(client *houston.Client) (*houston.AppConfig, error) {
+	req := houston.Request{
+		Query: houston.AppVersionRequest,
+	}
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Data.GetAppConfig, nil
+}
+
 // AppConfig returns application config from houston-api
 func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 	req := houston.Request{

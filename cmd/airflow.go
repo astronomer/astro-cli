@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
@@ -18,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/airflow"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
@@ -273,26 +275,10 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 		projectDirectory := filepath.Base(config.WorkingPath)
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
-
-	r := houston.Request{
-		Query: houston.DeploymentInfoRequest,
-	}
-
-	defaultImageTag := ""
-	wsResp, err := r.DoWithClient(client)
-	if err == nil {
-		defaultImageTag = wsResp.Data.DeploymentConfig.DefaultAirflowImageTag
-	}
-
-	// TODO: @andriisoldatenko rethink or remove this logic
-	// acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
-	// if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-	//  	return errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
-	// }
-
-	if len(defaultImageTag) == 0 {
-		defaultImageTag = "2.0.0-buster-onbuild"
-		fmt.Printf("Initializing Airflow project\nNot connected to Astronomer, pulling Airflow development files from %s\n", defaultImageTag)
+	httpClient := airflowversions.NewClient(httputil.NewHTTPClient())
+	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, httpClient, client, out)
+	if err != nil {
+		return err
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)

@@ -82,7 +82,7 @@ func isValidVersion(version string) bool {
 
 // printServerVersion outputs current server version
 func printServerVersion(client *houston.Client, out io.Writer) error {
-	appCfg, err := deployment.AppConfig(client)
+	appCfg, err := deployment.AppVersion(client)
 	if err != nil {
 		fmt.Fprintf(out, messages.HOUSTON_CURRENT_VERSION+"\n", "Please authenticate to a cluster to see server version")
 	}

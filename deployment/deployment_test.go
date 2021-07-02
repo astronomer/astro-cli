@@ -13,6 +13,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestAppVersion(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io"
+			}
+		}
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	config, err := AppVersion(api)
+	assert.NoError(t, err)
+	assert.Equal(t, config.Version, "0.15.1")
+	assert.Equal(t, config.BaseDomain, "local.astronomer.io")
+}
+
 func TestAppConfig(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{

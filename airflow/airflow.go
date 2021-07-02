@@ -64,15 +64,14 @@ func Init(path string, airflowImageTag string) error {
 
 	// Map of files to create
 	files := map[string]string{
-		".dockerignore":             include.Dockerignore,
-		"Dockerfile":                fmt.Sprintf(include.Dockerfile, airflowImageTag),
-		".gitignore":                include.Gitignore,
-		"packages.txt":              "",
-		"requirements.txt":          "",
-		".env":                      "",
-		"airflow_settings.yaml":     include.Settingsyml,
-		"dags/example-dag.py":       include.Exampledag,
-		"plugins/example-plugin.py": include.ExamplePlugin,
+		".dockerignore":         include.Dockerignore,
+		"Dockerfile":            fmt.Sprintf(include.Dockerfile, airflowImageTag),
+		".gitignore":            include.Gitignore,
+		"packages.txt":          "",
+		"requirements.txt":      "",
+		".env":                  "",
+		"airflow_settings.yaml": include.Settingsyml,
+		"dags/example-dag.py":   include.Exampledag,
 	}
 
 	// Initailize directories
