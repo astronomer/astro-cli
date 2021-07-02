@@ -223,7 +223,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 
 	DeploymentServiceAccountDeleteRequest = `
 	mutation deleteDeploymentServiceAccount(
-         $serviceAccountId: Uuid!
+         $serviceAccountUuid: Uuid!
          $deploymentUuid: Uuid!
     ) {
 		deleteDeploymentServiceAccount(
