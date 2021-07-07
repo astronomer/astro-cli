@@ -135,10 +135,10 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	return nil
 }
 
-func Delete(id string, client *houston.Client, out io.Writer) error {
+func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.DeploymentDeleteRequest,
-		Variables: map[string]interface{}{"deploymentId": id},
+		Variables: map[string]interface{}{"deploymentId": id, "deploymentHardDelete": hardDelete},
 	}
 
 	_, err := req.DoWithClient(client)
