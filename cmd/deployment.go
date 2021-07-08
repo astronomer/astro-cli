@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/deployment"
@@ -421,8 +420,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client,
 
 		if !i {
 			fmt.Println("No command was executed")
-			os.Exit(1)
-
+			return errors.New("No command was executed");
 		}
 	}
 	return deployment.Delete(args[0], hardDelete, client, out)
