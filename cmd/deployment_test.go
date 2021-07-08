@@ -577,7 +577,6 @@ func TestDeploymentDelete(t *testing.T) {
 
 func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `No command was executed`
 	okResponse := `{
 		"data": {
 		  "appConfig": {"nfsMountDagDeployment": false},
@@ -622,7 +621,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	os.Stdin = r
 
 	_, _, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
-	assert.Contains(t, err.Error(), expectedOut)
+	assert.Nil(t, err);
 }
 
 func TestDeploymentDeleteHardResponseYes(t *testing.T) {

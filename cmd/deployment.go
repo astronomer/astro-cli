@@ -420,7 +420,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client,
 
 		if !i {
 			fmt.Println("Exit: This command was not executed and your Deployment was not hard deleted.\n If you want to delete your Deployment but not permanently, try\n $ astro deployment delete without the --hard flag.")
-			return errors.New("No command was executed");
+			return nil
 		}
 	}
 	return deployment.Delete(args[0], hardDelete, client, out)
