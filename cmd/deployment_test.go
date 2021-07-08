@@ -577,7 +577,7 @@ func TestDeploymentDelete(t *testing.T) {
 
 func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `Successfully deleted deployment`
+	expectedOut := `No command was executed`
 	okResponse := `{
 		"data": {
 		  "appConfig": {"nfsMountDagDeployment": false},
