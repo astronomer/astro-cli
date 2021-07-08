@@ -117,3 +117,65 @@ func Get(entityType, id string, client *houston.Client, out io.Writer) error {
 
 	return tab.Print(out)
 }
+
+// get all deployment service accounts
+func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.DeploymentServiceAccountsGetRequest,
+		Variables: map[string]interface{}{"deploymentUuid": id},
+	}
+
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	sas := resp.Data.GetDeploymentServiceAccounts
+	fmt.Print(len(sas))
+	tab := newTableOut()
+	for _, sa := range sas {
+		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	}
+
+	return tab.Print(out)
+}
+
+// get single deployment service account
+func GetDeploymentServiceAccount(deploymentId string, serviceAccountId string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.DeploymentServiceAccountGetRequest,
+		Variables: map[string]interface{}{"deploymentUuid": deploymentId, "serviceAccountUuid": serviceAccountId},
+	}
+
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	sas := resp.Data.GetDeploymentServiceAccount
+	tab := newTableOut()
+	tab.AddRow([]string{sas.Label, sas.Category, sas.Id, sas.ApiKey}, false)
+
+	return tab.Print(out)
+}
+
+// get all workspace service accounts
+func GetWorkspaceServiceAccounts(id string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.WorkspaceServiceAccountsGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": id},
+	}
+
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	sas := resp.Data.GetWorkspaceServiceAccounts
+	tab := newTableOut()
+	for _, sa := range sas {
+		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	}
+
+	return tab.Print(out)
+}

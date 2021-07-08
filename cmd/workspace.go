@@ -377,7 +377,7 @@ func workspaceSaGet(cmd *cobra.Command, args []string, client *houston.Client, o
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Get("WORKSPACE", workspaceId, client, out)
+	return sa.GetWorkspaceServiceAccounts(workspaceId, client, out)
 }
 
 func workspaceSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
