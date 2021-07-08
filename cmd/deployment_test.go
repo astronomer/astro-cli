@@ -621,7 +621,6 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-
 	_, output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
@@ -672,7 +671,6 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	// Restore stdin right after the test.
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
-
 
 	_, output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
