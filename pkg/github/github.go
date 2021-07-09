@@ -12,10 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	httpclient = httputil.NewHTTPClient()
-)
-
 // RepoLatestResponse represents a tag info response from Github API
 type RepoLatestResponse struct {
 	Url         string    `json:"url"`

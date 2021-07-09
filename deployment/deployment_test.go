@@ -447,15 +447,21 @@ func TestUpdateError(t *testing.T) {
 
 func TestAirflowUpgrade(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{"data": {
-					"updateDeploymentAirflow": {
-						"id": "ckggzqj5f4157qtc9lescmehm",
-						"label": "test",
-						"airflowVersion": "1.10.5",
-						"desiredAirflowVersion": "1.10.10"
-					}
-				}
-			}`
+	okResponse := `{
+  "data": {
+    "deployment": {
+      "id": "ckbv818oa00r107606ywhoqtw",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+    },
+    "updateDeploymentAirflow": {
+	  "id": "ckbv818oa00r107606ywhoqtw",
+	  "label": "test",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+      }
+    }
+  }`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -471,7 +477,7 @@ func TestAirflowUpgrade(t *testing.T) {
 	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
 	assert.NoError(t, err)
 	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
- test                         v         ckggzqj5f4157qtc9lescmehm     1.10.5              
+ test                         v         ckbv818oa00r107606ywhoqtw     1.10.5              
 
 The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
 To cancel, run: 
@@ -505,15 +511,16 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 	testUtil.InitTestConfig()
 	deploymentId := "ckggzqj5f4157qtc9lescmehm"
 
-	okResponse := `{"data": {
-					"deployment": {
-						"id": "ckggzqj5f4157qtc9lescmehm",
-						"label": "test",
-						"airflowVersion": "1.10.5",
-						"desiredAirflowVersion": "1.10.10"
-					}
-				}
-			}`
+	okResponse := `{
+  "data": {
+    "deployment": {
+	  "id": "ckggzqj5f4157qtc9lescmehm",
+      "label": "test",
+      "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+      }
+    }
+  }`
 
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -549,17 +556,89 @@ func TestAirflowUpgradeCancelError(t *testing.T) {
 	assert.Error(t, err, "API error (500):")
 }
 
+func TestAirflowUpgradeEmptyDesiredVersion(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "deployment": {
+	  "id": "ckbv818oa00r107606ywhoqtw",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+	  },
+	  "updateDeploymentAirflow": {
+	  "id": "ckbv818oa00r107606ywhoqtw",
+	  "label": "test",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+	  },
+	  "deploymentConfig": {
+	  "airflowVersions": [
+	  "1.10.7",
+	  "1.10.10",
+	  "1.10.12"
+	  ]}
+      }
+    }
+  }`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	desiredAirflowVersion := ""
+
+	// mock os.Stdin for when prompted by getAirflowVersionSelection()
+	input := []byte("2")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	buf := new(bytes.Buffer)
+	err = AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
+	t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
+
+	assert.NoError(t, err)
+	expected := `#     AIRFLOW VERSION     
+1     1.10.7              
+2     1.10.10             
+3     1.10.12             
+ NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
+ test                         v         ckbv818oa00r107606ywhoqtw     1.10.5              
+
+The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
+To cancel, run: 
+ $ astro deployment airflow upgrade --cancel
+
+`
+	assert.Equal(t, buf.String(), expected)
+}
+
 func Test_getDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{"data": {
-					"deployment": {
-						"id": "ckggzqj5f4157qtc9lescmehm",
-						"label": "test",
-						"airflowVersion": "1.10.5",
-						"desiredAirflowVersion": "1.10.10"
-					}
-				}
-			}`
+	okResponse := `{
+  "data": {
+    "deployment": {
+	  "id": "ckggzqj5f4157qtc9lescmehm",
+	  "label": "test",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+	  }
+	}
+  }`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -589,28 +668,28 @@ func Test_getDeploymentError(t *testing.T) {
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 
 	_, err := getDeployment(deploymentId, api)
-	assert.Error(t, err, "tes")
+	assert.Error(t, err, "test")
 }
 
 func Test_getAirflowVersionSelection(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{"data": {
-					"deployment": {
-						"id": "ckggzqj5f4157qtc9lescmehm",
-						"label": "test",
-						"airflowVersion": "1.10.7",
-						"desiredAirflowVersion": "1.10.10"
-					},
-					"deploymentConfig": {
-							"airflowVersions": [
-							  "1.10.7",
-							  "1.10.10",
-							  "1.10.12"
-							]
-						}
-					}
-				}
-			}`
+	okResponse := `{
+  "data": {
+    "deployment": {
+	  "id": "ckggzqj5f4157qtc9lescmehm",
+	  "label": "test",
+	  "airflowVersion": "1.10.7",
+	  "desiredAirflowVersion": "1.10.10"
+	  },
+    "deploymentConfig": {
+	  "airflowVersions": [
+        "1.10.7",
+        "1.10.10",
+        "1.10.12"
+        ]}
+	  }
+	}
+  }`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -638,6 +717,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 	os.Stdin = r
 
 	airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
+	t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
 	assert.NoError(t, err)
 	assert.Equal(t, airflowVersion, "1.10.12")
 }
@@ -664,6 +744,14 @@ func Test_meetsAirflowUpgradeReqs(t *testing.T) {
 	desiredAirflowVersion := "2.0.0"
 	err := meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	assert.Error(t, err)
+	assert.EqualError(t, err, "Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to 1.10.14 "+
+		"first and make sure your DAGs and configs are 2.0 compatible.")
+
+	airflowVersion = "2.0.0"
+	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "Error: You tried to set --desired-airflow-version to 2.0.0, but this Airflow Deployment "+
+		"is already running 2.0.0. Please indicate a higher version of Airflow and try again.")
 
 	airflowVersion = "1.10.14"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
@@ -673,6 +761,18 @@ func Test_meetsAirflowUpgradeReqs(t *testing.T) {
 	desiredAirflowVersion = "1.10.10"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	assert.NoError(t, err)
+
+	airflowVersion = "-1.10.12"
+	desiredAirflowVersion = "2.0.0"
+	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "Invalid Semantic Version")
+
+	airflowVersion = "1.10.12"
+	desiredAirflowVersion = "-2.0.0"
+	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "Invalid Semantic Version")
 }
 
 func TestCheckNFSMountDagDeploymentError(t *testing.T) {
@@ -691,16 +791,16 @@ func TestCheckNFSMountDagDeploymentError(t *testing.T) {
 func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
-		"data": {
-			"appConfig": {
-				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false,
-                                "nfsMountDagDeployment": true
-			}
-		}
-}`
+  "data": {
+    "appConfig": {
+	  "version": "0.15.1",
+	  "baseDomain": "local.astronomer.io",
+	  "smtpConfigured": true,
+	  "manualReleaseNames": false,
+	  "nfsMountDagDeployment": true
+      }
+    }
+  }`
 
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
