@@ -291,7 +291,27 @@ func TestDelete(t *testing.T) {
 	deploymentId := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
-	err := Delete(deploymentId, api, buf)
+	err := Delete(deploymentId, false, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Successfully deleted deployment")
+}
+
+func TestDeleteHard(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{"data":{"deleteDeployment":{"id":"ckbv818oa00r107606ywhoqtw"}}}
+`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	deploymentId := "ckbv818oa00r107606ywhoqtw"
+
+	buf := new(bytes.Buffer)
+	err := Delete(deploymentId, true, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully deleted deployment")
 }
