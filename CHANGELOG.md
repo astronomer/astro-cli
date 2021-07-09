@@ -1,6 +1,8 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.25.2] - 2021-06-23
+- Add error message for airflow upgrade no-op #3055 (#417)
 
 ## [0.23.1] - 2020-11-25
 

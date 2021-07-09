@@ -35,7 +35,7 @@ type Request struct {
 	Variables map[string]interface{} `json:"variables"`
 }
 
-//Do (request) is a wrapper to more easily pass variables to a client.Do request
+// Do (request) is a wrapper to more easily pass variables to a client.Do request
 func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	doOpts := httputil.DoOptions{
 		Data: r,

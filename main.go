@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/tls"
+	"net/http"
 	"os"
 
 	"github.com/astronomer/astro-cli/cmd"
@@ -11,9 +13,12 @@ import (
 )
 
 func main() {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
+	httpClient := httputil.NewHTTPClient()
+	// configure http transport
+	httpClient.HTTPClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: config.CFG.SkipVerifyTLS.GetBool()}}
+	client := houston.NewHoustonClient(httpClient)
 	if err := cmd.NewRootCmd(client, os.Stdout).Execute(); err != nil {
 		os.Exit(1)
 	}

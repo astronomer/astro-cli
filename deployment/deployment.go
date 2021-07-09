@@ -245,7 +245,6 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 		}
 		desiredAirflowVersion = selectedVersion
 	}
-
 	err = meetsAirflowUpgradeReqs(deployment.AirflowVersion, desiredAirflowVersion)
 	if err != nil {
 		return err
@@ -385,19 +384,26 @@ func meetsAirflowUpgradeReqs(airflowVersion string, desiredAirflowVersion string
 		return err
 	}
 
+	currentVersion, err := semver.NewVersion(airflowVersion)
+	if err != nil {
+		return err
+	}
+
+	if currentVersion.Compare(desiredVersion) == 0 {
+		errorMessage := fmt.Sprintf("Error: You tried to set --desired-airflow-version to %s, but this Airflow Deployment "+
+			"is already running %s. Please indicate a higher version of Airflow and try again.", desiredVersion, currentVersion)
+		return errors.New(errorMessage)
+	}
+
 	if airflowUpgradeVersion.Compare(desiredVersion) < 1 {
 		minUpgrade, err := semver.NewVersion(minRequiredVersion)
 		if err != nil {
 			return err
 		}
 
-		currentVersion, err := semver.NewVersion(airflowVersion)
-		if err != nil {
-			return err
-		}
-
 		if currentVersion.Compare(minUpgrade) < 0 {
-			errorMessage := fmt.Sprintf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minRequiredVersion)
+			errorMessage := fmt.Sprintf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first "+
+				"and make sure your DAGs and configs are 2.0 compatible.", minRequiredVersion)
 			return errors.New(errorMessage)
 		}
 	}
