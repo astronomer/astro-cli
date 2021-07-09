@@ -152,24 +152,24 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 func TestGetDeploymentServiceAccount(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `
-	{
-		"data": {
-		  "deploymentServiceAccounts": [
-		    {
-		      "id": "ckqvfa2cu1468rn9hnr0bqqfk",
-		      "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
-		      "label": "yooo can u see me test",
-		      "category": "",
-		      "entityType": "DEPLOYMENT",
-		      "entityUuid": null,
-		      "active": true,
-		      "createdAt": "2021-07-08T21:28:57.966Z",
-		      "updatedAt": "2021-07-08T21:28:57.967Z",
-		      "lastUsedAt": null
-		    }
-		  ]
-		}
-	      }`
+{
+  "data": {
+    "deploymentServiceAccounts": [
+      {
+        "id": "ckqvfa2cu1468rn9hnr0bqqfk",
+        "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
+        "label": "yooo can u see me test",
+        "category": "",
+        "entityType": "DEPLOYMENT",
+        "entityUuid": null,
+        "active": true,
+        "createdAt": "2021-07-08T21:28:57.966Z",
+        "updatedAt": "2021-07-08T21:28:57.967Z",
+        "lastUsedAt": null
+      }
+    ]
+  }
+}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -189,24 +189,25 @@ func TestGetDeploymentServiceAccount(t *testing.T) {
 func TestGetWorkspaceServiceAccount(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `
-	{
-		"data": {
-		  "workspaceServiceAccounts": [
-		    {
-		      "id": "ckqvfa2cu1468rn9hnr0bqqfk",
-		      "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
-		      "label": "yooo can u see me test",
-		      "category": "",
-		      "entityType": "DEPLOYMENT",
-		      "entityUuid": null,
-		      "active": true,
-		      "createdAt": "2021-07-08T21:28:57.966Z",
-		      "updatedAt": "2021-07-08T21:28:57.967Z",
-		      "lastUsedAt": null
-		    }
-		  ]
-		}
-	      }`
+{
+  "data": {
+    "workspaceServiceAccounts": [
+      {
+        "id": "ckqvfa2cu1468rn9hnr0bqqfk",
+        "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
+        "label": "yooo can u see me test",
+        "category": "",
+        "entityType": "DEPLOYMENT",
+        "entityUuid": null,
+        "active": true,
+        "createdAt": "2021-07-08T21:28:57.966Z",
+        "updatedAt": "2021-07-08T21:28:57.967Z",
+        "lastUsedAt": null
+      }
+    ]
+  }
+}`
+
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,

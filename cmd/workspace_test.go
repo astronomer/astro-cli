@@ -98,25 +98,27 @@ func TestWorkspaceSAGetCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
 	okResponse := `
-	{
-		"data": {
-                                        "appConfig": {"nfsMountDagDeployment": false},
-		  "workspaceServiceAccounts": [
-		    {
-		      "id": "ckqvfa2cu1468rn9hnr0bqqfk",
-		      "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
-		      "label": "yooo can u see me test",
-		      "category": "",
-		      "entityType": "DEPLOYMENT",
-		      "entityUuid": null,
-		      "active": true,
-		      "createdAt": "2021-07-08T21:28:57.966Z",
-		      "updatedAt": "2021-07-08T21:28:57.967Z",
-		      "lastUsedAt": null
-		    }
-		  ]
-		}
-	      }`
+{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "workspaceServiceAccounts": [
+      {
+        "id": "ckqvfa2cu1468rn9hnr0bqqfk",
+        "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
+        "label": "yooo can u see me test",
+        "category": "",
+        "entityType": "DEPLOYMENT",
+        "entityUuid": null,
+        "active": true,
+        "createdAt": "2021-07-08T21:28:57.966Z",
+        "updatedAt": "2021-07-08T21:28:57.967Z",
+        "lastUsedAt": null
+      }
+    ]
+  }
+}`
+
+
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -126,7 +128,7 @@ func TestWorkspaceSAGetCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "workspace", "sa", "get",  "-w=ckqvf9spa1189rn9hbh5h439u")
+	_, output, err := executeCommandC(api, "workspace", "sa", "get", "-w=ckqvf9spa1189rn9hbh5h439u")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

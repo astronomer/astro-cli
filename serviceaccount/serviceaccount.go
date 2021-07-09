@@ -98,7 +98,6 @@ func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *ho
 	return nil
 }
 
-
 // get all deployment service accounts
 func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
@@ -120,7 +119,6 @@ func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writ
 
 	return tab.Print(out)
 }
-
 
 // get all workspace service accounts
 func GetWorkspaceServiceAccounts(id string, client *houston.Client, out io.Writer) error {
