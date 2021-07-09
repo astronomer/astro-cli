@@ -55,6 +55,7 @@ var (
 		WebserverPort:      newCfg("webserver.port", "8080"),
 		ShowWarnings:       newCfg("show_warnings", "true"),
 		AirflowReleasesURL: newCfg("airflow_releases_url", "https://updates.astronomer.io/astronomer-certified"),
+		SkipVerifyTLS:      newCfg("skip_verify_tls", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory
