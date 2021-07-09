@@ -12,7 +12,7 @@ var (
 	CLI_CURR_VERSION_DATE             = CLI_CURR_VERSION + " (%s)"
 	CLI_LATEST_VERSION                = "Astro CLI Latest: %s"
 	CLI_LATEST_VERSION_DATE           = CLI_LATEST_VERSION + " (%s)"
-	CLI_INSTALL_CMD                   = "\t$ curl -sL https://install.astronomer.io | sudo bash \nOR for homebrew users:\n\t$ brew install astronomer/tap/astro"
+	CLI_INSTALL_CMD                   = "\t$ curl -fsSL https://install.astronomer.io | sudo bash \nOR for homebrew users:\n\t$ brew install astronomer/tap/astro"
 	CLI_RUNNING_LATEST                = "You are running the latest version."
 	CLI_CHOOSE_WORKSPACE              = "Please choose a workspace:"
 	CLI_SET_WORKSPACE_EXAMPLE         = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
