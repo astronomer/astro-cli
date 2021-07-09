@@ -312,8 +312,8 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get",
-		Short:   "Get a service-account by entity type and entity id",
-		Long:    "Get a service-account by entity type and entity id",
+		Short:   "Get a service-account by deployment id",
+		Long:    "Get a service-account by deployment id",
 		Example: deploymentSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaGet(cmd, client, out)
