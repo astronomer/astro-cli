@@ -140,24 +140,6 @@ func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writ
 	return tab.Print(out)
 }
 
-// get single deployment service account
-func GetDeploymentServiceAccount(deploymentId string, serviceAccountId string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.DeploymentServiceAccountGetRequest,
-		Variables: map[string]interface{}{"deploymentUuid": deploymentId, "serviceAccountUuid": serviceAccountId},
-	}
-
-	resp, err := req.DoWithClient(client)
-	if err != nil {
-		return err
-	}
-
-	sas := resp.Data.GetDeploymentServiceAccount
-	tab := newTableOut()
-	tab.AddRow([]string{sas.Label, sas.Category, sas.Id, sas.ApiKey}, false)
-
-	return tab.Print(out)
-}
 
 // get all workspace service accounts
 func GetWorkspaceServiceAccounts(id string, client *houston.Client, out io.Writer) error {

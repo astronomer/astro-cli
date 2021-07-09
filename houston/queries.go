@@ -283,30 +283,6 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
       }
     }
   }`
-
-	DeploymentServiceAccountGetRequest = `
-  query GetDeploymentServiceAccount(
-	$deploymentUuid: Uuid!
-	$serviceAccountUuid: Uuid!
-  ){
-	deploymentServiceAccount(
-		deploymentUuid: $deploymentUuid
-		serviceAccountUuid: $serviceAccountUuid
-	){
-		id
-		apiKey
-		label
-		category
-		entityType
-		entityUuid
-		active
-		createdAt
-		updatedAt
-		lastUsedAt
-	}
-  }
-  `
-
 	DeploymentServiceAccountsGetRequest = `
   query GetDeploymentServiceAccounts(
 	$deploymentUuid: Uuid!

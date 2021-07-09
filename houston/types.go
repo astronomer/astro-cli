@@ -32,7 +32,6 @@ type Response struct {
 		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
 		GetDeploymentServiceAccounts   []ServiceAccount          `json:"deploymentServiceAccounts,omitempty"`
 		GetWorkspaceServiceAccounts    []ServiceAccount          `json:"workspaceServiceAccounts,omitempty"`
-		GetDeploymentServiceAccount    *ServiceAccount           `json:"deploymentServiceAccount,omitempty"`
 		GetUsers                       []User                    `json:"users,omitempty"`
 		GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
 		UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
