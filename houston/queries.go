@@ -55,8 +55,14 @@ var (
 	}`
 
 	DeploymentDeleteRequest = `
-	mutation DeleteDeployment($deploymentId: Uuid!) {
-		deleteDeployment(deploymentUuid: $deploymentId) {
+	mutation DeleteDeployment(
+		$deploymentId: Uuid!
+		$deploymentHardDelete: Boolean
+		) {
+		deleteDeployment(
+			deploymentUuid: $deploymentId
+			deploymentHardDelete: $deploymentHardDelete
+		) {
 			id
 			type
 			label

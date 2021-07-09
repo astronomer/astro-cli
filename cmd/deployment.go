@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/input"
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -14,6 +17,7 @@ import (
 var (
 	allDeployments        bool
 	cancel                bool
+	hardDelete            bool
 	executor              string
 	deploymentId          string
 	desiredAirflowVersion string
@@ -140,6 +144,7 @@ func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			return deploymentDelete(cmd, args, client, out)
 		},
 	}
+	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
 	return cmd
 }
 
@@ -406,8 +411,16 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	if hardDelete {
+		i, _ := input.InputConfirm(
+			fmt.Sprintf(messages.CLI_DEPLOYMENT_HARD_DELETE_PROMPT))
 
-	return deployment.Delete(args[0], client, out)
+		if !i {
+			fmt.Println("Exit: This command was not executed and your Deployment was not hard deleted.\n If you want to delete your Deployment but not permanently, try\n $ astro deployment delete without the --hard flag.")
+			return nil
+		}
+	}
+	return deployment.Delete(args[0], hardDelete, client, out)
 }
 
 func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
