@@ -231,8 +231,8 @@ func newWorkspaceSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comma
 func newWorkspaceSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get",
-		Short:   "Get a Service Account by entity type and entity id",
-		Long:    "Get a Service Account by entity type and entity id",
+		Short:   "Get a Service Account by workspace",
+		Long:    "Get a Service Account by workspace",
 		Example: workspaceSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaGet(cmd, args, client, out)
