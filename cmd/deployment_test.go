@@ -297,42 +297,6 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
 
-func TestDeploymentSaGetCommand(t *testing.T) {
-	testUtil.InitTestConfig()
-	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
- my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
-`
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "serviceAccounts": [{
-      "id": "q1w2e3r4t5y6u7i8o9p0",
-      "apiKey": "000000000000000000000000",
-      "label": "my_label",
-      "category": "default",
-      "entityType": "DEPLOYMENT",
-      "entityUuid": null,
-      "active": true,
-      "createdAt": "2019-10-16T21:14:22.105Z",
-      "updatedAt": "2019-10-16T21:14:22.105Z",
-      "lastUsedAt": null
-    }]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(client)
-
-	_, output, err := executeCommandC(api, "deployment", "service-account", "get", "--deployment-id=q1w2e3r4t5y6u7i8o9p0")
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
-}
-
 func TestDeploymentSaCreateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
