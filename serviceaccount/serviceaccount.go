@@ -98,25 +98,6 @@ func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *ho
 	return nil
 }
 
-func Get(entityType, id string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.ServiceAccountsGetRequest,
-		Variables: map[string]interface{}{"entityId": id, "entityType": entityType},
-	}
-
-	resp, err := req.DoWithClient(client)
-	if err != nil {
-		return err
-	}
-
-	sas := resp.Data.GetServiceAccounts
-	tab := newTableOut()
-	for _, sa := range sas {
-		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
-	}
-
-	return tab.Print(out)
-}
 
 // get all deployment service accounts
 func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writer) error {

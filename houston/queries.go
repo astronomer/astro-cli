@@ -324,31 +324,6 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 	}
   }
   `
-
-	ServiceAccountsGetRequest = `
-	query GetServiceAccount(
-		$serviceAccountId: Uuid
-		$entityId: Uuid
-		$entityType: EntityType!
-	) {
-		serviceAccounts(
-			serviceAccountUuid: $serviceAccountId
-			entityType: $entityType
-			entityUuid: $entityId
-		) {
-			id
-			apiKey
-			label
-			category
-			entityType
-			entityUuid
-			active
-			createdAt
-			updatedAt
-			lastUsedAt
-		}
-	}`
-
 	TokenBasicCreateRequest = `
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {

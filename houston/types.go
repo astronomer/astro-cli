@@ -29,7 +29,6 @@ type Response struct {
 		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
 		GetAppConfig                   *AppConfig                `json:"appConfig,omitempty"`
-		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
 		GetDeploymentServiceAccounts   []ServiceAccount          `json:"deploymentServiceAccounts,omitempty"`
 		GetWorkspaceServiceAccounts    []ServiceAccount          `json:"workspaceServiceAccounts,omitempty"`
 		GetUsers                       []User                    `json:"users,omitempty"`
