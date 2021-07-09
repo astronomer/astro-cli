@@ -628,7 +628,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	os.Stdin = r
 
 	_, _, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
-	assert.Nil(t, err);
+	assert.Nil(t, err)
 }
 
 func TestDeploymentDeleteHardResponseYes(t *testing.T) {
