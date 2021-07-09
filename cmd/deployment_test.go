@@ -298,42 +298,6 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
 
-func TestDeploymentSaGetCommand(t *testing.T) {
-	testUtil.InitTestConfig()
-	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
- my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
-`
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "serviceAccounts": [{
-      "id": "q1w2e3r4t5y6u7i8o9p0",
-      "apiKey": "000000000000000000000000",
-      "label": "my_label",
-      "category": "default",
-      "entityType": "DEPLOYMENT",
-      "entityUuid": null,
-      "active": true,
-      "createdAt": "2019-10-16T21:14:22.105Z",
-      "updatedAt": "2019-10-16T21:14:22.105Z",
-      "lastUsedAt": null
-    }]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(client)
-
-	_, output, err := executeCommandC(api, "deployment", "service-account", "get", "--deployment-id=q1w2e3r4t5y6u7i8o9p0")
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
-}
-
 func TestDeploymentSaCreateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
@@ -547,6 +511,43 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	assert.Contains(t, output, expectedOut)
 }
 
+func TestDeploymentSAGetCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
+	okResponse := `
+{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "deploymentServiceAccounts": [
+      {
+        "id": "ckqvfa2cu1468rn9hnr0bqqfk",
+        "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
+        "label": "yooo can u see me test",
+        "category": "",
+        "entityType": "DEPLOYMENT",
+        "entityUuid": null,
+        "active": true,
+        "createdAt": "2021-07-08T21:28:57.966Z",
+        "updatedAt": "2021-07-08T21:28:57.967Z",
+        "lastUsedAt": null
+      }
+    ]
+  }
+}`
+client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
 func TestDeploymentDelete(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `Successfully deleted deployment`
@@ -610,6 +611,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
+
 
 	// mock os.Stdin
 	input := []byte("n")

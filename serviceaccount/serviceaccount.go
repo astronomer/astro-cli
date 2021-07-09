@@ -98,10 +98,11 @@ func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *ho
 	return nil
 }
 
-func Get(entityType, id string, client *houston.Client, out io.Writer) error {
+// get all deployment service accounts
+func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
-		Query:     houston.ServiceAccountsGetRequest,
-		Variables: map[string]interface{}{"entityId": id, "entityType": entityType},
+		Query:     houston.DeploymentServiceAccountsGetRequest,
+		Variables: map[string]interface{}{"deploymentUuid": id},
 	}
 
 	resp, err := req.DoWithClient(client)
@@ -109,7 +110,29 @@ func Get(entityType, id string, client *houston.Client, out io.Writer) error {
 		return err
 	}
 
-	sas := resp.Data.GetServiceAccounts
+	sas := resp.Data.GetDeploymentServiceAccounts
+	fmt.Print(len(sas))
+	tab := newTableOut()
+	for _, sa := range sas {
+		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	}
+
+	return tab.Print(out)
+}
+
+// get all workspace service accounts
+func GetWorkspaceServiceAccounts(id string, client *houston.Client, out io.Writer) error {
+	req := houston.Request{
+		Query:     houston.WorkspaceServiceAccountsGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": id},
+	}
+
+	resp, err := req.DoWithClient(client)
+	if err != nil {
+		return err
+	}
+
+	sas := resp.Data.GetWorkspaceServiceAccounts
 	tab := newTableOut()
 	for _, sa := range sas {
 		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)

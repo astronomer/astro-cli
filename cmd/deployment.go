@@ -70,10 +70,7 @@ var (
   $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
 `
 	deploymentSaGetExample = `
-  # Get deployment service-account
-  $ astro deployment service-account get <service-account-id> --deployment-id=<deployment-id>
-
-  # or using deployment-id
+  # Get deployment service-accounts
   $ astro deployment service-account get --deployment-id=<deployment-id>
 `
 	deploymentSaDeleteExample = `
@@ -320,8 +317,8 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get",
-		Short:   "Get a service-account by entity type and entity id",
-		Long:    "Get a service-account by entity type and entity id",
+		Short:   "Get a service-account by deployment id",
+		Long:    "Get a service-account by deployment id",
 		Example: deploymentSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaGet(cmd, client, out)
@@ -532,7 +529,7 @@ func deploymentSaGet(cmd *cobra.Command, client *houston.Client, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Get("DEPLOYMENT", deploymentId, client, out)
+	return sa.GetDeploymentServiceAccounts(deploymentId, client, out)
 }
 
 func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
