@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -297,42 +298,6 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
 
-func TestDeploymentSaGetCommand(t *testing.T) {
-	testUtil.InitTestConfig()
-	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
- my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
-`
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "serviceAccounts": [{
-      "id": "q1w2e3r4t5y6u7i8o9p0",
-      "apiKey": "000000000000000000000000",
-      "label": "my_label",
-      "category": "default",
-      "entityType": "DEPLOYMENT",
-      "entityUuid": null,
-      "active": true,
-      "createdAt": "2019-10-16T21:14:22.105Z",
-      "updatedAt": "2019-10-16T21:14:22.105Z",
-      "lastUsedAt": null
-    }]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(client)
-
-	_, output, err := executeCommandC(api, "deployment", "service-account", "get", "--deployment-id=q1w2e3r4t5y6u7i8o9p0")
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
-}
-
 func TestDeploymentSaCreateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
@@ -485,16 +450,22 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
-	okResponse := `{"data": {
-					"appConfig": {"nfsMountDagDeployment": false},
-					"updateDeploymentAirflow": {
-						"id": "ckggzqj5f4157qtc9lescmehm",
-						"label": "test",
-						"airflowVersion": "1.10.5",
-						"desiredAirflowVersion": "1.10.10"
-					}
-				}
-			}`
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "deployment": {
+	  "id": "ckggzqj5f4157qtc9lescmehm",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+	  },
+	  "updateDeploymentAirflow": {
+	  "id": "ckggzqj5f4157qtc9lescmehm",
+	  "label": "test",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+	  }
+    }
+  }`
 
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -514,16 +485,17 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
-	okResponse := `{"data": {
-                                        "appConfig": {"nfsMountDagDeployment": false},
-					"deployment": {
-						"id": "ckggzqj5f4157qtc9lescmehm",
-						"label": "test",
-						"airflowVersion": "1.10.5",
-						"desiredAirflowVersion": "1.10.10"
-					}
-				}
-			}`
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "deployment": {
+	  "id": "ckggzqj5f4157qtc9lescmehm",
+	  "label": "test",
+	  "airflowVersion": "1.10.5",
+	  "desiredAirflowVersion": "1.10.10"
+    }
+  }
+}`
 
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -535,6 +507,179 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 
 	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentSAGetCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
+	okResponse := `
+{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": false},
+    "deploymentServiceAccounts": [
+      {
+        "id": "ckqvfa2cu1468rn9hnr0bqqfk",
+        "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
+        "label": "yooo can u see me test",
+        "category": "",
+        "entityType": "DEPLOYMENT",
+        "entityUuid": null,
+        "active": true,
+        "createdAt": "2021-07-08T21:28:57.966Z",
+        "updatedAt": "2021-07-08T21:28:57.967Z",
+        "lastUsedAt": null
+      }
+    ]
+  }
+}`
+client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentDelete(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `Successfully deleted deployment`
+	okResponse := `{
+		"data": {
+		  "appConfig": {"nfsMountDagDeployment": false},
+		  "deleteDeployment": {
+		    "id": "ckqh2dmzc43548h9hxzspysyi",
+		    "type": "airflow",
+		    "label": "test2",
+		    "description": "",
+		    "releaseName": "combusting-radiant-1610",
+		    "version": "0.17.1",
+		    "workspace": {
+		      "id": "ckqh2d9zh40758h9h650gf8dc"
+		    },
+		    "createdAt": "2021-06-28T20:19:03.193Z",
+		    "updatedAt": "2021-07-07T18:16:52.118Z"
+		  }
+		}
+	      }`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	_, output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentDeleteHardResponseNo(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+		  "appConfig": {"nfsMountDagDeployment": false},
+		  "deleteDeployment": {
+		    "id": "ckqh2dmzc43548h9hxzspysyi",
+		    "type": "airflow",
+		    "label": "test2",
+		    "description": "",
+		    "releaseName": "combusting-radiant-1610",
+		    "version": "0.17.1",
+		    "workspace": {
+		      "id": "ckqh2d9zh40758h9h650gf8dc"
+		    },
+		    "createdAt": "2021-06-28T20:19:03.193Z",
+		    "updatedAt": "2021-07-07T18:16:52.118Z"
+		  }
+		}
+	      }`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+
+	// mock os.Stdin
+	input := []byte("n")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	_, _, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	assert.Nil(t, err)
+}
+
+func TestDeploymentDeleteHardResponseYes(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `Successfully deleted deployment`
+	okResponse := `{
+		"data": {
+		  "appConfig": {"nfsMountDagDeployment": false},
+		  "deleteDeployment": {
+		    "id": "ckqh2dmzc43548h9hxzspysyi",
+		    "type": "airflow",
+		    "label": "test2",
+		    "description": "",
+		    "releaseName": "combusting-radiant-1610",
+		    "version": "0.17.1",
+		    "workspace": {
+		      "id": "ckqh2d9zh40758h9h650gf8dc"
+		    },
+		    "createdAt": "2021-06-28T20:19:03.193Z",
+		    "updatedAt": "2021-07-07T18:16:52.118Z"
+		  }
+		}
+	      }`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	// mock os.Stdin
+	input := []byte("y")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	_, output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

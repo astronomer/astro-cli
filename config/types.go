@@ -27,6 +27,7 @@ type cfgs struct {
 	WebserverPort      cfg
 	ShowWarnings       cfg
 	AirflowReleasesURL cfg
+	SkipVerifyTLS      cfg
 }
 
 // Creates a new cfg struct

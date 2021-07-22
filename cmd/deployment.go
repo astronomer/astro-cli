@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
+	"github.com/astronomer/astro-cli/pkg/input"
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -14,6 +17,7 @@ import (
 var (
 	allDeployments        bool
 	cancel                bool
+	hardDelete            bool
 	executor              string
 	deploymentId          string
 	desiredAirflowVersion string
@@ -66,10 +70,7 @@ var (
   $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
 `
 	deploymentSaGetExample = `
-  # Get deployment service-account
-  $ astro deployment service-account get <service-account-id> --deployment-id=<deployment-id>
-
-  # or using deployment-id
+  # Get deployment service-accounts
   $ astro deployment service-account get --deployment-id=<deployment-id>
 `
 	deploymentSaDeleteExample = `
@@ -143,6 +144,7 @@ func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			return deploymentDelete(cmd, args, client, out)
 		},
 	}
+	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
 	return cmd
 }
 
@@ -315,8 +317,8 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get",
-		Short:   "Get a service-account by entity type and entity id",
-		Long:    "Get a service-account by entity type and entity id",
+		Short:   "Get a service-account by deployment id",
+		Long:    "Get a service-account by deployment id",
 		Example: deploymentSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaGet(cmd, client, out)
@@ -409,8 +411,16 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	if hardDelete {
+		i, _ := input.InputConfirm(
+			fmt.Sprintf(messages.CLI_DEPLOYMENT_HARD_DELETE_PROMPT))
 
-	return deployment.Delete(args[0], client, out)
+		if !i {
+			fmt.Println("Exit: This command was not executed and your Deployment was not hard deleted.\n If you want to delete your Deployment but not permanently, try\n $ astro deployment delete without the --hard flag.")
+			return nil
+		}
+	}
+	return deployment.Delete(args[0], hardDelete, client, out)
 }
 
 func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -519,7 +529,7 @@ func deploymentSaGet(cmd *cobra.Command, client *houston.Client, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.Get("DEPLOYMENT", deploymentId, client, out)
+	return sa.GetDeploymentServiceAccounts(deploymentId, client, out)
 }
 
 func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {

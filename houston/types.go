@@ -29,7 +29,8 @@ type Response struct {
 		GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
 		GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
 		GetAppConfig                   *AppConfig                `json:"appConfig,omitempty"`
-		GetServiceAccounts             []ServiceAccount          `json:"serviceAccounts,omitempty"`
+		GetDeploymentServiceAccounts   []ServiceAccount          `json:"deploymentServiceAccounts,omitempty"`
+		GetWorkspaceServiceAccounts    []ServiceAccount          `json:"workspaceServiceAccounts,omitempty"`
 		GetUsers                       []User                    `json:"users,omitempty"`
 		GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
 		UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
@@ -126,8 +127,6 @@ type ServiceAccount struct {
 	ApiKey     string `json:"apiKey"`
 	Label      string `json:"label"`
 	Category   string `json:"category"`
-	EntityType string `json:"entityType"`
-	EntityId   string `json:"entityUuid"`
 	LastUsedAt string `json:"lastUsedAt"`
 	CreatedAt  string `json:"createdAt"`
 	UpdatedAt  string `json:"updatedAt"`

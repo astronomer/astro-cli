@@ -55,8 +55,14 @@ var (
 	}`
 
 	DeploymentDeleteRequest = `
-	mutation DeleteDeployment($deploymentId: Uuid!) {
-		deleteDeployment(deploymentUuid: $deploymentId) {
+	mutation DeleteDeployment(
+		$deploymentId: Uuid!
+		$deploymentHardDelete: Boolean
+		) {
+		deleteDeployment(
+			deploymentUuid: $deploymentId
+			deploymentHardDelete: $deploymentHardDelete
+		) {
 			id
 			type
 			label
@@ -283,31 +289,47 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
       }
     }
   }`
+	DeploymentServiceAccountsGetRequest = `
+  query GetDeploymentServiceAccounts(
+	$deploymentUuid: Uuid!
+  ){
+	deploymentServiceAccounts(
+		deploymentUuid: $deploymentUuid
+	){
+		id
+		apiKey
+		label
+		category
+		entityType
+		entityUuid
+		active
+		createdAt
+		updatedAt
+		lastUsedAt
+	}
+  }
+  `
 
-	ServiceAccountsGetRequest = `
-	query GetServiceAccount(
-		$serviceAccountId: Uuid
-		$entityId: Uuid
-		$entityType: EntityType!
-	) {
-		serviceAccounts(
-			serviceAccountUuid: $serviceAccountId
-			entityType: $entityType
-			entityUuid: $entityId
-		) {
-			id
-			apiKey
-			label
-			category
-			entityType
-			entityUuid
-			active
-			createdAt
-			updatedAt
-			lastUsedAt
-		}
-	}`
-
+	WorkspaceServiceAccountsGetRequest = `
+  query GetWorkspaceServiceAccounts(
+	$workspaceUuid: Uuid!
+  ){
+	workspaceServiceAccounts(
+		workspaceUuid: $workspaceUuid
+	){
+		id
+		apiKey
+		label
+		category
+		entityType
+		entityUuid
+		active
+		createdAt
+		updatedAt
+		lastUsedAt
+	}
+  }
+  `
 	TokenBasicCreateRequest = `
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {
