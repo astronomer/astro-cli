@@ -2,12 +2,13 @@ package workspace
 
 import (
 	"bytes"
-	"github.com/astronomer/astro-cli/houston"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/astronomer/astro-cli/houston"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAdd(t *testing.T) {
@@ -177,7 +178,8 @@ func TestListRolesError(t *testing.T) {
 }
 
 func TestUpdateRole(t *testing.T) {
-	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_VIEWER"}}`
+	testUtil.InitTestConfig()
+	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_ADMIN", "workspaceUser":{"roleBindings":[{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"DEPLOYMENT_VIEWER"},{"workspace":{"id":"ckoixo6o501496qemiwsja1tl"},"role":"WORKSPACE_VIEWER"},{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"WORKSPACE_EDITOR"},{"workspace":{"id":"ckql4ias908766qbpuck803fa"},"role":"WORKSPACE_ADMIN"}]}}}`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -186,18 +188,19 @@ func TestUpdateRole(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	id := "ck1qg6whg001r08691y117hub"
+	id := "ckoixo6o501496qemiwsja1tl"
 	role := "test-role"
 	email := "andrii@test.com"
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
 	assert.NoError(t, err)
-	expected := `Role has been changed from andrii@test.com to WORKSPACE_VIEWER for user test-role`
+	expected := `Role has been changed from WORKSPACE_VIEWER to WORKSPACE_ADMIN for user test-role`
 	assert.Equal(t, buf.String(), expected)
 }
 
 func TestUpdateRoleError(t *testing.T) {
+	testUtil.InitTestConfig()
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 500,
@@ -212,5 +215,43 @@ func TestUpdateRoleError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
+	assert.EqualError(t, err, "API error (500): Internal Server Error")
+}
+
+func TestGetUserRole(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{"data":{    "appConfig": {"nfsMountDagDeployment": false},"workspaceUser":{"roleBindings":[{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"DEPLOYMENT_VIEWER"},{"workspace":{"id":"ckoixo6o501496qemiwsja1tl"},"role":"WORKSPACE_VIEWER"},{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"WORKSPACE_EDITOR"},{"workspace":{"id":"ckql4ias908766qbpuck803fa"},"role":"WORKSPACE_ADMIN"}]}}}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	id := "ck1qg6whg001r08691y117hub"
+	email := "andrii@test.com"
+
+	buf := new(bytes.Buffer)
+	userRoleBinding, err := getUserRole(id, email, api, buf)
+	assert.NoError(t, err)
+	assert.Equal(t, len(userRoleBinding.RoleBindings), 4)
+}
+
+func TestGetUserRoleError(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	id := "ck1qg6whg001r08691y117hub"
+	email := "andrii@test.com"
+
+	buf := new(bytes.Buffer)
+	_, err := getUserRole(id, email, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
