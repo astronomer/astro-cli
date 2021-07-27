@@ -6,6 +6,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/pkg/errors"
 )
 
 // Add a user to a workspace with specified role
@@ -97,7 +98,41 @@ func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.
 		return err
 	}
 	newRole := r.Data.WorkspaceUpdateUserRole
+	// get user you are updating to show role from before change
+	roles, err := getUserRole(workspaceId, email, client, out)
 
-	fmt.Fprintf(out, "Role has been changed from %s to %s for user %s", role, newRole, email)
+	if err != nil {
+		return err
+	}
+
+	var rb houston.RoleBindingWorkspace
+	for _, val := range roles.RoleBindings {
+		if val.Workspace.Id == workspaceId {
+			rb = val
+			break
+		}
+	}
+	// check if rolebinding is an empty structure
+	if (rb == houston.RoleBindingWorkspace{}) {
+		return errors.New("The user you are trying to change is not part of this workspace")
+	}
+
+	fmt.Fprintf(out, "Role has been changed from %s to %s for user %s", rb.Role, newRole, email)
 	return nil
+}
+
+func getUserRole(workspaceId string, email string, client *houston.Client, out io.Writer) (workspaceUserRolebindings houston.WorkspaceUserRoleBindings, err error) {
+	req := houston.Request{
+		Query:     houston.WorkspaceGetUserRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email},
+	}
+	r, err := req.DoWithClient(client)
+
+	if err != nil {
+		return workspaceUserRolebindings, err
+	}
+	workspaceUserRolebindings = r.Data.WorkspaceGetUser
+
+	return workspaceUserRolebindings, nil
+
 }
