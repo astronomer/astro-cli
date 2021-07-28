@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -107,7 +108,7 @@ func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.
 
 	var rb houston.RoleBindingWorkspace
 	for _, val := range roles.RoleBindings {
-		if val.Workspace.Id == workspaceId {
+		if val.Workspace.Id == workspaceId && strings.Contains(val.Role, "WORKSPACE") {
 			rb = val
 			break
 		}

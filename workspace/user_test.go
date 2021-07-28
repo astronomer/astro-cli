@@ -199,6 +199,25 @@ func TestUpdateRole(t *testing.T) {
 	assert.Equal(t, buf.String(), expected)
 }
 
+func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_ADMIN", "workspaceUser":{"roleBindings":[{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"DEPLOYMENT_VIEWER"}]}}}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	id := "ckg6sfddu30911pc0n1o0e97e"
+	role := "test-role"
+	email := "andrii@test.com"
+
+	buf := new(bytes.Buffer)
+	err := UpdateRole(id, role, email, api, buf)
+	assert.Equal(t, err.Error(), "The user you are trying to change is not part of this workspace")
+}
 func TestUpdateRoleNoAccess(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_ADMIN", "workspaceUser":{"roleBindings":[]}}}`
