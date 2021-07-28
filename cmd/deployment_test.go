@@ -587,7 +587,15 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
 		"data": {
-		  "appConfig": {"nfsMountDagDeployment": false},
+		  "appConfig": {
+			"version": "0.15.1",
+			"baseDomain": "local.astronomer.io",
+			"smtpConfigured": true,
+			"manualReleaseNames": false,
+			"hardDeleteDeployment": true,
+			"nfsMountDagDeployment": false
+		},
+	
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
 		    "type": "airflow",
@@ -638,7 +646,14 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	expectedOut := `Successfully deleted deployment`
 	okResponse := `{
 		"data": {
-		  "appConfig": {"nfsMountDagDeployment": false},
+		  "appConfig": {
+			"version": "0.15.1",
+			"baseDomain": "local.astronomer.io",
+			"smtpConfigured": true,
+			"manualReleaseNames": false,
+			"hardDeleteDeployment": true,
+			"nfsMountDagDeployment": false
+		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
 		    "type": "airflow",
