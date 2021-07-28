@@ -216,7 +216,7 @@ func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
-	assert.Equal(t, err.Error(), "The user you are trying to change is not part of this workspace")
+	assert.Equal(t, "The user you are trying to change is not part of this workspace", err.Error())
 }
 func TestUpdateRoleNoAccess(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -235,7 +235,8 @@ func TestUpdateRoleNoAccess(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
-	assert.Equal(t, err.Error(), "The user you are trying to change is not part of this workspace")
+	assert.Equal(t, "The user you are trying to change is not part of this workspace", err.Error())
+
 }
 
 func TestUpdateRoleError(t *testing.T) {
@@ -274,7 +275,7 @@ func TestGetUserRole(t *testing.T) {
 	buf := new(bytes.Buffer)
 	userRoleBinding, err := getUserRole(id, email, api, buf)
 	assert.NoError(t, err)
-	assert.Equal(t, len(userRoleBinding.RoleBindings), 4)
+	assert.Equal(t, 4, len(userRoleBinding.RoleBindings))
 }
 
 func TestGetUserRoleError(t *testing.T) {
