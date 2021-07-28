@@ -46,7 +46,8 @@ func TestAppConfig(t *testing.T) {
 				"version": "0.15.1",
 				"baseDomain": "local.astronomer.io",
 				"smtpConfigured": true,
-				"manualReleaseNames": false
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": false
 			}
 		}
 }`
@@ -812,3 +813,44 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	assert.Equal(t, CheckNFSMountDagDeployment(api), true)
 }
+
+
+func TestCheckHardDeleteDeployment(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": true
+			}
+		}
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	hardDelete := CheckHardDeleteDeployment(api)
+	assert.Equal(t, hardDelete, true)
+}
+
+func TestCheckHardDeleteDeploymentError(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(``)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	assert.Equal(t, CheckNFSMountDagDeployment(api), false)
+}
+
