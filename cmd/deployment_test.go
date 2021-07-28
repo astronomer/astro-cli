@@ -534,7 +534,7 @@ func TestDeploymentSAGetCommand(t *testing.T) {
     ]
   }
 }`
-client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
 			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
@@ -595,7 +595,6 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 			"hardDeleteDeployment": true,
 			"nfsMountDagDeployment": false
 		},
-	
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
 		    "type": "airflow",
@@ -619,7 +618,6 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-
 
 	// mock os.Stdin
 	input := []byte("n")
