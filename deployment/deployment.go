@@ -75,6 +75,14 @@ func CheckNFSMountDagDeployment(client *houston.Client) bool {
 	return r.Data.GetAppConfig.NfsMountDagDeployment
 }
 
+func CheckHardDeleteDeployment(client *houston.Client) bool {
+	appConfig, err := AppConfig(client)
+	if err != nil {
+		return false
+	}
+	return appConfig.HardDeleteDeployment
+}
+
 // Create airflow deployment
 func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}

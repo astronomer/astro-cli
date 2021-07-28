@@ -34,8 +34,8 @@ func TestAppVersion(t *testing.T) {
 
 	config, err := AppVersion(api)
 	assert.NoError(t, err)
-	assert.Equal(t, config.Version, "0.15.1")
-	assert.Equal(t, config.BaseDomain, "local.astronomer.io")
+	assert.Equal(t, "0.15.1", config.Version)
+	assert.Equal(t, "local.astronomer.io", config.BaseDomain)
 }
 
 func TestAppConfig(t *testing.T) {
@@ -46,7 +46,8 @@ func TestAppConfig(t *testing.T) {
 				"version": "0.15.1",
 				"baseDomain": "local.astronomer.io",
 				"smtpConfigured": true,
-				"manualReleaseNames": false
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": false
 			}
 		}
 }`
@@ -61,9 +62,9 @@ func TestAppConfig(t *testing.T) {
 
 	config, err := AppConfig(api)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ManualReleaseNames, false)
-	assert.Equal(t, config.SmtpConfigured, true)
-	assert.Equal(t, config.BaseDomain, "local.astronomer.io")
+	assert.Equal(t, false, config.ManualReleaseNames)
+	assert.Equal(t, true, config.SmtpConfigured)
+	assert.Equal(t, "local.astronomer.io", config.BaseDomain)
 }
 
 func TestAppConfigError(t *testing.T) {
@@ -354,7 +355,7 @@ func TestList(t *testing.T) {
 	expected := ` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
  test     burning-terrestrial-5940     v         ckbv801t300qh0760pck7ea0c     ?                           
 `
-	assert.Equal(t, buf.String(), expected)
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestUpdate(t *testing.T) {
@@ -420,7 +421,7 @@ func TestUpdate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", api, buf)
 		assert.NoError(t, err)
-		assert.Equal(t, buf.String(), expected)
+		assert.Equal(t, expected, buf.String())
 	}
 }
 
@@ -485,7 +486,7 @@ To cancel, run:
 
 `
 
-	assert.Equal(t, buf.String(), expected)
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestAirflowUpgradeError(t *testing.T) {
@@ -536,7 +537,7 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 	expected := `
 Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.
 `
-	assert.Equal(t, buf.String(), expected)
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestAirflowUpgradeCancelError(t *testing.T) {
@@ -624,7 +625,7 @@ To cancel, run:
  $ astro deployment airflow upgrade --cancel
 
 `
-	assert.Equal(t, buf.String(), expected)
+	assert.Equal(t, expected, buf.String())
 }
 
 func Test_getDeployment(t *testing.T) {
@@ -719,7 +720,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 	airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
 	t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
 	assert.NoError(t, err)
-	assert.Equal(t, airflowVersion, "1.10.12")
+	assert.Equal(t, "1.10.12", airflowVersion)
 }
 
 func Test_getAirflowVersionSelectionError(t *testing.T) {
@@ -736,7 +737,7 @@ func Test_getAirflowVersionSelectionError(t *testing.T) {
 	buf := new(bytes.Buffer)
 	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
 	assert.Error(t, err, "API error (500):")
-	assert.Equal(t, airflowVersion, "")
+	assert.Equal(t, "", airflowVersion)
 }
 
 func Test_meetsAirflowUpgradeReqs(t *testing.T) {
@@ -785,7 +786,7 @@ func TestCheckNFSMountDagDeploymentError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	assert.Equal(t, CheckNFSMountDagDeployment(api), false)
+	assert.Equal(t, false, CheckNFSMountDagDeployment(api))
 }
 
 func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
@@ -810,5 +811,44 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	assert.Equal(t, CheckNFSMountDagDeployment(api), true)
+	assert.Equal(t, true, CheckNFSMountDagDeployment(api))
+}
+
+func TestCheckHardDeleteDeployment(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": true
+			}
+		}
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	hardDelete := CheckHardDeleteDeployment(api)
+	assert.Equal(t, true, hardDelete)
+}
+
+func TestCheckHardDeleteDeploymentError(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(``)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	assert.Equal(t, false, CheckHardDeleteDeployment(api))
 }
