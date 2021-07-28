@@ -38,6 +38,7 @@ type Response struct {
 		UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
 		DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
 		WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
+		WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
 		DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
@@ -192,6 +193,15 @@ type User struct {
 	// created at
 	// updated at
 	// profile
+}
+type RoleBindingWorkspace struct {
+	Role      string `json:"role"`
+	Workspace struct {
+		Id string `json:"id"`
+	} `json:"workspace"`
+}
+type WorkspaceUserRoleBindings struct {
+	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
 }
 
 type RoleBinding struct {

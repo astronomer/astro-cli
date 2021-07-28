@@ -118,7 +118,6 @@ func TestWorkspaceSAGetCommand(t *testing.T) {
   }
 }`
 
-
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
