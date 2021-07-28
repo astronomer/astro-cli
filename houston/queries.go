@@ -449,6 +449,21 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
         )
 	}`
 
+	WorkspaceGetUserRequest = `
+	query workspaceGetUser($workspaceUuid: Uuid!, $email: String!) {
+		workspaceUser(
+        	workspaceUuid: $workspaceUuid
+                user: { email: $email }
+        ) {
+		roleBindings {
+		  workspace{
+			id
+		  }
+		  role
+		}
+	}
+	}`
+
 	WorkspaceUserRemoveRequest = `
 	mutation RemoveWorkspaceUser(
 		$workspaceId: Uuid!

@@ -534,7 +534,7 @@ func TestDeploymentSAGetCommand(t *testing.T) {
     ]
   }
 }`
-client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
 			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
@@ -587,7 +587,14 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
 		"data": {
-		  "appConfig": {"nfsMountDagDeployment": false},
+		  "appConfig": {
+			"version": "0.15.1",
+			"baseDomain": "local.astronomer.io",
+			"smtpConfigured": true,
+			"manualReleaseNames": false,
+			"hardDeleteDeployment": true,
+			"nfsMountDagDeployment": false
+		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
 		    "type": "airflow",
@@ -611,7 +618,6 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-
 
 	// mock os.Stdin
 	input := []byte("n")
@@ -638,7 +644,14 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	expectedOut := `Successfully deleted deployment`
 	okResponse := `{
 		"data": {
-		  "appConfig": {"nfsMountDagDeployment": false},
+		  "appConfig": {
+			"version": "0.15.1",
+			"baseDomain": "local.astronomer.io",
+			"smtpConfigured": true,
+			"manualReleaseNames": false,
+			"hardDeleteDeployment": true,
+			"nfsMountDagDeployment": false
+		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
 		    "type": "airflow",

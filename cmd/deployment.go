@@ -144,7 +144,9 @@ func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comman
 			return deploymentDelete(cmd, args, client, out)
 		},
 	}
-	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
+	if deployment.CheckHardDeleteDeployment(client) {
+		cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
+	}
 	return cmd
 }
 

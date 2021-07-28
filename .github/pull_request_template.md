@@ -4,7 +4,7 @@
 
 ## 🎟 Issue(s)
 
-Resolves astronomer/issues#XXXX
+Related astronomer/issues#XXXX
 
 ## 🧪 Functional Testing
 
