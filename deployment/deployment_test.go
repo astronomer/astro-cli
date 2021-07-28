@@ -851,6 +851,6 @@ func TestCheckHardDeleteDeploymentError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	assert.Equal(t, CheckNFSMountDagDeployment(api), false)
+	assert.Equal(t, CheckHardDeleteDeployment(api), false)
 }
 
