@@ -89,16 +89,6 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 
 // Update workspace user role
 func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceUserUpdateRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
-	}
-	r, err := req.DoWithClient(client)
-
-	if err != nil {
-		return err
-	}
-	newRole := r.Data.WorkspaceUpdateUserRole
 	// get user you are updating to show role from before change
 	roles, err := getUserRole(workspaceId, email, client, out)
 
@@ -117,6 +107,17 @@ func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.
 	if (rb == houston.RoleBindingWorkspace{}) {
 		return errors.New("The user you are trying to change is not part of this workspace")
 	}
+
+	req := houston.Request{
+		Query:     houston.WorkspaceUserUpdateRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
+	}
+	r, err := req.DoWithClient(client)
+
+	if err != nil {
+		return err
+	}
+	newRole := r.Data.WorkspaceUpdateUserRole
 
 	fmt.Fprintf(out, "Role has been changed from %s to %s for user %s", rb.Role, newRole, email)
 	return nil
