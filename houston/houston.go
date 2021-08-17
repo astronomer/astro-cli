@@ -74,6 +74,9 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 		fmt.Printf("DEBUG: Request Data: %v\n", doOpts.Data)
 	}
 	if err != nil {
+		if config.CFG.Debug.GetBool() {
+			fmt.Printf("DEBUG: ERROR in HTTP request: %s", err.Error())
+		}
 		return nil, err
 	}
 	defer httpResponse.Body.Close()
