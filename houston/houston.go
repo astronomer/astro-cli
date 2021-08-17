@@ -2,16 +2,19 @@ package houston
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
 	"github.com/astronomer/astro-cli/cluster"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 )
 
 var PermissionsError = errors.New("You do not have the appropriate permissions for that")
 var PermissionsErrorVerbose = errors.New("You do not have the appropriate permissions for that: Your token has expired. Please log in again.")
+var debug = true
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
@@ -66,6 +69,10 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
+	if config.CFG.Debug.GetBool() {
+		fmt.Printf("DEBUG: This is the url %s \n", cl.GetAPIURL())
+		fmt.Printf("DEBUG: doOpts.Data: %v\n", doOpts.Data)
+	}
 	if err != nil {
 		return nil, err
 	}
