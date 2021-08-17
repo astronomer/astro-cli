@@ -171,6 +171,10 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	err = registryAuth()
 	if err != nil {
+		if config.CFG.Debug.GetBool() {
+			fmt.Printf("DEBUG: There was an error: %s", err.Error())
+		}
+
 		fmt.Printf(messages.RegistryAuthFail)
 	}
 
