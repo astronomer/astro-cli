@@ -112,7 +112,6 @@ var (
 		}
 	}`
 
-
 	DeploymentGetRequest = `
 	query GetDeployment(
 		$id: String!
@@ -557,6 +556,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			manualReleaseNames
 			configureDagDeployment
 			nfsMountDagDeployment
+			preCreatedNamespaces
 		}
 	}`
 )

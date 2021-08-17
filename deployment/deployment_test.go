@@ -148,7 +148,7 @@ func TestCreate(t *testing.T) {
 				"smtpConfigured": true,
 				"manualReleaseNames": false,
 				"hardDeleteDeployment": true,
-				"PreCreatedNamespaces": false
+				"preCreatedNamespaces": false
 			},
 			    "createDeployment": {
 			"id": "ckbv818oa00r107606ywhoqtw",
@@ -214,7 +214,7 @@ func TestCreateWithNFSLocation(t *testing.T) {
 				"smtpConfigured": true,
 				"manualReleaseNames": false,
 				"hardDeleteDeployment": true,
-				"PreCreatedNamespaces": false
+				"preCreatedNamespaces": false
 			},
     "createDeployment": {
 			"id": "ckbv818oa00r107606ywhoqtw",
@@ -280,7 +280,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 				"smtpConfigured": true,
 				"manualReleaseNames": false,
 				"hardDeleteDeployment": true,
-				"PreCreatedNamespaces": true
+				"preCreatedNamespaces": true
 			},
 			"availableNamespaces": [
 				{
@@ -1076,7 +1076,7 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 				"smtpConfigured": true,
 				"manualReleaseNames": false,
 				"hardDeleteDeployment": true,
-				"PreCreatedNamespaces": true
+				"preCreatedNamespaces": true
 			}
 		}
 }`
