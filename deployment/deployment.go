@@ -99,7 +99,6 @@ func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
 	return appConfig.PreCreatedNamespaces
 }
 
-
 // Create airflow deployment
 func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
@@ -107,7 +106,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	if CheckPreCreateNamespaceDeployment(client) {
 		namespace, err := getDeploymentSelectionNamespaces(client, out)
 		if err != nil {
-		 	return err
+			return err
 		}
 		vars["namespace"] = namespace
 	}
@@ -187,6 +186,7 @@ func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) e
 
 	return nil
 }
+
 // list all available namespaces
 func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (string, error) {
 	tab := namespacesTableOut()
@@ -202,6 +202,10 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 	}
 
 	names := r.Data.GetDeploymentNamespaces
+
+	if len(names) == 0 {
+		return "", errors.New("no namespaces are available")
+	}
 
 	for _, namespace := range names {
 		name := namespace.Name
@@ -224,6 +228,7 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 
 	return names[i-1].Name, nil
 }
+
 // List all airflow deployments
 func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 	var deployments []houston.Deployment

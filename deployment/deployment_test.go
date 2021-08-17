@@ -356,12 +356,10 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-
 	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
-
 
 func TestCreateHoustonError(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -1010,7 +1008,6 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-
 	name, err := getDeploymentSelectionNamespaces(api, buf)
 	assert.NoError(t, err)
 	expected := `#     NAME      
@@ -1020,6 +1017,37 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 	assert.Equal(t, expected, buf.String())
 	assert.Equal(t, "test1", name)
 
+}
+
+func TestGetDeploymentSelectionNamespacesNoNamespaces(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+		"data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": true
+			},
+			"availableNamespaces": [
+			      ]
+		}
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	buf := new(bytes.Buffer)
+	name, err := getDeploymentSelectionNamespaces(api, buf)
+	expected := ``
+	assert.Equal(t, expected, name)
+	assert.EqualError(t, err, "no namespaces are available")
 }
 
 func TestGetDeploymentSelectionNamespacesError(t *testing.T) {
@@ -1034,11 +1062,11 @@ func TestGetDeploymentSelectionNamespacesError(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
 	name, err := getDeploymentSelectionNamespaces(api, buf)
-	assert.Equal(t, "", name);
+	assert.Equal(t, "", name)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
-func TestCheckPreCreateNamespacesDeployment(t *testing.T){
+func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
 		"data": {
@@ -1064,5 +1092,3 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T){
 	hardDelete := CheckPreCreateNamespaceDeployment(api)
 	assert.Equal(t, true, hardDelete)
 }
-
-
