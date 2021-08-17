@@ -71,7 +71,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
 	if config.CFG.Debug.GetBool() {
 		fmt.Printf("DEBUG: This is the url %s \n", cl.GetAPIURL())
-		fmt.Printf("DEBUG: doOpts.Data: %v\n", doOpts.Data)
+		fmt.Printf("DEBUG: Request Data: %v\n", doOpts.Data)
 	}
 	if err != nil {
 		return nil, err
