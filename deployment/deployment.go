@@ -9,6 +9,7 @@ import (
 
 	"github.com/Masterminds/semver"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -100,6 +101,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		if err != nil {
 			return err
 		}
+
 		vars["namespace"] = namespace
 	}
 
@@ -188,6 +190,9 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
 	}
 
+	if config.CFG.Debug.GetBool() {
+		fmt.Println("checking namespaces available for platform")
+	}
 	tab.GetUserInput = true
 
 	req := houston.Request{
