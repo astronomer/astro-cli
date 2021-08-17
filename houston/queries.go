@@ -104,6 +104,15 @@ var (
 		}
 	}`
 
+	AvailableNamespacesGetRequest = `
+	query availableNamespaces() {
+		availableNamespaces(
+		) {
+			name
+		}
+	}`
+
+
 	DeploymentGetRequest = `
 	query GetDeployment(
 		$id: String!

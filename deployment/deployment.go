@@ -24,6 +24,14 @@ func newTableOut() *printutil.Table {
 	}
 }
 
+func namespacesTableOut() *printutil.Table {
+	return &printutil.Table{
+		Padding:        []int{30},
+		DynamicPadding: true,
+		Header:         []string{"NAME"},
+	}
+}
+
 // AppVersion returns application version from houston-api
 func AppVersion(client *houston.Client) (*houston.AppConfig, error) {
 	req := houston.Request{
@@ -83,9 +91,26 @@ func CheckHardDeleteDeployment(client *houston.Client) bool {
 	return appConfig.HardDeleteDeployment
 }
 
+func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
+	appConfig, err := AppConfig(client)
+	if err != nil {
+		return false
+	}
+	return appConfig.PreCreatedNamespaces
+}
+
+
 // Create airflow deployment
 func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
+
+	if CheckPreCreateNamespaceDeployment(client) {
+		namespace, err := getDeploymentSelectionNamespaces(client, out)
+		if err != nil {
+		 	return err
+		}
+		vars["namespace"] = namespace
+	}
 
 	if releaseName != "" && checkManualReleaseNames(client) {
 		vars["releaseName"] = releaseName
@@ -162,7 +187,43 @@ func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) e
 
 	return nil
 }
+// list all available namespaces
+func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (string, error) {
+	tab := namespacesTableOut()
+	tab.GetUserInput = true
 
+	req := houston.Request{
+		Query: houston.AvailableNamespacesGetRequest,
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	names := r.Data.GetDeploymentNamespaces
+
+	for _, namespace := range names {
+		name := namespace.Name
+
+		tab.AddRow([]string{name}, false)
+	}
+
+	tab.Print(out)
+
+	in := input.InputText("\n> ")
+	i, err := strconv.ParseInt(
+		in,
+		10,
+		64,
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("cannot parse %s to int", in)
+	}
+
+	return names[i-1].Name, nil
+}
 // List all airflow deployments
 func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 	var deployments []houston.Deployment
