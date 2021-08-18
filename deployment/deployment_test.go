@@ -1010,9 +1010,9 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 
 	name, err := getDeploymentSelectionNamespaces(api, buf)
 	assert.NoError(t, err)
-	expected := `#     AVAILABLE NAMESPACES     
-1     test1                    
-2     test2                    
+	expected := `#     AVAILABLE KUBERNETES NAMESPACES     
+1     test1                               
+2     test2                               
 `
 	assert.Equal(t, expected, buf.String())
 	assert.Equal(t, "test1", name)
@@ -1047,7 +1047,7 @@ func TestGetDeploymentSelectionNamespacesNoNamespaces(t *testing.T) {
 	name, err := getDeploymentSelectionNamespaces(api, buf)
 	expected := ``
 	assert.Equal(t, expected, name)
-	assert.EqualError(t, err, "no namespaces are available")
+	assert.EqualError(t, err, "no kubernetes namespaces are available")
 }
 
 func TestGetDeploymentSelectionNamespacesError(t *testing.T) {

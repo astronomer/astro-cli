@@ -28,7 +28,7 @@ func namespacesTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30},
 		DynamicPadding: true,
-		Header:         []string{"AVAILABLE NAMESPACES"},
+		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
 	}
 }
 
@@ -204,7 +204,7 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 	names := r.Data.GetDeploymentNamespaces
 
 	if len(names) == 0 {
-		return "", errors.New("no namespaces are available")
+		return "", errors.New("no kubernetes namespaces are available")
 	}
 
 	for _, namespace := range names {
