@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/pkg/errors"
 
@@ -16,6 +17,9 @@ import (
 func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string, skipVerCheck bool) error {
 	if skipVerCheck {
 		return nil
+	}
+	if config.CFG.Debug.GetBool() {
+		fmt.Println("checking if astro-cli version is not compatible with platform")
 	}
 
 	serverCfg, err := deployment.AppVersion(client)
