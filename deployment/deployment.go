@@ -28,7 +28,7 @@ func namespacesTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30},
 		DynamicPadding: true,
-		Header:         []string{"NAME"},
+		Header:         []string{"AVAILABLE NAMESPACES"},
 	}
 }
 

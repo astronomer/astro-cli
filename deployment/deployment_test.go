@@ -1010,9 +1010,9 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 
 	name, err := getDeploymentSelectionNamespaces(api, buf)
 	assert.NoError(t, err)
-	expected := `#     NAME      
-1     test1     
-2     test2     
+	expected := `#     AVAILABLE NAMESPACES     
+1     test1                    
+2     test2                    
 `
 	assert.Equal(t, expected, buf.String())
 	assert.Equal(t, "test1", name)
