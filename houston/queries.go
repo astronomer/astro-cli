@@ -105,9 +105,8 @@ var (
 	}`
 
 	AvailableNamespacesGetRequest = `
-	query availableNamespaces() {
-		availableNamespaces(
-		) {
+	query availableNamespaces {
+		availableNamespaces{
 			name
 		}
 	}`
