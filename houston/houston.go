@@ -14,7 +14,6 @@ import (
 
 var PermissionsError = errors.New("You do not have the appropriate permissions for that")
 var PermissionsErrorVerbose = errors.New("You do not have the appropriate permissions for that: Your token has expired. Please log in again.")
-var debug = true
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
