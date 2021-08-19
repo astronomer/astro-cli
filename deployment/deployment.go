@@ -88,7 +88,7 @@ func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
 	if err != nil {
 		return false
 	}
-	return appConfig.PreCreatedNamespaces
+	return appConfig.ManualNamespaceNames
 }
 
 // Create airflow deployment

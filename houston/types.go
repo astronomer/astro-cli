@@ -279,7 +279,7 @@ type AppConfig struct {
 	ConfigureDagDeployment bool   `json:"configureDagDeployment"`
 	NfsMountDagDeployment  bool   `json:"nfsMountDagDeployment"`
 	HardDeleteDeployment   bool   `json:"hardDeleteDeployment"`
-	PreCreatedNamespaces   bool   `json:"PreCreatedNamespaces"`
+	ManualNamespaceNames   bool   `json:"manualNamespaceNames"`
 }
 
 // coerce a string into SemVer if possible

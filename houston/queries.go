@@ -555,7 +555,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			manualReleaseNames
 			configureDagDeployment
 			nfsMountDagDeployment
-			preCreatedNamespaces
+			manualNamespaceNames
 		}
 	}`
 )
