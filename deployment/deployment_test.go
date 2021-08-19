@@ -924,15 +924,15 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 func TestCheckHardDeleteDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
-		"data": {
-			"appConfig": {
-				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false,
-				"hardDeleteDeployment": true
-			}
-		}
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true
+    }
+  }
 }`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -963,23 +963,16 @@ func TestCheckHardDeleteDeploymentError(t *testing.T) {
 func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
-		"data": {
-			"appConfig": {
-				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false,
-				"hardDeleteDeployment": true
-			},
-			"availableNamespaces": [
-				{
-				  "name": "test1"
-				},
-				{
-				  "name": "test2"
-				}
-			      ]
-		}
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true
+    },
+    "availableNamespaces": [ { "name": "test1" }, { "name": "test2" } ]
+  }
 }`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -1022,18 +1015,18 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 func TestGetDeploymentSelectionNamespacesNoNamespaces(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
-		"data": {
-			"appConfig": {
-				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false,
-				"hardDeleteDeployment": true
-			},
-			"availableNamespaces": [
-			      ]
-		}
-}`
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true
+    },
+    "availableNamespaces" : []
+  }
+}
+`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -1069,17 +1062,18 @@ func TestGetDeploymentSelectionNamespacesError(t *testing.T) {
 func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
-		"data": {
-			"appConfig": {
-				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false,
-				"hardDeleteDeployment": true,
-				"preCreatedNamespaces": true
-			}
-		}
-}`
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true,
+      "preCreatedNamespaces": true
+    }
+  }
+}
+`
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
@@ -1089,6 +1083,6 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	hardDelete := CheckPreCreateNamespaceDeployment(api)
-	assert.Equal(t, true, hardDelete)
+	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
+	assert.Equal(t, true, usesPreCreateNamespace)
 }

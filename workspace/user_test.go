@@ -34,7 +34,7 @@ func TestAdd(t *testing.T) {
           ckc0eir8e01gj07608ajmvia1     andrii@test.com     test-role     
 Successfully added andrii@test.com to 
 `
-	assert.Equal(t, expected, buf.String() )
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestAddError(t *testing.T) {
@@ -79,7 +79,7 @@ func TestRemove(t *testing.T) {
                                ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
 Successfully removed user from workspace
 `
-	assert.Equal(t, expected, buf.String() )
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestRemoveError(t *testing.T) {
@@ -156,7 +156,7 @@ func TestListRoles(t *testing.T) {
 	expected := ` USERNAME                 ID                            ROLE                
  andrii@astronomer.io     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
-	assert.Equal(t, expected, buf.String() )
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestListRolesError(t *testing.T) {

@@ -165,7 +165,7 @@ func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command 
 }
 
 func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
-	example := ` 
+	example := `
 # update labels and description for given deployment
 $ astro deployment update UUID label=Production-Airflow description=example version=v1.0.0`
 	updateExampleDagDeployment := `
@@ -378,7 +378,6 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 	cmd.MarkFlagRequired("deployment-id")
 	return cmd
 }
-
 
 func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()

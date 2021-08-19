@@ -24,14 +24,6 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func namespacesTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{30},
-		DynamicPadding: true,
-		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
-	}
-}
-
 // AppVersion returns application version from houston-api
 func AppVersion(client *houston.Client) (*houston.AppConfig, error) {
 	req := houston.Request{
@@ -189,7 +181,13 @@ func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) e
 
 // list all available namespaces
 func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (string, error) {
-	tab := namespacesTableOut()
+
+	tab := &printutil.Table{
+		Padding:        []int{30},
+		DynamicPadding: true,
+		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
+	}
+
 	tab.GetUserInput = true
 
 	req := houston.Request{

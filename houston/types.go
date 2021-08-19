@@ -40,12 +40,12 @@ type Response struct {
 		WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
 		WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
 		DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
-		GetDeploymentNamespaces        []Namespace        	 `json:"availableNamespaces,omitempty"`
+		GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
 }
 type Namespace struct {
-	Name        string `json:"name"`
+	Name string `json:"name"`
 }
 type AuthProvider struct {
 	Name        string `json:"name"`
