@@ -274,26 +274,26 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-			"appConfig": {
-				"version": "0.15.1",
-				"baseDomain": "local.astronomer.io",
-				"smtpConfigured": true,
-				"manualReleaseNames": false,
-				"hardDeleteDeployment": true,
-				"manualNamespaceNames": true
-			},
-			"availableNamespaces": [
-				{
-				  "name": "test1"
-				},
-				{
-				  "name": "test2"
-				}
-			      ],
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true,
+      "manualNamespaceNames": true
+    },
+    "availableNamespaces": [
+      {
+        "name": "test1"
+      },
+      {
+        "name": "test2"
+      }
+    ],
     "createDeployment": {
-			"id": "ckbv818oa00r107606ywhoqtw",
-			"executor": "CeleryExecutor",
-			"urls": [
+      "id": "ckbv818oa00r107606ywhoqtw",
+      "executor": "CeleryExecutor",
+      "urls": [
         {
           "type": "airflow",
           "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
