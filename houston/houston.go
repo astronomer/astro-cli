@@ -65,13 +65,13 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-
-	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
 	if config.CFG.Debug.GetBool() {
 		fmt.Printf("DEBUG: This is the url %s \n", cl.GetAPIURL())
 		fmt.Printf("DEBUG: Request Data: %v\n", doOpts.Data)
 	}
+	var response httputil.HTTPResponse
+	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
+
 	if err != nil {
 		if config.CFG.Debug.GetBool() {
 			fmt.Printf("DEBUG: ERROR in HTTP request: %s", err.Error())
