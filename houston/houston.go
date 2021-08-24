@@ -71,7 +71,6 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	}
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
-
 	if err != nil {
 		if config.CFG.Debug.GetBool() {
 			fmt.Printf("DEBUG: ERROR in HTTP request: %s", err.Error())
