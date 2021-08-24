@@ -223,7 +223,9 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 	if err != nil {
 		return "", fmt.Errorf("cannot parse %s to int", in)
 	}
-
+	if i > int64(len(names)) {
+		return "", errors.New("Number is out of available range")
+	}
 	return names[i-1].Name, nil
 }
 
