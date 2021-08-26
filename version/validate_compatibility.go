@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/deployment"
+	"github.com/astronomer/astro-cli/logger"
 	"github.com/pkg/errors"
 
 	"github.com/Masterminds/semver"
@@ -13,14 +13,14 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 )
 
+var newLogger = logger.NewLogger()
+
 // ValidateCompatibility print message if astro-cli version is not compatible with platform version
 func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string, skipVerCheck bool) error {
 	if skipVerCheck {
 		return nil
 	}
-	if config.CFG.Debug.GetBool() {
-		fmt.Println("checking if astro-cli version is not compatible with platform")
-	}
+	newLogger.Debug("checking if astro-cli version is not compatible with platform")
 
 	serverCfg, err := deployment.AppVersion(client)
 	if err != nil {

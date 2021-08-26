@@ -8,11 +8,14 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/logger"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
 )
+
+var newLogger = logger.NewLogger()
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string) (string, error) {
@@ -171,9 +174,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	err = registryAuth()
 	if err != nil {
-		if config.CFG.Debug.GetBool() {
-			fmt.Printf("DEBUG: There was an error: %s", err.Error())
-		}
+		newlogger.Debugf("There was an error logging into registry: %s", err.Error())
 
 		fmt.Printf(messages.RegistryAuthFail)
 	}
