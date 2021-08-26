@@ -641,6 +641,37 @@
   revision = "0c8571ac0ce161a5feb57375a9cdf148c98c0f70"
 
 [[projects]]
+  digest = "1:4306d6fbe32c56aa4808c78118ab2dd03c5b52f471fea11b23377f4e2bc4f48a"
+  name = "go.uber.org/atomic"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3504dfaa1fa414923b1c8693f45d2f6931daf229"
+  version = "v1.9.0"
+
+[[projects]]
+  digest = "1:ac2df12a5ec74e2ed232bf110e3a27ddb06760d6d5884920f47f91f22e1f8742"
+  name = "go.uber.org/multierr"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "a5cd5509686189240486545be669e1dff9b98dcf"
+  version = "v1.7.0"
+
+[[projects]]
+  digest = "1:85a0aeadb2da8a424cdfaf2c0c93553899024ad464cf84f407f7b8496a88e57b"
+  name = "go.uber.org/zap"
+  packages = [
+    ".",
+    "buffer",
+    "internal/bufferpool",
+    "internal/color",
+    "internal/exit",
+    "zapcore",
+  ]
+  pruneopts = "UT"
+  revision = "c8e813efff7b3d6f791ee71b3f76b9a175d2a9d8"
+  version = "v1.19.0"
+
+[[projects]]
   branch = "master"
   digest = "1:7eb36c25be2c753fc9cc32929ce16355984cf78bec65069e6b46f11108cd2467"
   name = "golang.org/x/crypto"
@@ -715,6 +746,7 @@
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/client",
     "github.com/docker/docker/pkg/jsonmessage",
+    "github.com/docker/docker/pkg/stdcopy",
     "github.com/docker/docker/registry",
     "github.com/docker/libcompose/cli/logger",
     "github.com/docker/libcompose/docker",
@@ -735,6 +767,7 @@
     "github.com/spf13/viper",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/suite",
+    "go.uber.org/zap",
     "golang.org/x/crypto/ssh/terminal",
   ]
   solver-name = "gps-cdcl"

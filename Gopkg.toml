@@ -67,3 +67,7 @@
 [[constraint]]
   name = "github.com/moby/buildkit"
   version = "0.6.3"
+
+[[constraint]]
+  name = "go.uber.org/zap"
+  version = "1.19.0"
