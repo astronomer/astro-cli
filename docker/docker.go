@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/registry"
 
+	"github.com/astronomer/astro-cli/logger"
 	"github.com/docker/docker/pkg/jsonmessage"
 
 	clicommand "github.com/docker/cli/cli/command"
@@ -25,6 +27,8 @@ const (
 	// Docker is the docker command.
 	Docker = "docker"
 )
+
+var newLogger = logger.NewLogger()
 
 type loginOptions struct {
 	serverAddress string
@@ -61,6 +65,9 @@ func ExecPush(serverAddress, token, image string) error {
 	// TODO: rethink how to reuse creds store
 	authConfig.Password = token
 
+	if config.CFG.Debug.GetBool() {
+		newLogger.Infof("Exec Push docker creds %v \n", authConfig)
+	}
 	if err != nil {
 		return errors.Errorf("Error reading credentials: %v", err)
 	}
