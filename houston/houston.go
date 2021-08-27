@@ -13,7 +13,7 @@ import (
 
 var PermissionsError = errors.New("You do not have the appropriate permissions for that")
 var PermissionsErrorVerbose = errors.New("You do not have the appropriate permissions for that: Your token has expired. Please log in again.")
-var log = logger.NewLogger()
+var newLogger = logger.NewLogger() //cant name log since it is being usd by an import
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
@@ -65,12 +65,12 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-	log.Debugf("This is the url %s \n", cl.GetAPIURL())
-	log.Debugf("Request Data: %v\n", doOpts.Data)
+	newLogger.Debugf("This is the url %s \n", cl.GetAPIURL())
+	newLogger.Debugf("Request Data: %v\n", doOpts.Data)
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
 	if err != nil {
-		log.Debugf("HTTP request ERROR: %s", err.Error())
+		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err
 	}
 	defer httpResponse.Body.Close()
@@ -90,7 +90,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
-	log.Debugf("Response Data: %v\n", string(body))
+	newLogger.Debugf("Response Data: %v\n", string(body))
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)
