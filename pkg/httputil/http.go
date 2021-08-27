@@ -8,10 +8,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 
+	"github.com/astronomer/astro-cli/logger"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/go/ctxhttp"
 )
+
+var log = logger.NewLogger()
 
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
 type HTTPClient struct {
@@ -61,7 +65,7 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 	for k, v := range doOptions.Headers {
 		req.Header.Set(k, v)
 	}
-
+	debug(httputil.DumpRequest(req, true))
 	ctx := doOptions.Context
 	if ctx == nil {
 		ctx = context.Background()
@@ -71,10 +75,18 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 	if err != nil {
 		return nil, errors.Wrap(chooseError(ctx, err), "HTTP DO Failed")
 	}
+	debug(httputil.DumpResponse(resp, true))
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return nil, newError(resp)
 	}
 	return resp, nil
+}
+func debug(data []byte, err error) {
+	if err == nil {
+		log.Debugf("%s\n\n", data)
+	} else {
+		log.Fatalf("%s\n\n", err)
+	}
 }
 
 // if error in context, return that instead of generic http error
