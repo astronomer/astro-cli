@@ -35,7 +35,7 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&skipVerCheck, "skip-version-check", "", false, "skip version compatibility check")
-	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
+	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	rootCmd.AddCommand(
 		newAuthRootCmd(client, out),
 		newWorkspaceCmd(client, out),
