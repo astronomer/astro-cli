@@ -174,7 +174,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	err = registryAuth()
 	if err != nil {
-		newlogger.Debugf("There was an error logging into registry: %s", err.Error())
+		newLogger.Debugf("There was an error logging into registry: %s", err.Error())
 
 		fmt.Printf(messages.RegistryAuthFail)
 	}
