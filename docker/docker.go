@@ -27,7 +27,7 @@ const (
 	Docker = "docker"
 )
 
-var newLogger = logger.NewLogger()
+var log = logger.NewLogger()
 
 type loginOptions struct {
 	serverAddress string
@@ -64,7 +64,7 @@ func ExecPush(serverAddress, token, image string) error {
 	// TODO: rethink how to reuse creds store
 	authConfig.Password = token
 
-	newLogger.Debugf("Exec Push docker creds %v \n", authConfig)
+	log.Debugf("Exec Push docker creds %v \n", authConfig)
 	if err != nil {
 		return errors.Errorf("Error reading credentials: %v", err)
 	}
