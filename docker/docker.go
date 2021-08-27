@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/registry"
 
-	"github.com/astronomer/astro-cli/logger"
 	"github.com/docker/docker/pkg/jsonmessage"
 
 	clicommand "github.com/docker/cli/cli/command"
@@ -20,14 +19,13 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
 	// Docker is the docker command.
 	Docker = "docker"
 )
-
-var log = logger.NewLogger()
 
 type loginOptions struct {
 	serverAddress string

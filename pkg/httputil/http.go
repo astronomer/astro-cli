@@ -11,12 +11,10 @@ import (
 	"net/http/httputil"
 	"time"
 
-	"github.com/astronomer/astro-cli/logger"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/go/ctxhttp"
+	log "github.com/sirupsen/logrus"
 )
-
-var log = logger.NewLogger()
 
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
 type HTTPClient struct {

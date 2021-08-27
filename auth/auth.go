@@ -8,14 +8,12 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/logger"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
-
-var log = logger.NewLogger()
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string) (string, error) {
