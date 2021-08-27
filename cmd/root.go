@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/logger"
 	"github.com/astronomer/astro-cli/version"
 )
 
@@ -15,8 +16,9 @@ var (
 	deploymentRole string
 	role           string
 	skipVerCheck   bool
+	debug   bool
 )
-
+var log = logger.NewLogger()
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	rootCmd := &cobra.Command{
@@ -24,11 +26,16 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Short: "Astronomer - CLI",
 		Long:  "astro is a command line interface for working with the Astronomer Platform.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if debug {
+				logger.SetLevelDebug()
+				log.Debug("helloooooooooooooooooooooooooooooooo000000000000000000")
+			}
 			return version.ValidateCompatibility(client, out, version.CurrVersion, skipVerCheck)
 		},
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&skipVerCheck, "skip-version-check", "", false, "skip version compatibility check")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "", false, "Enable Verbose Output")
 	rootCmd.AddCommand(
 		newAuthRootCmd(client, out),
 		newWorkspaceCmd(client, out),
