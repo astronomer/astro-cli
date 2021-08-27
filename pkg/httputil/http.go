@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"time"
 
 	"github.com/astronomer/astro-cli/logger"
 	"github.com/pkg/errors"
@@ -71,7 +72,9 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 		ctx = context.Background()
 	}
 
+	start := time.Now()
 	resp, err := ctxhttp.Do(ctx, c.HTTPClient, req)
+	log.Debugf("Total time %v", time.Since(start))
 	if err != nil {
 		return nil, errors.Wrap(chooseError(ctx, err), "HTTP DO Failed")
 	}
