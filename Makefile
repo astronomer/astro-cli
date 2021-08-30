@@ -8,6 +8,14 @@ LDFLAGS_VERSION=-X github.com/astronomer/astro-cli/version.CurrVersion=${VERSION
 LDFLAGS_GIT_COMMIT=-X github.com/astronomer/astro-cli/version.CurrCommit=${GIT_COMMIT}
 
 .DEFAULT_GOAL := build
+# golangci-lint version
+GOLANGCI_LINT_VERSION ?=v1.37.1
+
+SHELL := /bin/bash
+
+GOFMT ?= gofumpt -l -s -extra
+GOFILES := $(shell find . -name "*.go" -type f | grep -v /vendor/)
+ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
 dep:
 	dep ensure
@@ -15,7 +23,7 @@ dep:
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" main.go
 
-test:
+test: lint
 	go test -count=1 -cover ./...
 	go test -coverprofile=coverage.txt -covermode=atomic ./...
 
@@ -31,26 +39,9 @@ format:
 	@echo "--> Running go fmt"
 	@go fmt ./...
 
-vet:
-	@echo "--> Running go vet"
-	@go vet $(GOFILES); if [ $$? -eq 1 ]; then \
-		echo ""; \
-		echo "Vet found suspicious constructs. Please check the reported constructs"; \
-		echo "and fix them if necessary before submitting the code for review."; \
-		exit 1; \
-	fi
-
-style:
-	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
-
-staticcheck:
-	@echo ">> running staticcheck"
-	@staticcheck $(GOFILES)
-
-gosimple:
-	@echo ">> running gosimple"
-	@gosimple $(GOFILES)
+lint:
+	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint -o -f /go/bin/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
+	@if (test -f ${ENVTEST_ASSETS_DIR}/golangci-lint) then (${ENVTEST_ASSETS_DIR}/golangci-lint run) else (/go/bin/golangci-lint run) fi
 
 tools:
 	@echo ">> installing some extra tools"
