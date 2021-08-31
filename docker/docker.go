@@ -73,13 +73,11 @@ func ExecPush(serverAddress, token, image string) error {
 	}
 	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
-
 	if err != nil {
 		return err
 	}
 	encodedAuth := base64.URLEncoding.EncodeToString(buf)
 	responseBody, err := cli.ImagePush(ctx, image, types.ImagePushOptions{RegistryAuth: encodedAuth})
-
 	if err != nil {
 		return err
 	}
@@ -127,13 +125,11 @@ func ExecLogin(serverAddress, username, token string) error {
 
 // AirflowCommand is the main method of interaction with Airflow
 func AirflowCommand(id string, airflowCommand string) string {
-
 	cmd := exec.Command("docker", "exec", "-it", id, "bash", "-c", airflowCommand)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
-
 	if err != nil {
 		_ = errors.Wrapf(err, "error encountered")
 	}

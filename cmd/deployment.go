@@ -513,7 +513,7 @@ func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Wri
 	return deployment.UpdateUser(deploymentId, args[0], deploymentRole, client, out)
 }
 
-func deploymentSaCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	if len(label) == 0 {
 		return errors.New("must provide a service-account label with the --label (-l) flag")
 	}
@@ -541,7 +541,7 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Clien
 	return sa.DeleteUsingDeploymentUUID(args[0], deploymentId, client, out)
 }
 
-func deploymentAirflowUpgrade(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentAirflowUpgrade(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if cancel {

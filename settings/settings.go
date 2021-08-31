@@ -61,7 +61,6 @@ func InitSettings() {
 	}
 
 	err := viperSettings.Unmarshal(&settings)
-
 	if err != nil {
 		errors.Wrap(err, "unable to decode into struct")
 	}
@@ -101,9 +100,7 @@ func AddVariables(id string, version uint64) {
 func AddConnections(id string, airflowVersion uint64) {
 	connections := settings.Airflow.Connections
 	baseCmd := "airflow connections "
-	var (
-		baseAddCmd, baseRmCmd, baseListCmd, connIdArg, connTypeArg, connUriArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
-	)
+	var baseAddCmd, baseRmCmd, baseListCmd, connIdArg, connTypeArg, connUriArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
 	if airflowVersion >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
 		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html

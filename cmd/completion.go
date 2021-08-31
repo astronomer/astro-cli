@@ -39,12 +39,10 @@ line to your .profile or .bashrc/.zshrc:
 	autoload -Uz compinit && compinit -C
 `
 
-var (
-	completionShells = map[string]func(out io.Writer, cmd *cobra.Command) error{
-		"bash": runCompletionBash,
-		"zsh":  runCompletionZsh,
-	}
-)
+var completionShells = map[string]func(out io.Writer, cmd *cobra.Command) error{
+	"bash": runCompletionBash,
+	"zsh":  runCompletionZsh,
+}
 
 func runCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 	cmd.Hidden = true

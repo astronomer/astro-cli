@@ -652,7 +652,7 @@ func Test_getDeployment(t *testing.T) {
 
 	deployment, err := getDeployment(deploymentId, api)
 	assert.NoError(t, err)
-	assert.Equal(t, deployment, &houston.Deployment{Id: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
+	assert.Equal(t, deployment, &houston.Deployment{ID: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
 }
 
 func Test_getDeploymentError(t *testing.T) {

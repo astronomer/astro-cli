@@ -73,7 +73,7 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	Id                    string          `json:"id"`
+	ID                    string          `json:"id"`
 	Type                  string          `json:"type"`
 	Label                 string          `json:"label"`
 	ReleaseName           string          `json:"releaseName"`
@@ -90,7 +90,7 @@ type Deployment struct {
 // DeploymentUrl defines structure of a houston response DeploymentUrl object
 type DeploymentUrl struct {
 	Type string `json:"type"`
-	Url  string `json:"url"`
+	URL  string `json:"url"`
 }
 
 // DeploymentInfo contains registry related information for a deployment
@@ -124,8 +124,8 @@ type Status struct {
 
 // ServiceAccount defines a structure of a ServiceAccountResponse object
 type ServiceAccount struct {
-	Id         string `json:"id"`
-	ApiKey     string `json:"apiKey"`
+	ID         string `json:"id"`
+	APIKey     string `json:"apiKey"`
 	Label      string `json:"label"`
 	Category   string `json:"category"`
 	LastUsedAt string `json:"lastUsedAt"`
@@ -136,8 +136,8 @@ type ServiceAccount struct {
 
 // WorkspaceServiceAccount defines a structure of a WorkspaceServiceAccountResponse object
 type WorkspaceServiceAccount struct {
-	Id            string `json:"id"`
-	ApiKey        string `json:"apiKey"`
+	ID            string `json:"id"`
+	APIKey        string `json:"apiKey"`
 	Label         string `json:"label"`
 	Category      string `json:"category"`
 	EntityType    string `json:"entityType"`
@@ -194,12 +194,14 @@ type User struct {
 	// updated at
 	// profile
 }
+
 type RoleBindingWorkspace struct {
 	Role      string `json:"role"`
 	Workspace struct {
 		Id string `json:"id"`
 	} `json:"workspace"`
 }
+
 type WorkspaceUserRoleBindings struct {
 	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
 }

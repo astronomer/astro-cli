@@ -12,7 +12,6 @@ func IsGitRepository() bool {
 	}
 
 	return true
-
 }
 
 // HasUncommittedChanges checks repository for uncommitted changes

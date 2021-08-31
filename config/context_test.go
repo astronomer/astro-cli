@@ -2,9 +2,10 @@ package config
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewTableOut(t *testing.T) {

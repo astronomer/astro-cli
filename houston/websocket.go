@@ -44,7 +44,8 @@ func BuildDeploymentLogsSubscribeRequest(deploymentId, component, search string,
 	payload := Request{
 		Query: DeploymentLogsSubscribeRequest,
 		Variables: map[string]interface{}{
-			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp},
+			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp,
+		},
 	}
 	s := StartSubscription{Type: "start", Payload: payload}
 	b, _ := json.Marshal(s)
@@ -56,7 +57,6 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 	signal.Notify(interrupt, os.Interrupt)
 	h := http.Header{"Sec-WebSocket-Protocol": []string{"graphql-ws"}}
 	ws, _, err := websocket.DefaultDialer.Dial(url, h)
-
 	if err != nil {
 		log.Fatal("dial:", err)
 	}

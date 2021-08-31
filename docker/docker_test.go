@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"strings"
 	"testing"
+
+	"github.com/docker/docker/api/types"
 )
 
 func TestExecVersion(t *testing.T) {

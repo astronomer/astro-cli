@@ -270,7 +270,7 @@ func workspaceCreate(cmd *cobra.Command, args []string, client *houston.Client, 
 	return workspace.Create(args[0], createDesc, client, out)
 }
 
-func workspaceList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func workspaceList(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return workspace.List(client, out)
@@ -351,7 +351,7 @@ func workspaceSwitch(cmd *cobra.Command, client *houston.Client, out io.Writer, 
 	return workspace.Switch(id, client, out)
 }
 
-func workspaceUserList(_ *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func workspaceUserList(_ *cobra.Command, client *houston.Client, out io.Writer, _ []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -373,7 +373,7 @@ func workspaceSaCreate(cmd *cobra.Command, args []string, client *houston.Client
 	return sa.CreateUsingWorkspaceUUID(workspaceId, label, category, fullRole, client, out)
 }
 
-func workspaceSaGet(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func workspaceSaGet(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 

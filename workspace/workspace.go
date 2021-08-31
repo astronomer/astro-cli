@@ -153,7 +153,6 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 		10,
 		64,
 	)
-
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot parse %s to int", in)
 	}

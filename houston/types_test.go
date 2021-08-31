@@ -1,8 +1,9 @@
 package houston
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetValidTagsSimpleSemVer(t *testing.T) {
@@ -35,7 +36,8 @@ func TestGetValidTagsSimpleSemVer(t *testing.T) {
 		"1.10.7-8-alpine3.10-onbuild",
 		"1.10.7-8-buster-onbuild",
 		"1.10.7-8-alpine3.10",
-		"1.10.7-8-buster"}
+		"1.10.7-8-buster",
+	}
 	assert.Equal(t, expectedTags, validTags)
 }
 

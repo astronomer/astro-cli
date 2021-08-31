@@ -15,7 +15,8 @@ func DeploymentLog(deploymentId, component, search string, since time.Duration) 
 	req := houston.Request{
 		Query: houston.DeploymentLogsGetRequest,
 		Variables: map[string]interface{}{
-			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp},
+			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp,
+		},
 	}
 
 	r, err := req.Do()

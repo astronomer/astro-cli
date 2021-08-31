@@ -195,5 +195,4 @@ func Test_airflowVersionFromDockerFile(t *testing.T) {
 	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
 
 	assert.Error(t, err)
-
 }

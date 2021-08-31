@@ -12,13 +12,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	tab = printutil.Table{
-		Padding:      []int{44},
-		Header:       []string{"NAME"},
-		ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
-	}
-)
+var tab = printutil.Table{
+	Padding:      []int{44},
+	Header:       []string{"NAME"},
+	ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
+}
 
 // List all available clusters a user has previously authenticated to
 // Returns error
@@ -129,13 +127,11 @@ func getClusterSelection() (string, error) {
 		10,
 		64,
 	)
-
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot parse %s to int", in)
 	}
 
 	return contexts[i-1], nil
-
 }
 
 // SwitchCluster is a thin wrapper around the switch cluster receiver

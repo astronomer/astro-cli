@@ -2,14 +2,15 @@ package workspace
 
 import (
 	"bytes"
+	"io/ioutil"
+	"net/http"
+	"testing"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"net/http"
-	"testing"
 )
 
 func TestCreate(t *testing.T) {

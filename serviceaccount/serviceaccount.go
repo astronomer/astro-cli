@@ -56,7 +56,7 @@ func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, clien
 
 	sa := resp.Data.CreateWorkspaceServiceAccount
 	tab := newTableOut()
-	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
 	return tab.Print(out)
@@ -74,7 +74,7 @@ func DeleteUsingWorkspaceUUID(serviceAccountId, workspaceId string, client *hous
 	}
 	sa := resp.Data.DeleteWorkspaceServiceAccount
 
-	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
+	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.ID)
 	fmt.Fprintln(out, msg)
 
 	return nil
@@ -92,7 +92,7 @@ func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *ho
 	}
 	sa := resp.Data.DeleteDeploymentServiceAccount
 
-	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.Id)
+	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.ID)
 	fmt.Fprintln(out, msg)
 
 	return nil
@@ -114,7 +114,7 @@ func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writ
 	fmt.Print(len(sas))
 	tab := newTableOut()
 	for _, sa := range sas {
-		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+		tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
 	}
 
 	return tab.Print(out)
@@ -135,7 +135,7 @@ func GetWorkspaceServiceAccounts(id string, client *houston.Client, out io.Write
 	sas := resp.Data.GetWorkspaceServiceAccounts
 	tab := newTableOut()
 	for _, sa := range sas {
-		tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+		tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
 	}
 
 	return tab.Print(out)

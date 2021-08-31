@@ -104,7 +104,6 @@ func (t *Table) PrintHeader(out io.Writer) {
 
 // PrintRows prints rows with an "S"
 func (t *Table) PrintRows(out io.Writer) {
-
 	if len(t.RenderedPadding) == 0 {
 		p := t.GetPadding(t.altPadding)
 		t.RenderedPadding = p

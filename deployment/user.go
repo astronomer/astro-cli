@@ -93,7 +93,7 @@ func Add(deploymentId string, email string, role string, client *houston.Client,
 	}
 	d := r.Data.AddDeploymentUser
 
-	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.Id, d.User.Username, d.Role}, false)
+	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.ID, d.User.Username, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully added %s as a %s", email, role)
 	tab.Print(out)
 
@@ -117,7 +117,7 @@ func UpdateUser(deploymentId string, email string, role string, client *houston.
 	}
 	d := r.Data.UpdateDeploymentUser
 
-	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.Id, d.User.Username, d.Role}, false)
+	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.ID, d.User.Username, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated %s to a %s", email, role)
 	tab.Print(out)
 

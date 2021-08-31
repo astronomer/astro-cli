@@ -19,7 +19,7 @@ type Response struct {
 	Version           string              `json:"version"`
 }
 
-// AirflowVersionRaw represents a single ariflow version.
+// AirflowVersionRaw represents a single airflow version.
 type AirflowVersionRaw struct {
 	Version     string   `json:"version"`
 	Level       string   `json:"level"`

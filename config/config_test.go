@@ -1,12 +1,13 @@
 package config
 
 import (
+	"os"
+	"testing"
+
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func TestInitHome(t *testing.T) {

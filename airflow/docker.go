@@ -40,13 +40,11 @@ const (
 	dockerStateUp = "Up"
 )
 
-var (
-	tab = printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
-	}
-)
+var tab = printutil.Table{
+	Padding:        []int{5, 30, 30, 50},
+	DynamicPadding: true,
+	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
+}
 
 // ComposeConfig is input data to docker compose yaml template
 type ComposeConfig struct {
@@ -69,7 +67,6 @@ func projectNameUnique() (string, error) {
 	projectName := config.CFG.ProjectName.GetString()
 
 	pwd, err := fileutil.GetWorkingDir()
-
 	if err != nil {
 		return "", errors.Wrap(err, "error retrieving working directory")
 	}
@@ -112,7 +109,6 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 	}
 
 	envExists, err := fileutil.Exists(envFile)
-
 	if err != nil {
 		return "", errors.Wrapf(err, messages.ENV_PATH, envFile)
 	}
@@ -151,12 +147,7 @@ func generateConfig(projectName, airflowHome string, envFile string) (string, er
 
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
-
-	if scrubbedState == expectedState {
-		return true
-	}
-
-	return false
+	return scrubbedState == expectedState
 }
 
 // createProject creates project with yaml config as context
@@ -258,7 +249,6 @@ func Start(airflowHome string, dockerfile string, envFile string) error {
 		if err != nil {
 			return errors.Wrap(err, messages.COMPOSE_RECREATE_ERROR)
 		}
-
 	}
 
 	psInfo, err = project.Ps(context.Background())
@@ -267,7 +257,6 @@ func Start(airflowHome string, dockerfile string, envFile string) error {
 	}
 
 	fileState, err := fileutil.Exists("airflow_settings.yaml")
-
 	if err != nil {
 		return errors.Wrap(err, messages.SETTINGS_PATH)
 	}
@@ -293,7 +282,6 @@ func Start(airflowHome string, dockerfile string, envFile string) error {
 func Kill(airflowHome string) error {
 	// Get project name from config
 	projectName, err := projectNameUnique()
-
 	if err != nil {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
@@ -354,7 +342,6 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 func Stop(airflowHome string) error {
 	// Get project name from config
 	projectName, err := projectNameUnique()
-
 	if err != nil {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
@@ -378,7 +365,6 @@ func Stop(airflowHome string) error {
 func PS(airflowHome string) error {
 	// Get project name from config
 	projectName, err := projectNameUnique()
-
 	if err != nil {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
@@ -426,7 +412,6 @@ func getWebServerContainerId(airflowHome string) (string, error) {
 	}
 
 	psInfo, err := project.Ps(context.Background())
-
 	if err != nil {
 		return "", errors.Wrap(err, messages.COMPOSE_STATUS_CHECK_ERROR)
 	}
@@ -447,7 +432,6 @@ func getWebServerContainerId(airflowHome string) (string, error) {
 // inspired from https://github.com/docker/cli/tree/master/cli/command/container
 func Run(airflowHome string, args []string, user string) error {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
-
 	if err != nil {
 		return err
 	}
@@ -467,7 +451,6 @@ func Run(airflowHome string, args []string, user string) error {
 	}
 
 	response, err := cli.ContainerExecCreate(context.Background(), containerID, *execConfig)
-
 	if err != nil {
 		return errors.New("airflow is not running, Start it with 'astro airflow start'")
 	}
@@ -559,7 +542,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		deployMap := map[string]houston.Deployment{}
 		for i, d := range deployments {
 			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), d.Label, d.ReleaseName, currentWorkspace.Label, d.Id}, false)
+			tab.AddRow([]string{strconv.Itoa(index), d.Label, d.ReleaseName, currentWorkspace.Label, d.ID}, false)
 
 			deployMap[strconv.Itoa(index)] = d
 		}
@@ -600,7 +583,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	if config.CFG.ShowWarnings.GetBool() && !validImageRepo(image) {
 		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_NAME, image))
 		if !i {
-			fmt.Println("Cancelling deploy...")
+			fmt.Println("Canceling deploy...")
 			os.Exit(1)
 		}
 	}
@@ -619,7 +602,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(tag), ", ")
 		i, _ := input.InputConfirm(fmt.Sprintf(messages.WARNING_INVALID_IMAGE_TAG, tag, validTags))
 		if !i {
-			fmt.Println("Cancelling deploy...")
+			fmt.Println("Canceling deploy...")
 			os.Exit(1)
 		}
 	}
@@ -679,7 +662,6 @@ func airflowVersionFromDockerFile(airflowHome string, dockerfile string) (uint64
 	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
 
 	semVer, err := semver.NewVersion(airflowTag)
-
 	if err != nil {
 		return uint64(0x1), nil // Default to Airflow 1 if the user has a custom image without a semVer tag
 	}

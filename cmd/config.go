@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newConfigRootCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	var globalFlag bool
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -24,13 +24,13 @@ func newConfigRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 	cmd.AddCommand(
-		newConfigGetCmd(client, out, globalFlag),
-		newConfigSetCmd(client, out, globalFlag),
+		newConfigGetCmd(out, globalFlag),
+		newConfigSetCmd(out, globalFlag),
 	)
 	return cmd
 }
 
-func newConfigGetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
+func newConfigGetCmd(_ io.Writer, globalFlag bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get project configuration",
@@ -42,7 +42,7 @@ func newConfigGetCmd(client *houston.Client, out io.Writer, globalFlag bool) *co
 	return cmd
 }
 
-func newConfigSetCmd(client *houston.Client, out io.Writer, globalFlag bool) *cobra.Command {
+func newConfigSetCmd(_ io.Writer, globalFlag bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "Set project configuration",
@@ -58,7 +58,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string, globalFlag bool) {
 	isProjectDir, _ := config.IsProjectDir(config.WorkingPath)
 
 	if !isProjectDir && !globalFlag {
-		var c = "astro config " + cmd.Use + " " + args[0] + " -g"
+		c := "astro config " + cmd.Use + " " + args[0] + " -g"
 		fmt.Printf(messages.CONFIG_USE_OUTSIDE_PROJECT_DIR, cmd.Use, cmd.Use, c)
 		os.Exit(1)
 	}

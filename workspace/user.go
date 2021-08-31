@@ -67,7 +67,6 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 		Variables: map[string]interface{}{"workspaceId": workspaceId},
 	}
 	r, err := req.DoWithClient(client)
-
 	if err != nil {
 		return err
 	}
@@ -91,7 +90,6 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
 	// get user you are updating to show role from before change
 	roles, err := getUserRole(workspaceId, email, client, out)
-
 	if err != nil {
 		return err
 	}
@@ -113,7 +111,6 @@ func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.
 		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
 	}
 	r, err := req.DoWithClient(client)
-
 	if err != nil {
 		return err
 	}
@@ -129,12 +126,10 @@ func getUserRole(workspaceId string, email string, client *houston.Client, out i
 		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email},
 	}
 	r, err := req.DoWithClient(client)
-
 	if err != nil {
 		return workspaceUserRolebindings, err
 	}
 	workspaceUserRolebindings = r.Data.WorkspaceGetUser
 
 	return workspaceUserRolebindings, nil
-
 }

@@ -110,7 +110,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 
 	d := r.Data.CreateDeployment
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id, "-", d.AirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, "-", d.AirflowVersion}, false)
 
 	splitted := []string{"Celery", ""}
 
@@ -122,10 +122,10 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	var airflowUrl, flowerUrl string
 	for _, url := range r.Data.CreateDeployment.Urls {
 		if url.Type == "airflow" {
-			airflowUrl = url.Url
+			airflowUrl = url.URL
 		}
 		if url.Type == "flower" {
-			flowerUrl = url.Url
+			flowerUrl = url.URL
 		}
 	}
 
@@ -202,7 +202,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 		if currentTag == "" {
 			currentTag = "?"
 		}
-		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, currentTag, d.AirflowVersion}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, currentTag, d.AirflowVersion}, false)
 	}
 
 	return tab.Print(out)
@@ -232,7 +232,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 
 	d := r.Data.UpdateDeployment
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.Id, d.AirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, d.AirflowVersion}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
 	tab.Print(out)
 
@@ -276,7 +276,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "AIRFLOW VERSION"},
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.Id, d.AirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, d.AirflowVersion}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started. ", d.AirflowVersion, d.DesiredAirflowVersion) +
 		fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to Astronomer.\n", d.DesiredAirflowVersion) +
@@ -349,7 +349,6 @@ func getAirflowVersionSelection(airflowVersion string, client *houston.Client, o
 			filteredVersions = append(filteredVersions, v)
 			t.AddRow([]string{v}, false)
 		}
-
 	}
 
 	t.Print(out)
