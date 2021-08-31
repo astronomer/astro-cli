@@ -492,7 +492,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 
 	var currentWorkspace houston.Workspace
 	for _, workspace := range wsResp.Data.GetWorkspaces {
-		if workspace.Id == wsId {
+		if workspace.ID == wsId {
 			currentWorkspace = workspace
 			break
 		}
@@ -501,7 +501,7 @@ func Deploy(path, name, wsId string, prompt bool) error {
 	// Get Deployments from workspace ID
 	deReq := houston.Request{
 		Query:     houston.DeploymentsGetRequest,
-		Variables: map[string]interface{}{"workspaceId": currentWorkspace.Id},
+		Variables: map[string]interface{}{"workspaceId": currentWorkspace.ID},
 	}
 
 	deResp, err := deReq.Do()

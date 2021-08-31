@@ -37,7 +37,7 @@ func Create(label, desc string, client *houston.Client, out io.Writer) error {
 	w := r.Data.CreateWorkspace
 
 	tab := newTableOut()
-	tab.AddRow([]string{w.Label, w.Id}, false)
+	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully created workspace"
 	tab.Print(out)
 
@@ -61,11 +61,11 @@ func List(client *houston.Client, out io.Writer) error {
 	tab := newTableOut()
 	for _, w := range ws {
 		name := w.Label
-		workspace := w.Id
+		workspace := w.ID
 
 		var color bool
 
-		if c.Workspace == w.Id {
+		if c.Workspace == w.ID {
 			color = true
 		} else {
 			color = false
@@ -133,11 +133,11 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 
 	for _, w := range ws {
 		name := w.Label
-		workspace := w.Id
+		workspace := w.ID
 
 		var color bool
 
-		if c.Workspace == w.Id {
+		if c.Workspace == w.ID {
 			color = true
 		} else {
 			color = false
@@ -157,7 +157,7 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 		return "", errors.Wrapf(err, "cannot parse %s to int", in)
 	}
 
-	return ws[i-1].Id, nil
+	return ws[i-1].ID, nil
 }
 
 // Switch switches workspaces
@@ -212,7 +212,7 @@ func Update(id string, client *houston.Client, out io.Writer, args map[string]st
 
 	w := r.Data.UpdateWorkspace
 	tab := newTableOut()
-	tab.AddRow([]string{w.Label, w.Id}, false)
+	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"
 	tab.Print(out)
 

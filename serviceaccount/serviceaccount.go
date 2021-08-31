@@ -33,7 +33,7 @@ func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, cli
 
 	sa := resp.Data.CreateDeploymentServiceAccount
 	tab := newTableOut()
-	tab.AddRow([]string{sa.Label, sa.Category, sa.Id, sa.ApiKey}, false)
+	tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
 	tab.SuccessMsg = "\n Service account successfully created."
 
 	return tab.Print(out)

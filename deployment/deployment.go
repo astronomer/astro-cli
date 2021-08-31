@@ -195,7 +195,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 	// Build rows
 	for _, d := range deployments {
 		if all {
-			ws = d.Workspace.Id
+			ws = d.Workspace.ID
 		}
 
 		currentTag := d.DeploymentInfo.Current

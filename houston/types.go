@@ -47,7 +47,7 @@ type Response struct {
 type AuthProvider struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
-	Url         string `json:"url"`
+	URL         string `json:"url"`
 }
 
 // AuthConfig holds data related to oAuth and basic authentication
@@ -82,13 +82,13 @@ type Deployment struct {
 	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
 	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
 	Workspace             Workspace       `json:"workspace"`
-	Urls                  []DeploymentUrl `json:"urls"`
+	Urls                  []DeploymentURL `json:"urls"`
 	CreatedAt             string          `json:"createdAt"`
 	UpdatedAt             string          `json:"updatedAt"`
 }
 
-// DeploymentUrl defines structure of a houston response DeploymentUrl object
-type DeploymentUrl struct {
+// DeploymentURL defines structure of a houston response DeploymentURL object
+type DeploymentURL struct {
 	Type string `json:"type"`
 	URL  string `json:"url"`
 }
@@ -119,7 +119,7 @@ type Status struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Code    string `json:"code"`
-	Id      string `json:"id"`
+	ID      string `json:"id"`
 }
 
 // ServiceAccount defines a structure of a ServiceAccountResponse object
@@ -141,7 +141,7 @@ type WorkspaceServiceAccount struct {
 	Label         string `json:"label"`
 	Category      string `json:"category"`
 	EntityType    string `json:"entityType"`
-	WorkspaceUuid string `json:"workspaceUuid"`
+	WorkspaceUUID string `json:"workspaceUuid"`
 	LastUsedAt    string `json:"lastUsedAt"`
 	CreatedAt     string `json:"createdAt"`
 	UpdatedAt     string `json:"updatedAt"`
@@ -150,7 +150,7 @@ type WorkspaceServiceAccount struct {
 
 // DeploymentUser defines a structure of RBAC deployment users
 type DeploymentUser struct {
-	Id           string        `json:"id"`
+	ID           string        `json:"id"`
 	Emails       []Email       `json:"emails"`
 	FullName     string        `json:"fullName"`
 	Username     string        `json:"username"`
@@ -159,12 +159,12 @@ type DeploymentUser struct {
 
 // DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object
 type DeploymentServiceAccount struct {
-	Id             string `json:"id"`
-	ApiKey         string `json:"apiKey"`
+	ID             string `json:"id"`
+	APIKey         string `json:"apiKey"`
 	Label          string `json:"label"`
 	Category       string `json:"category"`
 	EntityType     string `json:"entityType"`
-	DeploymentUuid string `json:"deploymentUuid"`
+	DeploymentUUID string `json:"deploymentUuid"`
 	LastUsedAt     string `json:"lastUsedAt"`
 	CreatedAt      string `json:"createdAt"`
 	UpdatedAt      string `json:"updatedAt"`
@@ -179,14 +179,14 @@ type Token struct {
 
 // TokenPayload contains components of a houston auth token
 type TokenPayload struct {
-	Id  string `json:"id"`
+	ID  string `json:"id"`
 	Iat int    `json:"iat"`
 	Exp int    `json:"exp"`
 }
 
 // User contains all components of an Astronomer user
 type User struct {
-	Id       string  `json:"id"`
+	ID       string  `json:"id"`
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
@@ -198,7 +198,7 @@ type User struct {
 type RoleBindingWorkspace struct {
 	Role      string `json:"role"`
 	Workspace struct {
-		Id string `json:"id"`
+		ID string `json:"id"`
 	} `json:"workspace"`
 }
 
@@ -209,7 +209,7 @@ type WorkspaceUserRoleBindings struct {
 type RoleBinding struct {
 	Role string `json:"role"`
 	User struct {
-		Id       string `json:"id"`
+		ID       string `json:"id"`
 		Username string `json:"username"`
 	} `json:"user"`
 	Deployment Deployment `json:"deployment"`
@@ -217,7 +217,7 @@ type RoleBinding struct {
 
 // Workspace contains all components of an Astronomer Workspace
 type Workspace struct {
-	Id          string `json:"id"`
+	ID          string `json:"id"`
 	Label       string `json:"label"`
 	Description string `json:"description"`
 	Users       []User `json:"users"`
@@ -229,7 +229,7 @@ type Workspace struct {
 
 // DeploymentLog contains all log related to deployment components
 type DeploymentLog struct {
-	Id        string `json:"id"`
+	ID        string `json:"id"`
 	Component string `json:"component"`
 	CreatedAt string `json:"createdAt"`
 	Log       string `json:"log"`
@@ -273,7 +273,7 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 type AppConfig struct {
 	Version                string `json:"version"`
 	BaseDomain             string `json:"baseDomain"`
-	SmtpConfigured         bool   `json:"smtpConfigured"`
+	SMTPConfigured         bool   `json:"smtpConfigured"`
 	ManualReleaseNames     bool   `json:"manualReleaseNames"`
 	ConfigureDagDeployment bool   `json:"configureDagDeployment"`
 	NfsMountDagDeployment  bool   `json:"nfsMountDagDeployment"`

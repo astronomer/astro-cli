@@ -29,7 +29,7 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 		Header:         []string{"NAME", "WORKSPACE ID", "EMAIL", "ROLE"},
 	}
 
-	tab.AddRow([]string{w.Label, w.Id, email, role}, false)
+	tab.AddRow([]string{w.Label, w.ID, email, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
 	tab.Print(out)
 
@@ -54,7 +54,7 @@ func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) e
 		Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
 	}
 
-	utab.AddRow([]string{w.Label, w.Id, userId}, false)
+	utab.AddRow([]string{w.Label, w.ID, userId}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print(out)
 	return nil
@@ -79,7 +79,7 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 	}
 	for _, role := range workspace.RoleBindings {
 		var color bool
-		tab.AddRow([]string{role.User.Username, role.User.Id, role.Role}, color)
+		tab.AddRow([]string{role.User.Username, role.User.ID, role.Role}, color)
 	}
 
 	tab.Print(out)
@@ -96,7 +96,7 @@ func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.
 
 	var rb houston.RoleBindingWorkspace
 	for _, val := range roles.RoleBindings {
-		if val.Workspace.Id == workspaceId && strings.Contains(val.Role, "WORKSPACE") {
+		if val.Workspace.ID == workspaceId && strings.Contains(val.Role, "WORKSPACE") {
 			rb = val
 			break
 		}

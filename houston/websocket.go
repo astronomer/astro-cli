@@ -27,12 +27,12 @@ type StartSubscription struct {
 }
 
 type WSResponse struct {
-	Id      string
+	ID      string
 	Type    string `json:"type"`
 	Payload struct {
 		Data struct {
 			Log struct {
-				Id        string `json:"id"`
+				ID        string `json:"id"`
 				CreatedAt string `json:"createdAt"`
 				Log       string `json:"log"`
 			} `json:"log"`
@@ -40,11 +40,11 @@ type WSResponse struct {
 	} `json:"payload"`
 }
 
-func BuildDeploymentLogsSubscribeRequest(deploymentId, component, search string, timestamp time.Time) (string, error) {
+func BuildDeploymentLogsSubscribeRequest(deploymentID, component, search string, timestamp time.Time) (string, error) {
 	payload := Request{
 		Query: DeploymentLogsSubscribeRequest,
 		Variables: map[string]interface{}{
-			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp,
+			"component": component, "deploymentId": deploymentID, "search": search, "timestamp": timestamp,
 		},
 	}
 	s := StartSubscription{Type: "start", Payload: payload}

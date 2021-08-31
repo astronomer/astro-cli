@@ -63,7 +63,7 @@ func TestAppConfig(t *testing.T) {
 	config, err := AppConfig(api)
 	assert.NoError(t, err)
 	assert.Equal(t, false, config.ManualReleaseNames)
-	assert.Equal(t, true, config.SmtpConfigured)
+	assert.Equal(t, true, config.SMTPConfigured)
 	assert.Equal(t, "local.astronomer.io", config.BaseDomain)
 }
 

@@ -57,7 +57,7 @@ func UserList(deploymentId string, email string, userId string, fullName string,
 	// Build rows
 	for _, d := range deploymentUsers {
 		role := filterByRoleType(d.RoleBindings, houston.DeploymentRole)
-		tab.AddRow([]string{d.Id, d.FullName, d.Username, role}, false)
+		tab.AddRow([]string{d.ID, d.FullName, d.Username, role}, false)
 	}
 
 	tab.Print(out)

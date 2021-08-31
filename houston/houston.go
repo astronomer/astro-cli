@@ -73,7 +73,6 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	}
 	defer httpResponse.Body.Close()
 
-	// strings.NewReader(jsonStream)
 	body, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, err
