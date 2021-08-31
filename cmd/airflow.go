@@ -35,7 +35,7 @@ var (
 	schedulerLogs    bool
 	webserverLogs    bool
 
-	RunExample = `
+	runExample = `
 # Create default admin user.
 astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
@@ -118,11 +118,11 @@ func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
-	cmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
 
-func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowStartCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start an Airflow cluster locally using docker-compose",
@@ -139,7 +139,7 @@ func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowKillCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill",
 		Short: "Kill a locally running Airflow cluster",
@@ -154,7 +154,7 @@ func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowLogsCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Output logs for a locally running Airflow cluster",
@@ -172,7 +172,7 @@ func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowStopCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a locally running Airflow cluster",
@@ -187,7 +187,7 @@ func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowPSCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List locally running Airflow containers",
@@ -202,7 +202,7 @@ func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowRunCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a command inside locally running Airflow webserver",
@@ -213,13 +213,13 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowRun,
-		Example:            RunExample,
+		Example:            runExample,
 		DisableFlagParsing: true,
 	}
 	return cmd
 }
 
-func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowUpgradeCheckCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-check",
 		Short: "List DAG and config-level changes required to upgrade to Airflow 2.0",
@@ -230,7 +230,7 @@ func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Com
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowUpgradeCheck,
-		Example:            RunExample,
+		Example:            runExample,
 		DisableFlagParsing: true,
 	}
 	return cmd
@@ -261,9 +261,9 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func airflowInit(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	// Validate project name
-	if len(projectName) != 0 {
+	if projectName != "" {
 		projectNameValid := regexp.
 			MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).
 			MatchString

@@ -58,7 +58,7 @@ func initFiles(root string, files map[string]string) error {
 }
 
 // Init will scaffold out a new airflow project
-func Init(path string, airflowImageTag string) error {
+func Init(path, airflowImageTag string) error {
 	// List of directories to create
 	dirs := []string{"dags", "plugins", "include"}
 

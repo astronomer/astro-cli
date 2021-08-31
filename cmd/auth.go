@@ -46,15 +46,13 @@ func newAuthLoginCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAuthLogoutCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAuthLogoutCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of Astronomer",
 		Long:  "Logout of Astronomer",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return authLogout(cmd, args)
-		},
-		Args: cobra.MaximumNArgs(1),
+		RunE:  authLogout,
+		Args:  cobra.MaximumNArgs(1),
 	}
 	return cmd
 }

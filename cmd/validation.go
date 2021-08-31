@@ -52,17 +52,17 @@ func updateArgValidator(args, validArgs []string) error {
 }
 
 func coalesceWorkspace() (string, error) {
-	wsFlag := workspaceId
+	wsFlag := workspaceID
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get current workspace")
 	}
 
-	if len(wsFlag) != 0 {
+	if wsFlag != "" {
 		return wsFlag, nil
 	}
 
-	if len(wsCfg) != 0 {
+	if wsCfg != "" {
 		return wsCfg, nil
 	}
 

@@ -65,7 +65,7 @@ func runCompletionZsh(w io.Writer, cmd *cobra.Command) error {
 	return nil
 }
 
-func newCompletionCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newCompletionCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	var shells []string
 	for s := range completionShells {
 		shells = append(shells, s)

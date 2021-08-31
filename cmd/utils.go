@@ -39,7 +39,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 
-	if len(defaultImageTag) == 0 {
+	if defaultImageTag == "" {
 		defaultImageTag = "2.0.0-buster-onbuild"
 		fmt.Fprintf(out, "Initializing Airflow project\nNot connected to Astronomer, pulling Airflow development files from %s\n", defaultImageTag)
 	}

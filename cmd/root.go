@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	workspaceId    string
+	workspaceID    string
 	workspaceRole  string
 	deploymentRole string
 	role           string

@@ -99,7 +99,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-func newWorkersLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newWorkersLogsCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workers",
 		Aliases: []string{"workers", "worker", "wrk"},

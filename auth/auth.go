@@ -36,8 +36,8 @@ func basicAuth(username, password string) (string, error) {
 func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace) bool {
 	if c.LastUsedWorkspace != "" {
 		for _, w := range workspaces {
-			if c.LastUsedWorkspace == w.Id {
-				c.SetContextKey("workspace", w.Id)
+			if c.LastUsedWorkspace == w.ID {
+				c.SetContextKey("workspace", w.ID)
 				return true
 			}
 		}
@@ -149,10 +149,10 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	if len(workspaces) == 1 {
 		w := workspaces[0]
-		c.SetContextKey("workspace", w.Id)
+		c.SetContextKey("workspace", w.ID)
 		// update last used workspace ID
-		c.SetContextKey("last_used_workspace", w.Id)
-		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.Id)
+		c.SetContextKey("last_used_workspace", w.ID)
+		fmt.Printf(messages.CONFIG_SET_DEFAULT_WORKSPACE, w.Label, w.ID)
 	}
 
 	if len(workspaces) > 1 {

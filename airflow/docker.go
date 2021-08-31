@@ -102,7 +102,7 @@ func imageBuild(path, imageName string) error {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome string, envFile string) (string, error) {
+func generateConfig(projectName, airflowHome, envFile string) (string, error) {
 	tmpl, err := template.New("yml").Parse(include.Composeyml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
@@ -151,7 +151,7 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome string, envFile string) (project.APIProject, error) {
+func createProject(projectName, airflowHome, envFile string) (project.APIProject, error) {
 	// Generate the docker-compose yaml
 	yaml, err := generateConfig(projectName, airflowHome, envFile)
 	if err != nil {
@@ -193,7 +193,7 @@ func deploymentNameExists(name string, deployments []houston.Deployment) bool {
 }
 
 // Start starts a local airflow development cluster
-func Start(airflowHome string, dockerfile string, envFile string) error {
+func Start(airflowHome, dockerfile, envFile string) error {
 	// Get project name from config
 	projectName, err := projectNameUnique()
 	replacer := strings.NewReplacer("_", "", "-", "")
@@ -402,8 +402,8 @@ func PS(airflowHome string) error {
 	return tw.Flush()
 }
 
-// getWebServerContainerId return webserver container id
-func getWebServerContainerId(airflowHome string) (string, error) {
+// getWebServerContainerID return webserver container id
+func getWebServerContainerID(airflowHome string) (string, error) {
 	projectName, err := projectNameUnique()
 
 	project, err := createProject(projectName, airflowHome, "")
@@ -445,7 +445,7 @@ func Run(airflowHome string, args []string, user string) error {
 	}
 
 	fmt.Printf("Running: %s\n", strings.Join(args, " "))
-	containerID, err := getWebServerContainerId(airflowHome)
+	containerID, err := getWebServerContainerID(airflowHome)
 	if err != nil {
 		return err
 	}
@@ -652,7 +652,7 @@ func validImageRepo(image string) bool {
 	return result
 }
 
-func airflowVersionFromDockerFile(airflowHome string, dockerfile string) (uint64, error) {
+func airflowVersionFromDockerFile(airflowHome, dockerfile string) (uint64, error) {
 	// parse dockerfile
 	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
 	if err != nil {

@@ -93,7 +93,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		Short:   "Manage Astronomer Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the Astronomer platform.",
 	}
-	cmd.PersistentFlags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	cmd.AddCommand(
 		newDeploymentCreateCmd(client, out),
 		newDeploymentListCmd(client, out),
@@ -122,7 +122,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 
 	// let's hide under feature flag
 	if deployment.CheckNFSMountDagDeployment(client) {
-		cmd.Example = cmd.Example + createExampleDagDeployment
+		cmd.Example += createExampleDagDeployment
 		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
@@ -179,7 +179,7 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		Long:    "Update airflow deployments",
 		Example: example,
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) <= 0 {
+			if len(args) == 0 {
 				return errors.New("must specify a deployment ID and at least one attribute to update.")
 			}
 			return updateArgValidator(args[1:], deploymentUpdateAttrs)
@@ -191,7 +191,7 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 
 	// let's hide under feature flag
 	if deployment.CheckNFSMountDagDeployment(client) {
-		cmd.Example = cmd.Example + updateExampleDagDeployment
+		cmd.Example += updateExampleDagDeployment
 		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
@@ -383,7 +383,6 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
 	// Silence Usage as we have now validated command input
@@ -425,11 +424,10 @@ func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client,
 	return deployment.Delete(args[0], hardDelete, client, out)
 }
 
-func deploymentList(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentList(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
 	// Don't validate workspace if viewing all deployments
@@ -514,7 +512,7 @@ func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Wri
 }
 
 func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
-	if len(label) == 0 {
+	if label == "" {
 		return errors.New("must provide a service-account label with the --label (-l) flag")
 	}
 
