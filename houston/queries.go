@@ -24,6 +24,7 @@ var (
 		$workspaceId: Uuid!
 		$executor: ExecutorType!
 		$airflowVersion: String
+		$namespace: String
 		$config: JSON
 		$cloudRole: String
 		$dagDeployment: DagDeployment
@@ -35,6 +36,7 @@ var (
 			releaseName: $releaseName
 			executor: $executor
 		        airflowVersion: $airflowVersion
+			namespace: $namespace
 			config: $config
 			cloudRole: $cloudRole
 			dagDeployment: $dagDeployment
@@ -101,6 +103,13 @@ var (
 			airflowVersion
 			createdAt
 			updatedAt
+		}
+	}`
+
+	AvailableNamespacesGetRequest = `
+	query availableNamespaces {
+		availableNamespaces{
+			name
 		}
 	}`
 
@@ -548,6 +557,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			manualReleaseNames
 			configureDagDeployment
 			nfsMountDagDeployment
+			manualNamespaceNames
 		}
 	}`
 )
