@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,7 +38,9 @@ func TestExecPipeNils(t *testing.T) {
 		t.Error(err)
 	}
 }
+
 func TestExecPushErrAuthConfig(t *testing.T) {
+	testUtil.InitTestConfig()
 	err := ExecPush("", "", "")
 	assert.EqualError(t, err, "Error reading credentials: error getting credentials - err: no credentials server URL, out: `no credentials server URL`")
 }
