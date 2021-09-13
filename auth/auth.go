@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/workspace"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 // basicAuth handles authentication with the houston api
@@ -171,6 +172,8 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 
 	err = registryAuth()
 	if err != nil {
+		log.Debugf("There was an error logging into registry: %s", err.Error())
+
 		fmt.Printf(messages.RegistryAuthFail)
 	}
 

@@ -28,6 +28,7 @@ type cfgs struct {
 	ShowWarnings       cfg
 	AirflowReleasesURL cfg
 	SkipVerifyTLS      cfg
+	Verbosity          cfg
 }
 
 // Creates a new cfg struct

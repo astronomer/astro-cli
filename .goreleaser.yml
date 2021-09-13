@@ -27,13 +27,19 @@ brews:
       owner: astronomer
       name: homebrew-tap
     folder: Formula
+    # Setting this will prevent goreleaser to actually try to commit the updated
+    # formula - instead, the formula file will be stored on the dist folder only,
+    # leaving the responsibility of publishing it to the user.
+    # If set to auto, the release will not be uploaded to the homebrew tap
+    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
+    # Default is false.
+    skip_upload: auto
     homepage: https://astronomer.io
     description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
     test: |
       system "#{bin}/astro version"
 archives:
-  -
-    format: tar.gz
+  - format: tar.gz
     format_overrides:
       - goos: windows
         format: zip

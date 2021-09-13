@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Masterminds/semver"
+	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -39,6 +40,7 @@ func AppVersion(client *houston.Client) (*houston.AppConfig, error) {
 
 // AppConfig returns application config from houston-api
 func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
+	logrus.Debug("Checking AppConfig from houston-api")
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
@@ -51,6 +53,7 @@ func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 }
 
 func checkManualReleaseNames(client *houston.Client) bool {
+	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
@@ -64,6 +67,7 @@ func checkManualReleaseNames(client *houston.Client) bool {
 
 // CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
 func CheckNFSMountDagDeployment(client *houston.Client) bool {
+	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
@@ -76,6 +80,7 @@ func CheckNFSMountDagDeployment(client *houston.Client) bool {
 }
 
 func CheckHardDeleteDeployment(client *houston.Client) bool {
+	logrus.Debug("Checking for hard delete deployment flag")
 	appConfig, err := AppConfig(client)
 	if err != nil {
 		return false
@@ -84,6 +89,7 @@ func CheckHardDeleteDeployment(client *houston.Client) bool {
 }
 
 func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
+	logrus.Debug("Checking for pre created deployment flag")
 	appConfig, err := AppConfig(client)
 	if err != nil {
 		return false
@@ -188,6 +194,7 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
 	}
 
+	logrus.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
 	req := houston.Request{

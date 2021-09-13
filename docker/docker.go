@@ -19,6 +19,7 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -61,7 +62,9 @@ func ExecPush(serverAddress, token, image string) error {
 	// TODO: rethink how to reuse creds store
 	authConfig.Password = token
 
+	log.Debugf("Exec Push docker creds %v \n", authConfig)
 	if err != nil {
+		log.Debugf("Error reading credentials: %v", err)
 		return errors.Errorf("Error reading credentials: %v", err)
 	}
 
@@ -69,18 +72,21 @@ func ExecPush(serverAddress, token, image string) error {
 
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
+		log.Debugf("Error setting up new Client ops %v", err)
 		panic(err)
 	}
 	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
 
 	if err != nil {
+		log.Debugf("Error negotiating api version: %v", err)
 		return err
 	}
 	encodedAuth := base64.URLEncoding.EncodeToString(buf)
 	responseBody, err := cli.ImagePush(ctx, image, types.ImagePushOptions{RegistryAuth: encodedAuth})
 
 	if err != nil {
+		log.Debugf("Error pushing image to docker: %v", err)
 		return err
 	}
 	defer responseBody.Close()

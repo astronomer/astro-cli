@@ -6,6 +6,7 @@ import (
 
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/Masterminds/semver"
 	"github.com/astronomer/astro-cli/houston"
@@ -17,6 +18,7 @@ func ValidateCompatibility(client *houston.Client, out io.Writer, cliVer string,
 	if skipVerCheck {
 		return nil
 	}
+	logrus.Debug("checking if astro-cli version is not compatible with platform")
 
 	serverCfg, err := deployment.AppVersion(client)
 	if err != nil {
