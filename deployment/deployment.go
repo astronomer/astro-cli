@@ -106,7 +106,6 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		if err != nil {
 			return err
 		}
-
 		vars["namespace"] = namespace
 	}
 
