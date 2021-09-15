@@ -113,6 +113,7 @@ func ExecLogin(serverAddress, username, token string) error {
 		Password:      token,
 	}
 
+	log.Debugf("docker creds %v \n", authConfig)
 	_, err = cli.RegistryLogin(ctx, *authConfig)
 	if err != nil {
 		return errors.Errorf("registry login error: %v", err)
