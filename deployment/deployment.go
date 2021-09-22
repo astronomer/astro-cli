@@ -97,6 +97,15 @@ func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
 	return appConfig.ManualNamespaceNames
 }
 
+func CheckTriggererEnabled(client *houston.Client) bool {
+	logrus.Debug("Checking for triggerer flag")
+	appConfig, err := AppConfig(client)
+	if err != nil {
+		return false
+	}
+	return appConfig.TriggererEnabled
+}
+
 // Create airflow deployment
 func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}

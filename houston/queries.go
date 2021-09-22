@@ -559,6 +559,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			nfsMountDagDeployment
 			manualNamespaceNames
 			hardDeleteDeployment
+			triggererEnabled
 		}
 	}`
 )
