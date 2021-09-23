@@ -204,6 +204,73 @@ func TestCreate(t *testing.T) {
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
 
+func TestCreateTriggererEnabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": true,
+				"manualNamespaceNames": false,
+				"triggererEnabled": true
+			},
+			    "createDeployment": {
+			"id": "ckbv818oa00r107606ywhoqtw",
+			"executor": "CeleryExecutor",
+			"urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/flower"
+        }
+      ],
+      "properties": {
+        "component_version": "0.0.0",
+        "alert_emails": []
+      },
+      "description": "",
+      "label": "test2",
+      "releaseName": "boreal-penumbra-1102",
+      "status": null,
+      "type": "airflow",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9",
+        "label": "w1"
+      },
+      "createdAt": "2020-06-25T20:10:33.898Z",
+      "updatedAt": "2020-06-25T20:10:33.898Z"
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	label := "label"
+	ws := "ck1qg6whg001r08691y117hub"
+	releaseName := ""
+	role := "test-role"
+	executor := "CeleryExecutor"
+	airflowVersion := "1.10.5"
+	dagDeploymentType := "image"
+	nfsLocation := ""
+	buf := new(bytes.Buffer)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 1, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+}
+
 func TestCreateWithNFSLocation(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
@@ -626,6 +693,82 @@ func TestUpdate(t *testing.T) {
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
 		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 0, api, buf)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, buf.String())
+	}
+}
+
+func TestUpdateTriggerer(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+  "appConfig": {
+    "version": "0.15.1",
+     "baseDomain": "local.astronomer.io",
+     "smtpConfigured": true, 
+     "manualReleaseNames": false,
+     "hardDeleteDeployment": true,
+     "manualNamespaceNames": true,
+     "triggererEnabled": true
+	},
+    "updateDeployment": {
+			"id": "ckbv801t300qh0760pck7ea0c",
+			"executor": "CeleryExecutor",
+			"urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/burning-terrestrial-5940/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/burning-terrestrial-5940/flower"
+        }
+      ],
+      "properties": {
+        "component_version": "0.0.0",
+        "alert_emails": []
+      },
+      "description": "",
+      "label": "test123",
+      "releaseName": "burning-terrestrial-5940",
+      "status": null,
+      "type": "airflow",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9"
+      },
+      "createdAt": "2020-06-25T20:09:38.341Z",
+      "updatedAt": "2020-06-25T20:54:15.592Z"
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	id := "ck1qg6whg001r08691y117hub"
+	role := "test-role"
+
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
+ test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c             %!s(MISSING)
+
+ Successfully updated deployment
+`
+	myTests := []struct {
+		deploymentConfig  map[string]string
+		dagDeploymentType string
+		expectedOutput    string
+	}{
+		{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "", expectedOutput: expected},
+		{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "image", expectedOutput: expected},
+	}
+	for _, tt := range myTests {
+		buf := new(bytes.Buffer)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 1, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -1059,6 +1202,45 @@ func TestCheckHardDeleteDeploymentError(t *testing.T) {
 	assert.Equal(t, false, CheckHardDeleteDeployment(api))
 }
 
+func TestCheckTriggererEnabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true,
+      "triggererEnabled": true
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	hardDelete := CheckTriggererEnabled(api)
+	assert.Equal(t, true, hardDelete)
+}
+
+func TestCheckTriggererEnabledError(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 500,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(``)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	assert.Equal(t, false, CheckHardDeleteDeployment(api))
+}
 func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
