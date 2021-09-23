@@ -107,7 +107,7 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
@@ -128,6 +128,10 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 
 	if dagDeploymentType == "volume" && nfsLocation != "" {
 		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	}
+
+	if CheckTriggererEnabled(client) {
+		vars["triggererReplicas"] = triggererReplicas
 	}
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
@@ -291,7 +295,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation string, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -301,6 +305,10 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 
 	if dagDeploymentType != "" {
 		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	}
+
+	if CheckTriggererEnabled(client) {
+		vars["triggererReplicas"] = triggererReplicas
 	}
 
 	req := houston.Request{
