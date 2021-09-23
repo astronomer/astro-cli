@@ -199,7 +199,7 @@ func TestCreate(t *testing.T) {
 	dagDeploymentType := "image"
 	nfsLocation := ""
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -265,7 +265,7 @@ func TestCreateWithNFSLocation(t *testing.T) {
 	dagDeploymentType := "volume"
 	nfsLocation := "test:/test"
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -356,7 +356,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -447,7 +447,7 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
 	assert.EqualError(t, err, "Number is out of available range")
 }
 
@@ -470,7 +470,7 @@ func TestCreateHoustonError(t *testing.T) {
 	dagDeploymentType := "image"
 	nfsLocation := ""
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -559,6 +559,15 @@ func TestUpdate(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
+  "appConfig": {
+    "version": "0.15.1",
+     "baseDomain": "local.astronomer.io",
+     "smtpConfigured": true, 
+     "manualReleaseNames": false,
+     "hardDeleteDeployment": true,
+     "manualNamespaceNames": true,
+     "triggererEnabled": false
+	},
     "updateDeployment": {
 			"id": "ckbv801t300qh0760pck7ea0c",
 			"executor": "CeleryExecutor",
@@ -616,7 +625,7 @@ func TestUpdate(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 0, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -638,7 +647,7 @@ func TestUpdateError(t *testing.T) {
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, "", "", api, buf)
+	err := Update(id, role, deploymentConfig, "", "", 0, api, buf)
 
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
