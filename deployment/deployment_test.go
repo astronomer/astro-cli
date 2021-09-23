@@ -1239,7 +1239,7 @@ func TestCheckTriggererEnabledError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	assert.Equal(t, false, CheckHardDeleteDeployment(api))
+	assert.Equal(t, false, CheckTriggererEnabled(api))
 }
 func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 	testUtil.InitTestConfig()
