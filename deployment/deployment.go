@@ -76,7 +76,7 @@ func CheckNFSMountDagDeployment(client *houston.Client) bool {
 		return false
 	}
 
-	return r.Data.GetAppConfig.NfsMountDagDeployment
+	return r.Data.GetAppConfig.Flags.NfsMountDagDeployment
 }
 
 func CheckHardDeleteDeployment(client *houston.Client) bool {
@@ -85,7 +85,7 @@ func CheckHardDeleteDeployment(client *houston.Client) bool {
 	if err != nil {
 		return false
 	}
-	return appConfig.HardDeleteDeployment
+	return appConfig.Flags.HardDeleteDeployment
 }
 
 func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
@@ -94,7 +94,7 @@ func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
 	if err != nil {
 		return false
 	}
-	return appConfig.ManualNamespaceNames
+	return appConfig.Flags.ManualNamespaceNames
 }
 
 func CheckTriggererEnabled(client *houston.Client) bool {
@@ -103,7 +103,7 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 	if err != nil {
 		return false
 	}
-	return appConfig.TriggererEnabled
+	return appConfig.Flags.TriggererEnabled
 }
 
 // Create airflow deployment

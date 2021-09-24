@@ -272,15 +272,22 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 
 // AppConfig contains current houston config
 type AppConfig struct {
-	Version                string `json:"version"`
-	BaseDomain             string `json:"baseDomain"`
-	SmtpConfigured         bool   `json:"smtpConfigured"`
-	ManualReleaseNames     bool   `json:"manualReleaseNames"`
-	ConfigureDagDeployment bool   `json:"configureDagDeployment"`
-	NfsMountDagDeployment  bool   `json:"nfsMountDagDeployment"`
-	HardDeleteDeployment   bool   `json:"hardDeleteDeployment"`
-	ManualNamespaceNames   bool   `json:"manualNamespaceNames"`
-	TriggererEnabled       bool   `json:"triggererEnabled"`
+	Version                string       `json:"version"`
+	BaseDomain             string       `json:"baseDomain"`
+	SmtpConfigured         bool         `json:"smtpConfigured"`
+	ManualReleaseNames     bool         `json:"manualReleaseNames"`
+	ConfigureDagDeployment bool         `json:"configureDagDeployment"`
+	NfsMountDagDeployment  bool         `json:"nfsMountDagDeployment"`
+	HardDeleteDeployment   bool         `json:"hardDeleteDeployment"`
+	ManualNamespaceNames   bool         `json:"manualNamespaceNames"`
+	TriggererEnabled       bool         `json:"triggererEnabled"`
+	Flags                  FeatureFlags `json:"featureFlags",omitempty"`
+}
+type FeatureFlags struct {
+	NfsMountDagDeployment bool `json:"nfsMountDagDeployment"`
+	HardDeleteDeployment  bool `json:"hardDeleteDeployment"`
+	ManualNamespaceNames  bool `json:"manualNamespaceNames"`
+	TriggererEnabled      bool `json:"triggererEnabled"`
 }
 
 // coerce a string into SemVer if possible

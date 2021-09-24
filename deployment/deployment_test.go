@@ -509,7 +509,15 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
       "smtpConfigured": true,
       "manualReleaseNames": false,
       "hardDeleteDeployment": true,
-      "manualNamespaceNames": true
+      "manualNamespaceNames": true,
+      "featureFlags": {
+        "manualReleaseNames": false,
+        "configureDagDeployment": false,
+        "nfsMountDagDeployment": false,
+        "hardDeleteDeployment": false,
+        "manualNamespaceNames": true,
+        "sysAdminScalabilityImprovementsEnabled": false
+      }
     },
     "availableNamespaces": [
       {
@@ -1220,7 +1228,15 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 	  "baseDomain": "local.astronomer.io",
 	  "smtpConfigured": true,
 	  "manualReleaseNames": false,
-	  "nfsMountDagDeployment": true
+	  "nfsMountDagDeployment": true,
+	  "featureFlags": {
+		"manualReleaseNames": false,
+		"configureDagDeployment": false,
+		"nfsMountDagDeployment": true,
+		"hardDeleteDeployment": false,
+		"manualNamespaceNames": false,
+		"sysAdminScalabilityImprovementsEnabled": false
+	      }
       }
     }
   }`
@@ -1245,7 +1261,15 @@ func TestCheckHardDeleteDeployment(t *testing.T) {
       "baseDomain": "local.astronomer.io",
       "smtpConfigured": true,
       "manualReleaseNames": false,
-      "hardDeleteDeployment": true
+      "hardDeleteDeployment": true,
+      "featureFlags": {
+        "manualReleaseNames": false,
+        "configureDagDeployment": false,
+        "nfsMountDagDeployment": false,
+        "hardDeleteDeployment": true,
+        "manualNamespaceNames": false,
+        "sysAdminScalabilityImprovementsEnabled": false
+      }
     }
   }
 }`
@@ -1285,7 +1309,16 @@ func TestCheckTriggererEnabled(t *testing.T) {
       "smtpConfigured": true,
       "manualReleaseNames": false,
       "hardDeleteDeployment": true,
-      "triggererEnabled": true
+      "triggererEnabled": true,
+      "featureFlags": {
+        "manualReleaseNames": false,
+        "configureDagDeployment": false,
+        "nfsMountDagDeployment": false,
+        "hardDeleteDeployment": false,
+        "manualNamespaceNames": false,
+        "triggererEnabled": true,
+        "sysAdminScalabilityImprovementsEnabled": false
+      }
     }
   }
 }`
@@ -1469,7 +1502,15 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
       "smtpConfigured": true,
       "manualReleaseNames": false,
       "hardDeleteDeployment": true,
-      "manualNamespaceNames": true
+      "manualNamespaceNames": true,
+      "featureFlags": {
+        "manualReleaseNames": false,
+        "configureDagDeployment": false,
+        "nfsMountDagDeployment": false,
+        "hardDeleteDeployment": false,
+        "manualNamespaceNames": true,
+        "sysAdminScalabilityImprovementsEnabled": false
+      }
     }
   }
 }
