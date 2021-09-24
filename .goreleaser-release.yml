@@ -1,0 +1,52 @@
+---
+project_name: astro
+release:
+  github:
+    owner: astronomer
+    name: astro-cli
+  # If set to auto, will mark the release as not ready for production
+  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
+  prerelease: false
+build:
+  main: main.go
+  binary: astro
+  env:
+    - CGO_ENABLED=0
+  goos:
+    - linux
+    - darwin
+    - windows
+  goarch:
+    - 386
+    - amd64
+  goarm:
+    - 7
+  ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
+brews:
+  - tap:
+      owner: astronomer
+      name: homebrew-tap
+    folder: Formula
+    homepage: https://astronomer.io
+    description: To build and run Airflow DAGs locally via docker-compose and deploy DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API.
+    test: |
+      system "#{bin}/astro version"
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - licence*
+      - LICENCE*
+      - license*
+      - LICENSE*
+      - readme*
+      - README*
+      - changelog*
+      - CHANGELOG*
+snapshot:
+  name_template: SNAPSHOT-{{ .Commit }}
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
