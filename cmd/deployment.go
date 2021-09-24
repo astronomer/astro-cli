@@ -127,7 +127,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
 	if deployment.CheckTriggererEnabled(client) {
-		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "t", 0, "Number of replicas to use for triggerer airflow componenet, valid 0-2")
+		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "t", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
