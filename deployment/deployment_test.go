@@ -1225,8 +1225,8 @@ func TestCheckTriggererEnabled(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	hardDelete := CheckTriggererEnabled(api)
-	assert.Equal(t, true, hardDelete)
+	triggererEnabled := CheckTriggererEnabled(api)
+	assert.Equal(t, true, triggererEnabled)
 }
 
 func TestCheckTriggererEnabledError(t *testing.T) {
