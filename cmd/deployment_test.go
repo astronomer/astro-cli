@@ -262,7 +262,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"nfsMountDagDeployment": true},
+    "appConfig": {"nfsMountDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true}},
     "createDeployment": {
       "airflowVersion": "2.0.0",
       "config": {
@@ -404,7 +404,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"nfsMountDagDeployment": true},
+    "appConfig": {"nfsMountDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true}},
     "updateDeployment": {
       "createdAt": "2021-04-23T14:29:28.497Z",
       "dagDeployment": {
@@ -813,7 +813,10 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 			"smtpConfigured": true,
 			"manualReleaseNames": false,
 			"hardDeleteDeployment": true,
-			"nfsMountDagDeployment": false
+			"nfsMountDagDeployment": false,
+			"featureFlags": {
+				"hardDeleteDeployment": true
+			}
 		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
@@ -870,7 +873,10 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 			"smtpConfigured": true,
 			"manualReleaseNames": false,
 			"hardDeleteDeployment": true,
-			"nfsMountDagDeployment": false
+			"nfsMountDagDeployment": false,
+			"featureFlags": {
+			   "hardDeleteDeployment": true
+			}
 		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
