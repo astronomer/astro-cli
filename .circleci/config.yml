@@ -35,7 +35,7 @@ jobs:
     steps:
       - checkout
       - commit-next-tag
-  release:
+  pre-release:
     docker:
       - image: circleci/golang:1.13
     working_directory: /go/src/github.com/astronomer/astro-cli
@@ -44,7 +44,7 @@ jobs:
       - run:
           name: goreleaser
           command: curl -sL https://git.io/goreleaser | bash
-  release-homebrew:
+  release:
     docker:
       - image: circleci/golang:1.13
     working_directory: /go/src/github.com/astronomer/astro-cli
@@ -59,12 +59,12 @@ workflows:
   build-images:
     jobs:
       - test
-      - approve-release:
+      - approve-pre-release:
           type: approval
           filters:
             branches:
               only: "/release-.*/"
-      - approve-real-release:
+      - approve-release:
           type: approval
           filters:
             branches:
@@ -73,11 +73,11 @@ workflows:
           context:
             - github-repo
           requires:
-            - approve-release
+            - approve-pre-release
           filters:
             branches:
               only: "/release-.*/"
-      - release:
+      - pre-release:
           context:
             - github-repo
           # Only run this job on git tag pushes
@@ -86,9 +86,9 @@ workflows:
               ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*(-.*)*/
-      - release-homebrew:
+      - release:
           requires:
-            - approve-real-release
+            - approve-release
           context:
             - github-repo
           # Only run this job on git tag pushes
