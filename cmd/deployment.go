@@ -199,7 +199,7 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
 	if deployment.CheckTriggererEnabled(client) {
-		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "t", 0, "Number of replicas to use for triggerer airflow componenet, valid 0-2")
+		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "t", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
