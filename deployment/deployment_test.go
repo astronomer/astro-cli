@@ -198,8 +198,9 @@ func TestCreate(t *testing.T) {
 	airflowVersion := "1.10.5"
 	dagDeploymentType := "image"
 	nfsLocation := ""
+	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -265,8 +266,9 @@ func TestCreateTriggererEnabled(t *testing.T) {
 	airflowVersion := "1.10.5"
 	dagDeploymentType := "image"
 	nfsLocation := ""
+	triggerReplicas := 1
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 1, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -331,8 +333,9 @@ func TestCreateWithNFSLocation(t *testing.T) {
 	airflowVersion := "1.10.5"
 	dagDeploymentType := "volume"
 	nfsLocation := "test:/test"
+	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -405,6 +408,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	airflowVersion := "1.10.5"
 	dagDeploymentType := "volume"
 	nfsLocation := "test:/test"
+	triggerReplicas := 0
 	buf := new(bytes.Buffer)
 
 	// mock os.Stdin
@@ -423,7 +427,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -496,6 +500,7 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
 	airflowVersion := "1.10.5"
 	dagDeploymentType := "volume"
 	nfsLocation := "test:/test"
+	triggerReplicas := 0
 	buf := new(bytes.Buffer)
 
 	// mock os.Stdin
@@ -514,7 +519,7 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
 	assert.EqualError(t, err, "Number is out of available range")
 }
 
@@ -536,8 +541,9 @@ func TestCreateHoustonError(t *testing.T) {
 	airflowVersion := "1.10.5"
 	dagDeploymentType := "image"
 	nfsLocation := ""
+	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, 0, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
