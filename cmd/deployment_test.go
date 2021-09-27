@@ -387,7 +387,7 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--t=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "-t=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
