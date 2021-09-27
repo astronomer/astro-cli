@@ -337,7 +337,69 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 		assert.Contains(t, output, tt.expectedOutput)
 	}
 }
+func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": true},
+    "updateDeployment": {
+      "createdAt": "2021-04-23T14:29:28.497Z",
+      "dagDeployment": {
+        "nfsLocation": "test:/test",
+        "type": "volume"
+      },
+      "description": "",
+      "id": "cknuetusw0018yqxto2jzxjqq",
+      "label": "test_dima22asdasd",
+      "releaseName": "amateur-instrument-9515",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T21:42:35.361Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
 
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--t=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
 func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
