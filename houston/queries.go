@@ -564,6 +564,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			manualNamespaceNames
 			hardDeleteDeployment
 			triggererEnabled
+			featureFlags
 		}
 	}`
 )
