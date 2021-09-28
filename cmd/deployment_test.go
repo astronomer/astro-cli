@@ -183,7 +183,7 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"triggererEnabled": true},
+    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true} },
     "createDeployment": {
       "airflowVersion": "2.0.0",
       "config": {
@@ -341,7 +341,7 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"triggererEnabled": true},
+    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true}},
     "updateDeployment": {
       "createdAt": "2021-04-23T14:29:28.497Z",
       "dagDeployment": {
