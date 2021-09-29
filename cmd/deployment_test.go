@@ -245,7 +245,6 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "-t=1"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		_, output, err := executeCommandC(api, tt.cmdArgs...)
@@ -387,7 +386,6 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "-t=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
