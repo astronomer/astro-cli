@@ -185,7 +185,7 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 			if len(args) <= 0 {
 				return errors.New("must specify a deployment ID and at least one attribute to update.")
 			}
-			return updateArgValidator(args[1:], deploymentUpdateAttrs)
+			return updateArgValidator(args, deploymentUpdateAttrs)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUpdate(cmd, args, dagDeploymentType, nfsLocation, client, out)
