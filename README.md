@@ -49,6 +49,13 @@ brew install astronomer/tap/astro
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s
 ```
+#### For arch linux systems, via AUR
+
+There is an AUR package for astro-cli available [here](https://aur.archlinux.org/packages/astro-cli/).
+You can install it with an AUR helper like so:
+```
+yay -S astro-cli
+```
 
 ### Previous Versions
 
