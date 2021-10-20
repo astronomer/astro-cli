@@ -12,6 +12,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	defaultDirPerm os.FileMode = 0770
+	newFilePerm    os.FileMode = 0600
+)
+
 var (
 	// ConfigFileName is the name of the config files (home / project)
 	ConfigFileName = "config"
@@ -56,6 +61,7 @@ var (
 		ShowWarnings:       newCfg("show_warnings", "true"),
 		AirflowReleasesURL: newCfg("airflow_releases_url", "https://updates.astronomer.io/astronomer-certified"),
 		SkipVerifyTLS:      newCfg("skip_verify_tls", "false"),
+		Verbosity:          newCfg("verbosity", "warning"),
 	}
 
 	// viperHome is the viper object in the users home directory
@@ -90,7 +96,7 @@ func initHome(fs afero.Fs) {
 	if !homeConfigExists {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
-			fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
+			fmt.Printf(messages.ErrConfigHomeCreation, err)
 			return
 		}
 	}
@@ -98,7 +104,7 @@ func initHome(fs afero.Fs) {
 	// Read in home config
 	err := viperHome.ReadInConfig()
 	if err != nil {
-		fmt.Printf(messages.CONFIG_READ_ERROR, err)
+		fmt.Printf(messages.ErrReadingConfig, err)
 		return
 	}
 }
@@ -119,7 +125,7 @@ func initProject(fs afero.Fs) {
 
 	// If path is empty or config file does not exist, just return
 	workingConfigExists, _ := fileutil.Exists(workingConfigFile)
-	if len(workingConfigPath) == 0 || workingConfigPath == HomeConfigPath || !workingConfigExists {
+	if workingConfigPath == "" || workingConfigPath == HomeConfigPath || !workingConfigExists {
 		return
 	}
 
@@ -129,7 +135,7 @@ func initProject(fs afero.Fs) {
 	// Read in project config
 	readErr := viperProject.ReadInConfig()
 	if readErr != nil {
-		fmt.Printf(messages.CONFIG_READ_ERROR, readErr)
+		fmt.Printf(messages.ErrReadingConfig, readErr)
 	}
 }
 
@@ -140,7 +146,7 @@ func CreateProjectConfig(projectPath string) {
 
 	err := CreateConfig(viperProject, projectConfigDir, projectConfigFile)
 	if err != nil {
-		fmt.Printf(messages.CONFIG_CREATE_HOME_ERROR, err)
+		fmt.Printf(messages.ErrConfigHomeCreation, err)
 		return
 	}
 
@@ -155,16 +161,18 @@ func configExists(v *viper.Viper) bool {
 
 // CreateConfig creates a config file in the given directory
 func CreateConfig(v *viper.Viper, path, file string) error {
-	err := os.MkdirAll(path, 0770)
+	err := os.MkdirAll(path, defaultDirPerm)
 	if err != nil {
-		return errors.Wrap(err, messages.CONFIG_CREATE_DIR_ERROR)
+		return errors.Wrap(err, messages.ErrConfigDirCreation)
 	}
 
 	_, err = os.Create(file)
 	if err != nil {
-		return errors.Wrap(err, messages.CONFIG_CREATE_FILE_ERROR)
+		return errors.Wrap(err, messages.ErrConfigFileCreation)
 	}
-	os.Chmod(file, 0600)
+	if err = os.Chmod(file, newFilePerm); err != nil {
+		return errors.Wrap(err, messages.ErrConfigFileCreation)
+	}
 
 	return saveConfig(v, file)
 }
@@ -191,7 +199,7 @@ func IsProjectDir(path string) (bool, error) {
 func saveConfig(v *viper.Viper, file string) error {
 	err := v.WriteConfigAs(file)
 	if err != nil {
-		return errors.Wrap(err, messages.CONFIG_SAVE_ERROR)
+		return errors.Wrap(err, messages.ErrSavingConfig)
 	}
 	return nil
 }

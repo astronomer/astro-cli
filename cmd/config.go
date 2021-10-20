@@ -59,19 +59,19 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string, globalFlag bool) {
 
 	if !isProjectDir && !globalFlag {
 		c := "astro config " + cmd.Use + " " + args[0] + " -g"
-		fmt.Printf(messages.CONFIG_USE_OUTSIDE_PROJECT_DIR, cmd.Use, cmd.Use, c)
+		fmt.Printf(messages.ConfigUseOutsideProjectDir, cmd.Use, cmd.Use, c)
 		os.Exit(1)
 	}
 }
 
 func configGet(cmd *cobra.Command, args []string, globalFlag bool) error {
 	if len(args) != 1 {
-		return errors.New(messages.CONFIG_PATH_KEY_MISSING_ERROR)
+		return errors.New(messages.ErrMissingConfigPathKey)
 	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errors.New(messages.CONFIG_PATH_KEY_INVALID_ERROR)
+		return errors.New(messages.ErrInvalidConfigPathKey)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -87,26 +87,30 @@ func configGet(cmd *cobra.Command, args []string, globalFlag bool) error {
 }
 
 func configSet(cmd *cobra.Command, args []string, globalFlag bool) error {
-	if len(args) != 2 {
-		return errors.New(messages.CONFIG_INVALID_SET_ARGS)
+	if len(args) != 2 { // nolint:gomnd
+		return errors.New(messages.ConfigInvalidSetArgs)
 	}
 
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 
 	if !ok {
-		return errors.New(messages.CONFIG_PATH_KEY_INVALID_ERROR)
+		return errors.New(messages.ErrInvalidConfigPathKey)
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	var err error
 	if globalFlag {
-		cfg.SetHomeString(args[1])
+		err = cfg.SetHomeString(args[1])
 	} else {
-		cfg.SetProjectString(args[1])
+		err = cfg.SetProjectString(args[1])
+	}
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf(messages.CONFIG_SET_SUCCESS+"\n", cfg.Path, args[1])
+	fmt.Printf(messages.ConfigSetSuccess+"\n", cfg.Path, args[1])
 	return nil
 }

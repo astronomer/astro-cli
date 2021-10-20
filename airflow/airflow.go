@@ -11,6 +11,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
+const (
+	defaultDirPerm os.FileMode = 0777
+)
+
 func initDirs(root string, dirs []string) error {
 	// Create the dirs
 	for _, dir := range dirs {
@@ -24,7 +28,7 @@ func initDirs(root string, dirs []string) error {
 		}
 
 		// Create directory
-		if err := os.MkdirAll(fullpath, 0777); err != nil {
+		if err := os.MkdirAll(fullpath, defaultDirPerm); err != nil {
 			return errors.Wrapf(err, "failed to create dir '%s'", dir)
 		}
 	}

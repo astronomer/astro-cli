@@ -67,7 +67,7 @@ func (t *Table) AddRow(values []string, color bool) {
 
 // Print header __as well as__ rows
 func (t *Table) Print(out io.Writer) error {
-	if len(t.Rows) == 0 && len(t.NoResultsMsg) != 0 {
+	if len(t.Rows) == 0 && t.NoResultsMsg != "" {
 		fmt.Fprintln(out, t.NoResultsMsg)
 		return nil
 	}
@@ -75,7 +75,7 @@ func (t *Table) Print(out io.Writer) error {
 	t.PrintHeader(out)
 	t.PrintRows(out)
 
-	if len(t.SuccessMsg) != 0 {
+	if t.SuccessMsg != "" {
 		fmt.Fprintln(out, t.SuccessMsg)
 	}
 	return nil
@@ -104,7 +104,7 @@ func (t *Table) PrintHeader(out io.Writer) {
 
 // PrintRows prints rows with an "S"
 func (t *Table) PrintRows(out io.Writer) {
-	if len(t.RenderedPadding) == 0 {
+	if t.RenderedPadding == "" {
 		p := t.GetPadding(t.altPadding)
 		t.RenderedPadding = p
 	}

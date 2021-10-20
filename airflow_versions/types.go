@@ -45,7 +45,7 @@ func NewAirflowVersion(v string, tags []string) (*AirflowVersion, error) {
 
 	// get post_n1
 	m := AirflowVersionReg.FindStringSubmatch(v)
-	postN1, err := strconv.ParseUint(m[8], 10, 64)
+	postN1, _ := strconv.ParseUint(m[8], 10, 64)
 
 	av := AirflowVersion{
 		*semV,

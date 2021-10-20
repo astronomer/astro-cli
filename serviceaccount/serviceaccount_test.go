@@ -39,10 +39,10 @@ func TestCreateUsingDeploymentUUID(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	deploymentUuid := "ck1qg6whg001r08691y117hub"
+	deploymentUUID := "ck1qg6whg001r08691y117hub"
 	label, category, role := "test", "test", "test"
 	buf := new(bytes.Buffer)
-	err := CreateUsingDeploymentUUID(deploymentUuid, label, category, role, api, buf)
+	err := CreateUsingDeploymentUUID(deploymentUUID, label, category, role, api, buf)
 	assert.NoError(t, err)
 	expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
  test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
@@ -80,10 +80,10 @@ func TestCreateUsingWorkspaceUUID(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	workspaceUuid := "ck1qg6whg001r08691y117hub"
+	workspaceUUID := "ck1qg6whg001r08691y117hub"
 	label, category, role := "test", "test", "test"
 	buf := new(bytes.Buffer)
-	err := CreateUsingDeploymentUUID(workspaceUuid, label, category, role, api, buf)
+	err := CreateUsingDeploymentUUID(workspaceUUID, label, category, role, api, buf)
 	assert.NoError(t, err)
 	expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
  test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
@@ -111,10 +111,10 @@ func TestDeleteUsingWorkspaceUUID(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	serviceAccountId := "ckbvcbqs1014t0760u4bszmcs"
-	workspaceUuid := "ck1qg6whg001r08691y117hub"
+	serviceAccountID := "ckbvcbqs1014t0760u4bszmcs"
+	workspaceUUID := "ck1qg6whg001r08691y117hub"
 	buf := new(bytes.Buffer)
-	err := DeleteUsingWorkspaceUUID(serviceAccountId, workspaceUuid, api, buf)
+	err := DeleteUsingWorkspaceUUID(serviceAccountID, workspaceUUID, api, buf)
 	assert.NoError(t, err)
 	expectedOut := `Service Account  (ckbvcbqs1014t0760u4bszmcs) successfully deleted
 `
@@ -139,10 +139,10 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	serviceAccountId := "ckbvcbqs1014t0760u4bszmcs"
-	deploymentUuid := "ck1qg6whg001r08691y117hub"
+	serviceAccountID := "ckbvcbqs1014t0760u4bszmcs"
+	deploymentUUID := "ck1qg6whg001r08691y117hub"
 	buf := new(bytes.Buffer)
-	err := DeleteUsingDeploymentUUID(serviceAccountId, deploymentUuid, api, buf)
+	err := DeleteUsingDeploymentUUID(serviceAccountID, deploymentUUID, api, buf)
 	assert.NoError(t, err)
 	expectedOut := `Service Account  (ckbvcbqs1014t0760u4bszmcs) successfully deleted
 `
@@ -178,9 +178,9 @@ func TestGetDeploymentServiceAccount(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentUuid := "ckqvf9spa1189rn9hbh5h439u"
+	deploymentUUID := "ckqvf9spa1189rn9hbh5h439u"
 	buf := new(bytes.Buffer)
-	err := GetDeploymentServiceAccounts(deploymentUuid, api, buf)
+	err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
 	assert.NoError(t, err)
 	expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
 	assert.Contains(t, buf.String(), expectedOut)
@@ -216,9 +216,9 @@ func TestGetWorkspaceServiceAccount(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentUuid := "ckqvf9spa1189rn9hbh5h439u"
+	deploymentUUID := "ckqvf9spa1189rn9hbh5h439u"
 	buf := new(bytes.Buffer)
-	err := GetWorkspaceServiceAccounts(deploymentUuid, api, buf)
+	err := GetWorkspaceServiceAccounts(deploymentUUID, api, buf)
 	assert.NoError(t, err)
 	expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
 	assert.Contains(t, buf.String(), expectedOut)

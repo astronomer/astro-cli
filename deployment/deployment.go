@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/Masterminds/semver"
+	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -15,6 +16,35 @@ import (
 	"github.com/astronomer/astro-cli/settings"
 	"github.com/fatih/camelcase"
 )
+
+var (
+	minAirflowVersion = "1.10.14"
+
+	celeryExecutor       = "CeleryExecutor"
+	volumeDeploymentType = "volume"
+
+	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
+	ErrNumberOutOfRange                = errors.New("number is out of available range")
+	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
+)
+
+type ErrParsingInt struct {
+	in string
+}
+
+func (e ErrParsingInt) Error() string {
+	return fmt.Sprintf("cannot parse %s to int", e.in)
+}
+
+type ErrInvalidAirflowVersion struct {
+	desiredVersion string
+	currentVersion *semver.Version
+}
+
+func (e ErrInvalidAirflowVersion) Error() string {
+	return fmt.Sprintf("Error: You tried to set --desired-airflow-version to %s, but this Airflow Deployment "+
+		"is already running %s. Please indicate a higher version of Airflow and try again.", e.desiredVersion, e.currentVersion)
+}
 
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
@@ -39,6 +69,7 @@ func AppVersion(client *houston.Client) (*houston.AppConfig, error) {
 
 // AppConfig returns application config from houston-api
 func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
+	logrus.Debug("Checking AppConfig from houston-api")
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
@@ -51,6 +82,7 @@ func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
 }
 
 func checkManualReleaseNames(client *houston.Client) bool {
+	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
@@ -64,6 +96,7 @@ func checkManualReleaseNames(client *houston.Client) bool {
 
 // CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
 func CheckNFSMountDagDeployment(client *houston.Client) bool {
+	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 	req := houston.Request{
 		Query: houston.AppConfigRequest,
 	}
@@ -72,20 +105,47 @@ func CheckNFSMountDagDeployment(client *houston.Client) bool {
 		return false
 	}
 
-	return r.Data.GetAppConfig.NfsMountDagDeployment
+	return r.Data.GetAppConfig.Flags.NfsMountDagDeployment
 }
 
 func CheckHardDeleteDeployment(client *houston.Client) bool {
+	logrus.Debug("Checking for hard delete deployment flag")
 	appConfig, err := AppConfig(client)
 	if err != nil {
 		return false
 	}
-	return appConfig.HardDeleteDeployment
+	return appConfig.Flags.HardDeleteDeployment
+}
+
+func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
+	logrus.Debug("Checking for pre created deployment flag")
+	appConfig, err := AppConfig(client)
+	if err != nil {
+		return false
+	}
+	return appConfig.Flags.ManualNamespaceNames
+}
+
+func CheckTriggererEnabled(client *houston.Client) bool {
+	logrus.Debug("Checking for triggerer flag")
+	appConfig, err := AppConfig(client)
+	if err != nil {
+		return false
+	}
+	return appConfig.Flags.TriggererEnabled
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
+
+	if CheckPreCreateNamespaceDeployment(client) {
+		namespace, err := getDeploymentSelectionNamespaces(client, out)
+		if err != nil {
+			return err
+		}
+		vars["namespace"] = namespace
+	}
 
 	if releaseName != "" && checkManualReleaseNames(client) {
 		vars["releaseName"] = releaseName
@@ -95,8 +155,12 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		vars["airflowVersion"] = airflowVersion
 	}
 
-	if dagDeploymentType == "volume" && nfsLocation != "" {
+	if dagDeploymentType == volumeDeploymentType && nfsLocation != "" {
 		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	}
+
+	if CheckTriggererEnabled(client) {
+		vars["triggererReplicas"] = triggererReplicas
 	}
 	req := houston.Request{
 		Query:     houston.DeploymentCreateRequest,
@@ -119,24 +183,24 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		splitted = camelcase.Split(executor)
 	}
 
-	var airflowUrl, flowerUrl string
+	var airflowURL, flowerURL string
 	for _, url := range r.Data.CreateDeployment.Urls {
 		if url.Type == "airflow" {
-			airflowUrl = url.URL
+			airflowURL = url.URL
 		}
 		if url.Type == "flower" {
-			flowerUrl = url.URL
+			flowerURL = url.URL
 		}
 	}
 
 	tab.SuccessMsg =
 		fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
 			". Deployment can be accessed at the following URLs \n" +
-			fmt.Sprintf("\n Airflow Dashboard: %s", airflowUrl)
+			fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
 
 	// The Flower URL is specific to CeleryExecutor only
-	if executor == "CeleryExecutor" || executor == "" {
-		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerUrl)
+	if executor == celeryExecutor || executor == "" {
+		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerURL)
 	}
 	tab.Print(out)
 
@@ -161,6 +225,51 @@ func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) e
 	fmt.Fprintln(out, "\n Successfully deleted deployment")
 
 	return nil
+}
+
+// list all available namespaces
+func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (string, error) {
+	tab := &printutil.Table{
+		Padding:        []int{30},
+		DynamicPadding: true,
+		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
+	}
+
+	logrus.Debug("checking namespaces available for platform")
+	tab.GetUserInput = true
+
+	req := houston.Request{
+		Query: houston.AvailableNamespacesGetRequest,
+	}
+
+	r, err := req.DoWithClient(client)
+	if err != nil {
+		return "", err
+	}
+
+	names := r.Data.GetDeploymentNamespaces
+
+	if len(names) == 0 {
+		return "", ErrKubernetesNamespaceNotAvailable
+	}
+
+	for _, namespace := range names {
+		name := namespace.Name
+
+		tab.AddRow([]string{name}, false)
+	}
+
+	tab.Print(out)
+
+	in := input.Text("\n> ")
+	i, err := strconv.ParseInt(in, 10, 64)
+	if err != nil {
+		return "", ErrParsingInt{in: in}
+	}
+	if i > int64(len(names)) {
+		return "", ErrNumberOutOfRange
+	}
+	return names[i-1].Name, nil
 }
 
 // List all airflow deployments
@@ -193,10 +302,8 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 	tab := newTableOut()
 
 	// Build rows
-	for _, d := range deployments {
-		if all {
-			ws = d.Workspace.ID
-		}
+	for i := range deployments {
+		d := deployments[i]
 
 		currentTag := d.DeploymentInfo.Current
 		if currentTag == "" {
@@ -209,7 +316,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation string, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -219,6 +326,10 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 
 	if dagDeploymentType != "" {
 		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	}
+
+	if CheckTriggererEnabled(client) {
+		vars["triggererReplicas"] = triggererReplicas
 	}
 
 	req := houston.Request{
@@ -353,17 +464,16 @@ func getAirflowVersionSelection(airflowVersion string, client *houston.Client, o
 
 	t.Print(out)
 
-	in := input.InputText("\n> ")
-	i, err := strconv.ParseInt(
-		in,
-		10,
-		64,
-	)
+	in := input.Text("\n> ")
+	i, err := strconv.ParseInt(in, 10, 64)
+	if err != nil {
+		return "", err
+	}
 	return filteredVersions[i-1], nil
 }
 
-func getDeployment(deploymentId string, client *houston.Client) (*houston.Deployment, error) {
-	vars := map[string]interface{}{"id": deploymentId}
+func getDeployment(deploymentID string, client *houston.Client) (*houston.Deployment, error) {
+	vars := map[string]interface{}{"id": deploymentID}
 
 	req := houston.Request{
 		Query:     houston.DeploymentGetRequest,
@@ -378,9 +488,9 @@ func getDeployment(deploymentId string, client *houston.Client) (*houston.Deploy
 	return &r.Data.GetDeployment, nil
 }
 
-func meetsAirflowUpgradeReqs(airflowVersion string, desiredAirflowVersion string) error {
+func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error {
 	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10)
-	minRequiredVersion := "1.10.14"
+	minRequiredVersion := minAirflowVersion
 	airflowUpgradeVersion, err := semver.NewVersion(upgradeVersion)
 	if err != nil {
 		return err
@@ -397,9 +507,7 @@ func meetsAirflowUpgradeReqs(airflowVersion string, desiredAirflowVersion string
 	}
 
 	if currentVersion.Compare(desiredVersion) == 0 {
-		errorMessage := fmt.Sprintf("Error: You tried to set --desired-airflow-version to %s, but this Airflow Deployment "+
-			"is already running %s. Please indicate a higher version of Airflow and try again.", desiredVersion, currentVersion)
-		return errors.New(errorMessage)
+		return ErrInvalidAirflowVersion{desiredVersion: desiredAirflowVersion, currentVersion: currentVersion}
 	}
 
 	if airflowUpgradeVersion.Compare(desiredVersion) < 1 {
@@ -409,9 +517,7 @@ func meetsAirflowUpgradeReqs(airflowVersion string, desiredAirflowVersion string
 		}
 
 		if currentVersion.Compare(minUpgrade) < 0 {
-			errorMessage := fmt.Sprintf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first "+
-				"and make sure your DAGs and configs are 2.0 compatible.", minRequiredVersion)
-			return errors.New(errorMessage)
+			return ErrMajorAirflowVersionUpgrade
 		}
 	}
 

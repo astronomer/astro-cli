@@ -70,10 +70,10 @@ func TestRemove(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	id := "ck1qg6whg001r08691y117hub"
-	userId := "ckc0eir8e01gj07608ajmvia1"
+	userID := "ckc0eir8e01gj07608ajmvia1"
 
 	buf := new(bytes.Buffer)
-	err := Remove(id, userId, api, buf)
+	err := Remove(id, userID, api, buf)
 	assert.NoError(t, err)
 	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
                                ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
@@ -148,10 +148,10 @@ func TestListRoles(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	wsId := "ck1qg6whg001r08691y117hub"
+	wsID := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
-	err := ListRoles(wsId, api, buf)
+	err := ListRoles(wsID, api, buf)
 	assert.NoError(t, err)
 	expected := ` USERNAME                 ID                            ROLE                
  andrii@astronomer.io     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
@@ -170,10 +170,10 @@ func TestListRolesError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	wsId := "ck1qg6whg001r08691y117hub"
+	wsID := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
-	err := ListRoles(wsId, api, buf)
+	err := ListRoles(wsID, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -216,7 +216,7 @@ func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
-	assert.Equal(t, "The user you are trying to change is not part of this workspace", err.Error())
+	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
 }
 
 func TestUpdateRoleNoAccess(t *testing.T) {
@@ -236,7 +236,7 @@ func TestUpdateRoleNoAccess(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
-	assert.Equal(t, "The user you are trying to change is not part of this workspace", err.Error())
+	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
 }
 
 func TestUpdateRoleError(t *testing.T) {
@@ -272,8 +272,7 @@ func TestGetUserRole(t *testing.T) {
 	id := "ck1qg6whg001r08691y117hub"
 	email := "andrii@test.com"
 
-	buf := new(bytes.Buffer)
-	userRoleBinding, err := getUserRole(id, email, api, buf)
+	userRoleBinding, err := getUserRole(id, email, api)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(userRoleBinding.RoleBindings))
 }
@@ -291,7 +290,6 @@ func TestGetUserRoleError(t *testing.T) {
 	id := "ck1qg6whg001r08691y117hub"
 	email := "andrii@test.com"
 
-	buf := new(bytes.Buffer)
-	_, err := getUserRole(id, email, api, buf)
+	_, err := getUserRole(id, email, api)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }

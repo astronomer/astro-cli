@@ -7,11 +7,7 @@ import (
 // IsGitRepository checks if current directory is a git repository
 func IsGitRepository() bool {
 	_, err := exec.Command("git", "rev-parse", "--is-inside-working-tree").Output()
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // HasUncommittedChanges checks repository for uncommitted changes

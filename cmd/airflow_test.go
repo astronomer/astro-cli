@@ -12,19 +12,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func executeCommandC(client *houston.Client, args ...string) (c *cobra.Command, output string, err error) {
+func executeCommandC(client *houston.Client, args ...string) (output string, err error) {
 	buf := new(bytes.Buffer)
 	rootCmd := NewRootCmd(client, buf)
 	rootCmd.SetOut(buf)
 	rootCmd.SetArgs(args)
-	c, err = rootCmd.ExecuteC()
+	_, err = rootCmd.ExecuteC()
 	client.HTTPClient.HTTPClient.CloseIdleConnections()
-	return c, buf.String(), err
+	return buf.String(), err
 }
 
 func executeCommand(args ...string) (output string, err error) {
 	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	_, output, err = executeCommandC(client, args...)
+	output, err = executeCommandC(client, args...)
 	return output, err
 }
 
@@ -42,43 +42,36 @@ func TestNewAirflowInitCmd(t *testing.T) {
 }
 
 func TestNewAirflowStartCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowStartCmd(client, os.Stdout)
+	cmd := newAirflowStartCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowKillCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowKillCmd(client, os.Stdout)
+	cmd := newAirflowKillCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowLogsCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowLogsCmd(client, os.Stdout)
+	cmd := newAirflowLogsCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowStopCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowStopCmd(client, os.Stdout)
+	cmd := newAirflowStopCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowPSCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowPSCmd(client, os.Stdout)
+	cmd := newAirflowPSCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowRunCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowRunCmd(client, os.Stdout)
+	cmd := newAirflowRunCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowUpgradeCheckCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newAirflowUpgradeCheckCmd(client, os.Stdout)
+	cmd := newAirflowUpgradeCheckCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }

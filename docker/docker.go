@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -19,19 +20,13 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
 	// Docker is the docker command.
 	Docker = "docker"
 )
-
-type loginOptions struct {
-	serverAddress string
-	user          string
-	password      string
-	passwordStdin bool
-}
 
 // Exec executes a docker command
 func Exec(args ...string) error {
@@ -61,7 +56,9 @@ func ExecPush(serverAddress, token, image string) error {
 	// TODO: rethink how to reuse creds store
 	authConfig.Password = token
 
+	log.Debugf("Exec Push docker creds %v \n", authConfig)
 	if err != nil {
+		log.Debugf("Error reading credentials: %v", err)
 		return errors.Errorf("Error reading credentials: %v", err)
 	}
 
@@ -69,16 +66,19 @@ func ExecPush(serverAddress, token, image string) error {
 
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
+		log.Debugf("Error setting up new Client ops %v", err)
 		panic(err)
 	}
 	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
 	if err != nil {
+		log.Debugf("Error negotiating api version: %v", err)
 		return err
 	}
 	encodedAuth := base64.URLEncoding.EncodeToString(buf)
 	responseBody, err := cli.ImagePush(ctx, image, types.ImagePushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
+		log.Debugf("Error pushing image to docker: %v", err)
 		return err
 	}
 	defer responseBody.Close()
@@ -105,6 +105,7 @@ func ExecLogin(serverAddress, username, token string) error {
 		Password:      token,
 	}
 
+	log.Debugf("docker creds %v \n", authConfig)
 	_, err = cli.RegistryLogin(ctx, *authConfig)
 	if err != nil {
 		return errors.Errorf("registry login error: %v", err)
@@ -124,7 +125,7 @@ func ExecLogin(serverAddress, username, token string) error {
 }
 
 // AirflowCommand is the main method of interaction with Airflow
-func AirflowCommand(id string, airflowCommand string) string {
+func AirflowCommand(id, airflowCommand string) string {
 	cmd := exec.Command("docker", "exec", "-it", id, "bash", "-c", airflowCommand)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
@@ -154,10 +155,15 @@ func ExecPipe(resp types.HijackedResponse, inStream io.Reader, outStream, errorS
 	stdinDone := make(chan struct{})
 	go func() {
 		if inStream != nil {
-			io.Copy(resp.Conn, inStream)
+			_, err := io.Copy(resp.Conn, inStream)
+			if err != nil {
+				fmt.Println("Error copying input stream: ", err.Error())
+			}
 		}
 
-		if err := resp.CloseWrite(); err != nil {
+		err := resp.CloseWrite()
+		if err != nil {
+			fmt.Println("Error closing response body: ", err.Error())
 		}
 		close(stdinDone)
 	}()

@@ -33,7 +33,7 @@ type IntegrationTestSuite struct {
 func (ts *IntegrationTestSuite) SetupSuite() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig()
-	afero.WriteFile(fs, config.HomeConfigFile, []byte(configYaml), 0777)
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	rand.Seed(time.Now().UnixNano())
 	ts.Fs = fs
@@ -49,7 +49,7 @@ func (ts *IntegrationTestSuite) Test2CreateWorkspace() {
 	output := new(bytes.Buffer)
 	err := auth.Login(ts.TestDomain, true, ts.TestEmail, ts.TestPassword, ts.Client, output)
 	assert.NoError(ts.T(), err)
-	_, out, err := executeCommandC(ts.Client, "workspace", "create", ts.TestWorkspace)
+	out, err := executeCommandC(ts.Client, "workspace", "create", ts.TestWorkspace)
 	assert.NoError(ts.T(), err)
 	expectedOut := "Successfully created workspace"
 	assert.Contains(ts.T(), out, expectedOut)

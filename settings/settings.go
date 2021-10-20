@@ -8,7 +8,6 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -31,7 +30,7 @@ var (
 
 	settings Config
 
-	// Version 2.0.0
+	// AirflowVersionTwo is for Airflow Version 2.0.0
 	AirflowVersionTwo uint64 = 2
 )
 
@@ -57,12 +56,12 @@ func InitSettings() {
 	readErr := viperSettings.ReadInConfig()
 
 	if readErr != nil {
-		fmt.Printf(messages.CONFIG_READ_ERROR, readErr)
+		fmt.Printf(messages.ErrReadingConfig, readErr)
 	}
 
 	err := viperSettings.Unmarshal(&settings)
 	if err != nil {
-		errors.Wrap(err, "unable to decode into struct")
+		fmt.Println("Unable to decode settings struct: ", err.Error())
 	}
 }
 
@@ -75,23 +74,20 @@ func AddVariables(id string, version uint64) {
 			if objectValidator(0, variable.VariableValue) {
 				fmt.Print("Skipping Variable Creation: No Variable Name Specified.\n")
 			}
-		} else {
-			if objectValidator(0, variable.VariableValue) {
-
-				baseCmd := "airflow variables "
-				if version >= AirflowVersionTwo {
-					baseCmd += "set %s " // Airflow 2.0.0 command
-				} else {
-					baseCmd += "-s %s " // Airflow 1.0.0 command
-				}
-
-				airflowCommand := fmt.Sprintf(baseCmd, variable.VariableName)
-
-				airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
-
-				docker.AirflowCommand(id, airflowCommand)
-				fmt.Printf("Added Variable: %s\n", variable.VariableName)
+		} else if objectValidator(0, variable.VariableValue) {
+			baseCmd := "airflow variables "
+			if version >= AirflowVersionTwo {
+				baseCmd += "set %s " // Airflow 2.0.0 command
+			} else {
+				baseCmd += "-s %s " // Airflow 1.0.0 command
 			}
+
+			airflowCommand := fmt.Sprintf(baseCmd, variable.VariableName)
+
+			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
+
+			docker.AirflowCommand(id, airflowCommand)
+			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
 }
@@ -100,16 +96,16 @@ func AddVariables(id string, version uint64) {
 func AddConnections(id string, airflowVersion uint64) {
 	connections := settings.Airflow.Connections
 	baseCmd := "airflow connections "
-	var baseAddCmd, baseRmCmd, baseListCmd, connIdArg, connTypeArg, connUriArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
+	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
 	if airflowVersion >= AirflowVersionTwo {
 		// Airflow 2.0.0 command
 		// based on https://airflow.apache.org/docs/apache-airflow/2.0.0/cli-and-env-variables-ref.html
 		baseAddCmd = baseCmd + "add "
 		baseRmCmd = baseCmd + "delete "
 		baseListCmd = baseCmd + "list "
-		connIdArg = ""
+		connIDArg = ""
 		connTypeArg = "--conn-type"
-		connUriArg = "--conn-uri"
+		connURIArg = "--conn-uri"
 		connExtraArg = "--conn-extra"
 		connHostArg = "--conn-host"
 		connLoginArg = "--conn-login"
@@ -122,9 +118,9 @@ func AddConnections(id string, airflowVersion uint64) {
 		baseAddCmd = baseCmd + "-a "
 		baseRmCmd = baseCmd + "-d "
 		baseListCmd = baseCmd + "-l "
-		connIdArg = "--conn_id"
+		connIDArg = "--conn_id"
 		connTypeArg = "--conn_type"
-		connUriArg = "--conn_uri"
+		connURIArg = "--conn_uri"
 		connExtraArg = "--conn_extra"
 		connHostArg = "--conn_host"
 		connLoginArg = "--conn_login"
@@ -133,51 +129,53 @@ func AddConnections(id string, airflowVersion uint64) {
 		connPortArg = "--conn_port"
 	}
 
-	airflowCommand := fmt.Sprintf("%s", baseListCmd)
+	airflowCommand := baseListCmd
 	out := docker.AirflowCommand(id, airflowCommand)
 
-	for _, conn := range connections {
-		if objectValidator(0, conn.ConnID) {
-			quotedConnID := "'" + conn.ConnID + "'"
-
-			if strings.Contains(out, quotedConnID) {
-				fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
-				airflowCommand = fmt.Sprintf("%s %s \"%s\"", baseRmCmd, connIdArg, conn.ConnID)
-				docker.AirflowCommand(id, airflowCommand)
-			}
-
-			if !objectValidator(1, conn.ConnType, conn.ConnURI) {
-				fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
-			} else {
-				airflowCommand = fmt.Sprintf("%s %s \"%s\" ", baseAddCmd, connIdArg, conn.ConnID)
-				if objectValidator(0, conn.ConnType) {
-					airflowCommand += fmt.Sprintf("%s \"%s\" ", connTypeArg, conn.ConnType)
-				}
-				if objectValidator(0, conn.ConnURI) {
-					airflowCommand += fmt.Sprintf("%s '%s' ", connUriArg, conn.ConnURI)
-				}
-				if objectValidator(0, conn.ConnExtra) {
-					airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, conn.ConnExtra)
-				}
-				if objectValidator(0, conn.ConnHost) {
-					airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
-				}
-				if objectValidator(0, conn.ConnLogin) {
-					airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
-				}
-				if objectValidator(0, conn.ConnPassword) {
-					airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
-				}
-				if objectValidator(0, conn.ConnSchema) {
-					airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
-				}
-				if conn.ConnPort != 0 {
-					airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
-				}
-				docker.AirflowCommand(id, airflowCommand)
-				fmt.Printf("Added Connection: %s\n", conn.ConnID)
-			}
+	for idx := range connections {
+		conn := connections[idx]
+		if !objectValidator(0, conn.ConnID) {
+			continue
 		}
+		quotedConnID := "'" + conn.ConnID + "'"
+
+		if strings.Contains(out, quotedConnID) {
+			fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
+			airflowCommand = fmt.Sprintf("%s %s \"%s\"", baseRmCmd, connIDArg, conn.ConnID)
+			docker.AirflowCommand(id, airflowCommand)
+		}
+
+		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
+			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
+			continue
+		}
+		airflowCommand = fmt.Sprintf("%s %s \"%s\" ", baseAddCmd, connIDArg, conn.ConnID)
+		if objectValidator(0, conn.ConnType) {
+			airflowCommand += fmt.Sprintf("%s \"%s\" ", connTypeArg, conn.ConnType)
+		}
+		if objectValidator(0, conn.ConnURI) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
+		}
+		if objectValidator(0, conn.ConnExtra) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, conn.ConnExtra)
+		}
+		if objectValidator(0, conn.ConnHost) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
+		}
+		if objectValidator(0, conn.ConnLogin) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
+		}
+		if objectValidator(0, conn.ConnPassword) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
+		}
+		if objectValidator(0, conn.ConnSchema) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
+		}
+		if conn.ConnPort != 0 {
+			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
+		}
+		docker.AirflowCommand(id, airflowCommand)
+		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
 
@@ -204,7 +202,7 @@ func AddPools(id string, airflowVersion uint64) {
 				if objectValidator(0, pool.PoolDescription) {
 					airflowCommand += fmt.Sprintf("'%s' ", pool.PoolDescription)
 				} else {
-					airflowCommand += fmt.Sprint("\"\"")
+					airflowCommand += ""
 				}
 				docker.AirflowCommand(id, airflowCommand)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
@@ -218,12 +216,9 @@ func AddPools(id string, airflowVersion uint64) {
 func objectValidator(bound int, args ...string) bool {
 	count := 0
 	for _, arg := range args {
-		if len(arg) == 0 {
+		if arg == "" {
 			count++
 		}
 	}
-	if count > bound {
-		return false
-	}
-	return true
+	return count <= bound
 }

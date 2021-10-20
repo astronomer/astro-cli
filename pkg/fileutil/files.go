@@ -9,6 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	defaultFilePerm os.FileMode = 0777
+)
+
 // Exists returns a boolean indicating if the given path already exists
 func Exists(path string) (bool, error) {
 	if path == "" {
@@ -28,7 +32,7 @@ func Exists(path string) (bool, error) {
 }
 
 // WriteStringToFile write a string to a file
-func WriteStringToFile(path string, s string) error {
+func WriteStringToFile(path, s string) error {
 	return WriteToFile(path, strings.NewReader(s))
 }
 
@@ -36,7 +40,7 @@ func WriteStringToFile(path string, s string) error {
 func WriteToFile(path string, r io.Reader) error {
 	dir := filepath.Dir(path)
 	if dir != "" {
-		if err := os.MkdirAll(dir, 0777); err != nil {
+		if err := os.MkdirAll(dir, defaultFilePerm); err != nil {
 			return err
 		}
 	}

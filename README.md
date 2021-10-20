@@ -1,6 +1,5 @@
 # Astronomer CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/astronomer/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
 
-
 The Astronomer CLI can be used to build Airflow DAGs locally and run them via docker-compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
 
 ```
@@ -70,6 +69,7 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
 ```
 
 ie:
+
 ```
 curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 ```
@@ -77,7 +77,6 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 > Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh) script locally.
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
-
 
 ### Installing on Windows
 
@@ -87,17 +86,17 @@ curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
 2. Extract the file ending in `windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
 3. Open cmd or PowerShell console and run the `astro version` command. Your output should look something like this:
 
-    ```
-    C:\Windows\system32>astro version
-    Astro CLI Version: x.y.z
-    Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
-    ```
+   ```
+   C:\Windows\system32>astro version
+   Astro CLI Version: x.y.z
+   Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
+   ```
 
 #### Troubleshooting
 
 1. Make sure you go through instruction to install Docker on windows properly https://docs.docker.com/docker-for-windows/install/
 2. Make sure you enabled Hyper-V, it's required for Docker and Linux Containers, also please review this document
-https://docs.docker.com/docker-for-windows/troubleshoot/
+   https://docs.docker.com/docker-for-windows/troubleshoot/
 
 ## Getting Started
 
@@ -197,6 +196,7 @@ local:
 ### Run tests
 
 To run unit-tests you can run:
+
 > Note: Make sure you have running locally houston on http://localhost:8871/v1 it required for running tests
 
 ```bash
@@ -221,7 +221,15 @@ The astro-cli is following a semantic versioning scheme
 
 with all releases up until 1.0.0 considered beta.
 
-`astro-cli` tightly tracks the platform release versioning, this means that compatibility is only guaranteed between matching __minor__ versions of the platform and the astro-cli. ie. astro-cli `v0.9.0` is guaranteed to be compatible with houston-api `v0.9.x` but not houston-api `v0.10.x`
+`astro-cli` tightly tracks the platform release versioning, this means that compatibility is only guaranteed between matching **minor** versions of the platform and the astro-cli. ie. astro-cli `v0.9.0` is guaranteed to be compatible with houston-api `v0.9.x` but not houston-api `v0.10.x`
+
+## Debug
+
+`astro-cli` has a debug flag that allows to see queries and different helpful logs that are done internally. You can enable this by passing `--verbosity=debug` to your commands or you can edit your `~/.astro/config.yaml` and add the following to it. This will turn on debug for all requests that are done until it is changed to `info` or removed from config.
+
+```yaml
+verbosity: debug
+```
 
 ## Support
 

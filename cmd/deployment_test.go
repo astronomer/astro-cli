@@ -90,7 +90,164 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
-		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": false},
+    "createDeployment": {
+      "airflowVersion": "2.2.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.2.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "", expectedError: "unknown flag: --triggerer-replicas"},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true} },
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		output, err := executeCommandC(api, tt.cmdArgs...)
 		if tt.expectedError != "" {
 			assert.EqualError(t, err, tt.expectedError)
 		} else {
@@ -104,7 +261,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"nfsMountDagDeployment": true},
+    "appConfig": {"nfsMountDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true}},
     "createDeployment": {
       "airflowVersion": "2.0.0",
       "config": {
@@ -170,7 +327,70 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
 	}
 	for _, tt := range myTests {
-		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true}},
+    "updateDeployment": {
+      "createdAt": "2021-04-23T14:29:28.497Z",
+      "dagDeployment": {
+        "nfsLocation": "test:/test",
+        "type": "volume"
+      },
+      "description": "",
+      "id": "cknuetusw0018yqxto2jzxjqq",
+      "label": "test_dima22asdasd",
+      "releaseName": "amateur-instrument-9515",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T21:42:35.361Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		output, err := executeCommandC(api, tt.cmdArgs...)
 		if tt.expectedError != "" {
 			assert.EqualError(t, err, tt.expectedError)
 		} else {
@@ -184,7 +404,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"nfsMountDagDeployment": true},
+    "appConfig": {"nfsMountDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true}},
     "updateDeployment": {
       "createdAt": "2021-04-23T14:29:28.497Z",
       "dagDeployment": {
@@ -234,7 +454,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
-		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		output, err := executeCommandC(api, tt.cmdArgs...)
 		if tt.expectedError != "" {
 			assert.EqualError(t, err, tt.expectedError)
 		} else {
@@ -293,7 +513,7 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "service-account", "delete", "q1w2e3r4t5y6u7i8o9p0", "--deployment-id=1234")
+	output, err := executeCommandC(api, "deployment", "service-account", "delete", "q1w2e3r4t5y6u7i8o9p0", "--deployment-id=1234")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
@@ -331,7 +551,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "service-account", "create", "--deployment-id=ck1qg6whg001r08691y117hub", "--label=my_label", "--role=viewer")
+	output, err := executeCommandC(api, "deployment", "service-account", "create", "--deployment-id=ck1qg6whg001r08691y117hub", "--label=my_label", "--role=viewer")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -369,7 +589,7 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -407,7 +627,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -441,7 +661,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
+	output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -476,7 +696,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
+	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -506,7 +726,7 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
+	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -543,7 +763,7 @@ func TestDeploymentSAGetCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
+	output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -578,7 +798,7 @@ func TestDeploymentDelete(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
+	output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -593,7 +813,10 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 			"smtpConfigured": true,
 			"manualReleaseNames": false,
 			"hardDeleteDeployment": true,
-			"nfsMountDagDeployment": false
+			"nfsMountDagDeployment": false,
+			"featureFlags": {
+				"hardDeleteDeployment": true
+			}
 		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
@@ -635,7 +858,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	_, _, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	_, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.Nil(t, err)
 }
 
@@ -650,7 +873,10 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 			"smtpConfigured": true,
 			"manualReleaseNames": false,
 			"hardDeleteDeployment": true,
-			"nfsMountDagDeployment": false
+			"nfsMountDagDeployment": false,
+			"featureFlags": {
+			   "hardDeleteDeployment": true
+			}
 		},
 		  "deleteDeployment": {
 		    "id": "ckqh2dmzc43548h9hxzspysyi",
@@ -692,7 +918,7 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	_, output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

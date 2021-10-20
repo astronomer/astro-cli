@@ -8,11 +8,12 @@ import (
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
+	newLogger "github.com/sirupsen/logrus"
 )
 
 var (
-	PermissionsError        = errors.New("You do not have the appropriate permissions for that")
-	PermissionsErrorVerbose = errors.New("You do not have the appropriate permissions for that: Your token has expired. Please log in again.")
+	ErrInaptPermissions        = errors.New("You do not have the appropriate permissions for that") //nolint
+	ErrVerboseInaptPermissions = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
@@ -65,10 +66,11 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-
+	newLogger.Debugf("Request Data: %v\n", doOpts.Data)
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
 	if err != nil {
+		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err
 	}
 	defer httpResponse.Body.Close()
@@ -87,11 +89,12 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
+	newLogger.Debugf("Response Data: %v\n", string(body))
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)
-		if err.Error() == PermissionsError.Error() {
-			return nil, PermissionsErrorVerbose
+		if err.Error() == ErrInaptPermissions.Error() {
+			return nil, ErrVerboseInaptPermissions
 		}
 		return nil, err
 	}

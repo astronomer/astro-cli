@@ -10,6 +10,16 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+var (
+	ErrInvalidConfigNoDomain = errors.New("cluster config invalid, no domain specified")
+	ErrContextNotSet         = errors.New("no context set, have you authenticated to a cluster")
+	ErrClusterNotSet         = errors.New("cluster not set, have you authenticated to this cluster")
+
+	localhostDomain = "localhost"
+	houstonDomain   = "houston"
+	notApplicable   = "N/A"
+)
+
 // newTableOut construct new printutil.Table
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
@@ -36,8 +46,8 @@ func GetCurrentContext() (Context, error) {
 	c := Context{}
 
 	domain := CFG.Context.GetHomeString()
-	if len(domain) == 0 {
-		return Context{}, errors.New("No context set, have you authenticated to a cluster?")
+	if domain == "" {
+		return Context{}, ErrContextNotSet
 	}
 
 	c.Domain = domain
@@ -53,13 +63,13 @@ func (c Context) PrintContext(out io.Writer) error {
 	}
 
 	cluster := c.Domain
-	if len(cluster) == 0 {
-		cluster = "N/A"
+	if cluster == "" {
+		cluster = notApplicable
 	}
 
 	workspace := c.Workspace
-	if len(workspace) == 0 {
-		workspace = "N/A"
+	if workspace == "" {
+		workspace = notApplicable
 	}
 	tab := newTableOut()
 	tab.AddRow([]string{cluster, workspace}, false)
@@ -86,8 +96,8 @@ func PrintCurrentContext(out io.Writer) error {
 // GetContextKey allows a cluster domain to be used without interfering
 // with viper's dot (.) notation for fetching configs by replacing with underscores (_)
 func (c Context) GetContextKey() (string, error) {
-	if len(c.Domain) == 0 {
-		return "", errors.New("cluster config invalid, no domain specified")
+	if c.Domain == "" {
+		return "", ErrInvalidConfigNoDomain
 	}
 
 	return strings.Replace(c.Domain, ".", "_", -1), nil
@@ -114,7 +124,7 @@ func (c Context) GetContext() (Context, error) {
 	}
 
 	if !c.ContextExists() {
-		return c, errors.New("Cluster not set, have you authenticated to this cluster?")
+		return c, ErrClusterNotSet
 	}
 
 	err = viperHome.UnmarshalKey("contexts"+"."+key, &c)
@@ -150,9 +160,8 @@ func (c Context) SetContext() error {
 	}
 
 	viperHome.Set("contexts"+"."+key, context)
-	saveConfig(viperHome, HomeConfigFile)
-
-	return nil
+	err = saveConfig(viperHome, HomeConfigFile)
+	return err
 }
 
 // SetContextKey saves a single context key value pair
@@ -164,9 +173,8 @@ func (c Context) SetContextKey(key, value string) error {
 
 	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, key)
 	viperHome.Set(cfgPath, value)
-	saveConfig(viperHome, HomeConfigFile)
-
-	return nil
+	err = saveConfig(viperHome, HomeConfigFile)
+	return err
 }
 
 // SwitchContext sets the current config context to the one matching the provided Context struct
@@ -174,9 +182,10 @@ func (c Context) SwitchContext() error {
 	co, err := c.GetContext()
 	if err != nil {
 		return err
-	} else {
-		viperHome.Set("context", c.Domain)
-		saveConfig(viperHome, HomeConfigFile)
+	}
+	viperHome.Set("context", c.Domain)
+	if err := saveConfig(viperHome, HomeConfigFile); err != nil {
+		return err
 	}
 	tab := newTableOut()
 	tab.AddRow([]string{co.Domain, co.Workspace}, false)
@@ -188,7 +197,7 @@ func (c Context) SwitchContext() error {
 
 // GetAPIURL returns full Houston API Url for the provided Context
 func (c Context) GetAPIURL() string {
-	if c.Domain == "localhost" || c.Domain == "houston" {
+	if c.Domain == localhostDomain || c.Domain == houstonDomain {
 		return CFG.LocalHouston.GetString()
 	}
 
@@ -202,7 +211,7 @@ func (c Context) GetAPIURL() string {
 
 // GetWebsocketURL returns full Houston websocket Url for the provided Context
 func (c Context) GetWebsocketURL() string {
-	if c.Domain == "localhost" || c.Domain == "houston" {
+	if c.Domain == localhostDomain || c.Domain == houstonDomain {
 		return CFG.LocalHouston.GetString()
 	}
 
@@ -216,7 +225,7 @@ func (c Context) GetWebsocketURL() string {
 
 // GetAppURL returns full Houston API Url for the provided Context
 func (c Context) GetAppURL() string {
-	if c.Domain == "localhost" || c.Domain == "houston" {
+	if c.Domain == localhostDomain || c.Domain == houstonDomain {
 		return CFG.LocalOrbit.GetString()
 	}
 

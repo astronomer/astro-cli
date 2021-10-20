@@ -213,6 +213,6 @@ func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 	output := new(bytes.Buffer)
 
 	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-	assert.Equal(t, "The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again.", err.Error())
+	assert.Equal(t, "the --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again", err.Error())
 	assert.Equal(t, "", defaultTag)
 }
