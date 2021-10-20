@@ -31,8 +31,8 @@ var (
 	releaseName           string
 	nfsLocation           string
 	dagDeploymentType     string
-
-	CreateExample = `
+	triggererReplicas     int
+	CreateExample         = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create new-deployment-name --executor=celery
 
@@ -126,6 +126,9 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
+	if deployment.CheckTriggererEnabled(client) {
+		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+	}
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -165,7 +168,7 @@ func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command 
 }
 
 func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
-	example := ` 
+	example := `
 # update labels and description for given deployment
 $ astro deployment update UUID label=Production-Airflow description=example version=v1.0.0`
 	updateExampleDagDeployment := `
@@ -195,7 +198,9 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
-
+	if deployment.CheckTriggererEnabled(client) {
+		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+	}
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
 }
@@ -419,7 +424,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 			return err
 		}
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, client, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, triggererReplicas, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -469,7 +474,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 			return err
 		}
 	}
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, client, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, triggererReplicas, client, out)
 }
 
 func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {

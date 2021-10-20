@@ -61,6 +61,7 @@ var (
 		ShowWarnings:       newCfg("show_warnings", "true"),
 		AirflowReleasesURL: newCfg("airflow_releases_url", "https://updates.astronomer.io/astronomer-certified"),
 		SkipVerifyTLS:      newCfg("skip_verify_tls", "false"),
+		Verbosity:          newCfg("verbosity", "warning"),
 	}
 
 	// viperHome is the viper object in the users home directory

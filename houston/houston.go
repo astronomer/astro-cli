@@ -8,6 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
+	newLogger "github.com/sirupsen/logrus"
 )
 
 var (
@@ -65,10 +66,11 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-
+	newLogger.Debugf("Request Data: %v\n", doOpts.Data)
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do("POST", cl.GetAPIURL(), &doOpts)
 	if err != nil {
+		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err
 	}
 	defer httpResponse.Body.Close()
@@ -87,6 +89,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
 	}
+	newLogger.Debugf("Response Data: %v\n", string(body))
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)

@@ -24,9 +24,11 @@ var (
 		$workspaceId: Uuid!
 		$executor: ExecutorType!
 		$airflowVersion: String
+		$namespace: String
 		$config: JSON
 		$cloudRole: String
 		$dagDeployment: DagDeployment
+		$triggererReplicas: Int
 	) {
 		createDeployment(
 			label: $label
@@ -35,9 +37,13 @@ var (
 			releaseName: $releaseName
 			executor: $executor
 		        airflowVersion: $airflowVersion
+			namespace: $namespace
 			config: $config
 			cloudRole: $cloudRole
 			dagDeployment: $dagDeployment
+			triggerer: {
+				replicas: $triggererReplicas
+			}
 		) {
 			id
 			type
@@ -104,6 +110,13 @@ var (
 		}
 	}`
 
+	AvailableNamespacesGetRequest = `
+	query availableNamespaces {
+		availableNamespaces{
+			name
+		}
+	}`
+
 	DeploymentGetRequest = `
 	query GetDeployment(
 		$id: String!
@@ -118,8 +131,8 @@ var (
 	}`
 
 	DeploymentUpdateRequest = `
-mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String, $dagDeployment: DagDeployment) {
-		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole, dagDeployment: $dagDeployment) {
+mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String, $dagDeployment: DagDeployment, $triggererReplicas: Int) {
+		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole, dagDeployment: $dagDeployment, triggerer:{ replicas: $triggererReplicas }) {
 			id
 			type
 			label
@@ -549,6 +562,10 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			manualReleaseNames
 			configureDagDeployment
 			nfsMountDagDeployment
+			manualNamespaceNames
+			hardDeleteDeployment
+			triggererEnabled
+			featureFlags
 		}
 	}`
 )

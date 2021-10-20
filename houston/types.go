@@ -40,8 +40,13 @@ type Response struct {
 		WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
 		WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
 		DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
+		GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
 	} `json:"data"`
 	Errors []Error `json:"errors,omitempty"`
+}
+
+type Namespace struct {
+	Name string `json:"name"`
 }
 
 type AuthProvider struct {
@@ -271,13 +276,23 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 
 // AppConfig contains current houston config
 type AppConfig struct {
-	Version                string `json:"version"`
-	BaseDomain             string `json:"baseDomain"`
-	SMTPConfigured         bool   `json:"smtpConfigured"`
-	ManualReleaseNames     bool   `json:"manualReleaseNames"`
-	ConfigureDagDeployment bool   `json:"configureDagDeployment"`
-	NfsMountDagDeployment  bool   `json:"nfsMountDagDeployment"`
-	HardDeleteDeployment   bool   `json:"hardDeleteDeployment"`
+	Version                string       `json:"version"`
+	BaseDomain             string       `json:"baseDomain"`
+	SMTPConfigured         bool         `json:"smtpConfigured"`
+	ManualReleaseNames     bool         `json:"manualReleaseNames"`
+	ConfigureDagDeployment bool         `json:"configureDagDeployment"`
+	NfsMountDagDeployment  bool         `json:"nfsMountDagDeployment"`
+	HardDeleteDeployment   bool         `json:"hardDeleteDeployment"`
+	ManualNamespaceNames   bool         `json:"manualNamespaceNames"`
+	TriggererEnabled       bool         `json:"triggererEnabled"`
+	Flags                  FeatureFlags `json:"featureFlags,omitempty"`
+}
+
+type FeatureFlags struct {
+	NfsMountDagDeployment bool `json:"nfsMountDagDeployment"`
+	HardDeleteDeployment  bool `json:"hardDeleteDeployment"`
+	ManualNamespaceNames  bool `json:"manualNamespaceNames"`
+	TriggererEnabled      bool `json:"triggererEnabled"`
 }
 
 // coerce a string into SemVer if possible
