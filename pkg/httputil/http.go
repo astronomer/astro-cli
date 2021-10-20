@@ -83,13 +83,6 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 	}
 	return resp, nil
 }
-func debug(data []byte, err error) {
-	if err == nil {
-		log.Debugf("%s\n\n", data)
-	} else {
-		log.Fatalf("%s\n\n", err)
-	}
-}
 
 func debug(data []byte, err error) {
 	if err == nil {
