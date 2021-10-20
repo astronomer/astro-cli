@@ -257,6 +257,163 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 	}
 }
 
+func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": false},
+    "createDeployment": {
+      "airflowVersion": "2.2.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.2.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "", expectedError: "unknown flag: --triggerer-replicas"},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true} },
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
 func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
@@ -399,7 +556,68 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 		assert.Contains(t, output, tt.expectedOutput)
 	}
 }
+func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true}},
+    "updateDeployment": {
+      "createdAt": "2021-04-23T14:29:28.497Z",
+      "dagDeployment": {
+        "nfsLocation": "test:/test",
+        "type": "volume"
+      },
+      "description": "",
+      "id": "cknuetusw0018yqxto2jzxjqq",
+      "label": "test_dima22asdasd",
+      "releaseName": "amateur-instrument-9515",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T21:42:35.361Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
 
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
 func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
