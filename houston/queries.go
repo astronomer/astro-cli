@@ -330,6 +330,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 	}
   }
   `
+	// #nosec
 	TokenBasicCreateRequest = `
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {

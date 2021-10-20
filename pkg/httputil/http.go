@@ -50,7 +50,8 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 		body = bytes.NewBuffer(buf)
 	}
 
-	req, err := http.NewRequest(method, path, body)
+	req, err := http.NewRequest(method, path, body) //nolint:noctx
+	// req = req.WithContext(context.TODO())
 	if err != nil {
 		return nil, err
 	}

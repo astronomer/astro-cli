@@ -65,7 +65,7 @@ func TestPrintVersionError(t *testing.T) {
 	CurrVersion = ""
 	err := PrintVersion(api, output)
 	if assert.Error(t, err, "An error was expected") {
-		assert.EqualError(t, err, messages.ERROR_INVALID_CLI_VERSION)
+		assert.EqualError(t, err, messages.ErrInvalidCLIVersion)
 	}
 }
 

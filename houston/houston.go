@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	PermissionsError        = errors.New("You do not have the appropriate permissions for that")
-	PermissionsErrorVerbose = errors.New("You do not have the appropriate permissions for that: Your token has expired. Please log in again.")
+	ErrInaptPermissions        = errors.New("You do not have the appropriate permissions for that") //nolint
+	ErrVerboseInaptPermissions = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
@@ -90,8 +90,8 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = errors.New(decode.Errors[0].Message)
-		if err.Error() == PermissionsError.Error() {
-			return nil, PermissionsErrorVerbose
+		if err.Error() == ErrInaptPermissions.Error() {
+			return nil, ErrVerboseInaptPermissions
 		}
 		return nil, err
 	}

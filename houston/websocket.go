@@ -56,16 +56,21 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	h := http.Header{"Sec-WebSocket-Protocol": []string{"graphql-ws"}}
-	ws, _, err := websocket.DefaultDialer.Dial(url, h)
+	ws, resp, err := websocket.DefaultDialer.Dial(url, h)
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
-	defer ws.Close()
+	defer func() {
+		ws.Close()
+		if resp != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	initSubscription := InitSubscription{Type: "connection_init", Payload: AuthPayload{Authorization: jwtToken}}
 	js, _ := json.Marshal(&initSubscription)
 
-	err = ws.WriteMessage(websocket.TextMessage, []byte(js))
+	err = ws.WriteMessage(websocket.TextMessage, js)
 	if err != nil {
 		fmt.Printf("Could not init connection: %s", err.Error())
 	}
@@ -92,7 +97,9 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 				}
 			}
 			var resp WSResponse
-			json.Unmarshal(message, &resp)
+			if err = json.Unmarshal(message, &resp); err != nil {
+				log.Fatal(err)
+			}
 			fmt.Print(resp.Payload.Data.Log.Log)
 		}
 	}()

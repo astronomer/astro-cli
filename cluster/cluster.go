@@ -121,12 +121,8 @@ func getClusterSelection() (string, error) {
 
 	tab.Print(os.Stdout)
 
-	in := input.InputText("\n> ")
-	i, err := strconv.ParseInt(
-		in,
-		10,
-		64,
-	)
+	in := input.Text("\n> ")
+	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot parse %s to int", in)
 	}
@@ -137,7 +133,7 @@ func getClusterSelection() (string, error) {
 // SwitchCluster is a thin wrapper around the switch cluster receiver
 // Returns error
 func Switch(domain string) error {
-	if len(domain) == 0 {
+	if domain == "" {
 		d, err := getClusterSelection()
 		if err != nil {
 			return err

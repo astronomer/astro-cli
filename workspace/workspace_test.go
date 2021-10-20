@@ -253,10 +253,10 @@ func TestDelete(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	wsId := "ckc0j8y1101xo0760or02jdi7"
+	wsID := "ckc0j8y1101xo0760or02jdi7"
 
 	buf := new(bytes.Buffer)
-	err := Delete(wsId, api, buf)
+	err := Delete(wsID, api, buf)
 	assert.NoError(t, err)
 	expected := "\n Successfully deleted workspace\n"
 	assert.Equal(t, expected, buf.String())
@@ -273,10 +273,10 @@ func TestDeleteError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	wsId := "ckc0j8y1101xo0760or02jdi7"
+	wsID := "ckc0j8y1101xo0760or02jdi7"
 
 	buf := new(bytes.Buffer)
-	err := Delete(wsId, api, buf)
+	err := Delete(wsID, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -291,10 +291,10 @@ func TestGetCurrentWorkspace(t *testing.T) {
 
 func TestGetCurrentWorkspaceError(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, config.HomeConfigFile, []byte(""), 0777)
+	_ = afero.WriteFile(fs, config.HomeConfigFile, []byte(""), 0777)
 	config.InitConfig(fs)
-	_, err = GetCurrentWorkspace()
-	assert.EqualError(t, err, "No context set, have you authenticated to a cluster?")
+	_, err := GetCurrentWorkspace()
+	assert.EqualError(t, err, "no context set, have you authenticated to a cluster")
 }
 
 func TestGetCurrentWorkspaceErrorNoCurrentContext(t *testing.T) {
@@ -312,10 +312,10 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, config.HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0777)
 	config.InitConfig(fs)
-	_, err = GetCurrentWorkspace()
-	assert.EqualError(t, err, "Current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+	_, err := GetCurrentWorkspace()
+	assert.EqualError(t, err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 }
 
 func TestGetWorkspaceSelectionError(t *testing.T) {
@@ -350,7 +350,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, config.HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0777)
 	config.InitConfig(fs)
 
 	// prepare houston-api fake response
@@ -389,10 +389,10 @@ contexts:
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	wsId := "ckbv7zvb100pe0760xp98qnh9"
+	wsID := "ckbv7zvb100pe0760xp98qnh9"
 
 	buf := new(bytes.Buffer)
-	err = Switch(wsId, api, buf)
+	err := Switch(wsID, api, buf)
 	assert.NoError(t, err)
 	expected := " CLUSTER                             WORKSPACE                           \n localhost                           ckbv7zvb100pe0760xp98qnh9           \n"
 	assert.Equal(t, expected, buf.String())
@@ -414,7 +414,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, config.HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0777)
 	config.InitConfig(fs)
 
 	// prepare houston-api fake response
@@ -426,10 +426,10 @@ contexts:
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	wsId := "ckbv7zvb100pe0760xp98qnh9"
+	wsID := "ckbv7zvb100pe0760xp98qnh9"
 
 	buf := new(bytes.Buffer)
-	err = Switch(wsId, api, buf)
+	err := Switch(wsID, api, buf)
 	assert.EqualError(t, err, "workspace id is not valid: API error (500): Internal Server Error")
 }
 

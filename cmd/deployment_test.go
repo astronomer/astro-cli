@@ -90,7 +90,7 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
-		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		output, err := executeCommandC(api, tt.cmdArgs...)
 		if tt.expectedError != "" {
 			assert.EqualError(t, err, tt.expectedError)
 		} else {
@@ -170,7 +170,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
 	}
 	for _, tt := range myTests {
-		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		output, err := executeCommandC(api, tt.cmdArgs...)
 		if tt.expectedError != "" {
 			assert.EqualError(t, err, tt.expectedError)
 		} else {
@@ -234,7 +234,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
-		_, output, err := executeCommandC(api, tt.cmdArgs...)
+		output, err := executeCommandC(api, tt.cmdArgs...)
 		if tt.expectedError != "" {
 			assert.EqualError(t, err, tt.expectedError)
 		} else {
@@ -293,7 +293,7 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "service-account", "delete", "q1w2e3r4t5y6u7i8o9p0", "--deployment-id=1234")
+	output, err := executeCommandC(api, "deployment", "service-account", "delete", "q1w2e3r4t5y6u7i8o9p0", "--deployment-id=1234")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
@@ -331,7 +331,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "service-account", "create", "--deployment-id=ck1qg6whg001r08691y117hub", "--label=my_label", "--role=viewer")
+	output, err := executeCommandC(api, "deployment", "service-account", "create", "--deployment-id=ck1qg6whg001r08691y117hub", "--label=my_label", "--role=viewer")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -369,7 +369,7 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -407,7 +407,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
@@ -441,7 +441,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
+	output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -476,7 +476,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
+	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -506,7 +506,7 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
+	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -543,7 +543,7 @@ func TestDeploymentSAGetCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
+	output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -578,7 +578,7 @@ func TestDeploymentDelete(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
+	output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -635,7 +635,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	_, _, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	_, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.Nil(t, err)
 }
 
@@ -692,7 +692,7 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	_, output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

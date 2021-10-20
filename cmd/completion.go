@@ -1,12 +1,14 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
+
+var ErrGeneratingBash = "error while generating bash completion"
 
 const completionLong = `
 Generate autocompletions script for Astro for the specified shell (bash or zsh).
@@ -52,7 +54,7 @@ func runCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 func runCompletionBash(w io.Writer, cmd *cobra.Command) error {
 	err := cmd.Root().GenBashCompletion(w)
 	if err != nil {
-		return fmt.Errorf("error while generating bash completion: %v", err)
+		return errors.Wrap(err, ErrGeneratingBash)
 	}
 	return nil
 }
@@ -60,13 +62,13 @@ func runCompletionBash(w io.Writer, cmd *cobra.Command) error {
 func runCompletionZsh(w io.Writer, cmd *cobra.Command) error {
 	err := cmd.Root().GenZshCompletion(w)
 	if err != nil {
-		return fmt.Errorf("error while generating bash completion: %v", err)
+		return errors.Wrap(err, ErrGeneratingBash)
 	}
 	return nil
 }
 
 func newCompletionCmd(_ *houston.Client, out io.Writer) *cobra.Command {
-	var shells []string
+	shells := make([]string, 0, len(completionShells))
 	for s := range completionShells {
 		shells = append(shells, s)
 	}

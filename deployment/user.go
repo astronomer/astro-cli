@@ -20,15 +20,15 @@ var (
 )
 
 // UserList returns a list of user with deployment access
-func UserList(deploymentId string, email string, userId string, fullName string, client *houston.Client, out io.Writer) error {
+func UserList(deploymentID, email, userID, fullName string, client *houston.Client, out io.Writer) error {
 	user := map[string]interface{}{
-		"userId":   userId,
+		"userId":   userID,
 		"email":    email,
 		"fullName": fullName,
 	}
 	variables := map[string]interface{}{
 		"user":         user,
-		"deploymentId": deploymentId,
+		"deploymentId": deploymentID,
 	}
 	req := houston.Request{
 		Query:     houston.DeploymentUserListRequest,
@@ -43,12 +43,12 @@ func UserList(deploymentId string, email string, userId string, fullName string,
 	deploymentUsers := r.Data.DeploymentUserList
 
 	if len(deploymentUsers) < 1 {
-		out.Write([]byte(messages.HoustonInvalidDeploymentUsers))
-		return nil
+		_, err = out.Write([]byte(messages.HoustonInvalidDeploymentUsers))
+		return err
 	}
 
 	header = []string{"USER ID", "NAME", "EMAIL", "ROLE"}
-	tab := printutil.Table{
+	tab = printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
 		Header:         header,
@@ -67,7 +67,8 @@ func UserList(deploymentId string, email string, userId string, fullName string,
 
 // filterByRoleType selects the type of role from a list of roles
 func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) string {
-	for _, roleBinding := range roleBindings {
+	for i := range roleBindings {
+		roleBinding := roleBindings[i]
 		if strings.Contains(roleBinding.Role, roleType) {
 			return roleBinding.Role
 		}
@@ -76,13 +77,14 @@ func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) strin
 	return ""
 }
 
+// nolint:dupl
 // Add a user to a deployment with specified role
-func Add(deploymentId string, email string, role string, client *houston.Client, out io.Writer) error {
+func Add(deploymentID, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.DeploymentUserAddRequest,
 		Variables: map[string]interface{}{
 			"email":        email,
-			"deploymentId": deploymentId,
+			"deploymentId": deploymentID,
 			"role":         role,
 		},
 	}
@@ -100,13 +102,14 @@ func Add(deploymentId string, email string, role string, client *houston.Client,
 	return nil
 }
 
+// nolint:dupl
 // UpdateUser updates a user's deployment role
-func UpdateUser(deploymentId string, email string, role string, client *houston.Client, out io.Writer) error {
+func UpdateUser(deploymentID, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.DeploymentUserUpdateRequest,
 		Variables: map[string]interface{}{
 			"email":        email,
-			"deploymentId": deploymentId,
+			"deploymentId": deploymentID,
 			"role":         role,
 		},
 	}
@@ -125,12 +128,12 @@ func UpdateUser(deploymentId string, email string, role string, client *houston.
 }
 
 // DeleteUser removes user access for a deployment
-func DeleteUser(deploymentId string, email string, client *houston.Client, out io.Writer) error {
+func DeleteUser(deploymentID, email string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.DeploymentUserDeleteRequest,
 		Variables: map[string]interface{}{
 			"email":        email,
-			"deploymentId": deploymentId,
+			"deploymentId": deploymentID,
 		},
 	}
 
@@ -148,8 +151,8 @@ func DeleteUser(deploymentId string, email string, client *houston.Client, out i
 		Header:         header,
 	}
 
-	tab.AddRow([]string{deploymentId, email, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", d.Role, email, deploymentId)
+	tab.AddRow([]string{deploymentID, email, d.Role}, false)
+	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", d.Role, email, deploymentID)
 	tab.Print(out)
 
 	return nil

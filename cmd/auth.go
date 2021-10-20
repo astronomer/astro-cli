@@ -27,7 +27,7 @@ func newAuthRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(
 		newAuthLoginCmd(client, out),
-		newAuthLogoutCmd(client, out),
+		newAuthLogoutCmd(),
 	)
 	return cmd
 }
@@ -46,7 +46,7 @@ func newAuthLoginCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAuthLogoutCmd(_ *houston.Client, out io.Writer) *cobra.Command {
+func newAuthLogoutCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Logout of Astronomer",

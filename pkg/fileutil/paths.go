@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// GetWorkingDir returns the curent working directory
+// GetWorkingDir returns the current working directory
 func GetWorkingDir() (string, error) {
 	return os.Getwd()
 }
@@ -32,7 +32,7 @@ func FindDirInPath(search string) (string, error) {
 	}
 
 	// Recursively walk up the filesystem tree
-	for true {
+	for {
 		// Return if we're in root
 		if workingDir == "/" {
 			return "", nil
@@ -62,13 +62,11 @@ func FindDirInPath(search string) (string, error) {
 		// Set the directory, and try again
 		workingDir = path.Dir(workingDir)
 	}
-
-	return "", nil
 }
 
 // IsEmptyDir checks if path is an empty dir
-func IsEmptyDir(path string) bool {
-	f, err := os.Open(path)
+func IsEmptyDir(dirPath string) bool {
+	f, err := os.Open(dirPath)
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -76,8 +74,5 @@ func IsEmptyDir(path string) bool {
 	defer f.Close()
 
 	_, err = f.Readdirnames(1) // Or f.Readdir(1)
-	if err == io.EOF {
-		return true
-	}
-	return false // Either not empty or error, suits both cases
+	return err == io.EOF
 }

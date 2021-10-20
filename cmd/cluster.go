@@ -17,7 +17,7 @@ func newClusterRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newClusterListCmd(client, out),
-		newClusterSwitchCmd(client, out),
+		newClusterSwitchCmd(),
 	)
 	return cmd
 }
@@ -35,7 +35,7 @@ func newClusterListCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newClusterSwitchCmd(_ *houston.Client, out io.Writer) *cobra.Command {
+func newClusterSwitchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch",
 		Aliases: []string{"sw"},

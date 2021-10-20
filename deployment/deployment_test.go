@@ -289,10 +289,10 @@ func TestDelete(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	deploymentID := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
-	err := Delete(deploymentId, false, api, buf)
+	err := Delete(deploymentID, false, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully deleted deployment")
 }
@@ -309,10 +309,10 @@ func TestDeleteHard(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	deploymentID := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
-	err := Delete(deploymentId, true, api, buf)
+	err := Delete(deploymentID, true, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully deleted deployment")
 }
@@ -471,11 +471,11 @@ func TestAirflowUpgrade(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	deploymentID := "ckbv818oa00r107606ywhoqtw"
 	desiredAirflowVersion := "1.10.10"
 
 	buf := new(bytes.Buffer)
-	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
+	err := AirflowUpgrade(deploymentID, desiredAirflowVersion, api, buf)
 	assert.NoError(t, err)
 	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
  test                         v         ckbv818oa00r107606ywhoqtw     1.10.5              
@@ -500,17 +500,17 @@ func TestAirflowUpgradeError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	deploymentID := "ckbv818oa00r107606ywhoqtw"
 	desiredAirflowVersion := "1.10.10"
 
 	buf := new(bytes.Buffer)
-	err := AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
+	err := AirflowUpgrade(deploymentID, desiredAirflowVersion, api, buf)
 	assert.Error(t, err, "API error (500):")
 }
 
 func TestAirflowUpgradeCancel(t *testing.T) {
 	testUtil.InitTestConfig()
-	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 
 	okResponse := `{
   "data": {
@@ -532,7 +532,7 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
-	err := AirflowUpgradeCancel(deploymentId, api, buf)
+	err := AirflowUpgradeCancel(deploymentID, api, buf)
 	assert.NoError(t, err)
 	expected := `
 Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.
@@ -542,7 +542,7 @@ Airflow upgrade process has been successfully canceled. Your Deployment was not 
 
 func TestAirflowUpgradeCancelError(t *testing.T) {
 	testUtil.InitTestConfig()
-	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -553,7 +553,7 @@ func TestAirflowUpgradeCancelError(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
-	err := AirflowUpgradeCancel(deploymentId, api, buf)
+	err := AirflowUpgradeCancel(deploymentID, api, buf)
 	assert.Error(t, err, "API error (500):")
 }
 
@@ -589,7 +589,7 @@ func TestAirflowUpgradeEmptyDesiredVersion(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	desiredAirflowVersion := ""
 
 	// mock os.Stdin for when prompted by getAirflowVersionSelection()
@@ -609,7 +609,7 @@ func TestAirflowUpgradeEmptyDesiredVersion(t *testing.T) {
 	os.Stdin = r
 
 	buf := new(bytes.Buffer)
-	err = AirflowUpgrade(deploymentId, desiredAirflowVersion, api, buf)
+	err = AirflowUpgrade(deploymentID, desiredAirflowVersion, api, buf)
 	t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
 	assert.NoError(t, err)
@@ -648,9 +648,9 @@ func Test_getDeployment(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	deploymentID := "ckbv818oa00r107606ywhoqtw"
 
-	deployment, err := getDeployment(deploymentId, api)
+	deployment, err := getDeployment(deploymentID, api)
 	assert.NoError(t, err)
 	assert.Equal(t, deployment, &houston.Deployment{ID: "ckggzqj5f4157qtc9lescmehm", Label: "test", AirflowVersion: "1.10.5", DesiredAirflowVersion: "1.10.10"})
 }
@@ -666,9 +666,9 @@ func Test_getDeploymentError(t *testing.T) {
 		}
 	})
 	api := houston.NewHoustonClient(client)
-	deploymentId := "ckbv818oa00r107606ywhoqtw"
+	deploymentID := "ckbv818oa00r107606ywhoqtw"
 
-	_, err := getDeployment(deploymentId, api)
+	_, err := getDeployment(deploymentID, api)
 	assert.Error(t, err, "test")
 }
 
@@ -724,7 +724,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 }
 
 func Test_getAirflowVersionSelectionError(t *testing.T) {
-	deploymentId := "ckggzqj5f4157qtc9lescmehm"
+	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	testUtil.InitTestConfig()
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -735,7 +735,7 @@ func Test_getAirflowVersionSelectionError(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 	buf := new(bytes.Buffer)
-	airflowVersion, err := getAirflowVersionSelection(deploymentId, api, buf)
+	airflowVersion, err := getAirflowVersionSelection(deploymentID, api, buf)
 	assert.Error(t, err, "API error (500):")
 	assert.Equal(t, "", airflowVersion)
 }
@@ -746,7 +746,7 @@ func Test_meetsAirflowUpgradeReqs(t *testing.T) {
 	err := meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	assert.Error(t, err)
 	assert.EqualError(t, err, "Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to 1.10.14 "+
-		"first and make sure your DAGs and configs are 2.0 compatible.")
+		"first and make sure your DAGs and configs are 2.0 compatible")
 
 	airflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)

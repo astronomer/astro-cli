@@ -17,6 +17,7 @@ func main() {
 	config.InitConfig(fs)
 	httpClient := httputil.NewHTTPClient()
 	// configure http transport
+	// #nosec
 	httpClient.HTTPClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: config.CFG.SkipVerifyTLS.GetBool()}}
 	client := houston.NewHoustonClient(httpClient)
 	if err := cmd.NewRootCmd(client, os.Stdout).Execute(); err != nil {

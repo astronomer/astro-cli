@@ -8,6 +8,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+var serviceAccountSuccessMsg = "\n Service account successfully created."
+
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{40, 40, 50, 50},
@@ -16,13 +18,14 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, client *houston.Client, out io.Writer) error {
+// nolint:dupl
+func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.CreateDeploymentServiceAccountRequest,
 		Variables: map[string]interface{}{
 			"label":          label,
 			"category":       category,
-			"deploymentUuid": deploymentUuid,
+			"deploymentUuid": deploymentUUID,
 			"role":           role,
 		},
 	}
@@ -34,18 +37,19 @@ func CreateUsingDeploymentUUID(deploymentUuid, label, category, role string, cli
 	sa := resp.Data.CreateDeploymentServiceAccount
 	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
-	tab.SuccessMsg = "\n Service account successfully created."
+	tab.SuccessMsg = serviceAccountSuccessMsg
 
 	return tab.Print(out)
 }
 
-func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, client *houston.Client, out io.Writer) error {
+// nolint:dupl
+func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query: houston.CreateWorkspaceServiceAccountRequest,
 		Variables: map[string]interface{}{
 			"label":         label,
 			"category":      category,
-			"workspaceUuid": workspaceUuid,
+			"workspaceUuid": workspaceUUID,
 			"role":          role,
 		},
 	}
@@ -57,15 +61,15 @@ func CreateUsingWorkspaceUUID(workspaceUuid, label, category, role string, clien
 	sa := resp.Data.CreateWorkspaceServiceAccount
 	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
-	tab.SuccessMsg = "\n Service account successfully created."
+	tab.SuccessMsg = serviceAccountSuccessMsg
 
 	return tab.Print(out)
 }
 
-func DeleteUsingWorkspaceUUID(serviceAccountId, workspaceId string, client *houston.Client, out io.Writer) error {
+func DeleteUsingWorkspaceUUID(serviceAccountID, workspaceID string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountId, "workspaceUuid": workspaceId},
+		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "workspaceUuid": workspaceID},
 	}
 
 	resp, err := req.DoWithClient(client)
@@ -80,10 +84,10 @@ func DeleteUsingWorkspaceUUID(serviceAccountId, workspaceId string, client *hous
 	return nil
 }
 
-func DeleteUsingDeploymentUUID(serviceAccountId, deploymentId string, client *houston.Client, out io.Writer) error {
+func DeleteUsingDeploymentUUID(serviceAccountID, deploymentID string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.DeploymentServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountId, "deploymentUuid": deploymentId},
+		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "deploymentUuid": deploymentID},
 	}
 
 	resp, err := req.DoWithClient(client)

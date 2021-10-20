@@ -19,11 +19,11 @@ var (
 	cancel                bool
 	hardDelete            bool
 	executor              string
-	deploymentId          string
+	deploymentID          string
 	desiredAirflowVersion string
 	email                 string
 	fullName              string
-	userId                string
+	userID                string
 	systemSA              bool
 	category              string
 	label                 string
@@ -99,7 +99,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		newDeploymentListCmd(client, out),
 		newDeploymentUpdateCmd(client, out),
 		newDeploymentDeleteCmd(client, out),
-		newLogsCmd(client, out),
+		newLogsCmd(),
 		newDeploymentSaRootCmd(client, out),
 		newDeploymentUserRootCmd(client, out),
 		newDeploymentAirflowRootCmd(client, out),
@@ -180,7 +180,7 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		Example: example,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return errors.New("must specify a deployment ID and at least one attribute to update.")
+				return errors.New("must specify a deployment ID and at least one attribute to update")
 			}
 			return updateArgValidator(args[1:], deploymentUpdateAttrs)
 		},
@@ -226,14 +226,15 @@ func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Comm
 			return deploymentUserList(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
-	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "[ID]")
 	cmd.Flags().StringVarP(&email, "email", "e", "", "[EMAIL]")
 	cmd.Flags().StringVarP(&fullName, "name", "n", "", "[NAME]")
 
 	return cmd
 }
 
+// nolint:dupl
 func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add EMAIL",
@@ -245,11 +246,12 @@ func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comma
 			return deploymentUserAdd(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
 	return cmd
 }
 
+// nolint:dupl
 func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete EMAIL",
@@ -261,10 +263,11 @@ func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Co
 			return deploymentUserDelete(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment to remove user access")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to remove user access")
 	return cmd
 }
 
+// nolint:dupl
 func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update EMAIL",
@@ -276,7 +279,7 @@ func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Co
 			return deploymentUserUpdate(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentId, "deployment-id", "", "deployment assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
 	return cmd
 }
@@ -296,6 +299,7 @@ func newDeploymentSaRootCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	return cmd
 }
 
+// nolint:dupl
 func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -307,8 +311,8 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 			return deploymentSaCreate(cmd, args, client, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
-	cmd.Flags().StringVarP(&userId, "user-id", "u", "", "[ID]")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "[ID]")
 	cmd.Flags().BoolVarP(&systemSA, "system-sa", "s", false, "")
 	cmd.Flags().StringVarP(&category, "category", "c", "default", "CATEGORY")
 	cmd.Flags().StringVarP(&label, "label", "l", "", "LABEL")
@@ -326,8 +330,11 @@ func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command
 			return deploymentSaGet(cmd, client, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
-	cmd.MarkFlagRequired("deployment-id")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
 	return cmd
 }
 
@@ -343,8 +350,11 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 		},
 		Args: cobra.ExactArgs(1),
 	}
-	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
-	cmd.MarkFlagRequired("deployment-id")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
 	return cmd
 }
 
@@ -372,10 +382,13 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 			return deploymentAirflowUpgrade(cmd, args, client, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentId, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
 	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
-	cmd.MarkFlagRequired("deployment-id")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
 	return cmd
 }
 
@@ -413,8 +426,8 @@ func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client,
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if hardDelete {
-		i, _ := input.InputConfirm(
-			fmt.Sprintf(messages.CLI_DEPLOYMENT_HARD_DELETE_PROMPT))
+		i, _ := input.Confirm(
+			fmt.Sprintf(messages.CLIDeploymentHardDeletePrompt))
 
 		if !i {
 			fmt.Println("Exit: This command was not executed and your Deployment was not hard deleted.\n If you want to delete your Deployment but not permanently, try\n $ astro deployment delete without the --hard flag.")
@@ -467,7 +480,7 @@ func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Write
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UserList(args[0], email, userId, fullName, client, out)
+	return deployment.UserList(args[0], email, userID, fullName, client, out)
 }
 
 func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
@@ -482,7 +495,7 @@ func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.Add(deploymentId, args[0], deploymentRole, client, out)
+	return deployment.Add(deploymentID, args[0], deploymentRole, client, out)
 }
 
 func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
@@ -493,7 +506,7 @@ func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Wri
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.DeleteUser(deploymentId, args[0], client, out)
+	return deployment.DeleteUser(deploymentID, args[0], client, out)
 }
 
 func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
@@ -508,7 +521,7 @@ func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Wri
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UpdateUser(deploymentId, args[0], deploymentRole, client, out)
+	return deployment.UpdateUser(deploymentID, args[0], deploymentRole, client, out)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
@@ -522,28 +535,28 @@ func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, 
 	fullRole := strings.Join([]string{"DEPLOYMENT", strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return sa.CreateUsingDeploymentUUID(deploymentId, label, category, fullRole, client, out)
+	return sa.CreateUsingDeploymentUUID(deploymentID, label, category, fullRole, client, out)
 }
 
 func deploymentSaGet(cmd *cobra.Command, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.GetDeploymentServiceAccounts(deploymentId, client, out)
+	return sa.GetDeploymentServiceAccounts(deploymentID, client, out)
 }
 
 func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.DeleteUsingDeploymentUUID(args[0], deploymentId, client, out)
+	return sa.DeleteUsingDeploymentUUID(args[0], deploymentID, client, out)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if cancel {
-		return deployment.AirflowUpgradeCancel(deploymentId, client, out)
+		return deployment.AirflowUpgradeCancel(deploymentID, client, out)
 	}
-	return deployment.AirflowUpgrade(deploymentId, desiredAirflowVersion, client, out)
+	return deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, client, out)
 }
