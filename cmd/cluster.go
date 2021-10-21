@@ -17,12 +17,12 @@ func newClusterRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newClusterListCmd(client, out),
-		newClusterSwitchCmd(client, out),
+		newClusterSwitchCmd(),
 	)
 	return cmd
 }
 
-func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newClusterListCmd(_ *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -35,7 +35,7 @@ func newClusterListCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newClusterSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newClusterSwitchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch",
 		Aliases: []string{"sw"},
@@ -47,7 +47,7 @@ func newClusterSwitchCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func clusterList(cmd *cobra.Command, args []string, out io.Writer) error {
+func clusterList(cmd *cobra.Command, _ []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 

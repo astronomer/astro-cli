@@ -44,7 +44,7 @@ func TestWorkspaceList(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "workspace", "list")
+	output, err := executeCommandC(api, "workspace", "list")
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output, err)
 }
@@ -127,7 +127,7 @@ func TestWorkspaceSAGetCommand(t *testing.T) {
 	})
 	api := houston.NewHoustonClient(client)
 
-	_, output, err := executeCommandC(api, "workspace", "sa", "get", "-w=ckqvf9spa1189rn9hbh5h439u")
+	output, err := executeCommandC(api, "workspace", "sa", "get", "-w=ckqvf9spa1189rn9hbh5h439u")
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

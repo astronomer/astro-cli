@@ -53,7 +53,8 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 		body = bytes.NewBuffer(buf)
 	}
 
-	req, err := http.NewRequest(method, path, body)
+	req, err := http.NewRequest(method, path, body) //nolint:noctx
+	// req = req.WithContext(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +83,7 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 	}
 	return resp, nil
 }
+
 func debug(data []byte, err error) {
 	if err == nil {
 		log.Debugf("%s\n\n", data)

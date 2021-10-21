@@ -43,7 +43,7 @@ func newUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
+func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, _ []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -54,7 +54,7 @@ func printVersion(client *houston.Client, cmd *cobra.Command, out io.Writer, arg
 	return nil
 }
 
-func upgradeCheck(client *houston.Client, cmd *cobra.Command, out io.Writer, args []string) error {
+func upgradeCheck(client *houston.Client, cmd *cobra.Command, out io.Writer, _ []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	ghc := github.NewGithubClient(httputil.NewHTTPClient())

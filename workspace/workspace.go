@@ -37,7 +37,7 @@ func Create(label, desc string, client *houston.Client, out io.Writer) error {
 	w := r.Data.CreateWorkspace
 
 	tab := newTableOut()
-	tab.AddRow([]string{w.Label, w.Id}, false)
+	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully created workspace"
 	tab.Print(out)
 
@@ -58,14 +58,19 @@ func List(client *houston.Client, out io.Writer) error {
 	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
 	tab := newTableOut()
-	for _, w := range ws {
+	for i := range ws {
+		w := ws[i]
 		name := w.Label
-		workspace := w.Id
+		workspace := w.ID
 
 		var color bool
 
-		if c.Workspace == w.Id {
+		if c.Workspace == w.ID {
 			color = true
 		} else {
 			color = false
@@ -107,8 +112,8 @@ func GetCurrentWorkspace() (string, error) {
 		return "", err
 	}
 
-	if len(c.Workspace) == 0 {
-		return "", errors.New("Current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+	if c.Workspace == "" {
+		return "", errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 	}
 
 	return c.Workspace, nil
@@ -130,14 +135,18 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
 
-	for _, w := range ws {
+	for i := range ws {
+		w := ws[i]
 		name := w.Label
-		workspace := w.Id
+		workspace := w.ID
 
 		var color bool
 
-		if c.Workspace == w.Id {
+		if c.Workspace == w.ID {
 			color = true
 		} else {
 			color = false
@@ -147,23 +156,18 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 
 	tab.Print(out)
 
-	in := input.InputText("\n> ")
-	i, err := strconv.ParseInt(
-		in,
-		10,
-		64,
-	)
-
+	in := input.Text("\n> ")
+	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot parse %s to int", in)
 	}
 
-	return ws[i-1].Id, nil
+	return ws[i-1].ID, nil
 }
 
 // Switch switches workspaces
 func Switch(id string, client *houston.Client, out io.Writer) error {
-	if len(id) == 0 {
+	if id == "" {
 		_id, err := getWorkspaceSelection(client, out)
 		if err != nil {
 			return err
@@ -193,9 +197,8 @@ func Switch(id string, client *houston.Client, out io.Writer) error {
 		return err
 	}
 
-	config.PrintCurrentContext(out)
-
-	return nil
+	err = config.PrintCurrentContext(out)
+	return err
 }
 
 // Update an astronomer workspace
@@ -213,7 +216,7 @@ func Update(id string, client *houston.Client, out io.Writer, args map[string]st
 
 	w := r.Data.UpdateWorkspace
 	tab := newTableOut()
-	tab.AddRow([]string{w.Label, w.Id}, false)
+	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"
 	tab.Print(out)
 

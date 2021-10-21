@@ -16,8 +16,10 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 
 	vs := make(AirflowVersions, len(resp.AvailableReleases))
 	for i, r := range resp.AvailableReleases {
-		v, _ := NewAirflowVersion(r.Version, r.Tags)
-		vs[i] = v
+		v, err := NewAirflowVersion(r.Version, r.Tags)
+		if err == nil {
+			vs[i] = v
+		}
 	}
 
 	sort.Sort(vs)

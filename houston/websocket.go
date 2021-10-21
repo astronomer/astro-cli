@@ -27,12 +27,12 @@ type StartSubscription struct {
 }
 
 type WSResponse struct {
-	Id      string
+	ID      string
 	Type    string `json:"type"`
 	Payload struct {
 		Data struct {
 			Log struct {
-				Id        string `json:"id"`
+				ID        string `json:"id"`
 				CreatedAt string `json:"createdAt"`
 				Log       string `json:"log"`
 			} `json:"log"`
@@ -40,11 +40,12 @@ type WSResponse struct {
 	} `json:"payload"`
 }
 
-func BuildDeploymentLogsSubscribeRequest(deploymentId, component, search string, timestamp time.Time) (string, error) {
+func BuildDeploymentLogsSubscribeRequest(deploymentID, component, search string, timestamp time.Time) (string, error) {
 	payload := Request{
 		Query: DeploymentLogsSubscribeRequest,
 		Variables: map[string]interface{}{
-			"component": component, "deploymentId": deploymentId, "search": search, "timestamp": timestamp},
+			"component": component, "deploymentId": deploymentID, "search": search, "timestamp": timestamp,
+		},
 	}
 	s := StartSubscription{Type: "start", Payload: payload}
 	b, _ := json.Marshal(s)
@@ -55,17 +56,21 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	h := http.Header{"Sec-WebSocket-Protocol": []string{"graphql-ws"}}
-	ws, _, err := websocket.DefaultDialer.Dial(url, h)
-
+	ws, resp, err := websocket.DefaultDialer.Dial(url, h)
 	if err != nil {
 		log.Fatal("dial:", err)
 	}
-	defer ws.Close()
+	defer func() {
+		ws.Close()
+		if resp != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	initSubscription := InitSubscription{Type: "connection_init", Payload: AuthPayload{Authorization: jwtToken}}
 	js, _ := json.Marshal(&initSubscription)
 
-	err = ws.WriteMessage(websocket.TextMessage, []byte(js))
+	err = ws.WriteMessage(websocket.TextMessage, js)
 	if err != nil {
 		fmt.Printf("Could not init connection: %s", err.Error())
 	}
@@ -92,7 +97,9 @@ func Subscribe(jwtToken, url, queryMessage string) error {
 				}
 			}
 			var resp WSResponse
-			json.Unmarshal(message, &resp)
+			if err = json.Unmarshal(message, &resp); err != nil {
+				log.Fatal(err)
+			}
 			fmt.Print(resp.Payload.Data.Log.Log)
 		}
 	}()

@@ -31,5 +31,5 @@ func main() {
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
 	rootCmd := cmd.NewRootCmd(client, os.Stdout)
-	doc.GenMarkdownTreeCustom(rootCmd, "./docs/", emptyStr, identity)
+	_ = doc.GenMarkdownTreeCustom(rootCmd, "./docs/", emptyStr, identity)
 }

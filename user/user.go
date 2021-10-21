@@ -9,16 +9,21 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
+var (
+	ErrPasswordMismatch     = errors.New("passwords do not match")
+	ErrUserCreationDisabled = errors.New("user creation is disabled")
+)
+
 // Create verifies input before sending a CreateUser API call to houston
 func Create(email, password string, client *houston.Client, out io.Writer) error {
-	if len(email) == 0 {
-		email = input.InputText("Email: ")
+	if email == "" {
+		email = input.Text("Email: ")
 	}
 	if password == "" {
-		inputPassword, _ := input.InputPassword("Password: ")
-		inputPassword2, _ := input.InputPassword("Re-enter Password: ")
+		inputPassword, _ := input.Password("Password: ")
+		inputPassword2, _ := input.Password("Re-enter Password: ")
 		if inputPassword != inputPassword2 {
-			return errors.New("Passwords do not match")
+			return ErrPasswordMismatch
 		}
 		password = inputPassword
 	}
@@ -30,7 +35,7 @@ func Create(email, password string, client *houston.Client, out io.Writer) error
 
 	resp, err := req.DoWithClient(client)
 	if err != nil {
-		return errors.New("User creation is disabled")
+		return ErrUserCreationDisabled
 	}
 
 	authUser := resp.Data.CreateUser

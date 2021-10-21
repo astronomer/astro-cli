@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	workspaceId    string
+	workspaceID    string
 	workspaceRole  string
 	deploymentRole string
 	role           string
@@ -47,11 +47,11 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newCompletionCmd(client, out),
 		newConfigRootCmd(client, out),
 		newDeploymentRootCmd(client, out),
-		newDeployCmd(client, out),
+		newDeployCmd(),
 		newSaRootCmd(client, out),
 		// TODO: remove newAirflowRootCmd, after 1.0 we have only devRootCmd
 		newAirflowRootCmd(client, out),
-		newLogsDeprecatedCmd(client, out),
+		newLogsDeprecatedCmd(),
 	)
 	return rootCmd
 }

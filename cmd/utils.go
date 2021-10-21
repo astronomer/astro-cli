@@ -23,7 +23,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 	if err == nil {
 		acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
 		if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-			return "", errors.Errorf(messages.ERROR_INVALID_AIRFLOW_VERSION, strings.Join(acceptableAirflowVersions, ", "))
+			return "", errors.Errorf(messages.ErrInvalidAirflowVersion, strings.Join(acceptableAirflowVersions, ", "))
 		}
 		if airflowVersion == "" {
 			defaultImageTag = ""
@@ -34,12 +34,12 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		switch t := err; t {
 		default:
 			return "", err
-		case houston.PermissionsErrorVerbose:
-			return "", errors.New("The --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again.")
+		case houston.ErrVerboseInaptPermissions:
+			return "", errors.New("the --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again")
 		}
 	}
 
-	if len(defaultImageTag) == 0 {
+	if defaultImageTag == "" {
 		defaultImageTag = "2.0.0-buster-onbuild"
 		fmt.Fprintf(out, "Initializing Airflow project\nNot connected to Astronomer, pulling Airflow development files from %s\n", defaultImageTag)
 	}

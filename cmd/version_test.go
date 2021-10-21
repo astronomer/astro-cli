@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"os"
+	"testing"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/spf13/cobra"
-	"os"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"

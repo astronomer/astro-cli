@@ -1,12 +1,13 @@
 package config
 
 import (
+	"os"
+	"testing"
+
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func TestInitHome(t *testing.T) {
@@ -27,7 +28,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	initHome(fs)
 }
 
@@ -49,7 +50,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	initProject(fs)
 	homeDir, _ := fileutil.GetHomeDir()
 	_, err := fs.Stat(homeDir)
@@ -95,7 +96,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	initProject(fs)
 
 	viperWOConfig := viper.New()

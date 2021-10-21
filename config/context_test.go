@@ -2,9 +2,10 @@ package config
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewTableOut(t *testing.T) {
@@ -31,7 +32,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	err := afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	InitConfig(fs)
 	ctx, err := GetCurrentContext()
 	assert.NoError(t, err)
@@ -51,10 +52,10 @@ local:
   enabled: true
   houston: http://example.com:8871/v1
 `)
-	err := afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	InitConfig(fs)
-	_, err = GetCurrentContext()
-	assert.EqualError(t, err, "No context set, have you authenticated to a cluster?")
+	_, err := GetCurrentContext()
+	assert.EqualError(t, err, "no context set, have you authenticated to a cluster")
 }
 
 func TestPrintContext(t *testing.T) {
@@ -75,7 +76,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	err := afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	InitConfig(fs)
 
 	ctx := Context{
@@ -85,7 +86,7 @@ contexts:
 		Domain:            "example.com",
 	}
 	buf := new(bytes.Buffer)
-	err = ctx.PrintContext(buf)
+	err := ctx.PrintContext(buf)
 	assert.NoError(t, err)
 	expected := " CLUSTER                             WORKSPACE                           \n example.com                         ck05r3bor07h40d02y2hw4n4v           \n"
 	assert.Equal(t, expected, buf.String())
@@ -109,7 +110,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace:
 `)
-	err := afero.WriteFile(fs, HomeConfigFile, []byte(configRaw), 0777)
+	_ = afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
 	InitConfig(fs)
 
 	ctx := Context{
@@ -119,7 +120,7 @@ contexts:
 		Domain:            "example.com",
 	}
 	buf := new(bytes.Buffer)
-	err = ctx.PrintContext(buf)
+	err := ctx.PrintContext(buf)
 	assert.NoError(t, err)
 	expected := " CLUSTER                             WORKSPACE                           \n example.com                         N/A                                 \n"
 	assert.Equal(t, expected, buf.String())

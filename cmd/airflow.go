@@ -35,7 +35,7 @@ var (
 	schedulerLogs    bool
 	webserverLogs    bool
 
-	RunExample = `
+	runExample = `
 # Create default admin user.
 astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
@@ -51,13 +51,13 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
-		newAirflowDeployCmd(client, out),
-		newAirflowStartCmd(client, out),
-		newAirflowKillCmd(client, out),
-		newAirflowLogsCmd(client, out),
-		newAirflowStopCmd(client, out),
-		newAirflowPSCmd(client, out),
-		newAirflowRunCmd(client, out),
+		newAirflowDeployCmd(),
+		newAirflowStartCmd(),
+		newAirflowKillCmd(),
+		newAirflowLogsCmd(),
+		newAirflowStopCmd(),
+		newAirflowPSCmd(),
+		newAirflowRunCmd(),
 	)
 	return cmd
 }
@@ -71,14 +71,14 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
-		newAirflowDeployCmd(client, out),
-		newAirflowStartCmd(client, out),
-		newAirflowKillCmd(client, out),
-		newAirflowLogsCmd(client, out),
-		newAirflowStopCmd(client, out),
-		newAirflowPSCmd(client, out),
-		newAirflowRunCmd(client, out),
-		newAirflowUpgradeCheckCmd(client, out),
+		newAirflowDeployCmd(),
+		newAirflowStartCmd(),
+		newAirflowKillCmd(),
+		newAirflowLogsCmd(),
+		newAirflowStopCmd(),
+		newAirflowPSCmd(),
+		newAirflowRunCmd(),
+		newAirflowUpgradeCheckCmd(),
 	)
 	return cmd
 }
@@ -102,8 +102,8 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
-	deployCmd := newDeployCmd(client, out)
+func newAirflowDeployCmd() *cobra.Command {
+	deployCmd := newDeployCmd()
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an Airflow project",
@@ -118,11 +118,11 @@ func newAirflowDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
-	cmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
 
-func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start an Airflow cluster locally using docker-compose",
@@ -139,7 +139,7 @@ func newAirflowStartCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowKillCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill",
 		Short: "Kill a locally running Airflow cluster",
@@ -154,7 +154,7 @@ func newAirflowKillCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Output logs for a locally running Airflow cluster",
@@ -172,7 +172,7 @@ func newAirflowLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowStopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a locally running Airflow cluster",
@@ -187,7 +187,7 @@ func newAirflowStopCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowPSCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List locally running Airflow containers",
@@ -202,7 +202,7 @@ func newAirflowPSCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a command inside locally running Airflow webserver",
@@ -213,13 +213,13 @@ func newAirflowRunCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowRun,
-		Example:            RunExample,
+		Example:            runExample,
 		DisableFlagParsing: true,
 	}
 	return cmd
 }
 
-func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowUpgradeCheckCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-check",
 		Short: "List DAG and config-level changes required to upgrade to Airflow 2.0",
@@ -230,7 +230,7 @@ func newAirflowUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Com
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowUpgradeCheck,
-		Example:            RunExample,
+		Example:            runExample,
 		DisableFlagParsing: true,
 	}
 	return cmd
@@ -261,15 +261,15 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func airflowInit(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	// Validate project name
-	if len(projectName) != 0 {
+	if projectName != "" {
 		projectNameValid := regexp.
 			MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`).
 			MatchString
 
 		if !projectNameValid(projectName) {
-			return errors.New(messages.CONFIG_PROJECT_NAME_ERROR)
+			return errors.New(messages.ErrInvalidConfigProjectName)
 		}
 	} else {
 		projectDirectory := filepath.Base(config.WorkingPath)
@@ -283,11 +283,11 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
 	if !emtpyDir {
-		i, _ := input.InputConfirm(
+		i, _ := input.Confirm(
 			fmt.Sprintf("%s \nYou are not in an empty directory. Are you sure you want to initialize a project?", config.WorkingPath))
 
 		if !i {
-			fmt.Println("Cancelling project initialization...")
+			fmt.Println("Canceling project initialization...")
 			os.Exit(1)
 		}
 	}
@@ -295,7 +295,10 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	if !exists {
 		config.CreateProjectConfig(config.WorkingPath)
 	}
-	config.CFG.ProjectName.SetProjectString(projectName)
+	err = config.CFG.ProjectName.SetProjectString(projectName)
+	if err != nil {
+		return err
+	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -307,9 +310,9 @@ func airflowInit(cmd *cobra.Command, args []string, client *houston.Client, out 
 	}
 
 	if exists {
-		fmt.Printf(messages.CONFIG_REINIT_PROJECT_CONFIG+"\n", config.WorkingPath)
+		fmt.Printf(messages.ConfigReinitProjectConfig+"\n", config.WorkingPath)
 	} else {
-		fmt.Printf(messages.CONFIG_INIT_PROJECT_CONFIG+"\n", config.WorkingPath)
+		fmt.Printf(messages.ConfigInitProjectConfig+"\n", config.WorkingPath)
 	}
 
 	return nil
@@ -384,7 +387,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Add airflow command, to simplify astro cli usage
-	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"})
+	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}, args...)
 	return airflow.Run(config.WorkingPath, args, "root")
 }
 

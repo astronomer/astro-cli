@@ -2,19 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-var (
-	deployExample = `
+var deployExample = `
 Deployment you would like to deploy to Airflow cluster:
 
   $ astro deploy <deployment name>
@@ -23,9 +20,8 @@ Menu will be presented if you do not specify a deployment name:
 
   $ astro deploy
 `
-)
 
-func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an Airflow project",
@@ -39,7 +35,7 @@ func newDeployCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
-	cmd.Flags().StringVar(&workspaceId, "workspace-id", "", "workspace assigned to deployment")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
 
@@ -47,7 +43,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
-		// fmt.Println("Default workspace id not set, set default workspace id or pass a workspace in via the --workspace-id flag")
 	}
 
 	releaseName := ""
@@ -59,11 +54,14 @@ func deploy(cmd *cobra.Command, args []string) error {
 
 	// Save release name in config if specified
 	if len(releaseName) > 0 && saveDeployConfig {
-		config.CFG.ProjectDeployment.SetProjectString(releaseName)
+		err = config.CFG.ProjectDeployment.SetProjectString(releaseName)
+		if err != nil {
+			return err
+		}
 	}
 
 	if git.HasUncommittedChanges() && !forceDeploy {
-		fmt.Println(messages.REGISTRY_UNCOMMITTED_CHANGES)
+		fmt.Println(messages.RegistryUncommittedChanges)
 		return nil
 	}
 

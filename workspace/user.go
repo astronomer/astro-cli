@@ -11,10 +11,10 @@ import (
 )
 
 // Add a user to a workspace with specified role
-func Add(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
+func Add(workspaceID, email, role string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserAddRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "email": email, "role": role},
+		Variables: map[string]interface{}{"workspaceId": workspaceID, "email": email, "role": role},
 	}
 
 	r, err := req.DoWithClient(client)
@@ -29,7 +29,7 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 		Header:         []string{"NAME", "WORKSPACE ID", "EMAIL", "ROLE"},
 	}
 
-	tab.AddRow([]string{w.Label, w.Id, email, role}, false)
+	tab.AddRow([]string{w.Label, w.ID, email, role}, false)
 	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
 	tab.Print(out)
 
@@ -37,10 +37,10 @@ func Add(workspaceId, email, role string, client *houston.Client, out io.Writer)
 }
 
 // Remove a user from a workspace
-func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) error {
+func Remove(workspaceID, userID string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspaceUserRemoveRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId, "userId": userId},
+		Variables: map[string]interface{}{"workspaceId": workspaceID, "userId": userID},
 	}
 
 	r, err := req.DoWithClient(client)
@@ -54,20 +54,19 @@ func Remove(workspaceId, userId string, client *houston.Client, out io.Writer) e
 		Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
 	}
 
-	utab.AddRow([]string{w.Label, w.Id, userId}, false)
+	utab.AddRow([]string{w.Label, w.ID, userID}, false)
 	utab.SuccessMsg = "Successfully removed user from workspace"
 	utab.Print(out)
 	return nil
 }
 
 // ListRoles print users and roles from a workspace
-func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error {
+func ListRoles(workspaceID string, client *houston.Client, out io.Writer) error {
 	req := houston.Request{
 		Query:     houston.WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceId},
+		Variables: map[string]interface{}{"workspaceId": workspaceID},
 	}
 	r, err := req.DoWithClient(client)
-
 	if err != nil {
 		return err
 	}
@@ -78,9 +77,10 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 		DynamicPadding: true,
 		Header:         []string{"USERNAME", "ID", "ROLE"},
 	}
-	for _, role := range workspace.RoleBindings {
+	for i := range workspace.RoleBindings {
+		role := workspace.RoleBindings[i]
 		var color bool
-		tab.AddRow([]string{role.User.Username, role.User.Id, role.Role}, color)
+		tab.AddRow([]string{role.User.Username, role.User.ID, role.Role}, color)
 	}
 
 	tab.Print(out)
@@ -88,32 +88,30 @@ func ListRoles(workspaceId string, client *houston.Client, out io.Writer) error 
 }
 
 // Update workspace user role
-func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.Writer) error {
+func UpdateRole(workspaceID, email, role string, client *houston.Client, out io.Writer) error {
 	// get user you are updating to show role from before change
-	roles, err := getUserRole(workspaceId, email, client, out)
-
+	roles, err := getUserRole(workspaceID, email, client)
 	if err != nil {
 		return err
 	}
 
 	var rb houston.RoleBindingWorkspace
 	for _, val := range roles.RoleBindings {
-		if val.Workspace.Id == workspaceId && strings.Contains(val.Role, "WORKSPACE") {
+		if val.Workspace.ID == workspaceID && strings.Contains(val.Role, "WORKSPACE") {
 			rb = val
 			break
 		}
 	}
 	// check if rolebinding is an empty structure
 	if (rb == houston.RoleBindingWorkspace{}) {
-		return errors.New("The user you are trying to change is not part of this workspace")
+		return errors.New("the user you are trying to change is not part of this workspace")
 	}
 
 	req := houston.Request{
 		Query:     houston.WorkspaceUserUpdateRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email, "role": role},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email, "role": role},
 	}
 	r, err := req.DoWithClient(client)
-
 	if err != nil {
 		return err
 	}
@@ -123,18 +121,16 @@ func UpdateRole(workspaceId, email, role string, client *houston.Client, out io.
 	return nil
 }
 
-func getUserRole(workspaceId string, email string, client *houston.Client, out io.Writer) (workspaceUserRolebindings houston.WorkspaceUserRoleBindings, err error) {
+func getUserRole(workspaceID, email string, client *houston.Client) (workspaceUserRolebindings houston.WorkspaceUserRoleBindings, err error) {
 	req := houston.Request{
 		Query:     houston.WorkspaceGetUserRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceId, "email": email},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email},
 	}
 	r, err := req.DoWithClient(client)
-
 	if err != nil {
 		return workspaceUserRolebindings, err
 	}
 	workspaceUserRolebindings = r.Data.WorkspaceGetUser
 
 	return workspaceUserRolebindings, nil
-
 }

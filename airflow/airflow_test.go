@@ -26,7 +26,6 @@ func TestInitDirs(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, exist)
-
 }
 
 func TestInitDirsEmpty(t *testing.T) {
@@ -38,7 +37,6 @@ func TestInitDirsEmpty(t *testing.T) {
 
 	err = initDirs(tmpDir, nil)
 	assert.NoError(t, err)
-
 }
 
 func TestInitFiles(t *testing.T) {
@@ -59,7 +57,6 @@ func TestInitFiles(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, exist)
-
 }
 
 func TestInit(t *testing.T) {

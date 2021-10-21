@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"io"
 	"time"
 
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/logs"
 	"github.com/spf13/cobra"
 )
@@ -28,7 +26,7 @@ var (
 `
 )
 
-func newLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
@@ -37,14 +35,14 @@ func newLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Example: logsExample,
 	}
 	cmd.AddCommand(
-		newWebserverLogsCmd(client, out),
-		newSchedulerLogsCmd(client, out),
-		newWorkersLogsCmd(client, out),
+		newWebserverLogsCmd(),
+		newSchedulerLogsCmd(),
+		newWorkersLogsCmd(),
 	)
 	return cmd
 }
 
-func newLogsDeprecatedCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newLogsDeprecatedCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "logs",
 		Aliases:    []string{"log", "l"},
@@ -54,14 +52,15 @@ func newLogsDeprecatedCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		Deprecated: "could please use new command instead `astro deployment logs [subcommands] [flags]`",
 	}
 	cmd.AddCommand(
-		newWebserverLogsCmd(client, out),
-		newSchedulerLogsCmd(client, out),
-		newWorkersLogsCmd(client, out),
+		newWebserverLogsCmd(),
+		newSchedulerLogsCmd(),
+		newWorkersLogsCmd(),
 	)
 	return cmd
 }
 
-func newWebserverLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+// nolint:dupl
+func newWebserverLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "webserver",
 		Aliases: []string{"web", "w"},
@@ -80,7 +79,8 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-func newSchedulerLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+// nolint:dupl
+func newSchedulerLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "scheduler",
 		Aliases: []string{"sch", "s"},
@@ -99,7 +99,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-func newWorkersLogsCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newWorkersLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workers",
 		Aliases: []string{"workers", "worker", "wrk"},

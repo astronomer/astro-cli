@@ -30,29 +30,29 @@ type IntegrationTestSuite struct {
 	Fs            afero.Fs
 }
 
-func (suite *IntegrationTestSuite) SetupSuite() {
+func (ts *IntegrationTestSuite) SetupSuite() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig()
-	afero.WriteFile(fs, config.HomeConfigFile, []byte(configYaml), 0777)
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	rand.Seed(time.Now().UnixNano())
-	suite.Fs = fs
-	suite.Client = houston.NewHoustonClient(httputil.NewHTTPClient())
-	suite.TestDomain = testUtils.GetEnv("HOUSTON_HOST", "localhost")
-	suite.TestEmail = fmt.Sprintf("test%d@astronomer.io", rand.Intn(100))
-	suite.TestPassword = "pass"
-	suite.TestWorkspace = "test-workspace"
-	user.Create(suite.TestEmail, suite.TestPassword, suite.Client, new(bytes.Buffer))
+	ts.Fs = fs
+	ts.Client = houston.NewHoustonClient(httputil.NewHTTPClient())
+	ts.TestDomain = testUtils.GetEnv("HOUSTON_HOST", "localhost")
+	ts.TestEmail = fmt.Sprintf("test%d@astronomer.io", rand.Intn(100))
+	ts.TestPassword = "pass"
+	ts.TestWorkspace = "test-workspace"
+	user.Create(ts.TestEmail, ts.TestPassword, ts.Client, new(bytes.Buffer))
 }
 
-func (suite *IntegrationTestSuite) Test2CreateWorkspace() {
+func (ts *IntegrationTestSuite) Test2CreateWorkspace() {
 	output := new(bytes.Buffer)
-	err := auth.Login(suite.TestDomain, true, suite.TestEmail, suite.TestPassword, suite.Client, output)
-	assert.NoError(suite.T(), err)
-	_, out, err := executeCommandC(suite.Client, "workspace", "create", suite.TestWorkspace)
-	assert.NoError(suite.T(), err)
+	err := auth.Login(ts.TestDomain, true, ts.TestEmail, ts.TestPassword, ts.Client, output)
+	assert.NoError(ts.T(), err)
+	out, err := executeCommandC(ts.Client, "workspace", "create", ts.TestWorkspace)
+	assert.NoError(ts.T(), err)
 	expectedOut := "Successfully created workspace"
-	assert.Contains(suite.T(), out, expectedOut)
+	assert.Contains(ts.T(), out, expectedOut)
 }
 
 func TestCreateWorkspaceSuite(t *testing.T) {
