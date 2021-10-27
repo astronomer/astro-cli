@@ -17,8 +17,8 @@ GOFMT ?= gofumpt -l -s -extra
 GOFILES := $(shell find . -name "*.go" -type f | grep -v /vendor/)
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
-dep:
-	dep ensure
+mod:
+	go mod vendor
 
 build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" main.go

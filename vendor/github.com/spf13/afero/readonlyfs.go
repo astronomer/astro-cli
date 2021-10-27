@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+var _ Lstater = (*ReadOnlyFs)(nil)
+
 type ReadOnlyFs struct {
 	source Fs
 }
@@ -32,6 +34,26 @@ func (r *ReadOnlyFs) Name() string {
 
 func (r *ReadOnlyFs) Stat(name string) (os.FileInfo, error) {
 	return r.source.Stat(name)
+}
+
+func (r *ReadOnlyFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
+	if lsf, ok := r.source.(Lstater); ok {
+		return lsf.LstatIfPossible(name)
+	}
+	fi, err := r.Stat(name)
+	return fi, false, err
+}
+
+func (r *ReadOnlyFs) SymlinkIfPossible(oldname, newname string) error {
+	return &os.LinkError{Op: "symlink", Old: oldname, New: newname, Err: ErrNoSymlink}
+}
+
+func (r *ReadOnlyFs) ReadlinkIfPossible(name string) (string, error) {
+	if srdr, ok := r.source.(LinkReader); ok {
+		return srdr.ReadlinkIfPossible(name)
+	}
+
+	return "", &os.PathError{Op: "readlink", Path: name, Err: ErrNoReadlink}
 }
 
 func (r *ReadOnlyFs) Rename(o, n string) error {

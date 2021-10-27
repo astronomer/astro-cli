@@ -7,7 +7,7 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh/terminal" //nolint:staticcheck
 )
 
 // Text requests a user for input text and returns it
