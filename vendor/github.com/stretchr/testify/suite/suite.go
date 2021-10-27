@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"runtime/debug"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,68 +80,40 @@ func (suite *Suite) Run(name string, subtest func()) bool {
 // Run takes a testing suite and runs all of the tests attached
 // to it.
 func Run(t *testing.T, suite TestingSuite) {
+	suite.SetT(t)
 	defer failOnPanic(t)
 
-	suite.SetT(t)
-
-	var suiteSetupDone bool
-
-	var stats *SuiteInformation
-	if _, ok := suite.(WithStats); ok {
-		stats = newSuiteInformation()
-	}
-
-	tests := []testing.InternalTest{}
+	suiteSetupDone := false
+	
 	methodFinder := reflect.TypeOf(suite)
-	suiteName := methodFinder.Elem().Name()
-
-	for i := 0; i < methodFinder.NumMethod(); i++ {
-		method := methodFinder.Method(i)
-
+	tests := []testing.InternalTest{}
+	for index := 0; index < methodFinder.NumMethod(); index++ {
+		method := methodFinder.Method(index)
 		ok, err := methodFilter(method.Name)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "testify: invalid regexp for -m: %s\n", err)
 			os.Exit(1)
 		}
-
 		if !ok {
 			continue
 		}
-
 		if !suiteSetupDone {
-			if stats != nil {
-				stats.Start = time.Now()
-			}
-
 			if setupAllSuite, ok := suite.(SetupAllSuite); ok {
 				setupAllSuite.SetupSuite()
 			}
-
+			defer func() {
+				if tearDownAllSuite, ok := suite.(TearDownAllSuite); ok {
+					tearDownAllSuite.TearDownSuite()
+				}
+			}()
 			suiteSetupDone = true
 		}
-
 		test := testing.InternalTest{
 			Name: method.Name,
 			F: func(t *testing.T) {
 				parentT := suite.T()
 				suite.SetT(t)
 				defer failOnPanic(t)
-				defer func() {
-					if stats != nil {
-						passed := !t.Failed()
-						stats.end(method.Name, passed)
-					}
-
-					if afterTestSuite, ok := suite.(AfterTest); ok {
-						afterTestSuite.AfterTest(suiteName, method.Name)
-					}
-
-					if tearDownTestSuite, ok := suite.(TearDownTestSuite); ok {
-						tearDownTestSuite.TearDownTest()
-					}
-
-					suite.SetT(parentT)
-				}()
 
 				if setupTestSuite, ok := suite.(SetupTestSuite); ok {
 					setupTestSuite.SetupTest()
@@ -150,47 +121,24 @@ func Run(t *testing.T, suite TestingSuite) {
 				if beforeTestSuite, ok := suite.(BeforeTest); ok {
 					beforeTestSuite.BeforeTest(methodFinder.Elem().Name(), method.Name)
 				}
-
-				if stats != nil {
-					stats.start(method.Name)
-				}
-
+				defer func() {
+					if afterTestSuite, ok := suite.(AfterTest); ok {
+						afterTestSuite.AfterTest(methodFinder.Elem().Name(), method.Name)
+					}
+					if tearDownTestSuite, ok := suite.(TearDownTestSuite); ok {
+						tearDownTestSuite.TearDownTest()
+					}
+					suite.SetT(parentT)
+				}()
 				method.Func.Call([]reflect.Value{reflect.ValueOf(suite)})
 			},
 		}
 		tests = append(tests, test)
 	}
-	if suiteSetupDone {
-		defer func() {
-			if tearDownAllSuite, ok := suite.(TearDownAllSuite); ok {
-				tearDownAllSuite.TearDownSuite()
-			}
-
-			if suiteWithStats, measureStats := suite.(WithStats); measureStats {
-				stats.End = time.Now()
-				suiteWithStats.HandleStats(suiteName, stats)
-			}
-		}()
-	}
-
 	runTests(t, tests)
 }
 
-// Filtering method according to set regular expression
-// specified command-line argument -m
-func methodFilter(name string) (bool, error) {
-	if ok, _ := regexp.MatchString("^Test", name); !ok {
-		return false, nil
-	}
-	return regexp.MatchString(*matchMethod, name)
-}
-
 func runTests(t testing.TB, tests []testing.InternalTest) {
-	if len(tests) == 0 {
-		t.Log("warning: no tests to run")
-		return
-	}
-
 	r, ok := t.(runner)
 	if !ok { // backwards compatibility with Go 1.6 and below
 		if !testing.RunTests(allTestsFilter, tests) {
@@ -202,6 +150,15 @@ func runTests(t testing.TB, tests []testing.InternalTest) {
 	for _, test := range tests {
 		r.Run(test.Name, test.F)
 	}
+}
+
+// Filtering method according to set regular expression
+// specified command-line argument -m
+func methodFilter(name string) (bool, error) {
+	if ok, _ := regexp.MatchString("^Test", name); !ok {
+		return false, nil
+	}
+	return regexp.MatchString(*matchMethod, name)
 }
 
 type runner interface {
