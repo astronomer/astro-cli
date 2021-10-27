@@ -3,6 +3,7 @@ package cmd
 import (
 	"testing"
 
+	"github.com/astronomer/astro-cli/messages"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,9 +23,9 @@ func TestConfigGetCommandSuccess(t *testing.T) {
 
 func TestConfigGetCommandFailure(t *testing.T) {
 	testUtil.InitTestConfig()
-	output, err := executeCommand("config", "get", "-g", "test")
+	_, err := executeCommand("config", "get", "-g", "test")
 	assert.Error(t, err)
-	assert.Contains(t, output, "Config does not exist, check your config key")
+	assert.EqualError(t, err, messages.ErrInvalidConfigPathKey)
 }
 
 func TestConfigSetCommandFailure(t *testing.T) {
