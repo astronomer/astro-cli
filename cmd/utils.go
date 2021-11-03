@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"strings"
 
@@ -12,8 +11,6 @@ import (
 )
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient *houston.Client, out io.Writer) (string, error) {
-	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, "")
-
 	r := houston.Request{
 		Query: houston.DeploymentInfoRequest,
 	}
@@ -25,11 +22,6 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
 			return "", errors.Errorf(messages.ErrInvalidAirflowVersion, strings.Join(acceptableAirflowVersions, ", "))
 		}
-		if airflowVersion == "" {
-			defaultImageTag = ""
-		} else {
-			defaultImageTag = fmt.Sprintf("%s-buster-onbuild", airflowVersion)
-		}
 	} else if airflowVersion != "" {
 		switch t := err; t {
 		default:
@@ -39,9 +31,10 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 
+	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, airflowVersion)
+
 	if defaultImageTag == "" {
 		defaultImageTag = "2.0.0-buster-onbuild"
-		fmt.Fprintf(out, "Initializing Airflow project\nNot connected to Astronomer, pulling Airflow development files from %s\n", defaultImageTag)
 	}
 	return defaultImageTag, nil
 }
