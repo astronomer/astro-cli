@@ -15,6 +15,13 @@ var (
 	volumeDeploymentType  = "volume"
 	imageDeploymentType   = "image"
 	gitSyncDeploymentType = "git_sync"
+
+	validGitScheme = map[string]struct{}{
+		"git":   struct{}{},
+		"ssh":   struct{}{},
+		"http":  struct{}{},
+		"https": struct{}{},
+	}
 )
 
 type ErrParsingKV struct {
@@ -138,13 +145,18 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string
 	return nil
 }
 
+// validURL will validate whether the URL's scheme is a known Git transport
 func validURL(URL string) bool {
 	if URL == "" {
 		return false
 	}
 
-	_, err := giturls.Parse(URL)
+	u, err := giturls.Parse(URL)
 	if err != nil {
+		return false
+	}
+	_, ok := validGitScheme[u.Scheme]
+	if !ok {
 		return false
 	}
 	return true
