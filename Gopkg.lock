@@ -352,6 +352,12 @@
   revision = "3de563c3dc08a7504131e9d63f678b7d1c3e85d7"
 
 [[projects]]
+  name = "github.com/whilp/git-urls"
+  packages = ["."]
+  revision = "73f16f3fd7d12a4bf3849aae6d2f8c0f94370a60"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
   name = "github.com/inconshreveable/mousetrap"
   packages = ["."]

@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+	giturls "github.com/whilp/git-urls"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
-
-	"github.com/pkg/errors"
 )
 
 var (
-	volumeDeploymentType = "volume"
-	imageDeploymentType  = "image"
+	volumeDeploymentType  = "volume"
+	imageDeploymentType   = "image"
+	gitSyncDeploymentType = "git_sync"
 )
 
 type ErrParsingKV struct {
@@ -123,12 +125,27 @@ func validateRole(role string) error {
 	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
 }
 
-func validateDagDeploymentArgs(dagDeploymentType, nfsLocation string) error {
-	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != "" {
-		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume")
+func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string) error {
+	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != gitSyncDeploymentType && dagDeploymentType != "" {
+		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
 	}
 	if dagDeploymentType == volumeDeploymentType && nfsLocation == "" {
 		return errors.New("please specify the nfs location via --nfs-location flag")
 	}
+	if dagDeploymentType == gitSyncDeploymentType && !validURL(gitRepoURL) {
+		return errors.New("please specify a valid git repository URL via --git-repository-url")
+	}
 	return nil
+}
+
+func validURL(URL string) bool {
+	if URL == "" {
+		return false
+	}
+
+	_, err := giturls.Parse(URL)
+	if err != nil {
+		return false
+	}
+	return true
 }

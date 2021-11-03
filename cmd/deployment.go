@@ -32,6 +32,13 @@ var (
 	nfsLocation           string
 	dagDeploymentType     string
 	triggererReplicas     int
+	gitRevision           string
+	gitRepoURL            string
+	gitBranchName         string
+	gitDAGDir             string
+	gitSyncInterval       int
+	sshKey                string
+	knowHosts             string
 	CreateExample         = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create new-deployment-name --executor=celery
@@ -120,15 +127,40 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 	}
 
+	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
+	appConfig, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Println("Error checking feature flag", err)
+	} else {
+		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
+		triggererEnabled = appConfig.Flags.TriggererEnabled
+		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+	}
+
 	// let's hide under feature flag
-	if deployment.CheckNFSMountDagDeployment(client) {
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume, git_sync")
+	}
+
+	if nfsMountDAGDeploymentEnabled {
 		cmd.Example += createExampleDagDeployment
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
-	if deployment.CheckTriggererEnabled(client) {
+
+	if gitSyncDAGDeploymentEnabled {
+		cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
+		cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
+		cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
+		cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
+		cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", 1, "The interval in seconds in which git-sync will be polling git for updates")
+		cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
+		cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
+	}
+
+	if triggererEnabled {
 		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
+
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -192,15 +224,40 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		},
 	}
 
+	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
+	appConfig, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Println("Error checking feature flag", err)
+	} else {
+		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
+		triggererEnabled = appConfig.Flags.TriggererEnabled
+		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+	}
+
 	// let's hide under feature flag
-	if deployment.CheckNFSMountDagDeployment(client) {
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
+		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume, git_sync")
+	}
+
+	if nfsMountDAGDeploymentEnabled {
 		cmd.Example += updateExampleDagDeployment
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", "DAG Deployment mechanism: image, volume")
 		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
 	}
-	if deployment.CheckTriggererEnabled(client) {
+
+	if triggererEnabled {
 		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
+
+	if gitSyncDAGDeploymentEnabled {
+		cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
+		cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
+		cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
+		cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
+		cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", 1, "The interval in seconds in which git-sync will be polling git for updates")
+		cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
+		cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
+	}
+
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
 }
@@ -417,14 +474,25 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	default:
 		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 	}
+
+	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
+	appConfig, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Println("Error checking feature flag", err)
+	} else {
+		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
+		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+	}
+
 	// we should validate only in case when this feature has been enabled
-	if deployment.CheckNFSMountDagDeployment(client) {
-		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL)
 		if err != nil {
 			return err
 		}
 	}
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, triggererReplicas, client, out)
+
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRevision, gitRepoURL, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -467,14 +535,25 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+
+	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
+	appConfig, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Println("Error checking feature flag", err)
+	} else {
+		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
+		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+	}
+
 	// we should validate only in case when this feature has been enabled
-	if deployment.CheckNFSMountDagDeployment(client) {
-		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation)
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL)
 		if err != nil {
 			return err
 		}
 	}
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, triggererReplicas, client, out)
+
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRevision, gitRepoURL, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
 }
 
 func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {

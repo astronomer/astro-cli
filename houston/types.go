@@ -293,6 +293,7 @@ type FeatureFlags struct {
 	HardDeleteDeployment  bool `json:"hardDeleteDeployment"`
 	ManualNamespaceNames  bool `json:"manualNamespaceNames"`
 	TriggererEnabled      bool `json:"triggererEnabled"`
+	GitSyncEnabled        bool `json:"gitSyncDagDeployment"`
 }
 
 // coerce a string into SemVer if possible
