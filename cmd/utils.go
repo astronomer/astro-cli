@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient *houston.Client, _ io.Writer) (string, error) {
+func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient *houston.Client, out io.Writer) (string, error) {
 	r := houston.Request{
 		Query: houston.DeploymentInfoRequest,
 	}
@@ -35,6 +36,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 
 	if defaultImageTag == "" {
 		defaultImageTag = "2.0.0-buster-onbuild"
+		fmt.Fprintf(out, "Initializing Airflow project, pulling Airflow development files from %s\n", defaultImageTag)
 	}
 	return defaultImageTag, nil
 }
