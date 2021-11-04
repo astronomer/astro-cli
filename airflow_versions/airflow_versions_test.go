@@ -8,6 +8,8 @@ import (
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/Masterminds/semver"
 )
 
 func TestGetDefaultImageTag(t *testing.T) {
@@ -53,6 +55,14 @@ func TestGetDefaultImageTag(t *testing.T) {
         "1.10.4-11-buster"
       ],
       "channel": "stable"
+    },
+    {
+      "version": "2.2.0",
+      "level": "new_feature",
+      "url": "https://github.com/astronomer/airflow/releases/tag/v2.2.0%2Bastro.2",
+      "release_date": "2021-10-14T12:46:00+00:00",
+      "tags": ["2.2.0", "2.2.0-onbuild"],
+      "channel": "stable"
     }
   ]
 }`
@@ -65,9 +75,28 @@ func TestGetDefaultImageTag(t *testing.T) {
 	})
 	httpClient := NewClient(client)
 
-	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
-	assert.NoError(t, err)
-	assert.Equal(t, "1.10.5-buster-onbuild", defaultImageTag)
+	tests := []struct {
+		airflowVersion string
+		output         string
+		err            error
+	}{
+		{airflowVersion: "", output: "2.2.0-onbuild", err: nil},
+		{airflowVersion: "1.10.5", output: "1.10.5-buster-onbuild", err: nil},
+		{airflowVersion: "1.10.4-rc.1", output: "1.10.4-rc.1", err: nil},
+		{airflowVersion: "2.2.1", output: "2.2.1", err: nil},
+		{airflowVersion: "2.2.0", output: "2.2.0-onbuild", err: nil},
+		{airflowVersion: "2.2.x", output: "", err: semver.ErrInvalidSemVer},
+	}
+
+	for _, tt := range tests {
+		defaultImageTag, err := GetDefaultImageTag(httpClient, tt.airflowVersion)
+		if tt.err == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, tt.err.Error())
+		}
+		assert.Equal(t, tt.output, defaultImageTag)
+	}
 }
 
 func TestGetDefaultImageTagError(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient *houston.Client, out io.Writer) (string, error) {
+func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient *houston.Client, _ io.Writer) (string, error) {
 	r := houston.Request{
 		Query: houston.DeploymentInfoRequest,
 	}
@@ -24,10 +24,10 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	} else if airflowVersion != "" {
 		switch t := err; t {
-		default:
-			return "", err
 		case houston.ErrVerboseInaptPermissions:
 			return "", errors.New("the --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again")
+		default:
+			return "", err
 		}
 	}
 
