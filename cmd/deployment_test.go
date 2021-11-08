@@ -324,7 +324,171 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	}{
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+	}
+	for _, tt := range myTests {
+		output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"gitSyncDagDeployment": true, "featureFlags": { "gitSyncDagDeployment": true}},
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=local", "--dag-deployment-type=git_sync", "-u=https://github.com/bote795/public-ariflow-dags-test.git", "-p=dagscopy/", "-b=main", "-s=200"}, expectedOutput: "Successfully created deployment with Local executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		// {cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts", "-s=0"}, expectedOutput: "", expectedError: "syncInterval under min value"},
+		// {cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts", "-s=400"}, expectedOutput: "", expectedError: "syncInterval over max value"},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
+	}
+	for _, tt := range myTests {
+		output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"gitSyncDagDeployment": false},
+    "createDeployment": {
+      "airflowVersion": "2.0.0",
+      "config": {
+        "dagDeployment": {
+          "nfsLocation": "",
+          "type": "image"
+        },
+        "executor": "CeleryExecutor"
+      },
+      "createdAt": "2021-04-26T20:03:36.262Z",
+      "dagDeployment": {
+        "nfsLocation": "",
+        "type": "image"
+      },
+      "description": "",
+      "desiredAirflowVersion": "2.0.0",
+      "id": "cknz133ra49758zr9w34b87ua",
+      "label": "test",
+      "properties": {
+        "alert_emails": [
+          "andrii@astronomer.io"
+        ],
+        "component_version": "2.0.0"
+      },
+      "releaseName": "accurate-radioactivity-8677",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T20:03:36.262Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli",
+        "label": "w1"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --dag-deployment-type"},
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		output, err := executeCommandC(api, tt.cmdArgs...)
@@ -404,7 +568,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	okResponse := `{
   "data": {
-    "appConfig": {"nfsMountDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true}},
+    "appConfig": {"nfsMountDagDeployment": true, "gitSyncDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true, "gitSyncDagDeployment": true}},
     "updateDeployment": {
       "createdAt": "2021-04-23T14:29:28.497Z",
       "dagDeployment": {
@@ -450,9 +614,77 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume"},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "-u=https://github.com/bote795/public-ariflow-dags-test.git", "-p=dagscopy/", "-b=main", "-s=200"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/id_rsa", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+	}
+	for _, tt := range myTests {
+		output, err := executeCommandC(api, tt.cmdArgs...)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, output, tt.expectedOutput)
+	}
+}
+
+func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {"nfsMountDagDeployment": true, "gitSyncDagDeployment": false, "featureFlags": { "nfsMountDagDeployment": true, "gitSyncDagDeployment": false}},
+    "updateDeployment": {
+      "createdAt": "2021-04-23T14:29:28.497Z",
+      "dagDeployment": {
+        "nfsLocation": "test:/test",
+        "type": "volume"
+      },
+      "description": "",
+      "id": "cknuetusw0018yqxto2jzxjqq",
+      "label": "test_dima22asdasd",
+      "releaseName": "amateur-instrument-9515",
+      "status": null,
+      "type": "airflow",
+      "updatedAt": "2021-04-26T21:42:35.361Z",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
+        }
+      ],
+      "version": "0.15.6",
+      "workspace": {
+        "id": "ckn4phn1k0104v5xtrer5lpli"
+      }
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+		expectedError  string
+	}{
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --git-repository-url"},
 	}
 	for _, tt := range myTests {
 		output, err := executeCommandC(api, tt.cmdArgs...)

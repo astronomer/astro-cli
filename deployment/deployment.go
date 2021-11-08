@@ -570,9 +570,7 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 		if gitDAGDir != "" {
 			dagDeploymentConfig["dagDirectoryLocation"] = gitDAGDir
 		}
-		if gitSyncInterval != 0 {
-			dagDeploymentConfig["syncInterval"] = gitSyncInterval
-		}
+		dagDeploymentConfig["syncInterval"] = gitSyncInterval
 		vars["dagDeployment"] = dagDeploymentConfig
 	}
 	return nil
