@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -146,18 +147,20 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string
 }
 
 // validURL will validate whether the URL's scheme is a known Git transport
-func validURL(URL string) bool {
-	if URL == "" {
+func validURL(gitURL string) bool {
+	if gitURL == "" {
 		return false
 	}
 
-	u, err := giturls.Parse(URL)
+	u, err := giturls.Parse(gitURL)
 	if err != nil {
 		return false
 	}
-	_, ok := validGitScheme[u.Scheme]
-	if !ok {
-		return false
+	if strings.HasPrefix(gitURL, "http") || strings.HasPrefix(gitURL, "https") { // Parsing http & https URLs via more stricter ParseRequestURI
+		if _, err := url.ParseRequestURI(gitURL); err != nil {
+			return false
+		}
 	}
-	return true
+	_, ok := validGitScheme[u.Scheme]
+	return ok
 }

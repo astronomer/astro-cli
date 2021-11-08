@@ -143,7 +143,7 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRevision, gitRepoURL, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
@@ -324,7 +324,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRevision, gitRepoURL, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -570,9 +570,7 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 		if gitDAGDir != "" {
 			dagDeploymentConfig["dagDirectoryLocation"] = gitDAGDir
 		}
-		if gitSyncInterval != 0 {
-			dagDeploymentConfig["syncInterval"] = gitSyncInterval
-		}
+		dagDeploymentConfig["syncInterval"] = gitSyncInterval
 		vars["dagDeployment"] = dagDeploymentConfig
 	}
 	return nil
@@ -581,8 +579,8 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 func readSSHKeyFile(sshFilePath string) (string, error) {
 	fd, err := os.Open(sshFilePath)
 	if err != nil {
-		if os.IsExist(err) {
-			return "", errors.New("wrong path specified, no file exists")
+		if os.IsNotExist(err) {
+			return "", errors.New("wrong path specified, no file exists for ssh key")
 		}
 		return "", err
 	}
@@ -598,8 +596,8 @@ func readSSHKeyFile(sshFilePath string) (string, error) {
 func readKnownHostsFile(filePath, repoHost string) (string, error) {
 	fd, err := os.Open(filePath)
 	if err != nil {
-		if os.IsExist(err) {
-			return "", errors.New("wrong path specified, no file exists")
+		if os.IsNotExist(err) {
+			return "", errors.New("wrong path specified, no file exists for known hosts")
 		}
 		return "", err
 	}
@@ -621,8 +619,8 @@ func readKnownHostsFile(filePath, repoHost string) (string, error) {
 	return "", errors.New("git repository host not present in known hosts file")
 }
 
-func getURLHost(URL string) (string, error) {
-	u, err := giturls.Parse(URL)
+func getURLHost(gitURL string) (string, error) {
+	u, err := giturls.Parse(gitURL)
 	if err != nil {
 		return "", err
 	}
