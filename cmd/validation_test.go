@@ -23,33 +23,42 @@ func TestValidateValidRole(t *testing.T) {
 
 func TestValidateDagDeploymentArgs(t *testing.T) {
 	myTests := []struct {
-		dagDeploymentType, nfsLocation string
-		expectedOutput                 string
-		expectedError                  error
+		dagDeploymentType, nfsLocation, gitRepoURL string
+		expectedOutput                             string
+		expectedError                              error
 	}{
 		{dagDeploymentType: "volume", nfsLocation: "test:/test", expectedError: nil},
 		{dagDeploymentType: "image", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "https://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "http://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "git@github.com:neel-astro/private-airflow-dags-test.git", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "ssh://login@server.com:8080/~/private-airflow-dags-test.git", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "user@server.com:path/to/repo.git", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "git://server.com/~user/path/to/repo.git/", expectedError: nil},
 	}
 
 	for _, tt := range myTests {
-		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, "")
+		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL)
 		assert.NoError(t, actualError, "optional message here")
 	}
 }
 
 func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 	myTests := []struct {
-		dagDeploymentType, nfsLocation string
-		expectedOutput                 string
-		expectedError                  string
+		dagDeploymentType, nfsLocation, gitRepoURL string
+		expectedOutput                             string
+		expectedError                              string
 	}{
 		{dagDeploymentType: "volume", expectedError: "please specify the nfs location via --nfs-location flag"},
 		{dagDeploymentType: "unknown", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
 		{dagDeploymentType: "image", expectedError: ""},
+		{dagDeploymentType: "git_sync", expectedError: "please specify a valid git repository URL via --git-repository-url"},
+		{dagDeploymentType: "git_sync", gitRepoURL: "/tmp/test/local-repo.git", expectedError: "please specify a valid git repository URL via --git-repository-url"},
+		{dagDeploymentType: "git_sync", gitRepoURL: "http://192.168.0.%31:8080/", expectedError: "please specify a valid git repository URL via --git-repository-url"},
 	}
 
 	for _, tt := range myTests {
-		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, "")
+		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL)
 		if tt.expectedError != "" {
 			assert.EqualError(t, actualError, tt.expectedError, "optional message here")
 		} else {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -154,6 +155,11 @@ func validURL(gitURL string) bool {
 	u, err := giturls.Parse(gitURL)
 	if err != nil {
 		return false
+	}
+	if strings.HasPrefix(gitURL, "http") || strings.HasPrefix(gitURL, "https") { // Parsing http & https URLs via more stricter ParseRequestURI
+		if _, err := url.ParseRequestURI(gitURL); err != nil {
+			return false
+		}
 	}
 	_, ok := validGitScheme[u.Scheme]
 	return ok

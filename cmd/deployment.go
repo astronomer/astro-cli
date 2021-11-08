@@ -491,7 +491,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 		}
 	}
 
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRevision, gitRepoURL, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
@@ -552,7 +552,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRevision, gitRepoURL, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
 }
 
 func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
