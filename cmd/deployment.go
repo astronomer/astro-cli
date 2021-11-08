@@ -148,13 +148,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	}
 
 	if gitSyncDAGDeploymentEnabled {
-		cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
-		cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
-		cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
-		cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
-		cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", 1, "The interval in seconds in which git-sync will be polling git for updates")
-		cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
-		cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
+		addGitSyncDeploymentFlags(cmd)
 	}
 
 	if triggererEnabled {
@@ -248,18 +242,23 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
+	//noline:dupl
 	if gitSyncDAGDeploymentEnabled {
-		cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
-		cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
-		cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
-		cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
-		cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", 1, "The interval in seconds in which git-sync will be polling git for updates")
-		cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
-		cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
+		addGitSyncDeploymentFlags(cmd)
 	}
 
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
+}
+
+func addGitSyncDeploymentFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
+	cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
+	cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
+	cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
+	cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", 1, "The interval in seconds in which git-sync will be polling git for updates")
+	cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
+	cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
 }
 
 func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Command {

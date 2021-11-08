@@ -146,18 +146,15 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string
 }
 
 // validURL will validate whether the URL's scheme is a known Git transport
-func validURL(URL string) bool {
-	if URL == "" {
+func validURL(gitURL string) bool {
+	if gitURL == "" {
 		return false
 	}
 
-	u, err := giturls.Parse(URL)
+	u, err := giturls.Parse(gitURL)
 	if err != nil {
 		return false
 	}
 	_, ok := validGitScheme[u.Scheme]
-	if !ok {
-		return false
-	}
-	return true
+	return ok
 }

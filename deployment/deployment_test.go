@@ -200,7 +200,7 @@ func TestCreate(t *testing.T) {
 	nfsLocation := ""
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -269,7 +269,7 @@ func TestCreateTriggererEnabled(t *testing.T) {
 	nfsLocation := ""
 	triggerReplicas := 1
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -336,7 +336,7 @@ func TestCreateWithNFSLocation(t *testing.T) {
 	nfsLocation := "test:/test"
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -428,7 +428,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -528,7 +528,7 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.EqualError(t, err, "number is out of available range")
 }
 
@@ -552,7 +552,7 @@ func TestCreateHoustonError(t *testing.T) {
 	nfsLocation := ""
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -707,7 +707,7 @@ func TestUpdate(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 0, api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", 1, 0, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -783,7 +783,7 @@ func TestUpdateTriggerer(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 1, api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", 1, 1, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -805,7 +805,7 @@ func TestUpdateError(t *testing.T) {
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, "", "", 0, api, buf)
+	err := Update(id, role, deploymentConfig, "", "", "", "", "", "", "", "", 1, 0, api, buf)
 
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }

@@ -619,8 +619,8 @@ func readKnownHostsFile(filePath, repoHost string) (string, error) {
 	return "", errors.New("git repository host not present in known hosts file")
 }
 
-func getURLHost(URL string) (string, error) {
-	u, err := giturls.Parse(URL)
+func getURLHost(gitURL string) (string, error) {
+	u, err := giturls.Parse(gitURL)
 	if err != nil {
 		return "", err
 	}
