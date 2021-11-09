@@ -156,7 +156,8 @@ func validURL(gitURL string) bool {
 	if err != nil {
 		return false
 	}
-	if strings.HasPrefix(gitURL, "http") || strings.HasPrefix(gitURL, "https") { // Parsing http & https URLs via more stricter ParseRequestURI
+	// Parsing http & https URLs via more stricter ParseRequestURI
+	if strings.HasPrefix(gitURL, "http") || strings.HasPrefix(gitURL, "https") {
 		if _, err := url.ParseRequestURI(gitURL); err != nil {
 			return false
 		}
