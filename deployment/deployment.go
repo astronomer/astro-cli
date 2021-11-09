@@ -542,21 +542,24 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 
 	if dagDeploymentType == gitSyncDeploymentType {
 		dagDeploymentConfig := map[string]interface{}{"type": dagDeploymentType}
-		if sshKey != "" && knownHosts != "" {
+		if sshKey != "" {
 			sshPubKey, err := readSSHKeyFile(sshKey)
 			if err != nil {
 				return err
 			}
-			repoHost, err := getURLHost(gitRepoURL)
-			if err != nil {
-				return err
-			}
-			knownHostsVal, err := readKnownHostsFile(knownHosts, repoHost)
-			if err != nil {
-				return err
-			}
 			dagDeploymentConfig["sshKey"] = sshPubKey
-			dagDeploymentConfig["knownHosts"] = knownHostsVal
+
+			if knownHosts != "" {
+				repoHost, err := getURLHost(gitRepoURL)
+				if err != nil {
+					return err
+				}
+				knownHostsVal, err := readKnownHostsFile(knownHosts, repoHost)
+				if err != nil {
+					return err
+				}
+				dagDeploymentConfig["knownHosts"] = knownHostsVal
+			}
 		}
 		if gitRevision != "" {
 			dagDeploymentConfig["rev"] = gitRevision
