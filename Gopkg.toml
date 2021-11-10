@@ -71,3 +71,7 @@
 [[constraint]]
   name = "github.com/sirupsen/logrus"
   version = "v1.0.3"
+
+[[constraint]]
+  name = "github.com/whilp/git-urls"
+  revision = "73f16f3fd7d12a4bf3849aae6d2f8c0f94370a60"

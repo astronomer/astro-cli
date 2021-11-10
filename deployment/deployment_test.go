@@ -200,7 +200,7 @@ func TestCreate(t *testing.T) {
 	nfsLocation := ""
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -269,7 +269,7 @@ func TestCreateTriggererEnabled(t *testing.T) {
 	nfsLocation := ""
 	triggerReplicas := 1
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -336,9 +336,99 @@ func TestCreateWithNFSLocation(t *testing.T) {
 	nfsLocation := "test:/test"
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+}
+
+func TestCreateWithGitSync(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+			"appConfig": {
+				"version": "0.15.1",
+				"baseDomain": "local.astronomer.io",
+				"smtpConfigured": true,
+				"manualReleaseNames": false,
+				"hardDeleteDeployment": true,
+				"manualNamespaceNames": false
+			},
+    "createDeployment": {
+			"id": "ckbv818oa00r107606ywhoqtw",
+			"executor": "CeleryExecutor",
+			"urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/flower"
+        }
+      ],
+      "properties": {
+        "component_version": "0.0.0",
+        "alert_emails": []
+      },
+      "description": "",
+      "label": "test2",
+      "releaseName": "boreal-penumbra-1102",
+      "status": null,
+      "type": "airflow",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9",
+        "label": "w1"
+      },
+      "createdAt": "2020-06-25T20:10:33.898Z",
+      "updatedAt": "2020-06-25T20:10:33.898Z"
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	label := "label"
+	ws := "ck1qg6whg001r08691y117hub"
+	releaseName := ""
+	role := "test-role"
+	executor := "CeleryExecutor"
+	airflowVersion := "1.10.5"
+	dagDeploymentType := "git_sync"
+	triggerReplicas := 0
+	myTests := []struct {
+		repoURL              string
+		revision             string
+		dagDirectoryLocation string
+		branchName           string
+		syncInterval         int
+		sshKey               string
+		knownHosts           string
+		expectedOutput       string
+		expectedError        string
+	}{
+		{repoURL: "https://github.com/bote795/public-ariflow-dags-test.git", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", syncInterval: 100, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../cmd/testfiles/ssh_key", knownHosts: "../cmd/testfiles/known_hosts", syncInterval: 100, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../cmd/testfiles/ssh_key", syncInterval: 100, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../cmd/testfiles/wrong_ssh_key", knownHosts: "../cmd/testfiles/known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "wrong path specified, no file exists for ssh key"},
+		{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../cmd/testfiles/ssh_key", knownHosts: "../cmd/testfiles/wrong_known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "wrong path specified, no file exists for known hosts"},
+		{repoURL: "https://gitlab.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../cmd/testfiles/ssh_key", knownHosts: "../cmd/testfiles/known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "git repository host not present in known hosts file"},
+	}
+	for _, tt := range myTests {
+		buf := new(bytes.Buffer)
+		err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, api, buf)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Contains(t, buf.String(), tt.expectedOutput)
+	}
 }
 
 func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
@@ -428,7 +518,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 }
@@ -528,7 +618,7 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.EqualError(t, err, "number is out of available range")
 }
 
@@ -552,7 +642,7 @@ func TestCreateHoustonError(t *testing.T) {
 	nfsLocation := ""
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
-	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, triggerReplicas, api, buf)
+	err := Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
 
@@ -707,7 +797,7 @@ func TestUpdate(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 0, api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", 1, 0, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -783,7 +873,7 @@ func TestUpdateTriggerer(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", 1, api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", 1, 1, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -805,7 +895,7 @@ func TestUpdateError(t *testing.T) {
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, "", "", 0, api, buf)
+	err := Update(id, role, deploymentConfig, "", "", "", "", "", "", "", "", 1, 0, api, buf)
 
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }
