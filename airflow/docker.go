@@ -43,6 +43,7 @@ const (
 
 	projectStopTimeout    = 5
 	defaultAirflowVersion = uint64(0x1) //nolint:gomnd
+	dockerfile            = "Dockerfile"
 )
 
 type ErrWorkspaceNotFound struct {
@@ -71,6 +72,7 @@ type ComposeConfig struct {
 	AirflowUser          string
 	AirflowWebserverPort string
 	MountLabel           string
+	TriggererEnabled     bool
 }
 
 // projectNameUnique creates a reasonably unique project name based on the hashed
@@ -119,7 +121,7 @@ func imageBuild(path, imageName string) error {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile string) (string, error) {
+func generateConfig(projectName, airflowHome, envFile string, triggererEnabled bool) (string, error) {
 	tmpl, err := template.New("yml").Parse(include.Composeyml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
@@ -151,6 +153,7 @@ func generateConfig(projectName, airflowHome, envFile string) (string, error) {
 		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
 		AirflowEnvFile:       envFile,
 		MountLabel:           "z",
+		TriggererEnabled:     triggererEnabled,
 	}
 
 	buff := new(bytes.Buffer)
@@ -168,9 +171,15 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome, envFile string) (p.APIProject, error) {
+func createProject(projectName, airflowHome, envFile string, airflowVer *semver.Version) (p.APIProject, error) {
+	triggererEnabled := false
+
+	version, _ := semver.NewVersion("2.2.0")
+	if airflowVer != nil && airflowVer.GreaterThan(version) {
+		triggererEnabled = true
+	}
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile)
+	yaml, err := generateConfig(projectName, airflowHome, envFile, triggererEnabled)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
@@ -227,7 +236,7 @@ func Start(airflowHome, dockerfile, envFile string) error {
 	}
 
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome, envFile)
+	project, err := createProject(projectName, airflowHome, envFile, airflowDockerVersion)
 	if err != nil {
 		return errors.Wrap(err, messages.ErrComposeCreate)
 	}
@@ -283,7 +292,7 @@ func Start(airflowHome, dockerfile, envFile string) error {
 		for _, info := range psInfo {
 			if strings.Contains(info["Name"], strippedProjectName) &&
 				strings.Contains(info["Name"], "webserver") {
-				settings.ConfigSettings(info["Id"], airflowDockerVersion)
+				settings.ConfigSettings(info["Id"], airflowDockerVersion.Major())
 			}
 		}
 	}
@@ -304,8 +313,13 @@ func Kill(airflowHome string) error {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
 
+	airflowDockerVersion, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
+	if err != nil {
+		return errors.Wrap(err, "error parsing airflow version from dockerfile")
+	}
+
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome, "")
+	project, err := createProject(projectName, airflowHome, "", airflowDockerVersion)
 	if err != nil {
 		return errors.Wrap(err, messages.ErrComposeCreate)
 	}
@@ -329,8 +343,13 @@ func Logs(airflowHome string, webserver, scheduler, follow bool) error {
 		return err
 	}
 
+	airflowDockerVersion, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
+	if err != nil {
+		return errors.Wrap(err, "error parsing airflow version from dockerfile")
+	}
+
 	// Create libcompose project
-	project, err := createProject(projectName, airflowHome, "")
+	project, err := createProject(projectName, airflowHome, "", airflowDockerVersion)
 	if err != nil {
 		return errors.Wrap(err, messages.ErrComposeCreate)
 	}
@@ -367,8 +386,13 @@ func Stop(airflowHome string) error {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
 
+	airflowDockerVersion, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
+	if err != nil {
+		return errors.Wrap(err, "error parsing airflow version from dockerfile")
+	}
+
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome, "")
+	project, err := createProject(projectName, airflowHome, "", airflowDockerVersion)
 	if err != nil {
 		return errors.Wrap(err, messages.ErrComposeCreate)
 	}
@@ -390,8 +414,13 @@ func PS(airflowHome string) error {
 		return errors.Wrap(err, "error retrieving working directory")
 	}
 
+	airflowDockerVersion, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
+	if err != nil {
+		return errors.Wrap(err, "error parsing airflow version from dockerfile")
+	}
+
 	// Create a libcompose project
-	project, err := createProject(projectName, airflowHome, "")
+	project, err := createProject(projectName, airflowHome, "", airflowDockerVersion)
 	if err != nil {
 		return errors.Wrap(err, messages.ErrComposeCreate)
 	}
@@ -430,7 +459,12 @@ func getWebServerContainerID(airflowHome string) (string, error) {
 		return "", err
 	}
 
-	project, err := createProject(projectName, airflowHome, "")
+	airflowDockerVersion, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
+	if err != nil {
+		return "", errors.Wrap(err, "error parsing airflow version from dockerfile")
+	}
+
+	project, err := createProject(projectName, airflowHome, "", airflowDockerVersion)
 	if err != nil {
 		return "", errors.Wrap(err, messages.ErrComposeCreate)
 	}
@@ -688,19 +722,19 @@ func validImageRepo(image string) bool {
 	return result
 }
 
-func airflowVersionFromDockerFile(airflowHome, dockerfile string) (uint64, error) {
+func airflowVersionFromDockerFile(airflowHome, dockerfile string) (*semver.Version, error) {
 	// parse dockerfile
 	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, dockerfile))
+		return nil, errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, dockerfile))
 	}
 
 	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
 
 	semVer, err := semver.NewVersion(airflowTag)
 	if err != nil {
-		return defaultAirflowVersion, nil // Default to Airflow 1 if the user has a custom image without a semVer tag
+		return semver.NewVersion(string(defaultAirflowVersion)) // Default to Airflow 1 if the user has a custom image without a semVer tag
 	}
 
-	return semVer.Major(), nil
+	return semVer, nil
 }
