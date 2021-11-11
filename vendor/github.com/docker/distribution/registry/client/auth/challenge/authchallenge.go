@@ -45,13 +45,13 @@ type Manager interface {
 // to a backend.
 func NewSimpleManager() Manager {
 	return &simpleManager{
-		Challanges: make(map[string][]Challenge),
+		Challenges: make(map[string][]Challenge),
 	}
 }
 
 type simpleManager struct {
 	sync.RWMutex
-	Challanges map[string][]Challenge
+	Challenges map[string][]Challenge
 }
 
 func normalizeURL(endpoint *url.URL) {
@@ -64,7 +64,7 @@ func (m *simpleManager) GetChallenges(endpoint url.URL) ([]Challenge, error) {
 
 	m.RLock()
 	defer m.RUnlock()
-	challenges := m.Challanges[endpoint.String()]
+	challenges := m.Challenges[endpoint.String()]
 	return challenges, nil
 }
 
@@ -82,7 +82,7 @@ func (m *simpleManager) AddResponse(resp *http.Response) error {
 
 	m.Lock()
 	defer m.Unlock()
-	m.Challanges[urlCopy.String()] = challenges
+	m.Challenges[urlCopy.String()] = challenges
 	return nil
 }
 
@@ -117,8 +117,8 @@ func init() {
 		var t octetType
 		isCtl := c <= 31 || c == 127
 		isChar := 0 <= c && c <= 127
-		isSeparator := strings.IndexRune(" \t\"(),/:;<=>?@[]\\{}", rune(c)) >= 0
-		if strings.IndexRune(" \t\r\n", rune(c)) >= 0 {
+		isSeparator := strings.ContainsRune(" \t\"(),/:;<=>?@[]\\{}", rune(c))
+		if strings.ContainsRune(" \t\r\n", rune(c)) {
 			t |= isSpace
 		}
 		if isChar && !isCtl && !isSeparator {
