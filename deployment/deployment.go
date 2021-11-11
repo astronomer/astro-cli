@@ -1,14 +1,19 @@
 package deployment
 
 import (
-	"errors"
+	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	giturls "github.com/whilp/git-urls"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -20,8 +25,10 @@ import (
 var (
 	minAirflowVersion = "1.10.14"
 
-	celeryExecutor       = "CeleryExecutor"
-	volumeDeploymentType = "volume"
+	celeryExecutor = "CeleryExecutor"
+
+	volumeDeploymentType  = "volume"
+	gitSyncDeploymentType = "git_sync"
 
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
@@ -136,7 +143,7 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation string, triggererReplicas int, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
@@ -155,8 +162,9 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		vars["airflowVersion"] = airflowVersion
 	}
 
-	if dagDeploymentType == volumeDeploymentType && nfsLocation != "" {
-		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	err := addDagDeploymentArgs(vars, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
+	if err != nil {
+		return err
 	}
 
 	if CheckTriggererEnabled(client) {
@@ -316,7 +324,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation string, triggererReplicas int, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -324,8 +332,10 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		vars["sync"] = true
 	}
 
-	if dagDeploymentType != "" {
-		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	// adds dag deployment args to the vars map
+	err := addDagDeploymentArgs(vars, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
+	if err != nil {
+		return err
 	}
 
 	if CheckTriggererEnabled(client) {
@@ -522,4 +532,101 @@ func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error
 	}
 
 	return nil
+}
+
+// addDagDeploymentArgs adds dag deployment argument to houston request map
+func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir string, gitSyncInterval int) error {
+	if dagDeploymentType == volumeDeploymentType && nfsLocation != "" {
+		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	}
+
+	if dagDeploymentType == gitSyncDeploymentType {
+		dagDeploymentConfig := map[string]interface{}{"type": dagDeploymentType}
+		if sshKey != "" {
+			sshPubKey, err := readSSHKeyFile(sshKey)
+			if err != nil {
+				return err
+			}
+			dagDeploymentConfig["sshKey"] = sshPubKey
+
+			if knownHosts != "" {
+				repoHost, err := getURLHost(gitRepoURL)
+				if err != nil {
+					return err
+				}
+				knownHostsVal, err := readKnownHostsFile(knownHosts, repoHost)
+				if err != nil {
+					return err
+				}
+				dagDeploymentConfig["knownHosts"] = knownHostsVal
+			}
+		}
+		if gitRevision != "" {
+			dagDeploymentConfig["rev"] = gitRevision
+		}
+		if gitRepoURL != "" {
+			dagDeploymentConfig["repositoryUrl"] = gitRepoURL
+		}
+		if gitBranchName != "" {
+			dagDeploymentConfig["branchName"] = gitBranchName
+		}
+		if gitDAGDir != "" {
+			dagDeploymentConfig["dagDirectoryLocation"] = gitDAGDir
+		}
+		dagDeploymentConfig["syncInterval"] = gitSyncInterval
+		vars["dagDeployment"] = dagDeploymentConfig
+	}
+	return nil
+}
+
+func readSSHKeyFile(sshFilePath string) (string, error) {
+	fd, err := os.Open(sshFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", errors.New("wrong path specified, no file exists for ssh key")
+		}
+		return "", err
+	}
+	defer fd.Close()
+
+	data, err := ioutil.ReadAll(fd)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func readKnownHostsFile(filePath, repoHost string) (string, error) {
+	fd, err := os.Open(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", errors.New("wrong path specified, no file exists for known hosts")
+		}
+		return "", err
+	}
+	defer fd.Close()
+
+	scanner := bufio.NewScanner(fd)
+
+	for scanner.Scan() {
+		hostVal := scanner.Text()
+		if strings.Contains(hostVal, repoHost) {
+			return hostVal, nil
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", errors.Wrapf(err, "error reading known hosts file")
+	}
+
+	return "", errors.New("git repository host not present in known hosts file")
+}
+
+func getURLHost(gitURL string) (string, error) {
+	u, err := giturls.Parse(gitURL)
+	if err != nil {
+		return "", err
+	}
+	// Hostname will remove the port from the host if present, check if that is needed
+	return u.Hostname(), nil
 }

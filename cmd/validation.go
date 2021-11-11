@@ -2,17 +2,27 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
+	giturls "github.com/whilp/git-urls"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
-
-	"github.com/pkg/errors"
 )
 
 var (
-	volumeDeploymentType = "volume"
-	imageDeploymentType  = "image"
+	volumeDeploymentType  = "volume"
+	imageDeploymentType   = "image"
+	gitSyncDeploymentType = "git_sync"
+
+	validGitScheme = map[string]struct{}{
+		"git":   struct{}{},
+		"ssh":   struct{}{},
+		"http":  struct{}{},
+		"https": struct{}{},
+	}
 )
 
 type ErrParsingKV struct {
@@ -123,12 +133,35 @@ func validateRole(role string) error {
 	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
 }
 
-func validateDagDeploymentArgs(dagDeploymentType, nfsLocation string) error {
-	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != "" {
-		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume")
+func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string) error {
+	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != gitSyncDeploymentType && dagDeploymentType != "" {
+		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
 	}
 	if dagDeploymentType == volumeDeploymentType && nfsLocation == "" {
 		return errors.New("please specify the nfs location via --nfs-location flag")
 	}
+	if dagDeploymentType == gitSyncDeploymentType && !validURL(gitRepoURL) {
+		return errors.New("please specify a valid git repository URL via --git-repository-url")
+	}
 	return nil
+}
+
+// validURL will validate whether the URL's scheme is a known Git transport
+func validURL(gitURL string) bool {
+	if gitURL == "" {
+		return false
+	}
+
+	u, err := giturls.Parse(gitURL)
+	if err != nil {
+		return false
+	}
+	// Parsing http & https URLs via more stricter ParseRequestURI
+	if strings.HasPrefix(gitURL, "http") || strings.HasPrefix(gitURL, "https") {
+		if _, err := url.ParseRequestURI(gitURL); err != nil {
+			return false
+		}
+	}
+	_, ok := validGitScheme[u.Scheme]
+	return ok
 }

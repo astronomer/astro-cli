@@ -84,7 +84,7 @@ func projectNameUnique() (string, error) {
 		return "", errors.Wrap(err, "error retrieving working directory")
 	}
 
-	// #nosecc
+	// #nosec
 	b := md5.Sum([]byte(pwd))
 	s := fmt.Sprintf("%x", b[:])
 
