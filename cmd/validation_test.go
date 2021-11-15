@@ -24,6 +24,7 @@ func TestValidateValidRole(t *testing.T) {
 func TestValidateDagDeploymentArgs(t *testing.T) {
 	myTests := []struct {
 		dagDeploymentType, nfsLocation, gitRepoURL string
+		acceptEmptyArgs                            bool
 		expectedOutput                             string
 		expectedError                              error
 	}{
@@ -35,10 +36,11 @@ func TestValidateDagDeploymentArgs(t *testing.T) {
 		{dagDeploymentType: "git_sync", gitRepoURL: "ssh://login@server.com:8080/~/private-airflow-dags-test.git", expectedError: nil},
 		{dagDeploymentType: "git_sync", gitRepoURL: "user@server.com:path/to/repo.git", expectedError: nil},
 		{dagDeploymentType: "git_sync", gitRepoURL: "git://server.com/~user/path/to/repo.git/", expectedError: nil},
+		{dagDeploymentType: "git_sync", gitRepoURL: "", acceptEmptyArgs: true, expectedError: nil},
 	}
 
 	for _, tt := range myTests {
-		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL)
+		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL, tt.acceptEmptyArgs)
 		assert.NoError(t, actualError, "optional message here")
 	}
 }
@@ -46,6 +48,7 @@ func TestValidateDagDeploymentArgs(t *testing.T) {
 func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 	myTests := []struct {
 		dagDeploymentType, nfsLocation, gitRepoURL string
+		acceptEmptyArgs                            bool
 		expectedOutput                             string
 		expectedError                              string
 	}{
@@ -58,7 +61,7 @@ func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 	}
 
 	for _, tt := range myTests {
-		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL)
+		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL, tt.acceptEmptyArgs)
 		if tt.expectedError != "" {
 			assert.EqualError(t, actualError, tt.expectedError, "optional message here")
 		} else {

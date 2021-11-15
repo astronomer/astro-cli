@@ -133,25 +133,26 @@ func validateRole(role string) error {
 	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
 }
 
-func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string) error {
+func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string, acceptEmptyArgs bool) error {
 	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != gitSyncDeploymentType && dagDeploymentType != "" {
 		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
 	}
 	if dagDeploymentType == volumeDeploymentType && nfsLocation == "" {
 		return errors.New("please specify the nfs location via --nfs-location flag")
 	}
-	if dagDeploymentType == gitSyncDeploymentType && !validURL(gitRepoURL) {
+	if dagDeploymentType == gitSyncDeploymentType && !validURL(gitRepoURL, acceptEmptyArgs) {
 		return errors.New("please specify a valid git repository URL via --git-repository-url")
 	}
 	return nil
 }
 
 // validURL will validate whether the URL's scheme is a known Git transport
-func validURL(gitURL string) bool {
-	if gitURL == "" {
+func validURL(gitURL string, acceptEmptyURL bool) bool {
+	if !acceptEmptyURL && gitURL == "" {
 		return false
+	} else if acceptEmptyURL && gitURL == "" {
+		return true
 	}
-
 	u, err := giturls.Parse(gitURL)
 	if err != nil {
 		return false
