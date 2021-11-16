@@ -485,7 +485,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
-		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL)
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, false)
 		if err != nil {
 			return err
 		}
@@ -546,7 +546,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
-		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL)
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
 		if err != nil {
 			return err
 		}
