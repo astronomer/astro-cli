@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/logs"
+
 	"github.com/spf13/cobra"
 )
 

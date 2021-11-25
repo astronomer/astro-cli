@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/workspace"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -69,7 +70,11 @@ func registryAuth() error {
 
 	registry := "registry." + c.Domain
 	token := c.Token
-	err = docker.ExecLogin(registry, "user", token)
+	registryHandler, err := airflow.RegistryHandlerInit(registry)
+	if err != nil {
+		return err
+	}
+	err = registryHandler.Login("user", token)
 	if err != nil {
 		return err
 	}

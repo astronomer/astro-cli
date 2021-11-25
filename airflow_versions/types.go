@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/Masterminds/semver"
+	semver "github.com/Masterminds/semver/v3"
 )
 
 // AirflowVersionReg represents translated python regexpr to JS from https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions

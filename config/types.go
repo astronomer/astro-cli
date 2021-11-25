@@ -36,6 +36,7 @@ type cfgs struct {
 	AirflowReleasesURL cfg
 	SkipVerifyTLS      cfg
 	Verbosity          cfg
+	ContainerEngine    cfg
 }
 
 // Creates a new cfg struct

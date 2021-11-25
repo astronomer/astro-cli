@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
+
 	"github.com/stretchr/testify/assert"
 )
 

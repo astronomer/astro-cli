@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/user"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"

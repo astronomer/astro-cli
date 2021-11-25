@@ -10,16 +10,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Masterminds/semver"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	giturls "github.com/whilp/git-urls"
-
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/settings"
+
+	semver "github.com/Masterminds/semver/v3"
 	"github.com/fatih/camelcase"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	giturls "github.com/whilp/git-urls"
 )
 
 var (

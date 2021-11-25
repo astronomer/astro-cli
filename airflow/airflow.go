@@ -5,14 +5,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	"github.com/astronomer/astro-cli/airflow/include"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+
+	semver "github.com/Masterminds/semver/v3"
+	"github.com/pkg/errors"
 )
 
 const (
 	defaultDirPerm os.FileMode = 0777
+
+	defaultAirflowVersion = uint64(0x1) //nolint:gomnd
+	componentName         = "airflow"
 )
 
 func initDirs(root string, dirs []string) error {
@@ -78,6 +84,11 @@ func Init(path, airflowImageTag string) error {
 		"dags/example-dag.py":   include.Exampledag,
 	}
 
+	containerEngine := config.CFG.ContainerEngine.GetString()
+	if containerEngine == string(PodmanEngine) {
+		files["pod-config.yaml"] = include.PodmanConfigYml
+	}
+
 	// Initailize directories
 	if err := initDirs(path, dirs); err != nil {
 		return errors.Wrap(err, "failed to create project directories")
@@ -89,4 +100,31 @@ func Init(path, airflowImageTag string) error {
 	}
 
 	return nil
+}
+
+func ParseVersionFromDockerFile(airflowHome, dockerfile string) (uint64, error) {
+	// parse dockerfile
+	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, dockerfile))
+	}
+
+	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
+
+	semVer, err := semver.NewVersion(airflowTag)
+	if err != nil {
+		return defaultAirflowVersion, nil // Default to Airflow 1 if the user has a custom image without a semVer tag
+	}
+
+	return semVer.Major(), nil
+}
+
+// repositoryName creates an airflow repository name
+func repositoryName(name string) string {
+	return fmt.Sprintf("%s/%s", name, componentName)
+}
+
+// imageName creates an airflow image name
+func imageName(name, tag string) string {
+	return fmt.Sprintf("%s:%s", repositoryName(name), tag)
 }

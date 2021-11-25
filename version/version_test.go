@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsValidVersionInValid(t *testing.T) {

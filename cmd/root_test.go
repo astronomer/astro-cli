@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+
 	"github.com/stretchr/testify/assert"
 )
 

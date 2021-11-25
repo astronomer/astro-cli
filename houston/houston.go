@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+
 	"github.com/pkg/errors"
 	newLogger "github.com/sirupsen/logrus"
 )

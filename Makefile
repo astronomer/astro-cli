@@ -17,22 +17,25 @@ GOFMT ?= gofumpt -l -s -extra
 GOFILES := $(shell find . -name "*.go" -type f | grep -v /vendor/)
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
+GO_PODMAN_BUILD_TAGS=containers_image_openpgp,exclude_graphdriver_btrfs,exclude_graphdriver_devicemapper
+GO_BUILD_TAGS=$(GO_PODMAN_BUILD_TAGS)
+
 mod:
 	go mod vendor
 
 build:
-	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" main.go
+	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" -tags=${GO_BUILD_TAGS} main.go
 
 test: lint
-	go test -count=1 -cover ./...
-	go test -coverprofile=coverage.txt -covermode=atomic ./...
+	go test -tags=${GO_BUILD_TAGS} -count=1 -cover ./...
+	go test -tags=${GO_BUILD_TAGS} -coverprofile=coverage.txt -covermode=atomic ./...
 
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)
 
 cover:
 	rm -f cover.out
-	go test -coverprofile=cover.out ./...
+	go test -tags=${GO_BUILD_TAGS} -coverprofile=cover.out ./...
 	go tool cover -func=cover.out
 
 format:
@@ -41,7 +44,7 @@ format:
 
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint -o -f /go/bin/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
-	@if (test -f ${ENVTEST_ASSETS_DIR}/golangci-lint) then (${ENVTEST_ASSETS_DIR}/golangci-lint run) else (/go/bin/golangci-lint run) fi
+	@if (test -f ${ENVTEST_ASSETS_DIR}/golangci-lint) then (${ENVTEST_ASSETS_DIR}/golangci-lint run --build-tags=${GO_BUILD_TAGS}) else (/go/bin/golangci-lint run --build-tags=${GO_BUILD_TAGS}) fi
 
 tools:
 	@echo ">> installing some extra tools"

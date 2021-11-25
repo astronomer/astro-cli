@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
@@ -52,7 +53,7 @@ var (
 		LocalOrbit:         newCfg("local.orbit", ""),
 		PostgresUser:       newCfg("postgres.user", "postgres"),
 		PostgresPassword:   newCfg("postgres.password", "postgres"),
-		PostgresHost:       newCfg("postgres.host", "postgres"),
+		PostgresHost:       newCfg("postgres.host", "0.0.0.0"),
 		PostgresPort:       newCfg("postgres.port", "5432"),
 		ProjectDeployment:  newCfg("project.deployment", ""),
 		ProjectName:        newCfg("project.name", ""),
@@ -62,6 +63,7 @@ var (
 		AirflowReleasesURL: newCfg("airflow_releases_url", "https://updates.astronomer.io/astronomer-certified"),
 		SkipVerifyTLS:      newCfg("skip_verify_tls", "false"),
 		Verbosity:          newCfg("verbosity", "warning"),
+		ContainerEngine:    newCfg("container.engine", "docker"),
 	}
 
 	// viperHome is the viper object in the users home directory

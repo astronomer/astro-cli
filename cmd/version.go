@@ -3,12 +3,12 @@ package cmd
 import (
 	"io"
 
-	"github.com/spf13/cobra"
-
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/github"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
+
+	"github.com/spf13/cobra"
 )
 
 func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {

@@ -4,7 +4,7 @@ jobs:
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: asoldatenko/dnd-golang:19.03
+      - image: neeldalsania/dind-golang:1.17
       - image: postgres
         name: postgres
         environment:

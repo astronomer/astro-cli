@@ -5,6 +5,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/user"
+
 	"github.com/spf13/cobra"
 )
 

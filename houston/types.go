@@ -3,7 +3,7 @@ package houston
 import (
 	"fmt"
 
-	"github.com/Masterminds/semver"
+	semver "github.com/Masterminds/semver/v3"
 )
 
 // Response wraps all houston response structs used for json marashalling

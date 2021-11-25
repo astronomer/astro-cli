@@ -7,9 +7,9 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/spf13/cobra"
-
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 

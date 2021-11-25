@@ -8,20 +8,19 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/iancoleman/strcase"
-	"github.com/pkg/errors"
-
-	"github.com/astronomer/astro-cli/messages"
-
-	"github.com/spf13/cobra"
-
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/settings"
+
+	"github.com/iancoleman/strcase"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -37,7 +36,7 @@ var (
 
 	runExample = `
 # Create default admin user.
-astro dev run create_user -r Admin -u admin -e admin@example.com -f admin -l user -p admin
+astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
 )
 
@@ -329,7 +328,34 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	return airflow.Start(config.WorkingPath, dockerfile, envFile)
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	airflowDockerVersion, err := airflow.ParseVersionFromDockerFile(config.WorkingPath, dockerfile)
+	if err != nil {
+		return errors.Wrap(err, "error parsing airflow version from dockerfile")
+	}
+
+	err = containerHandler.Start(dockerfile)
+	if err != nil {
+		return err
+	}
+
+	fileState, err := fileutil.Exists("airflow_settings.yaml")
+	if err != nil {
+		return errors.Wrap(err, messages.SettingsPath)
+	}
+
+	if fileState {
+		containerID, err := containerHandler.GetContainerID("webserver")
+		if err != nil {
+			return errors.Wrap(err, messages.ErrContainerStatusCheck)
+		}
+		settings.ConfigSettings(containerHandler, containerID, airflowDockerVersion)
+	}
+	return nil
 }
 
 // Kill an airflow cluster
@@ -337,21 +363,34 @@ func airflowKill(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return airflow.Kill(config.WorkingPath)
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Kill()
 }
 
 // Outputs logs for a development airflow cluster
 func airflowLogs(cmd *cobra.Command, args []string) error {
 	// default is to display all logs
-	if !schedulerLogs && !webserverLogs {
-		schedulerLogs = true
-		webserverLogs = true
+	containersNames := make([]string, 0)
+	if schedulerLogs {
+		containersNames = append(containersNames, "scheduler")
+	}
+	if webserverLogs {
+		containersNames = append(containersNames, "webserver")
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return airflow.Logs(config.WorkingPath, webserverLogs, schedulerLogs, followLogs)
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Logs(followLogs, containersNames...)
 }
 
 // Stop an airflow cluster
@@ -359,7 +398,12 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return airflow.Stop(config.WorkingPath)
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Stop()
 }
 
 // List containers of an airflow cluster
@@ -367,7 +411,12 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return airflow.PS(config.WorkingPath)
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.PS()
 }
 
 // airflowRun
@@ -378,7 +427,13 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"airflow"}, args...)
 	// ignore last user parameter
-	return airflow.Run(config.WorkingPath, args, "")
+
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Run(args, "")
 }
 
 // airflowUpgradeCheck
@@ -388,7 +443,13 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}, args...)
-	return airflow.Run(config.WorkingPath, args, "root")
+
+	containerHandler, err := airflow.ContainerHandlerInit(config.WorkingPath, envFile)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.Run(args, "root")
 }
 
 func acceptableVersion(a string, list []string) bool {

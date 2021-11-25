@@ -8,6 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+
 	"github.com/pkg/errors"
 )
 
