@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -37,9 +38,9 @@ func GetEnv(key, fallback string) string {
 	return fallback
 }
 
-func NewTestConfig() []byte {
+func NewTestConfig(containerEngine string) []byte {
 	houstonHost := GetEnv("HOUSTON_HOST", "localhost")
-	configRaw := []byte(`cloud:
+	configRaw := []byte(fmt.Sprintf(`cloud:
   api:
     port: "443"
     protocol: https
@@ -54,7 +55,10 @@ contexts:
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
-`)
+show_warnings: false
+container:
+  engine: %s 
+`, containerEngine))
 	cfg := strings.ReplaceAll(string(configRaw), "HOUSTON_HOST", houstonHost)
 	return []byte(cfg)
 }
@@ -62,7 +66,7 @@ contexts:
 func InitTestConfig() {
 	// fake filesystem
 	fs := afero.NewMemMapFs()
-	configYaml := NewTestConfig()
+	configYaml := NewTestConfig("docker")
 	err := afero.WriteFile(fs, config.HomeConfigFile, configYaml, defaultFilePerm)
 	config.InitConfig(fs)
 	if err != nil {

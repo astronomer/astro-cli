@@ -20,6 +20,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	// these are used to monkey patch the function in order to write unit test cases
+	imageHandlerInit = airflow.ImageHandlerInit
+
+	getDeploymentInfoRequest = &houston.Request{Query: houston.DeploymentInfoRequest}
+	getDeploymentInfo        = getDeploymentInfoRequest.Do
+)
+
 var tab = printutil.Table{
 	Padding:        []int{5, 30, 30, 50},
 	DynamicPadding: true,
@@ -241,10 +249,7 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 		}
 	}
 	// Get valid image tags for platform using Deployment Info request
-	diReq := houston.Request{
-		Query: houston.DeploymentInfoRequest,
-	}
-	diResp, err := diReq.Do()
+	diResp, err := getDeploymentInfo()
 	if err != nil {
 		return err
 	}
@@ -257,8 +262,7 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 			os.Exit(1)
 		}
 	}
-	fmt.Println("test", name)
-	imageHandler, err := airflow.ImageHandlerInit(name)
+	imageHandler, err := imageHandlerInit(name)
 	if err != nil {
 		return err
 	}

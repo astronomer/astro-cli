@@ -65,7 +65,7 @@ func TestInitFiles(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	tmpDir, err := ioutil.TempDir("", "temp")

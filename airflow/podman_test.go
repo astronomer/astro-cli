@@ -85,7 +85,7 @@ func TestPodmanGetContainerIDFailure(t *testing.T) {
 
 func TestPodmanStartSuccess(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 	projectDir, _ := os.Getwd()
@@ -123,7 +123,7 @@ func TestPodmanStartSuccess(t *testing.T) {
 
 func TestPodmanStartFailure(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 	projectDir, _ := os.Getwd()
@@ -157,7 +157,7 @@ func TestPodmanStartFailure(t *testing.T) {
 
 func TestPodmanKillSuccess(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
@@ -177,7 +177,7 @@ func TestPodmanKillSuccess(t *testing.T) {
 
 func TestPodmanKillFailure(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 

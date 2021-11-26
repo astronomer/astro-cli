@@ -33,7 +33,7 @@ func TestCheckServiceStateFalse(t *testing.T) {
 
 func TestGenerateConfig(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", DockerEngine)
@@ -132,7 +132,7 @@ services:
 
 func TestCreateProject(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	project, err := createProject("test-project-name", "airflow_home", ".env")

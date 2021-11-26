@@ -12,7 +12,6 @@ import (
 
 func TestExists(t *testing.T) {
 	testUtil.InitTestConfig()
-	// Check that we don't have localhost123 in test config from testUtils.NewTestConfig()
 	assert.False(t, Exists("localhost123"))
 }
 

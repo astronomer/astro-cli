@@ -33,7 +33,7 @@ type IntegrationTestSuite struct {
 
 func (ts *IntegrationTestSuite) SetupSuite() {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	rand.Seed(time.Now().UnixNano())
