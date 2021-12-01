@@ -86,7 +86,7 @@ func Init(path, airflowImageTag string) error {
 
 	containerEngine := config.CFG.ContainerEngine.GetString()
 	if containerEngine == string(PodmanEngine) {
-		files["pod-config.yaml"] = include.PodmanConfigYml
+		files["pod-config.yml"] = include.PodmanConfigYml
 	}
 
 	// Initailize directories

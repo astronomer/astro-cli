@@ -400,7 +400,7 @@ func readPodConfigFile() string {
 }
 
 func (p *Podman) webserverHealthCheck() {
-	for i := 0; i < 25; i++ {
+	for i := 0; i < 10; i++ {
 		var resp string
 		containerID, err := p.getWebserverContainerID()
 		if err != nil {
