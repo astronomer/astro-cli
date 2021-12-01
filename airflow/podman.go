@@ -18,6 +18,7 @@ import (
 
 	"github.com/containers/podman/v3/pkg/api/handlers"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
+	"github.com/containers/podman/v3/pkg/bindings/play"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
@@ -328,7 +329,11 @@ func (p *Podman) startPod(projectName, projectDir, envFile string) (string, erro
 		return podID, err
 	}
 	defer os.Remove(podStateFile)
-	podReport, err := p.podmanBind.Kube(p.conn, podStateFile, nil)
+	options := &play.KubeOptions{}
+	if strings.HasPrefix(config.CFG.PodmanConnectionURI.GetString(), "ssh") {
+		options = options.WithNetwork("podman")
+	}
+	podReport, err := p.podmanBind.Kube(p.conn, podStateFile, options)
 	if err != nil {
 		return podID, err
 	}
@@ -354,12 +359,18 @@ func generatePodState(projectName, projectDir, envFile string) error {
 }
 
 func getConn(ctx context.Context, binder PodmanBind) (context.Context, error) {
-	// Get Podman socket location
-	sockDir, ok := os.LookupEnv("XDG_RUNTIME_DIR")
-	if !ok {
-		sockDir = defaultPodmanSockDir
+	var socket string
+	connectionURI := config.CFG.PodmanConnectionURI.GetString()
+	if connectionURI != "" {
+		socket = connectionURI
+	} else {
+		// Get Podman socket location
+		sockDir, ok := os.LookupEnv("XDG_RUNTIME_DIR")
+		if !ok {
+			sockDir = defaultPodmanSockDir
+		}
+		socket = "unix://" + sockDir + "/podman/podman.sock"
 	}
-	socket := "unix://" + sockDir + "/podman/podman.sock"
 
 	// podman connection is essentially a context
 	return binder.NewConnection(ctx, socket)
