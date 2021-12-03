@@ -34,8 +34,8 @@ func TestConfigSetCommandFailure(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestConfigSetCommandFailurePrjConfig(t *testing.T) {
+func TestConfigSetCommandSuccess(t *testing.T) {
 	testUtil.InitTestConfig()
 	_, err := executeCommand("config", "set", "-g", "project.name", "testing")
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
