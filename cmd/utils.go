@@ -8,6 +8,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
+
 	"github.com/pkg/errors"
 )
 

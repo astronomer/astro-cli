@@ -1,36 +1,19 @@
 package airflow
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
+
+	"github.com/docker/docker/api/types"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/astronomer/astro-cli/houston"
 )
-
-func TestDeploymentNameExists(t *testing.T) {
-	deployments := []houston.Deployment{
-		{ReleaseName: "dev"},
-		{ReleaseName: "dev1"},
-	}
-	exists := deploymentNameExists("dev", deployments)
-	if !exists {
-		t.Errorf("deploymentNameExists(dev) = %t; want true", exists)
-	}
-}
-
-func TestDeploymentNameDoesntExists(t *testing.T) {
-	deployments := []houston.Deployment{
-		{ReleaseName: "dummy"},
-	}
-	exists := deploymentNameExists("dev", deployments)
-	if exists {
-		t.Errorf("deploymentNameExists(dev) = %t; want false", exists)
-	}
-}
 
 func TestRepositoryName(t *testing.T) {
 	assert.Equal(t, repositoryName("test-repo"), "test-repo/airflow")
@@ -50,10 +33,10 @@ func TestCheckServiceStateFalse(t *testing.T) {
 
 func TestGenerateConfig(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
-	cfg, err := generateConfig("test-project-name", "airflow_home", ".env")
+	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", DockerEngine)
 	assert.NoError(t, err)
 	expectedCfg := `version: '2'
 
@@ -100,7 +83,7 @@ services:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@0.0.0.0:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
     volumes:
@@ -132,7 +115,7 @@ services:
       - postgres
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@0.0.0.0:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
@@ -149,7 +132,7 @@ services:
 
 func TestCreateProject(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	project, err := createProject("test-project-name", "airflow_home", ".env")
@@ -157,42 +140,29 @@ func TestCreateProject(t *testing.T) {
 	assert.NotNil(t, project)
 }
 
-func Test_validImageRepo(t *testing.T) {
-	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
-	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
-	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
+func TestExecVersion(t *testing.T) {
+	err := dockerExec("version")
+	if err != nil {
+		t.Error(err)
+	}
 }
 
-func Test_airflowVersionFromDockerFile(t *testing.T) {
-	airflowHome := config.WorkingPath + "/testfiles"
+func TestExecPipe(t *testing.T) {
+	var buf bytes.Buffer
+	data := ""
+	resp := &types.HijackedResponse{Reader: bufio.NewReader(strings.NewReader(data))}
+	err := execPipe(*resp, &buf, &buf, &buf)
+	fmt.Println(buf.String())
+	if err != nil {
+		t.Error(err)
+	}
+}
 
-	// Version 1
-	expected := uint64(0x1)
-	dockerfile := "Dockerfile.Airflow1.ok"
-	version, err := airflowVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, version)
-
-	// Version 2
-	expected = uint64(0x2)
-	dockerfile = "Dockerfile.Airflow2.ok"
-	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, version)
-
-	// Default to Airflow 1 when there is an invalid Tag
-	expected = uint64(0x1)
-	dockerfile = "Dockerfile.tag.invalid"
-	version, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, version)
-
-	// Invalid Dockerfile
-	dockerfile = "Dockerfile.not.real"
-	_, err = airflowVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.Error(t, err)
+func TestExecPipeNils(t *testing.T) {
+	data := ""
+	resp := &types.HijackedResponse{Reader: bufio.NewReader(strings.NewReader(data))}
+	err := execPipe(*resp, nil, nil, nil)
+	if err != nil {
+		t.Error(err)
+	}
 }

@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+
 	"github.com/spf13/viper"
 )
 
@@ -35,11 +36,11 @@ var (
 )
 
 // ConfigSettings is the main builder of the settings package
-func ConfigSettings(id string, version uint64) {
+func ConfigSettings(containerEngine airflow.ContainerHandler, id string, version uint64) {
 	InitSettings()
-	AddConnections(id, version)
-	AddPools(id, version)
-	AddVariables(id, version)
+	AddConnections(containerEngine, id, version)
+	AddPools(containerEngine, id, version)
+	AddVariables(containerEngine, id, version)
 }
 
 // InitSettings initializes settings file
@@ -66,7 +67,7 @@ func InitSettings() {
 }
 
 // AddVariables is a function to add Variables from settings.yaml
-func AddVariables(id string, version uint64) {
+func AddVariables(containerEngine airflow.ContainerHandler, id string, version uint64) {
 	variables := settings.Airflow.Variables
 
 	for _, variable := range variables {
@@ -86,14 +87,14 @@ func AddVariables(id string, version uint64) {
 
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 
-			docker.AirflowCommand(id, airflowCommand)
+			containerEngine.ExecCommand(id, airflowCommand)
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
 }
 
 // AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string, airflowVersion uint64) {
+func AddConnections(containerEngine airflow.ContainerHandler, id string, airflowVersion uint64) {
 	connections := settings.Airflow.Connections
 	baseCmd := "airflow connections "
 	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
@@ -130,8 +131,7 @@ func AddConnections(id string, airflowVersion uint64) {
 	}
 
 	airflowCommand := baseListCmd
-	out := docker.AirflowCommand(id, airflowCommand)
-
+	out := containerEngine.ExecCommand(id, airflowCommand)
 	for idx := range connections {
 		conn := connections[idx]
 		if !objectValidator(0, conn.ConnID) {
@@ -142,7 +142,7 @@ func AddConnections(id string, airflowVersion uint64) {
 		if strings.Contains(out, quotedConnID) {
 			fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
 			airflowCommand = fmt.Sprintf("%s %s \"%s\"", baseRmCmd, connIDArg, conn.ConnID)
-			docker.AirflowCommand(id, airflowCommand)
+			containerEngine.ExecCommand(id, airflowCommand)
 		}
 
 		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
@@ -174,13 +174,13 @@ func AddConnections(id string, airflowVersion uint64) {
 		if conn.ConnPort != 0 {
 			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
 		}
-		docker.AirflowCommand(id, airflowCommand)
+		containerEngine.ExecCommand(id, airflowCommand)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
 
 // AddPools  is a function to add Pools from settings.yaml
-func AddPools(id string, airflowVersion uint64) {
+func AddPools(containerEngine airflow.ContainerHandler, id string, airflowVersion uint64) {
 	pools := settings.Airflow.Pools
 	baseCmd := "airflow "
 	if airflowVersion >= AirflowVersionTwo {
@@ -204,7 +204,7 @@ func AddPools(id string, airflowVersion uint64) {
 				} else {
 					airflowCommand += ""
 				}
-				docker.AirflowCommand(id, airflowCommand)
+				containerEngine.ExecCommand(id, airflowCommand)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)

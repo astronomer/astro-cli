@@ -5,12 +5,12 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/deployment"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
-	"github.com/Masterminds/semver"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
+
+	semver "github.com/Masterminds/semver/v3"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // ValidateCompatibility print message if astro-cli version is not compatible with platform version

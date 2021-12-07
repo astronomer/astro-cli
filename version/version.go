@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
+
+	"github.com/pkg/errors"
 )
 
 var (

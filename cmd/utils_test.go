@@ -10,6 +10,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+
 	"github.com/stretchr/testify/assert"
 )
 

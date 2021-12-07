@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/user"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -32,7 +33,7 @@ type IntegrationTestSuite struct {
 
 func (ts *IntegrationTestSuite) SetupSuite() {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig()
+	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
 	config.InitConfig(fs)
 	rand.Seed(time.Now().UnixNano())

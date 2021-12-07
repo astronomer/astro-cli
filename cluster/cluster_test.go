@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
-
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestExists(t *testing.T) {
 	testUtil.InitTestConfig()
-	// Check that we don't have localhost123 in test config from testUtils.NewTestConfig()
 	assert.False(t, Exists("localhost123"))
 }
 

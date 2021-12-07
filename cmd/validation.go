@@ -5,11 +5,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/pkg/errors"
-	giturls "github.com/whilp/git-urls"
-
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
+
+	"github.com/pkg/errors"
+	giturls "github.com/whilp/git-urls"
 )
 
 var (

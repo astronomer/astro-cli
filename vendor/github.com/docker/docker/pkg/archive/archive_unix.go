@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package archive // import "github.com/docker/docker/pkg/archive"
@@ -11,7 +12,7 @@ import (
 
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/system"
-	rsystem "github.com/opencontainers/runc/libcontainer/system"
+	rsystem "github.com/opencontainers/runc/libcontainer/userns"
 	"golang.org/x/sys/unix"
 )
 
