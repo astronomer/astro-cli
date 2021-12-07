@@ -96,34 +96,60 @@ func TestInit(t *testing.T) {
 
 func Test_airflowVersionFromDockerFile(t *testing.T) {
 	airflowHome := config.WorkingPath + "/testfiles"
+	type args struct {
+		dockerFile string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		wantErr        bool
+		expectedResult interface{}
+	}{
+		{
+			name: "airflow version 1 ok",
+			args: args{
+				dockerFile: "Dockerfile.Airflow1.ok",
+			},
+			wantErr:        false,
+			expectedResult: uint64(0x1),
+		},
+		{
+			name: "airflow version 2 ok",
+			args: args{
+				dockerFile: "Dockerfile.Airflow2.ok",
+			},
+			wantErr:        false,
+			expectedResult: uint64(0x2),
+		},
+		{
+			name: "invalid airflow tag ok",
+			args: args{
+				dockerFile: "Dockerfile.tag.invalid",
+			},
+			wantErr:        false,
+			expectedResult: uint64(0x1),
+		},
+		{
+			name: "invalid dockerfile",
+			args: args{
+				dockerFile: "Dockerfile.not.real",
+			},
+			wantErr:        true,
+			expectedResult: nil,
+		},
+	}
 
-	// Version 1
-	expected := uint64(0x1)
-	dockerfile := "Dockerfile.Airflow1.ok"
-	version, err := ParseVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, version)
-
-	// Version 2
-	expected = uint64(0x2)
-	dockerfile = "Dockerfile.Airflow2.ok"
-	version, err = ParseVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, version)
-
-	// Default to Airflow 1 when there is an invalid Tag
-	expected = uint64(0x1)
-	dockerfile = "Dockerfile.tag.invalid"
-	version, err = ParseVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.NoError(t, err)
-	assert.Equal(t, expected, version)
-
-	// Invalid Dockerfile
-	dockerfile = "Dockerfile.not.real"
-	_, err = ParseVersionFromDockerFile(airflowHome, dockerfile)
-
-	assert.Error(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			version, err := ParseVersionFromDockerFile(airflowHome, tt.args.dockerFile)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			if tt.expectedResult != nil {
+				assert.Equal(t, tt.expectedResult, version)
+			}
+		})
+	}
 }
