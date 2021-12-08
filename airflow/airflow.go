@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
@@ -20,6 +21,8 @@ const (
 	defaultAirflowVersion = uint64(0x1) //nolint:gomnd
 	componentName         = "airflow"
 )
+
+var repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number
 
 func initDirs(root string, dirs []string) error {
 	// Create the dirs
@@ -121,10 +124,15 @@ func ParseVersionFromDockerFile(airflowHome, dockerfile string) (uint64, error) 
 
 // repositoryName creates an airflow repository name
 func repositoryName(name string) string {
-	return fmt.Sprintf("%s/%s", name, componentName)
+	return fmt.Sprintf("%s/%s", sanitizeRepoName(name), componentName)
 }
 
 // imageName creates an airflow image name
 func imageName(name, tag string) string {
 	return fmt.Sprintf("%s:%s", repositoryName(name), tag)
+}
+
+// sanitizeRepoName updates the repoName to be compatible with docker image naming convention
+func sanitizeRepoName(repoName string) string {
+	return repoNameSanitizeRegexp.ReplaceAllString(repoName, "")
 }
