@@ -13,49 +13,46 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var globalFlag bool
+
 func newConfigRootCmd(_ *houston.Client, out io.Writer) *cobra.Command {
-	var globalFlag bool
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage project configuration",
 		Long:  "Manage project configuration",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			ensureGlobalFlag(cmd, args, globalFlag)
+			ensureGlobalFlag(cmd, args)
 		},
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 	cmd.AddCommand(
-		newConfigGetCmd(out, globalFlag),
-		newConfigSetCmd(out, globalFlag),
+		newConfigGetCmd(out),
+		newConfigSetCmd(out),
 	)
 	return cmd
 }
 
-func newConfigGetCmd(_ io.Writer, globalFlag bool) *cobra.Command {
+func newConfigGetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get project configuration",
 		Long:  "Get project configuration",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return configGet(cmd, args, globalFlag)
-		},
+		RunE:  configGet,
 	}
 	return cmd
 }
 
-func newConfigSetCmd(_ io.Writer, globalFlag bool) *cobra.Command {
+func newConfigSetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "Set project configuration",
 		Long:  "Set project configuration",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return configSet(cmd, args, globalFlag)
-		},
+		RunE:  configSet,
 	}
 	return cmd
 }
 
-func ensureGlobalFlag(cmd *cobra.Command, args []string, globalFlag bool) {
+func ensureGlobalFlag(cmd *cobra.Command, args []string) {
 	isProjectDir, _ := config.IsProjectDir(config.WorkingPath)
 
 	if !isProjectDir && !globalFlag {
@@ -65,7 +62,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string, globalFlag bool) {
 	}
 }
 
-func configGet(cmd *cobra.Command, args []string, globalFlag bool) error {
+func configGet(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New(messages.ErrMissingConfigPathKey)
 	}
@@ -87,7 +84,7 @@ func configGet(cmd *cobra.Command, args []string, globalFlag bool) error {
 	return nil
 }
 
-func configSet(cmd *cobra.Command, args []string, globalFlag bool) error {
+func configSet(cmd *cobra.Command, args []string) error {
 	if len(args) != 2 { // nolint:gomnd
 		return errors.New(messages.ConfigInvalidSetArgs)
 	}
