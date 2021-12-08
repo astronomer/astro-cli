@@ -136,7 +136,7 @@ func schedulerRemoteLogs(cmd *cobra.Command, args []string) error {
 
 func workersRemoteLogs(cmd *cobra.Command, args []string) error {
 	if follow {
-		return logs.SubscribeDeploymentLog(args[0], "workers", search, since)
+		return logs.SubscribeDeploymentLog(args[0], "worker", search, since)
 	}
-	return logs.DeploymentLog(args[0], "workers", search, since)
+	return logs.DeploymentLog(args[0], "worker", search, since)
 }
