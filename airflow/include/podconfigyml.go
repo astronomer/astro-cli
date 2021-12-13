@@ -75,6 +75,8 @@ spec:
       readOnlyRootFilesystem: false
       runAsGroup: 50000
       runAsUser: 50000
+      seLinuxOptions:
+        type: spc_t
     volumeMounts:
     - mountPath: /usr/local/airflow/dags
       name: airflow-dags-dir
@@ -138,6 +140,8 @@ spec:
       readOnlyRootFilesystem: false
       runAsGroup: 50000
       runAsUser: 50000
+      seLinuxOptions:
+        type: spc_t
     volumeMounts:
     - mountPath: /usr/local/airflow/dags
       name: airflow-dags-dir

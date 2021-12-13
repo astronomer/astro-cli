@@ -132,29 +132,6 @@ func (_m *PodmanBind) Kube(ctx context.Context, path string, options *play.KubeO
 	return r0, r1
 }
 
-// KubeDown provides a mock function with given fields: ctx, path
-func (_m *PodmanBind) KubeDown(ctx context.Context, path string) (*entities.PlayKubeReport, error) {
-	ret := _m.Called(ctx, path)
-
-	var r0 *entities.PlayKubeReport
-	if rf, ok := ret.Get(0).(func(context.Context, string) *entities.PlayKubeReport); ok {
-		r0 = rf(ctx, path)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*entities.PlayKubeReport)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, path)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // List provides a mock function with given fields: ctx, options
 func (_m *PodmanBind) List(ctx context.Context, options *containers.ListOptions) ([]entities.ListContainer, error) {
 	ret := _m.Called(ctx, options)
@@ -241,6 +218,29 @@ func (_m *PodmanBind) Push(ctx context.Context, source string, destination strin
 	}
 
 	return r0
+}
+
+// Remove provides a mock function with given fields: ctx, nameOrID, options
+func (_m *PodmanBind) Remove(ctx context.Context, nameOrID string, options *pods.RemoveOptions) (*entities.PodRmReport, error) {
+	ret := _m.Called(ctx, nameOrID, options)
+
+	var r0 *entities.PodRmReport
+	if rf, ok := ret.Get(0).(func(context.Context, string, *pods.RemoveOptions) *entities.PodRmReport); ok {
+		r0 = rf(ctx, nameOrID, options)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entities.PodRmReport)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, *pods.RemoveOptions) error); ok {
+		r1 = rf(ctx, nameOrID, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Start provides a mock function with given fields: ctx, nameOrID, options

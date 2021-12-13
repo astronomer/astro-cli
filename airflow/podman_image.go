@@ -54,6 +54,7 @@ func (p *PodmanImage) Build(path string) error {
 		Output:                  imageName(p.imageName, "latest"),
 		Quiet:                   false,
 		CommonBuildOpts:         &buildah.CommonBuildOptions{},
+		OutputFormat:            buildah.Dockerv2ImageManifest,
 	}
 	options := entities.BuildOptions{BuildOptions: buildahOpts}
 	_, err = p.podmanBind.Build(p.conn, []string{filepath.Join(projectDir, "Dockerfile")}, options)

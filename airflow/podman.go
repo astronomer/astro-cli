@@ -19,6 +19,7 @@ import (
 	"github.com/containers/podman/v3/pkg/api/handlers"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/play"
+	"github.com/containers/podman/v3/pkg/bindings/pods"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
@@ -133,33 +134,16 @@ func (p *Podman) PS() error {
 }
 
 func (p *Podman) Kill() error {
-	err := generatePodState(p.projectName, p.projectDir, p.envFile)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(podStateFile)
-	report, err := p.podmanBind.KubeDown(p.conn, podStateFile)
+	options := new(pods.RemoveOptions)
+	options = options.WithForce(true)
+	report, err := p.podmanBind.Remove(p.conn, p.projectName, options)
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerStop)
+	} else if report.Err != nil {
+		return errors.Wrap(report.Err, messages.ErrContainerStop)
 	}
-
-	for idx := range report.Pods {
-		if idx == 0 {
-			fmt.Println("pod:")
-		}
-		podInfo := report.Pods[idx]
-		fmt.Println(podInfo.ID)
-		fmt.Println("\ncontainers:")
-		for containerIdx := range podInfo.Containers {
-			fmt.Println(podInfo.Containers[containerIdx])
-		}
-	}
-	for idx := range report.Volumes {
-		if idx == 0 {
-			fmt.Println("\nvolumes:")
-		}
-		fmt.Println(report.Volumes[idx].Name)
-	}
+	fmt.Println("Successfully removed Airflow pod")
+	fmt.Println(report.Id)
 	return nil
 }
 
