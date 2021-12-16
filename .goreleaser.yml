@@ -21,6 +21,8 @@ build:
     - amd64
   goarm:
     - 7
+  flags:
+    - -mod=vendor
   ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
   tags:
     - containers_image_openpgp
