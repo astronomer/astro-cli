@@ -25,10 +25,10 @@ type PodmanBind interface {
 	List(ctx context.Context, options *containers.ListOptions) ([]entities.ListContainer, error)
 	Logs(ctx context.Context, nameOrID string, options *containers.LogOptions, stdoutChan, stderrChan chan string) error
 	Kube(ctx context.Context, path string, options *play.KubeOptions) (*entities.PlayKubeReport, error)
-	KubeDown(ctx context.Context, path string) (*entities.PlayKubeReport, error)
 	Stop(ctx context.Context, nameOrID string, options *pods.StopOptions) (*entities.PodStopReport, error)
 	Exists(ctx context.Context, nameOrID string, options *pods.ExistsOptions) (bool, error)
 	Start(ctx context.Context, nameOrID string, options *pods.StartOptions) (*entities.PodStartReport, error)
+	Remove(ctx context.Context, nameOrID string, options *pods.RemoveOptions) (*entities.PodRmReport, error)
 	// Methods to handle image operations
 	Build(ctx context.Context, containerFiles []string, options entities.BuildOptions) (*entities.BuildReport, error)
 	Tag(ctx context.Context, nameOrID, tag, repo string, options *images.TagOptions) error
@@ -76,6 +76,10 @@ func (p *PodmanBinder) Exists(ctx context.Context, nameOrID string, options *pod
 
 func (p *PodmanBinder) Start(ctx context.Context, nameOrID string, options *pods.StartOptions) (*entities.PodStartReport, error) {
 	return pods.Start(ctx, nameOrID, options)
+}
+
+func (p *PodmanBinder) Remove(ctx context.Context, nameOrID string, options *pods.RemoveOptions) (*entities.PodRmReport, error) {
+	return pods.Remove(ctx, nameOrID, options)
 }
 
 func (p *PodmanBinder) Build(ctx context.Context, containerFiles []string, options entities.BuildOptions) (*entities.BuildReport, error) { //nolint:gocritic
