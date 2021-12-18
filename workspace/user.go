@@ -81,9 +81,12 @@ func ListRoles(workspaceID string, client *houston.Client, out io.Writer) error 
 	for i := range workspace.RoleBindings {
 		role := workspace.RoleBindings[i]
 		var color bool
-		tab.AddRow([]string{role.User.Username, role.User.ID, role.Role}, color)
+		if len(role.User.Username) != 0 {
+			tab.AddRow([]string{role.User.Username, role.User.ID, role.Role}, color)
+		} else {
+			tab.AddRow([]string{role.ServiceAccount.Label, role.ServiceAccount.ID, role.Role}, color)
+		}
 	}
-
 	tab.Print(out)
 	return nil
 }

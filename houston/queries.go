@@ -401,6 +401,10 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
                   id
                   username
         		}
+				serviceAccount {
+					id
+					label
+				}
       		}
 		}
 	}`

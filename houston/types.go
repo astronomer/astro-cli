@@ -217,6 +217,10 @@ type RoleBinding struct {
 		ID       string `json:"id"`
 		Username string `json:"username"`
 	} `json:"user"`
+	ServiceAccount struct {
+		ID	string	`json:"id"`
+		Label	string	`json:"label"`
+	} `json:"serviceAccount"`
 	Deployment Deployment `json:"deployment"`
 }
 
