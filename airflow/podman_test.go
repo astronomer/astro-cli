@@ -161,15 +161,15 @@ func TestPodmanKillSuccess(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	mockResp := &entities.PlayKubeReport{
-		Pods:    []entities.PlayKubePod{{ID: "test-1", Containers: []string{"websever-id", "scheduler-id", "postgres-id"}}},
-		Volumes: []entities.PlayKubeVolume{{Name: "test-volume"}},
+	mockResp := &entities.PodRmReport{
+		Err: nil,
+		Id:  "testing",
 	}
 
 	bindMock := new(mocks.PodmanBind)
 	bindMock.On("NewConnection", mock.Anything, mock.Anything).Return(context.TODO(), nil)
 	podmanMock := &Podman{projectDir: "test", projectName: "test", envFile: ".env", podmanBind: bindMock, conn: context.TODO()}
-	bindMock.On("KubeDown", podmanMock.conn, mock.Anything).Return(mockResp, nil).Once()
+	bindMock.On("Remove", podmanMock.conn, mock.Anything, mock.Anything).Return(mockResp, nil).Once()
 
 	err := podmanMock.Kill()
 	assert.NoError(t, err)
@@ -184,7 +184,7 @@ func TestPodmanKillFailure(t *testing.T) {
 	bindMock := new(mocks.PodmanBind)
 	bindMock.On("NewConnection", mock.Anything, mock.Anything).Return(context.TODO(), nil)
 	podmanMock := &Podman{projectDir: "test", projectName: "test", envFile: ".env", podmanBind: bindMock, conn: context.TODO()}
-	bindMock.On("KubeDown", podmanMock.conn, mock.Anything).Return(&entities.PlayKubeReport{}, errPodman).Once()
+	bindMock.On("Remove", podmanMock.conn, mock.Anything, mock.Anything).Return(&entities.PodRmReport{}, errPodman).Once()
 
 	err := podmanMock.Kill()
 	assert.Contains(t, err.Error(), errPodman.Error())
