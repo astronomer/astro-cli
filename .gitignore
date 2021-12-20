@@ -7,7 +7,6 @@ astro-cli
 cover.out
 coverage.txt
 dist/
-meta/
 packages.txt
 requirements.txt
 vendor/github.com/theupdateframework/notary/Dockerfile

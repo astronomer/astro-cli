@@ -110,7 +110,6 @@ func ParseVersionFromDockerFile(airflowHome, dockerfile string) (uint64, error) 
 	}
 
 	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
-
 	semVer, err := semver.NewVersion(airflowTag)
 	if err != nil {
 		return defaultAirflowVersion, nil // Default to Airflow 1 if the user has a custom image without a semVer tag

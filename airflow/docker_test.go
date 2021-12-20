@@ -4,16 +4,24 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/messages"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/api/types"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
+
+var ErrSomeDockerIssue = errors.New("some docker error")
 
 func TestRepositoryName(t *testing.T) {
 	assert.Equal(t, repositoryName("test-repo"), "test-repo/airflow")
@@ -38,7 +46,7 @@ func TestGenerateConfig(t *testing.T) {
 	config.InitConfig(fs)
 	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", DockerEngine)
 	assert.NoError(t, err)
-	expectedCfg := `version: '2'
+	expectedCfg := `version: '3.1'
 
 networks:
   airflow:
@@ -130,16 +138,6 @@ services:
 	assert.Equal(t, cfg, expectedCfg)
 }
 
-func TestCreateProject(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
-	config.InitConfig(fs)
-	project, err := createProject("test-project-name", "airflow_home", ".env")
-	assert.NoError(t, err)
-	assert.NotNil(t, project)
-}
-
 func TestExecVersion(t *testing.T) {
 	err := dockerExec("version")
 	if err != nil {
@@ -165,4 +163,110 @@ func TestExecPipeNils(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestDockerStartFailure(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "Up"}}, nil)
+	composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := docker.Start("./testfiles/Dockerfile.Airflow1.ok")
+	assert.Contains(t, err.Error(), "cannot start, project already running")
+}
+
+func TestDockerKillSuccess(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Down", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := docker.Kill()
+	assert.NoError(t, err)
+}
+
+func TestDockerKillFailure(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Down", mock.Anything, mock.Anything, mock.Anything).Return(ErrSomeDockerIssue)
+	err := docker.Kill()
+	assert.Contains(t, err.Error(), messages.ErrContainerStop)
+}
+
+func TestDockerLogsSuccess(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "test", Name: "test"}}, nil)
+	composeMock.On("Logs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := docker.Logs(false, []string{"test"}...)
+	assert.NoError(t, err)
+}
+
+func TestDockerLogsFailure(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{}, nil).Once()
+	err := docker.Logs(false, []string{"test"}...)
+	assert.Contains(t, err.Error(), "cannot view logs, project not running")
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "test", Name: "test"}}, nil)
+	composeMock.On("Logs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ErrSomeDockerIssue)
+	err = docker.Logs(false, []string{"test"}...)
+	assert.Contains(t, err.Error(), ErrSomeDockerIssue.Error())
+}
+
+func TestDockerStopSuccess(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Stop", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	err := docker.Stop()
+	assert.NoError(t, err)
+}
+
+func TestDockerStopFailure(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Stop", mock.Anything, mock.Anything, mock.Anything).Return(ErrSomeDockerIssue)
+	err := docker.Stop()
+	assert.Contains(t, err.Error(), messages.ErrContainerPause)
+}
+
+func TestDockerPSSuccess(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{Name: "test", State: "Up", Publishers: api.PortPublishers{api.PortPublisher{PublishedPort: 8888}}}}, nil)
+	err := docker.PS()
+	assert.NoError(t, err)
+}
+
+func TestDockerPSFailure(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{}, ErrSomeDockerIssue)
+	err := docker.PS()
+	assert.Contains(t, err.Error(), messages.ErrContainerStatusCheck)
+}
+
+func TestDockerGetContainerIDSuccess(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "Up", Publishers: api.PortPublishers{api.PortPublisher{PublishedPort: 8888}}}}, nil)
+	id, err := docker.GetContainerID("test")
+	assert.NoError(t, err)
+	assert.Contains(t, id, "testID")
+}
+
+func TestDockerGetContainerIDFailure(t *testing.T) {
+	composeMock, docker := getComposeMocks()
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{}, ErrSomeDockerIssue).Once()
+	id, err := docker.GetContainerID("testFail")
+	assert.Contains(t, err.Error(), messages.ErrContainerStatusCheck)
+	assert.Contains(t, id, "")
+	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "Up", Publishers: api.PortPublishers{api.PortPublisher{PublishedPort: 8888}}}}, nil)
+	id, err = docker.GetContainerID("testFail")
+	assert.NoError(t, err)
+	assert.Contains(t, id, "")
+}
+
+func getComposeMocks() (*mocks.Service, *DockerCompose) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtils.NewTestConfig("docker")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+	projectDir, _ := os.Getwd()
+
+	componseMock := new(mocks.Service)
+	docker := &DockerCompose{
+		airflowHome:    projectDir,
+		projectName:    "test",
+		envFile:        "",
+		composeService: componseMock,
+	}
+	return componseMock, docker
 }

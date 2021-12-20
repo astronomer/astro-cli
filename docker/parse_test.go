@@ -24,7 +24,7 @@ func TestParseReader(t *testing.T) {
 	assert.Nil(t, err)
 	expected := []Command{
 		{
-			Cmd:       "from",
+			Cmd:       "FROM",
 			Original:  "FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild",
 			StartLine: 1,
 			EndLine:   1,
@@ -46,7 +46,7 @@ func TestParseFile(t *testing.T) {
 	assert.Nil(t, err)
 	expected := []Command{
 		{
-			Cmd:       "from",
+			Cmd:       "FROM",
 			Original:  "FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild",
 			StartLine: 1,
 			EndLine:   1,

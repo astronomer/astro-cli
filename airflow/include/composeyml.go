@@ -4,7 +4,7 @@ import "strings"
 
 // Composeyml is the docker-compose template
 var Composeyml = strings.TrimSpace(`
-version: '2'
+version: '3.1'
 
 networks:
   airflow:
