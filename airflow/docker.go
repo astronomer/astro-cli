@@ -16,7 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 
 	"github.com/compose-spec/compose-go/loader"
-	cTypes "github.com/compose-spec/compose-go/types"
+	composeTypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -275,7 +275,7 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome, envFile string) (*cTypes.Project, error) {
+func createProject(projectName, airflowHome, envFile string) (*composeTypes.Project, error) {
 	// Generate the docker-compose yaml
 	yaml, err := generateConfig(projectName, airflowHome, envFile, DockerEngine)
 	if err != nil {
@@ -286,8 +286,8 @@ func createProject(projectName, airflowHome, envFile string) (*cTypes.Project, e
 		return nil, err
 	}
 
-	var configs []cTypes.ConfigFile
-	composeConfig := cTypes.ConfigFile{
+	var configs []composeTypes.ConfigFile
+	composeConfig := composeTypes.ConfigFile{
 		Content:  []byte(yaml),
 		Filename: "docker-compose.yml",
 	}
@@ -299,7 +299,7 @@ func createProject(projectName, airflowHome, envFile string) (*cTypes.Project, e
 		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeFile)
 	}
 	if err == nil {
-		overrideConfig := cTypes.ConfigFile{Content: composeBytes, Filename: composeFile}
+		overrideConfig := composeTypes.ConfigFile{Content: composeBytes, Filename: composeFile}
 		configs = append(configs, overrideConfig)
 	}
 
@@ -307,7 +307,7 @@ func createProject(projectName, airflowHome, envFile string) (*cTypes.Project, e
 		opts.Name = projectName
 	}
 
-	project, err := loader.Load(cTypes.ConfigDetails{
+	project, err := loader.Load(composeTypes.ConfigDetails{
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
 		Environment: map[string]string{},
