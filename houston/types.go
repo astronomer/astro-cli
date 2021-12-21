@@ -218,7 +218,7 @@ type RoleBinding struct {
 		Username string `json:"username"`
 	} `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
-	Deployment     Deployment               `json:"deployment"`
+	Deployment     Deployment              `json:"deployment"`
 }
 
 // Workspace contains all components of an Astronomer Workspace
