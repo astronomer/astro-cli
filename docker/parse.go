@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 
+	"github.com/docker/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
@@ -102,10 +102,27 @@ func GetImageTagFromParsedFile(cmds []Command) (baseImage, tag string) {
 	for _, cmd := range cmds {
 		if cmd.Cmd == command.From {
 			from := cmd.Value[0]
-			splittedFrom := strings.Split(from, ":")
-			baseImage, tag := splittedFrom[0], splittedFrom[1]
+			baseImage, tag := parseImageName(from)
 			return baseImage, tag
 		}
 	}
 	return "", ""
+}
+
+func parseImageName(imageName string) (baseImage, tag string) {
+	ref, err := reference.Parse(imageName)
+	if err != nil {
+		return baseImage, tag
+	}
+	parsedName, ok := ref.(reference.Named)
+	if ok {
+		baseImage = parsedName.Name()
+	}
+	parsedTag, ok := ref.(reference.Tagged)
+	if ok {
+		tag = parsedTag.Tag()
+	} else {
+		tag = "latest"
+	}
+	return baseImage, tag
 }
