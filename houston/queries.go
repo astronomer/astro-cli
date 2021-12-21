@@ -396,16 +396,16 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			createdAt
 			updatedAt
 			roleBindings {
-        		role
-  				user {
-                  id
-                  username
-        		}
+				role
+				user {
+					id
+					username
+				}
 				serviceAccount {
 					id
 					label
 				}
-      		}
+			}
 		}
 	}`
 
