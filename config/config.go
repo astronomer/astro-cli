@@ -53,7 +53,7 @@ var (
 		LocalOrbit:          newCfg("local.orbit", ""),
 		PostgresUser:        newCfg("postgres.user", "postgres"),
 		PostgresPassword:    newCfg("postgres.password", "postgres"),
-		PostgresHost:        newCfg("postgres.host", "0.0.0.0"),
+		PostgresHost:        newCfg("postgres.host", "postgres"),
 		PostgresPort:        newCfg("postgres.port", "5432"),
 		ProjectDeployment:   newCfg("project.deployment", ""),
 		ProjectName:         newCfg("project.name", ""),

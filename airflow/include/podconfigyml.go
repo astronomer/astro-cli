@@ -56,7 +56,7 @@ spec:
     - name: AIRFLOW_HOME
       value: /usr/local/airflow
     - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-      value: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
+      value: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@localhost:5432
     - name: AIRFLOW__CORE__LOAD_EXAMPLES
       value: "False"
     - name: ASTRONOMER_USER
@@ -125,7 +125,7 @@ spec:
     - name: AIRFLOW__CORE__FERNET_KEY
       value: d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw=
     - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
-      value: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
+      value: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@localhost:5432
     - name: AIRFLOW_SNOWFLAKE_PARTNER
       value: ASTRONOMER
     - name: AIRFLOW__CORE__LOAD_EXAMPLES
