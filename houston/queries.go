@@ -131,8 +131,8 @@ var (
 	}`
 
 	DeploymentUpdateRequest = `
-mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: String, $dagDeployment: DagDeployment, $triggererReplicas: Int) {
-		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, cloudRole: $cloudRole, dagDeployment: $dagDeployment, triggerer:{ replicas: $triggererReplicas }) {
+mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: ExecutorType, $cloudRole: String, $dagDeployment: DagDeployment, $triggererReplicas: Int) {
+		updateDeployment(deploymentUuid: $deploymentId, payload: $payload, executor: $executor, cloudRole: $cloudRole, dagDeployment: $dagDeployment, triggerer:{ replicas: $triggererReplicas }) {
 			id
 			type
 			label
