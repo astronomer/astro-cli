@@ -118,11 +118,10 @@ func parseImageName(imageName string) (baseImage, tag string) {
 	if ok {
 		baseImage = parsedName.Name()
 	}
+	tag = "latest"
 	parsedTag, ok := ref.(reference.Tagged)
 	if ok {
 		tag = parsedTag.Tag()
-	} else {
-		tag = "latest"
 	}
 	return baseImage, tag
 }
