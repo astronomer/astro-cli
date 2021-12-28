@@ -63,8 +63,12 @@ func registryAuth() error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("WOOOT")
+	fmt.Printf(c.Domain)
 
-	if c.Domain == "localhost" || c.Domain == "houston" {
+	if c.Domain == "localhost" || c.Domain == "houston" || c.Domain == "localtest.me" {
+		fmt.Printf("LOOT")
+
 		return nil
 	}
 
