@@ -51,37 +51,37 @@ func TestNewAirflowInitCmd(t *testing.T) {
 }
 
 func TestNewAirflowStartCmd(t *testing.T) {
-	cmd := newAirflowStartCmd()
+	cmd := newAirflowStartCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowKillCmd(t *testing.T) {
-	cmd := newAirflowKillCmd()
+	cmd := newAirflowKillCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowLogsCmd(t *testing.T) {
-	cmd := newAirflowLogsCmd()
+	cmd := newAirflowLogsCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowStopCmd(t *testing.T) {
-	cmd := newAirflowStopCmd()
+	cmd := newAirflowStopCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowPSCmd(t *testing.T) {
-	cmd := newAirflowPSCmd()
+	cmd := newAirflowPSCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowRunCmd(t *testing.T) {
-	cmd := newAirflowRunCmd()
+	cmd := newAirflowRunCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowUpgradeCheckCmd(t *testing.T) {
-	cmd := newAirflowUpgradeCheckCmd()
+	cmd := newAirflowUpgradeCheckCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
@@ -97,7 +97,7 @@ func TestAirflowKillSuccess(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowKillCmd()
+	cmd := newAirflowKillCmd(os.Stdout)
 	err := airflowKill(cmd, []string{})
 	assert.NoError(t, err)
 	mockContainer.AssertExpectations(t)
@@ -115,7 +115,7 @@ func TestAirflowKillFailure(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowKillCmd()
+	cmd := newAirflowKillCmd(os.Stdout)
 	err := airflowKill(cmd, []string{})
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockContainer.AssertExpectations(t)
@@ -133,7 +133,7 @@ func TestAirflowLogsSuccess(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowLogsCmd()
+	cmd := newAirflowLogsCmd(os.Stdout)
 	cmd.Flags().Set("scheduler", "true")
 	cmd.Flags().Set("webserver", "true")
 	err := airflowLogs(cmd, []string{})
@@ -153,7 +153,7 @@ func TestAirflowLogsFailure(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowLogsCmd()
+	cmd := newAirflowLogsCmd(os.Stdout)
 	err := airflowLogs(cmd, []string{})
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockContainer.AssertExpectations(t)
@@ -171,7 +171,7 @@ func TestAirflowStopSuccess(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowStopCmd()
+	cmd := newAirflowStopCmd(os.Stdout)
 	err := airflowStop(cmd, []string{})
 	assert.NoError(t, err)
 	mockContainer.AssertExpectations(t)
@@ -189,7 +189,7 @@ func TestAirflowStopFailure(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowStopCmd()
+	cmd := newAirflowStopCmd(os.Stdout)
 	err := airflowStop(cmd, []string{})
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockContainer.AssertExpectations(t)
@@ -207,7 +207,7 @@ func TestAirflowPSSuccess(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowPSCmd()
+	cmd := newAirflowPSCmd(os.Stdout)
 	err := airflowPS(cmd, []string{})
 	assert.NoError(t, err)
 	mockContainer.AssertExpectations(t)
@@ -225,7 +225,7 @@ func TestAirflowPSFailure(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowPSCmd()
+	cmd := newAirflowPSCmd(os.Stdout)
 	err := airflowPS(cmd, []string{})
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockContainer.AssertExpectations(t)
@@ -243,7 +243,7 @@ func TestAirflowRunSuccess(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowRunCmd()
+	cmd := newAirflowRunCmd(os.Stdout)
 	err := airflowRun(cmd, []string{})
 	assert.NoError(t, err)
 	mockContainer.AssertExpectations(t)
@@ -261,7 +261,7 @@ func TestAirflowRunFailure(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowRunCmd()
+	cmd := newAirflowRunCmd(os.Stdout)
 	err := airflowRun(cmd, []string{})
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockContainer.AssertExpectations(t)
@@ -279,7 +279,7 @@ func TestAirflowUpgradeCheckSuccess(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowUpgradeCheckCmd()
+	cmd := newAirflowUpgradeCheckCmd(os.Stdout)
 	err := airflowUpgradeCheck(cmd, []string{})
 	assert.NoError(t, err)
 	mockContainer.AssertExpectations(t)
@@ -297,7 +297,7 @@ func TestAirflowUpgradeCheckFailure(t *testing.T) {
 		return mockContainer, nil
 	}
 
-	cmd := newAirflowUpgradeCheckCmd()
+	cmd := newAirflowUpgradeCheckCmd(os.Stdout)
 	err := airflowUpgradeCheck(cmd, []string{})
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockContainer.AssertExpectations(t)
