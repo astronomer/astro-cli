@@ -848,9 +848,6 @@ func TestUpdateTriggerer(t *testing.T) {
       "workspace": {
         "id": "ckbv7zvb100pe0760xp98qnh9"
       },
-	  "deployInfo":{
-		"current":"2.2.2-1"
-	  },
       "createdAt": "2020-06-25T20:09:38.341Z",
       "updatedAt": "2020-06-25T20:54:15.592Z"
     }
@@ -867,8 +864,8 @@ func TestUpdateTriggerer(t *testing.T) {
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 
-	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         AIRFLOW VERSION     
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     2.2.2-1     2.2.2               
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
+ test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     ?       2.2.2               
 
  Successfully updated deployment
 `
