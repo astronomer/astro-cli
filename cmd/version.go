@@ -18,7 +18,8 @@ func newVersionCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Long:  "The astro-cli semantic version and git commit tied to that release.",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return printVersion(client, cmd, out, args)
@@ -34,7 +35,8 @@ func newUpgradeCheckCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Long:  "Check for newer version of Astronomer CLI",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return upgradeCheck(client, cmd, out, args)

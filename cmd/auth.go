@@ -19,7 +19,8 @@ func newAuthRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		Use:   "auth",
 		Short: "Authenticate with an Astronomer Cluster",

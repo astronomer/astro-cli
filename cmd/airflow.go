@@ -54,12 +54,12 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
 		newAirflowDeployCmd(),
-		newAirflowStartCmd(),
-		newAirflowKillCmd(),
-		newAirflowLogsCmd(),
-		newAirflowStopCmd(),
-		newAirflowPSCmd(),
-		newAirflowRunCmd(),
+		newAirflowStartCmd(out),
+		newAirflowKillCmd(out),
+		newAirflowLogsCmd(out),
+		newAirflowStopCmd(out),
+		newAirflowPSCmd(out),
+		newAirflowRunCmd(out),
 	)
 	return cmd
 }
@@ -74,13 +74,13 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
 		newAirflowDeployCmd(),
-		newAirflowStartCmd(),
-		newAirflowKillCmd(),
-		newAirflowLogsCmd(),
-		newAirflowStopCmd(),
-		newAirflowPSCmd(),
-		newAirflowRunCmd(),
-		newAirflowUpgradeCheckCmd(),
+		newAirflowStartCmd(out),
+		newAirflowKillCmd(out),
+		newAirflowLogsCmd(out),
+		newAirflowStopCmd(out),
+		newAirflowPSCmd(out),
+		newAirflowRunCmd(out),
+		newAirflowUpgradeCheckCmd(out),
 	)
 	return cmd
 }
@@ -93,7 +93,8 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return airflowInit(cmd, args, client, out)
@@ -124,7 +125,7 @@ func newAirflowDeployCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowStartCmd() *cobra.Command {
+func newAirflowStartCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start an Airflow cluster locally using docker-compose",
@@ -132,7 +133,8 @@ func newAirflowStartCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStart,
@@ -141,14 +143,15 @@ func newAirflowStartCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowKillCmd() *cobra.Command {
+func newAirflowKillCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill",
 		Short: "Kill a locally running Airflow cluster",
 		Long:  "Kill a locally running Airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowKill,
@@ -156,14 +159,15 @@ func newAirflowKillCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowLogsCmd() *cobra.Command {
+func newAirflowLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Output logs for a locally running Airflow cluster",
 		Long:  "Output logs for a locally running Airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowLogs,
@@ -174,14 +178,15 @@ func newAirflowLogsCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowStopCmd() *cobra.Command {
+func newAirflowStopCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a locally running Airflow cluster",
 		Long:  "Stop a locally running Airflow cluster",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStop,
@@ -189,14 +194,15 @@ func newAirflowStopCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowPSCmd() *cobra.Command {
+func newAirflowPSCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List locally running Airflow containers",
 		Long:  "List locally running Airflow containers",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowPS,
@@ -204,14 +210,15 @@ func newAirflowPSCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowRunCmd() *cobra.Command {
+func newAirflowRunCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a command inside locally running Airflow webserver",
 		Long:  "Run a command inside locally running Airflow webserver",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowRun,
@@ -221,14 +228,15 @@ func newAirflowRunCmd() *cobra.Command {
 	return cmd
 }
 
-func newAirflowUpgradeCheckCmd() *cobra.Command {
+func newAirflowUpgradeCheckCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade-check",
 		Short: "List DAG and config-level changes required to upgrade to Airflow 2.0",
 		Long:  "List DAG and config-level changes required to upgrade to Airflow 2.0",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			err := SetUpLogs(out, verboseLevel)
+			return err
 		},
 		PreRunE:            ensureProjectDir,
 		RunE:               airflowUpgradeCheck,
