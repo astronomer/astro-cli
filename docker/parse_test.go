@@ -72,3 +72,23 @@ func TestGetImageTagFromParsedFile(t *testing.T) {
 	assert.Equal(t, "quay.io/astronomer/ap-airflow", image)
 	assert.Equal(t, "2.0.0-buster-onbuild", tag)
 }
+
+func TestParseImageName(t *testing.T) {
+	tests := []struct {
+		imageName         string
+		expectedBaseImage string
+		expectedTag       string
+	}{
+		{imageName: "localhost:5000/airflow:latest", expectedBaseImage: "localhost:5000/airflow", expectedTag: "latest"},
+		{imageName: "localhost/airflow:1.2.0", expectedBaseImage: "localhost/airflow", expectedTag: "1.2.0"},
+		{imageName: "quay.io:5000/airflow", expectedBaseImage: "quay.io:5000/airflow", expectedTag: "latest"},
+		{imageName: "airflow:latest", expectedBaseImage: "airflow", expectedTag: "latest"},
+		{imageName: "airflow", expectedBaseImage: "airflow", expectedTag: "latest"},
+	}
+
+	for _, tt := range tests {
+		baseImage, tag := parseImageName(tt.imageName)
+		assert.Equal(t, tt.expectedBaseImage, baseImage)
+		assert.Equal(t, tt.expectedTag, tag)
+	}
+}
