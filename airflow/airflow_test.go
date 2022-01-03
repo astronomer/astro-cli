@@ -153,3 +153,41 @@ func Test_airflowVersionFromDockerFile(t *testing.T) {
 		})
 	}
 }
+
+func Test_repositoryName(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		expectedResult string
+	}{
+		{
+			name:           "repo name with alphanumeric only",
+			args:           args{name: "testing123"},
+			expectedResult: "testing123/airflow",
+		},
+		{
+			name:           "repo name starting with alphanumeric",
+			args:           args{name: "testing-123_test"},
+			expectedResult: "testing-123_test/airflow",
+		},
+		{
+			name:           "repo name starting with dot",
+			args:           args{name: ".testing-123_test"},
+			expectedResult: "testing-123_test/airflow",
+		},
+		{
+			name:           "repo name starting with underscore",
+			args:           args{name: "_testing-123_test"},
+			expectedResult: "testing-123_test/airflow",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := repositoryName(tt.args.name)
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
