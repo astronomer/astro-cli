@@ -764,9 +764,13 @@ func TestUpdate(t *testing.T) {
       "status": null,
       "type": "airflow",
       "version": "0.0.0",
+	  "airflowVersion": "2.2.2",
       "workspace": {
         "id": "ckbv7zvb100pe0760xp98qnh9"
       },
+	  "deployInfo":{
+		"current":"2.2.2-1"
+	  },
       "createdAt": "2020-06-25T20:09:38.341Z",
       "updatedAt": "2020-06-25T20:54:15.592Z"
     }
@@ -783,8 +787,8 @@ func TestUpdate(t *testing.T) {
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 
-	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c             %!s(MISSING)
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         AIRFLOW VERSION     
+ test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     2.2.2-1     2.2.2               
 
  Successfully updated deployment
 `
@@ -840,6 +844,7 @@ func TestUpdateTriggerer(t *testing.T) {
       "status": null,
       "type": "airflow",
       "version": "0.0.0",
+	  "airflowVersion": "2.2.2",
       "workspace": {
         "id": "ckbv7zvb100pe0760xp98qnh9"
       },
@@ -860,7 +865,7 @@ func TestUpdateTriggerer(t *testing.T) {
 	role := "test-role"
 
 	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c             %!s(MISSING)
+ test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     ?       2.2.2               
 
  Successfully updated deployment
 `

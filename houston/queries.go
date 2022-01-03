@@ -143,6 +143,9 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $cloudRole: Str
 			workspace {
 				id
 			}
+			deployInfo {
+				current
+			}
 			createdAt
 			updatedAt
 		}
