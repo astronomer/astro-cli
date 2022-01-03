@@ -353,7 +353,11 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 
 	d := r.Data.UpdateDeployment
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, d.AirflowVersion}, false)
+	currentTag := d.DeploymentInfo.Current
+	if currentTag == "" {
+		currentTag = "?"
+	}
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, currentTag, d.AirflowVersion}, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
 	tab.Print(out)
 
