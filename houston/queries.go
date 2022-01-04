@@ -399,12 +399,16 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			createdAt
 			updatedAt
 			roleBindings {
-        		role
-  				user {
-                  id
-                  username
-        		}
-      		}
+				role
+				user {
+					id
+					username
+				}
+				serviceAccount {
+					id
+					label
+				}
+			}
 		}
 	}`
 
