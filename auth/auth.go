@@ -64,7 +64,7 @@ func registryAuth() error {
 		return err
 	}
 
-	if c.Domain == "localhost" || c.Domain == "houston" {
+	if c.Domain == "localhost" || c.Domain == "houston" || c.Domain == "localtest.me" {
 		return nil
 	}
 
