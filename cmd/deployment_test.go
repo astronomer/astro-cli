@@ -618,7 +618,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
-		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "label=test22222", "--executor=local"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 		{cmdArgs: []string{"deployment", "update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {

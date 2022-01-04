@@ -146,6 +146,21 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string
 	return nil
 }
 
+func validateExecutorArg(executor string) (string, error) {
+	var executorType string
+	switch executor {
+	case "local":
+		executorType = "LocalExecutor"
+	case "celery":
+		executorType = "CeleryExecutor"
+	case "kubernetes", "k8s":
+		executorType = "KubernetesExecutor"
+	default:
+		return executorType, errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+	}
+	return executorType, nil
+}
+
 // validURL will validate whether the URL's scheme is a known Git transport
 func validURL(gitURL string, acceptEmptyURL bool) bool {
 	if !acceptEmptyURL && gitURL == "" {
