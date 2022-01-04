@@ -160,6 +160,73 @@ func TestListRoles(t *testing.T) {
 	assert.Equal(t, expected, buf.String())
 }
 
+func TestListRolesWithServiceAccounts(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "workspaces": [
+      {
+        "id": "ckbv7zvb100pe0760xp98qnh9",
+        "label": "w1",
+        "description": "",
+        "createdAt": "2020-06-25T20:09:29.917Z",
+        "updatedAt": "2020-06-25T20:09:29.917Z",
+        "roleBindings": [
+          {
+            "role": "WORKSPACE_ADMIN",
+            "user": {
+              "id": "ckbv7zpkh00og0760ki4mhl6r",
+              "username": "andrii@astronomer.io"
+            }
+          },
+		  {
+            "role": "WORKSPACE_ADMIN",
+            "serviceAccount": {
+              "id": "ckxaolfky0822zsvcrgts3c6a",
+              "label": "WA1"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ckbv8pwbq00wk0760us7ktcgd",
+        "label": "wwww",
+        "description": "",
+        "createdAt": "2020-06-25T20:29:44.294Z",
+        "updatedAt": "2020-06-25T20:29:44.294Z",
+        "roleBindings": [
+          {
+            "role": "WORKSPACE_ADMIN",
+            "user": {
+              "id": "ckbv7zpkh00og0760ki4mhl6r",
+              "username": "andriiii@astronomer.io"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	wsID := "ck1qg6whg001r08691y117hub"
+
+	buf := new(bytes.Buffer)
+	err := ListRoles(wsID, api, buf)
+	assert.NoError(t, err)
+	expected := ` USERNAME                 ID                            ROLE                
+ andrii@astronomer.io     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
+ WA1                      ckxaolfky0822zsvcrgts3c6a     WORKSPACE_ADMIN     
+`
+	assert.Equal(t, expected, buf.String())
+}
+
 func TestListRolesError(t *testing.T) {
 	testUtil.InitTestConfig()
 
