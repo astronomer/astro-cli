@@ -802,7 +802,7 @@ func TestUpdate(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", 1, 0, api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -879,7 +879,7 @@ func TestUpdateTriggerer(t *testing.T) {
 	}
 	for _, tt := range myTests {
 		buf := new(bytes.Buffer)
-		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", 1, 1, api, buf)
+		err := Update(id, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, expected, buf.String())
 	}
@@ -901,7 +901,7 @@ func TestUpdateError(t *testing.T) {
 	deploymentConfig["executor"] = "CeleryExecutor"
 
 	buf := new(bytes.Buffer)
-	err := Update(id, role, deploymentConfig, "", "", "", "", "", "", "", "", 1, 0, api, buf)
+	err := Update(id, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, buf)
 
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }

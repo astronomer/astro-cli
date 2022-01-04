@@ -196,12 +196,12 @@ func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command 
 
 func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	example := `
-# update labels for given deployment
-$ astro deployment update UUID label=Production-Airflow`
+# update executor for given deployment
+$ astro deployment update UUID --executor=celery`
 	updateExampleDagDeployment := `
 
 # update dag deployment strategy
-$ astro deployment update UUID label=Production-Airflow --dag-deployment-type=volume --nfs-location=test:/test`
+$ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:/test`
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
@@ -228,6 +228,8 @@ $ astro deployment update UUID label=Production-Airflow --dag-deployment-type=vo
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 	}
+
+	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
@@ -463,16 +465,9 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	var executorType string
-	switch executor {
-	case "local":
-		executorType = "LocalExecutor"
-	case "celery":
-		executorType = "CeleryExecutor"
-	case "kubernetes", "k8s":
-		executorType = "KubernetesExecutor"
-	default:
-		return errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+	executorType, err := validateExecutorArg(executor)
+	if err != nil {
+		return err
 	}
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
@@ -553,7 +548,15 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
+	var executorType string
+	if executor != "" {
+		executorType, err = validateExecutorArg(executor)
+		if err != nil {
+			return nil
+		}
+	}
+
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, triggererReplicas, client, out)
 }
 
 func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {

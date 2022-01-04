@@ -219,3 +219,50 @@ func Test_ErrInvalidArg(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateExecutorArg(t *testing.T) {
+	type args struct {
+		executor string
+	}
+	tests := []struct {
+		name        string
+		args        args
+		result      string
+		expectedErr string
+	}{
+		{
+			name:        "valid local executor",
+			args:        args{executor: "local"},
+			result:      "LocalExecutor",
+			expectedErr: "",
+		},
+		{
+			name:        "valid kubernetes executor",
+			args:        args{executor: "kubernetes"},
+			result:      "KubernetesExecutor",
+			expectedErr: "",
+		},
+		{
+			name:        "valid celery executor",
+			args:        args{executor: "celery"},
+			result:      "CeleryExecutor",
+			expectedErr: "",
+		},
+		{
+			name:        "invalid executor",
+			args:        args{executor: "invalid test"},
+			result:      "",
+			expectedErr: "please specify correct executor, one of: local, celery, kubernetes, k8s",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			executorType, err := validateExecutorArg(tt.args.executor)
+			assert.Equal(t, tt.result, executorType)
+			if tt.expectedErr != "" {
+				assert.EqualError(t, err, tt.expectedErr)
+			}
+		})
+	}
+}
