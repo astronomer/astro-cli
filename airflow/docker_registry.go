@@ -5,6 +5,7 @@ import (
 	"os"
 
 	cliconfig "github.com/docker/cli/cli/config"
+	cliTypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
@@ -45,14 +46,16 @@ func (d *DockerRegistry) Login(username, token string) error {
 		return errors.Errorf("registry login error: %v", err)
 	}
 
+	cliAuthConfig := cliTypes.AuthConfig(*authConfig)
+
 	// Get this idea from docker login cli
-	authConfig.RegistryToken = ""
+	cliAuthConfig.RegistryToken = ""
 
 	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
 
 	creds := configFile.GetCredentialsStore(serverAddress)
 
-	if err := creds.Store(*authConfig); err != nil {
+	if err := creds.Store(cliAuthConfig); err != nil {
 		return errors.Errorf("Error saving credentials: %v", err)
 	}
 	return nil

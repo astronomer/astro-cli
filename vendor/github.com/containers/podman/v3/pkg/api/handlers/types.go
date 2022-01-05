@@ -263,6 +263,7 @@ func ImageDataToImageInspect(ctx context.Context, l *libimage.Image) (*ImageInsp
 		RepoTags:        info.RepoTags,
 		RootFS:          rootfs,
 		Size:            info.Size,
+		Variant:         "",
 		VirtualSize:     info.VirtualSize,
 	}
 	return &ImageInspect{dockerImageInspect}, nil

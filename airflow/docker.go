@@ -7,21 +7,24 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
 
+	"github.com/compose-spec/compose-go/loader"
+	composeTypes "github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/libcompose/cli/logger"
-	dockercompose "github.com/docker/libcompose/docker"
-	"github.com/docker/libcompose/docker/ctx"
-	p "github.com/docker/libcompose/project"
-	"github.com/docker/libcompose/project/options"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -34,9 +37,10 @@ const (
 )
 
 type DockerCompose struct {
-	airflowHome string
-	projectName string
-	envFile     string
+	airflowHome    string
+	projectName    string
+	envFile        string
+	composeService api.Service
 }
 
 func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
@@ -46,10 +50,17 @@ func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
 		return nil, errors.Wrap(err, "error retrieving working directory")
 	}
 
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, errors.Wrap(err, "error initializing docker client")
+	}
+	composeService := compose.NewComposeService(dockerClient, &configfile.ConfigFile{})
+
 	return &DockerCompose{
-		airflowHome: airflowHome,
-		projectName: projectName,
-		envFile:     envFile,
+		airflowHome:    airflowHome,
+		projectName:    projectName,
+		envFile:        envFile,
+		composeService: composeService,
 	}, nil
 }
 
@@ -60,28 +71,30 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	}
 
 	// Get project containers
-	psInfo, err := project.Ps(context.Background())
+	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerStatusCheck)
 	}
 
 	if len(psInfo) > 0 {
 		// Ensure project is not already running
-		for _, info := range psInfo {
-			if checkServiceState(info["State"], dockerStateUp) {
+		for idx := range psInfo {
+			info := psInfo[idx]
+			if checkServiceState(info.State, dockerStateUp) {
 				return errors.New("cannot start, project already running")
 			}
 		}
 	}
 
 	// Build this project image
-	err = d.Build(imageName(d.projectName, "latest"))
+	imageBuilder := DockerImageInit(d.projectName)
+	err = imageBuilder.Build(".")
 	if err != nil {
 		return err
 	}
 
 	// Start up our project
-	err = project.Up(context.Background(), options.Up{})
+	err = d.composeService.Up(context.TODO(), project, api.UpOptions{})
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerRecreate)
 	}
@@ -96,13 +109,7 @@ func (d *DockerCompose) Start(dockerfile string) error {
 
 func (d *DockerCompose) Kill() error {
 	// Shut down our project
-
-	project, err := createProject(d.projectName, d.airflowHome, d.envFile)
-	if err != nil {
-		return err
-	}
-
-	err = project.Down(context.Background(), options.Down{RemoveVolume: true, RemoveOrphans: true})
+	err := d.composeService.Down(context.TODO(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerStop)
 	}
@@ -111,21 +118,17 @@ func (d *DockerCompose) Kill() error {
 }
 
 func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
-	project, err := createProject(d.projectName, d.airflowHome, d.envFile)
-	if err != nil {
-		return err
-	}
-
-	psInfo, err := project.Ps(context.Background())
+	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerStatusCheck)
 	}
 
 	if len(psInfo) == 0 {
-		return errors.Wrap(err, "cannot view logs, project not running")
+		return errors.New("cannot view logs, project not running")
 	}
 
-	err = project.Log(context.Background(), follow, containerNames...)
+	logger := &ComposeLogger{logger: logrus.New()}
+	err = d.composeService.Logs(context.TODO(), d.projectName, logger, api.LogOptions{Services: containerNames, Follow: follow})
 	if err != nil {
 		return err
 	}
@@ -139,7 +142,8 @@ func (d *DockerCompose) Stop() error {
 		return err
 	}
 	// Pause our project
-	err = project.Stop(context.Background(), projectStopTimeout)
+	stopTimeout := time.Duration(projectStopTimeout)
+	err = d.composeService.Stop(context.TODO(), project, api.StopOptions{Timeout: &stopTimeout})
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerPause)
 	}
@@ -148,12 +152,8 @@ func (d *DockerCompose) Stop() error {
 }
 
 func (d *DockerCompose) PS() error {
-	project, err := createProject(d.projectName, d.airflowHome, d.envFile)
-	if err != nil {
-		return err
-	}
 	// List project containers
-	psInfo, err := project.Ps(context.Background())
+	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerStatusCheck)
 	}
@@ -166,12 +166,15 @@ func (d *DockerCompose) PS() error {
 	tw.Init(os.Stdout, 0, 8, 2, '\t', tabwriter.AlignRight) // nolint:gomnd
 
 	// Append data to table
+	// Fix this
 	fmt.Fprintln(tw, strings.Join(infoColumns, "\t"))
-	for _, info := range psInfo {
-		data := []string{}
-		for _, lbl := range infoColumns {
-			data = append(data, info[lbl])
+	for idx := range psInfo {
+		info := psInfo[idx]
+		ports := []string{}
+		for _, port := range info.Publishers {
+			ports = append(ports, strconv.Itoa(port.PublishedPort))
 		}
+		data := []string{info.Name, info.State, strings.Join(ports, ",")}
 		fmt.Fprintln(tw, strings.Join(data, "\t"))
 	}
 
@@ -251,22 +254,16 @@ func (d *DockerCompose) ExecCommand(containerID, command string) string {
 }
 
 func (d *DockerCompose) GetContainerID(containerName string) (string, error) {
-	project, err := createProject(d.projectName, d.airflowHome, d.envFile)
-	if err != nil {
-		return "", err
-	}
-	psInfo, err := project.Ps(context.Background())
+	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
 		return "", errors.Wrap(err, messages.ErrContainerStatusCheck)
 	}
 
-	replacer := strings.NewReplacer("_", "", "-", "")
-	strippedProjectName := replacer.Replace(d.projectName)
-
-	for _, info := range psInfo {
-		if strings.Contains(info["Name"], strippedProjectName) &&
-			strings.Contains(info["Name"], containerName) {
-			return info["Id"], nil
+	for idx := range psInfo {
+		info := psInfo[idx]
+		if strings.Contains(info.Name, d.projectName) &&
+			strings.Contains(info.Name, containerName) {
+			return info.ID, nil
 		}
 	}
 	return "", err
@@ -278,35 +275,45 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome, envFile string) (p.APIProject, error) {
+func createProject(projectName, airflowHome, envFile string) (*composeTypes.Project, error) {
 	// Generate the docker-compose yaml
 	yaml, err := generateConfig(projectName, airflowHome, envFile, DockerEngine)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
-	composeCtx := p.Context{
-		ComposeBytes:  [][]byte{[]byte(yaml)},
-		ProjectName:   projectName,
-		LoggerFactory: logger.NewColorLoggerFactory(),
+
+	if err != nil {
+		return nil, err
 	}
 
-	// No need to stat then read, just try to read and ignore ENOENT error
+	var configs []composeTypes.ConfigFile
+	composeConfig := composeTypes.ConfigFile{
+		Content:  []byte(yaml),
+		Filename: "docker-compose.yml",
+	}
+	configs = append(configs, composeConfig)
+
 	composeFile := "docker-compose.override.yml"
 	composeBytes, err := ioutil.ReadFile(composeFile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeFile)
 	}
 	if err == nil {
-		composeCtx.ComposeBytes = append(composeCtx.ComposeBytes, composeBytes)
-
-		// Even though these won't be loaded (as we have provided ComposeBytes) we
-		// need to specify this so that relative volume paths are resolved by
-		// libcompose
-		composeCtx.ComposeFiles = []string{composeFile}
+		overrideConfig := composeTypes.ConfigFile{Content: composeBytes, Filename: composeFile}
+		configs = append(configs, overrideConfig)
 	}
 
-	// Create the project
-	return dockercompose.NewProject(&ctx.Context{Context: composeCtx}, nil)
+	loaderOption := func(opts *loader.Options) {
+		opts.Name = projectName
+	}
+
+	project, err := loader.Load(composeTypes.ConfigDetails{
+		ConfigFiles: configs,
+		WorkingDir:  airflowHome,
+		Environment: map[string]string{},
+	}, loaderOption)
+
+	return project, err
 }
 
 func checkServiceState(serviceState, expectedState string) bool {
@@ -376,4 +383,19 @@ func execPipe(resp types.HijackedResponse, inStream io.Reader, outStream, errorS
 	}
 
 	return nil
+}
+
+type ComposeLogger struct {
+	logger *logrus.Logger
+}
+
+func (l *ComposeLogger) Log(service, container, message string) {
+	l.logger.Infof("%s | %s", service, message)
+}
+
+func (l *ComposeLogger) Status(container, msg string) {
+	l.logger.Infof("%s | %s", container, msg)
+}
+
+func (l *ComposeLogger) Register(container string) {
 }
