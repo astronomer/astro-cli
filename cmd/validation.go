@@ -18,10 +18,10 @@ var (
 	gitSyncDeploymentType = "git_sync"
 
 	validGitScheme = map[string]struct{}{
-		"git":   struct{}{},
-		"ssh":   struct{}{},
-		"http":  struct{}{},
-		"https": struct{}{},
+		"git":   {},
+		"ssh":   {},
+		"http":  {},
+		"https": {},
 	}
 )
 

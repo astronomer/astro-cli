@@ -37,10 +37,11 @@ repos:
       - id: sort-simple-yaml
       - id: trailing-whitespace
         exclude: '.*_test.go$'  # regex
-  - repo: https://github.com/detailyang/pre-commit-shell
-    rev: 1.0.5
+  - repo: https://github.com/lovesegfault/beautysh
+    rev: v6.2.1
     hooks:
-      - id: shell-lint
+      - id: beautysh
+        args: ['--indent-size', '2']
   - repo: https://github.com/adrienverge/yamllint.git
     rev: v1.25.0
     hooks:

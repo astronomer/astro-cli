@@ -63,7 +63,7 @@ spec:
       value: astro
 {{ .AirflowEnvFile }}
     image: {{ .AirflowImage }}
-    name: scheduler
+    name: {{ .SchedulerContainerName }}
     ports:
     - containerPort: 8080
       hostPort: {{ .AirflowWebserverPort }}
@@ -132,7 +132,7 @@ spec:
       value: "False"
 {{ .AirflowEnvFile }}
     image: {{ .AirflowImage }}
-    name: webserver
+    name: {{ .WebserverContainerName }}
     resources: {}
     securityContext:
       allowPrivilegeEscalation: true
