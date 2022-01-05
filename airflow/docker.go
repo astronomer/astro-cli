@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	dockerStateUp = "Up"
+	dockerStateUp = "running"
 
 	projectStopTimeout = 5
 
@@ -41,6 +41,7 @@ type DockerCompose struct {
 	projectName    string
 	envFile        string
 	composeService api.Service
+	imageHandler   ImageHandler
 }
 
 func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
@@ -55,21 +56,18 @@ func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
 		return nil, errors.Wrap(err, "error initializing docker client")
 	}
 	composeService := compose.NewComposeService(dockerClient, &configfile.ConfigFile{})
+	imageBuilder := DockerImageInit(projectName)
 
 	return &DockerCompose{
 		airflowHome:    airflowHome,
 		projectName:    projectName,
 		envFile:        envFile,
 		composeService: composeService,
+		imageHandler:   imageBuilder,
 	}, nil
 }
 
 func (d *DockerCompose) Start(dockerfile string) error {
-	project, err := createProject(d.projectName, d.airflowHome, d.envFile)
-	if err != nil {
-		return err
-	}
-
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
@@ -87,8 +85,18 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	}
 
 	// Build this project image
-	imageBuilder := DockerImageInit(d.projectName)
-	err = imageBuilder.Build(".")
+	err = d.imageHandler.Build(".")
+	if err != nil {
+		return err
+	}
+
+	labels, err := d.imageHandler.GetImageLabels()
+	if err != nil {
+		return err
+	}
+
+	// recreate the project, to pass the labels
+	project, err := createProject(d.projectName, d.airflowHome, d.envFile, labels)
 	if err != nil {
 		return err
 	}
@@ -137,7 +145,12 @@ func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
 }
 
 func (d *DockerCompose) Stop() error {
-	project, err := createProject(d.projectName, d.airflowHome, d.envFile)
+	labels, err := d.imageHandler.GetImageLabels()
+	if err != nil {
+		return err
+	}
+
+	project, err := createProject(d.projectName, d.airflowHome, d.envFile, labels)
 	if err != nil {
 		return err
 	}
@@ -221,23 +234,6 @@ func (d *DockerCompose) Run(args []string, user string) error {
 	return execPipe(resp, os.Stdin, os.Stdout, os.Stderr)
 }
 
-// imageBuild builds the airflow project
-func (d *DockerCompose) Build(imageName string) error {
-	// Change to location of Dockerfile
-	err := os.Chdir(d.airflowHome)
-	if err != nil {
-		return err
-	}
-
-	// Build image
-	err = dockerExec("build", "-t", imageName, ".")
-	if err != nil {
-		return errors.Wrapf(err, "command 'docker build -t %s failed", imageName)
-	}
-
-	return nil
-}
-
 // ExecCommand executes a command on webserver container, and sends the response as string, this can be clubbed with Run()
 func (d *DockerCompose) ExecCommand(containerID, command string) string {
 	cmd := exec.Command("docker", "exec", "-it", containerID, "bash", "-c", command)
@@ -275,9 +271,9 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome, envFile string) (*composeTypes.Project, error) {
+func createProject(projectName, airflowHome, envFile string, labels map[string]string) (*composeTypes.Project, error) {
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile, DockerEngine)
+	yaml, err := generateConfig(projectName, airflowHome, envFile, labels, DockerEngine)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
@@ -319,25 +315,6 @@ func createProject(projectName, airflowHome, envFile string) (*composeTypes.Proj
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
-}
-
-// Exec executes a docker command
-func dockerExec(args ...string) error {
-	_, lookErr := exec.LookPath(Docker)
-	if lookErr != nil {
-		return errors.Wrap(lookErr, "failed to find the docker binary")
-	}
-
-	cmd := exec.Command(Docker, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-
-	if cmdErr := cmd.Run(); cmdErr != nil {
-		return errors.Wrapf(cmdErr, "failed to execute cmd")
-	}
-
-	return nil
 }
 
 // execPipe does pipe stream into stdout/stdin and stderr

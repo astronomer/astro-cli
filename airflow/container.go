@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/docker/docker/api/types/versions"
 
 	"github.com/pkg/errors"
 )
@@ -37,6 +38,7 @@ type ContainerHandler interface {
 type ImageHandler interface {
 	Build(path string) error
 	Push(serverAddress, token, remoteImage string) error
+	GetImageLabels() (map[string]string, error)
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -57,6 +59,7 @@ type ComposeConfig struct {
 	AirflowWebserverPort string
 	MountLabel           string
 	ProjectName          string
+	TriggererEnabled     bool
 }
 
 func ContainerHandlerInit(airflowHome, envFile string) (ContainerHandler, error) {
@@ -96,7 +99,7 @@ func RegistryHandlerInit(registry string) (RegistryHandler, error) {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile string, containerEngine Container) (string, error) {
+func generateConfig(projectName, airflowHome, envFile string, imageLabels map[string]string, containerEngine Container) (string, error) {
 	var tmplFile string
 	switch containerEngine {
 	case DockerEngine:
@@ -117,6 +120,12 @@ func generateConfig(projectName, airflowHome, envFile string, containerEngine Co
 		return "", err
 	}
 
+	var triggererEnabled bool
+	airflowVersion := imageLabels[airflowVersionLabelName]
+	if versions.GreaterThanOrEqualTo(airflowVersion, triggererAllowedAirflowVersion) {
+		triggererEnabled = true
+	}
+
 	cfg := ComposeConfig{
 		PostgresUser:         config.CFG.PostgresUser.GetString(),
 		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
@@ -129,6 +138,7 @@ func generateConfig(projectName, airflowHome, envFile string, containerEngine Co
 		AirflowEnvFile:       envFile,
 		MountLabel:           "z",
 		ProjectName:          projectName,
+		TriggererEnabled:     triggererEnabled,
 	}
 
 	buff := new(bytes.Buffer)
@@ -136,7 +146,6 @@ func generateConfig(projectName, airflowHome, envFile string, containerEngine Co
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
 	}
-
 	return buff.String(), nil
 }
 
