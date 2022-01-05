@@ -145,7 +145,7 @@ All notable changes to this project will be documented in this file.
 - Add airflow upgradedb (#307)
 - Query Houston for Airflow Image Tag (#308)
 - Update example dag file (#315)
-- Implement warning messages during airflow deploy (#314) 
+- Implement warning messages during airflow deploy (#314)
 
 ## [0.10.3] - 2019-10-28
 
