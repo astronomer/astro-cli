@@ -56,14 +56,14 @@ func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
 		return nil, errors.Wrap(err, "error initializing docker client")
 	}
 	composeService := compose.NewComposeService(dockerClient, &configfile.ConfigFile{})
-	imageBuilder := DockerImageInit(projectName)
+	imageHandler := DockerImageInit(projectName)
 
 	return &DockerCompose{
 		airflowHome:    airflowHome,
 		projectName:    projectName,
 		envFile:        envFile,
 		composeService: composeService,
-		imageHandler:   imageBuilder,
+		imageHandler:   imageHandler,
 	}, nil
 }
 
