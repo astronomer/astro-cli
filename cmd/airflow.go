@@ -360,7 +360,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 	}
 
 	if fileState {
-		containerID, err := containerHandler.GetContainerID("webserver")
+		containerID, err := containerHandler.GetContainerID(config.CFG.WebserverContainerName.GetString())
 		if err != nil {
 			return errors.Wrap(err, messages.ErrContainerStatusCheck)
 		}
@@ -388,13 +388,13 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	containersNames := make([]string, 0)
 	// default is to display all logs
 	if !schedulerLogs && !webserverLogs {
-		containersNames = append(containersNames, []string{"scheduler", "webserver"}...)
+		containersNames = append(containersNames, []string{config.CFG.SchedulerContainerName.GetString(), config.CFG.WebserverContainerName.GetString()}...)
 	}
 	if schedulerLogs {
-		containersNames = append(containersNames, "scheduler")
+		containersNames = append(containersNames, config.CFG.SchedulerContainerName.GetString())
 	}
 	if webserverLogs {
-		containersNames = append(containersNames, "webserver")
+		containersNames = append(containersNames, config.CFG.WebserverContainerName.GetString())
 	}
 
 	// Silence Usage as we have now validated command input
