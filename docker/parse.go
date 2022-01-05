@@ -100,7 +100,7 @@ func ParseFile(filename string) ([]Command, error) {
 // e.g. FROM ubuntu:xenial returns "ubuntu", "xenial"
 func GetImageTagFromParsedFile(cmds []Command) (baseImage, tag string) {
 	for _, cmd := range cmds {
-		if cmd.Cmd == command.From {
+		if strings.EqualFold(cmd.Cmd, command.From) {
 			from := cmd.Value[0]
 			baseImage, tag := parseImageName(from)
 			return baseImage, tag

@@ -8,16 +8,22 @@ import (
 )
 
 const (
-	networkOptName  = "name"
-	networkOptAlias = "alias"
-	driverOpt       = "driver-opt"
+	networkOptName        = "name"
+	networkOptAlias       = "alias"
+	networkOptIPv4Address = "ip"
+	networkOptIPv6Address = "ip6"
+	driverOpt             = "driver-opt"
 )
 
 // NetworkAttachmentOpts represents the network options for endpoint creation
 type NetworkAttachmentOpts struct {
-	Target     string
-	Aliases    []string
-	DriverOpts map[string]string
+	Target       string
+	Aliases      []string
+	DriverOpts   map[string]string
+	Links        []string // TODO add support for links in the csv notation of `--network`
+	IPv4Address  string
+	IPv6Address  string
+	LinkLocalIPs []string // TODO add support for LinkLocalIPs in the csv notation of `--network` ?
 }
 
 // NetworkOpt represents a network config in swarm mode.
@@ -56,6 +62,10 @@ func (n *NetworkOpt) Set(value string) error {
 				netOpt.Target = value
 			case networkOptAlias:
 				netOpt.Aliases = append(netOpt.Aliases, value)
+			case networkOptIPv4Address:
+				netOpt.IPv4Address = value
+			case networkOptIPv6Address:
+				netOpt.IPv6Address = value
 			case driverOpt:
 				key, value, err = parseDriverOpt(value)
 				if err == nil {
@@ -93,6 +103,16 @@ func (n *NetworkOpt) Value() []NetworkAttachmentOpts {
 // String returns the network opts as a string
 func (n *NetworkOpt) String() string {
 	return ""
+}
+
+// NetworkMode return the network mode for the network option
+func (n *NetworkOpt) NetworkMode() string {
+	networkIDOrName := "default"
+	netOptVal := n.Value()
+	if len(netOptVal) > 0 {
+		networkIDOrName = netOptVal[0].Target
+	}
+	return networkIDOrName
 }
 
 func parseDriverOpt(driverOpt string) (string, string, error) {

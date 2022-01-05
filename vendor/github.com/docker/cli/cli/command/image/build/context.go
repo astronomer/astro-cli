@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -24,6 +23,7 @@ import (
 	"github.com/docker/docker/pkg/streamformatter"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/pkg/errors"
+	exec "golang.org/x/sys/execabs"
 )
 
 const (
@@ -41,6 +41,12 @@ func ValidateContextDirectory(srcPath string, excludes []string) error {
 	if err != nil {
 		return err
 	}
+
+	pm, err := fileutils.NewPatternMatcher(excludes)
+	if err != nil {
+		return err
+	}
+
 	return filepath.Walk(contextRoot, func(filePath string, f os.FileInfo, err error) error {
 		if err != nil {
 			if os.IsPermission(err) {
@@ -55,7 +61,7 @@ func ValidateContextDirectory(srcPath string, excludes []string) error {
 		// skip this directory/file if it's not in the path, it won't get added to the context
 		if relFilePath, err := filepath.Rel(contextRoot, filePath); err != nil {
 			return err
-		} else if skip, err := fileutils.Matches(relFilePath, excludes); err != nil {
+		} else if skip, err := filepathMatches(pm, relFilePath); err != nil {
 			return err
 		} else if skip {
 			if f.IsDir() {
@@ -81,6 +87,15 @@ func ValidateContextDirectory(srcPath string, excludes []string) error {
 	})
 }
 
+func filepathMatches(matcher *fileutils.PatternMatcher, file string) (bool, error) {
+	file = filepath.Clean(file)
+	if file == "." {
+		// Don't let them exclude everything, kind of silly.
+		return false, nil
+	}
+	return matcher.Matches(file)
+}
+
 // DetectArchiveReader detects whether the input stream is an archive or a
 // Dockerfile and returns a buffered version of input, safe to consume in lieu
 // of input. If an archive is detected, isArchive is set to true, and to false
@@ -89,7 +104,7 @@ func ValidateContextDirectory(srcPath string, excludes []string) error {
 func DetectArchiveReader(input io.ReadCloser) (rc io.ReadCloser, isArchive bool, err error) {
 	buf := bufio.NewReader(input)
 
-	magic, err := buf.Peek(archiveHeaderSize)
+	magic, err := buf.Peek(archiveHeaderSize * 2)
 	if err != nil && err != io.EOF {
 		return nil, false, errors.Errorf("failed to peek context header from STDIN: %v", err)
 	}
@@ -217,6 +232,7 @@ func GetContextFromURL(out io.Writer, remoteURL, dockerfileName string) (io.Read
 // getWithStatusError does an http.Get() and returns an error if the
 // status code is 4xx or 5xx.
 func getWithStatusError(url string) (resp *http.Response, err error) {
+	// #nosec G107
 	if resp, err = http.Get(url); err != nil {
 		return nil, err
 	}
@@ -227,9 +243,9 @@ func getWithStatusError(url string) (resp *http.Response, err error) {
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, errors.Wrapf(err, msg+": error reading body")
+		return nil, errors.Wrapf(err, "%s: error reading body", msg)
 	}
-	return nil, errors.Errorf(msg+": %s", bytes.TrimSpace(body))
+	return nil, errors.Errorf("%s: %s", msg, bytes.TrimSpace(body))
 }
 
 // GetContextFromLocalDir uses the given local directory as context for a
@@ -329,7 +345,6 @@ func getDockerfileRelPath(absContextDir, givenDockerfile string) (string, error)
 		absDockerfile, err = filepath.EvalSymlinks(absDockerfile)
 		if err != nil {
 			return "", errors.Errorf("unable to evaluate symlinks in Dockerfile path: %v", err)
-
 		}
 	}
 
