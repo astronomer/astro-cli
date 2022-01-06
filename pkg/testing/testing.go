@@ -57,7 +57,7 @@ contexts:
     workspace: ck05r3bor07h40d02y2hw4n4v
 show_warnings: false
 container:
-  engine: %s 
+  engine: %s
 `, containerEngine))
 	cfg := strings.ReplaceAll(string(configRaw), "HOUSTON_HOST", houstonHost)
 	return []byte(cfg)

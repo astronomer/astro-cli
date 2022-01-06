@@ -33,6 +33,7 @@ var (
 	saveDeployConfig bool
 	schedulerLogs    bool
 	webserverLogs    bool
+	triggererLogs    bool
 
 	runExample = `
 # Create default admin user.
@@ -175,6 +176,7 @@ func newAirflowLogsCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
 	cmd.Flags().BoolVarP(&schedulerLogs, "scheduler", "s", false, "Output scheduler logs")
 	cmd.Flags().BoolVarP(&webserverLogs, "webserver", "w", false, "Output webserver logs")
+	cmd.Flags().BoolVarP(&triggererLogs, "triggerer", "t", false, "Output triggerer logs")
 	return cmd
 }
 
@@ -387,14 +389,17 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// default is to display all logs
 	containersNames := make([]string, 0)
 	// default is to display all logs
-	if !schedulerLogs && !webserverLogs {
-		containersNames = append(containersNames, []string{"scheduler", "webserver"}...)
+	if !schedulerLogs && !webserverLogs && !triggererLogs {
+		containersNames = append(containersNames, []string{"scheduler", "webserver", "triggerer"}...)
 	}
 	if schedulerLogs {
 		containersNames = append(containersNames, "scheduler")
 	}
 	if webserverLogs {
 		containersNames = append(containersNames, "webserver")
+	}
+	if triggererLogs {
+		containersNames = append(containersNames, "triggerer")
 	}
 
 	// Silence Usage as we have now validated command input
