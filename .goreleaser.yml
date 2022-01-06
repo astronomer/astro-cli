@@ -7,28 +7,47 @@ release:
   # If set to auto, will mark the release as not ready for production
   # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
   prerelease: true
-build:
-  main: main.go
-  binary: astro
-  env:
-    - CGO_ENABLED=0
-  goos:
-    - linux
-    - darwin
-    - windows
-  goarch:
-    - 386
-    - amd64
-    - arm64
-  goarm:
-    - 7
-  flags:
-    - -mod=vendor
-  ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
-  tags:
-    - containers_image_openpgp
-    - exclude_graphdriver_btrfs
-    - exclude_graphdriver_devicemapper
+builds:
+  - main: main.go
+    binary: astro
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - 386
+      - amd64
+      - arm64
+    goarm:
+      - 7
+    flags:
+      - -mod=vendor
+    ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
+    tags:
+      - containers_image_openpgp
+      - exclude_graphdriver_btrfs
+      - exclude_graphdriver_devicemapper
+  - id: astro-windows
+    main: main.go
+    binary: astro
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - 386
+      - amd64
+    goarm:
+      - 7
+    flags:
+      - -mod=vendor
+    ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
+    tags:
+      - containers_image_openpgp
+      - exclude_graphdriver_btrfs
+      - exclude_graphdriver_devicemapper
+      - remote
 brews:
   - tap:
       owner: astronomer
