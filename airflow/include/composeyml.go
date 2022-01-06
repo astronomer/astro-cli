@@ -95,4 +95,33 @@ services:
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
+{{if .TriggererEnabled}}
+  triggerer:
+    image: {{ .AirflowImage }}
+    container_name: {{ .TriggererContainerName }}
+    command: >
+      bash -c "(airflow upgradedb || airflow db upgrade) && airflow triggerer"
+    restart: unless-stopped
+    networks:
+      - airflow
+    user: {{ .AirflowUser }}
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-triggerer"
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+      AIRFLOW__WEBSERVER__RBAC: "True"
+    volumes:
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
+      - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
+      - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
+      - airflow_logs:/usr/local/airflow/logs
+    {{ .AirflowEnvFile }}
+{{end}}
 `)

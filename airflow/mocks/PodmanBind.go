@@ -109,6 +109,29 @@ func (_m *PodmanBind) Exists(ctx context.Context, nameOrID string, options *pods
 	return r0, r1
 }
 
+// GetImage provides a mock function with given fields: ctx, nameOrID, options
+func (_m *PodmanBind) GetImage(ctx context.Context, nameOrID string, options *images.GetOptions) (*entities.ImageInspectReport, error) {
+	ret := _m.Called(ctx, nameOrID, options)
+
+	var r0 *entities.ImageInspectReport
+	if rf, ok := ret.Get(0).(func(context.Context, string, *images.GetOptions) *entities.ImageInspectReport); ok {
+		r0 = rf(ctx, nameOrID, options)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entities.ImageInspectReport)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, *images.GetOptions) error); ok {
+		r1 = rf(ctx, nameOrID, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Kube provides a mock function with given fields: ctx, path, options
 func (_m *PodmanBind) Kube(ctx context.Context, path string, options *play.KubeOptions) (*entities.PlayKubeReport, error) {
 	ret := _m.Called(ctx, path, options)

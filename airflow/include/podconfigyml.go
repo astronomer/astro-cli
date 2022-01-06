@@ -150,6 +150,53 @@ spec:
     - mountPath: /usr/local/airflow/include
       name: airflow-include-dir
     workingDir: /usr/local/airflow
+{{if .TriggererEnabled}}
+  - args:
+    - bash
+    - -c
+    - (airflow upgradedb || airflow db upgrade) && airflow triggerer
+    command:
+    - /entrypoint
+    env:
+    - name: ASTRONOMER_USER
+      value: astro
+    - name: AIRFLOW_HOME
+      value: /usr/local/airflow
+    - name: AIRFLOW__WEBSERVER__RBAC
+      value: "True"
+    - name: AIRFLOW__CORE__EXECUTOR
+      value: LocalExecutor
+    - name: ASTRONOMER_UID
+      value: "50000"
+    - name: AIRFLOW__CORE__FERNET_KEY
+      value: d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw=
+    - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+      value: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@localhost:5432
+    - name: AIRFLOW_SNOWFLAKE_PARTNER
+      value: ASTRONOMER
+    - name: AIRFLOW__CORE__LOAD_EXAMPLES
+      value: "False"
+{{ .AirflowEnvFile }}
+    image: {{ .AirflowImage }}
+    name: {{ .TriggererContainerName }}
+    resources: {}
+    securityContext:
+      allowPrivilegeEscalation: true
+      privileged: false
+      readOnlyRootFilesystem: false
+      runAsGroup: 50000
+      runAsUser: 50000
+      seLinuxOptions:
+        type: spc_t
+    volumeMounts:
+    - mountPath: /usr/local/airflow/dags
+      name: airflow-dags-dir
+    - mountPath: /usr/local/airflow/plugins
+      name: airflow-plugins-dir
+    - mountPath: /usr/local/airflow/include
+      name: airflow-include-dir
+    workingDir: /usr/local/airflow
+{{end}}
   dnsConfig: {}
   restartPolicy: OnFailure
   volumes:

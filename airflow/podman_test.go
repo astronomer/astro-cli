@@ -15,6 +15,7 @@ import (
 
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/domain/entities"
+	"github.com/containers/podman/v3/pkg/inspect"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -97,6 +98,7 @@ func TestPodmanStartSuccess(t *testing.T) {
 	podmanMock := &Podman{projectDir: "test", projectName: "test", envFile: ".env", podmanBind: bindMock, conn: context.TODO()}
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
 	bindMock.On("Build", podmanMock.conn, []string{filepath.Join(projectDir, "Dockerfile")}, mock.AnythingOfType("entities.BuildOptions")).Return(&entities.BuildReport{}, nil)
+	bindMock.On("GetImage", podmanMock.conn, mock.Anything, mock.Anything).Return(&entities.ImageInspectReport{&inspect.ImageData{}}, nil) //nolint
 	bindMock.On("Exists", podmanMock.conn, mock.Anything, mock.Anything).Return(false, nil)
 	bindMock.On("Kube", podmanMock.conn, mock.Anything, mock.Anything).Return(&entities.PlayKubeReport{Pods: []entities.PlayKubePod{{ID: "test"}}}, nil)
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{{Names: []string{"test-webserver"}, ID: "test-id"}}, nil)
@@ -142,7 +144,14 @@ func TestPodmanStartFailure(t *testing.T) {
 	assert.EqualError(t, err, errPodman.Error())
 
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
+	bindMock.On("Build", podmanMock.conn, []string{filepath.Join(projectDir, "Dockerfile")}, mock.AnythingOfType("entities.BuildOptions")).Return(&entities.BuildReport{}, nil).Once()
+	bindMock.On("GetImage", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
+	err = podmanMock.Start("test-dockerfile")
+	assert.EqualError(t, err, errPodman.Error())
+
+	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
 	bindMock.On("Build", podmanMock.conn, []string{filepath.Join(projectDir, "Dockerfile")}, mock.AnythingOfType("entities.BuildOptions")).Return(&entities.BuildReport{}, nil)
+	bindMock.On("GetImage", podmanMock.conn, mock.Anything, mock.Anything).Return(&entities.ImageInspectReport{&inspect.ImageData{}}, nil) //nolint
 	bindMock.On("Exists", podmanMock.conn, mock.Anything, mock.Anything).Return(false, nil).Once()
 	bindMock.On("Kube", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
 	err = podmanMock.Start("test-dockerfile")

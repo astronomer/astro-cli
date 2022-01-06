@@ -40,6 +40,7 @@ type cfgs struct {
 	PodmanConnectionURI    cfg
 	SchedulerContainerName cfg
 	WebserverContainerName cfg
+	TriggererContainerName cfg
 }
 
 // Creates a new cfg struct

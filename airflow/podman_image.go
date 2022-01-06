@@ -84,3 +84,12 @@ func (p *PodmanImage) Push(cloudDomain, token, remoteImageTag string) error {
 	}
 	return nil
 }
+
+func (p *PodmanImage) GetImageLabels() (map[string]string, error) {
+	imageReport, err := p.podmanBind.GetImage(p.conn, imageName(p.imageName, "latest"), nil)
+	if err != nil {
+		var labels map[string]string
+		return labels, err
+	}
+	return imageReport.Labels, nil
+}

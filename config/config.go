@@ -67,6 +67,7 @@ var (
 		PodmanConnectionURI:    newCfg("podman.connection_uri", ""),
 		SchedulerContainerName: newCfg("scheduler.container_name", "scheduler"),
 		WebserverContainerName: newCfg("webserver.container_name", "webserver"),
+		TriggererContainerName: newCfg("triggerer.container_name", "triggerer"),
 	}
 
 	// viperHome is the viper object in the users home directory

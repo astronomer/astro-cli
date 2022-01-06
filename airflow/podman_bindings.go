@@ -34,6 +34,7 @@ type PodmanBind interface {
 	Tag(ctx context.Context, nameOrID, tag, repo string, options *images.TagOptions) error
 	Push(ctx context.Context, source, destination string, options *podmanImages.PushOptions) error
 	Untag(ctx context.Context, nameOrID, tag, repo string, options *images.UntagOptions) error
+	GetImage(ctx context.Context, nameOrID string, options *images.GetOptions) (*entities.ImageInspectReport, error)
 	// Method to handle registry operations
 	Login(ctx context.Context, systemContext *types.SystemContext, opts *auth.LoginOptions, args []string) error
 }
@@ -96,6 +97,10 @@ func (p *PodmanBinder) Push(ctx context.Context, source, destination string, opt
 
 func (p *PodmanBinder) Untag(ctx context.Context, nameOrID, tag, repo string, options *images.UntagOptions) error {
 	return images.Untag(ctx, nameOrID, tag, repo, options)
+}
+
+func (p *PodmanBinder) GetImage(ctx context.Context, nameOrID string, options *images.GetOptions) (*entities.ImageInspectReport, error) {
+	return images.GetImage(ctx, nameOrID, options)
 }
 
 func (p *PodmanBinder) Login(ctx context.Context, systemContext *types.SystemContext, opts *auth.LoginOptions, args []string) error {

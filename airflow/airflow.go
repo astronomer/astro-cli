@@ -20,6 +20,9 @@ const (
 
 	defaultAirflowVersion = uint64(0x1) //nolint:gomnd
 	componentName         = "airflow"
+
+	airflowVersionLabelName        = "io.astronomer.docker.airflow.version"
+	triggererAllowedAirflowVersion = "2.2.0"
 )
 
 var repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number
