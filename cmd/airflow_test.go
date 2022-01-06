@@ -129,13 +129,14 @@ func TestAirflowLogsSuccess(t *testing.T) {
 
 	mockContainer := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Logs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainer.On("Logs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockContainer, nil
 	}
 
 	cmd := newAirflowLogsCmd(os.Stdout)
 	cmd.Flags().Set("scheduler", "true")
 	cmd.Flags().Set("webserver", "true")
+	cmd.Flags().Set("triggerer", "true")
 	err := airflowLogs(cmd, []string{})
 	assert.NoError(t, err)
 	mockContainer.AssertExpectations(t)
@@ -149,7 +150,7 @@ func TestAirflowLogsFailure(t *testing.T) {
 
 	mockContainer := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Logs", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
+		mockContainer.On("Logs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
 		return mockContainer, nil
 	}
 
