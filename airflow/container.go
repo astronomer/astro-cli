@@ -48,18 +48,21 @@ type RegistryHandler interface {
 
 // ComposeConfig is input data to docker compose yaml template
 type ComposeConfig struct {
-	PostgresUser         string
-	PostgresPassword     string
-	PostgresHost         string
-	PostgresPort         string
-	AirflowEnvFile       string
-	AirflowImage         string
-	AirflowHome          string
-	AirflowUser          string
-	AirflowWebserverPort string
-	MountLabel           string
-	ProjectName          string
-	TriggererEnabled     bool
+	PostgresUser           string
+	PostgresPassword       string
+	PostgresHost           string
+	PostgresPort           string
+	AirflowEnvFile         string
+	AirflowImage           string
+	AirflowHome            string
+	AirflowUser            string
+	AirflowWebserverPort   string
+	MountLabel             string
+	ProjectName            string
+	TriggererEnabled       bool
+	SchedulerContainerName string
+	WebserverContainerName string
+	TriggererContainerName string
 }
 
 func ContainerHandlerInit(airflowHome, envFile string) (ContainerHandler, error) {
@@ -127,18 +130,21 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 	}
 
 	cfg := ComposeConfig{
-		PostgresUser:         config.CFG.PostgresUser.GetString(),
-		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
-		PostgresHost:         config.CFG.PostgresHost.GetString(),
-		PostgresPort:         config.CFG.PostgresPort.GetString(),
-		AirflowImage:         imageName(projectName, "latest"),
-		AirflowHome:          airflowHome,
-		AirflowUser:          "astro",
-		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
-		AirflowEnvFile:       envFile,
-		MountLabel:           "z",
-		ProjectName:          projectName,
-		TriggererEnabled:     triggererEnabled,
+		PostgresUser:           config.CFG.PostgresUser.GetString(),
+		PostgresPassword:       config.CFG.PostgresPassword.GetString(),
+		PostgresHost:           config.CFG.PostgresHost.GetString(),
+		PostgresPort:           config.CFG.PostgresPort.GetString(),
+		AirflowImage:           imageName(projectName, "latest"),
+		AirflowHome:            airflowHome,
+		AirflowUser:            "astro",
+		AirflowWebserverPort:   config.CFG.WebserverPort.GetString(),
+		AirflowEnvFile:         envFile,
+		MountLabel:             "z",
+		ProjectName:            projectName,
+		TriggererEnabled:       triggererEnabled,
+		SchedulerContainerName: config.CFG.SchedulerContainerName.GetString(),
+		WebserverContainerName: config.CFG.WebserverContainerName.GetString(),
+		TriggererContainerName: config.CFG.TriggererContainerName.GetString(),
 	}
 
 	buff := new(bytes.Buffer)
