@@ -35,6 +35,7 @@ services:
 
   scheduler:
     image: {{ .AirflowImage }}
+    container_name: {{ .SchedulerContainerName }}
     command: >
       bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
     restart: unless-stopped
@@ -61,6 +62,7 @@ services:
 
   webserver:
     image: {{ .AirflowImage }}
+    container_name: {{ .WebserverContainerName }}
     command: >
       bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
@@ -96,6 +98,7 @@ services:
 {{if .TriggererEnabled}}
   triggerer:
     image: {{ .AirflowImage }}
+    container_name: {{ .TriggererContainerName }}
     command: >
       bash -c "(airflow upgradedb || airflow db upgrade) && airflow triggerer"
     restart: unless-stopped

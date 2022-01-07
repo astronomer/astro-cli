@@ -417,5 +417,5 @@ func (p *Podman) webserverHealthCheck() {
 }
 
 func (p *Podman) getWebserverContainerID() (string, error) {
-	return p.GetContainerID("webserver")
+	return p.GetContainerID(config.CFG.WebserverContainerName.GetString())
 }

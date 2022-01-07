@@ -362,8 +362,8 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 	}
 
 	if fileState {
-		containerID, err := containerHandler.GetContainerID("webserver")
-		if err != nil {
+		containerID, err := containerHandler.GetContainerID(config.CFG.WebserverContainerName.GetString())
+		if err != nil || containerID == "" {
 			return errors.Wrap(err, messages.ErrContainerStatusCheck)
 		}
 		settings.ConfigSettings(containerHandler, containerID, airflowDockerVersion)
@@ -390,16 +390,16 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	containersNames := make([]string, 0)
 	// default is to display all logs
 	if !schedulerLogs && !webserverLogs && !triggererLogs {
-		containersNames = append(containersNames, []string{"scheduler", "webserver", "triggerer"}...)
+		containersNames = append(containersNames, []string{config.CFG.SchedulerContainerName.GetString(), config.CFG.WebserverContainerName.GetString(), config.CFG.TriggererContainerName.GetString()}...)
 	}
 	if schedulerLogs {
-		containersNames = append(containersNames, "scheduler")
+		containersNames = append(containersNames, config.CFG.SchedulerContainerName.GetString())
 	}
 	if webserverLogs {
-		containersNames = append(containersNames, "webserver")
+		containersNames = append(containersNames, config.CFG.WebserverContainerName.GetString())
 	}
 	if triggererLogs {
-		containersNames = append(containersNames, "triggerer")
+		containersNames = append(containersNames, config.CFG.TriggererContainerName.GetString())
 	}
 
 	// Silence Usage as we have now validated command input

@@ -257,8 +257,7 @@ func (d *DockerCompose) GetContainerID(containerName string) (string, error) {
 
 	for idx := range psInfo {
 		info := psInfo[idx]
-		if strings.Contains(info.Name, d.projectName) &&
-			strings.Contains(info.Name, containerName) {
+		if strings.Contains(info.Name, containerName) {
 			return info.ID, nil
 		}
 	}
@@ -267,7 +266,7 @@ func (d *DockerCompose) GetContainerID(containerName string) (string, error) {
 
 // getWebServerContainerID return webserver container id
 func (d *DockerCompose) getWebServerContainerID() (string, error) {
-	return d.GetContainerID("webserver")
+	return d.GetContainerID(config.CFG.WebserverContainerName.GetString())
 }
 
 // createProject creates project with yaml config as context
