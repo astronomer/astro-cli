@@ -133,6 +133,12 @@ DAGs can go in the `dags` folder, custom Airflow plugins in `plugins`, python pa
 Run `astro dev start` to start a local version of airflow on your machine. This will spin up a few locally running docker containers - one for the airflow scheduler, one for the webserver, and one for postgres.
 (Run `docker ps` to verify)
 
+## Requirements
+
+The CLI interacts with Docker or Podman in order to run `astro dev` commands, and the minimum supported versions for them are as following:
+Docker Engine: 1.13.1
+Podman: 3.1.0
+
 ## Help
 
 The CLI includes a help command, descriptions, as well as usage info for subcommands.
