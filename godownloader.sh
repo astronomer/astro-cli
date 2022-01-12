@@ -83,7 +83,7 @@ get_binaries() {
       ;;
   esac
 }
-version_gte() { 
+version_gte() {
   if [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]; then
     return 0
   else
@@ -362,7 +362,7 @@ PREFIX="$OWNER/$REPO"
 
 # use in logging routines
 log_prefix() {
-	echo "$PREFIX"
+  echo "$PREFIX"
 }
 PLATFORM="${OS}/${ARCH}"
 GITHUB_DOWNLOAD=https://github.com/${OWNER}/${REPO}/releases/download
