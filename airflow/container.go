@@ -140,7 +140,7 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 		AirflowWebserverPort:   config.CFG.WebserverPort.GetString(),
 		AirflowEnvFile:         envFile,
 		MountLabel:             "z",
-		ProjectName:            projectName,
+		ProjectName:            sanitizeRepoName(projectName),
 		TriggererEnabled:       triggererEnabled,
 		SchedulerContainerName: config.CFG.SchedulerContainerName.GetString(),
 		WebserverContainerName: config.CFG.WebserverContainerName.GetString(),
