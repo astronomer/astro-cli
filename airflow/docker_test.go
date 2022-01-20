@@ -55,12 +55,15 @@ networks:
 volumes:
   postgres_data:
     driver: local
+    name: test-project-name_postgres_data
   airflow_logs:
     driver: local
+    name: test-project-name_airflow_logs
 
 services:
   postgres:
     image: postgres:12.2
+    container_name: test-project-name-postgres
     restart: unless-stopped
     networks:
       - airflow
