@@ -1,12 +1,11 @@
 package fileutil
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -25,7 +24,7 @@ func Exists(path string) (bool, error) {
 	}
 
 	if !os.IsNotExist(err) {
-		return false, errors.Wrap(err, "cannot determine if path exists, error ambiguous")
+		return false, fmt.Errorf("cannot determine if path exists, error ambiguous: %w", err)
 	}
 
 	return false, nil

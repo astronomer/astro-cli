@@ -1,15 +1,16 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/pkg/errors"
 )
+
+var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
 
 // Add a user to a workspace with specified role
 func Add(workspaceID, email, role string, client *houston.Client, out io.Writer) error {
@@ -108,7 +109,7 @@ func UpdateRole(workspaceID, email, role string, client *houston.Client, out io.
 	}
 	// check if rolebinding is an empty structure
 	if (rb == houston.RoleBindingWorkspace{}) {
-		return errors.New("the user you are trying to change is not part of this workspace")
+		return errUserNotInWorkspace
 	}
 
 	req := houston.Request{

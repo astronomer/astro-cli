@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -9,9 +10,9 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/pkg/errors"
 )
+
+var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
@@ -113,7 +114,7 @@ func GetCurrentWorkspace() (string, error) {
 	}
 
 	if c.Workspace == "" {
-		return "", errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+		return "", errWorkspaceContextNotSet
 	}
 
 	return c.Workspace, nil
@@ -159,7 +160,7 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 	in := input.Text("\n> ")
 	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
-		return "", errors.Wrapf(err, "cannot parse %s to int", in)
+		return "", fmt.Errorf("cannot parse %s to int: %w", in, err)
 	}
 
 	return ws[i-1].ID, nil
@@ -183,7 +184,7 @@ func Switch(id string, client *houston.Client, out io.Writer) error {
 
 	_, err := req.DoWithClient(client)
 	if err != nil {
-		return errors.Wrap(err, "workspace id is not valid")
+		return fmt.Errorf("workspace id is not valid: %w", err)
 	}
 
 	c, err := config.GetCurrentContext()

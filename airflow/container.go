@@ -3,6 +3,7 @@ package airflow
 import (
 	"bytes"
 	"crypto/md5" //nolint:gosec
+	"errors"
 	"fmt"
 	"text/template"
 
@@ -11,8 +12,13 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/docker/docker/api/types/versions"
+)
 
-	"github.com/pkg/errors"
+var (
+	errProjectAlreadyRunning   = errors.New("cannot start, project already running")
+	errNoLogsProjectNotRunning = errors.New("cannot view logs, project not running")
+	errAirflowNotRunning       = errors.New("airflow is not running, Start it with 'astro airflow start'")
+	errEmptyExecID             = errors.New("exec ID is empty")
 )
 
 type Container string
@@ -115,7 +121,7 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 
 	tmpl, err := template.New("yml").Parse(tmplFile)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to generate config")
+		return "", fmt.Errorf("failed to generate config: %w", err)
 	}
 
 	envFile, err = getFmtEnvFile(envFile, containerEngine)
@@ -150,7 +156,7 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 	buff := new(bytes.Buffer)
 	err = tmpl.Execute(buff, cfg)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to generate config")
+		return "", fmt.Errorf("failed to generate config: %w", err)
 	}
 	return buff.String(), nil
 }
@@ -163,7 +169,7 @@ func projectNameUnique() (string, error) {
 
 	pwd, err := fileutil.GetWorkingDir()
 	if err != nil {
-		return "", errors.Wrap(err, "error retrieving working directory")
+		return "", fmt.Errorf("error retrieving working directory: %w", err)
 	}
 
 	// #nosec
@@ -180,7 +186,7 @@ func getFmtEnvFile(envFile string, containerEngine Container) (string, error) {
 
 	envExists, err := fileutil.Exists(envFile)
 	if err != nil {
-		return "", errors.Wrapf(err, messages.EnvPath, envFile)
+		return "", fmt.Errorf("%s: %w", fmt.Sprintf(messages.EnvPath, envFile), err)
 	}
 
 	if !envExists {

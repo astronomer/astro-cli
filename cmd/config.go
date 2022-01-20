@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,8 +10,13 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+)
+
+var (
+	errMissingConfigPath = errors.New(messages.ErrMissingConfigPathKey)
+	errInvalidSetArgs    = errors.New(messages.ConfigInvalidSetArgs)
+	errInvalidConfigPath = errors.New(messages.ErrInvalidConfigPathKey)
 )
 
 var globalFlag bool
@@ -64,12 +70,12 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) {
 
 func configGet(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
-		return errors.New(messages.ErrMissingConfigPathKey)
+		return errMissingConfigPath
 	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errors.New(messages.ErrInvalidConfigPathKey)
+		return errInvalidConfigPath
 	}
 
 	// Silence Usage as we have now validated command input
@@ -86,14 +92,14 @@ func configGet(cmd *cobra.Command, args []string) error {
 
 func configSet(cmd *cobra.Command, args []string) error {
 	if len(args) != 2 { // nolint:gomnd
-		return errors.New(messages.ConfigInvalidSetArgs)
+		return errInvalidSetArgs
 	}
 
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 
 	if !ok {
-		return errors.New(messages.ErrInvalidConfigPathKey)
+		return errInvalidConfigPath
 	}
 
 	// Silence Usage as we have now validated command input

@@ -11,7 +11,6 @@ import (
 	"github.com/containers/buildah"
 	"github.com/containers/buildah/imagebuildah"
 	"github.com/containers/podman/v3/pkg/domain/entities"
-	"github.com/pkg/errors"
 )
 
 type PodmanImage struct {
@@ -71,16 +70,16 @@ func (p *PodmanImage) Push(cloudDomain, token, remoteImageTag string) error {
 
 	err := p.podmanBind.Tag(p.conn, imageName(p.imageName, "latest"), remoteImageTag, fmt.Sprintf("%s/%s", registry, p.imageName), nil)
 	if err != nil {
-		return errors.Wrapf(err, "command 'podman tag %s %s' failed", p.imageName, remoteImage)
+		return fmt.Errorf("command 'podman tag %s %s' failed: %w", p.imageName, remoteImage, err)
 	}
 	options := new(podmanImages.PushOptions).WithIdentityToken(token)
 	if err := p.podmanBind.Push(p.conn, p.imageName, remoteImage, options); err != nil {
-		return errors.Wrapf(err, "Error pushing %s image to %s", p.imageName, registry)
+		return fmt.Errorf("error pushing %s image to %s: %w", p.imageName, registry, err)
 	}
 
 	err = p.podmanBind.Untag(p.conn, imageName(p.imageName, "latest"), remoteImageTag, fmt.Sprintf("%s/%s", registry, p.imageName), nil)
 	if err != nil {
-		return errors.Wrapf(err, "command 'podman untag %s' failed", remoteImage)
+		return fmt.Errorf("command 'podman untag %s' failed: %w", remoteImage, err)
 	}
 	return nil
 }

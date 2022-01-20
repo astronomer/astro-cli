@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,8 +20,13 @@ import (
 	"github.com/astronomer/astro-cli/settings"
 
 	"github.com/iancoleman/strcase"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+)
+
+var (
+	errNotProjectDir         = errors.New("not in a project directory")
+	errProjectConfigNotFound = errors.New("project config file does not exists")
+	errInvalidProjectName    = errors.New(messages.ErrInvalidConfigProjectName)
 )
 
 var (
@@ -251,22 +257,22 @@ func newAirflowUpgradeCheckCmd(out io.Writer) *cobra.Command {
 func ensureProjectDir(cmd *cobra.Command, args []string) error {
 	isProjectDir, err := config.IsProjectDir(config.WorkingPath)
 	if err != nil {
-		return errors.Wrap(err, "cannot ensure is a project directory")
+		return fmt.Errorf("cannot ensure is a project directory: %w", err)
 	}
 
 	if !isProjectDir {
-		return errors.New("not in a project directory")
+		return errNotProjectDir
 	}
 
 	projectConfigFile := filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt)
 
 	configExists, err := fileutil.Exists(projectConfigFile)
 	if err != nil {
-		return errors.Wrapf(err, "failed to check existence of '%s'", projectConfigFile)
+		return fmt.Errorf("failed to check existence of '%s': %w", projectConfigFile, err)
 	}
 
 	if !configExists {
-		return errors.New("project config file does not exists")
+		return errProjectConfigNotFound
 	}
 
 	return nil
@@ -281,7 +287,7 @@ func airflowInit(cmd *cobra.Command, _ []string, client *houston.Client, out io.
 			MatchString
 
 		if !projectNameValid(projectName) {
-			return errors.New(messages.ErrInvalidConfigProjectName)
+			return errInvalidProjectName
 		}
 	} else {
 		projectDirectory := filepath.Base(config.WorkingPath)
@@ -348,7 +354,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 
 	airflowDockerVersion, err := airflow.ParseVersionFromDockerFile(config.WorkingPath, dockerfile)
 	if err != nil {
-		return errors.Wrap(err, "error parsing airflow version from dockerfile")
+		return fmt.Errorf("error parsing airflow version from dockerfile: %w", err)
 	}
 
 	err = containerHandler.Start(dockerfile)
@@ -358,13 +364,13 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 
 	fileState, err := fileutil.Exists("airflow_settings.yaml")
 	if err != nil {
-		return errors.Wrap(err, messages.SettingsPath)
+		return fmt.Errorf("%s: %w", messages.SettingsPath, err)
 	}
 
 	if fileState {
 		containerID, err := containerHandler.GetContainerID(config.CFG.WebserverContainerName.GetString())
 		if err != nil || containerID == "" {
-			return errors.Wrap(err, messages.ErrContainerStatusCheck)
+			return fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
 		}
 		settings.ConfigSettings(containerHandler, containerID, airflowDockerVersion)
 	}
