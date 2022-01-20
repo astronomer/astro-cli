@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/shurcooL/go/ctxhttp"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
