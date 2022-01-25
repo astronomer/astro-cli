@@ -27,6 +27,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var errComposeProjectRunning = errors.New("project is up and running")
+
 const (
 	dockerStateUp = "running"
 
@@ -103,6 +105,11 @@ func (d *DockerCompose) Start(dockerfile string) error {
 
 	// Start up our project
 	err = d.composeService.Up(context.TODO(), project, api.UpOptions{})
+	if err != nil {
+		return errors.Wrap(err, messages.ErrContainerRecreate)
+	}
+
+	err = d.webserverHealthCheck()
 	if err != nil {
 		return errors.Wrap(err, messages.ErrContainerRecreate)
 	}
@@ -314,6 +321,25 @@ func createProject(projectName, airflowHome, envFile string, labels map[string]s
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
+}
+
+func (d *DockerCompose) webserverHealthCheck() error {
+	err := d.composeService.Events(context.Background(), d.projectName, api.EventsOptions{
+		Services: []string{config.CFG.WebserverContainerName.GetString()}, Consumer: func(event api.Event) error {
+			if event.Status == "health_status: healthy" {
+				fmt.Println("\nProject is running! All components are now available.")
+				return errComposeProjectRunning
+			} else if event.Status == "exec_die" {
+				fmt.Println("Waiting for Airflow components to spin up...")
+				time.Sleep(webserverHealthCheckInterval)
+			}
+			return nil
+		},
+	})
+	if err != nil && errors.Is(err, errComposeProjectRunning) {
+		return err
+	}
+	return nil
 }
 
 // execPipe does pipe stream into stdout/stdin and stderr

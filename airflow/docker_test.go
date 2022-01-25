@@ -139,6 +139,12 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
+    healthcheck:
+      test: curl --fail http://webserver:8080/health || exit 1
+      interval: 2s
+      retries: 50
+      start_period: 10s
+      timeout: 10s
     
 
   triggerer:

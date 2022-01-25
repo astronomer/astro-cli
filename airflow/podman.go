@@ -411,7 +411,7 @@ func (p *Podman) webserverHealthCheck() {
 			break
 		}
 	sleep:
-		fmt.Println("Waiting for Airflow containers to spin up...")
+		fmt.Println("Waiting for Airflow components to spin up...")
 		time.Sleep(webserverHealthCheckInterval)
 	}
 }

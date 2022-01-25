@@ -97,6 +97,12 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
+    healthcheck:
+      test: curl --fail http://webserver:8080/health || exit 1
+      interval: 2s
+      retries: 50
+      start_period: 10s
+      timeout: 10s
     {{ .AirflowEnvFile }}
 {{if .TriggererEnabled}}
   triggerer:
