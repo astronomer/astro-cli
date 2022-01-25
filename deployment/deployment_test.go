@@ -1391,7 +1391,10 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
       "baseDomain": "local.astronomer.io",
       "smtpConfigured": true,
       "manualReleaseNames": false,
-      "hardDeleteDeployment": true
+      "hardDeleteDeployment": true,
+	  "featureFlags": {
+		"namespaceFreeformEntry": false
+	  }
     },
     "availableNamespaces": [ { "name": "test1" }, { "name": "test2" } ]
   }
@@ -1793,6 +1796,5 @@ func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
 	os.Stdin = r
 
 	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
-	assert.NoError(t, err)
 	assert.EqualError(t, err, "no kubernetes namespaces name specified")
 }
