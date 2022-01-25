@@ -33,6 +33,7 @@ var (
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
 	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
+	ErrKubernetesNamespaceNotSpecified = errors.New("no kubernetes namespaces name specified")
 )
 
 type ErrParsingInt struct {
@@ -133,6 +134,14 @@ func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
 	return appConfig.Flags.ManualNamespaceNames
 }
 
+func CheckNamespaceFreeformEntryDeployment(client *houston.Client) bool {
+	appConfig, err := AppConfig(client)
+	if err != nil {
+		return false
+	}
+	return appConfig.Flags.NamespaceFreeformEntry
+}
+
 func CheckTriggererEnabled(client *houston.Client) bool {
 	logrus.Debug("Checking for triggerer flag")
 	appConfig, err := AppConfig(client)
@@ -146,8 +155,16 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
-	if CheckPreCreateNamespaceDeployment(client) {
+	if CheckPreCreateNamespaceDeployment(client) && !CheckNamespaceFreeformEntryDeployment(client) {
 		namespace, err := getDeploymentSelectionNamespaces(client, out)
+		if err != nil {
+			return err
+		}
+		vars["namespace"] = namespace
+	}
+
+	if CheckNamespaceFreeformEntryDeployment(client) && CheckPreCreateNamespaceDeployment(client) {
+		namespace, err := getDeploymentNamespaceName()
 		if err != nil {
 			return err
 		}
@@ -278,6 +295,15 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 		return "", ErrNumberOutOfRange
 	}
 	return names[i-1].Name, nil
+}
+
+func getDeploymentNamespaceName() (string, error) {
+	namespaceName := input.Text("\nKubernetes Namespace Name: ")
+	noSpaceString := strings.ReplaceAll(namespaceName, " ", "")
+	if noSpaceString == "" {
+		return "", ErrKubernetesNamespaceNotSpecified
+	}
+	return namespaceName, nil
 }
 
 // List all airflow deployments
