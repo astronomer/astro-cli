@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
@@ -23,6 +24,8 @@ const (
 
 	airflowVersionLabelName        = "io.astronomer.docker.airflow.version"
 	triggererAllowedAirflowVersion = "2.2.0"
+
+	webserverHealthCheckInterval = 5 * time.Second
 )
 
 var repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number

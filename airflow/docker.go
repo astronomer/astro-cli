@@ -328,6 +328,7 @@ func (d *DockerCompose) webserverHealthCheck() error {
 		Services: []string{config.CFG.WebserverContainerName.GetString()}, Consumer: func(event api.Event) error {
 			if event.Status == "health_status: healthy" {
 				fmt.Println("\nProject is running! All components are now available.")
+				// have to return an error to break from the event listener loop
 				return errComposeProjectRunning
 			} else if event.Status == "exec_die" {
 				fmt.Println("Waiting for Airflow components to spin up...")
@@ -336,7 +337,7 @@ func (d *DockerCompose) webserverHealthCheck() error {
 			return nil
 		},
 	})
-	if err != nil && errors.Is(err, errComposeProjectRunning) {
+	if err != nil && !errors.Is(err, errComposeProjectRunning) {
 		return err
 	}
 	return nil

@@ -296,6 +296,25 @@ func TestDockerGetContainerIDFailure(t *testing.T) {
 	assert.Contains(t, id, "")
 }
 
+func TestDockerWebserverHealthCheck(t *testing.T) {
+	composeMock, docker, _ := getComposeMocks()
+	mockCall := composeMock.On("Events", mock.Anything, mock.Anything, mock.Anything)
+	mockCall.RunFn = func(args mock.Arguments) {
+		consumer := args.Get(2).(api.EventsOptions).Consumer
+		err := consumer(api.Event{Status: "exec_create"})
+		assert.Nil(t, err)
+		err = consumer(api.Event{Status: "exec_start"})
+		assert.Nil(t, err)
+		err = consumer(api.Event{Status: "exec_die"})
+		assert.Nil(t, err)
+		err = consumer(api.Event{Status: "health_status: healthy"})
+		assert.ErrorIs(t, err, errComposeProjectRunning)
+		mockCall.ReturnArguments = mock.Arguments{err}
+	}
+	err := docker.webserverHealthCheck()
+	assert.Nil(t, err)
+}
+
 func getComposeMocks() (*mocks.Service, *DockerCompose, *mocks.ImageHandler) {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("docker")
