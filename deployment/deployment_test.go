@@ -726,8 +726,8 @@ func TestList(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := List(ws, false, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION
- test     burning-terrestrial-5940     v         ckbv801t300qh0760pck7ea0c     ?
+	expected := ` NAME     DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
+ test     burning-terrestrial-5940     v         ckbv801t300qh0760pck7ea0c     ?                           
 `
 	assert.Equal(t, expected, buf.String())
 }
@@ -791,8 +791,8 @@ func TestUpdate(t *testing.T) {
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 
-	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         AIRFLOW VERSION
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     2.2.2-1     2.2.2
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         AIRFLOW VERSION     
+ test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     2.2.2-1     2.2.2               
 
  Successfully updated deployment
 `
@@ -868,8 +868,8 @@ func TestUpdateTriggerer(t *testing.T) {
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 
-	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     ?       2.2.2
+	expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG     AIRFLOW VERSION     
+ test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     ?       2.2.2               
 
  Successfully updated deployment
 `
@@ -941,11 +941,11 @@ func TestAirflowUpgrade(t *testing.T) {
 	buf := new(bytes.Buffer)
 	err := AirflowUpgrade(deploymentID, desiredAirflowVersion, api, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION
- test                         v         ckbv818oa00r107606ywhoqtw     1.10.5
+	expected := ` NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
+ test                         v         ckbv818oa00r107606ywhoqtw     1.10.5              
 
 The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
-To cancel, run:
+To cancel, run: 
  $ astro deployment airflow upgrade --cancel
 
 `
@@ -1077,15 +1077,15 @@ func TestAirflowUpgradeEmptyDesiredVersion(t *testing.T) {
 	t.Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
 	assert.NoError(t, err)
-	expected := `#     AIRFLOW VERSION
-1     1.10.7
-2     1.10.10
-3     1.10.12
- NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION
- test                         v         ckbv818oa00r107606ywhoqtw     1.10.5
+	expected := `#     AIRFLOW VERSION     
+1     1.10.7              
+2     1.10.10             
+3     1.10.12             
+ NAME     DEPLOYMENT NAME     ASTRO     DEPLOYMENT ID                 AIRFLOW VERSION     
+ test                         v         ckbv818oa00r107606ywhoqtw     1.10.5              
 
 The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.
-To cancel, run:
+To cancel, run: 
  $ astro deployment airflow upgrade --cancel
 
 `
@@ -1428,9 +1428,9 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 
 	name, err := getDeploymentSelectionNamespaces(api, buf)
 	assert.NoError(t, err)
-	expected := `#     AVAILABLE KUBERNETES NAMESPACES
-1     test1
-2     test2
+	expected := `#     AVAILABLE KUBERNETES NAMESPACES     
+1     test1                               
+2     test2                               
 `
 	assert.Equal(t, expected, buf.String())
 	assert.Equal(t, "test1", name)
