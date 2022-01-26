@@ -1605,7 +1605,7 @@ func TestGetDeploymentNamespaceNameError(t *testing.T) {
 
 	name, err := getDeploymentNamespaceName()
 	assert.Equal(t, "", name)
-	assert.EqualError(t, err, "no kubernetes namespaces name specified")
+	assert.EqualError(t, err, "no kubernetes namespaces specified")
 }
 
 func TestCreateWithFreeFormNamespaceDeployment(t *testing.T) {
@@ -1796,5 +1796,5 @@ func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
 	os.Stdin = r
 
 	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
-	assert.EqualError(t, err, "no kubernetes namespaces name specified")
+	assert.EqualError(t, err, "no kubernetes namespaces specified")
 }
