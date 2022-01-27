@@ -48,7 +48,10 @@ func TestAppConfig(t *testing.T) {
 				"baseDomain": "local.astronomer.io",
 				"smtpConfigured": true,
 				"manualReleaseNames": false,
-				"hardDeleteDeployment": false
+				"hardDeleteDeployment": false,
+				"featureFlags": {
+					"namespaceFreeformEntry": false
+				}
 			}
 		}
 }`
@@ -66,6 +69,7 @@ func TestAppConfig(t *testing.T) {
 	assert.Equal(t, false, config.ManualReleaseNames)
 	assert.Equal(t, true, config.SMTPConfigured)
 	assert.Equal(t, "local.astronomer.io", config.BaseDomain)
+	assert.Equal(t, false, config.Flags.NamespaceFreeformEntry)
 }
 
 func TestAppConfigError(t *testing.T) {
@@ -735,7 +739,7 @@ func TestUpdate(t *testing.T) {
   "appConfig": {
     "version": "0.15.1",
      "baseDomain": "local.astronomer.io",
-     "smtpConfigured": true, 
+     "smtpConfigured": true,
      "manualReleaseNames": false,
      "hardDeleteDeployment": true,
      "manualNamespaceNames": true,
@@ -815,7 +819,7 @@ func TestUpdateTriggerer(t *testing.T) {
   "appConfig": {
     "version": "0.15.1",
      "baseDomain": "local.astronomer.io",
-     "smtpConfigured": true, 
+     "smtpConfigured": true,
      "manualReleaseNames": false,
      "hardDeleteDeployment": true,
      "manualNamespaceNames": true,
@@ -1387,7 +1391,10 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
       "baseDomain": "local.astronomer.io",
       "smtpConfigured": true,
       "manualReleaseNames": false,
-      "hardDeleteDeployment": true
+      "hardDeleteDeployment": true,
+	  "featureFlags": {
+		"namespaceFreeformEntry": false
+	  }
     },
     "availableNamespaces": [ { "name": "test1" }, { "name": "test2" } ]
   }
@@ -1556,4 +1563,238 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 
 	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
 	assert.Equal(t, true, usesPreCreateNamespace)
+}
+
+func TestGetDeploymentNamespaceName(t *testing.T) {
+	// mock os.Stdin
+	input := []byte("Test1")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	name, _ := getDeploymentNamespaceName()
+	assert.Equal(t, "Test1", name)
+}
+
+func TestGetDeploymentNamespaceNameError(t *testing.T) {
+	// mock os.Stdin
+	input := []byte("   ")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	name, err := getDeploymentNamespaceName()
+	assert.Equal(t, "", name)
+	assert.EqualError(t, err, "no kubernetes namespaces specified")
+}
+
+func TestCreateWithFreeFormNamespaceDeployment(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true,
+      "manualNamespaceNames": true,
+	  "featureFlags": {
+		"manualNamespaceNames": true,
+		"namespaceFreeformEntry": true
+	  }
+    },
+    "availableNamespaces": [
+      {
+        "name": "test1"
+      },
+      {
+        "name": "test2"
+      }
+    ],
+    "createDeployment": {
+      "id": "ckbv818oa00r107606ywhoqtw",
+      "executor": "CeleryExecutor",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/flower"
+        }
+      ],
+      "properties": {
+        "component_version": "0.0.0",
+        "alert_emails": []
+      },
+      "description": "",
+      "label": "test2",
+      "releaseName": "boreal-penumbra-1102",
+      "status": null,
+      "type": "airflow",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9",
+        "label": "w1"
+      },
+      "createdAt": "2020-06-25T20:10:33.898Z",
+      "updatedAt": "2020-06-25T20:10:33.898Z"
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	label := "label"
+	ws := "ck1qg6whg001r08691y117hub"
+	releaseName := ""
+	role := "test-role"
+	executor := "CeleryExecutor"
+	airflowVersion := "1.10.5"
+	dagDeploymentType := "volume"
+	nfsLocation := "test:/test"
+	triggerReplicas := 0
+	buf := new(bytes.Buffer)
+
+	// mock os.Stdin
+	input := []byte("Test1")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+}
+
+func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
+	testUtil.InitTestConfig()
+	okResponse := `{
+  "data": {
+    "appConfig": {
+      "version": "0.15.1",
+      "baseDomain": "local.astronomer.io",
+      "smtpConfigured": true,
+      "manualReleaseNames": false,
+      "hardDeleteDeployment": true,
+      "manualNamespaceNames": true,
+	  "featureFlags": {
+		"manualNamespaceNames": true,
+		"namespaceFreeformEntry": true
+	  }
+    },
+    "availableNamespaces": [
+      {
+        "name": "test1"
+      },
+      {
+        "name": "test2"
+      }
+    ],
+    "createDeployment": {
+      "id": "ckbv818oa00r107606ywhoqtw",
+      "executor": "CeleryExecutor",
+      "urls": [
+        {
+          "type": "airflow",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/airflow"
+        },
+        {
+          "type": "flower",
+          "url": "https://deployments.local.astronomer.io/boreal-penumbra-1102/flower"
+        }
+      ],
+      "properties": {
+        "component_version": "0.0.0",
+        "alert_emails": []
+      },
+      "description": "",
+      "label": "test2",
+      "releaseName": "boreal-penumbra-1102",
+      "status": null,
+      "type": "airflow",
+      "version": "0.0.0",
+      "workspace": {
+        "id": "ckbv7zvb100pe0760xp98qnh9",
+        "label": "w1"
+      },
+      "createdAt": "2020-06-25T20:10:33.898Z",
+      "updatedAt": "2020-06-25T20:10:33.898Z"
+    }
+  }
+}`
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	label := "label"
+	ws := "ck1qg6whg001r08691y117hub"
+	releaseName := ""
+	role := "test-role"
+	executor := "CeleryExecutor"
+	airflowVersion := "1.10.5"
+	dagDeploymentType := "volume"
+	nfsLocation := "test:/test"
+	triggerReplicas := 0
+	buf := new(bytes.Buffer)
+
+	// mock os.Stdin
+	input := []byte("    ")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	err = Create(label, ws, releaseName, role, executor, airflowVersion, dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+	assert.EqualError(t, err, "no kubernetes namespaces specified")
 }

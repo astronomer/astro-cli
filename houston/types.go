@@ -290,11 +290,12 @@ type AppConfig struct {
 }
 
 type FeatureFlags struct {
-	NfsMountDagDeployment bool `json:"nfsMountDagDeployment"`
-	HardDeleteDeployment  bool `json:"hardDeleteDeployment"`
-	ManualNamespaceNames  bool `json:"manualNamespaceNames"`
-	TriggererEnabled      bool `json:"triggererEnabled"`
-	GitSyncEnabled        bool `json:"gitSyncDagDeployment"`
+	NfsMountDagDeployment  bool `json:"nfsMountDagDeployment"`
+	HardDeleteDeployment   bool `json:"hardDeleteDeployment"`
+	ManualNamespaceNames   bool `json:"manualNamespaceNames"`
+	TriggererEnabled       bool `json:"triggererEnabled"`
+	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
+	NamespaceFreeformEntry bool `json:"namespaceFreeformEntry"`
 }
 
 // coerce a string into SemVer if possible
