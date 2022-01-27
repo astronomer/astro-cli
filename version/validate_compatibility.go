@@ -9,7 +9,6 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 
 	semver "github.com/Masterminds/semver/v3"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,7 +51,7 @@ func compareVersions(compareVer, currentVer string, out io.Writer) error {
 
 	switch {
 	case currMajor < compareMajor:
-		return errors.Errorf(messages.ErrNewMajorVersion, currentVer, compareVer)
+		return fmt.Errorf(messages.ErrNewMajorVersion, currentVer, compareVer) //nolint:goerr113
 	case currMinor < compareMinor:
 		fmt.Fprintf(out, messages.WarningNewMinorVersion, currentVer, compareVer)
 	case currMinor > compareMinor:

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -8,8 +9,16 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
 
-	"github.com/pkg/errors"
 	giturls "github.com/whilp/git-urls"
+)
+
+var (
+	errNotEnoughArgs            = errors.New("requires at least one arg")
+	errNoWorkspaceFound         = errors.New("no valid workspace source found")
+	errInvalidDAGDeploymentType = errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
+	errNFSLocationNotFound      = errors.New("please specify the nfs location via --nfs-location flag")
+	errGitRepoNotFound          = errors.New("please specify a valid git repository URL via --git-repository-url")
+	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 )
 
 var (
@@ -65,7 +74,7 @@ func isValidUpdateAttr(arg string, valids []string) bool {
 
 func updateArgValidator(args, validArgs []string) error {
 	if len(args) < 1 {
-		return errors.New("requires at least one arg")
+		return errNotEnoughArgs
 	}
 
 	for _, kv := range args[1:] {
@@ -86,7 +95,7 @@ func coalesceWorkspace() (string, error) {
 	wsFlag := workspaceID
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get current workspace")
+		return "", fmt.Errorf("failed to get current workspace: %w", err)
 	}
 
 	if wsFlag != "" {
@@ -97,7 +106,7 @@ func coalesceWorkspace() (string, error) {
 		return wsCfg, nil
 	}
 
-	return "", errors.New("no valid workspace source found")
+	return "", errNoWorkspaceFound
 }
 
 func validateWorkspaceRole(role string) error {
@@ -108,7 +117,7 @@ func validateWorkspaceRole(role string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
 }
 
 func validateDeploymentRole(role string) error {
@@ -119,7 +128,7 @@ func validateDeploymentRole(role string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
 }
 
 func validateRole(role string) error {
@@ -130,18 +139,18 @@ func validateRole(role string) error {
 			return nil
 		}
 	}
-	return errors.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
 }
 
 func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string, acceptEmptyArgs bool) error {
 	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != gitSyncDeploymentType && dagDeploymentType != "" {
-		return errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
+		return errInvalidDAGDeploymentType
 	}
 	if dagDeploymentType == volumeDeploymentType && nfsLocation == "" {
-		return errors.New("please specify the nfs location via --nfs-location flag")
+		return errNFSLocationNotFound
 	}
 	if dagDeploymentType == gitSyncDeploymentType && !validURL(gitRepoURL, acceptEmptyArgs) {
-		return errors.New("please specify a valid git repository URL via --git-repository-url")
+		return errGitRepoNotFound
 	}
 	return nil
 }
@@ -156,7 +165,7 @@ func validateExecutorArg(executor string) (string, error) {
 	case "kubernetes", "k8s":
 		executorType = "KubernetesExecutor"
 	default:
-		return executorType, errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+		return executorType, errInvalidExecutorType
 	}
 	return executorType, nil
 }

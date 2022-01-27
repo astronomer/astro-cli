@@ -1,6 +1,7 @@
 package fileutil
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,8 +9,9 @@ import (
 	"path/filepath"
 
 	homedir "github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 )
+
+var errNotHomeDir = errors.New("current working directory is a home directory")
 
 // GetWorkingDir returns the current working directory
 func GetWorkingDir() (string, error) {
@@ -45,13 +47,13 @@ func FindDirInPath(search string) (string, error) {
 		}
 
 		if workingDir == homeDir {
-			return "", errors.New("current working directory is a home directory")
+			return "", errNotHomeDir
 		}
 
 		// Check if our file exists
 		exists, err := Exists(filepath.Join(workingDir, search))
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to check existence of '%s'", filepath.Join(workingDir, search))
+			return "", fmt.Errorf("failed to check existence of '%s': %w", filepath.Join(workingDir, search), err)
 		}
 
 		// Return where we found it

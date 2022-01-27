@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,8 +22,8 @@ func TestPodmanLoginSuccess(t *testing.T) {
 func TestPodmanLoginFailure(t *testing.T) {
 	bindMock := new(mocks.PodmanBind)
 	podmanRegistryMock := &PodmanRegistry{conn: context.TODO(), podmanBind: bindMock, registry: "test.astro.io"}
-	bindMock.On("Login", podmanRegistryMock.conn, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("some login error"))
+	bindMock.On("Login", podmanRegistryMock.conn, mock.Anything, mock.Anything, mock.Anything).Return(errPodman)
 
 	err := podmanRegistryMock.Login("user", "token")
-	assert.Contains(t, err.Error(), "some login error")
+	assert.Contains(t, err.Error(), "some podman error")
 }
