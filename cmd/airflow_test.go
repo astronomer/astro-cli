@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"testing"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/pkg/errors"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -8,9 +9,9 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
-
-	"github.com/pkg/errors"
 )
+
+var errAirflowVersionNotSupported = errors.New("the --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again")
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient *houston.Client, out io.Writer) (string, error) {
 	r := houston.Request{
@@ -22,12 +23,12 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 	if err == nil {
 		acceptableAirflowVersions := wsResp.Data.DeploymentConfig.AirflowVersions
 		if airflowVersion != "" && !acceptableVersion(airflowVersion, acceptableAirflowVersions) {
-			return "", errors.Errorf(messages.ErrInvalidAirflowVersion, strings.Join(acceptableAirflowVersions, ", "))
+			return "", fmt.Errorf(messages.ErrInvalidAirflowVersion, strings.Join(acceptableAirflowVersions, ", ")) //nolint:goerr113
 		}
 	} else if airflowVersion != "" {
 		switch t := err; t {
 		case houston.ErrVerboseInaptPermissions:
-			return "", errors.New("the --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again")
+			return "", errAirflowVersionNotSupported
 		default:
 			return "", err
 		}

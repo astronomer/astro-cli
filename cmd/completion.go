@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/houston"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +55,7 @@ func runCompletion(out io.Writer, cmd *cobra.Command, args []string) error {
 func runCompletionBash(w io.Writer, cmd *cobra.Command) error {
 	err := cmd.Root().GenBashCompletion(w)
 	if err != nil {
-		return errors.Wrap(err, ErrGeneratingBash)
+		return fmt.Errorf("%s: %w", ErrGeneratingBash, err)
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ func runCompletionBash(w io.Writer, cmd *cobra.Command) error {
 func runCompletionZsh(w io.Writer, cmd *cobra.Command) error {
 	err := cmd.Root().GenZshCompletion(w)
 	if err != nil {
-		return errors.Wrap(err, ErrGeneratingBash)
+		return fmt.Errorf("%s: %w", ErrGeneratingBash, err)
 	}
 	return nil
 }

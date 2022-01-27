@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,7 +18,6 @@ import (
 
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/fatih/camelcase"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
 )
@@ -34,6 +34,9 @@ var (
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
 	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
 	ErrKubernetesNamespaceNotSpecified = errors.New("no kubernetes namespaces specified")
+	errInvalidSSHKeyPath               = errors.New("wrong path specified, no file exists for ssh key")
+	errInvalidKnownHostsPath           = errors.New("wrong path specified, no file exists for known hosts")
+	errHostNotPresent                  = errors.New("git repository host not present in known hosts file")
 )
 
 type ErrParsingInt struct {
@@ -617,7 +620,7 @@ func readSSHKeyFile(sshFilePath string) (string, error) {
 	fd, err := os.Open(sshFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", errors.New("wrong path specified, no file exists for ssh key")
+			return "", errInvalidSSHKeyPath
 		}
 		return "", err
 	}
@@ -634,7 +637,7 @@ func readKnownHostsFile(filePath, repoHost string) (string, error) {
 	fd, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", errors.New("wrong path specified, no file exists for known hosts")
+			return "", errInvalidKnownHostsPath
 		}
 		return "", err
 	}
@@ -650,10 +653,10 @@ func readKnownHostsFile(filePath, repoHost string) (string, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", errors.Wrapf(err, "error reading known hosts file")
+		return "", fmt.Errorf("error reading known hosts file: %w", err)
 	}
 
-	return "", errors.New("git repository host not present in known hosts file")
+	return "", errHostNotPresent
 }
 
 func getURLHost(gitURL string) (string, error) {

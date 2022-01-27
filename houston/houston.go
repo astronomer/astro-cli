@@ -2,13 +2,14 @@ package houston
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 
-	"github.com/pkg/errors"
 	newLogger "github.com/sirupsen/logrus"
 )
 
@@ -88,12 +89,12 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to JSON decode Houston response")
+		return nil, fmt.Errorf("failed to JSON decode Houston response: %w", err)
 	}
 	newLogger.Debugf("Response Data: %v\n", string(body))
 	// Houston Specific Errors
 	if decode.Errors != nil {
-		err = errors.New(decode.Errors[0].Message)
+		err = fmt.Errorf("%s", decode.Errors[0].Message) //nolint:goerr113
 		if err.Error() == ErrInaptPermissions.Error() {
 			return nil, ErrVerboseInaptPermissions
 		}

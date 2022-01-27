@@ -3,6 +3,7 @@ package airflow
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,7 +23,6 @@ import (
 	"github.com/containers/podman/v3/pkg/bindings/pods"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/joho/godotenv"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
@@ -58,7 +58,7 @@ func PodmanInit(projectDir, envFile string) (*Podman, error) {
 	// Get project name from config
 	projectName, err := projectNameUnique()
 	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving working directory")
+		return nil, fmt.Errorf("error retrieving working directory: %w", err)
 	}
 
 	return &Podman{projectDir: projectDir, envFile: envFile, projectName: projectName, conn: conn, podmanBind: &binder}, nil
@@ -67,7 +67,7 @@ func PodmanInit(projectDir, envFile string) (*Podman, error) {
 func (p *Podman) Start(dockerfile string) error {
 	psInfo, err := p.listContainers()
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerStatusCheck)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
 	}
 
 	if len(psInfo) > 0 {
@@ -75,7 +75,7 @@ func (p *Podman) Start(dockerfile string) error {
 			info := psInfo[idx]
 			if info.State == podContainerStateRunning {
 				// move error to common message package
-				return errors.New("cannot start, project already running")
+				return errProjectAlreadyRunning
 			}
 		}
 	}
@@ -96,7 +96,7 @@ func (p *Podman) Start(dockerfile string) error {
 
 	_, err = p.startPod(p.projectName, p.projectDir, p.envFile, labels)
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerRecreate)
+		return fmt.Errorf("%s: %w", messages.ErrContainerRecreate, err)
 	}
 
 	// A work around to make sure airflow db is up and running before doing anyother operations
@@ -143,9 +143,9 @@ func (p *Podman) Kill() error {
 	options = options.WithForce(true)
 	report, err := p.podmanBind.Remove(p.conn, p.projectName, options)
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerStop)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStop, err)
 	} else if report.Err != nil {
-		return errors.Wrap(report.Err, messages.ErrContainerStop)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStop, err)
 	}
 	fmt.Println("Successfully removed Airflow pod")
 	fmt.Println(report.Id)
@@ -158,7 +158,7 @@ func (p *Podman) Logs(follow bool, containerNames ...string) error {
 		return err
 	}
 	if len(psInfo) == 0 {
-		return errors.New("cannot view logs, project not running")
+		return errNoLogsProjectNotRunning
 	}
 
 	for idx := range containerNames {
@@ -253,7 +253,7 @@ func (p *Podman) GetContainerID(containerName string) (string, error) {
 		}
 	}
 
-	return "", errors.New(messages.ErrContainerNotFound)
+	return "", fmt.Errorf("%s", messages.ErrContainerNotFound) //nolint:goerr113
 }
 
 func (p *Podman) getLogs(containerName string, podInfo []entities.ListContainer, follow bool) error {
@@ -342,7 +342,7 @@ func generatePodState(projectName, projectDir, envFile string, imageLabels map[s
 	}
 	configYAML, err := generateConfig(projectName, projectDir, envFile, imageLabels, PodmanEngine)
 	if err != nil {
-		return errors.Wrap(err, "failed to create pod state file")
+		return fmt.Errorf("failed to create pod state file: %w", err)
 	}
 	return initFiles("", map[string]string{podStateFile: configYAML})
 }

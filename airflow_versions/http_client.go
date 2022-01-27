@@ -8,8 +8,6 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-
-	"github.com/pkg/errors"
 )
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
@@ -65,7 +63,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Failed to JSON decode %s response", url))
+		return nil, fmt.Errorf("failed to JSON decode %s response: %w", url, err)
 	}
 
 	return &decode, nil

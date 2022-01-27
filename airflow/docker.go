@@ -23,7 +23,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -48,12 +47,12 @@ func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
 	// Get project name from config
 	projectName, err := projectNameUnique()
 	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving working directory")
+		return nil, fmt.Errorf("error retrieving working directory: %w", err)
 	}
 
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		return nil, errors.Wrap(err, "error initializing docker client")
+		return nil, fmt.Errorf("error initializing docker client: %w", err)
 	}
 	composeService := compose.NewComposeService(dockerClient, &configfile.ConfigFile{})
 	imageHandler := DockerImageInit(projectName)
@@ -71,7 +70,7 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerStatusCheck)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
 	}
 
 	if len(psInfo) > 0 {
@@ -79,7 +78,7 @@ func (d *DockerCompose) Start(dockerfile string) error {
 		for idx := range psInfo {
 			info := psInfo[idx]
 			if checkServiceState(info.State, dockerStateUp) {
-				return errors.New("cannot start, project already running")
+				return errProjectAlreadyRunning
 			}
 		}
 	}
@@ -104,7 +103,7 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	// Start up our project
 	err = d.composeService.Up(context.TODO(), project, api.UpOptions{})
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerRecreate)
+		return fmt.Errorf("%s: %w", messages.ErrContainerRecreate, err)
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
@@ -119,7 +118,7 @@ func (d *DockerCompose) Kill() error {
 	// Shut down our project
 	err := d.composeService.Down(context.TODO(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerStop)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStop, err)
 	}
 
 	return nil
@@ -128,11 +127,11 @@ func (d *DockerCompose) Kill() error {
 func (d *DockerCompose) Logs(follow bool, containerNames ...string) error {
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerStatusCheck)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
 	}
 
 	if len(psInfo) == 0 {
-		return errors.New("cannot view logs, project not running")
+		return errNoLogsProjectNotRunning
 	}
 
 	logger := &ComposeLogger{logger: logrus.New()}
@@ -158,7 +157,7 @@ func (d *DockerCompose) Stop() error {
 	stopTimeout := time.Duration(projectStopTimeout)
 	err = d.composeService.Stop(context.TODO(), project, api.StopOptions{Timeout: &stopTimeout})
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerPause)
+		return fmt.Errorf("%s: %w", messages.ErrContainerPause, err)
 	}
 
 	return nil
@@ -168,7 +167,7 @@ func (d *DockerCompose) PS() error {
 	// List project containers
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerStatusCheck)
+		return fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
 	}
 
 	// Columns for table
@@ -217,12 +216,12 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 	response, err := cli.ContainerExecCreate(context.Background(), containerID, *execConfig)
 	if err != nil {
-		return errors.New("airflow is not running, Start it with 'astro airflow start'")
+		return errAirflowNotRunning
 	}
 
 	execID := response.ID
 	if execID == "" {
-		return errors.New("exec ID is empty")
+		return errEmptyExecID
 	}
 
 	execStartCheck := types.ExecStartCheck{
@@ -240,10 +239,7 @@ func (d *DockerCompose) ExecCommand(containerID, command string) string {
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
-	out, err := cmd.Output()
-	if err != nil {
-		_ = errors.Wrapf(err, "error encountered")
-	}
+	out, _ := cmd.Output()
 
 	stringOut := string(out)
 	return stringOut
@@ -252,7 +248,7 @@ func (d *DockerCompose) ExecCommand(containerID, command string) string {
 func (d *DockerCompose) GetContainerID(containerName string) (string, error) {
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
-		return "", errors.Wrap(err, messages.ErrContainerStatusCheck)
+		return "", fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
 	}
 
 	for idx := range psInfo {
@@ -274,7 +270,7 @@ func createProject(projectName, airflowHome, envFile string, labels map[string]s
 	// Generate the docker-compose yaml
 	yaml, err := generateConfig(projectName, airflowHome, envFile, labels, DockerEngine)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create project")
+		return nil, fmt.Errorf("failed to create project: %w", err)
 	}
 
 	if err != nil {
@@ -291,7 +287,7 @@ func createProject(projectName, airflowHome, envFile string, labels map[string]s
 	composeFile := "docker-compose.override.yml"
 	composeBytes, err := ioutil.ReadFile(composeFile)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeFile)
+		return nil, fmt.Errorf("failed to open the compose file: %s: %w", composeFile, err)
 	}
 	if err == nil {
 		overrideConfig := composeTypes.ConfigFile{Content: composeBytes, Filename: composeFile}
