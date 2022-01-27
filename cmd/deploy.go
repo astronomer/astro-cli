@@ -28,6 +28,7 @@ var (
 	errInvalidDeploymentSelected = errors.New(messages.HoustonInvalidDeploymentKey)
 )
 
+// these are used to monkey patch the function in order to write unit test cases
 var imageHandlerInit = airflow.ImageHandlerInit
 
 var tab = printutil.Table{
