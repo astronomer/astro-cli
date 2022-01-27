@@ -106,8 +106,8 @@ func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 	return appConfig.Flags.ManualNamespaceNames
 }
 
-func CheckNamespaceFreeFormEntryDeployment(client *houston.Client) bool {
-	appConfig, err := AppConfig(client)
+func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}

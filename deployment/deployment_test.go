@@ -1554,7 +1554,7 @@ func TestCreateWithFreeFormNamespaceDeployment(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -1650,7 +1650,7 @@ func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
