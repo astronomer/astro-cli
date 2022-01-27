@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,8 +17,15 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+)
+
+var (
+	errNoWorkspaceID             = errors.New("no workspace id provided")
+	errNoDomainSet               = errors.New("no domain set, re-authenticate")
+	errInvalidDeploymentName     = errors.New(messages.ErrHoustonDeploymentName)
+	errDeploymentNotFound        = errors.New(messages.ErrNoHoustonDeployment)
+	errInvalidDeploymentSelected = errors.New(messages.HoustonInvalidDeploymentKey)
 )
 
 var (
@@ -73,7 +81,7 @@ func newDeployCmd() *cobra.Command {
 func deploy(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	releaseName := ""
@@ -104,7 +112,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 
 func deployAirflow(path, name, wsID string, prompt bool) error {
 	if wsID == "" {
-		return errors.New("no workspace id provided")
+		return errNoWorkspaceID
 	}
 
 	// Validate workspace
@@ -133,7 +141,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 
 	cloudDomain := c.Domain
 	if cloudDomain == "" {
-		return errors.New("no domain set, re-authenticate")
+		return errNoDomainSet
 	}
 
 	// Use config deployment if provided
@@ -142,13 +150,13 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	if name != "" && !deploymentNameExists(name, deployments) {
-		return errors.New(messages.ErrHoustonDeploymentName)
+		return errInvalidDeploymentName
 	}
 
 	// Prompt user for deployment if no deployment passed in
 	if name == "" || prompt {
 		if len(deployments) == 0 {
-			return errors.New(messages.ErrNoHoustonDeployment)
+			return errDeploymentNotFound
 		}
 
 		fmt.Printf(messages.HoustonDeploymentHeader, cloudDomain)
@@ -167,7 +175,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 		choice := input.Text("\n> ")
 		selected, ok := deployMap[choice]
 		if !ok {
-			return errors.New(messages.HoustonInvalidDeploymentKey)
+			return errInvalidDeploymentSelected
 		}
 		name = selected.ReleaseName
 	}
@@ -237,7 +245,7 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 	// parse dockerfile
 	cmds, err := docker.ParseFile(filepath.Join(path, "Dockerfile"))
 	if err != nil {
-		return errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, "Dockerfile"))
+		return fmt.Errorf("failed to parse dockerfile: %s: %w", filepath.Join(path, "Dockerfile"), err)
 	}
 
 	image, tag := docker.GetImageTagFromParsedFile(cmds)

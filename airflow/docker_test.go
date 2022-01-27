@@ -3,6 +3,7 @@ package airflow
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/api/types"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -55,12 +55,15 @@ networks:
 volumes:
   postgres_data:
     driver: local
+    name: test-project-name_postgres_data
   airflow_logs:
     driver: local
+    name: test-project-name_airflow_logs
 
 services:
   postgres:
     image: postgres:12.2
+    container_name: test-project-name-postgres
     restart: unless-stopped
     networks:
       - airflow

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -12,9 +13,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/workspace"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+var errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string) (string, error) {
@@ -208,13 +210,13 @@ func getAuthToken(username, password string, authConfig *houston.AuthConfig, con
 		if len(authConfig.AuthProviders) > 0 {
 			token = oAuth(context.GetAppURL() + "/token")
 		} else {
-			return "", errors.New("cannot authenticate, oauth is disabled")
+			return "", errOAuthDisabled
 		}
 	} else {
 		if authConfig.LocalEnabled {
 			token, err = basicAuth(username, password)
 			if err != nil {
-				return "", errors.Wrap(err, "local auth login failed")
+				return "", fmt.Errorf("local auth login failed: %w", err)
 			}
 		} else {
 			fmt.Println(messages.HoustonBasicAuthDisabled)

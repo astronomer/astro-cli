@@ -11,7 +11,6 @@ import (
 	"net/http/httputil"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -75,7 +74,7 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 	resp, err := ctxhttp.Do(ctx, c.HTTPClient, req)
 	log.Debugf("Total time %v", time.Since(start))
 	if err != nil {
-		return nil, errors.Wrap(chooseError(ctx, err), "HTTP DO Failed")
+		return nil, fmt.Errorf("HTTP DO Failed: %w", chooseError(ctx, err))
 	}
 	debug(httputil.DumpResponse(resp, true))
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {

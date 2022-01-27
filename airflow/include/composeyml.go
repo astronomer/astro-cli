@@ -13,12 +13,15 @@ networks:
 volumes:
   postgres_data:
     driver: local
+    name: {{ .ProjectName }}_postgres_data
   airflow_logs:
     driver: local
+    name: {{ .ProjectName }}_airflow_logs
 
 services:
   postgres:
     image: postgres:12.2
+    container_name: {{ .ProjectName }}-postgres
     restart: unless-stopped
     networks:
       - airflow

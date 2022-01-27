@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -11,8 +12,12 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+)
+
+var (
+	errUpdateDeploymentInvalidArgs = errors.New("must specify a deployment ID and at least one attribute to update")
+	errServiceAccountNotPresent    = errors.New("must provide a service-account label with the --label (-l) flag")
 )
 
 var (
@@ -210,7 +215,7 @@ $ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:
 		Example: example,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return errors.New("must specify a deployment ID and at least one attribute to update")
+				return errUpdateDeploymentInvalidArgs
 			}
 			return updateArgValidator(args, deploymentUpdateAttrs)
 		},
@@ -459,7 +464,7 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -508,7 +513,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client,
 func deploymentList(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	// Don't validate workspace if viewing all deployments
@@ -562,7 +567,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -573,11 +578,11 @@ func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Write
 func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	if err := validateDeploymentRole(deploymentRole); err != nil {
-		return errors.Wrap(err, "failed to find a valid role")
+		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -588,7 +593,7 @@ func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer
 func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -599,11 +604,11 @@ func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Wri
 func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	if err := validateDeploymentRole(deploymentRole); err != nil {
-		return errors.Wrap(err, "failed to find a valid role")
+		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -613,11 +618,11 @@ func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Wri
 
 func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	if label == "" {
-		return errors.New("must provide a service-account label with the --label (-l) flag")
+		return errServiceAccountNotPresent
 	}
 
 	if err := validateRole(role); err != nil {
-		return errors.Wrap(err, "failed to find a valid role")
+		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 	fullRole := strings.Join([]string{"DEPLOYMENT", strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input
