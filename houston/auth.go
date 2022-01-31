@@ -7,7 +7,7 @@ func (h HoustonClientImplementation) AuthenticateWithBasicAuth(username, passwor
 		Variables: map[string]interface{}{"identity": username, "password": password},
 	}
 
-	resp, err := req.Do()
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return "", err
 	}
@@ -21,7 +21,7 @@ func (h HoustonClientImplementation) GetAuthConfig() (*AuthConfig, error) {
 		Query: AuthConfigGetRequest,
 	}
 	
-	acResp, err := acReq.Do()
+	acResp, err := acReq.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}

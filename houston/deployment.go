@@ -23,7 +23,7 @@ func (h HoustonClientImplementation) CreateDeployment(vars map[string]interface{
 		Variables: vars,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (h HoustonClientImplementation) DeleteDeployment(deploymentID string, doHar
 		Variables: map[string]interface{}{"deploymentId": deploymentID, "deploymentHardDelete": doHardDelete},
 	}
 
-	res, err := req.DoWithClient(h.Client)
+	res, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (h HoustonClientImplementation) ListDeployments(filters ListDeploymentsRequ
 		req.Variables = variables
 	}
 
-	res, err := req.DoWithClient(h.Client)
+	res, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (h HoustonClientImplementation) UpdateDeployment(variables map[string]inter
 		Variables: variables,
 	}
 	
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (h HoustonClientImplementation) GetDeployment(deploymentID string) (*Deploy
 		Variables: map[string]interface{}{"id": deploymentID},
 	}
 
-	res, err := req.DoWithClient(h.Client)
+	res, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (h HoustonClientImplementation) UpdateDeploymentAirflow(variables map[strin
 		Variables: variables,
 	}
 
-	res, err := req.DoWithClient(h.Client)
+	res, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (h HoustonClientImplementation) GetDeploymentConfig() (*DeploymentConfig, e
 		Query: DeploymentInfoRequest,
 	}
 
-	resp, err := dReq.DoWithClient(h.Client)
+	resp, err := dReq.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (h HoustonClientImplementation) ListDeploymentLogs(filters ListDeploymentLo
 		Variables: filters,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}

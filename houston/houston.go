@@ -38,6 +38,7 @@ type HoustonClientInterface interface {
 	AuthenticateWithBasicAuth(username, password string) (string, error)
 	GetAuthConfig() (*AuthConfig, error)
 	// deployment
+	// TODO: MIGHT WANT TO CHANGE map[string]interface{} to structures like with CreateServiceAccountRequest
 	CreateDeployment(vars map[string]interface{}) (*Deployment, error)
 	DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error)
 	ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error)
@@ -65,7 +66,7 @@ type HoustonClientInterface interface {
 
 // HoustonClientImplementation - implementation of the Houston Client Interface
 type HoustonClientImplementation struct {
-	Client *Client
+	client *Client
 }
 
 // TODO: RENAME THIS METHOD ONCE TESTS ARE REFACTORED TOO
@@ -74,7 +75,7 @@ type HoustonClientImplementation struct {
 var Init = func (c *httputil.HTTPClient) HoustonClientInterface {
 	client := NewHoustonClient(c)
 	return &HoustonClientImplementation{
-		Client: client,
+		client: client,
 	}
 }
 

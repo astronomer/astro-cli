@@ -7,7 +7,7 @@ func (h HoustonClientImplementation) CreateWorkspace(label, description string) 
 		Variables: map[string]interface{}{"label": label, "description": description},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -21,7 +21,7 @@ func (h HoustonClientImplementation) ListWorkspaces() ([]Workspace, error) {
 		Query: WorkspacesGetRequest,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (h HoustonClientImplementation) DeleteWorkspace(workspaceID string) (*Works
 		Variables: map[string]interface{}{"workspaceId": workspaceID},
 	}
 
-	res, err := req.DoWithClient(h.Client)
+	res, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (h HoustonClientImplementation) GetWorkspace(workspaceID string) (*Workspac
 		Variables: map[string]interface{}{"workspaceId": workspaceID},
 	}
 
-	res, err := req.DoWithClient(h.Client)
+	res, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (h HoustonClientImplementation) UpdateWorkspace(workspaceID string, args ma
 		Variables: map[string]interface{}{"workspaceId": workspaceID, "payload": args},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}

@@ -31,7 +31,7 @@ func (h HoustonClientImplementation) ListUsersInDeployment(filters ListUsersInDe
 		Variables: variables,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return []DeploymentUser{}, err
 	}
@@ -46,7 +46,7 @@ func (h HoustonClientImplementation) AddUserToDeployment(variables UpdateUserInD
 		Variables: variables,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (h HoustonClientImplementation) UpdateUserInDeployment(variables UpdateUser
 		Variables: variables,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (h HoustonClientImplementation) DeleteUserFromDeployment(deploymentID, emai
 		},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,7 @@ func (h HoustonClientImplementation) GetAppConfig() (*AppConfig, error) {
 		Query: AppConfigRequest,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -20,7 +20,7 @@ func (h HoustonClientImplementation) GetAvailableNamespaces() ([]Namespace, erro
 		Query: AvailableNamespacesGetRequest,
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return []Namespace{}, err
 	}

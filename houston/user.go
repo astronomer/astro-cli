@@ -7,7 +7,7 @@ func (h HoustonClientImplementation) CreateUser(email, password string) (*AuthUs
 		Variables: map[string]interface{}{"email": email, "password": password},
 	}
 
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}

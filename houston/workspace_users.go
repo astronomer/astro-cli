@@ -7,7 +7,7 @@ func (h HoustonClientImplementation) AddUserToWorkspace(workspaceID, email, role
 		Variables: map[string]interface{}{"workspaceId": workspaceID, "email": email, "role": role},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -22,7 +22,7 @@ func (h HoustonClientImplementation) DeleteUserFromWorkspace(workspaceID, userID
 		Variables: map[string]interface{}{"workspaceId": workspaceID, "userId": userID},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (h HoustonClientImplementation) ListUserAndRolesFromWorkspace(workspaceID s
 		Variables: map[string]interface{}{"workspaceId": workspaceID},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (h HoustonClientImplementation) UpdateUserRoleInWorkspace(workspaceID, emai
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email, "role": role},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return "", err
 	}
@@ -67,7 +67,7 @@ func (h HoustonClientImplementation) GetUserRoleInWorkspace(workspaceID, email s
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email},
 	}
 
-	r, err := req.DoWithClient(h.Client)
+	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return WorkspaceUserRoleBindings{}, err
 	}
