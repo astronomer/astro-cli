@@ -9,8 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-
-	"github.com/pkg/errors"
 )
 
 // RepoLatestResponse represents a tag info response from Github API
@@ -74,7 +72,7 @@ func (c *Client) RepoLatestRequest(orgName, repoName string) (*RepoLatestRespons
 	decode := RepoLatestResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf(messages.ErrGithubJSONMarshalling, url))
+		return nil, fmt.Errorf("%s: %w", fmt.Sprintf(messages.ErrGithubJSONMarshalling, url), err)
 	}
 	return &decode, nil
 }
@@ -91,7 +89,7 @@ func (c *Client) RepoTagRequest(orgName, repoName, tagName string) (*RepoLatestR
 	decode := RepoLatestResponse{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf(messages.ErrGithubJSONMarshalling, url))
+		return nil, fmt.Errorf("%s: %w", fmt.Sprintf(messages.ErrGithubJSONMarshalling, url), err)
 	}
 	return &decode, nil
 }

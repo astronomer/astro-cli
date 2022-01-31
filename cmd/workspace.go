@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -8,9 +10,10 @@ import (
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/astronomer/astro-cli/workspace"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
+
+var errUpdateWorkspaceInvalidArgs = errors.New("must specify a workspace ID and at least one attribute to update")
 
 var (
 	workspaceUpdateAttrs   = []string{"label"}
@@ -112,7 +115,7 @@ func newWorkspaceUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command
 		Long:    "Update a Workspace name, as well as users and roles assigned to a Workspace",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) <= 1 {
-				return errors.New("must specify a workspace ID and at least one attribute to update")
+				return errUpdateWorkspaceInvalidArgs
 			}
 			return updateArgValidator(args[1:], workspaceUpdateAttrs)
 		},
@@ -300,11 +303,11 @@ func workspaceUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, 
 func workspaceUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	if err := validateWorkspaceRole(workspaceRole); err != nil {
-		return errors.Wrap(err, "failed to find a valid role")
+		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -315,11 +318,11 @@ func workspaceUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer,
 func workspaceUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	if err := validateWorkspaceRole(workspaceRole); err != nil {
-		return errors.Wrap(err, "failed to find a valid role")
+		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -330,7 +333,7 @@ func workspaceUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writ
 func workspaceUserRm(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -355,18 +358,18 @@ func workspaceSwitch(cmd *cobra.Command, client *houston.Client, out io.Writer, 
 func workspaceUserList(_ *cobra.Command, client *houston.Client, out io.Writer, _ []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 	return workspace.ListRoles(ws, client, out)
 }
 
 func workspaceSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
 	if label == "" {
-		return errors.New("must provide a service-account label with the --label (-l) flag")
+		return errServiceAccountNotPresent
 	}
 
 	if err := validateRole(role); err != nil {
-		return errors.Wrap(err, "failed to find a valid role")
+		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 	fullRole := strings.Join([]string{"WORKSPACE", strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -9,8 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/pkg/errors"
 )
 
 var tab = printutil.Table{
@@ -125,7 +124,7 @@ func getClusterSelection() (string, error) {
 	in := input.Text("\n> ")
 	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
-		return "", errors.Wrapf(err, "cannot parse %s to int", in)
+		return "", fmt.Errorf("cannot parse %s to int: %w", in, err)
 	}
 
 	return contexts[i-1], nil

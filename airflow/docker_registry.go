@@ -2,6 +2,7 @@ package airflow
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	cliconfig "github.com/docker/cli/cli/config"
@@ -9,7 +10,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,7 +43,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	log.Debugf("docker creds %v \n", authConfig)
 	_, err = cli.RegistryLogin(ctx, *authConfig)
 	if err != nil {
-		return errors.Errorf("registry login error: %v", err)
+		return fmt.Errorf("registry login error: %w", err)
 	}
 
 	cliAuthConfig := cliTypes.AuthConfig(*authConfig)
@@ -56,7 +56,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	creds := configFile.GetCredentialsStore(serverAddress)
 
 	if err := creds.Store(cliAuthConfig); err != nil {
-		return errors.Errorf("Error saving credentials: %v", err)
+		return fmt.Errorf("error saving credentials: %w", err)
 	}
 	return nil
 }

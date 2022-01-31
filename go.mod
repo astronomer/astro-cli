@@ -12,6 +12,7 @@ require (
 	github.com/cri-o/ocicni v0.2.1-0.20210621164014-d0acc7862283
 	github.com/docker/cli v20.10.7+incompatible
 	github.com/docker/compose/v2 v2.2.2
+	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.8+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/gorilla/websocket v1.4.2
@@ -20,8 +21,6 @@ require (
 	github.com/json-iterator/go v1.1.11
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/buildkit v0.9.3
-	github.com/pkg/errors v0.9.1
-	github.com/shurcooL/go v0.0.0-20180423040247-9e1955d9fb6e
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.2.1
@@ -29,6 +28,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -70,7 +70,6 @@ require (
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e // indirect
 	github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc // indirect
-	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
@@ -143,6 +142,7 @@ require (
 	github.com/openshift/imagebuilder v1.2.2-0.20210415181909-87f3e48c2656 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20190702140239-759a8c1ac913 // indirect
 	github.com/pelletier/go-toml v1.9.3 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.10.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -182,7 +182,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.0.0-RC1 // indirect
 	go.opentelemetry.io/otel/trace v1.0.0-RC1 // indirect
 	go.opentelemetry.io/proto/otlp v0.9.0 // indirect
-	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023 // indirect
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359 // indirect

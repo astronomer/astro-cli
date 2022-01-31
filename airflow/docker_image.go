@@ -17,7 +17,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -40,7 +39,7 @@ func (d *DockerImage) Build(path string) error {
 	// Build image
 	err = dockerExec(nil, nil, "build", "-t", imageName, ".")
 	if err != nil {
-		return errors.Wrapf(err, "command 'docker build -t %s failed", d.imageName)
+		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
 
 	return nil
@@ -52,7 +51,7 @@ func (d *DockerImage) Push(cloudDomain, token, remoteImageTag string) error {
 
 	err := dockerExec(nil, nil, "tag", imageName(d.imageName, "latest"), remoteImage)
 	if err != nil {
-		return errors.Wrapf(err, "command 'docker tag %s %s' failed", d.imageName, remoteImage)
+		return fmt.Errorf("command 'docker tag %s %s' failed: %w", d.imageName, remoteImage, err)
 	}
 
 	// Push image to registry
@@ -67,7 +66,7 @@ func (d *DockerImage) Push(cloudDomain, token, remoteImageTag string) error {
 	log.Debugf("Exec Push docker creds %v \n", authConfig)
 	if err != nil {
 		log.Debugf("Error reading credentials: %v", err)
-		return errors.Errorf("Error reading credentials: %v", err)
+		return fmt.Errorf("error reading credentials: %w", err)
 	}
 
 	ctx := context.Background()
@@ -99,7 +98,7 @@ func (d *DockerImage) Push(cloudDomain, token, remoteImageTag string) error {
 	// Delete the image tags we just generated
 	err = dockerExec(nil, nil, "rmi", remoteImage)
 	if err != nil {
-		return errors.Wrapf(err, "command 'docker rmi %s' failed", remoteImage)
+		return fmt.Errorf("command 'docker rmi %s' failed: %w", remoteImage, err)
 	}
 	return nil
 }
@@ -114,7 +113,7 @@ func (d *DockerImage) GetImageLabels() (map[string]string, error) {
 		return labels, err
 	}
 	if execErr := stderr.String(); execErr != "" {
-		return labels, errors.Wrap(errGetImageLabel, execErr)
+		return labels, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
 	}
 	err = json.Unmarshal(stdout.Bytes(), &labels)
 	if err != nil {
@@ -127,7 +126,7 @@ func (d *DockerImage) GetImageLabels() (map[string]string, error) {
 func dockerExec(stdout, stderr io.Writer, args ...string) error {
 	_, lookErr := exec.LookPath(Docker)
 	if lookErr != nil {
-		return errors.Wrap(lookErr, "failed to find the docker binary")
+		return fmt.Errorf("failed to find the docker binary: %w", lookErr)
 	}
 
 	cmd := exec.Command(Docker, args...)
@@ -145,7 +144,7 @@ func dockerExec(stdout, stderr io.Writer, args ...string) error {
 	}
 
 	if cmdErr := cmd.Run(); cmdErr != nil {
-		return errors.Wrapf(cmdErr, "failed to execute cmd")
+		return fmt.Errorf("failed to execute cmd: %w", cmdErr)
 	}
 
 	return nil

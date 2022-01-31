@@ -8,7 +8,6 @@ import (
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 )
@@ -169,15 +168,15 @@ func configExists(v *viper.Viper) bool {
 func CreateConfig(v *viper.Viper, path, file string) error {
 	err := os.MkdirAll(path, defaultDirPerm)
 	if err != nil {
-		return errors.Wrap(err, messages.ErrConfigDirCreation)
+		return fmt.Errorf("%s: %w", messages.ErrConfigDirCreation, err)
 	}
 
 	_, err = os.Create(file)
 	if err != nil {
-		return errors.Wrap(err, messages.ErrConfigFileCreation)
+		return fmt.Errorf("%s: %w", messages.ErrConfigFileCreation, err)
 	}
 	if err = os.Chmod(file, newFilePerm); err != nil {
-		return errors.Wrap(err, messages.ErrConfigFileCreation)
+		return fmt.Errorf("%s: %w", messages.ErrConfigFileCreation, err)
 	}
 
 	return saveConfig(v, file)
@@ -205,7 +204,7 @@ func IsProjectDir(path string) (bool, error) {
 func saveConfig(v *viper.Viper, file string) error {
 	err := v.WriteConfigAs(file)
 	if err != nil {
-		return errors.Wrap(err, messages.ErrSavingConfig)
+		return fmt.Errorf("%s: %w", messages.ErrSavingConfig, err)
 	}
 	return nil
 }

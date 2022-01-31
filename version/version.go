@@ -1,6 +1,7 @@
 package version
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -8,8 +9,6 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -17,13 +16,15 @@ var (
 	CurrCommit  string
 )
 
+var errInvalidCLIVersion = errors.New(messages.ErrInvalidCLIVersion)
+
 // PrintVersion outputs current cli version and git commit if exists
 func PrintVersion(client *houston.Client, out io.Writer) error {
 	version := CurrVersion
 	gitCommit := CurrCommit
 
 	if !isValidVersion(version) {
-		return errors.New(messages.ErrInvalidCLIVersion)
+		return errInvalidCLIVersion
 	}
 
 	fmt.Fprintf(out, messages.CLICurrVersion+", ", version)

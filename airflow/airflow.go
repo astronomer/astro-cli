@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 
 	semver "github.com/Masterminds/semver/v3"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -39,12 +38,12 @@ func initDirs(root string, dirs []string) error {
 		// Move on if already exists
 		_, err := fileutil.Exists(fullpath)
 		if err != nil {
-			return errors.Wrapf(err, "failed to check existence of '%s'", fullpath)
+			return fmt.Errorf("failed to check existence of '%s': %w", fullpath, err)
 		}
 
 		// Create directory
 		if err := os.MkdirAll(fullpath, defaultDirPerm); err != nil {
-			return errors.Wrapf(err, "failed to create dir '%s'", dir)
+			return fmt.Errorf("failed to create dir '%s': %w", dir, err)
 		}
 	}
 
@@ -60,7 +59,7 @@ func initFiles(root string, files map[string]string) error {
 		// Move on if already exists
 		fileExist, err := fileutil.Exists(fullpath)
 		if err != nil {
-			return errors.Wrapf(err, "failed to check existence of '%s'", fullpath)
+			return fmt.Errorf("failed to check existence of '%s': %w", fullpath, err)
 		}
 
 		if fileExist {
@@ -69,7 +68,7 @@ func initFiles(root string, files map[string]string) error {
 
 		// Write files out
 		if err := fileutil.WriteStringToFile(fullpath, content); err != nil {
-			return errors.Wrapf(err, "failed to create file '%s'", fullpath)
+			return fmt.Errorf("failed to create file '%s': %w", fullpath, err)
 		}
 	}
 
@@ -100,12 +99,12 @@ func Init(path, airflowImageTag string) error {
 
 	// Initailize directories
 	if err := initDirs(path, dirs); err != nil {
-		return errors.Wrap(err, "failed to create project directories")
+		return fmt.Errorf("failed to create project directories: %w", err)
 	}
 
 	// Initialize files
 	if err := initFiles(path, files); err != nil {
-		return errors.Wrap(err, "failed to create project files")
+		return fmt.Errorf("failed to create project files: %w", err)
 	}
 
 	return nil
@@ -115,7 +114,7 @@ func ParseVersionFromDockerFile(airflowHome, dockerfile string) (uint64, error) 
 	// parse dockerfile
 	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(airflowHome, dockerfile))
+		return 0, fmt.Errorf("failed to parse dockerfile: %s: %w", filepath.Join(airflowHome, dockerfile), err)
 	}
 
 	_, airflowTag := docker.GetImageTagFromParsedFile(cmd)
