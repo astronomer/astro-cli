@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/astronomer/astro-cli/deployment"
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/logs"
 
 	"github.com/spf13/cobra"
@@ -37,7 +35,7 @@ var (
 `
 )
 
-func newLogsCmd(client *houston.Client) *cobra.Command {
+func newLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
@@ -51,7 +49,7 @@ func newLogsCmd(client *houston.Client) *cobra.Command {
 		newWorkersLogsCmd(),
 	)
 
-	appConfig, err := deployment.AppConfig(client)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else if appConfig.Flags.TriggererEnabled {
@@ -61,7 +59,7 @@ func newLogsCmd(client *houston.Client) *cobra.Command {
 	return cmd
 }
 
-func newLogsDeprecatedCmd(client *houston.Client) *cobra.Command {
+func newLogsDeprecatedCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "logs",
 		Aliases:    []string{"log", "l"},
@@ -76,7 +74,7 @@ func newLogsDeprecatedCmd(client *houston.Client) *cobra.Command {
 		newWorkersLogsCmd(),
 	)
 
-	appConfig, err := deployment.AppConfig(client)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else if appConfig.Flags.TriggererEnabled {
@@ -180,5 +178,5 @@ func fetchRemoteLogs(component string, args []string) error {
 	if follow {
 		return logs.SubscribeDeploymentLog(args[0], component, search, since)
 	}
-	return logs.DeploymentLog(args[0], component, search, since)
+	return logs.DeploymentLog(args[0], component, search, since, houstonClient)
 }

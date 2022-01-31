@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/houston"
-
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +66,7 @@ func runCompletionZsh(w io.Writer, cmd *cobra.Command) error {
 	return nil
 }
 
-func newCompletionCmd(_ *houston.Client, out io.Writer) *cobra.Command {
+func newCompletionCmd(out io.Writer) *cobra.Command {
 	shells := make([]string, 0, len(completionShells))
 	for s := range completionShells {
 		shells = append(shells, s)

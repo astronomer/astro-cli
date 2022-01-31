@@ -31,9 +31,6 @@ var (
 var (
 	// these are used to monkey patch the function in order to write unit test cases
 	imageHandlerInit = airflow.ImageHandlerInit
-
-	getDeploymentInfoRequest = &houston.Request{Query: houston.DeploymentInfoRequest}
-	getDeploymentInfo        = getDeploymentInfoRequest.Do
 )
 
 var tab = printutil.Table{
@@ -116,23 +113,19 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	// Validate workspace
-	currentWorkspace, err := validateWorkspace(wsID)
+	currentWorkspace, err := houstonClient.GetWorkspace(wsID)
 	if err != nil {
 		return err
 	}
 
 	// Get Deployments from workspace ID
-	deReq := houston.Request{
-		Query:     houston.DeploymentsGetRequest,
-		Variables: map[string]interface{}{"workspaceId": currentWorkspace.ID},
+	request := houston.ListDeploymentsRequest{
+		WorkspaceID: currentWorkspace.ID,
 	}
-
-	deResp, err := deReq.Do()
+	deployments, err := houstonClient.ListDeployments(request)
 	if err != nil {
 		return err
 	}
-
-	deployments := deResp.Data.GetDeployments
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -202,33 +195,6 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	return nil
 }
 
-func validateWorkspace(wsID string) (houston.Workspace, error) {
-	var currentWorkspace houston.Workspace
-
-	wsReq := houston.Request{
-		Query:     houston.WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": wsID},
-	}
-
-	wsResp, err := wsReq.Do()
-	if err != nil {
-		return currentWorkspace, err
-	}
-
-	if len(wsResp.Data.GetWorkspaces) == 0 {
-		return currentWorkspace, ErrWorkspaceNotFound{workspaceID: wsID}
-	}
-
-	for i := range wsResp.Data.GetWorkspaces {
-		workspace := wsResp.Data.GetWorkspaces[i]
-		if workspace.ID == wsID {
-			currentWorkspace = workspace
-			break
-		}
-	}
-	return currentWorkspace, nil
-}
-
 // Find deployment name in deployments slice
 func deploymentNameExists(name string, deployments []houston.Deployment) bool {
 	for idx := range deployments {
@@ -259,13 +225,13 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 		}
 	}
 	// Get valid image tags for platform using Deployment Info request
-	diResp, err := getDeploymentInfo()
+	deploymentConfig, err := houstonClient.GetDeploymentConfig()
 	if err != nil {
 		return err
 	}
 
-	if config.CFG.ShowWarnings.GetBool() && !diResp.Data.DeploymentConfig.IsValidTag(tag) {
-		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(tag), ", ")
+	if config.CFG.ShowWarnings.GetBool() && !deploymentConfig.IsValidTag(tag) {
+		validTags := strings.Join(deploymentConfig.GetValidTags(tag), ", ")
 		i, _ := input.Confirm(fmt.Sprintf(messages.WarningInvalidNameTag, tag, validTags))
 		if !i {
 			fmt.Println("Canceling deploy...")
