@@ -12,7 +12,7 @@ import (
 )
 
 // ValidateCompatibility print message if astro-cli version is not compatible with platform version
-func ValidateCompatibility(client houston.HoustonClientInterface, out io.Writer, cliVer string, skipVerCheck bool) error {
+func ValidateCompatibility(client houston.ClientInterface, out io.Writer, cliVer string, skipVerCheck bool) error {
 	if skipVerCheck {
 		return nil
 	}

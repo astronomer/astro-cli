@@ -63,14 +63,14 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
     }
   }
 }`
-	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
 			Body:       ioutil.NopCloser(bytes.NewBufferString(ok)),
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(houstonClient)
+	api := houston.Init(testHoustonClient)
 
 	output := new(bytes.Buffer)
 
@@ -131,14 +131,14 @@ func Test_fallbackDefaultAirflowImageTag(t *testing.T) {
 			}
 		}
 	}`
-	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
 			Body:       ioutil.NopCloser(bytes.NewBufferString(ok)),
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(houstonClient)
+	api := houston.Init(testHoustonClient)
 
 	output := new(bytes.Buffer)
 
@@ -193,14 +193,14 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 400,
 			Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(houstonClient)
+	api := houston.Init(testHoustonClient)
 
 	output := new(bytes.Buffer)
 
@@ -266,14 +266,14 @@ func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	houstonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
 			Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(houstonClient)
+	api := houston.Init(testHoustonClient)
 
 	output := new(bytes.Buffer)
 

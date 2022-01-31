@@ -13,7 +13,7 @@ import (
 var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
 
 // Add a user to a workspace with specified role
-func Add(workspaceID, email, role string, client houston.HoustonClientInterface, out io.Writer) error {
+func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	w, err := client.AddUserToWorkspace(workspaceID, email, role)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func Add(workspaceID, email, role string, client houston.HoustonClientInterface,
 }
 
 // Remove a user from a workspace
-func Remove(workspaceID, userID string, client houston.HoustonClientInterface, out io.Writer) error {
+func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error {
 	w, err := client.DeleteUserFromWorkspace(workspaceID, userID)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func Remove(workspaceID, userID string, client houston.HoustonClientInterface, o
 }
 
 // ListRoles print users and roles from a workspace
-func ListRoles(workspaceID string, client houston.HoustonClientInterface, out io.Writer) error {
+func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer) error {
 	workspace, err := client.ListUserAndRolesFromWorkspace(workspaceID)
 	if err != nil {
 		return err
@@ -76,7 +76,7 @@ func ListRoles(workspaceID string, client houston.HoustonClientInterface, out io
 }
 
 // Update workspace user role
-func UpdateRole(workspaceID, email, role string, client houston.HoustonClientInterface, out io.Writer) error {
+func UpdateRole(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	// get user you are updating to show role from before change
 	roles, err := client.GetUserRoleInWorkspace(workspaceID, email)
 	if err != nil {

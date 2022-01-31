@@ -19,7 +19,7 @@ import (
 var errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
 
 // basicAuth handles authentication with the houston api
-func basicAuth(username, password string, client houston.HoustonClientInterface) (string, error) {
+func basicAuth(username, password string, client houston.ClientInterface) (string, error) {
 	if password == "" {
 		password, _ = input.Password(messages.InputPassword)
 	}
@@ -77,7 +77,7 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client houston.HoustonClientInterface, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
 
@@ -182,7 +182,7 @@ func checkClusterDomain(domain string) error {
 	return nil
 }
 
-func getAuthToken(username, password string, authConfig *houston.AuthConfig, context config.Context, client houston.HoustonClientInterface) (string, error) {
+func getAuthToken(username, password string, authConfig *houston.AuthConfig, context config.Context, client houston.ClientInterface) (string, error) {
 	var token string
 	var err error
 	if username == "" {

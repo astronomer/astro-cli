@@ -10,14 +10,14 @@ type ListDeploymentsRequest struct {
 
 // ListDeploymentLogsRequest - filters to list logs from a deployment
 type ListDeploymentLogsRequest struct {
-	DeploymentID string `json:"deploymentId"`
-	Component    string `json:"component"`
-	Search       string `json:"search"`
+	DeploymentID string    `json:"deploymentId"`
+	Component    string    `json:"component"`
+	Search       string    `json:"search"`
 	Timestamp    time.Time `json:"timestamp"`
 }
 
 // CreateDeployment - create a deployment
-func (h HoustonClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
+func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
 	req := Request{
 		Query:     DeploymentCreateRequest,
 		Variables: vars,
@@ -32,7 +32,7 @@ func (h HoustonClientImplementation) CreateDeployment(vars map[string]interface{
 }
 
 // DeleteDeployment - delete a deployment
-func (h HoustonClientImplementation) DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error) {
+func (h ClientImplementation) DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error) {
 	req := Request{
 		Query:     DeploymentDeleteRequest,
 		Variables: map[string]interface{}{"deploymentId": deploymentID, "deploymentHardDelete": doHardDelete},
@@ -47,7 +47,7 @@ func (h HoustonClientImplementation) DeleteDeployment(deploymentID string, doHar
 }
 
 // ListDeployments - List deployments from the API
-func (h HoustonClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error) {
+func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error) {
 	variables := map[string]interface{}{}
 	if filters.WorkspaceID != "" {
 		variables["workspaceId"] = filters.WorkspaceID
@@ -73,12 +73,12 @@ func (h HoustonClientImplementation) ListDeployments(filters ListDeploymentsRequ
 }
 
 // UpdateDeployment - update a deployment
-func (h HoustonClientImplementation) UpdateDeployment(variables map[string]interface{}) (*Deployment, error) {
+func (h ClientImplementation) UpdateDeployment(variables map[string]interface{}) (*Deployment, error) {
 	req := Request{
 		Query:     DeploymentUpdateRequest,
 		Variables: variables,
 	}
-	
+
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (h HoustonClientImplementation) UpdateDeployment(variables map[string]inter
 }
 
 // GetDeployment - get a deployment
-func (h HoustonClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
+func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
 	req := Request{
 		Query:     DeploymentGetRequest,
 		Variables: map[string]interface{}{"id": deploymentID},
@@ -103,7 +103,7 @@ func (h HoustonClientImplementation) GetDeployment(deploymentID string) (*Deploy
 }
 
 // UpdateDeploymentAirflow - update airflow on a deployment
-func (h HoustonClientImplementation) UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error) {
+func (h ClientImplementation) UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error) {
 	req := Request{
 		Query:     UpdateDeploymentAirflowRequest,
 		Variables: variables,
@@ -118,7 +118,7 @@ func (h HoustonClientImplementation) UpdateDeploymentAirflow(variables map[strin
 }
 
 // GetDeploymentConfig - get a deployment configuration
-func (h HoustonClientImplementation) GetDeploymentConfig() (*DeploymentConfig, error) {
+func (h ClientImplementation) GetDeploymentConfig() (*DeploymentConfig, error) {
 	dReq := Request{
 		Query: DeploymentInfoRequest,
 	}
@@ -127,14 +127,14 @@ func (h HoustonClientImplementation) GetDeploymentConfig() (*DeploymentConfig, e
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &resp.Data.DeploymentConfig, nil
 }
 
 // ListDeploymentLogs - list logs from a deployment
-func (h HoustonClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error) {
+func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error) {
 	req := Request{
-		Query: DeploymentLogsGetRequest,
+		Query:     DeploymentLogsGetRequest,
 		Variables: filters,
 	}
 
@@ -142,6 +142,6 @@ func (h HoustonClientImplementation) ListDeploymentLogs(filters ListDeploymentLo
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return r.Data.DeploymentLog, nil
 }

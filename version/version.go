@@ -18,7 +18,7 @@ var (
 var errInvalidCLIVersion = errors.New(messages.ErrInvalidCLIVersion)
 
 // PrintVersion outputs current cli version and git commit if exists
-func PrintVersion(client houston.HoustonClientInterface, out io.Writer) error {
+func PrintVersion(client houston.ClientInterface, out io.Writer) error {
 	version := CurrVersion
 	gitCommit := CurrCommit
 
@@ -35,7 +35,7 @@ func PrintVersion(client houston.HoustonClientInterface, out io.Writer) error {
 }
 
 // CheckForUpdate checks current version against latest on github
-func CheckForUpdate(client houston.HoustonClientInterface, ghc *github.Client, out io.Writer) error {
+func CheckForUpdate(client houston.ClientInterface, ghc *github.Client, out io.Writer) error {
 	version := CurrVersion
 
 	if !isValidVersion(version) {
@@ -77,7 +77,7 @@ func isValidVersion(version string) bool {
 }
 
 // printServerVersion outputs current server version
-func printServerVersion(client houston.HoustonClientInterface, out io.Writer) {
+func printServerVersion(client houston.ClientInterface, out io.Writer) {
 	appCfg, err := client.GetAppConfig()
 	if err != nil {
 		fmt.Fprintf(out, messages.HoustonCurrentVersion+"\n", "Please authenticate to a cluster to see server version")

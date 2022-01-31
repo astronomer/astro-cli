@@ -28,7 +28,7 @@ func main() {
 		return fmt.Sprintf(`{{< relref "docs/%s" >}}`, s)
 	}
 	emptyStr := func(s string) string { return "" }
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
+	client := houston.Init(httputil.NewHTTPClient())
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
 	rootCmd := cmd.NewRootCmd(client, os.Stdout)

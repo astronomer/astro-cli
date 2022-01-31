@@ -76,9 +76,6 @@ func TestBuildPushDockerImageSuccess(t *testing.T) {
 
 	var resp *houston.Response
 	_ = json.Unmarshal([]byte(ok), resp)
-	getDeploymentInfo = func() (*houston.Response, error) {
-		return resp, nil
-	}
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
@@ -118,9 +115,6 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 
 	var resp *houston.Response
 	_ = json.Unmarshal([]byte(ok), resp)
-	getDeploymentInfo = func() (*houston.Response, error) {
-		return resp, nil
-	}
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {

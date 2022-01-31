@@ -1,7 +1,7 @@
 package houston
 
 // GetAppConfig - get application configuration
-func (h HoustonClientImplementation) GetAppConfig() (*AppConfig, error) {
+func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
 	req := Request{
 		Query: AppConfigRequest,
 	}
@@ -15,7 +15,7 @@ func (h HoustonClientImplementation) GetAppConfig() (*AppConfig, error) {
 }
 
 // GetAvailableNamespace - get namespaces to create deployments
-func (h HoustonClientImplementation) GetAvailableNamespaces() ([]Namespace, error) {
+func (h ClientImplementation) GetAvailableNamespaces() ([]Namespace, error) {
 	req := Request{
 		Query: AvailableNamespacesGetRequest,
 	}

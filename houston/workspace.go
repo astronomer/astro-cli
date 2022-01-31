@@ -1,7 +1,7 @@
 package houston
 
 // CreateWorkspace - create a workspace
-func (h HoustonClientImplementation) CreateWorkspace(label, description string) (*Workspace, error) {
+func (h ClientImplementation) CreateWorkspace(label, description string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceCreateRequest,
 		Variables: map[string]interface{}{"label": label, "description": description},
@@ -16,7 +16,7 @@ func (h HoustonClientImplementation) CreateWorkspace(label, description string) 
 }
 
 // ListWorkspaces - list workspaces
-func (h HoustonClientImplementation) ListWorkspaces() ([]Workspace, error) {
+func (h ClientImplementation) ListWorkspaces() ([]Workspace, error) {
 	req := Request{
 		Query: WorkspacesGetRequest,
 	}
@@ -30,7 +30,7 @@ func (h HoustonClientImplementation) ListWorkspaces() ([]Workspace, error) {
 }
 
 // DeleteWorkspace - delete a workspace
-func (h HoustonClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, error) {
+func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceDeleteRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceID},
@@ -40,12 +40,12 @@ func (h HoustonClientImplementation) DeleteWorkspace(workspaceID string) (*Works
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return res.Data.DeleteWorkspace, nil
 }
 
 // GetWorkspace - get a workspace
-func (h HoustonClientImplementation) GetWorkspace(workspaceID string) (*Workspace, error) {
+func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, error) {
 	// TODO: CHANGE THIS QUERY TO USE THE RIGHT ONE: GET A SINGLE WORKSPACE
 	req := Request{
 		Query:     WorkspacesGetRequest,
@@ -56,17 +56,17 @@ func (h HoustonClientImplementation) GetWorkspace(workspaceID string) (*Workspac
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(res.Data.GetWorkspaces) < 1 {
 		// return error if no workspace found
 		return nil, ErrWorkspaceNotFound{workspaceID: workspaceID}
 	}
-	
+
 	return &res.Data.GetWorkspaces[0], nil
 }
 
 // UpdateWorkspace - update a workspace
-func (h HoustonClientImplementation) UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error) {
+func (h ClientImplementation) UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceUpdateRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceID, "payload": args},

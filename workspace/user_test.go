@@ -23,7 +23,7 @@ func TestAdd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -48,7 +48,7 @@ func TestAddError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -69,7 +69,7 @@ func TestRemove(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ck1qg6whg001r08691y117hub"
 	userID := "ckc0eir8e01gj07608ajmvia1"
 
@@ -93,7 +93,7 @@ func TestRemoveError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ck1qg6whg001r08691y117hub"
 	email := "andrii@test.com"
 
@@ -148,7 +148,7 @@ func TestListRoles(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	wsID := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
@@ -214,7 +214,7 @@ func TestListRolesWithServiceAccounts(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	wsID := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
@@ -237,7 +237,7 @@ func TestListRolesError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	wsID := "ck1qg6whg001r08691y117hub"
 
 	buf := new(bytes.Buffer)
@@ -255,7 +255,7 @@ func TestUpdateRole(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ckoixo6o501496qemiwsja1tl"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -277,7 +277,7 @@ func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ckg6sfddu30911pc0n1o0e97e"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -297,7 +297,7 @@ func TestUpdateRoleNoAccess(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ckoixo6o501496qemiwsja1tl"
 	role := "test-role"
 	email := "andrii@test.com"
@@ -316,48 +316,12 @@ func TestUpdateRoleError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, role, email, api, buf)
-	assert.EqualError(t, err, "API error (500): Internal Server Error")
-}
-
-func TestGetUserRole(t *testing.T) {
-	testUtil.InitTestConfig()
-	okResponse := `{"data":{    "appConfig": {"nfsMountDagDeployment": false},"workspaceUser":{"roleBindings":[{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"DEPLOYMENT_VIEWER"},{"workspace":{"id":"ckoixo6o501496qemiwsja1tl"},"role":"WORKSPACE_VIEWER"},{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"WORKSPACE_EDITOR"},{"workspace":{"id":"ckql4ias908766qbpuck803fa"},"role":"WORKSPACE_ADMIN"}]}}}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(client)
-	id := "ck1qg6whg001r08691y117hub"
-	email := "andrii@test.com"
-
-	userRoleBinding, err := getUserRole(id, email, api)
-	assert.NoError(t, err)
-	assert.Equal(t, 4, len(userRoleBinding.RoleBindings))
-}
-
-func TestGetUserRoleError(t *testing.T) {
-	testUtil.InitTestConfig()
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 500,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewHoustonClient(client)
-	id := "ck1qg6whg001r08691y117hub"
-	email := "andrii@test.com"
-
-	_, err := getUserRole(id, email, api)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 )
 
-func DeploymentLog(deploymentID, component, search string, since time.Duration, client houston.HoustonClientInterface) error {
+func DeploymentLog(deploymentID, component, search string, since time.Duration, client houston.ClientInterface) error {
 	// Calculate timestamp as now - since e.g:
 	// (2019-04-02 17:51:03.780819 +0000 UTC - 2 mins) = 2019-04-02 17:49:03.780819 +0000 UTC
 	timestamp := time.Now().UTC().Add(-since)

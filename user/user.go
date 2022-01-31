@@ -15,7 +15,7 @@ var (
 )
 
 // Create verifies input before sending a CreateUser API call to houston
-func Create(email, password string, client houston.HoustonClientInterface, out io.Writer) error {
+func Create(email, password string, client houston.ClientInterface, out io.Writer) error {
 	if email == "" {
 		email = input.Text("Email: ")
 	}

@@ -1,7 +1,7 @@
 package houston
 
 // AuthenticateWithBasicAuth - authentiate to Houston using basic auth
-func (h HoustonClientImplementation) AuthenticateWithBasicAuth(username, password string) (string, error) {
+func (h ClientImplementation) AuthenticateWithBasicAuth(username, password string) (string, error) {
 	req := Request{
 		Query:     TokenBasicCreateRequest,
 		Variables: map[string]interface{}{"identity": username, "password": password},
@@ -16,11 +16,11 @@ func (h HoustonClientImplementation) AuthenticateWithBasicAuth(username, passwor
 }
 
 // GetAuthConfig - get authentication configuration
-func (h HoustonClientImplementation) GetAuthConfig() (*AuthConfig, error) {
+func (h ClientImplementation) GetAuthConfig() (*AuthConfig, error) {
 	acReq := Request{
 		Query: AuthConfigGetRequest,
 	}
-	
+
 	acResp, err := acReq.DoWithClient(h.client)
 	if err != nil {
 		return nil, err

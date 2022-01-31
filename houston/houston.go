@@ -18,8 +18,8 @@ var (
 	ErrVerboseInaptPermissions = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 
-// HoustonClientInterface - Interface that defines methods exposed by the Houston API
-type HoustonClientInterface interface {
+// ClientInterface - Interface that defines methods exposed by the Houston API
+type ClientInterface interface {
 	// user
 	CreateUser(email, password string) (*AuthUser, error)
 	// workspace
@@ -53,28 +53,28 @@ type HoustonClientInterface interface {
 	UpdateUserInDeployment(variables UpdateUserInDeploymentRequest) (*RoleBinding, error)
 	DeleteUserFromDeployment(deploymentID, email string) (*RoleBinding, error)
 	// service account
-	CreateServiceAccountInDeployment(variables CreateServiceAccountRequest) (*DeploymentServiceAccount, error)
-	DeleteServiceAccountFromDeployment(deploymentID, serviceAccountID string) (*ServiceAccount, error)
-	ListServiceAccountsInDeployment(deploymentID string) ([]ServiceAccount, error)
-	CreateServiceAccountInWorkspace(variables CreateServiceAccountRequest) (*WorkspaceServiceAccount, error)
-	DeleteServiceAccountFromWorkspace(workspaceID, serviceAccountID string) (*ServiceAccount, error)
-	ListServiceAccountsInWorkspace(workspaceID string) ([]ServiceAccount, error)
+	CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error)
+	DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error)
+	ListDeploymentServiceAccounts(deploymentID string) ([]ServiceAccount, error)
+	CreateWorkspaceServiceAccount(variables *CreateServiceAccountRequest) (*WorkspaceServiceAccount, error)
+	DeleteWorkspaceServiceAccount(workspaceID, serviceAccountID string) (*ServiceAccount, error)
+	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
 	GetAppConfig() (*AppConfig, error)
 	GetAvailableNamespaces() ([]Namespace, error)
 }
 
-// HoustonClientImplementation - implementation of the Houston Client Interface
-type HoustonClientImplementation struct {
+// ClientImplementation - implementation of the Houston Client Interface
+type ClientImplementation struct {
 	client *Client
 }
 
-// TODO: RENAME THIS METHOD ONCE TESTS ARE REFACTORED TOO
 // Init - initialized the Houston Client singleton object with proper HTTP Client configuration
 // set as a variable so we can change it to return mock houston clients
-var Init = func (c *httputil.HTTPClient) HoustonClientInterface {
+// TODO: RENAME THIS METHOD ONCE TESTS ARE REFACTORED TOO
+var Init = func(c *httputil.HTTPClient) ClientInterface {
 	client := NewHoustonClient(c)
-	return &HoustonClientImplementation{
+	return &ClientImplementation{
 		client: client,
 	}
 }
@@ -97,7 +97,7 @@ type GraphQLQuery struct {
 }
 
 type Request struct {
-	Query     string                 `json:"query"`
+	Query     string      `json:"query"`
 	Variables interface{} `json:"variables"`
 }
 

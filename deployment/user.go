@@ -20,11 +20,11 @@ var (
 )
 
 // UserList returns a list of user with deployment access
-func UserList(deploymentID, email, userID, fullName string, client houston.HoustonClientInterface, out io.Writer) error {
+func UserList(deploymentID, email, userID, fullName string, client houston.ClientInterface, out io.Writer) error {
 	filters := houston.ListUsersInDeploymentRequest{
-		UserID: userID,
-		Email: email,
-		FullName: fullName,
+		UserID:       userID,
+		Email:        email,
+		FullName:     fullName,
 		DeploymentID: deploymentID,
 	}
 	deploymentUsers, err := client.ListUsersInDeployment(filters)
@@ -70,7 +70,7 @@ func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) strin
 
 // nolint:dupl
 // Add a user to a deployment with specified role
-func Add(deploymentID, email, role string, client houston.HoustonClientInterface, out io.Writer) error {
+func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	addUserRequest := houston.UpdateUserInDeploymentRequest{
 		Email:        email,
 		Role:         role,
@@ -90,7 +90,7 @@ func Add(deploymentID, email, role string, client houston.HoustonClientInterface
 
 // nolint:dupl
 // UpdateUser updates a user's deployment role
-func UpdateUser(deploymentID, email, role string, client houston.HoustonClientInterface, out io.Writer) error {
+func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	updateUserRequest := houston.UpdateUserInDeploymentRequest{
 		Email:        email,
 		Role:         role,
@@ -109,7 +109,7 @@ func UpdateUser(deploymentID, email, role string, client houston.HoustonClientIn
 }
 
 // DeleteUser removes user access for a deployment
-func DeleteUser(deploymentID, email string, client houston.HoustonClientInterface, out io.Writer) error {
+func DeleteUser(deploymentID, email string, client houston.ClientInterface, out io.Writer) error {
 	d, err := client.DeleteUserFromDeployment(deploymentID, email)
 	if err != nil {
 		fmt.Println(err)

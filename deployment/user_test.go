@@ -49,7 +49,7 @@ func TestUserList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	deploymentID := "ckgqw2k2600081qc90nbamgno"
 	email := "somebody@astronomer.io"
 	userID := "somebody@astronomer.io"
@@ -107,7 +107,7 @@ func TestUserList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = houston.Init(client)
 	deploymentID = "ckgqw2k2600081qc90nbamgno"
 
 	buf = new(bytes.Buffer)
@@ -131,7 +131,7 @@ func TestUserList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = houston.Init(client)
 	deploymentID = "ckgqw2k2600081qc90nbamgno"
 
 	buf = new(bytes.Buffer)
@@ -164,7 +164,7 @@ func TestAdd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
 	role := "DEPLOYMENT_ADMIN"
@@ -211,7 +211,7 @@ func TestAdd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = houston.Init(client)
 	deploymentID = "ckggzqj5f4157qtc9lescmehm"
 	email = "somebody@astronomer.com"
 	role = "DEPLOYMENT_ADMIN"
@@ -246,7 +246,7 @@ func TestDeleteUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
 
@@ -293,7 +293,7 @@ func TestDeleteUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = houston.Init(client)
 	deploymentID = "ckggzqj5f4157qtc9lescmehm"
 	email = "somebody@astronomer.com"
 
@@ -327,7 +327,7 @@ func TestUpdateUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
 	role := houston.DeploymentEditor
@@ -369,7 +369,7 @@ func TestUpdateUser(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api = houston.NewHoustonClient(client)
+	api = houston.Init(client)
 	deploymentID = "ckggzqj5f4157qtc9lescmehm"
 	email = "somebody@astronomer.com"
 	role = "DEPLOYMENT_FAKE_ROLE"

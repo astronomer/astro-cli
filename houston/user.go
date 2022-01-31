@@ -1,7 +1,7 @@
 package houston
 
 // CreateUser - Send a request to create a user in the Houston API
-func (h HoustonClientImplementation) CreateUser(email, password string) (*AuthUser, error) {
+func (h ClientImplementation) CreateUser(email, password string) (*AuthUser, error) {
 	req := Request{
 		Query:     UserCreateRequest,
 		Variables: map[string]interface{}{"email": email, "password": password},

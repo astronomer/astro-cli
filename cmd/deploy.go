@@ -28,23 +28,13 @@ var (
 	errInvalidDeploymentSelected = errors.New(messages.HoustonInvalidDeploymentKey)
 )
 
-var (
-	// these are used to monkey patch the function in order to write unit test cases
-	imageHandlerInit = airflow.ImageHandlerInit
-)
+// these are used to monkey patch the function in order to write unit test cases
+var imageHandlerInit = airflow.ImageHandlerInit
 
 var tab = printutil.Table{
 	Padding:        []int{5, 30, 30, 50},
 	DynamicPadding: true,
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
-}
-
-type ErrWorkspaceNotFound struct {
-	workspaceID string
-}
-
-func (e ErrWorkspaceNotFound) Error() string {
-	return fmt.Sprintf("no workspaces with id (%s) found", e.workspaceID)
 }
 
 var deployExample = `

@@ -33,7 +33,7 @@ func TestPrintVersionHoustonError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	output := new(bytes.Buffer)
 	CurrVersion = "0.15.0"
 	err := PrintVersion(api, output)
@@ -60,7 +60,7 @@ func TestPrintVersionError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.Init(client)
 	output := new(bytes.Buffer)
 	CurrVersion = ""
 	err := PrintVersion(api, output)
@@ -88,7 +88,7 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	houstonClient := houston.NewHoustonClient(client)
+	houstonClient := houston.Init(client)
 
 	CurrVersion = "0.15.0"
 	okGitHubResponse := `{
@@ -133,7 +133,7 @@ func TestPrintServerVersion(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	houstonClient := houston.NewHoustonClient(client)
+	houstonClient := houston.Init(client)
 
 	output := new(strings.Builder)
 	printServerVersion(houstonClient, output)

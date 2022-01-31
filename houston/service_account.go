@@ -10,9 +10,9 @@ type CreateServiceAccountRequest struct {
 }
 
 // CreateServiceAccountInDeployment - create a service account in a deployment
-func (h HoustonClientImplementation) CreateServiceAccountInDeployment(variables CreateServiceAccountRequest) (*DeploymentServiceAccount, error) {
+func (h ClientImplementation) CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error) {
 	req := Request{
-		Query: CreateDeploymentServiceAccountRequest,
+		Query:     CreateDeploymentServiceAccountRequest,
 		Variables: variables,
 	}
 	resp, err := req.DoWithClient(h.client)
@@ -24,9 +24,9 @@ func (h HoustonClientImplementation) CreateServiceAccountInDeployment(variables 
 }
 
 // CreateServiceAccountInWorkspace - create a service account into a workspace
-func (h HoustonClientImplementation) CreateServiceAccountInWorkspace(variables CreateServiceAccountRequest) (*WorkspaceServiceAccount, error) {
+func (h ClientImplementation) CreateWorkspaceServiceAccount(variables *CreateServiceAccountRequest) (*WorkspaceServiceAccount, error) {
 	req := Request{
-		Query: CreateWorkspaceServiceAccountRequest,
+		Query:     CreateWorkspaceServiceAccountRequest,
 		Variables: variables,
 	}
 	resp, err := req.DoWithClient(h.client)
@@ -38,7 +38,7 @@ func (h HoustonClientImplementation) CreateServiceAccountInWorkspace(variables C
 }
 
 // DeleteServiceAccountFromDeployment - delete a service account from a workspace
-func (h HoustonClientImplementation) DeleteServiceAccountFromDeployment(deploymentID, serviceAccountID string) (*ServiceAccount, error) {
+func (h ClientImplementation) DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error) {
 	req := Request{
 		Query:     DeploymentServiceAccountDeleteRequest,
 		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "deploymentUuid": deploymentID},
@@ -53,7 +53,7 @@ func (h HoustonClientImplementation) DeleteServiceAccountFromDeployment(deployme
 }
 
 // DeleteServiceAccountFromWorkspace - delete a service account from a workspace
-func (h HoustonClientImplementation) DeleteServiceAccountFromWorkspace(workspaceID, serviceAccountID string) (*ServiceAccount, error) {
+func (h ClientImplementation) DeleteWorkspaceServiceAccount(workspaceID, serviceAccountID string) (*ServiceAccount, error) {
 	req := Request{
 		Query:     WorkspaceServiceAccountDeleteRequest,
 		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "workspaceUuid": workspaceID},
@@ -68,7 +68,7 @@ func (h HoustonClientImplementation) DeleteServiceAccountFromWorkspace(workspace
 }
 
 // ListServiceAccountsInDeployment - list service accounts in a deployment
-func (h HoustonClientImplementation) ListServiceAccountsInDeployment(deploymentID string) ([]ServiceAccount, error) {
+func (h ClientImplementation) ListDeploymentServiceAccounts(deploymentID string) ([]ServiceAccount, error) {
 	req := Request{
 		Query:     DeploymentServiceAccountsGetRequest,
 		Variables: map[string]interface{}{"deploymentUuid": deploymentID},
@@ -83,7 +83,7 @@ func (h HoustonClientImplementation) ListServiceAccountsInDeployment(deploymentI
 }
 
 // ListServiceAccountsInWorkspace - list service accounts in a workspace
-func (h HoustonClientImplementation) ListServiceAccountsInWorkspace(workspaceID string) ([]ServiceAccount, error) {
+func (h ClientImplementation) ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error) {
 	req := Request{
 		Query:     WorkspaceServiceAccountsGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},

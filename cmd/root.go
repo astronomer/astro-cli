@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	houstonClient houston.HoustonClientInterface
+	houstonClient  houston.ClientInterface
 	workspaceID    string
 	workspaceRole  string
 	deploymentRole string
@@ -22,7 +22,7 @@ var (
 )
 
 // NewRootCmd adds all of the primary commands for the cli
-func NewRootCmd(client houston.HoustonClientInterface, out io.Writer) *cobra.Command {
+func NewRootCmd(client houston.ClientInterface, out io.Writer) *cobra.Command {
 	houstonClient = client
 
 	rootCmd := &cobra.Command{
