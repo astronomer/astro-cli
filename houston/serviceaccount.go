@@ -15,7 +15,7 @@ func (h HoustonClientImplementation) CreateServiceAccountInDeployment(variables 
 		Query: CreateDeploymentServiceAccountRequest,
 		Variables: variables,
 	}
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (h HoustonClientImplementation) CreateServiceAccountInWorkspace(variables C
 		Query: CreateWorkspaceServiceAccountRequest,
 		Variables: variables,
 	}
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (h HoustonClientImplementation) DeleteServiceAccountFromDeployment(deployme
 		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "deploymentUuid": deploymentID},
 	}
 
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (h HoustonClientImplementation) DeleteServiceAccountFromWorkspace(workspace
 		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "workspaceUuid": workspaceID},
 	}
 
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (h HoustonClientImplementation) ListServiceAccountsInDeployment(deploymentI
 		Variables: map[string]interface{}{"deploymentUuid": deploymentID},
 	}
 
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (h HoustonClientImplementation) ListServiceAccountsInWorkspace(workspaceID 
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
 	}
 
-	resp, err := req.DoWithClient(h.Client)
+	resp, err := req.DoWithClient(h.client)
 	if err != nil {
 		return nil, err
 	}
