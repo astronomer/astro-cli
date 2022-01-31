@@ -20,27 +20,18 @@ var (
 )
 
 // UserList returns a list of user with deployment access
-func UserList(deploymentID, email, userID, fullName string, client *houston.Client, out io.Writer) error {
-	user := map[string]interface{}{
-		"userId":   userID,
-		"email":    email,
-		"fullName": fullName,
+func UserList(deploymentID, email, userID, fullName string, client houston.HoustonClientInterface, out io.Writer) error {
+	filters := houston.ListUsersInDeploymentRequest{
+		UserID: userID,
+		Email: email,
+		FullName: fullName,
+		DeploymentID: deploymentID,
 	}
-	variables := map[string]interface{}{
-		"user":         user,
-		"deploymentId": deploymentID,
-	}
-	req := houston.Request{
-		Query:     houston.DeploymentUserListRequest,
-		Variables: variables,
-	}
-
-	r, err := req.DoWithClient(client)
+	deploymentUsers, err := client.ListUsersInDeployment(filters)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	deploymentUsers := r.Data.DeploymentUserList
 
 	if len(deploymentUsers) < 1 {
 		_, err = out.Write([]byte(messages.HoustonInvalidDeploymentUsers))
@@ -79,21 +70,16 @@ func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) strin
 
 // nolint:dupl
 // Add a user to a deployment with specified role
-func Add(deploymentID, email, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.DeploymentUserAddRequest,
-		Variables: map[string]interface{}{
-			"email":        email,
-			"deploymentId": deploymentID,
-			"role":         role,
-		},
+func Add(deploymentID, email, role string, client houston.HoustonClientInterface, out io.Writer) error {
+	addUserRequest := houston.UpdateUserInDeploymentRequest{
+		Email:        email,
+		Role:         role,
+		DeploymentID: deploymentID,
 	}
-
-	r, err := req.DoWithClient(client)
+	d, err := client.AddUserToDeployment(addUserRequest)
 	if err != nil {
 		return err
 	}
-	d := r.Data.AddDeploymentUser
 
 	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.ID, d.User.Username, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully added %s as a %s", email, role)
@@ -104,21 +90,16 @@ func Add(deploymentID, email, role string, client *houston.Client, out io.Writer
 
 // nolint:dupl
 // UpdateUser updates a user's deployment role
-func UpdateUser(deploymentID, email, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.DeploymentUserUpdateRequest,
-		Variables: map[string]interface{}{
-			"email":        email,
-			"deploymentId": deploymentID,
-			"role":         role,
-		},
+func UpdateUser(deploymentID, email, role string, client houston.HoustonClientInterface, out io.Writer) error {
+	updateUserRequest := houston.UpdateUserInDeploymentRequest{
+		Email:        email,
+		Role:         role,
+		DeploymentID: deploymentID,
 	}
-
-	r, err := req.DoWithClient(client)
+	d, err := client.UpdateUserInDeployment(updateUserRequest)
 	if err != nil {
 		return err
 	}
-	d := r.Data.UpdateDeploymentUser
 
 	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.ID, d.User.Username, d.Role}, false)
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated %s to a %s", email, role)
@@ -128,21 +109,12 @@ func UpdateUser(deploymentID, email, role string, client *houston.Client, out io
 }
 
 // DeleteUser removes user access for a deployment
-func DeleteUser(deploymentID, email string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.DeploymentUserDeleteRequest,
-		Variables: map[string]interface{}{
-			"email":        email,
-			"deploymentId": deploymentID,
-		},
-	}
-
-	r, err := req.DoWithClient(client)
+func DeleteUser(deploymentID, email string, client houston.HoustonClientInterface, out io.Writer) error {
+	d, err := client.DeleteUserFromDeployment(deploymentID, email)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	d := r.Data.DeleteDeploymentUser
 	header := []string{"DEPLOYMENT ID", "USER", "ROLE"}
 
 	tab := printutil.Table{

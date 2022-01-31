@@ -19,22 +19,18 @@ func newTableOut() *printutil.Table {
 }
 
 // nolint:dupl
-func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.CreateDeploymentServiceAccountRequest,
-		Variables: map[string]interface{}{
-			"label":          label,
-			"category":       category,
-			"deploymentUuid": deploymentUUID,
-			"role":           role,
-		},
+func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.HoustonClientInterface, out io.Writer) error {
+	createServiceAccountRequest := houston.CreateServiceAccountRequest{
+		DeploymentID: deploymentUUID,
+		Label:        label,
+		Category:     category,
+		Role:         role,
 	}
-	resp, err := req.DoWithClient(client)
+	sa, err := client.CreateServiceAccountInDeployment(createServiceAccountRequest)
 	if err != nil {
 		return err
 	}
 
-	sa := resp.Data.CreateDeploymentServiceAccount
 	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
 	tab.SuccessMsg = serviceAccountSuccessMsg
@@ -43,22 +39,18 @@ func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, cli
 }
 
 // nolint:dupl
-func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.CreateWorkspaceServiceAccountRequest,
-		Variables: map[string]interface{}{
-			"label":         label,
-			"category":      category,
-			"workspaceUuid": workspaceUUID,
-			"role":          role,
-		},
+func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.HoustonClientInterface, out io.Writer) error {
+	request := houston.CreateServiceAccountRequest{
+		WorkspaceID:  workspaceUUID,
+		Label:        label,
+		Category:     category,
+		Role:         role,
 	}
-	resp, err := req.DoWithClient(client)
+	sa, err := client.CreateServiceAccountInWorkspace(request)
 	if err != nil {
 		return err
 	}
 
-	sa := resp.Data.CreateWorkspaceServiceAccount
 	tab := newTableOut()
 	tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)
 	tab.SuccessMsg = serviceAccountSuccessMsg
@@ -66,17 +58,11 @@ func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, clien
 	return tab.Print(out)
 }
 
-func DeleteUsingWorkspaceUUID(serviceAccountID, workspaceID string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "workspaceUuid": workspaceID},
-	}
-
-	resp, err := req.DoWithClient(client)
+func DeleteUsingWorkspaceUUID(serviceAccountID, workspaceID string, client houston.HoustonClientInterface, out io.Writer) error {
+	sa, err := client.DeleteServiceAccountFromWorkspace(workspaceID, serviceAccountID)
 	if err != nil {
 		return err
 	}
-	sa := resp.Data.DeleteWorkspaceServiceAccount
 
 	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.ID)
 	fmt.Fprintln(out, msg)
@@ -84,17 +70,11 @@ func DeleteUsingWorkspaceUUID(serviceAccountID, workspaceID string, client *hous
 	return nil
 }
 
-func DeleteUsingDeploymentUUID(serviceAccountID, deploymentID string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.DeploymentServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "deploymentUuid": deploymentID},
-	}
-
-	resp, err := req.DoWithClient(client)
+func DeleteUsingDeploymentUUID(serviceAccountID, deploymentID string, client houston.HoustonClientInterface, out io.Writer) error {
+	sa, err := client.DeleteServiceAccountFromDeployment(deploymentID, serviceAccountID)
 	if err != nil {
 		return err
 	}
-	sa := resp.Data.DeleteDeploymentServiceAccount
 
 	msg := fmt.Sprintf("Service Account %s (%s) successfully deleted", sa.Label, sa.ID)
 	fmt.Fprintln(out, msg)
@@ -103,18 +83,12 @@ func DeleteUsingDeploymentUUID(serviceAccountID, deploymentID string, client *ho
 }
 
 // get all deployment service accounts
-func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.DeploymentServiceAccountsGetRequest,
-		Variables: map[string]interface{}{"deploymentUuid": id},
-	}
-
-	resp, err := req.DoWithClient(client)
+func GetDeploymentServiceAccounts(id string, client houston.HoustonClientInterface, out io.Writer) error {
+	sas, err := client.ListServiceAccountsInDeployment(id)
 	if err != nil {
 		return err
 	}
 
-	sas := resp.Data.GetDeploymentServiceAccounts
 	fmt.Print(len(sas))
 	tab := newTableOut()
 	for _, sa := range sas {
@@ -125,18 +99,12 @@ func GetDeploymentServiceAccounts(id string, client *houston.Client, out io.Writ
 }
 
 // get all workspace service accounts
-func GetWorkspaceServiceAccounts(id string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceServiceAccountsGetRequest,
-		Variables: map[string]interface{}{"workspaceUuid": id},
-	}
-
-	resp, err := req.DoWithClient(client)
+func GetWorkspaceServiceAccounts(id string, client houston.HoustonClientInterface, out io.Writer) error {
+	sas, err := client.ListServiceAccountsInWorkspace(id)
 	if err != nil {
 		return err
 	}
 
-	sas := resp.Data.GetWorkspaceServiceAccounts
 	tab := newTableOut()
 	for _, sa := range sas {
 		tab.AddRow([]string{sa.Label, sa.Category, sa.ID, sa.APIKey}, false)

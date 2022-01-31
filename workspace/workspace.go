@@ -24,18 +24,11 @@ func newTableOut() *printutil.Table {
 }
 
 // Create a workspace
-func Create(label, desc string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceCreateRequest,
-		Variables: map[string]interface{}{"label": label, "description": desc},
-	}
-
-	r, err := req.DoWithClient(client)
+func Create(label, desc string, client houston.HoustonClientInterface, out io.Writer) error {
+	w, err := client.CreateWorkspace(label, desc)
 	if err != nil {
 		return err
 	}
-
-	w := r.Data.CreateWorkspace
 
 	tab := newTableOut()
 	tab.AddRow([]string{w.Label, w.ID}, false)
@@ -46,17 +39,11 @@ func Create(label, desc string, client *houston.Client, out io.Writer) error {
 }
 
 // List all workspaces
-func List(client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query: houston.WorkspacesGetRequest,
-	}
-
-	r, err := req.DoWithClient(client)
+func List(client houston.HoustonClientInterface, out io.Writer) error {
+	ws, err := client.ListWorkspaces()
 	if err != nil {
 		return err
 	}
-
-	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -85,13 +72,8 @@ func List(client *houston.Client, out io.Writer) error {
 }
 
 // Delete a workspace by id
-func Delete(id string, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.WorkspaceDeleteRequest,
-		Variables: map[string]interface{}{"workspaceId": id},
-	}
-
-	_, err := req.DoWithClient(client)
+func Delete(id string, client houston.HoustonClientInterface, out io.Writer) error {
+	_, err := client.DeleteWorkspace(id)
 	if err != nil {
 		return err
 	}
@@ -120,20 +102,14 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error) {
+func getWorkspaceSelection(client houston.HoustonClientInterface, out io.Writer) (string, error) {
 	tab := newTableOut()
 	tab.GetUserInput = true
 
-	req := houston.Request{
-		Query: houston.WorkspacesGetRequest,
-	}
-
-	r, err := req.DoWithClient(client)
+	ws, err := client.ListWorkspaces()
 	if err != nil {
 		return "", err
 	}
-
-	ws := r.Data.GetWorkspaces
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -167,7 +143,7 @@ func getWorkspaceSelection(client *houston.Client, out io.Writer) (string, error
 }
 
 // Switch switches workspaces
-func Switch(id string, client *houston.Client, out io.Writer) error {
+func Switch(id string, client houston.HoustonClientInterface, out io.Writer) error {
 	if id == "" {
 		_id, err := getWorkspaceSelection(client, out)
 		if err != nil {
@@ -177,12 +153,7 @@ func Switch(id string, client *houston.Client, out io.Writer) error {
 		id = _id
 	}
 	// validate workspace
-	req := houston.Request{
-		Query:     houston.WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": id},
-	}
-
-	_, err := req.DoWithClient(client)
+	_, err := client.GetWorkspace(id)
 	if err != nil {
 		return fmt.Errorf("workspace id is not valid: %w", err)
 	}
@@ -203,19 +174,13 @@ func Switch(id string, client *houston.Client, out io.Writer) error {
 }
 
 // Update an astronomer workspace
-func Update(id string, client *houston.Client, out io.Writer, args map[string]string) error {
+func Update(id string, client houston.HoustonClientInterface, out io.Writer, args map[string]string) error {
 	// validate workspace
-	req := houston.Request{
-		Query:     houston.WorkspaceUpdateRequest,
-		Variables: map[string]interface{}{"workspaceId": id, "payload": args},
-	}
-
-	r, err := req.DoWithClient(client)
+	w, err := client.UpdateWorkspace(id, args)
 	if err != nil {
 		return err
 	}
 
-	w := r.Data.UpdateWorkspace
 	tab := newTableOut()
 	tab.AddRow([]string{w.Label, w.ID}, false)
 	tab.SuccessMsg = "\n Successfully updated workspace"

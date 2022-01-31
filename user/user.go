@@ -15,7 +15,7 @@ var (
 )
 
 // Create verifies input before sending a CreateUser API call to houston
-func Create(email, password string, client *houston.Client, out io.Writer) error {
+func Create(email, password string, client houston.HoustonClientInterface, out io.Writer) error {
 	if email == "" {
 		email = input.Text("Email: ")
 	}
@@ -28,17 +28,10 @@ func Create(email, password string, client *houston.Client, out io.Writer) error
 		password = inputPassword
 	}
 
-	req := houston.Request{
-		Query:     houston.UserCreateRequest,
-		Variables: map[string]interface{}{"email": email, "password": password},
-	}
-
-	resp, err := req.DoWithClient(client)
+	authUser, err := client.CreateUser(email, password)
 	if err != nil {
 		return ErrUserCreationDisabled
 	}
-
-	authUser := resp.Data.CreateUser
 
 	msg := "Successfully created user %s. %s"
 
