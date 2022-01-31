@@ -27,8 +27,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var errComposeProjectRunning = errors.New("project is up and running")
-
 const (
 	dockerStateUp = "running"
 
@@ -36,6 +34,10 @@ const (
 
 	// Docker is the docker command.
 	Docker = "docker"
+
+	healthCheckBreakPoint = 25 // Maximum number of tries to wait for health check to pass
+	healthyProjectStatus  = "health_status: healthy"
+	execDieStatus         = "exec_die"
 )
 
 type DockerCompose struct {
@@ -324,20 +326,25 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 func (d *DockerCompose) webserverHealthCheck() error {
+	healthCheckCounter := 0
 	err := d.composeService.Events(context.Background(), d.projectName, api.EventsOptions{
 		Services: []string{config.CFG.WebserverContainerName.GetString()}, Consumer: func(event api.Event) error {
-			if event.Status == "health_status: healthy" {
+			if event.Status == healthyProjectStatus {
 				fmt.Println("\nProject is running! All components are now available.")
 				// have to return an error to break from the event listener loop
 				return errComposeProjectRunning
-			} else if event.Status == "exec_die" {
+			} else if event.Status == execDieStatus {
 				fmt.Println("Waiting for Airflow components to spin up...")
 				time.Sleep(webserverHealthCheckInterval)
+			}
+			healthCheckCounter += 1
+			if healthCheckCounter > healthCheckBreakPoint {
+				return errHealthCheckBreakPointReached
 			}
 			return nil
 		},
 	})
-	if err != nil && !errors.Is(err, errComposeProjectRunning) {
+	if err != nil && !errors.Is(err, errComposeProjectRunning) && !errors.Is(err, errHealthCheckBreakPointReached) {
 		return err
 	}
 	return nil

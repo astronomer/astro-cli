@@ -21,8 +21,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var errGetImageLabel = errors.New("error getting image label")
-
 type DockerImage struct {
 	imageName string
 }

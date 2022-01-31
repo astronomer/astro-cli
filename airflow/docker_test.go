@@ -3,6 +3,7 @@ package airflow
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -296,9 +297,9 @@ func TestDockerGetContainerIDFailure(t *testing.T) {
 	assert.Contains(t, id, "")
 }
 
-func TestDockerWebserverHealthCheck(t *testing.T) {
+func TestDockerWebserverHealthCheckPass(t *testing.T) {
 	composeMock, docker, _ := getComposeMocks()
-	mockCall := composeMock.On("Events", mock.Anything, mock.Anything, mock.Anything)
+	mockCall := composeMock.On("Events", context.Background(), "test", mock.Anything)
 	mockCall.RunFn = func(args mock.Arguments) {
 		consumer := args.Get(2).(api.EventsOptions).Consumer
 		err := consumer(api.Event{Status: "exec_create"})
@@ -309,6 +310,23 @@ func TestDockerWebserverHealthCheck(t *testing.T) {
 		assert.Nil(t, err)
 		err = consumer(api.Event{Status: "health_status: healthy"})
 		assert.ErrorIs(t, err, errComposeProjectRunning)
+		mockCall.ReturnArguments = mock.Arguments{err}
+	}
+	err := docker.webserverHealthCheck()
+	assert.Nil(t, err)
+}
+
+func TestDockerWebserverHealthCheckBreakPoint(t *testing.T) {
+	composeMock, docker, _ := getComposeMocks()
+	mockCall := composeMock.On("Events", context.Background(), "test", mock.Anything)
+	mockCall.RunFn = func(args mock.Arguments) {
+		consumer := args.Get(2).(api.EventsOptions).Consumer
+		for i := 0; i < healthCheckBreakPoint; i++ {
+			err := consumer(api.Event{Status: "exec_start"})
+			assert.Nil(t, err)
+		}
+		err := consumer(api.Event{Status: "exec_start"})
+		assert.ErrorIs(t, err, errHealthCheckBreakPointReached)
 		mockCall.ReturnArguments = mock.Arguments{err}
 	}
 	err := docker.webserverHealthCheck()
