@@ -352,7 +352,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
 
-	d, err := client.UpdateDeployment(vars)
+	d, err := client.UpdateDeploymentAirflow(vars)
 	if err != nil {
 		return err
 	}
