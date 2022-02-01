@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -56,33 +55,29 @@ func TestBuildPushDockerImageSuccess(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	ok := `{
-		"data": {
-		  "deploymentConfig": {
-			"airflowVersions": [
-			  "2.1.0",
-			  "2.0.2",
-			  "2.0.0",
-			  "1.10.15",
-			  "1.10.14",
-			  "1.10.12",
-			  "1.10.10",
-			  "1.10.7",
-			  "1.10.5"
-			]
-		  }
-		}
-	  }`
-
-	var resp *houston.Response
-	_ = json.Unmarshal([]byte(ok), resp)
-
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
 		mockImageHandler.On("Build", mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockImageHandler, nil
 	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowVersions: []string{
+			"2.1.0",
+			"2.0.2",
+			"2.0.0",
+			"1.10.15",
+			"1.10.14",
+			"1.10.12",
+			"1.10.10",
+			"1.10.7",
+			"1.10.5",
+		},
+	}
+	houstonMock := new(mocks.ClientInterface)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonClient = houstonMock
 
 	err := buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
 	assert.NoError(t, err)
@@ -95,26 +90,22 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	ok := `{
-		"data": {
-		  "deploymentConfig": {
-			"airflowVersions": [
-			  "2.1.0",
-			  "2.0.2",
-			  "2.0.0",
-			  "1.10.15",
-			  "1.10.14",
-			  "1.10.12",
-			  "1.10.10",
-			  "1.10.7",
-			  "1.10.5"
-			]
-		  }
-		}
-	  }`
-
-	var resp *houston.Response
-	_ = json.Unmarshal([]byte(ok), resp)
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowVersions: []string{
+			"2.1.0",
+			"2.0.2",
+			"2.0.0",
+			"1.10.15",
+			"1.10.14",
+			"1.10.12",
+			"1.10.10",
+			"1.10.7",
+			"1.10.5",
+		},
+	}
+	houstonMock := new(mocks.ClientInterface)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
+	houstonClient = houstonMock
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
