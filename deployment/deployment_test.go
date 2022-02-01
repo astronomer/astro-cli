@@ -1620,7 +1620,7 @@ func TestCreateWithFreeFormNamespaceDeployment(t *testing.T) {
       "hardDeleteDeployment": true,
       "manualNamespaceNames": true,
 	  "featureFlags": {
-		"manualNamespaceNames": true,
+		"manualNamespaceNames": false,
 		"namespaceFreeformEntry": true
 	  }
     },
@@ -1716,7 +1716,7 @@ func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
       "hardDeleteDeployment": true,
       "manualNamespaceNames": true,
 	  "featureFlags": {
-		"manualNamespaceNames": true,
+		"manualNamespaceNames": false,
 		"namespaceFreeformEntry": true
 	  }
     },

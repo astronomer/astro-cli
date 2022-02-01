@@ -158,7 +158,7 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
-	if CheckPreCreateNamespaceDeployment(client) && !CheckNamespaceFreeformEntryDeployment(client) {
+	if CheckPreCreateNamespaceDeployment(client) {
 		namespace, err := getDeploymentSelectionNamespaces(client, out)
 		if err != nil {
 			return err
@@ -166,7 +166,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		vars["namespace"] = namespace
 	}
 
-	if CheckNamespaceFreeformEntryDeployment(client) && CheckPreCreateNamespaceDeployment(client) {
+	if CheckNamespaceFreeformEntryDeployment(client) {
 		namespace, err := getDeploymentNamespaceName()
 		if err != nil {
 			return err
