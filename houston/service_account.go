@@ -4,9 +4,9 @@ package houston
 type CreateServiceAccountRequest struct {
 	WorkspaceID  string `json:"workspaceUuid"`
 	DeploymentID string `json:"deploymentUuid"`
-	Label        string
-	Category     string
-	Role         string
+	Label        string `json:"label"`
+	Category     string `json:"category"`
+	Role         string `json:"role"`
 }
 
 // CreateServiceAccountInDeployment - create a service account in a deployment

@@ -2,17 +2,17 @@ package houston
 
 // ListUsersInDeploymentRequest - properties to filter users in a deployment
 type ListUsersInDeploymentRequest struct {
-	UserID       string
-	Email        string
-	FullName     string
-	DeploymentID string
+	UserID       string `json:"userId"`
+	Email        string `json:"email"`
+	FullName     string `json:"fullName"`
+	DeploymentID string `json:"deploymentId"`
 }
 
 // UpdateUserInDeploymentRequest - properties to create a user in a deployment
 type UpdateUserInDeploymentRequest struct {
-	Email        string
-	Role         string
-	DeploymentID string
+	Email        string `json:"email"`
+	Role         string `json:"role"`
+	DeploymentID string `json:"deploymentId"`
 }
 
 // ListUsersInDeployment - list users with deployment access
