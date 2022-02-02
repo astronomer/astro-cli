@@ -50,7 +50,7 @@ func TestAppConfig(t *testing.T) {
 				"manualReleaseNames": false,
 				"hardDeleteDeployment": false,
 				"featureFlags": {
-					"namespaceFreeformEntry": false
+					"namespaceFreeFormEntry": false
 				}
 			}
 		}
@@ -69,7 +69,7 @@ func TestAppConfig(t *testing.T) {
 	assert.Equal(t, false, config.ManualReleaseNames)
 	assert.Equal(t, true, config.SMTPConfigured)
 	assert.Equal(t, "local.astronomer.io", config.BaseDomain)
-	assert.Equal(t, false, config.Flags.NamespaceFreeformEntry)
+	assert.Equal(t, false, config.Flags.NamespaceFreeFormEntry)
 }
 
 func TestAppConfigError(t *testing.T) {
@@ -1393,7 +1393,7 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
       "manualReleaseNames": false,
       "hardDeleteDeployment": true,
 	  "featureFlags": {
-		"namespaceFreeformEntry": false
+		"namespaceFreeFormEntry": false
 	  }
     },
     "availableNamespaces": [ { "name": "test1" }, { "name": "test2" } ]
@@ -1621,7 +1621,7 @@ func TestCreateWithFreeFormNamespaceDeployment(t *testing.T) {
       "manualNamespaceNames": true,
 	  "featureFlags": {
 		"manualNamespaceNames": false,
-		"namespaceFreeformEntry": true
+		"namespaceFreeFormEntry": true
 	  }
     },
     "availableNamespaces": [
@@ -1717,7 +1717,7 @@ func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
       "manualNamespaceNames": true,
 	  "featureFlags": {
 		"manualNamespaceNames": false,
-		"namespaceFreeformEntry": true
+		"namespaceFreeFormEntry": true
 	  }
     },
     "availableNamespaces": [

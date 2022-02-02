@@ -137,12 +137,12 @@ func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
 	return appConfig.Flags.ManualNamespaceNames
 }
 
-func CheckNamespaceFreeformEntryDeployment(client *houston.Client) bool {
+func CheckNamespaceFreeFormEntryDeployment(client *houston.Client) bool {
 	appConfig, err := AppConfig(client)
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.NamespaceFreeformEntry
+	return appConfig.Flags.NamespaceFreeFormEntry
 }
 
 func CheckTriggererEnabled(client *houston.Client) bool {
@@ -166,7 +166,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		vars["namespace"] = namespace
 	}
 
-	if CheckNamespaceFreeformEntryDeployment(client) {
+	if CheckNamespaceFreeFormEntryDeployment(client) {
 		namespace, err := getDeploymentNamespaceName()
 		if err != nil {
 			return err
