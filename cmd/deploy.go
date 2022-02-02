@@ -197,7 +197,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	deploymentLink := buildAstroUIDeploymentLink(name, wsID)
-	fmt.Printf("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful (%s).", deploymentLink)
+	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).", deploymentLink)
 
 	return nil
 }
@@ -300,5 +300,5 @@ func buildAstroUIDeploymentLink(deploymentName, wsID string) string {
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf("https://app.%s/w/%s/d/%s", context.Domain, wsID, deploymentName)
+	return fmt.Sprintf("%s://app.%s/w/%s/d/%s", config.CFG.CloudAPIProtocol.GetString(), context.Domain, wsID, deploymentName)
 }
