@@ -295,7 +295,7 @@ type FeatureFlags struct {
 	ManualNamespaceNames   bool `json:"manualNamespaceNames"`
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
-	NamespaceFreeformEntry bool `json:"namespaceFreeformEntry"`
+	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
 }
 
 // coerce a string into SemVer if possible
