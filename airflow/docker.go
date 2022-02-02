@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
 
+	composeInterp "github.com/compose-spec/compose-go/interpolation"
 	"github.com/compose-spec/compose-go/loader"
 	composeTypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -296,12 +297,14 @@ func createProject(projectName, airflowHome, envFile string, labels map[string]s
 
 	loaderOption := func(opts *loader.Options) {
 		opts.Name = projectName
+		opts.Interpolate = &composeInterp.Options{
+			LookupValue: os.LookupEnv,
+		}
 	}
 
 	project, err := loader.Load(composeTypes.ConfigDetails{
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
-		Environment: map[string]string{},
 	}, loaderOption)
 
 	return project, err
