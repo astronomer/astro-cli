@@ -14,7 +14,7 @@ const (
 	defaultFilePerm os.FileMode = 0777
 )
 
-// Exists returns a boolean indicating if the given path already exists
+// Exists returns a boolean indicating if the given path already exists in fs or os in case fs is nil
 func Exists(path string, fs afero.Fs) (bool, error) {
 	if path == "" {
 		return false, nil

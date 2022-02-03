@@ -88,7 +88,7 @@ func TestInit(t *testing.T) {
 		"dags/example-dag.py",
 	}
 	for _, file := range expectedFiles {
-		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), fs)
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil) // passing afero.Fs as nil since none of the files in expectedFiles are created using fs
 		assert.NoError(t, err)
 		assert.True(t, exist)
 	}
