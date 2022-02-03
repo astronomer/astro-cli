@@ -31,8 +31,6 @@ var (
 	podConfigFile            = "pod-config.yml"
 	podStateFile             = ".astro/pod-state.yaml"
 	podContainerStateRunning = "running"
-
-	webserverHealthCheckInterval = 5 * time.Second
 )
 
 type Podman struct {
@@ -411,7 +409,7 @@ func (p *Podman) webserverHealthCheck() {
 			break
 		}
 	sleep:
-		fmt.Println("Waiting for Airflow containers to spin up...")
+		fmt.Println("Waiting for Airflow components to spin up...")
 		time.Sleep(webserverHealthCheckInterval)
 	}
 }

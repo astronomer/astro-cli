@@ -14,6 +14,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
+	"github.com/pkg/errors"
 
 	"github.com/compose-spec/compose-go/loader"
 	composeTypes "github.com/compose-spec/compose-go/types"
@@ -33,6 +34,10 @@ const (
 
 	// Docker is the docker command.
 	Docker = "docker"
+
+	healthCheckBreakPoint = 25 // Maximum number of tries to wait for health check to pass
+	healthyProjectStatus  = "health_status: healthy"
+	execDieStatus         = "exec_die"
 )
 
 type DockerCompose struct {
@@ -104,6 +109,11 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	err = d.composeService.Up(context.TODO(), project, api.UpOptions{})
 	if err != nil {
 		return fmt.Errorf("%s: %w", messages.ErrContainerRecreate, err)
+	}
+
+	err = d.webserverHealthCheck()
+	if err != nil {
+		return errors.Wrap(err, messages.ErrContainerRecreate)
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
@@ -310,6 +320,31 @@ func createProject(projectName, airflowHome, envFile string, labels map[string]s
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
+}
+
+func (d *DockerCompose) webserverHealthCheck() error {
+	healthCheckCounter := 0
+	err := d.composeService.Events(context.Background(), d.projectName, api.EventsOptions{
+		Services: []string{config.CFG.WebserverContainerName.GetString()}, Consumer: func(event api.Event) error {
+			if event.Status == healthyProjectStatus {
+				fmt.Println("\nProject is running! All components are now available.")
+				// have to return an error to break from the event listener loop
+				return errComposeProjectRunning
+			} else if event.Status == execDieStatus {
+				fmt.Println("Waiting for Airflow components to spin up...")
+				time.Sleep(webserverHealthCheckInterval)
+			}
+			healthCheckCounter++
+			if healthCheckCounter > healthCheckBreakPoint {
+				return errHealthCheckBreakPointReached
+			}
+			return nil
+		},
+	})
+	if err != nil && !errors.Is(err, errComposeProjectRunning) && !errors.Is(err, errHealthCheckBreakPointReached) {
+		return err
+	}
+	return nil
 }
 
 // execPipe does pipe stream into stdout/stdin and stderr

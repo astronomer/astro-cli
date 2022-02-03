@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,8 +19,6 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	log "github.com/sirupsen/logrus"
 )
-
-var errGetImageLabel = errors.New("error getting image label")
 
 type DockerImage struct {
 	imageName string

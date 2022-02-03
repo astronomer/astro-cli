@@ -3,6 +3,7 @@ package airflow
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -139,6 +140,12 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
+    healthcheck:
+      test: curl --fail http://webserver:8080/health || exit 1
+      interval: 2s
+      retries: 50
+      start_period: 10s
+      timeout: 10s
     
 
   triggerer:
@@ -288,6 +295,42 @@ func TestDockerGetContainerIDFailure(t *testing.T) {
 	id, err = docker.GetContainerID("testFail")
 	assert.NoError(t, err)
 	assert.Contains(t, id, "")
+}
+
+func TestDockerWebserverHealthCheckPass(t *testing.T) {
+	composeMock, docker, _ := getComposeMocks()
+	mockCall := composeMock.On("Events", context.Background(), "test", mock.Anything)
+	mockCall.RunFn = func(args mock.Arguments) {
+		consumer := args.Get(2).(api.EventsOptions).Consumer
+		err := consumer(api.Event{Status: "exec_create"})
+		assert.Nil(t, err)
+		err = consumer(api.Event{Status: "exec_start"})
+		assert.Nil(t, err)
+		err = consumer(api.Event{Status: "exec_die"})
+		assert.Nil(t, err)
+		err = consumer(api.Event{Status: "health_status: healthy"})
+		assert.ErrorIs(t, err, errComposeProjectRunning)
+		mockCall.ReturnArguments = mock.Arguments{err}
+	}
+	err := docker.webserverHealthCheck()
+	assert.Nil(t, err)
+}
+
+func TestDockerWebserverHealthCheckBreakPoint(t *testing.T) {
+	composeMock, docker, _ := getComposeMocks()
+	mockCall := composeMock.On("Events", context.Background(), "test", mock.Anything)
+	mockCall.RunFn = func(args mock.Arguments) {
+		consumer := args.Get(2).(api.EventsOptions).Consumer
+		for i := 0; i < healthCheckBreakPoint; i++ {
+			err := consumer(api.Event{Status: "exec_start"})
+			assert.Nil(t, err)
+		}
+		err := consumer(api.Event{Status: "exec_start"})
+		assert.ErrorIs(t, err, errHealthCheckBreakPointReached)
+		mockCall.ReturnArguments = mock.Arguments{err}
+	}
+	err := docker.webserverHealthCheck()
+	assert.Nil(t, err)
 }
 
 func getComposeMocks() (*mocks.Service, *DockerCompose, *mocks.ImageHandler) {
