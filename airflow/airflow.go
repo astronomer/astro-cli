@@ -36,7 +36,7 @@ func initDirs(root string, dirs []string) error {
 		fullpath := filepath.Join(root, dir)
 
 		// Move on if already exists
-		_, err := fileutil.Exists(fullpath)
+		_, err := fileutil.Exists(fullpath, nil)
 		if err != nil {
 			return fmt.Errorf("failed to check existence of '%s': %w", fullpath, err)
 		}
@@ -57,7 +57,7 @@ func initFiles(root string, files map[string]string) error {
 		fullpath := filepath.Join(root, file)
 
 		// Move on if already exists
-		fileExist, err := fileutil.Exists(fullpath)
+		fileExist, err := fileutil.Exists(fullpath, nil)
 		if err != nil {
 			return fmt.Errorf("failed to check existence of '%s': %w", fullpath, err)
 		}

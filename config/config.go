@@ -96,7 +96,7 @@ func initHome(fs afero.Fs) {
 	}
 
 	// If home config does not exist, create it
-	homeConfigExists, _ := fileutil.Exists(HomeConfigFile)
+	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs)
 
 	if !homeConfigExists {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
@@ -129,7 +129,7 @@ func initProject(fs afero.Fs) {
 	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
 
 	// If path is empty or config file does not exist, just return
-	workingConfigExists, _ := fileutil.Exists(workingConfigFile)
+	workingConfigExists, _ := fileutil.Exists(workingConfigFile, fs)
 	if workingConfigPath == "" || workingConfigPath == HomeConfigPath || !workingConfigExists {
 		return
 	}
@@ -197,7 +197,7 @@ func IsProjectDir(path string) (bool, error) {
 		return false, nil
 	}
 
-	return fileutil.Exists(configFile)
+	return fileutil.Exists(configFile, nil)
 }
 
 // saveConfig will save the config to a file

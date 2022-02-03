@@ -184,7 +184,7 @@ func getFmtEnvFile(envFile string, containerEngine Container) (string, error) {
 		return "", nil
 	}
 
-	envExists, err := fileutil.Exists(envFile)
+	envExists, err := fileutil.Exists(envFile, nil)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", fmt.Sprintf(messages.EnvPath, envFile), err)
 	}
