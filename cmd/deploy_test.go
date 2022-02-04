@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -141,4 +142,15 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	err = buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockImageHandler.AssertExpectations(t)
+}
+
+func TestBuildAstroUIDeploymentLink(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("docker")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+	houstonHost := testUtil.GetEnv("HOUSTON_HOST", "localhost")
+	expectedResult := fmt.Sprintf("https://app.%s/w/wsID1234/d/test", houstonHost)
+	actualResult := buildAstroUIDeploymentLink("test", "wsID1234")
+	assert.Equal(t, expectedResult, actualResult)
 }
