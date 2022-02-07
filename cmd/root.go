@@ -51,7 +51,7 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newSaRootCmd(client, out),
 		// TODO: remove newAirflowRootCmd, after 1.0 we have only devRootCmd
 		newAirflowRootCmd(client, out),
-		newLogsDeprecatedCmd(),
+		newLogsDeprecatedCmd(client),
 	)
 	return rootCmd
 }

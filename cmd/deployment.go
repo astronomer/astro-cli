@@ -112,7 +112,7 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 		newDeploymentListCmd(client, out),
 		newDeploymentUpdateCmd(client, out),
 		newDeploymentDeleteCmd(client, out),
-		newLogsCmd(),
+		newLogsCmd(client),
 		newDeploymentSaRootCmd(client, out),
 		newDeploymentUserRootCmd(client, out),
 		newDeploymentAirflowRootCmd(client, out),
