@@ -1,11 +1,21 @@
 package cmd
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/astronomer/astro-cli/deployment"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/logs"
 
 	"github.com/spf13/cobra"
+)
+
+const (
+	logWebserver = "webserver"
+	logScheduler = "scheduler"
+	logWorker    = "worker"
+	logTriggerer = "triggerer"
 )
 
 var (
@@ -27,7 +37,7 @@ var (
 `
 )
 
-func newLogsCmd() *cobra.Command {
+func newLogsCmd(client *houston.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
@@ -40,10 +50,18 @@ func newLogsCmd() *cobra.Command {
 		newSchedulerLogsCmd(),
 		newWorkersLogsCmd(),
 	)
+
+	appConfig, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Println("Error checking feature flag", err)
+	} else if appConfig.Flags.TriggererEnabled {
+		cmd.AddCommand(newTriggererLogsCmd())
+	}
+
 	return cmd
 }
 
-func newLogsDeprecatedCmd() *cobra.Command {
+func newLogsDeprecatedCmd(client *houston.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "logs",
 		Aliases:    []string{"log", "l"},
@@ -57,6 +75,14 @@ func newLogsDeprecatedCmd() *cobra.Command {
 		newSchedulerLogsCmd(),
 		newWorkersLogsCmd(),
 	)
+
+	appConfig, err := deployment.AppConfig(client)
+	if err != nil {
+		fmt.Println("Error checking feature flag", err)
+	} else if appConfig.Flags.TriggererEnabled {
+		cmd.AddCommand(newTriggererLogsCmd())
+	}
+
 	return cmd
 }
 
@@ -71,7 +97,9 @@ func newWebserverLogsCmd() *cobra.Command {
 astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
-		RunE: webserverRemoteLogs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fetchRemoteLogs(logWebserver, args)
+		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
@@ -91,7 +119,9 @@ func newSchedulerLogsCmd() *cobra.Command {
 astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
-		RunE: schedulerRemoteLogs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fetchRemoteLogs(logScheduler, args)
+		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
@@ -100,6 +130,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
+// nolint:dupl
 func newWorkersLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workers",
@@ -110,7 +141,9 @@ func newWorkersLogsCmd() *cobra.Command {
 astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
-		RunE: workersRemoteLogs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fetchRemoteLogs(logWorker, args)
+		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
@@ -120,23 +153,32 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-func webserverRemoteLogs(cmd *cobra.Command, args []string) error {
-	if follow {
-		return logs.SubscribeDeploymentLog(args[0], "webserver", search, since)
+// nolint:dupl
+func newTriggererLogsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "triggerer",
+		Aliases: []string{"triggerers", "triggerer", "trg"},
+		Short:   "Stream logs from Airflow triggerer",
+		Long: `Stream logs from Airflow triggerer. For example:
+
+astro deployment logs triggerer YOU_DEPLOYMENT_ID -s string-to-find
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fetchRemoteLogs(logTriggerer, args)
+		},
 	}
-	return logs.DeploymentLog(args[0], "webserver", search, since)
+	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	// get airflow workers logs
+	return cmd
 }
 
-func schedulerRemoteLogs(cmd *cobra.Command, args []string) error {
+func fetchRemoteLogs(component string, args []string) error {
 	if follow {
-		return logs.SubscribeDeploymentLog(args[0], "scheduler", search, since)
+		return logs.SubscribeDeploymentLog(args[0], component, search, since)
 	}
-	return logs.DeploymentLog(args[0], "scheduler", search, since)
-}
-
-func workersRemoteLogs(cmd *cobra.Command, args []string) error {
-	if follow {
-		return logs.SubscribeDeploymentLog(args[0], "worker", search, since)
-	}
-	return logs.DeploymentLog(args[0], "worker", search, since)
+	return logs.DeploymentLog(args[0], component, search, since)
 }
