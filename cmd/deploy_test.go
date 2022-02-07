@@ -82,6 +82,7 @@ func TestBuildPushDockerImageSuccess(t *testing.T) {
 	err := buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
 	assert.NoError(t, err)
 	mockImageHandler.AssertExpectations(t)
+	houstonMock.AssertExpectations(t)
 }
 
 func TestBuildPushDockerImageFailure(t *testing.T) {
@@ -127,6 +128,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	err = buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockImageHandler.AssertExpectations(t)
+	houstonMock.AssertExpectations(t)
 }
 
 func TestBuildAstroUIDeploymentLink(t *testing.T) {
