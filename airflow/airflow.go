@@ -24,7 +24,7 @@ const (
 	airflowVersionLabelName        = "io.astronomer.docker.airflow.version"
 	triggererAllowedAirflowVersion = "2.2.0"
 
-	webserverHealthCheckInterval = 5 * time.Second
+	webserverHealthCheckInterval = 10 * time.Second
 )
 
 var repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number

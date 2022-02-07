@@ -35,7 +35,7 @@ const (
 	// Docker is the docker command.
 	Docker = "docker"
 
-	healthCheckBreakPoint = 25 // Maximum number of tries to wait for health check to pass
+	healthCheckBreakPoint = 100 // Maximum number of events to wait for health check to pass
 	healthyProjectStatus  = "health_status: healthy"
 	execDieStatus         = "exec_die"
 )
