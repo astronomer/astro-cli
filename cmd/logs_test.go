@@ -26,7 +26,7 @@ func TestDeploymentLogsRootCommandTriggererEnabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 	output, err := executeCommandC(api, "deployment", "logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")
@@ -47,7 +47,7 @@ func TestDeploymentLogsRootCommandTriggererDisabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 	output, err := executeCommandC(api, "deployment", "logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")
