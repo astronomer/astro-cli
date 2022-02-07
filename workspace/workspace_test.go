@@ -33,7 +33,7 @@ func TestCreate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "test"
 	description := "description"
 
@@ -58,7 +58,7 @@ func TestCreateError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "test"
 	description := "description"
 
@@ -132,7 +132,7 @@ func TestList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
@@ -210,7 +210,7 @@ func TestListActiveWorkspace(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
@@ -229,7 +229,7 @@ func TestListError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
@@ -253,7 +253,7 @@ func TestDelete(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	wsID := "ckc0j8y1101xo0760or02jdi7"
 
 	buf := new(bytes.Buffer)
@@ -273,7 +273,7 @@ func TestDeleteError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	wsID := "ckc0j8y1101xo0760or02jdi7"
 
 	buf := new(bytes.Buffer)
@@ -329,7 +329,7 @@ func TestGetWorkspaceSelectionError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	_, err := getWorkspaceSelection(api, buf)
 	assert.EqualError(t, err, "API error (500): Internal Server Error")
@@ -389,7 +389,7 @@ contexts:
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	wsID := "ckbv7zvb100pe0760xp98qnh9"
 
 	buf := new(bytes.Buffer)
@@ -426,7 +426,7 @@ contexts:
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	wsID := "ckbv7zvb100pe0760xp98qnh9"
 
 	buf := new(bytes.Buffer)
@@ -454,7 +454,7 @@ func TestUpdate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	id := "test"
 	args := map[string]string{"1": "2"}
 
@@ -476,7 +476,7 @@ func TestUpdateError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	id := "test"
 	args := map[string]string{"1": "2"}
 

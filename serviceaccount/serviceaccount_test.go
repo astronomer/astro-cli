@@ -38,7 +38,7 @@ func TestCreateUsingDeploymentUUID(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	deploymentUUID := "ck1qg6whg001r08691y117hub"
 	label, category, role := "test", "test", "test"
@@ -79,7 +79,7 @@ func TestCreateUsingWorkspaceUUID(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	workspaceUUID := "ck1qg6whg001r08691y117hub"
 	label, category, role := "test", "test", "test"
@@ -111,7 +111,7 @@ func TestDeleteUsingWorkspaceUUID(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	serviceAccountID := "ckbvcbqs1014t0760u4bszmcs"
 	workspaceUUID := "ck1qg6whg001r08691y117hub"
 	buf := new(bytes.Buffer)
@@ -139,7 +139,7 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	serviceAccountID := "ckbvcbqs1014t0760u4bszmcs"
 	deploymentUUID := "ck1qg6whg001r08691y117hub"
 	buf := new(bytes.Buffer)
@@ -178,7 +178,7 @@ func TestGetDeploymentServiceAccount(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentUUID := "ckqvf9spa1189rn9hbh5h439u"
 	buf := new(bytes.Buffer)
 	err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
@@ -216,7 +216,7 @@ func TestGetWorkspaceServiceAccount(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentUUID := "ckqvf9spa1189rn9hbh5h439u"
 	buf := new(bytes.Buffer)
 	err := GetWorkspaceServiceAccounts(deploymentUUID, api, buf)

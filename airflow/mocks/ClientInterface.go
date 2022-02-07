@@ -12,12 +12,12 @@ type ClientInterface struct {
 	mock.Mock
 }
 
-// AddUserToDeployment provides a mock function with given fields: variables
-func (_m *ClientInterface) AddUserToDeployment(variables houston.UpdateUserInDeploymentRequest) (*houston.RoleBinding, error) {
+// AddDeploymentUser provides a mock function with given fields: variables
+func (_m *ClientInterface) AddDeploymentUser(variables houston.UpdateDeploymentUserRequest) (*houston.RoleBinding, error) {
 	ret := _m.Called(variables)
 
 	var r0 *houston.RoleBinding
-	if rf, ok := ret.Get(0).(func(houston.UpdateUserInDeploymentRequest) *houston.RoleBinding); ok {
+	if rf, ok := ret.Get(0).(func(houston.UpdateDeploymentUserRequest) *houston.RoleBinding); ok {
 		r0 = rf(variables)
 	} else {
 		if ret.Get(0) != nil {
@@ -26,7 +26,7 @@ func (_m *ClientInterface) AddUserToDeployment(variables houston.UpdateUserInDep
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(houston.UpdateUserInDeploymentRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(houston.UpdateDeploymentUserRequest) error); ok {
 		r1 = rf(variables)
 	} else {
 		r1 = ret.Error(1)
@@ -35,8 +35,8 @@ func (_m *ClientInterface) AddUserToDeployment(variables houston.UpdateUserInDep
 	return r0, r1
 }
 
-// AddUserToWorkspace provides a mock function with given fields: workspaceID, email, role
-func (_m *ClientInterface) AddUserToWorkspace(workspaceID string, email string, role string) (*houston.Workspace, error) {
+// AddWorkspaceUser provides a mock function with given fields: workspaceID, email, role
+func (_m *ClientInterface) AddWorkspaceUser(workspaceID string, email string, role string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID, email, role)
 
 	var r0 *houston.Workspace
@@ -240,8 +240,8 @@ func (_m *ClientInterface) DeleteDeploymentServiceAccount(deploymentID string, s
 	return r0, r1
 }
 
-// DeleteUserFromDeployment provides a mock function with given fields: deploymentID, email
-func (_m *ClientInterface) DeleteUserFromDeployment(deploymentID string, email string) (*houston.RoleBinding, error) {
+// DeleteDeploymentUser provides a mock function with given fields: deploymentID, email
+func (_m *ClientInterface) DeleteDeploymentUser(deploymentID string, email string) (*houston.RoleBinding, error) {
 	ret := _m.Called(deploymentID, email)
 
 	var r0 *houston.RoleBinding
@@ -256,29 +256,6 @@ func (_m *ClientInterface) DeleteUserFromDeployment(deploymentID string, email s
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = rf(deploymentID, email)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// DeleteUserFromWorkspace provides a mock function with given fields: workspaceID, userID
-func (_m *ClientInterface) DeleteUserFromWorkspace(workspaceID string, userID string) (*houston.Workspace, error) {
-	ret := _m.Called(workspaceID, userID)
-
-	var r0 *houston.Workspace
-	if rf, ok := ret.Get(0).(func(string, string) *houston.Workspace); ok {
-		r0 = rf(workspaceID, userID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*houston.Workspace)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(workspaceID, userID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -325,6 +302,29 @@ func (_m *ClientInterface) DeleteWorkspaceServiceAccount(workspaceID string, ser
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = rf(workspaceID, serviceAccountID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteWorkspaceUser provides a mock function with given fields: workspaceID, userID
+func (_m *ClientInterface) DeleteWorkspaceUser(workspaceID string, userID string) (*houston.Workspace, error) {
+	ret := _m.Called(workspaceID, userID)
+
+	var r0 *houston.Workspace
+	if rf, ok := ret.Get(0).(func(string, string) *houston.Workspace); ok {
+		r0 = rf(workspaceID, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Workspace)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(workspaceID, userID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -447,27 +447,6 @@ func (_m *ClientInterface) GetDeploymentConfig() (*houston.DeploymentConfig, err
 	return r0, r1
 }
 
-// GetUserRoleInWorkspace provides a mock function with given fields: workspaceID, email
-func (_m *ClientInterface) GetUserRoleInWorkspace(workspaceID string, email string) (houston.WorkspaceUserRoleBindings, error) {
-	ret := _m.Called(workspaceID, email)
-
-	var r0 houston.WorkspaceUserRoleBindings
-	if rf, ok := ret.Get(0).(func(string, string) houston.WorkspaceUserRoleBindings); ok {
-		r0 = rf(workspaceID, email)
-	} else {
-		r0 = ret.Get(0).(houston.WorkspaceUserRoleBindings)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(workspaceID, email)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetWorkspace provides a mock function with given fields: workspaceID
 func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID)
@@ -484,6 +463,27 @@ func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace,
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(workspaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceUserRole provides a mock function with given fields: workspaceID, email
+func (_m *ClientInterface) GetWorkspaceUserRole(workspaceID string, email string) (houston.WorkspaceUserRoleBindings, error) {
+	ret := _m.Called(workspaceID, email)
+
+	var r0 houston.WorkspaceUserRoleBindings
+	if rf, ok := ret.Get(0).(func(string, string) houston.WorkspaceUserRoleBindings); ok {
+		r0 = rf(workspaceID, email)
+	} else {
+		r0 = ret.Get(0).(houston.WorkspaceUserRoleBindings)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(workspaceID, email)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -537,6 +537,29 @@ func (_m *ClientInterface) ListDeploymentServiceAccounts(deploymentID string) ([
 	return r0, r1
 }
 
+// ListDeploymentUsers provides a mock function with given fields: filters
+func (_m *ClientInterface) ListDeploymentUsers(filters houston.ListDeploymentUsersRequest) ([]houston.DeploymentUser, error) {
+	ret := _m.Called(filters)
+
+	var r0 []houston.DeploymentUser
+	if rf, ok := ret.Get(0).(func(houston.ListDeploymentUsersRequest) []houston.DeploymentUser); ok {
+		r0 = rf(filters)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.DeploymentUser)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(houston.ListDeploymentUsersRequest) error); ok {
+		r1 = rf(filters)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListDeployments provides a mock function with given fields: filters
 func (_m *ClientInterface) ListDeployments(filters houston.ListDeploymentsRequest) ([]houston.Deployment, error) {
 	ret := _m.Called(filters)
@@ -560,16 +583,16 @@ func (_m *ClientInterface) ListDeployments(filters houston.ListDeploymentsReques
 	return r0, r1
 }
 
-// ListUserAndRolesFromWorkspace provides a mock function with given fields: workspaceID
-func (_m *ClientInterface) ListUserAndRolesFromWorkspace(workspaceID string) (*houston.Workspace, error) {
+// ListWorkspaceServiceAccounts provides a mock function with given fields: workspaceID
+func (_m *ClientInterface) ListWorkspaceServiceAccounts(workspaceID string) ([]houston.ServiceAccount, error) {
 	ret := _m.Called(workspaceID)
 
-	var r0 *houston.Workspace
-	if rf, ok := ret.Get(0).(func(string) *houston.Workspace); ok {
+	var r0 []houston.ServiceAccount
+	if rf, ok := ret.Get(0).(func(string) []houston.ServiceAccount); ok {
 		r0 = rf(workspaceID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*houston.Workspace)
+			r0 = ret.Get(0).([]houston.ServiceAccount)
 		}
 	}
 
@@ -583,39 +606,16 @@ func (_m *ClientInterface) ListUserAndRolesFromWorkspace(workspaceID string) (*h
 	return r0, r1
 }
 
-// ListUsersInDeployment provides a mock function with given fields: filters
-func (_m *ClientInterface) ListUsersInDeployment(filters houston.ListUsersInDeploymentRequest) ([]houston.DeploymentUser, error) {
-	ret := _m.Called(filters)
-
-	var r0 []houston.DeploymentUser
-	if rf, ok := ret.Get(0).(func(houston.ListUsersInDeploymentRequest) []houston.DeploymentUser); ok {
-		r0 = rf(filters)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]houston.DeploymentUser)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(houston.ListUsersInDeploymentRequest) error); ok {
-		r1 = rf(filters)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListWorkspaceServiceAccounts provides a mock function with given fields: workspaceID
-func (_m *ClientInterface) ListWorkspaceServiceAccounts(workspaceID string) ([]houston.ServiceAccount, error) {
+// ListWorkspaceUserAndRoles provides a mock function with given fields: workspaceID
+func (_m *ClientInterface) ListWorkspaceUserAndRoles(workspaceID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID)
 
-	var r0 []houston.ServiceAccount
-	if rf, ok := ret.Get(0).(func(string) []houston.ServiceAccount); ok {
+	var r0 *houston.Workspace
+	if rf, ok := ret.Get(0).(func(string) *houston.Workspace); ok {
 		r0 = rf(workspaceID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]houston.ServiceAccount)
+			r0 = ret.Get(0).(*houston.Workspace)
 		}
 	}
 
@@ -698,12 +698,12 @@ func (_m *ClientInterface) UpdateDeploymentAirflow(variables map[string]interfac
 	return r0, r1
 }
 
-// UpdateUserInDeployment provides a mock function with given fields: variables
-func (_m *ClientInterface) UpdateUserInDeployment(variables houston.UpdateUserInDeploymentRequest) (*houston.RoleBinding, error) {
+// UpdateDeploymentUser provides a mock function with given fields: variables
+func (_m *ClientInterface) UpdateDeploymentUser(variables houston.UpdateDeploymentUserRequest) (*houston.RoleBinding, error) {
 	ret := _m.Called(variables)
 
 	var r0 *houston.RoleBinding
-	if rf, ok := ret.Get(0).(func(houston.UpdateUserInDeploymentRequest) *houston.RoleBinding); ok {
+	if rf, ok := ret.Get(0).(func(houston.UpdateDeploymentUserRequest) *houston.RoleBinding); ok {
 		r0 = rf(variables)
 	} else {
 		if ret.Get(0) != nil {
@@ -712,29 +712,8 @@ func (_m *ClientInterface) UpdateUserInDeployment(variables houston.UpdateUserIn
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(houston.UpdateUserInDeploymentRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(houston.UpdateDeploymentUserRequest) error); ok {
 		r1 = rf(variables)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// UpdateUserRoleInWorkspace provides a mock function with given fields: workspaceID, email, role
-func (_m *ClientInterface) UpdateUserRoleInWorkspace(workspaceID string, email string, role string) (string, error) {
-	ret := _m.Called(workspaceID, email, role)
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func(string, string, string) string); ok {
-		r0 = rf(workspaceID, email, role)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
-		r1 = rf(workspaceID, email, role)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -758,6 +737,27 @@ func (_m *ClientInterface) UpdateWorkspace(workspaceID string, args map[string]s
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, map[string]string) error); ok {
 		r1 = rf(workspaceID, args)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateWorkspaceUserRole provides a mock function with given fields: workspaceID, email, role
+func (_m *ClientInterface) UpdateWorkspaceUserRole(workspaceID string, email string, role string) (string, error) {
+	ret := _m.Called(workspaceID, email, role)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, string, string) string); ok {
+		r0 = rf(workspaceID, email, role)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(workspaceID, email, role)
 	} else {
 		r1 = ret.Error(1)
 	}

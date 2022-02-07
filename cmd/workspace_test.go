@@ -42,7 +42,7 @@ func TestWorkspaceList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "workspace", "list")
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestNewWorkspaceUserListCmd(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	houstonClient = houston.Init(client)
+	houstonClient = houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceUserListCmd(buf)
 	assert.NotNil(t, cmd)
@@ -86,7 +86,7 @@ func TestWorkspaceUserRm(t *testing.T) {
                                ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
 Successfully removed user from workspace
 `
-	houstonClient = houston.Init(client)
+	houstonClient = houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceUserRmCmd(buf)
 	err := cmd.RunE(cmd, []string{"ckc0eir8e01gj07608ajmvia1"})
@@ -125,7 +125,7 @@ func TestWorkspaceSAGetCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "workspace", "sa", "get", "-w=ckqvf9spa1189rn9hbh5h439u")
 	assert.NoError(t, err)

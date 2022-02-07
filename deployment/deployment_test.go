@@ -30,7 +30,7 @@ func TestCheckManualReleaseNamesTrue(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	assert.True(t, checkManualReleaseNames(api))
 }
@@ -51,7 +51,7 @@ func TestCheckManualReleaseNamesFalse(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	assert.False(t, checkManualReleaseNames(api))
 }
@@ -65,7 +65,7 @@ func TestCheckManualReleaseNamesError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	assert.False(t, checkManualReleaseNames(api))
 }
@@ -121,7 +121,7 @@ func TestCreate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -190,7 +190,7 @@ func TestCreateTriggererEnabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -257,7 +257,7 @@ func TestCreateWithNFSLocation(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -324,7 +324,7 @@ func TestCreateWithGitSync(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -422,7 +422,7 @@ func TestCreateWithPreCreateNamespaceDeployment(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -522,7 +522,7 @@ func TestCreateWithPreCreateNamespaceDeploymentError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -563,7 +563,7 @@ func TestCreateHoustonError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -589,7 +589,7 @@ func TestDelete(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentID := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
@@ -609,7 +609,7 @@ func TestDeleteHard(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentID := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
@@ -647,7 +647,7 @@ func TestList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	ws := "ckbv818oa00r107606ywhoqtw"
 
 	buf := new(bytes.Buffer)
@@ -714,7 +714,7 @@ func TestUpdate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 
@@ -791,7 +791,7 @@ func TestUpdateTriggerer(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 
@@ -825,7 +825,7 @@ func TestUpdateError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	deploymentConfig := make(map[string]string)
@@ -861,7 +861,7 @@ func TestAirflowUpgrade(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentID := "ckbv818oa00r107606ywhoqtw"
 	desiredAirflowVersion := "1.10.10"
 
@@ -890,7 +890,7 @@ func TestAirflowUpgradeError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentID := "ckbv818oa00r107606ywhoqtw"
 	desiredAirflowVersion := "1.10.10"
 
@@ -921,7 +921,7 @@ func TestAirflowUpgradeCancel(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	err := AirflowUpgradeCancel(deploymentID, api, buf)
 	assert.NoError(t, err)
@@ -942,7 +942,7 @@ func TestAirflowUpgradeCancelError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	err := AirflowUpgradeCancel(deploymentID, api, buf)
 	assert.Error(t, err, "API error (500):")
@@ -979,7 +979,7 @@ func TestAirflowUpgradeEmptyDesiredVersion(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	desiredAirflowVersion := ""
 
@@ -1045,7 +1045,7 @@ func Test_getAirflowVersionSelection(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	buf := new(bytes.Buffer)
 
 	// mock os.Stdin
@@ -1080,7 +1080,7 @@ func Test_getAirflowVersionSelectionError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	airflowVersion, err := getAirflowVersionSelection(deploymentID, api, buf)
 	assert.Error(t, err, "API error (500):")
@@ -1132,7 +1132,7 @@ func TestCheckNFSMountDagDeploymentError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	assert.Equal(t, false, CheckNFSMountDagDeployment(api))
 }
 
@@ -1165,7 +1165,7 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	assert.Equal(t, true, CheckNFSMountDagDeployment(api))
 }
 
@@ -1197,7 +1197,7 @@ func TestCheckHardDeleteDeployment(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	hardDelete := CheckHardDeleteDeployment(api)
 	assert.Equal(t, true, hardDelete)
@@ -1212,7 +1212,7 @@ func TestCheckHardDeleteDeploymentError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	assert.Equal(t, false, CheckHardDeleteDeployment(api))
 }
 
@@ -1246,7 +1246,7 @@ func TestCheckTriggererEnabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	triggererEnabled := CheckTriggererEnabled(api)
 	assert.Equal(t, true, triggererEnabled)
@@ -1261,7 +1261,7 @@ func TestCheckTriggererEnabledError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	assert.Equal(t, false, CheckTriggererEnabled(api))
 }
 
@@ -1289,7 +1289,7 @@ func TestGetDeploymentSelectionNamespaces(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	buf := new(bytes.Buffer)
 
@@ -1341,7 +1341,7 @@ func TestGetDeploymentSelectionNamespacesNoNamespaces(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	buf := new(bytes.Buffer)
 	name, err := getDeploymentSelectionNamespaces(api, buf)
@@ -1371,7 +1371,7 @@ func TestGetDeploymentSelectionNamespacesParseError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	buf := new(bytes.Buffer)
 
@@ -1405,7 +1405,7 @@ func TestGetDeploymentSelectionNamespacesError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	name, err := getDeploymentSelectionNamespaces(api, buf)
 	assert.Equal(t, "", name)
@@ -1442,7 +1442,7 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 
 	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
 	assert.Equal(t, true, usesPreCreateNamespace)
@@ -1554,7 +1554,7 @@ func TestCreateWithFreeFormNamespaceDeployment(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
@@ -1650,7 +1650,7 @@ func TestCreateWithFreeFormNamespaceDeploymentError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(client)
+	api := houston.NewClient(client)
 	label := "label"
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""

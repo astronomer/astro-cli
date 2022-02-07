@@ -29,16 +29,15 @@ type ClientInterface interface {
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)
 	// workspace users and roles
-	AddUserToWorkspace(workspaceID, email, role string) (*Workspace, error)
-	DeleteUserFromWorkspace(workspaceID, userID string) (*Workspace, error)
-	ListUserAndRolesFromWorkspace(workspaceID string) (*Workspace, error)
-	UpdateUserRoleInWorkspace(workspaceID, email, role string) (string, error)
-	GetUserRoleInWorkspace(workspaceID, email string) (WorkspaceUserRoleBindings, error)
+	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)
+	DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error)
+	ListWorkspaceUserAndRoles(workspaceID string) (*Workspace, error)
+	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
+	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
 	// auth
 	AuthenticateWithBasicAuth(username, password string) (string, error)
 	GetAuthConfig() (*AuthConfig, error)
 	// deployment
-	// TODO: MIGHT WANT TO CHANGE map[string]interface{} to structures like with CreateServiceAccountRequest
 	CreateDeployment(vars map[string]interface{}) (*Deployment, error)
 	DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error)
 	ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error)
@@ -48,10 +47,10 @@ type ClientInterface interface {
 	GetDeploymentConfig() (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
 	// deployment users
-	ListUsersInDeployment(filters ListUsersInDeploymentRequest) ([]DeploymentUser, error)
-	AddUserToDeployment(variables UpdateUserInDeploymentRequest) (*RoleBinding, error)
-	UpdateUserInDeployment(variables UpdateUserInDeploymentRequest) (*RoleBinding, error)
-	DeleteUserFromDeployment(deploymentID, email string) (*RoleBinding, error)
+	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
+	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
+	UpdateDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
+	DeleteDeploymentUser(deploymentID, email string) (*RoleBinding, error)
 	// service account
 	CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error)
 	DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error)
@@ -69,11 +68,10 @@ type ClientImplementation struct {
 	client *Client
 }
 
-// Init - initialized the Houston Client singleton object with proper HTTP Client configuration
-// set as a variable so we can change it to return mock houston clients
-// TODO: RENAME THIS METHOD ONCE TESTS ARE REFACTORED TOO
-var Init = func(c *httputil.HTTPClient) ClientInterface {
-	client := NewHoustonClient(c)
+// NewClient - initialized the Houston Client object with proper HTTP Client configuration
+// set as a variable so we can change it to return mock houston clients in tests
+var NewClient = func(c *httputil.HTTPClient) ClientInterface {
+	client := newInternalClient(c)
 	return &ClientImplementation{
 		client: client,
 	}
@@ -84,8 +82,8 @@ type Client struct {
 	HTTPClient *httputil.HTTPClient
 }
 
-// NewHoustonClient returns a new Client with the logger and HTTP Client setup.
-func NewHoustonClient(c *httputil.HTTPClient) *Client {
+// newInternalClient returns a new Client with the logger and HTTP Client setup.
+func newInternalClient(c *httputil.HTTPClient) *Client {
 	return &Client{
 		HTTPClient: c,
 	}
@@ -115,7 +113,7 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 
 // Do (request) is a wrapper to more easily pass variables to a Client.Do request
 func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(NewHoustonClient(httputil.NewHTTPClient()))
+	return r.DoWithClient(newInternalClient(httputil.NewHTTPClient()))
 }
 
 // Do executes a query against the Houston API, logging out any errors contained in the response object

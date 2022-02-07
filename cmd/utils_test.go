@@ -70,7 +70,7 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(testHoustonClient)
+	api := houston.NewClient(testHoustonClient)
 
 	output := new(bytes.Buffer)
 
@@ -138,7 +138,7 @@ func Test_fallbackDefaultAirflowImageTag(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(testHoustonClient)
+	api := houston.NewClient(testHoustonClient)
 
 	output := new(bytes.Buffer)
 
@@ -200,7 +200,7 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(testHoustonClient)
+	api := houston.NewClient(testHoustonClient)
 
 	output := new(bytes.Buffer)
 
@@ -273,7 +273,7 @@ func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.Init(testHoustonClient)
+	api := houston.NewClient(testHoustonClient)
 
 	output := new(bytes.Buffer)
 

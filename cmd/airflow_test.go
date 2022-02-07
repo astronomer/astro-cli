@@ -32,7 +32,7 @@ func executeCommandC(client houston.ClientInterface, args ...string) (output str
 
 func executeCommand(args ...string) (output string, err error) {
 	httpClient := httputil.NewHTTPClient()
-	client := houston.Init(httpClient)
+	client := houston.NewClient(httpClient)
 	output, err = executeCommandC(client, args...)
 	httpClient.HTTPClient.CloseIdleConnections()
 	return output, err

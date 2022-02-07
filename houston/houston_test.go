@@ -9,6 +9,6 @@ import (
 )
 
 func TestNewHoustonClient(t *testing.T) {
-	client := NewHoustonClient(httputil.NewHTTPClient())
+	client := newInternalClient(httputil.NewHTTPClient())
 	assert.NotNil(t, client, "Can't create new houston Client")
 }

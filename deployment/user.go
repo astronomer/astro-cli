@@ -21,13 +21,13 @@ var (
 
 // UserList returns a list of user with deployment access
 func UserList(deploymentID, email, userID, fullName string, client houston.ClientInterface, out io.Writer) error {
-	filters := houston.ListUsersInDeploymentRequest{
+	filters := houston.ListDeploymentUsersRequest{
 		UserID:       userID,
 		Email:        email,
 		FullName:     fullName,
 		DeploymentID: deploymentID,
 	}
-	deploymentUsers, err := client.ListUsersInDeployment(filters)
+	deploymentUsers, err := client.ListDeploymentUsers(filters)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -71,12 +71,12 @@ func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) strin
 // nolint:dupl
 // Add a user to a deployment with specified role
 func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
-	addUserRequest := houston.UpdateUserInDeploymentRequest{
+	addUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
 		DeploymentID: deploymentID,
 	}
-	d, err := client.AddUserToDeployment(addUserRequest)
+	d, err := client.AddDeploymentUser(addUserRequest)
 	if err != nil {
 		return err
 	}
@@ -91,12 +91,12 @@ func Add(deploymentID, email, role string, client houston.ClientInterface, out i
 // nolint:dupl
 // UpdateUser updates a user's deployment role
 func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
-	updateUserRequest := houston.UpdateUserInDeploymentRequest{
+	updateUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
 		DeploymentID: deploymentID,
 	}
-	d, err := client.UpdateUserInDeployment(updateUserRequest)
+	d, err := client.UpdateDeploymentUser(updateUserRequest)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func UpdateUser(deploymentID, email, role string, client houston.ClientInterface
 
 // DeleteUser removes user access for a deployment
 func DeleteUser(deploymentID, email string, client houston.ClientInterface, out io.Writer) error {
-	d, err := client.DeleteUserFromDeployment(deploymentID, email)
+	d, err := client.DeleteDeploymentUser(deploymentID, email)
 	if err != nil {
 		fmt.Println(err)
 		return err

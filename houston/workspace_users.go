@@ -1,7 +1,7 @@
 package houston
 
 // AddUserToWorkspace - add a user to a workspace
-func (h ClientImplementation) AddUserToWorkspace(workspaceID, email, role string) (*Workspace, error) {
+func (h ClientImplementation) AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceUserAddRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceID, "email": email, "role": role},
@@ -16,7 +16,7 @@ func (h ClientImplementation) AddUserToWorkspace(workspaceID, email, role string
 }
 
 // RemoveUserFromWorkspace - remove a user from a workspace
-func (h ClientImplementation) DeleteUserFromWorkspace(workspaceID, userID string) (*Workspace, error) {
+func (h ClientImplementation) DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceUserRemoveRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceID, "userId": userID},
@@ -31,7 +31,7 @@ func (h ClientImplementation) DeleteUserFromWorkspace(workspaceID, userID string
 }
 
 // ListUserAndRolesFromWorkspace - list users and roles from a workspace
-func (h ClientImplementation) ListUserAndRolesFromWorkspace(workspaceID string) (*Workspace, error) {
+func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspacesGetRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceID},
@@ -46,7 +46,7 @@ func (h ClientImplementation) ListUserAndRolesFromWorkspace(workspaceID string) 
 }
 
 // UpdateUserRoleInWorkspace - update a user role in a workspace
-func (h ClientImplementation) UpdateUserRoleInWorkspace(workspaceID, email, role string) (string, error) {
+func (h ClientImplementation) UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error) {
 	req := Request{
 		Query:     WorkspaceUserUpdateRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email, "role": role},
@@ -61,7 +61,7 @@ func (h ClientImplementation) UpdateUserRoleInWorkspace(workspaceID, email, role
 }
 
 // GetUserRoleInWorkspace - get a user role in a workspace
-func (h ClientImplementation) GetUserRoleInWorkspace(workspaceID, email string) (WorkspaceUserRoleBindings, error) {
+func (h ClientImplementation) GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error) {
 	req := Request{
 		Query:     WorkspaceGetUserRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "email": email},

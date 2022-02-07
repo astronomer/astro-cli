@@ -20,7 +20,7 @@ func main() {
 	// configure http transport
 	// #nosec
 	httpClient.HTTPClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: config.CFG.SkipVerifyTLS.GetBool()}}
-	houstonClient := houston.Init(httpClient)
+	houstonClient := houston.NewClient(httpClient)
 	// setup log level before we start command since we will miss the feature flag checks other wise
 	if err := cmd.SetUpLogs(os.Stdout, config.CFG.Verbosity.GetString()); err != nil {
 		os.Exit(1)

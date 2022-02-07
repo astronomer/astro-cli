@@ -59,6 +59,10 @@ uninstall:
 	$(eval DESTDIR ?= $(GOBIN))
 	rm $(GOBIN)/$(OUTPUT)
 
+# TODO: WE MIGHT WANT TO ADD A TOP-LEVEL mock COMMAND TO GENERATE ALL OF THE MOCK INTERFACES
+mock_houston:
+	mockery --filename=ClientInterface.go --output=airflow/mocks --dir=houston --name ClientInterface
+
 ifeq (debug,$(firstword $(MAKECMDGOALS)))
   # use the rest as arguments for "debug"
   DEBUG_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))

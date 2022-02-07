@@ -1,22 +1,22 @@
 package houston
 
-// ListUsersInDeploymentRequest - properties to filter users in a deployment
-type ListUsersInDeploymentRequest struct {
+// ListDeploymentUsersRequest - properties to filter users in a deployment
+type ListDeploymentUsersRequest struct {
 	UserID       string `json:"userId"`
 	Email        string `json:"email"`
 	FullName     string `json:"fullName"`
 	DeploymentID string `json:"deploymentId"`
 }
 
-// UpdateUserInDeploymentRequest - properties to create a user in a deployment
-type UpdateUserInDeploymentRequest struct {
+// UpdateDeploymentUserRequest - properties to create a user in a deployment
+type UpdateDeploymentUserRequest struct {
 	Email        string `json:"email"`
 	Role         string `json:"role"`
 	DeploymentID string `json:"deploymentId"`
 }
 
 // ListUsersInDeployment - list users with deployment access
-func (h ClientImplementation) ListUsersInDeployment(filters ListUsersInDeploymentRequest) ([]DeploymentUser, error) {
+func (h ClientImplementation) ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error) {
 	user := map[string]interface{}{
 		"userId":   filters.UserID,
 		"email":    filters.Email,
@@ -40,7 +40,7 @@ func (h ClientImplementation) ListUsersInDeployment(filters ListUsersInDeploymen
 }
 
 // AddUserToDeployment - Add a user to a deployment with specified role
-func (h ClientImplementation) AddUserToDeployment(variables UpdateUserInDeploymentRequest) (*RoleBinding, error) {
+func (h ClientImplementation) AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error) {
 	req := Request{
 		Query:     DeploymentUserAddRequest,
 		Variables: variables,
@@ -55,7 +55,7 @@ func (h ClientImplementation) AddUserToDeployment(variables UpdateUserInDeployme
 }
 
 // UpdateUserInDeployment - update a user's role inside a deployment
-func (h ClientImplementation) UpdateUserInDeployment(variables UpdateUserInDeploymentRequest) (*RoleBinding, error) {
+func (h ClientImplementation) UpdateDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error) {
 	req := Request{
 		Query:     DeploymentUserUpdateRequest,
 		Variables: variables,
@@ -70,7 +70,7 @@ func (h ClientImplementation) UpdateUserInDeployment(variables UpdateUserInDeplo
 }
 
 // DeleteUserFromDeployment - remove a user from a deployment
-func (h ClientImplementation) DeleteUserFromDeployment(deploymentID, email string) (*RoleBinding, error) {
+func (h ClientImplementation) DeleteDeploymentUser(deploymentID, email string) (*RoleBinding, error) {
 	req := Request{
 		Query: DeploymentUserDeleteRequest,
 		Variables: map[string]interface{}{
