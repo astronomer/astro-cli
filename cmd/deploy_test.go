@@ -8,6 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 
@@ -75,7 +76,7 @@ func TestBuildPushDockerImageSuccess(t *testing.T) {
 			"1.10.5",
 		},
 	}
-	houstonMock := new(mocks.ClientInterface)
+	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
 	houstonClient = houstonMock
 
@@ -104,7 +105,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 			"1.10.5",
 		},
 	}
-	houstonMock := new(mocks.ClientInterface)
+	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
 	houstonClient = houstonMock
 

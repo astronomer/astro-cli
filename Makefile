@@ -61,7 +61,7 @@ uninstall:
 
 # TODO: WE MIGHT WANT TO ADD A TOP-LEVEL mock COMMAND TO GENERATE ALL OF THE MOCK INTERFACES
 mock_houston:
-	mockery --filename=ClientInterface.go --output=airflow/mocks --dir=houston --name ClientInterface
+	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
 
 ifeq (debug,$(firstword $(MAKECMDGOALS)))
   # use the rest as arguments for "debug"
