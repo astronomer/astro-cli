@@ -142,7 +142,7 @@ services:
       - airflow_logs:/usr/local/airflow/logs
     healthcheck:
       test: curl --fail http://webserver:8080/health || exit 1
-      interval: 2s
+      interval: 10s
       retries: 50
       start_period: 10s
       timeout: 10s
