@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/astronomer/astro-cli/logs"
@@ -35,7 +36,7 @@ var (
 `
 )
 
-func newLogsCmd() *cobra.Command {
+func newLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
@@ -44,22 +45,22 @@ func newLogsCmd() *cobra.Command {
 		Example: logsExample,
 	}
 	cmd.AddCommand(
-		newWebserverLogsCmd(),
-		newSchedulerLogsCmd(),
-		newWorkersLogsCmd(),
+		newWebserverLogsCmd(out),
+		newSchedulerLogsCmd(out),
+		newWorkersLogsCmd(out),
 	)
 
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else if appConfig.Flags.TriggererEnabled {
-		cmd.AddCommand(newTriggererLogsCmd())
+		cmd.AddCommand(newTriggererLogsCmd(out))
 	}
 
 	return cmd
 }
 
-func newLogsDeprecatedCmd() *cobra.Command {
+func newLogsDeprecatedCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "logs",
 		Aliases:    []string{"log", "l"},
@@ -69,23 +70,23 @@ func newLogsDeprecatedCmd() *cobra.Command {
 		Deprecated: "could please use new command instead `astro deployment logs [subcommands] [flags]`",
 	}
 	cmd.AddCommand(
-		newWebserverLogsCmd(),
-		newSchedulerLogsCmd(),
-		newWorkersLogsCmd(),
+		newWebserverLogsCmd(out),
+		newSchedulerLogsCmd(out),
+		newWorkersLogsCmd(out),
 	)
 
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else if appConfig.Flags.TriggererEnabled {
-		cmd.AddCommand(newTriggererLogsCmd())
+		cmd.AddCommand(newTriggererLogsCmd(out))
 	}
 
 	return cmd
 }
 
 // nolint:dupl
-func newWebserverLogsCmd() *cobra.Command {
+func newWebserverLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "webserver",
 		Aliases: []string{"web", "w"},
@@ -96,7 +97,7 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logWebserver, args)
+			return fetchRemoteLogs(logWebserver, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
@@ -107,7 +108,7 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 }
 
 // nolint:dupl
-func newSchedulerLogsCmd() *cobra.Command {
+func newSchedulerLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "scheduler",
 		Aliases: []string{"sch", "s"},
@@ -118,7 +119,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logScheduler, args)
+			return fetchRemoteLogs(logScheduler, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
@@ -129,7 +130,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 }
 
 // nolint:dupl
-func newWorkersLogsCmd() *cobra.Command {
+func newWorkersLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workers",
 		Aliases: []string{"workers", "worker", "wrk"},
@@ -140,7 +141,7 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logWorker, args)
+			return fetchRemoteLogs(logWorker, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
@@ -152,7 +153,7 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 }
 
 // nolint:dupl
-func newTriggererLogsCmd() *cobra.Command {
+func newTriggererLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "triggerer",
 		Aliases: []string{"triggerers", "triggerer", "trg"},
@@ -163,7 +164,7 @@ astro deployment logs triggerer YOU_DEPLOYMENT_ID -s string-to-find
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logTriggerer, args)
+			return fetchRemoteLogs(logTriggerer, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
@@ -174,9 +175,9 @@ astro deployment logs triggerer YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-func fetchRemoteLogs(component string, args []string) error {
+func fetchRemoteLogs(component string, args []string, out io.Writer) error {
 	if follow {
 		return logs.SubscribeDeploymentLog(args[0], component, search, since)
 	}
-	return logs.DeploymentLog(args[0], component, search, since, houstonClient)
+	return logs.DeploymentLog(args[0], component, search, since, houstonClient, out)
 }

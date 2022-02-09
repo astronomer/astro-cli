@@ -2,13 +2,14 @@ package logs
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/astronomer/astro-cli/cluster"
 	"github.com/astronomer/astro-cli/houston"
 )
 
-func DeploymentLog(deploymentID, component, search string, since time.Duration, client houston.ClientInterface) error {
+func DeploymentLog(deploymentID, component, search string, since time.Duration, client houston.ClientInterface, out io.Writer) error {
 	// Calculate timestamp as now - since e.g:
 	// (2019-04-02 17:51:03.780819 +0000 UTC - 2 mins) = 2019-04-02 17:49:03.780819 +0000 UTC
 	timestamp := time.Now().UTC().Add(-since)
@@ -25,7 +26,7 @@ func DeploymentLog(deploymentID, component, search string, since time.Duration, 
 	}
 
 	for _, log := range logs {
-		fmt.Print(log.Log)
+		fmt.Fprintln(out, log.Log)
 	}
 	return nil
 }

@@ -2,12 +2,13 @@ package deployment
 
 import (
 	"bytes"
-	"io/ioutil"
-	"net/http"
+	"errors"
 	"testing"
 
-	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/messages"
+
+	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,366 +17,249 @@ import (
 func TestUserList(t *testing.T) {
 	testUtil.InitTestConfig()
 	// Test that UserList returns a single deployment user correctly
-	okResponse := `{
-		"data": {
-			"deploymentUsers": [
-				{
-					"id": "ckgqw2k2600081qc90nbamgno",
-					"fullName": "Some Person",
-					"username": "somebody@astronomer.io",
-					"roleBindings": [
-						{
-							"role": "SYSTEM_ADMIN"
-						},
-						{
-							"role": "WORKSPACE_ADMIN"
-						},
-						{
-							"role": "WORKSPACE_VIEWER"
-						},
-						{
-							"role": "DEPLOYMENT_ADMIN"
-						}
-					]
-				}
-			]
-		}
+	mockUser := houston.DeploymentUser{
+		ID:       "ckgqw2k2600081qc90nbamgno",
+		FullName: "Some Person",
+		Username: "somebody",
+		RoleBindings: []houston.RoleBinding{
+			{Role: "SYSTEM_ADMIN"},
+			{Role: "WORKSPACE_ADMIN"},
+			{Role: "WORKSPACE_VIEWER"},
+			{Role: "DEPLOYMENT_ADMIN"},
+		},
+		Emails: []houston.Email{
+			{Address: "somebody@astronomer.io"},
+		},
 	}
-`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
+
+	t.Run("single deployment user", func(t *testing.T) {
+		deploymentID := "ckgqw2k2600081qc90nbage4h"
+
+		expectedRequest := houston.ListDeploymentUsersRequest{
+			UserID:       mockUser.ID,
+			Email:        mockUser.Emails[0].Address,
+			FullName:     mockUser.FullName,
+			DeploymentID: deploymentID,
 		}
+		api := new(mocks.ClientInterface)
+		api.On("ListDeploymentUsers", expectedRequest).Return([]houston.DeploymentUser{mockUser}, nil)
+
+		buf := new(bytes.Buffer)
+		err := UserList(deploymentID, mockUser.Emails[0].Address, mockUser.ID, mockUser.FullName, api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person     somebody     DEPLOYMENT_ADMIN`)
+		api.AssertExpectations(t)
 	})
-	api := houston.NewClient(client)
-	deploymentID := "ckgqw2k2600081qc90nbamgno"
-	email := "somebody@astronomer.io"
-	userID := "somebody@astronomer.io"
-	fullName := "Some Person"
 
-	buf := new(bytes.Buffer)
-	err := UserList(deploymentID, email, userID, fullName, api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person     somebody@astronomer.io     DEPLOYMENT_ADMIN`)
-
-	// Test that UserList returns a list of deployment users correctly
-	okResponse = `{
-		"data": {
-			"deploymentUsers": [
-				{
-					"id": "ckgqw2k2600081qc90nbamgno",
-					"fullName": "Some Person",
-					"username": "somebody@astronomer.io",
-					"roleBindings": [
-						{
-							"role": "SYSTEM_ADMIN"
-						},
-						{
-							"role": "WORKSPACE_ADMIN"
-						},
-						{
-							"role": "WORKSPACE_VIEWER"
-						},
-						{
-							"role": "DEPLOYMENT_ADMIN"
-						}
-					]
+	t.Run("multiple users", func(t *testing.T) {
+		mockUsers := []houston.DeploymentUser{
+			mockUser,
+			{
+				ID: "ckgqw2k2600081qc90nbamgni",
+				Emails: []houston.Email{
+					{Address: "anotherperson@astronomer.io"},
 				},
-				{
-					"id": "ckgqw2k2600081qc90nbamgno",
-					"fullName": "Another Person",
-					"username": "somebody+1@astronomer.io",
-					"roleBindings": [
-						{
-							"role": "WORKSPACE_VIEWER"
-						},
-						{
-							"role": "DEPLOYMENT_EDITOR"
-						}
-					]
-				}
-			]
+				FullName: "Another Person",
+				Username: "anotherperson",
+				RoleBindings: []houston.RoleBinding{
+					{Role: "WORKSPACE_VIEWER"},
+					{Role: "DEPLOYMENT_EDITOR"},
+				},
+			},
 		}
-	}
-`
-	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api = houston.NewClient(client)
-	deploymentID = "ckgqw2k2600081qc90nbamgno"
 
-	buf = new(bytes.Buffer)
-	err = UserList(deploymentID, "", "", "", api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person        somebody@astronomer.io       DEPLOYMENT_ADMIN`)
-	assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Another Person     somebody+1@astronomer.io     DEPLOYMENT_EDITOR`)
+		deploymentID := "ckgqw2k2600081qc90nbamgno"
+		expectedRequest := houston.ListDeploymentUsersRequest{
+			DeploymentID: deploymentID,
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("ListDeploymentUsers", expectedRequest).Return(mockUsers, nil)
+		buf := new(bytes.Buffer)
+		err := UserList(deploymentID, "", "", "", api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgno     Some Person        somebody          DEPLOYMENT_ADMIN`)
+		assert.Contains(t, buf.String(), `ckgqw2k2600081qc90nbamgni     Another Person     anotherperson     DEPLOYMENT_EDITOR`)
+		api.AssertExpectations(t)
+	})
 
 	// Test that UserList returns an empty list when deployment does not exist
-	// TODO: @adam2k update this test with the correct error response once the Houston API work is completed
-	okResponse = `{
-		"data": {
-			"deploymentUsers": []
+	t.Run("empty list when deployment does not exist", func(t *testing.T) {
+		deploymentID := "ckgqw2k2600081qc90nbamgno"
+		expectedRequest := houston.ListDeploymentUsersRequest{
+			DeploymentID: deploymentID,
 		}
-	}
-`
-	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api = houston.NewClient(client)
-	deploymentID = "ckgqw2k2600081qc90nbamgno"
+		api := new(mocks.ClientInterface)
+		api.On("ListDeploymentUsers", expectedRequest).Return([]houston.DeploymentUser{}, nil)
 
-	buf = new(bytes.Buffer)
-	err = UserList(deploymentID, "", "", "", api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), messages.HoustonInvalidDeploymentUsers)
+		buf := new(bytes.Buffer)
+		err := UserList(deploymentID, "", "", "", api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), messages.HoustonInvalidDeploymentUsers)
+		api.AssertExpectations(t)
+	})
+
+	t.Run("api error", func(t *testing.T) {
+		mockErr := errors.New("api error") //nolint:goerr113
+		deploymentID := "ckgqw2k2600081qc90nbamgno"
+		expectedRequest := houston.ListDeploymentUsersRequest{
+			DeploymentID: deploymentID,
+		}
+		api := new(mocks.ClientInterface)
+		api.On("ListDeploymentUsers", expectedRequest).Return([]houston.DeploymentUser{}, mockErr)
+
+		buf := new(bytes.Buffer)
+		err := UserList(deploymentID, "", "", "", api, buf)
+		assert.EqualError(t, err, mockErr.Error())
+		api.AssertExpectations(t)
+	})
 }
 
 func TestAdd(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-		"data": {
-			"deploymentAddUserRole": {
-				"id": "ckggzqj5f4157qtc9lescmehm",
-				"user": {
-					"username": "somebody@astronomer.com"
-				},
-				"role": "DEPLOYMENT_ADMIN",
-				"deployment": {
-					"releaseName": "prehistoric-gravity-9229"
-				}
-			}
+
+	t.Run("add user success", func(t *testing.T) {
+		mockUserRole := &houston.RoleBinding{
+			Role: "DEPLOYMENT_ADMIN",
+			User: houston.RoleBindingUser{
+				Username: "somebody@astronomer.io",
+			},
+			Deployment: houston.Deployment{
+				ID:          "ckggzqj5f4157qtc9lescmehm",
+				ReleaseName: "prehistoric-gravity-9229",
+			},
 		}
-	}
-`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
+
+		expectedRequest := houston.UpdateDeploymentUserRequest{
+			Email:        mockUserRole.User.Username,
+			Role:         mockUserRole.Role,
+			DeploymentID: mockUserRole.Deployment.ID,
 		}
+
+		api := new(mocks.ClientInterface)
+		api.On("AddDeploymentUser", expectedRequest).Return(mockUserRole, nil)
+
+		buf := new(bytes.Buffer)
+		err := Add(mockUserRole.Deployment.ID, mockUserRole.User.Username, mockUserRole.Role, api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Successfully added somebody@astronomer.io as a DEPLOYMENT_ADMIN")
+		api.AssertExpectations(t)
 	})
-	api := houston.NewClient(client)
-	deploymentID := "ckggzqj5f4157qtc9lescmehm"
-	email := "somebody@astronomer.com"
-	role := "DEPLOYMENT_ADMIN"
 
-	buf := new(bytes.Buffer)
-	err := Add(deploymentID, email, role, api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Successfully added somebody@astronomer.com as a DEPLOYMENT_ADMIN")
+	t.Run("add user api error", func(t *testing.T) {
+		mockErr := errors.New("api error") //nolint:goerr113
 
-	errResponse := `{
-		"errors": [
-			{
-				"message": "A duplicate role binding already exists",
-				"locations": [
-					{
-						"line": 2,
-						"column": 3
-					}
-				],
-				"path": [
-					"deploymentAddUserRole"
-				],
-				"extensions": {
-					"code": "BAD_USER_INPUT",
-					"exception": {
-						"message": "A duplicate role binding already exists",
-						"stacktrace": [
-							"UserInputError: A duplicate role binding already exists"
-						]
-					}
-				}
-			}
-		],
-		"data": {
-			"deploymentAddUserRole": null
+		deploymentID := "ckggzqj5f4157qtc9lescmehm"
+		email := "somebody@astronomer.com"
+		role := "DEPLOYMENT_ADMIN"
+
+		expectedRequest := houston.UpdateDeploymentUserRequest{
+			Email:        email,
+			Role:         role,
+			DeploymentID: deploymentID,
 		}
-	}
-	`
 
-	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(errResponse)),
-			Header:     make(http.Header),
-		}
+		api := new(mocks.ClientInterface)
+		api.On("AddDeploymentUser", expectedRequest).Return(nil, mockErr)
+
+		buf := new(bytes.Buffer)
+		err := Add(deploymentID, email, role, api, buf)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), mockErr.Error())
+		api.AssertExpectations(t)
 	})
-	api = houston.NewClient(client)
-	deploymentID = "ckggzqj5f4157qtc9lescmehm"
-	email = "somebody@astronomer.com"
-	role = "DEPLOYMENT_ADMIN"
-
-	buf = new(bytes.Buffer)
-	err = Add(deploymentID, email, role, api, buf)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "A duplicate role binding already exists")
 }
 
 func TestDeleteUser(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-		"data": {
-			"deploymentRemoveUserRole": {
-				"id": "ckggzqj5f4157qtc9lescmehm",
-				"user": {
-					"username": "somebody@astronomer.com"
-				},
-				"role": "DEPLOYMENT_ADMIN",
-				"deployment": {
-					"releaseName": "prehistoric-gravity-9229"
-				}
-			}
+
+	t.Run("delete user success", func(t *testing.T) {
+		mockUserRole := &houston.RoleBinding{
+			User: houston.RoleBindingUser{Username: "somebody@astronomer.com"},
+			Role: "DEPLOYMENT_ADMIN",
+			Deployment: houston.Deployment{
+				ID:          "deploymentid",
+				ReleaseName: "prehistoric-gravity-9229",
+			},
 		}
-	}
-`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
+
+		api := new(mocks.ClientInterface)
+		api.On("DeleteDeploymentUser", mockUserRole.Deployment.ID, mockUserRole.User.Username).Return(mockUserRole, nil)
+
+		buf := new(bytes.Buffer)
+		err := DeleteUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Successfully removed the DEPLOYMENT_ADMIN role for somebody@astronomer.com from deployment deploymentid")
+		api.AssertExpectations(t)
 	})
-	api := houston.NewClient(client)
-	deploymentID := "ckggzqj5f4157qtc9lescmehm"
-	email := "somebody@astronomer.com"
 
-	buf := new(bytes.Buffer)
-	err := DeleteUser(deploymentID, email, api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Successfully removed the DEPLOYMENT_ADMIN role for somebody@astronomer.com from deployment ckggzqj5f4157qtc9lescmehm")
+	t.Run("delete user api error", func(t *testing.T) {
+		mockError := errors.New("api error") //nolint:goerr113
 
-	// Test that an error message appears when a user is not deleted
-	errResponse := `{
-		"errors": [
-			{
-				"message": "The role binding does not exist for this user",
-				"locations": [
-					{
-						"line": 2,
-						"column": 3
-					}
-				],
-				"path": [
-					"deploymentRemoveUserRole"
-				],
-				"extensions": {
-					"code": "BAD_USER_INPUT",
-					"exception": {
-						"message": "The role binding does not exist for this user",
-						"stacktrace": [
-							"UserInputError: The role binding does not exist for this user"
-						]
-					}
-				}
-			}
-		],
-		"data": {
-			"deploymentRemoveUserRole": null
-		}
-	}
-`
+		deploymentID := "deploymentid"
+		email := "somebody@astronomer.com"
 
-	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 400,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(errResponse)),
-			Header:     make(http.Header),
-		}
+		api := new(mocks.ClientInterface)
+		api.On("DeleteDeploymentUser", deploymentID, email).Return(nil, mockError)
+
+		buf := new(bytes.Buffer)
+		err := DeleteUser(deploymentID, email, api, buf)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), mockError.Error())
+		api.AssertExpectations(t)
 	})
-	api = houston.NewClient(client)
-	deploymentID = "ckggzqj5f4157qtc9lescmehm"
-	email = "somebody@astronomer.com"
-
-	buf = new(bytes.Buffer)
-	err = DeleteUser(deploymentID, email, api, buf)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "The role binding does not exist for this user")
 }
 
 func TestUpdateUser(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-		"data": {
-			"deploymentUpdateUserRole": {
-				"id": "ckggzqj5f4157qtc9lescmehm",
-				"user": {
-					"username": "somebody@astronomer.com"
-				},
-				"role": "DEPLOYMENT_EDITOR",
-				"deployment": {
-					"releaseName": "prehistoric-gravity-9229"
-				}
-			}
+
+	t.Run("update user success", func(t *testing.T) {
+		mockUserRole := &houston.RoleBinding{
+			Role: houston.DeploymentEditor,
+			User: houston.RoleBindingUser{
+				Username: "somebody@astronomer.com",
+			},
+			Deployment: houston.Deployment{
+				ID:          "deployment-id",
+				ReleaseName: "prehistoric-gravity-9229",
+			},
 		}
-	}
-`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
+
+		expectedRequest := houston.UpdateDeploymentUserRequest{
+			Email:        mockUserRole.User.Username,
+			Role:         houston.DeploymentEditor,
+			DeploymentID: mockUserRole.Deployment.ID,
 		}
+
+		api := new(mocks.ClientInterface)
+		api.On("UpdateDeploymentUser", expectedRequest).Return(mockUserRole, nil)
+
+		buf := new(bytes.Buffer)
+		err := UpdateUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, houston.DeploymentEditor, api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Successfully updated somebody@astronomer.com to a DEPLOYMENT_EDITOR")
+		api.AssertExpectations(t)
 	})
-	api := houston.NewClient(client)
-	deploymentID := "ckggzqj5f4157qtc9lescmehm"
-	email := "somebody@astronomer.com"
-	role := houston.DeploymentEditor
 
-	buf := new(bytes.Buffer)
-	err := UpdateUser(deploymentID, email, role, api, buf)
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Successfully updated somebody@astronomer.com to a DEPLOYMENT_EDITOR")
+	t.Run("update user api error", func(t *testing.T) {
+		mockError := errors.New("api error") //nolint:goerr113
 
-	errResponse := `{
-		"error": {
-			"errors": [
-				{
-					"message": "Variable \"$role\" got invalid value \"DEPLOYMENT_FAKE_ROLE\"; Expected type Role. Did you mean DEPLOYMENT_ADMIN, DEPLOYMENT_EDITOR, or DEPLOYMENT_VIEWER?",
-					"locations": [
-						{
-							"line": 1,
-							"column": 85
-						}
-					],
-					"extensions": {
-						"code": "INTERNAL_SERVER_ERROR",
-						"exception": {
-							"stacktrace": [
-								"GraphQLError: Variable \"$role\" got invalid value \"DEPLOYMENT_FAKE_ROLE\"; Expected type Role. Did you mean DEPLOYMENT_ADMIN, DEPLOYMENT_EDITOR, or DEPLOYMENT_VIEWER?"
-							]
-						}
-					}
-				}
-			]
+		deploymentID := "ckggzqj5f4157qtc9lescmehm"
+		email := "somebody@astronomer.com"
+		role := "DEPLOYMENT_FAKE_ROLE"
+		expectedRequest := houston.UpdateDeploymentUserRequest{
+			Email:        email,
+			Role:         role,
+			DeploymentID: deploymentID,
 		}
-	}
-	`
 
-	client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 400,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(errResponse)),
-			Header:     make(http.Header),
-		}
+		api := new(mocks.ClientInterface)
+		api.On("UpdateDeploymentUser", expectedRequest).Return(nil, mockError)
+
+		buf := new(bytes.Buffer)
+		err := UpdateUser(deploymentID, email, role, api, buf)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), mockError.Error())
+		api.AssertExpectations(t)
 	})
-	api = houston.NewClient(client)
-	deploymentID = "ckggzqj5f4157qtc9lescmehm"
-	email = "somebody@astronomer.com"
-	role = "DEPLOYMENT_FAKE_ROLE"
-
-	buf = new(bytes.Buffer)
-	err = UpdateUser(deploymentID, email, role, api, buf)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Expected type Role. Did you mean DEPLOYMENT_ADMIN, DEPLOYMENT_EDITOR, or DEPLOYMENT_VIEWER")
 }

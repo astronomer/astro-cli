@@ -1,17 +1,58 @@
 package cmd
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
 	"os"
-	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+var (
+	mockDeployment = &houston.Deployment{
+		ID:                    "cknz133ra49758zr9w34b87ua",
+		Type:                  "airflow",
+		Label:                 "test",
+		ReleaseName:           "accurate-radioactivity-8677",
+		Version:               "0.15.6",
+		AirflowVersion:        "2.0.0",
+		DesiredAirflowVersion: "2.0.0",
+		DeploymentInfo:        houston.DeploymentInfo{},
+		Workspace: houston.Workspace{
+			ID:    "ckn4phn1k0104v5xtrer5lpli",
+			Label: "w1",
+		},
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower", Type: "flower"},
+		},
+		CreatedAt: "2021-04-26T20:03:36.262Z",
+		UpdatedAt: "2021-04-26T20:03:36.262Z",
+	}
+	mockAppConfig    = &houston.AppConfig{}
+	mockDeploymentSA = &houston.ServiceAccount{
+		ID:         "q1w2e3r4t5y6u7i8o9p0",
+		APIKey:     "000000000000000000000000",
+		Label:      "my_label",
+		Category:   "default",
+		LastUsedAt: "2019-10-16T21:14:22.105Z",
+		CreatedAt:  "2019-10-16T21:14:22.105Z",
+		UpdatedAt:  "2019-10-16T21:14:22.105Z",
+		Active:     true,
+	}
+	mockDeploymentUserRole = &houston.RoleBinding{
+		Role: "DEPLOYMENT_VIEWER",
+		User: houston.RoleBindingUser{
+			Username: "somebody@astronomer.io",
+		},
+		Deployment: houston.Deployment{
+			ID:          "ckggvxkw112212kc9ebv8vu6p",
+			ReleaseName: "prehistoric-gravity-9229",
+		},
+	}
 )
 
 func TestDeploymentRootCommand(t *testing.T) {
@@ -23,63 +64,13 @@ func TestDeploymentRootCommand(t *testing.T) {
 
 func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "createDeployment": {
-      "airflowVersion": "2.0.0",
-      "config": {
-        "dagDeployment": {
-          "nfsLocation": "",
-          "type": "image"
-        },
-        "executor": "CeleryExecutor"
-      },
-      "createdAt": "2021-04-26T20:03:36.262Z",
-      "dagDeployment": {
-        "nfsLocation": "",
-        "type": "image"
-      },
-      "description": "",
-      "desiredAirflowVersion": "2.0.0",
-      "id": "cknz133ra49758zr9w34b87ua",
-      "label": "test",
-      "properties": {
-        "alert_emails": [
-          "andrii@astronomer.io"
-        ],
-        "component_version": "2.0.0"
-      },
-      "releaseName": "accurate-radioactivity-8677",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T20:03:36.262Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli",
-        "label": "w1"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfig := &houston.AppConfig{
+		NfsMountDagDeployment: false,
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -102,63 +93,11 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 
 func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"triggererEnabled": false},
-    "createDeployment": {
-      "airflowVersion": "2.2.0",
-      "config": {
-        "dagDeployment": {
-          "nfsLocation": "",
-          "type": "image"
-        },
-        "executor": "CeleryExecutor"
-      },
-      "createdAt": "2021-04-26T20:03:36.262Z",
-      "dagDeployment": {
-        "nfsLocation": "",
-        "type": "image"
-      },
-      "description": "",
-      "desiredAirflowVersion": "2.2.0",
-      "id": "cknz133ra49758zr9w34b87ua",
-      "label": "test",
-      "properties": {
-        "alert_emails": [
-          "andrii@astronomer.io"
-        ],
-        "component_version": "2.0.0"
-      },
-      "releaseName": "accurate-radioactivity-8677",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T20:03:36.262Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli",
-        "label": "w1"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{TriggererEnabled: false}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -181,63 +120,15 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 
 func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true} },
-    "createDeployment": {
-      "airflowVersion": "2.0.0",
-      "config": {
-        "dagDeployment": {
-          "nfsLocation": "",
-          "type": "image"
-        },
-        "executor": "CeleryExecutor"
-      },
-      "createdAt": "2021-04-26T20:03:36.262Z",
-      "dagDeployment": {
-        "nfsLocation": "",
-        "type": "image"
-      },
-      "description": "",
-      "desiredAirflowVersion": "2.0.0",
-      "id": "cknz133ra49758zr9w34b87ua",
-      "label": "test",
-      "properties": {
-        "alert_emails": [
-          "andrii@astronomer.io"
-        ],
-        "component_version": "2.0.0"
-      },
-      "releaseName": "accurate-radioactivity-8677",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T20:03:36.262Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli",
-        "label": "w1"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		TriggererEnabled: true,
+		Flags: houston.FeatureFlags{
+			TriggererEnabled: true,
+		},
+	}
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -259,63 +150,16 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 
 func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true}},
-    "createDeployment": {
-      "airflowVersion": "2.0.0",
-      "config": {
-        "dagDeployment": {
-          "nfsLocation": "",
-          "type": "image"
-        },
-        "executor": "CeleryExecutor"
-      },
-      "createdAt": "2021-04-26T20:03:36.262Z",
-      "dagDeployment": {
-        "nfsLocation": "",
-        "type": "image"
-      },
-      "description": "",
-      "desiredAirflowVersion": "2.0.0",
-      "id": "cknz133ra49758zr9w34b87ua",
-      "label": "test",
-      "properties": {
-        "alert_emails": [
-          "andrii@astronomer.io"
-        ],
-        "component_version": "2.0.0"
-      },
-      "releaseName": "accurate-radioactivity-8677",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T20:03:36.262Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli",
-        "label": "w1"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		NfsMountDagDeployment: true,
+		Flags: houston.FeatureFlags{
+			NfsMountDagDeployment: true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(2)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -339,63 +183,15 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 
 func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"gitSyncDagDeployment": true, "featureFlags": { "gitSyncDagDeployment": true}},
-    "createDeployment": {
-      "airflowVersion": "2.0.0",
-      "config": {
-        "dagDeployment": {
-          "nfsLocation": "",
-          "type": "image"
-        },
-        "executor": "CeleryExecutor"
-      },
-      "createdAt": "2021-04-26T20:03:36.262Z",
-      "dagDeployment": {
-        "nfsLocation": "",
-        "type": "image"
-      },
-      "description": "",
-      "desiredAirflowVersion": "2.0.0",
-      "id": "cknz133ra49758zr9w34b87ua",
-      "label": "test",
-      "properties": {
-        "alert_emails": [
-          "andrii@astronomer.io"
-        ],
-        "component_version": "2.0.0"
-      },
-      "releaseName": "accurate-radioactivity-8677",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T20:03:36.262Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli",
-        "label": "w1"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			GitSyncEnabled: true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -422,63 +218,13 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 
 func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"gitSyncDagDeployment": false},
-    "createDeployment": {
-      "airflowVersion": "2.0.0",
-      "config": {
-        "dagDeployment": {
-          "nfsLocation": "",
-          "type": "image"
-        },
-        "executor": "CeleryExecutor"
-      },
-      "createdAt": "2021-04-26T20:03:36.262Z",
-      "dagDeployment": {
-        "nfsLocation": "",
-        "type": "image"
-      },
-      "description": "",
-      "desiredAirflowVersion": "2.0.0",
-      "id": "cknz133ra49758zr9w34b87ua",
-      "label": "test",
-      "properties": {
-        "alert_emails": [
-          "andrii@astronomer.io"
-        ],
-        "component_version": "2.0.0"
-      },
-      "releaseName": "accurate-radioactivity-8677",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T20:03:36.262Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli",
-        "label": "w1"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		Flags: houston.FeatureFlags{GitSyncEnabled: false},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -501,47 +247,14 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 
 func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"triggererEnabled": true, "featureFlags": { "triggererEnabled": true}},
-    "updateDeployment": {
-      "createdAt": "2021-04-23T14:29:28.497Z",
-      "dagDeployment": {
-        "nfsLocation": "test:/test",
-        "type": "volume"
-      },
-      "description": "",
-      "id": "cknuetusw0018yqxto2jzxjqq",
-      "label": "test_dima22asdasd",
-      "releaseName": "amateur-instrument-9515",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T21:42:35.361Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		TriggererEnabled: true,
+		Flags:            houston.FeatureFlags{TriggererEnabled: true},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -564,47 +277,17 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 
 func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": true, "gitSyncDagDeployment": true, "featureFlags": { "nfsMountDagDeployment": true, "gitSyncDagDeployment": true}},
-    "updateDeployment": {
-      "createdAt": "2021-04-23T14:29:28.497Z",
-      "dagDeployment": {
-        "nfsLocation": "test:/test",
-        "type": "volume"
-      },
-      "description": "",
-      "id": "cknuetusw0018yqxto2jzxjqq",
-      "label": "test_dima22asdasd",
-      "releaseName": "amateur-instrument-9515",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T21:42:35.361Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		NfsMountDagDeployment: true,
+		Flags: houston.FeatureFlags{
+			NfsMountDagDeployment: true,
+			GitSyncEnabled:        true,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -634,47 +317,17 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 
 func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": true, "gitSyncDagDeployment": false, "featureFlags": { "nfsMountDagDeployment": true, "gitSyncDagDeployment": false}},
-    "updateDeployment": {
-      "createdAt": "2021-04-23T14:29:28.497Z",
-      "dagDeployment": {
-        "nfsLocation": "test:/test",
-        "type": "volume"
-      },
-      "description": "",
-      "id": "cknuetusw0018yqxto2jzxjqq",
-      "label": "test_dima22asdasd",
-      "releaseName": "amateur-instrument-9515",
-      "status": null,
-      "type": "airflow",
-      "updatedAt": "2021-04-26T21:42:35.361Z",
-      "urls": [
-        {
-          "type": "airflow",
-          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/airflow"
-        },
-        {
-          "type": "flower",
-          "url": "https://deployments.local.astronomer.io/amateur-instrument-9515/flower"
-        }
-      ],
-      "version": "0.15.6",
-      "workspace": {
-        "id": "ckn4phn1k0104v5xtrer5lpli"
-      }
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	appConfigResponse := &houston.AppConfig{
+		NfsMountDagDeployment: true,
+		Flags: houston.FeatureFlags{
+			NfsMountDagDeployment: true,
+			GitSyncEnabled:        false,
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -718,33 +371,11 @@ func TestDeploymentSaDeleteWoDeploymentIdCommand(t *testing.T) {
 
 func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "deleteDeploymentServiceAccount": {
-      "id": "q1w2e3r4t5y6u7i8o9p0",
-      "apiKey": "000000000000000000000000",
-      "label": "my_label",
-      "category": "default",
-      "entityType": "DEPLOYMENT",
-      "entityUuid": null,
-      "active": true,
-      "createdAt": "2019-10-16T21:14:22.105Z",
-      "updatedAt": "2019-10-16T21:14:22.105Z",
-      "lastUsedAt": null
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 
-	output, err := executeCommandC(api, "deployment", "service-account", "delete", "q1w2e3r4t5y6u7i8o9p0", "--deployment-id=1234")
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("DeleteDeploymentServiceAccount", "1234", mockDeploymentSA.ID).Return(mockDeploymentSA, nil)
+	output, err := executeCommandC(api, "deployment", "service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }
@@ -756,143 +387,119 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 
  Service account successfully created.
 `
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "createDeploymentServiceAccount": {
-      "id": "q1w2e3r4t5y6u7i8o9p0",
-      "apiKey": "000000000000000000000000",
-      "label": "my_label",
-      "category": "default",
-      "entityType": "DEPLOYMENT",
-      "entityUuid": null,
-      "active": true,
-      "createdAt": "2019-10-16T21:14:22.105Z",
-      "updatedAt": "2019-10-16T21:14:22.105Z",
-      "lastUsedAt": null
-    }
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 
-	output, err := executeCommandC(api, "deployment", "service-account", "create", "--deployment-id=ck1qg6whg001r08691y117hub", "--label=my_label", "--role=viewer")
+	mockSA := &houston.DeploymentServiceAccount{
+		ID:             mockDeploymentSA.ID,
+		APIKey:         mockDeploymentSA.APIKey,
+		Label:          mockDeploymentSA.Label,
+		Category:       mockDeploymentSA.Category,
+		EntityType:     "DEPLOYMENT",
+		DeploymentUUID: mockDeployment.ID,
+		CreatedAt:      mockDeploymentSA.CreatedAt,
+		UpdatedAt:      mockDeploymentSA.UpdatedAt,
+		Active:         true,
+	}
+
+	expectedSARequest := &houston.CreateServiceAccountRequest{
+		DeploymentID: "ck1qg6whg001r08691y117hub",
+		Label:        "my_label",
+		Category:     "default",
+		Role:         "DEPLOYMENT_VIEWER",
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("CreateDeploymentServiceAccount", expectedSARequest).Return(mockSA, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"service-account",
+		"create",
+		"--deployment-id="+expectedSARequest.DeploymentID,
+		"--label="+expectedSARequest.Label,
+		"--role=viewer",
+	)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
 
 func TestDeploymentUserAddCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` DEPLOYMENT NAME              DEPLOYMENT ID                 USER                        ROLE                  
- prehistoric-gravity-9229     ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER     
+	expectedOut := ` DEPLOYMENT NAME              DEPLOYMENT ID                 USER                       ROLE                  
+ prehistoric-gravity-9229     ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.io     DEPLOYMENT_VIEWER     
 
- Successfully added somebody@astronomer.com as a DEPLOYMENT_VIEWER
+ Successfully added somebody@astronomer.io as a DEPLOYMENT_VIEWER
 `
-	okResponse := `{
-		"data": {
-		        "appConfig": {"nfsMountDagDeployment": false},
-			"deploymentAddUserRole": {
-				"id": "ckggzqj5f4157qtc9lescmehm",
-				"user": {
-					"username": "somebody@astronomer.com"
-				},
-				"role": "DEPLOYMENT_VIEWER",
-				"deployment": {
-					"id": "ckggvxkw112212kc9ebv8vu6p",
-					"releaseName": "prehistoric-gravity-9229"
-				}
-			}
-		}
-	}`
+	expectedAddUserRequest := houston.UpdateDeploymentUserRequest{
+		Email:        mockDeploymentUserRole.User.Username,
+		Role:         mockDeploymentUserRole.Role,
+		DeploymentID: mockDeploymentUserRole.Deployment.ID,
+	}
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("AddDeploymentUser", expectedAddUserRequest).Return(mockDeploymentUserRole, nil)
 
-	output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	output, err := executeCommandC(api,
+		"deployment",
+		"user",
+		"add",
+		"--deployment-id="+mockDeploymentUserRole.Deployment.ID,
+		mockDeploymentUserRole.User.Username,
+	)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
 
 func TestDeploymentUserDeleteCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` DEPLOYMENT ID                 USER                        ROLE                  
- ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.com     DEPLOYMENT_VIEWER     
+	expectedOut := ` DEPLOYMENT ID                 USER                       ROLE                  
+ ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.io     DEPLOYMENT_VIEWER     
 
- Successfully removed the DEPLOYMENT_VIEWER role for somebody@astronomer.com from deployment ckggvxkw112212kc9ebv8vu6p
+ Successfully removed the DEPLOYMENT_VIEWER role for somebody@astronomer.io from deployment ckggvxkw112212kc9ebv8vu6p
 `
-	okResponse := `{
-		"data": {
-		        "appConfig": {"nfsMountDagDeployment": false},
-			"deploymentRemoveUserRole": {
-				"id": "ckggzqj5f4157qtc9lescmehm",
-				"user": {
-					"username": "somebody@astronomer.com"
-				},
-				"role": "DEPLOYMENT_VIEWER",
-				"deployment": {
-					"id": "ckggvxkw112212kc9ebv8vu6p",
-					"releaseName": "prehistoric-gravity-9229"
-				}
-			}
-		}
-	}`
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("DeleteDeploymentUser", mockDeploymentUserRole.Deployment.ID, mockDeploymentUserRole.User.Username).
+		Return(mockDeploymentUserRole, nil)
 
-	output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
+	output, err := executeCommandC(api,
+		"deployment",
+		"user",
+		"delete",
+		"--deployment-id="+mockDeploymentUserRole.Deployment.ID,
+		mockDeploymentUserRole.User.Username,
+	)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedOut, output)
 }
 
 func TestDeploymentUserUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `Successfully updated somebody@astronomer.com to a DEPLOYMENT_ADMIN`
-	okResponse := `{
-		"data": {
-			"appConfig": {"nfsMountDagDeployment": false},
-			"deploymentUpdateUserRole": {
-				"id": "ckggzqj5f4157qtc9lescmehm",
-				"user": {
-					"username": "somebody@astronomer.com"
-				},
-				"role": "DEPLOYMENT_ADMIN",
-				"deployment": {
-					"id": "ckggvxkw112212kc9ebv8vu6p",
-					"releaseName": "prehistoric-gravity-9229"
-				}
-			}
-		}
-	}`
+	expectedNewRole := "DEPLOYMENT_ADMIN"
+	expectedOut := `Successfully updated somebody@astronomer.io to a ` + expectedNewRole
+	mockResponseUserRole := *mockDeploymentUserRole
+	mockResponseUserRole.Role = expectedNewRole
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	expectedUpdateUserRequest := houston.UpdateDeploymentUserRequest{
+		Email:        mockResponseUserRole.User.Username,
+		Role:         expectedNewRole,
+		DeploymentID: mockDeploymentUserRole.Deployment.ID,
+	}
 
-	output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("UpdateDeploymentUser", expectedUpdateUserRequest).Return(&mockResponseUserRole, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"user",
+		"update",
+		"--deployment-id="+mockResponseUserRole.Deployment.ID,
+		"--role="+expectedNewRole,
+		mockResponseUserRole.User.Username,
+	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -901,33 +508,27 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "deployment": {
-	  "id": "ckggzqj5f4157qtc9lescmehm",
-	  "airflowVersion": "1.10.5",
-	  "desiredAirflowVersion": "1.10.10"
-	  },
-	  "updateDeploymentAirflow": {
-	  "id": "ckggzqj5f4157qtc9lescmehm",
-	  "label": "test",
-	  "airflowVersion": "1.10.5",
-	  "desiredAirflowVersion": "1.10.10"
-	  }
-    }
-  }`
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "1.10.5"
+	mockDeploymentResponse.DesiredAirflowVersion = "1.10.10"
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentId":          mockDeploymentResponse.ID,
+		"desiredAirflowVersion": mockDeploymentResponse.DesiredAirflowVersion,
+	}
 
-	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentAirflow", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"airflow",
+		"upgrade",
+		"--deployment-id="+mockDeploymentResponse.ID,
+		"--desired-airflow-version="+mockDeploymentResponse.DesiredAirflowVersion,
+	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
@@ -936,142 +537,82 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
-	okResponse := `{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "deployment": {
-	  "id": "ckggzqj5f4157qtc9lescmehm",
-	  "label": "test",
-	  "airflowVersion": "1.10.5",
-	  "desiredAirflowVersion": "1.10.10"
-    }
-  }
-}`
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "1.10.5"
+	mockDeploymentResponse.DesiredAirflowVersion = "1.10.10"
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	expectedUpdateRequest := map[string]interface{}{
+		"deploymentId":          mockDeploymentResponse.ID,
+		"desiredAirflowVersion": mockDeploymentResponse.AirflowVersion,
+	}
 
-	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
+	mockDeploymentUpdated := mockDeploymentResponse
+	mockDeploymentUpdated.DesiredAirflowVersion = mockDeploymentUpdated.AirflowVersion
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentAirflow", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"airflow",
+		"upgrade",
+		"--cancel",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
 
 func TestDeploymentSAGetCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
-	okResponse := `
-{
-  "data": {
-    "appConfig": {"nfsMountDagDeployment": false},
-    "deploymentServiceAccounts": [
-      {
-        "id": "ckqvfa2cu1468rn9hnr0bqqfk",
-        "apiKey": "658b304f36eaaf19860a6d9eb73f7d8a",
-        "label": "yooo can u see me test",
-        "category": "",
-        "entityType": "DEPLOYMENT",
-        "entityUuid": null,
-        "active": true,
-        "createdAt": "2021-07-08T21:28:57.966Z",
-        "updatedAt": "2021-07-08T21:28:57.967Z",
-        "lastUsedAt": null
-      }
-    ]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 
-	output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
+	mockSA := houston.ServiceAccount{
+		ID:        "ckqvfa2cu1468rn9hnr0bqqfk",
+		APIKey:    "658b304f36eaaf19860a6d9eb73f7d8a",
+		Label:     "yooo can u see me test",
+		Category:  "default",
+		CreatedAt: "2021-07-08T21:28:57.966Z",
+		UpdatedAt: "2021-07-08T21:28:57.966Z",
+		Active:    true,
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("ListDeploymentServiceAccounts", mockDeployment.ID).Return([]houston.ServiceAccount{mockSA}, nil)
+
+	output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id="+mockDeployment.ID)
 	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	assert.Contains(t, output, mockSA.Label)
+	assert.Contains(t, output, mockSA.ID)
+	assert.Contains(t, output, mockSA.APIKey)
 }
 
 func TestDeploymentDelete(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `Successfully deleted deployment`
-	okResponse := `{
-		"data": {
-		  "appConfig": {"nfsMountDagDeployment": false},
-		  "deleteDeployment": {
-		    "id": "ckqh2dmzc43548h9hxzspysyi",
-		    "type": "airflow",
-		    "label": "test2",
-		    "description": "",
-		    "releaseName": "combusting-radiant-1610",
-		    "version": "0.17.1",
-		    "workspace": {
-		      "id": "ckqh2d9zh40758h9h650gf8dc"
-		    },
-		    "createdAt": "2021-06-28T20:19:03.193Z",
-		    "updatedAt": "2021-07-07T18:16:52.118Z"
-		  }
-		}
-	      }`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 
-	output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("DeleteDeployment", mockDeployment.ID, false).Return(mockDeployment, nil)
+
+	output, err := executeCommandC(api, "deployment", "delete", mockDeployment.ID)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }
 
 func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-		"data": {
-		  "appConfig": {
-			"version": "0.15.1",
-			"baseDomain": "local.astronomer.io",
-			"smtpConfigured": true,
-			"manualReleaseNames": false,
-			"hardDeleteDeployment": true,
-			"nfsMountDagDeployment": false,
-			"featureFlags": {
-				"hardDeleteDeployment": true
-			}
+	appConfig := &houston.AppConfig{
+		HardDeleteDeployment: true,
+		Flags: houston.FeatureFlags{
+			HardDeleteDeployment: true,
 		},
-		  "deleteDeployment": {
-		    "id": "ckqh2dmzc43548h9hxzspysyi",
-		    "type": "airflow",
-		    "label": "test2",
-		    "description": "",
-		    "releaseName": "combusting-radiant-1610",
-		    "version": "0.17.1",
-		    "workspace": {
-		      "id": "ckqh2d9zh40758h9h650gf8dc"
-		    },
-		    "createdAt": "2021-06-28T20:19:03.193Z",
-		    "updatedAt": "2021-07-07T18:16:52.118Z"
-		  }
-		}
-	      }`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
 
 	// mock os.Stdin
 	input := []byte("n")
@@ -1089,49 +630,23 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	_, err = executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	_, err = executeCommandC(api, "deployment", "delete", "--hard", mockDeployment.ID)
 	assert.Nil(t, err)
 }
 
 func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	testUtil.InitTestConfig()
 	expectedOut := `Successfully deleted deployment`
-	okResponse := `{
-		"data": {
-		  "appConfig": {
-			"version": "0.15.1",
-			"baseDomain": "local.astronomer.io",
-			"smtpConfigured": true,
-			"manualReleaseNames": false,
-			"hardDeleteDeployment": true,
-			"nfsMountDagDeployment": false,
-			"featureFlags": {
-			   "hardDeleteDeployment": true
-			}
+	appConfig := &houston.AppConfig{
+		HardDeleteDeployment: true,
+		Flags: houston.FeatureFlags{
+			HardDeleteDeployment: true,
 		},
-		  "deleteDeployment": {
-		    "id": "ckqh2dmzc43548h9hxzspysyi",
-		    "type": "airflow",
-		    "label": "test2",
-		    "description": "",
-		    "releaseName": "combusting-radiant-1610",
-		    "version": "0.17.1",
-		    "workspace": {
-		      "id": "ckqh2d9zh40758h9h650gf8dc"
-		    },
-		    "createdAt": "2021-06-28T20:19:03.193Z",
-		    "updatedAt": "2021-07-07T18:16:52.118Z"
-		  }
-		}
-	      }`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(strings.NewReader(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("DeleteDeployment", mockDeployment.ID, true).Return(mockDeployment, nil)
 
 	// mock os.Stdin
 	input := []byte("y")
@@ -1149,7 +664,7 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	output, err := executeCommandC(api, "deployment", "delete", "--hard", "ckqh2dmzc43548h9hxzspysyi")
+	output, err := executeCommandC(api, "deployment", "delete", "--hard", mockDeployment.ID)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

@@ -2,31 +2,48 @@ package workspace
 
 import (
 	"bytes"
-	"io/ioutil"
-	"net/http"
+	"errors"
 	"testing"
 
-	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
+	"github.com/astronomer/astro-cli/airflow/mocks"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/stretchr/testify/assert"
+)
+
+var (
+	mockWsUserResponse = &houston.Workspace{
+		ID: "ckc0eir8e01gj07608ajmvia1",
+	}
+	mockRoles = houston.WorkspaceUserRoleBindings{
+		RoleBindings: []houston.RoleBindingWorkspace{
+			{
+				Role: "WORKSPACE_VIEWER",
+				Workspace: struct {
+					ID string `json:"id"`
+				}{ID: "ckoixo6o501496qemiwsja1tl"},
+			},
+			{
+				Role: "DEPLOYMENT_VIEWER",
+				Workspace: struct {
+					ID string `json:"id"`
+				}{ID: "ckg6sfddu30911pc0n1o0e97e"},
+			},
+		},
+	}
+	errMock = errors.New("api error") //nolint:goerr113
 )
 
 func TestAdd(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	okResponse := `{"data":{"workspaceAddUser":{"id":"ckc0eir8e01gj07608ajmvia1"}}}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
+
+	api := new(mocks.ClientInterface)
+	api.On("AddWorkspaceUser", id, email, role).Return(mockWsUserResponse, nil)
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
@@ -36,42 +53,33 @@ func TestAdd(t *testing.T) {
 Successfully added andrii@test.com to 
 `
 	assert.Equal(t, expected, buf.String())
+	api.AssertExpectations(t)
 }
 
 func TestAddError(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 500,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
 
+	api := new(mocks.ClientInterface)
+	api.On("AddWorkspaceUser", id, email, role).Return(nil, errMock)
+
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
-	assert.EqualError(t, err, "API error (500): Internal Server Error")
+	assert.EqualError(t, err, errMock.Error())
+	api.AssertExpectations(t)
 }
 
 func TestRemove(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	okResponse := `{"data":{"workspaceRemoveUser":{"id":"ckc0eir8e01gj07608ajmvia1"}}}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	userID := "ckc0eir8e01gj07608ajmvia1"
+
+	api := new(mocks.ClientInterface)
+	api.On("DeleteWorkspaceUser", id, mockWsUserResponse.ID).Return(mockWsUserResponse, nil)
 
 	buf := new(bytes.Buffer)
 	err := Remove(id, userID, api, buf)
@@ -81,75 +89,45 @@ func TestRemove(t *testing.T) {
 Successfully removed user from workspace
 `
 	assert.Equal(t, expected, buf.String())
+	api.AssertExpectations(t)
 }
 
 func TestRemoveError(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 500,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 	id := "ck1qg6whg001r08691y117hub"
 	email := "andrii@test.com"
 
+	api := new(mocks.ClientInterface)
+	api.On("DeleteWorkspaceUser", id, email).Return(nil, errMock)
+
 	buf := new(bytes.Buffer)
 	err := Remove(id, email, api, buf)
-	assert.EqualError(t, err, "API error (500): Internal Server Error")
+	assert.EqualError(t, err, errMock.Error())
+	api.AssertExpectations(t)
 }
 
 func TestListRoles(t *testing.T) {
-	okResponse := `{
-  "data": {
-    "workspaces": [
-      {
-        "id": "ckbv7zvb100pe0760xp98qnh9",
-        "label": "w1",
-        "description": "",
-        "createdAt": "2020-06-25T20:09:29.917Z",
-        "updatedAt": "2020-06-25T20:09:29.917Z",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "andrii@astronomer.io"
-            }
-          }
-        ]
-      },
-      {
-        "id": "ckbv8pwbq00wk0760us7ktcgd",
-        "label": "wwww",
-        "description": "",
-        "createdAt": "2020-06-25T20:29:44.294Z",
-        "updatedAt": "2020-06-25T20:29:44.294Z",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "andrii@astronomer.io"
-            }
-          }
-        ]
-      }
-    ]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+	mockResponse := &houston.Workspace{
+		ID:        "ckbv7zvb100pe0760xp98qnh9",
+		Label:     "w1",
+		CreatedAt: "2020-06-25T20:09:29.917Z",
+		UpdatedAt: "2020-06-25T20:09:29.917Z",
+		RoleBindings: []houston.RoleBinding{
+			{
+				Role: "WORKSPACE_ADMIN",
+				User: houston.RoleBindingUser{
+					ID:       "ckbv7zpkh00og0760ki4mhl6r",
+					Username: "andrii@astronomer.io",
+				},
+			},
+		},
+	}
+
 	wsID := "ck1qg6whg001r08691y117hub"
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaceUserAndRoles", wsID).Return(mockResponse, nil)
 
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsID, api, buf)
@@ -158,64 +136,38 @@ func TestListRoles(t *testing.T) {
  andrii@astronomer.io     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
 	assert.Equal(t, expected, buf.String())
+	api.AssertExpectations(t)
 }
 
 func TestListRolesWithServiceAccounts(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "data": {
-    "workspaces": [
-      {
-        "id": "ckbv7zvb100pe0760xp98qnh9",
-        "label": "w1",
-        "description": "",
-        "createdAt": "2020-06-25T20:09:29.917Z",
-        "updatedAt": "2020-06-25T20:09:29.917Z",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "andrii@astronomer.io"
-            }
-          },
-		  {
-            "role": "WORKSPACE_ADMIN",
-            "serviceAccount": {
-              "id": "ckxaolfky0822zsvcrgts3c6a",
-              "label": "WA1"
-            }
-          }
-        ]
-      },
-      {
-        "id": "ckbv8pwbq00wk0760us7ktcgd",
-        "label": "wwww",
-        "description": "",
-        "createdAt": "2020-06-25T20:29:44.294Z",
-        "updatedAt": "2020-06-25T20:29:44.294Z",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "andriiii@astronomer.io"
-            }
-          }
-        ]
-      }
-    ]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+
+	mockResponse := &houston.Workspace{
+		ID:        "ckbv7zvb100pe0760xp98qnh9",
+		Label:     "w1",
+		CreatedAt: "2020-06-25T20:09:29.917Z",
+		UpdatedAt: "2020-06-25T20:09:29.917Z",
+		RoleBindings: []houston.RoleBinding{
+			{
+				Role: "WORKSPACE_ADMIN",
+				User: houston.RoleBindingUser{
+					ID:       "ckbv7zpkh00og0760ki4mhl6r",
+					Username: "andrii@astronomer.io",
+				},
+			},
+			{
+				Role: "WORKSPACE_ADMIN",
+				ServiceAccount: houston.WorkspaceServiceAccount{
+					ID:    "ckxaolfky0822zsvcrgts3c6a",
+					Label: "WA1",
+				},
+			},
+		},
+	}
 	wsID := "ck1qg6whg001r08691y117hub"
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaceUserAndRoles", wsID).Return(mockResponse, nil)
 
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsID, api, buf)
@@ -225,103 +177,105 @@ func TestListRolesWithServiceAccounts(t *testing.T) {
  WA1                      ckxaolfky0822zsvcrgts3c6a     WORKSPACE_ADMIN     
 `
 	assert.Equal(t, expected, buf.String())
+	api.AssertExpectations(t)
 }
 
 func TestListRolesError(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 500,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
 	wsID := "ck1qg6whg001r08691y117hub"
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaceUserAndRoles", wsID).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsID, api, buf)
-	assert.EqualError(t, err, "API error (500): Internal Server Error")
+	assert.EqualError(t, err, errMock.Error())
+	api.AssertExpectations(t)
 }
 
 func TestUpdateRole(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_ADMIN", "workspaceUser":{"roleBindings":[{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"DEPLOYMENT_VIEWER"},{"workspace":{"id":"ckoixo6o501496qemiwsja1tl"},"role":"WORKSPACE_VIEWER"},{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"WORKSPACE_EDITOR"},{"workspace":{"id":"ckql4ias908766qbpuck803fa"},"role":"WORKSPACE_ADMIN"}]}}}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+
 	id := "ckoixo6o501496qemiwsja1tl"
 	role := "test-role"
 	email := "andrii@test.com"
 
+	api := new(mocks.ClientInterface)
+	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
+	api.On("UpdateWorkspaceUserRole", id, email, role).Return(role, nil)
+
 	buf := new(bytes.Buffer)
-	err := UpdateRole(id, role, email, api, buf)
+	err := UpdateRole(id, email, role, api, buf)
 	assert.NoError(t, err)
-	expected := `Role has been changed from WORKSPACE_VIEWER to WORKSPACE_ADMIN for user test-role`
+	expected := `Role has been changed from WORKSPACE_VIEWER to test-role for user andrii@test.com`
 	assert.Equal(t, expected, buf.String())
+	api.AssertExpectations(t)
 }
 
 func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_ADMIN", "workspaceUser":{"roleBindings":[{"workspace":{"id":"ckg6sfddu30911pc0n1o0e97e"},"role":"DEPLOYMENT_VIEWER"}]}}}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+
 	id := "ckg6sfddu30911pc0n1o0e97e"
 	role := "test-role"
 	email := "andrii@test.com"
 
-	buf := new(bytes.Buffer)
-	err := UpdateRole(id, role, email, api, buf)
-	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
-}
-
-func TestUpdateRoleNoAccess(t *testing.T) {
-	testUtil.InitTestConfig()
-	okResponse := `{"data":{"workspaceUpdateUserRole":"WORKSPACE_ADMIN", "workspaceUser":{"roleBindings":[]}}}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
-	id := "ckoixo6o501496qemiwsja1tl"
-	role := "test-role"
-	email := "andrii@test.com"
+	api := new(mocks.ClientInterface)
+	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
 
 	buf := new(bytes.Buffer)
-	err := UpdateRole(id, role, email, api, buf)
+	err := UpdateRole(id, email, role, api, buf)
 	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
+	api.AssertExpectations(t)
 }
 
-func TestUpdateRoleError(t *testing.T) {
+func TestUpdateRoleErrorGetRoles(t *testing.T) {
 	testUtil.InitTestConfig()
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 500,
-			Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(client)
+
 	id := "ck1qg6whg001r08691y117hub"
 	role := "test-role"
 	email := "andrii@test.com"
 
+	api := new(mocks.ClientInterface)
+	api.On("GetWorkspaceUserRole", id, email).Return(houston.WorkspaceUserRoleBindings{}, errMock)
+
 	buf := new(bytes.Buffer)
-	err := UpdateRole(id, role, email, api, buf)
-	assert.EqualError(t, err, "API error (500): Internal Server Error")
+	err := UpdateRole(id, email, role, api, buf)
+	assert.EqualError(t, err, errMock.Error())
+	api.AssertExpectations(t)
+}
+
+func TestUpdateRoleError(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	id := "ckoixo6o501496qemiwsja1tl"
+	role := "test-role"
+	email := "andrii@test.com"
+
+	api := new(mocks.ClientInterface)
+	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
+	api.On("UpdateWorkspaceUserRole", id, email, role).Return("", errMock)
+
+	buf := new(bytes.Buffer)
+	err := UpdateRole(id, email, role, api, buf)
+	assert.EqualError(t, err, errMock.Error())
+	api.AssertExpectations(t)
+}
+
+func TestUpdateRoleNoAccess(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	mockRoles.RoleBindings = []houston.RoleBindingWorkspace{}
+
+	id := "ckoixo6o501496qemiwsja1tl"
+	role := "test-role"
+	email := "andrii@test.com"
+
+	api := new(mocks.ClientInterface)
+	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
+
+	buf := new(bytes.Buffer)
+	err := UpdateRole(id, email, role, api, buf)
+	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
+	api.AssertExpectations(t)
 }

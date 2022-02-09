@@ -112,7 +112,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentListCmd(out),
 		newDeploymentUpdateCmd(out),
 		newDeploymentDeleteCmd(out),
-		newLogsCmd(),
+		newLogsCmd(out),
 		newDeploymentSaRootCmd(out),
 		newDeploymentUserRootCmd(out),
 		newDeploymentAirflowRootCmd(out),
