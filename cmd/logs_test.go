@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/houston"

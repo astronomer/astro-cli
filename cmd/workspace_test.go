@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"

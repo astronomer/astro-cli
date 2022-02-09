@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/houston"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"

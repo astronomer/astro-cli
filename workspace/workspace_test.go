@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"

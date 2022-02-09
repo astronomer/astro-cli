@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/houston"

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/astronomer/astro-cli/messages"
 
 	"github.com/astronomer/astro-cli/houston"

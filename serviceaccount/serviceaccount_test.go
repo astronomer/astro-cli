@@ -7,8 +7,8 @@ import (
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/houston"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/stretchr/testify/assert"
 )
 

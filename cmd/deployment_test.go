@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/houston"
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
