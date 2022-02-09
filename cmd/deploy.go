@@ -197,7 +197,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	deploymentLink := buildAstroUIDeploymentLink(name, wsID)
-	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).", deploymentLink)
+	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return nil
 }
