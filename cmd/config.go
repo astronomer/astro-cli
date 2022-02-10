@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 
 	"github.com/spf13/cobra"
@@ -21,7 +20,7 @@ var (
 
 var globalFlag bool
 
-func newConfigRootCmd(_ *houston.Client, out io.Writer) *cobra.Command {
+func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage project configuration",

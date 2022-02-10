@@ -19,22 +19,12 @@ import (
 var errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
 
 // basicAuth handles authentication with the houston api
-func basicAuth(username, password string) (string, error) {
+func basicAuth(username, password string, client houston.ClientInterface) (string, error) {
 	if password == "" {
 		password, _ = input.Password(messages.InputPassword)
 	}
 
-	req := houston.Request{
-		Query:     houston.TokenBasicCreateRequest,
-		Variables: map[string]interface{}{"identity": username, "password": password},
-	}
-
-	resp, err := req.Do()
-	if err != nil {
-		return "", err
-	}
-
-	return resp.Data.CreateToken.Token.Value, nil
+	return client.AuthenticateWithBasicAuth(username, password)
 }
 
 func switchToLastUsedWorkspace(c config.Context, workspaces []houston.Workspace) bool {
@@ -87,7 +77,7 @@ func registryAuth() error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client *houston.Client, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
 
@@ -102,21 +92,16 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 		return err
 	}
 
-	acReq := houston.Request{
-		Query: houston.AuthConfigGetRequest,
-	}
-
-	acResp, err := acReq.Do()
+	authConfig, err := client.GetAuthConfig()
 	if err != nil {
 		return err
 	}
-	authConfig := acResp.Data.GetAuthConfig
 
 	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
 		username = input.Text(messages.InputUsername)
 	}
 
-	token, err = getAuthToken(username, password, authConfig, c)
+	token, err = getAuthToken(username, password, authConfig, c, client)
 	if err != nil {
 		return err
 	}
@@ -126,16 +111,10 @@ func Login(domain string, oAuthOnly bool, username, password string, client *hou
 		return err
 	}
 
-	wsReq := houston.Request{
-		Query: houston.WorkspacesGetRequest,
-	}
-
-	wsResp, err := wsReq.Do()
+	workspaces, err := client.ListWorkspaces()
 	if err != nil {
 		return err
 	}
-
-	workspaces := wsResp.Data.GetWorkspaces
 
 	if len(workspaces) == 1 {
 		w := workspaces[0]
@@ -203,7 +182,7 @@ func checkClusterDomain(domain string) error {
 	return nil
 }
 
-func getAuthToken(username, password string, authConfig *houston.AuthConfig, context config.Context) (string, error) {
+func getAuthToken(username, password string, authConfig *houston.AuthConfig, context config.Context, client houston.ClientInterface) (string, error) {
 	var token string
 	var err error
 	if username == "" {
@@ -214,7 +193,7 @@ func getAuthToken(username, password string, authConfig *houston.AuthConfig, con
 		}
 	} else {
 		if authConfig.LocalEnabled {
-			token, err = basicAuth(username, password)
+			token, err = basicAuth(username, password, client)
 			if err != nil {
 				return "", fmt.Errorf("local auth login failed: %w", err)
 			}

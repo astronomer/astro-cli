@@ -99,7 +99,7 @@ var (
 	deploymentUpdateAttrs = []string{"label"}
 )
 
-func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deployment",
 		Aliases: []string{"de"},
@@ -108,19 +108,19 @@ func newDeploymentRootCmd(client *houston.Client, out io.Writer) *cobra.Command 
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	cmd.AddCommand(
-		newDeploymentCreateCmd(client, out),
-		newDeploymentListCmd(client, out),
-		newDeploymentUpdateCmd(client, out),
-		newDeploymentDeleteCmd(client, out),
-		newLogsCmd(client),
-		newDeploymentSaRootCmd(client, out),
-		newDeploymentUserRootCmd(client, out),
-		newDeploymentAirflowRootCmd(client, out),
+		newDeploymentCreateCmd(out),
+		newDeploymentListCmd(out),
+		newDeploymentUpdateCmd(out),
+		newDeploymentDeleteCmd(out),
+		newLogsCmd(),
+		newDeploymentSaRootCmd(out),
+		newDeploymentUserRootCmd(out),
+		newDeploymentAirflowRootCmd(out),
 	)
 	return cmd
 }
 
-func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create DEPLOYMENT",
 		Aliases: []string{"cr"},
@@ -129,12 +129,12 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		Example: CreateExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentCreate(cmd, args, client, out)
+			return deploymentCreate(cmd, args, out)
 		},
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.AppConfig(client)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else {
@@ -168,7 +168,7 @@ func newDeploymentCreateCmd(client *houston.Client, out io.Writer) *cobra.Comman
 	return cmd
 }
 
-func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete DEPLOYMENT",
 		Aliases: []string{"de"},
@@ -176,30 +176,30 @@ func newDeploymentDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		Long:    "Delete an airflow deployment",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentDelete(cmd, args, client, out)
+			return deploymentDelete(cmd, args, out)
 		},
 	}
-	if deployment.CheckHardDeleteDeployment(client) {
+	if deployment.CheckHardDeleteDeployment(houstonClient) {
 		cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
 	}
 	return cmd
 }
 
-func newDeploymentListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List airflow deployments",
 		Long:    "List airflow deployments",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentList(cmd, args, client, out)
+			return deploymentList(cmd, args, out)
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	return cmd
 }
 
-func newDeploymentUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	example := `
 # update executor for given deployment
 $ astro deployment update UUID --executor=celery`
@@ -220,12 +220,12 @@ $ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:
 			return updateArgValidator(args, deploymentUpdateAttrs)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUpdate(cmd, args, dagDeploymentType, nfsLocation, client, out)
+			return deploymentUpdate(cmd, args, dagDeploymentType, nfsLocation, out)
 		},
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.AppConfig(client)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else {
@@ -269,22 +269,22 @@ func addGitSyncDeploymentFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
 }
 
-func newDeploymentUserRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "user",
 		Short: "Manage deployment user resources",
 		Long:  "Users can be added or removed from deployment",
 	}
 	cmd.AddCommand(
-		newDeploymentUserListCmd(client, out),
-		newDeploymentUserAddCmd(client, out),
-		newDeploymentUserDeleteCmd(client, out),
-		newDeploymentUserUpdateCmd(client, out),
+		newDeploymentUserListCmd(out),
+		newDeploymentUserAddCmd(out),
+		newDeploymentUserDeleteCmd(out),
+		newDeploymentUserUpdateCmd(out),
 	)
 	return cmd
 }
 
-func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list USERS",
 		Short:   "Search for deployment user's",
@@ -292,7 +292,7 @@ func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Comm
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserList(cmd, client, out, args)
+			return deploymentUserList(cmd, out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
@@ -304,7 +304,7 @@ func newDeploymentUserListCmd(client *houston.Client, out io.Writer) *cobra.Comm
 }
 
 // nolint:dupl
-func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add EMAIL",
 		Short:   "Add a user to a deployment",
@@ -312,7 +312,7 @@ func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comma
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserAdd(cmd, client, out, args)
+			return deploymentUserAdd(cmd, out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
@@ -321,7 +321,7 @@ func newDeploymentUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comma
 }
 
 // nolint:dupl
-func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete EMAIL",
 		Short:   "Delete a user from a deployment",
@@ -329,7 +329,7 @@ func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Co
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserDeleteExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserDelete(cmd, client, out, args)
+			return deploymentUserDelete(cmd, out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to remove user access")
@@ -337,7 +337,7 @@ func newDeploymentUserDeleteCmd(client *houston.Client, out io.Writer) *cobra.Co
 }
 
 // nolint:dupl
-func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update EMAIL",
 		Short:   "Update a user's role for a deployment",
@@ -345,7 +345,7 @@ func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Co
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserUpdate(cmd, client, out, args)
+			return deploymentUserUpdate(cmd, out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
@@ -353,7 +353,7 @@ func newDeploymentUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Co
 	return cmd
 }
 
-func newDeploymentSaRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
@@ -361,15 +361,15 @@ func newDeploymentSaRootCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		Long:    "Service-accounts represent a revokable token with access to the Astronomer platform",
 	}
 	cmd.AddCommand(
-		newDeploymentSaCreateCmd(client, out),
-		newDeploymentSaGetCmd(client, out),
-		newDeploymentSaDeleteCmd(client, out),
+		newDeploymentSaCreateCmd(out),
+		newDeploymentSaGetCmd(out),
+		newDeploymentSaDeleteCmd(out),
 	)
 	return cmd
 }
 
 // nolint:dupl
-func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
@@ -377,7 +377,7 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 		Long:    "Create a service-account in the astronomer platform",
 		Example: deploymentSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaCreate(cmd, args, client, out)
+			return deploymentSaCreate(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
@@ -389,14 +389,14 @@ func newDeploymentSaCreateCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
-func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentSaGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get",
 		Short:   "Get a service-account by deployment id",
 		Long:    "Get a service-account by deployment id",
 		Example: deploymentSaGetExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaGet(cmd, client, out)
+			return deploymentSaGet(cmd, out)
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
@@ -407,7 +407,7 @@ func newDeploymentSaGetCmd(client *houston.Client, out io.Writer) *cobra.Command
 	return cmd
 }
 
-func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [SA-ID]",
 		Aliases: []string{"de"},
@@ -415,7 +415,7 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 		Long:    "Delete a service-account in the astronomer platform",
 		Example: deploymentSaDeleteExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaDelete(cmd, args, client, out)
+			return deploymentSaDelete(cmd, args, out)
 		},
 		Args: cobra.ExactArgs(1),
 	}
@@ -427,7 +427,7 @@ func newDeploymentSaDeleteCmd(client *houston.Client, out io.Writer) *cobra.Comm
 	return cmd
 }
 
-func newDeploymentAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentAirflowRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "airflow",
 		Aliases: []string{"ai"},
@@ -435,12 +435,12 @@ func newDeploymentAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.C
 		Long:    "Manage airflow deployments",
 	}
 	cmd.AddCommand(
-		newDeploymentAirflowUpgradeCmd(client, out),
+		newDeploymentAirflowUpgradeCmd(out),
 	)
 	return cmd
 }
 
-func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"up"},
@@ -448,7 +448,7 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 		Long:    "Upgrade Airflow version",
 		Example: deploymentAirflowUpgradeExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentAirflowUpgrade(cmd, args, client, out)
+			return deploymentAirflowUpgrade(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
@@ -461,7 +461,7 @@ func newDeploymentAirflowUpgradeCmd(client *houston.Client, out io.Writer) *cobr
 	return cmd
 }
 
-func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -476,7 +476,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 	}
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.AppConfig(client)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else {
@@ -492,10 +492,10 @@ func deploymentCreate(cmd *cobra.Command, args []string, client *houston.Client,
 		}
 	}
 
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, client, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, houstonClient, out)
 }
 
-func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if hardDelete {
@@ -507,10 +507,10 @@ func deploymentDelete(cmd *cobra.Command, args []string, client *houston.Client,
 			return nil
 		}
 	}
-	return deployment.Delete(args[0], hardDelete, client, out)
+	return deployment.Delete(args[0], hardDelete, houstonClient, out)
 }
 
-func deploymentList(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
+func deploymentList(cmd *cobra.Command, _ []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -524,10 +524,10 @@ func deploymentList(cmd *cobra.Command, _ []string, client *houston.Client, out 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, client, out)
+	return deployment.List(ws, allDeployments, houstonClient, out)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, client *houston.Client, out io.Writer) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
 	argsMap, err := argsToMap(args[1:])
 	if err != nil {
 		return err
@@ -537,7 +537,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.AppConfig(client)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		fmt.Println("Error checking feature flag", err)
 	} else {
@@ -561,10 +561,10 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, triggererReplicas, client, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, triggererReplicas, houstonClient, out)
 }
 
-func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func deploymentUserList(cmd *cobra.Command, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -572,36 +572,10 @@ func deploymentUserList(cmd *cobra.Command, client *houston.Client, out io.Write
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UserList(args[0], email, userID, fullName, client, out)
+	return deployment.UserList(args[0], email, userID, fullName, houstonClient, out)
 }
 
-func deploymentUserAdd(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
-	_, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
-	}
-
-	if err := validateDeploymentRole(deploymentRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-	return deployment.Add(deploymentID, args[0], deploymentRole, client, out)
-}
-
-func deploymentUserDelete(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
-	_, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-	return deployment.DeleteUser(deploymentID, args[0], client, out)
-}
-
-func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Writer, args []string) error {
+func deploymentUserAdd(cmd *cobra.Command, out io.Writer, args []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -613,10 +587,36 @@ func deploymentUserUpdate(cmd *cobra.Command, client *houston.Client, out io.Wri
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UpdateUser(deploymentID, args[0], deploymentRole, client, out)
+	return deployment.Add(deploymentID, args[0], deploymentRole, houstonClient, out)
 }
 
-func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
+func deploymentUserDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+	_, err := coalesceWorkspace()
+	if err != nil {
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return deployment.DeleteUser(deploymentID, args[0], houstonClient, out)
+}
+
+func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	_, err := coalesceWorkspace()
+	if err != nil {
+		return fmt.Errorf("failed to find a valid workspace: %w", err)
+	}
+
+	if err := validateDeploymentRole(deploymentRole); err != nil {
+		return fmt.Errorf("failed to find a valid role: %w", err)
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	return deployment.UpdateUser(deploymentID, args[0], deploymentRole, houstonClient, out)
+}
+
+func deploymentSaCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	if label == "" {
 		return errServiceAccountNotPresent
 	}
@@ -627,28 +627,28 @@ func deploymentSaCreate(cmd *cobra.Command, _ []string, client *houston.Client, 
 	fullRole := strings.Join([]string{"DEPLOYMENT", strings.ToUpper(role)}, "_")
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return sa.CreateUsingDeploymentUUID(deploymentID, label, category, fullRole, client, out)
+	return sa.CreateUsingDeploymentUUID(deploymentID, label, category, fullRole, houstonClient, out)
 }
 
-func deploymentSaGet(cmd *cobra.Command, client *houston.Client, out io.Writer) error {
+func deploymentSaGet(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.GetDeploymentServiceAccounts(deploymentID, client, out)
+	return sa.GetDeploymentServiceAccounts(deploymentID, houstonClient, out)
 }
 
-func deploymentSaDelete(cmd *cobra.Command, args []string, client *houston.Client, out io.Writer) error {
+func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return sa.DeleteUsingDeploymentUUID(args[0], deploymentID, client, out)
+	return sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient, out)
 }
 
-func deploymentAirflowUpgrade(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
+func deploymentAirflowUpgrade(cmd *cobra.Command, _ []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if cancel {
-		return deployment.AirflowUpgradeCancel(deploymentID, client, out)
+		return deployment.AirflowUpgradeCancel(deploymentID, houstonClient, out)
 	}
-	return deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, client, out)
+	return deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, out)
 }

@@ -65,89 +65,58 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-// AppVersion returns application version from houston-api
-func AppVersion(client *houston.Client) (*houston.AppConfig, error) {
-	req := houston.Request{
-		Query: houston.AppVersionRequest,
-	}
-	r, err := req.DoWithClient(client)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.Data.GetAppConfig, nil
-}
-
-// AppConfig returns application config from houston-api
-func AppConfig(client *houston.Client) (*houston.AppConfig, error) {
-	logrus.Debug("Checking AppConfig from houston-api")
-	req := houston.Request{
-		Query: houston.AppConfigRequest,
-	}
-	r, err := req.DoWithClient(client)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.Data.GetAppConfig, nil
-}
-
-func checkManualReleaseNames(client *houston.Client) bool {
+func checkManualReleaseNames(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
-	req := houston.Request{
-		Query: houston.AppConfigRequest,
-	}
-	r, err := req.DoWithClient(client)
+
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 
-	return r.Data.GetAppConfig.ManualReleaseNames
+	return appConfig.ManualReleaseNames
 }
 
 // CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
-func CheckNFSMountDagDeployment(client *houston.Client) bool {
+func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
-	req := houston.Request{
-		Query: houston.AppConfigRequest,
-	}
-	r, err := req.DoWithClient(client)
+
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 
-	return r.Data.GetAppConfig.Flags.NfsMountDagDeployment
+	return appConfig.Flags.NfsMountDagDeployment
 }
 
-func CheckHardDeleteDeployment(client *houston.Client) bool {
+func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for hard delete deployment flag")
-	appConfig, err := AppConfig(client)
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 	return appConfig.Flags.HardDeleteDeployment
 }
 
-func CheckPreCreateNamespaceDeployment(client *houston.Client) bool {
+func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for pre created deployment flag")
-	appConfig, err := AppConfig(client)
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 	return appConfig.Flags.ManualNamespaceNames
 }
 
-func CheckNamespaceFreeFormEntryDeployment(client *houston.Client) bool {
-	appConfig, err := AppConfig(client)
+func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 	return appConfig.Flags.NamespaceFreeFormEntry
 }
 
-func CheckTriggererEnabled(client *houston.Client) bool {
+func CheckTriggererEnabled(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for triggerer flag")
-	appConfig, err := AppConfig(client)
+	appConfig, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
@@ -155,7 +124,7 @@ func CheckTriggererEnabled(client *houston.Client) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
@@ -190,17 +159,11 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	if CheckTriggererEnabled(client) {
 		vars["triggererReplicas"] = triggererReplicas
 	}
-	req := houston.Request{
-		Query:     houston.DeploymentCreateRequest,
-		Variables: vars,
-	}
-
-	r, err := req.DoWithClient(client)
+	d, err := client.CreateDeployment(vars)
 	if err != nil {
 		return err
 	}
 
-	d := r.Data.CreateDeployment
 	tab := newTableOut()
 	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, "-", d.AirflowVersion}, false)
 
@@ -212,7 +175,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	}
 
 	var airflowURL, flowerURL string
-	for _, url := range r.Data.CreateDeployment.Urls {
+	for _, url := range d.Urls {
 		if url.Type == "airflow" {
 			airflowURL = url.URL
 		}
@@ -235,13 +198,8 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	return nil
 }
 
-func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) error {
-	req := houston.Request{
-		Query:     houston.DeploymentDeleteRequest,
-		Variables: map[string]interface{}{"deploymentId": id, "deploymentHardDelete": hardDelete},
-	}
-
-	_, err := req.DoWithClient(client)
+func Delete(id string, hardDelete bool, client houston.ClientInterface, out io.Writer) error {
+	_, err := client.DeleteDeployment(id, hardDelete)
 	if err != nil {
 		return err
 	}
@@ -256,7 +214,7 @@ func Delete(id string, hardDelete bool, client *houston.Client, out io.Writer) e
 }
 
 // list all available namespaces
-func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (string, error) {
+func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer) (string, error) {
 	tab := &printutil.Table{
 		Padding:        []int{30},
 		DynamicPadding: true,
@@ -266,16 +224,10 @@ func getDeploymentSelectionNamespaces(client *houston.Client, out io.Writer) (st
 	logrus.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
-	req := houston.Request{
-		Query: houston.AvailableNamespacesGetRequest,
-	}
-
-	r, err := req.DoWithClient(client)
+	names, err := client.GetAvailableNamespaces()
 	if err != nil {
 		return "", err
 	}
-
-	names := r.Data.GetDeploymentNamespaces
 
 	if len(names) == 0 {
 		return "", ErrKubernetesNamespaceNotAvailable
@@ -310,29 +262,16 @@ func getDeploymentNamespaceName() (string, error) {
 }
 
 // List all airflow deployments
-func List(ws string, all bool, client *houston.Client, out io.Writer) error {
-	var deployments []houston.Deployment
-	var r *houston.Response
-	var err error
-
-	req := houston.Request{
-		Query: houston.DeploymentsGetRequest,
+func List(ws string, all bool, client houston.ClientInterface, out io.Writer) error {
+	listDeploymentRequest := houston.ListDeploymentsRequest{}
+	if !all {
+		listDeploymentRequest.WorkspaceID = ws
 	}
 
-	if all {
-		r, err = req.DoWithClient(client)
-		if err != nil {
-			return err
-		}
-	} else {
-		req.Variables = map[string]interface{}{"workspaceId": ws}
-		r, err = req.DoWithClient(client)
-		if err != nil {
-			return err
-		}
+	deployments, err := client.ListDeployments(listDeploymentRequest)
+	if err != nil {
+		return err
 	}
-
-	deployments = r.Data.GetDeployments
 
 	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Label > deployments[j].Label })
 
@@ -353,7 +292,7 @@ func List(ws string, all bool, client *houston.Client, out io.Writer) error {
 }
 
 // Update an airflow deployment
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client *houston.Client, out io.Writer) error {
+func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -375,16 +314,11 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		vars["triggererReplicas"] = triggererReplicas
 	}
 
-	req := houston.Request{
-		Query:     houston.DeploymentUpdateRequest,
-		Variables: vars,
-	}
-	r, err := req.DoWithClient(client)
+	d, err := client.UpdateDeployment(vars)
 	if err != nil {
 		return err
 	}
 
-	d := r.Data.UpdateDeployment
 	tab := newTableOut()
 	currentTag := d.DeploymentInfo.Current
 	if currentTag == "" {
@@ -398,8 +332,8 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 }
 
 // Upgrade airflow deployment
-func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, out io.Writer) error {
-	deployment, err := getDeployment(id, client)
+func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInterface, out io.Writer) error {
+	deployment, err := client.GetDeployment(id)
 	if err != nil {
 		return err
 	}
@@ -418,17 +352,11 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
 
-	req := houston.Request{
-		Query:     houston.UpdateDeploymentAirflowRequest,
-		Variables: vars,
-	}
-
-	r, err := req.DoWithClient(client)
+	d, err := client.UpdateDeploymentAirflow(vars)
 	if err != nil {
 		return err
 	}
 
-	d := r.Data.UpdateDeploymentAirflow
 	tab := &printutil.Table{
 		Padding:        []int{30, 30, 10, 50, 10},
 		DynamicPadding: true,
@@ -446,8 +374,8 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client *houston.Client, ou
 }
 
 // Upgrade airflow deployment
-func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) error {
-	deployment, err := getDeployment(id, client)
+func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
+	deployment, err := client.GetDeployment(id)
 	if err != nil {
 		return err
 	}
@@ -455,12 +383,7 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
 		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
 
-		req := houston.Request{
-			Query:     houston.UpdateDeploymentAirflowRequest,
-			Variables: vars,
-		}
-
-		_, err := req.DoWithClient(client)
+		_, err := client.UpdateDeploymentAirflow(vars)
 		if err != nil {
 			return err
 		}
@@ -475,21 +398,17 @@ func AirflowUpgradeCancel(id string, client *houston.Client, out io.Writer) erro
 	return nil
 }
 
-func getAirflowVersionSelection(airflowVersion string, client *houston.Client, out io.Writer) (string, error) {
+func getAirflowVersionSelection(airflowVersion string, client houston.ClientInterface, out io.Writer) (string, error) {
 	currentAirflowVersion, err := semver.NewVersion(airflowVersion)
 	if err != nil {
 		return "", err
 	}
 	// prepare list of AC airflow versions
-	dReq := houston.Request{
-		Query: houston.DeploymentInfoRequest,
-	}
-
-	resp, err := dReq.DoWithClient(client)
+	config, err := client.GetDeploymentConfig()
 	if err != nil {
 		return "", err
 	}
-	airflowVersions := resp.Data.DeploymentConfig.AirflowVersions
+	airflowVersions := config.AirflowVersions
 
 	t := &printutil.Table{
 		Padding:        []int{10},
@@ -517,22 +436,6 @@ func getAirflowVersionSelection(airflowVersion string, client *houston.Client, o
 		return "", err
 	}
 	return filteredVersions[i-1], nil
-}
-
-func getDeployment(deploymentID string, client *houston.Client) (*houston.Deployment, error) {
-	vars := map[string]interface{}{"id": deploymentID}
-
-	req := houston.Request{
-		Query:     houston.DeploymentGetRequest,
-		Variables: vars,
-	}
-
-	r, err := req.DoWithClient(client)
-	if err != nil {
-		return nil, err
-	}
-
-	return &r.Data.GetDeployment, nil
 }
 
 func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error {

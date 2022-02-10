@@ -21,7 +21,7 @@ func TestVersionRootCommand(t *testing.T) {
 }
 
 func TestNewVersionCmd(t *testing.T) {
-	client := houston.NewHoustonClient(httputil.NewHTTPClient())
-	cmd := newVersionCmd(client, os.Stdout)
+	houstonClient = houston.NewClient(httputil.NewHTTPClient())
+	cmd := newVersionCmd(os.Stdout)
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }

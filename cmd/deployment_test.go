@@ -79,7 +79,7 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -158,7 +158,7 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -237,7 +237,7 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -315,7 +315,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -395,7 +395,7 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -478,7 +478,7 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -541,7 +541,7 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -604,7 +604,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -674,7 +674,7 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	myTests := []struct {
 		cmdArgs        []string
@@ -742,7 +742,7 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "service-account", "delete", "q1w2e3r4t5y6u7i8o9p0", "--deployment-id=1234")
 	assert.NoError(t, err)
@@ -780,7 +780,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "service-account", "create", "--deployment-id=ck1qg6whg001r08691y117hub", "--label=my_label", "--role=viewer")
 	assert.NoError(t, err)
@@ -818,7 +818,7 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "user", "add", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
@@ -856,7 +856,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "user", "delete", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "somebody@astronomer.com")
 	assert.NoError(t, err)
@@ -890,7 +890,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "user", "update", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--role=DEPLOYMENT_ADMIN", "somebody@astronomer.com")
 	assert.NoError(t, err)
@@ -925,7 +925,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--deployment-id=ckggvxkw112212kc9ebv8vu6p", "--desired-airflow-version=1.10.10")
 	assert.NoError(t, err)
@@ -955,7 +955,7 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "airflow", "upgrade", "--cancel", "--deployment-id=ckggvxkw112212kc9ebv8vu6p")
 	assert.NoError(t, err)
@@ -992,7 +992,7 @@ func TestDeploymentSAGetCommand(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id=ckqvf9spa1189rn9hbh5h439u")
 	assert.NoError(t, err)
@@ -1027,7 +1027,7 @@ func TestDeploymentDelete(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	output, err := executeCommandC(api, "deployment", "delete", "ckqh2dmzc43548h9hxzspysyi")
 	assert.NoError(t, err)
@@ -1071,7 +1071,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	// mock os.Stdin
 	input := []byte("n")
@@ -1131,7 +1131,7 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	api := houston.NewHoustonClient(client)
+	api := houston.NewClient(client)
 
 	// mock os.Stdin
 	input := []byte("y")

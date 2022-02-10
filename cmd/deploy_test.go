@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
+	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 
@@ -56,30 +56,6 @@ func TestBuildPushDockerImageSuccess(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	ok := `{
-		"data": {
-		  "deploymentConfig": {
-			"airflowVersions": [
-			  "2.1.0",
-			  "2.0.2",
-			  "2.0.0",
-			  "1.10.15",
-			  "1.10.14",
-			  "1.10.12",
-			  "1.10.10",
-			  "1.10.7",
-			  "1.10.5"
-			]
-		  }
-		}
-	  }`
-
-	var resp *houston.Response
-	_ = json.Unmarshal([]byte(ok), resp)
-	getDeploymentInfo = func() (*houston.Response, error) {
-		return resp, nil
-	}
-
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
 		mockImageHandler.On("Build", mock.Anything).Return(nil)
@@ -87,9 +63,27 @@ func TestBuildPushDockerImageSuccess(t *testing.T) {
 		return mockImageHandler, nil
 	}
 
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowVersions: []string{
+			"2.1.0",
+			"2.0.2",
+			"2.0.0",
+			"1.10.15",
+			"1.10.14",
+			"1.10.12",
+			"1.10.10",
+			"1.10.7",
+			"1.10.5",
+		},
+	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonClient = houstonMock
+
 	err := buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
 	assert.NoError(t, err)
 	mockImageHandler.AssertExpectations(t)
+	houstonMock.AssertExpectations(t)
 }
 
 func TestBuildPushDockerImageFailure(t *testing.T) {
@@ -98,29 +92,22 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	ok := `{
-		"data": {
-		  "deploymentConfig": {
-			"airflowVersions": [
-			  "2.1.0",
-			  "2.0.2",
-			  "2.0.0",
-			  "1.10.15",
-			  "1.10.14",
-			  "1.10.12",
-			  "1.10.10",
-			  "1.10.7",
-			  "1.10.5"
-			]
-		  }
-		}
-	  }`
-
-	var resp *houston.Response
-	_ = json.Unmarshal([]byte(ok), resp)
-	getDeploymentInfo = func() (*houston.Response, error) {
-		return resp, nil
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowVersions: []string{
+			"2.1.0",
+			"2.0.2",
+			"2.0.0",
+			"1.10.15",
+			"1.10.14",
+			"1.10.12",
+			"1.10.10",
+			"1.10.7",
+			"1.10.5",
+		},
 	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
+	houstonClient = houstonMock
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
@@ -142,6 +129,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	err = buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockImageHandler.AssertExpectations(t)
+	houstonMock.AssertExpectations(t)
 }
 
 func TestBuildAstroUIDeploymentLink(t *testing.T) {

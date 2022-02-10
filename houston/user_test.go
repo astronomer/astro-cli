@@ -1,0 +1,65 @@
+package houston
+
+import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"testing"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestCreateUser(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	mockResponse := &Response{
+		Data: ResponseData{
+			CreateUser: &AuthUser{
+				User: User{
+					ID: "user-id",
+					Emails: []Email{
+						{Address: "test@astronomer.com"},
+					},
+					Username: "username",
+					Status:   "active",
+				},
+				Token: Token{
+					Value: "test-token",
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		response, err := api.CreateUser("email", "password")
+		assert.NoError(t, err)
+		assert.Equal(t, response, mockResponse.Data.CreateUser)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.CreateUser("email", "password")
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}

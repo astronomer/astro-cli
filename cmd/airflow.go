@@ -12,7 +12,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -50,7 +49,7 @@ astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l us
 	containerHandlerInit = airflow.ContainerHandlerInit
 )
 
-func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "airflow",
 		Aliases:    []string{"a"},
@@ -59,7 +58,7 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Deprecated: "please use `astro dev [subcommands] [flags]` instead",
 	}
 	cmd.AddCommand(
-		newAirflowInitCmd(client, out),
+		newAirflowInitCmd(out),
 		newAirflowDeployCmd(),
 		newAirflowStartCmd(out),
 		newAirflowKillCmd(out),
@@ -71,7 +70,7 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newDevRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Aliases: []string{"d"},
@@ -79,7 +78,7 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		Long:    "Airflow projects contain Airflow code and Deployment configuration",
 	}
 	cmd.AddCommand(
-		newAirflowInitCmd(client, out),
+		newAirflowInitCmd(out),
 		newAirflowDeployCmd(),
 		newAirflowStartCmd(out),
 		newAirflowKillCmd(out),
@@ -92,7 +91,7 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func newAirflowInitCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold a new Airflow project",
@@ -104,7 +103,7 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return airflowInit(cmd, args, client, out)
+			return airflowInit(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
@@ -279,7 +278,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 }
 
 // Use project name for image name
-func airflowInit(cmd *cobra.Command, _ []string, client *houston.Client, out io.Writer) error {
+func airflowInit(cmd *cobra.Command, _ []string, out io.Writer) error {
 	// Validate project name
 	if projectName != "" {
 		projectNameValid := regexp.
@@ -294,7 +293,7 @@ func airflowInit(cmd *cobra.Command, _ []string, client *houston.Client, out io.
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
 	httpClient := airflowversions.NewClient(httputil.NewHTTPClient())
-	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, httpClient, client, out)
+	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, httpClient, houstonClient, out)
 	if err != nil {
 		return err
 	}

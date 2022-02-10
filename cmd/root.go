@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	houstonClient  houston.ClientInterface
 	workspaceID    string
 	workspaceRole  string
 	deploymentRole string
@@ -21,7 +22,9 @@ var (
 )
 
 // NewRootCmd adds all of the primary commands for the cli
-func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
+func NewRootCmd(client houston.ClientInterface, out io.Writer) *cobra.Command {
+	houstonClient = client
+
 	rootCmd := &cobra.Command{
 		Use:   "astro",
 		Short: "Astronomer - CLI",
@@ -30,28 +33,28 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 			if err := SetUpLogs(out, verboseLevel); err != nil {
 				return err
 			}
-			return version.ValidateCompatibility(client, out, version.CurrVersion, skipVerCheck)
+			return version.ValidateCompatibility(houstonClient, out, version.CurrVersion, skipVerCheck)
 		},
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&skipVerCheck, "skip-version-check", "", false, "skip version compatibility check")
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	rootCmd.AddCommand(
-		newAuthRootCmd(client, out),
-		newWorkspaceCmd(client, out),
-		newVersionCmd(client, out),
-		newUpgradeCheckCmd(client, out),
-		newUserCmd(client, out),
-		newClusterRootCmd(client, out),
-		newDevRootCmd(client, out),
-		newCompletionCmd(client, out),
-		newConfigRootCmd(client, out),
-		newDeploymentRootCmd(client, out),
+		newAuthRootCmd(out),
+		newWorkspaceCmd(out),
+		newVersionCmd(out),
+		newUpgradeCheckCmd(out),
+		newUserCmd(out),
+		newClusterRootCmd(out),
+		newDevRootCmd(out),
+		newCompletionCmd(out),
+		newConfigRootCmd(out),
+		newDeploymentRootCmd(out),
 		newDeployCmd(),
-		newSaRootCmd(client, out),
+		newSaRootCmd(out),
 		// TODO: remove newAirflowRootCmd, after 1.0 we have only devRootCmd
-		newAirflowRootCmd(client, out),
-		newLogsDeprecatedCmd(client),
+		newAirflowRootCmd(out),
+		newLogsDeprecatedCmd(),
 	)
 	return rootCmd
 }

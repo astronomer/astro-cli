@@ -27,7 +27,7 @@ type IntegrationTestSuite struct {
 	TestWorkspace string
 	TestDomain    string
 	Temp          string
-	Client        *houston.Client
+	Client        houston.ClientInterface
 	Fs            afero.Fs
 }
 
@@ -38,7 +38,7 @@ func (ts *IntegrationTestSuite) SetupSuite() {
 	config.InitConfig(fs)
 	rand.Seed(time.Now().UnixNano())
 	ts.Fs = fs
-	ts.Client = houston.NewHoustonClient(httputil.NewHTTPClient())
+	ts.Client = houston.NewClient(httputil.NewHTTPClient())
 	ts.TestDomain = testUtils.GetEnv("HOUSTON_HOST", "localhost")
 	ts.TestEmail = fmt.Sprintf("test%d@astronomer.io", rand.Intn(100))
 	ts.TestPassword = "pass"

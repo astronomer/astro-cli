@@ -18,13 +18,72 @@ var (
 	ErrVerboseInaptPermissions = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 
+// ClientInterface - Interface that defines methods exposed by the Houston API
+type ClientInterface interface {
+	// user
+	CreateUser(email, password string) (*AuthUser, error)
+	// workspace
+	CreateWorkspace(label, description string) (*Workspace, error)
+	ListWorkspaces() ([]Workspace, error)
+	DeleteWorkspace(workspaceID string) (*Workspace, error)
+	GetWorkspace(workspaceID string) (*Workspace, error)
+	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)
+	// workspace users and roles
+	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)
+	DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error)
+	ListWorkspaceUserAndRoles(workspaceID string) (*Workspace, error)
+	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
+	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
+	// auth
+	AuthenticateWithBasicAuth(username, password string) (string, error)
+	GetAuthConfig() (*AuthConfig, error)
+	// deployment
+	CreateDeployment(vars map[string]interface{}) (*Deployment, error)
+	DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error)
+	ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error)
+	UpdateDeployment(variables map[string]interface{}) (*Deployment, error)
+	GetDeployment(deploymentID string) (*Deployment, error)
+	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
+	GetDeploymentConfig() (*DeploymentConfig, error)
+	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
+	// deployment users
+	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
+	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
+	UpdateDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
+	DeleteDeploymentUser(deploymentID, email string) (*RoleBinding, error)
+	// service account
+	CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error)
+	DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error)
+	ListDeploymentServiceAccounts(deploymentID string) ([]ServiceAccount, error)
+	CreateWorkspaceServiceAccount(variables *CreateServiceAccountRequest) (*WorkspaceServiceAccount, error)
+	DeleteWorkspaceServiceAccount(workspaceID, serviceAccountID string) (*ServiceAccount, error)
+	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
+	// app
+	GetAppConfig() (*AppConfig, error)
+	GetAvailableNamespaces() ([]Namespace, error)
+}
+
+// ClientImplementation - implementation of the Houston Client Interface
+type ClientImplementation struct {
+	client *Client
+}
+
+// NewClient - initialized the Houston Client object with proper HTTP Client configuration
+// set as a variable so we can change it to return mock houston clients in tests
+var NewClient = func(c *httputil.HTTPClient) ClientInterface {
+	client := newInternalClient(c)
+	return &ClientImplementation{
+		client: client,
+	}
+}
+
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
 	HTTPClient *httputil.HTTPClient
 }
 
-// NewHoustonClient returns a new Client with the logger and HTTP client setup.
-func NewHoustonClient(c *httputil.HTTPClient) *Client {
+// newInternalClient returns a new Client with the logger and HTTP Client setup.
+func newInternalClient(c *httputil.HTTPClient) *Client {
 	return &Client{
 		HTTPClient: c,
 	}
@@ -36,11 +95,11 @@ type GraphQLQuery struct {
 }
 
 type Request struct {
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
+	Query     string      `json:"query"`
+	Variables interface{} `json:"variables"`
 }
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
+// Do (request) is a wrapper to more easily pass variables to a Client.Do request
 func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	doOpts := httputil.DoOptions{
 		Data: r,
@@ -52,9 +111,9 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	return api.Do(doOpts)
 }
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
+// Do (request) is a wrapper to more easily pass variables to a Client.Do request
 func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(NewHoustonClient(httputil.NewHTTPClient()))
+	return r.DoWithClient(newInternalClient(httputil.NewHTTPClient()))
 }
 
 // Do executes a query against the Houston API, logging out any errors contained in the response object
