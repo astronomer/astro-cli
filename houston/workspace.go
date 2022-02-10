@@ -46,10 +46,9 @@ func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, e
 
 // GetWorkspace - get a workspace
 func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, error) {
-	// TODO: CHANGE THIS QUERY TO USE THE RIGHT ONE: GET A SINGLE WORKSPACE
 	req := Request{
-		Query:     WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceID},
+		Query:     WorkspaceGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
 	}
 
 	res, err := req.DoWithClient(h.client)
@@ -57,12 +56,12 @@ func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, erro
 		return nil, handleAPIErr(err)
 	}
 
-	if len(res.Data.GetWorkspaces) < 1 {
-		// return error if no workspace found
+	workspace := res.Data.GetWorkspace
+	if workspace == nil {
 		return nil, ErrWorkspaceNotFound{workspaceID: workspaceID}
 	}
 
-	return &res.Data.GetWorkspaces[0], nil
+	return workspace, nil
 }
 
 // UpdateWorkspace - update a workspace

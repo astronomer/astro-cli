@@ -37,6 +37,7 @@ type ResponseData struct {
 	GetWorkspaceServiceAccounts    []ServiceAccount          `json:"workspaceServiceAccounts,omitempty"`
 	GetUsers                       []User                    `json:"users,omitempty"`
 	GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
+	GetWorkspace                   *Workspace                `json:"workspace,omitempty"`
 	UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
 	UpdateDeploymentAirflow        *Deployment               `json:"updateDeploymentAirflow,omitempty"`
 	UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
