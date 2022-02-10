@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/houston"
@@ -13,6 +15,20 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+var mockDeploymentConfig = &houston.DeploymentConfig{
+	AirflowVersions: []string{
+		"2.1.0",
+		"2.0.2",
+		"2.0.0",
+		"1.10.15",
+		"1.10.14",
+		"1.10.12",
+		"1.10.10",
+		"1.10.7",
+		"1.10.5",
+	},
+}
 
 func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 	testUtil.InitTestConfig()
@@ -46,31 +62,8 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	ok := `{
-  "data": {
-    "deploymentConfig": {
-      "airflowVersions": [
-        "2.1.0",
-        "2.0.2",
-        "2.0.0",
-        "1.10.15",
-        "1.10.14",
-        "1.10.12",
-        "1.10.10",
-        "1.10.7",
-        "1.10.5"
-      ]
-    }
-  }
-}`
-	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(ok)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(testHoustonClient)
+	api := new(mocks.ClientInterface)
+	api.On("GetDeploymentConfig").Return(mockDeploymentConfig, nil)
 
 	output := new(bytes.Buffer)
 
@@ -114,31 +107,8 @@ func Test_fallbackDefaultAirflowImageTag(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	ok := `{
-	"data": {
-		"deploymentConfig": {
-				"airflowVersions": [
-					"2.1.0",
-					"2.0.2",
-					"2.0.0",
-					"1.10.15",
-					"1.10.14",
-					"1.10.12",
-					"1.10.10",
-					"1.10.7",
-					"1.10.5"
-				]
-			}
-		}
-	}`
-	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(ok)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(testHoustonClient)
+	api := new(mocks.ClientInterface)
+	api.On("GetDeploymentConfig").Return(mockDeploymentConfig, nil)
 
 	output := new(bytes.Buffer)
 
@@ -162,7 +132,7 @@ func Test_fallbackDefaultAirflowImageTag(t *testing.T) {
 
 func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	testUtil.InitTestConfig()
-	mockErrorResponse := `An error occurred`
+	mockErrorResponse := errors.New(`an error occurred`) //nolint:goerr113
 	// prepare fake response from updates.astronomer.io
 	okResponse := `{
 	  "version": "1.0",
@@ -193,49 +163,19 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 400,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(testHoustonClient)
+	api := new(mocks.ClientInterface)
+	api.On("GetDeploymentConfig").Return(nil, mockErrorResponse)
 
 	output := new(bytes.Buffer)
 
 	defaultTag, err := prepareDefaultAirflowImageTag("2.0.2", httpClient, api, output)
-	assert.Equal(t, err.Error(), fmt.Sprintf("API error (400): %s", mockErrorResponse))
+	assert.Equal(t, mockErrorResponse.Error(), err.Error())
 	assert.Equal(t, "", defaultTag)
 }
 
 func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 	testUtil.InitTestConfig()
-	mockErrorResponse := `{
-	  "errors": [
-		{
-		  "message": "You do not have the appropriate permissions for that",
-		  "locations": [
-			{
-			  "line": 2,
-			  "column": 3
-			}
-		  ],
-		  "path": [
-			"deploymentConfig"
-		  ],
-		  "extensions": {
-			"code": "FORBIDDEN",
-			"exception": {
-			  "message": "You do not have the appropriate permissions for that"
-			}
-		  }
-		}
-	  ],
-	  "data": {
-		"deploymentConfig": null
-	  }
-	}`
+
 	// prepare fake response from updates.astronomer.io
 	okResponse := `{
 	  "version": "1.0",
@@ -266,14 +206,8 @@ func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 	httpClient := airflowversions.NewClient(client)
 
 	// prepare fake response from houston
-	testHoustonClient := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(mockErrorResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := houston.NewClient(testHoustonClient)
+	api := new(mocks.ClientInterface)
+	api.On("GetDeploymentConfig").Return(nil, houston.ErrVerboseInaptPermissions)
 
 	output := new(bytes.Buffer)
 
