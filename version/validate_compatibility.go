@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/deployment"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 
@@ -19,7 +21,7 @@ func ValidateCompatibility(client houston.ClientInterface, out io.Writer, cliVer
 	}
 	logrus.Debug("checking if astro-cli version is not compatible with platform")
 
-	serverCfg, err := client.GetAppConfig()
+	serverCfg, err := deployment.GetAppConfig(client)
 	if err != nil {
 		var e *houston.ErrFieldsNotAvailable
 		if errors.As(err, &e) {

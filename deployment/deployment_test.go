@@ -23,7 +23,9 @@ func TestCheckManualReleaseNames(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(appConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return appConfig, nil
+		}
 
 		assert.True(t, checkManualReleaseNames(api))
 		api.AssertExpectations(t)
@@ -35,7 +37,9 @@ func TestCheckManualReleaseNames(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(appConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return appConfig, nil
+		}
 
 		assert.False(t, checkManualReleaseNames(api))
 		api.AssertExpectations(t)
@@ -44,7 +48,9 @@ func TestCheckManualReleaseNames(t *testing.T) {
 	t.Run("manual release names error", func(t *testing.T) {
 		mockErr := errors.New("api error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(nil, mockErr)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return nil, mockErr
+		}
 
 		assert.False(t, checkManualReleaseNames(api))
 		api.AssertExpectations(t)
@@ -97,7 +103,9 @@ func TestCreate(t *testing.T) {
 
 	t.Run("create success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		// Have to use mock anything for now as vars is too big
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
@@ -112,7 +120,9 @@ func TestCreate(t *testing.T) {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		triggerReplicas = 1
@@ -127,7 +137,9 @@ func TestCreate(t *testing.T) {
 		mockAppConfig.TriggererEnabled = false
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		nfsLocation = "test:/test"
@@ -142,7 +154,9 @@ func TestCreate(t *testing.T) {
 
 	t.Run("create git sync enabled", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		nfsLocation = ""
@@ -181,7 +195,9 @@ func TestCreate(t *testing.T) {
 
 	t.Run("create with pre-create namespace deployment success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		releaseName = ""
@@ -223,7 +239,9 @@ func TestCreate(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(&appConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return &appConfig, nil
+		}
 		api.On("GetAvailableNamespaces").Return(mockNamespaces, nil)
 
 		buf := new(bytes.Buffer)
@@ -257,7 +275,9 @@ func TestCreate(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(&appConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return &appConfig, nil
+		}
 		api.On("GetAvailableNamespaces").Return([]houston.Namespace{}, mockError)
 
 		buf := new(bytes.Buffer)
@@ -270,7 +290,9 @@ func TestCreate(t *testing.T) {
 		mockError := errors.New("api error") //nolint:goerr113
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
@@ -283,7 +305,9 @@ func TestCreate(t *testing.T) {
 		mockAppConfig.Flags.NamespaceFreeFormEntry = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
@@ -313,7 +337,9 @@ func TestCreate(t *testing.T) {
 		mockError := errors.New("api error") //nolint:goerr113
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("CreateDeployment", mock.Anything).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
@@ -489,7 +515,9 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("update success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         AIRFLOW VERSION     
@@ -518,7 +546,9 @@ func TestUpdate(t *testing.T) {
 		mockAppConfig.TriggererEnabled = true
 
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         AIRFLOW VERSION     
@@ -546,7 +576,9 @@ func TestUpdate(t *testing.T) {
 	t.Run("update error", func(t *testing.T) {
 		mockError := errors.New("api error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 		api.On("UpdateDeployment", mock.Anything).Return(nil, mockError)
 
 		deploymentConfig := make(map[string]string)
@@ -822,7 +854,9 @@ func TestCheckNFSMountDagDeploymentError(t *testing.T) {
 	mockError := errors.New("api error") //nolint:goerr113
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(nil, mockError)
+	GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return nil, mockError
+	}
 	assert.Equal(t, false, CheckNFSMountDagDeployment(api))
 	api.AssertExpectations(t)
 }
@@ -843,7 +877,9 @@ func TestCheckNFSMountDagDeploymentSuccess(t *testing.T) {
 		},
 	}
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	assert.Equal(t, true, CheckNFSMountDagDeployment(api))
 	api.AssertExpectations(t)
 }
@@ -861,7 +897,9 @@ func TestCheckHardDeleteDeployment(t *testing.T) {
 
 	t.Run("check hard delete success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 
 		hardDelete := CheckHardDeleteDeployment(api)
 		assert.Equal(t, true, hardDelete)
@@ -871,7 +909,9 @@ func TestCheckHardDeleteDeployment(t *testing.T) {
 	t.Run("check hard delete error", func(t *testing.T) {
 		mockError := errors.New("error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(nil, mockError)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return nil, mockError
+		}
 
 		hardDelete := CheckHardDeleteDeployment(api)
 		assert.False(t, hardDelete)
@@ -891,7 +931,9 @@ func TestCheckTriggererEnabled(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(mockAppConfig, nil)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return mockAppConfig, nil
+		}
 
 		triggererEnabled := CheckTriggererEnabled(api)
 		assert.True(t, triggererEnabled)
@@ -900,7 +942,9 @@ func TestCheckTriggererEnabled(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		mockError := errors.New("error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
-		api.On("GetAppConfig").Return(nil, mockError)
+		GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+			return nil, mockError
+		}
 
 		triggererEnabled := CheckTriggererEnabled(api)
 		assert.False(t, triggererEnabled)
@@ -1010,7 +1054,9 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 
 	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
 	assert.Equal(t, true, usesPreCreateNamespace)

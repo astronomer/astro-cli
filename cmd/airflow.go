@@ -100,6 +100,7 @@ func newAirflowInitCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -140,6 +141,7 @@ func newAirflowStartCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -157,6 +159,7 @@ func newAirflowKillCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -173,6 +176,7 @@ func newAirflowLogsCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -193,6 +197,7 @@ func newAirflowStopCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -209,6 +214,7 @@ func newAirflowPSCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -225,6 +231,7 @@ func newAirflowRunCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE:            ensureProjectDir,
@@ -243,6 +250,7 @@ func newAirflowUpgradeCheckCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE:            ensureProjectDir,

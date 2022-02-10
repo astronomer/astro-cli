@@ -19,6 +19,7 @@ var (
 	role           string
 	skipVerCheck   bool
 	verboseLevel   string
+	initDebugLogs  = []string{}
 )
 
 // NewRootCmd adds all of the primary commands for the cli
@@ -33,6 +34,7 @@ func NewRootCmd(client houston.ClientInterface, out io.Writer) *cobra.Command {
 			if err := SetUpLogs(out, verboseLevel); err != nil {
 				return err
 			}
+			printDebugLogs()
 			return version.ValidateCompatibility(houstonClient, out, version.CurrVersion, skipVerCheck)
 		},
 	}
@@ -72,4 +74,10 @@ func SetUpLogs(out io.Writer, level string) error {
 	}
 	logrus.SetLevel(lvl)
 	return nil
+}
+
+func printDebugLogs() {
+	for _, log := range initDebugLogs {
+		logrus.Debug(log)
+	}
 }

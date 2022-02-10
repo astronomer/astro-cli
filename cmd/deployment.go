@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
@@ -134,9 +136,9 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
+	appConfig, err := deployment.GetAppConfig(houstonClient)
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
@@ -225,9 +227,9 @@ $ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
+	appConfig, err := deployment.GetAppConfig(houstonClient)
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
@@ -476,9 +478,9 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
+	appConfig, err := deployment.GetAppConfig(houstonClient)
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		logrus.Debugln("Error checking feature flag", err)
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -537,9 +539,9 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
+	appConfig, err := deployment.GetAppConfig(houstonClient)
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		logrus.Debugln("Error checking feature flag", err)
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/deployment"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/astronomer/astro-cli/messages"
@@ -39,7 +41,9 @@ func TestPrintVersionHoustonError(t *testing.T) {
 	testUtil.InitTestConfig()
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(nil, errMock)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return nil, errMock
+	}
 	output := new(bytes.Buffer)
 	CurrVersion = "0.15.0"
 	err := PrintVersion(api, output)
@@ -52,7 +56,9 @@ func TestPrintVersionError(t *testing.T) {
 	testUtil.InitTestConfig()
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 
 	output := new(bytes.Buffer)
 	CurrVersion = ""
@@ -65,7 +71,9 @@ func TestPrintVersionError(t *testing.T) {
 func TestCheckForUpdateVersionMatch(t *testing.T) {
 	testUtil.InitTestConfig()
 	houstonClient := new(mocks.ClientInterface)
-	houstonClient.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 
 	CurrVersion = "0.15.0"
 	okGitHubResponse := `{
@@ -95,7 +103,9 @@ func TestCheckForUpdateVersionMatch(t *testing.T) {
 func TestPrintServerVersion(t *testing.T) {
 	testUtil.InitTestConfig()
 	houstonClient := new(mocks.ClientInterface)
-	houstonClient.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 
 	output := new(strings.Builder)
 	printServerVersion(houstonClient, output)

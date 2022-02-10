@@ -69,59 +69,59 @@ func newTableOut() *printutil.Table {
 func checkManualReleaseNames(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 
-	appConfig, err := client.GetAppConfig()
+	config, err := GetAppConfig(client)
 	if err != nil {
 		return false
 	}
 
-	return appConfig.ManualReleaseNames
+	return config.ManualReleaseNames
 }
 
 // CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
 func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 
-	appConfig, err := client.GetAppConfig()
+	config, err := GetAppConfig(client)
 	if err != nil {
 		return false
 	}
 
-	return appConfig.Flags.NfsMountDagDeployment
+	return config.Flags.NfsMountDagDeployment
 }
 
 func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for hard delete deployment flag")
-	appConfig, err := client.GetAppConfig()
+	config, err := GetAppConfig(client)
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.HardDeleteDeployment
+	return config.Flags.HardDeleteDeployment
 }
 
 func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for pre created deployment flag")
-	appConfig, err := client.GetAppConfig()
+	config, err := GetAppConfig(client)
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.ManualNamespaceNames
+	return config.Flags.ManualNamespaceNames
 }
 
 func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
-	appConfig, err := client.GetAppConfig()
+	config, err := GetAppConfig(client)
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.NamespaceFreeFormEntry
+	return config.Flags.NamespaceFreeFormEntry
 }
 
 func CheckTriggererEnabled(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for triggerer flag")
-	appConfig, err := client.GetAppConfig()
+	config, err := GetAppConfig(client)
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.TriggererEnabled
+	return config.Flags.TriggererEnabled
 }
 
 // Create airflow deployment
@@ -185,10 +185,9 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		}
 	}
 
-	tab.SuccessMsg =
-		fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
-			". Deployment can be accessed at the following URLs \n" +
-			fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
+	tab.SuccessMsg = fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
+		". Deployment can be accessed at the following URLs \n" +
+		fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
 
 	// The Flower URL is specific to CeleryExecutor only
 	if executor == celeryExecutor || executor == "" {

@@ -18,6 +18,7 @@ func newVersionCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,6 +36,7 @@ func newUpgradeCheckCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

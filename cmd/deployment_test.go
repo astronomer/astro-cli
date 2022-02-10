@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/astronomer/astro-cli/deployment"
+
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -69,7 +71,9 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfig, nil
+	}
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -96,7 +100,9 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 	appConfigResponse := &houston.AppConfig{TriggererEnabled: false}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -127,7 +133,9 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 		},
 	}
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -158,7 +166,9 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(2)
 
 	myTests := []struct {
@@ -190,7 +200,9 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
 
 	myTests := []struct {
@@ -223,7 +235,9 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -253,7 +267,9 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
 
 	myTests := []struct {
@@ -286,7 +302,9 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
 
 	myTests := []struct {
@@ -326,7 +344,9 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfigResponse, nil
+	}
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -373,7 +393,9 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	testUtil.InitTestConfig()
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("DeleteDeploymentServiceAccount", "1234", mockDeploymentSA.ID).Return(mockDeploymentSA, nil)
 	output, err := executeCommandC(api, "deployment", "service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234")
 	assert.NoError(t, err)
@@ -408,7 +430,9 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("CreateDeploymentServiceAccount", expectedSARequest).Return(mockSA, nil)
 
 	output, err := executeCommandC(api,
@@ -437,7 +461,9 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("AddDeploymentUser", expectedAddUserRequest).Return(mockDeploymentUserRole, nil)
 
 	output, err := executeCommandC(api,
@@ -460,7 +486,9 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("DeleteDeploymentUser", mockDeploymentUserRole.Deployment.ID, mockDeploymentUserRole.User.Username).
 		Return(mockDeploymentUserRole, nil)
 
@@ -489,7 +517,9 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("UpdateDeploymentUser", expectedUpdateUserRequest).Return(&mockResponseUserRole, nil)
 
 	output, err := executeCommandC(api,
@@ -518,7 +548,9 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentAirflow", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
 
@@ -550,7 +582,9 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	mockDeploymentUpdated.DesiredAirflowVersion = mockDeploymentUpdated.AirflowVersion
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentAirflow", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
 
@@ -579,7 +613,9 @@ func TestDeploymentSAGetCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("ListDeploymentServiceAccounts", mockDeployment.ID).Return([]houston.ServiceAccount{mockSA}, nil)
 
 	output, err := executeCommandC(api, "deployment", "sa", "get", "--deployment-id="+mockDeployment.ID)
@@ -594,7 +630,9 @@ func TestDeploymentDelete(t *testing.T) {
 	expectedOut := `Successfully deleted deployment`
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return mockAppConfig, nil
+	}
 	api.On("DeleteDeployment", mockDeployment.ID, false).Return(mockDeployment, nil)
 
 	output, err := executeCommandC(api, "deployment", "delete", mockDeployment.ID)
@@ -612,7 +650,9 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfig, nil
+	}
 
 	// mock os.Stdin
 	input := []byte("n")
@@ -645,7 +685,9 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfig, nil
+	}
 	api.On("DeleteDeployment", mockDeployment.ID, true).Return(mockDeployment, nil)
 
 	// mock os.Stdin

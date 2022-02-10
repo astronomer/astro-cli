@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/astronomer/astro-cli/deployment"
+
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/stretchr/testify/mock"
 
@@ -41,7 +43,9 @@ func TestDeploymentLogsRootCommandTriggererEnabled(t *testing.T) {
 		},
 	}
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfig, nil
+	}
 	output, err := executeCommandC(api, "deployment", "logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")
@@ -57,7 +61,9 @@ func TestDeploymentLogsRootCommandTriggererDisabled(t *testing.T) {
 		},
 	}
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+		return appConfig, nil
+	}
 	output, err := executeCommandC(api, "deployment", "logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")
@@ -83,7 +89,9 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 
 		t.Run(fmt.Sprintf("list %s logs success", test.component), func(t *testing.T) {
 			api := new(mocks.ClientInterface)
-			api.On("GetAppConfig").Return(appConfig, nil)
+			deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+				return appConfig, nil
+			}
 			// Have to use mock.Anything because since is computed in the function by using time.Now()
 			api.On("ListDeploymentLogs", mock.Anything).Return(mockLogs, nil)
 
@@ -96,7 +104,9 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 		t.Run(fmt.Sprintf("list %s logs error", test.component), func(t *testing.T) {
 			mockErr := errors.New("test error") //nolint:goerr113
 			api := new(mocks.ClientInterface)
-			api.On("GetAppConfig").Return(appConfig, nil)
+			deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
+				return appConfig, nil
+			}
 			api.On("ListDeploymentLogs", mock.Anything).Return(nil, mockErr)
 
 			_, err := executeCommandC(api, "logs", test.component, mockDeployment.ID)
