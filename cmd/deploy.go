@@ -20,6 +20,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const airflowURLType = "airflow"
+
 var (
 	errNoWorkspaceID             = errors.New("no workspace id provided")
 	errNoDomainSet               = errors.New("no domain set, re-authenticate")
@@ -300,6 +302,10 @@ func validImageRepo(image string) bool {
 }
 
 func getAirflowUILink(deploymentID string, client *houston.Client) string {
+	if deploymentID == "" {
+		return ""
+	}
+
 	vars := map[string]interface{}{"id": deploymentID}
 
 	req := houston.Request{
@@ -312,7 +318,7 @@ func getAirflowUILink(deploymentID string, client *houston.Client) string {
 		return ""
 	}
 	for _, url := range resp.Data.GetDeployment.Urls {
-		if url.Type == "airflow" {
+		if url.Type == airflowURLType {
 			return url.URL
 		}
 	}
