@@ -127,6 +127,10 @@ var (
 			id
 			airflowVersion
 			desiredAirflowVersion
+			urls {
+				type
+				url
+			}
 		}
 	}`
 

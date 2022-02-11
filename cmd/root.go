@@ -47,7 +47,7 @@ func NewRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 		newCompletionCmd(client, out),
 		newConfigRootCmd(client, out),
 		newDeploymentRootCmd(client, out),
-		newDeployCmd(),
+		newDeployCmd(client),
 		newSaRootCmd(client, out),
 		// TODO: remove newAirflowRootCmd, after 1.0 we have only devRootCmd
 		newAirflowRootCmd(client, out),

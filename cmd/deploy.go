@@ -60,14 +60,16 @@ Menu will be presented if you do not specify a deployment name:
   $ astro deploy
 `
 
-func newDeployCmd() *cobra.Command {
+func newDeployCmd(client *houston.Client) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an Airflow project",
 		Long:    "Deploy an Airflow project to an Astronomer Cluster",
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: ensureProjectDir,
-		RunE:    deploy,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploy(cmd, args, client)
+		},
 		Example: deployExample,
 		Aliases: []string{"airflow deploy"},
 	}
@@ -78,7 +80,7 @@ func newDeployCmd() *cobra.Command {
 	return cmd
 }
 
-func deploy(cmd *cobra.Command, args []string) error {
+func deploy(cmd *cobra.Command, args []string, client *houston.Client) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -107,10 +109,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployAirflow(config.WorkingPath, releaseName, ws, forcePrompt)
+	return deployAirflow(config.WorkingPath, releaseName, ws, forcePrompt, client)
 }
 
-func deployAirflow(path, name, wsID string, prompt bool) error {
+func deployAirflow(path, name, wsID string, prompt bool, client *houston.Client) error {
 	if wsID == "" {
 		return errNoWorkspaceID
 	}
@@ -181,10 +183,12 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	nextTag := ""
+	deploymentID := ""
 	for i := range deployments {
 		deployment := deployments[i]
 		if deployment.ReleaseName == name {
 			nextTag = deployment.DeploymentInfo.NextCli
+			deploymentID = deployment.ID
 		}
 	}
 
@@ -196,7 +200,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 		return err
 	}
 
-	deploymentLink := buildAstroUIDeploymentLink(name, wsID)
+	deploymentLink := getAirflowUILink(deploymentID, client)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return nil
@@ -295,10 +299,26 @@ func validImageRepo(image string) bool {
 	return result
 }
 
-func buildAstroUIDeploymentLink(deploymentName, wsID string) string {
-	context, err := config.GetCurrentContext()
+func getAirflowUILink(deploymentID string, client *houston.Client) string {
+	if deploymentID == "" {
+		return ""
+	}
+
+	vars := map[string]interface{}{"id": deploymentID}
+
+	req := houston.Request{
+		Query:     houston.DeploymentGetRequest,
+		Variables: vars,
+	}
+
+	resp, err := req.DoWithClient(client)
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf("%s://app.%s/w/%s/d/%s", config.CFG.CloudAPIProtocol.GetString(), context.Domain, wsID, deploymentName)
+	for _, url := range resp.Data.GetDeployment.Urls {
+		if url.Type == houston.AirflowURLType {
+			return url.URL
+		}
+	}
+	return ""
 }
