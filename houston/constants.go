@@ -7,4 +7,6 @@ const (
 	DeploymentAdmin  = "DEPLOYMENT_ADMIN"
 	DeploymentEditor = "DEPLOYMENT_EDITOR"
 	DeploymentViewer = "DEPLOYMENT_VIEWER"
+
+	AirflowURLType = "airflow"
 )
