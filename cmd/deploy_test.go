@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	"io/ioutil"
+	"net/http"
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -144,13 +146,40 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	mockImageHandler.AssertExpectations(t)
 }
 
-func TestBuildAstroUIDeploymentLink(t *testing.T) {
+func TestGetAirflowUILink(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
-	houstonHost := testUtil.GetEnv("HOUSTON_HOST", "localhost")
-	expectedResult := fmt.Sprintf("https://app.%s/w/wsID1234/d/test", houstonHost)
-	actualResult := buildAstroUIDeploymentLink("test", "wsID1234")
+
+	okResponse := `{
+		"data": {
+		  "deployment": {
+			"id": "ckbv801t300qh0760pck7ea0c",
+			"executor": "CeleryExecutor",
+			"urls": [
+			  {
+				"type": "airflow",
+				"url": "https://deployments.local.astronomer.io/testDeploymentID/airflow"
+			  },
+			  {
+				"type": "flower",
+				"url": "https://deployments.local.astronomer.io/testDeploymentID/flower"
+			  }
+			]
+		  }
+		}
+	  }`
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := houston.NewHoustonClient(client)
+	expectedResult := "https://deployments.local.astronomer.io/testDeploymentID/airflow"
+	actualResult := getAirflowUILink("testDeploymentID", api)
 	assert.Equal(t, expectedResult, actualResult)
 }

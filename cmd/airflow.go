@@ -60,7 +60,7 @@ func newAirflowRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
-		newAirflowDeployCmd(),
+		newAirflowDeployCmd(client),
 		newAirflowStartCmd(out),
 		newAirflowKillCmd(out),
 		newAirflowLogsCmd(out),
@@ -80,7 +80,7 @@ func newDevRootCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newAirflowInitCmd(client, out),
-		newAirflowDeployCmd(),
+		newAirflowDeployCmd(client),
 		newAirflowStartCmd(out),
 		newAirflowKillCmd(out),
 		newAirflowLogsCmd(out),
@@ -112,8 +112,8 @@ func newAirflowInitCmd(client *houston.Client, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newAirflowDeployCmd() *cobra.Command {
-	deployCmd := newDeployCmd()
+func newAirflowDeployCmd(client *houston.Client) *cobra.Command {
+	deployCmd := newDeployCmd(client)
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT",
 		Short:   "Deploy an Airflow project",
