@@ -317,7 +317,7 @@ func coerce(version string) (*semver.Version, error) {
 	}
 	coerceVer, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch()))
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 	return coerceVer, nil
 }
