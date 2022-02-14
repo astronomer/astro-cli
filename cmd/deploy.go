@@ -164,10 +164,12 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	nextTag := ""
+	deploymentID = ""
 	for i := range deployments {
 		deployment := deployments[i]
 		if deployment.ReleaseName == name {
 			nextTag = deployment.DeploymentInfo.NextCli
+			deploymentID = deployment.ID
 		}
 	}
 
@@ -179,7 +181,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 		return err
 	}
 
-	deploymentLink := buildAstroUIDeploymentLink(name, wsID)
+	deploymentLink := getAirflowUILink(deploymentID)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return nil
@@ -251,10 +253,19 @@ func validImageRepo(image string) bool {
 	return result
 }
 
-func buildAstroUIDeploymentLink(deploymentName, wsID string) string {
-	context, err := config.GetCurrentContext()
-	if err != nil {
+func getAirflowUILink(deploymentID string) string {
+	if deploymentID == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s://app.%s/w/%s/d/%s", config.CFG.CloudAPIProtocol.GetString(), context.Domain, wsID, deploymentName)
+
+	resp, err := houstonClient.GetDeployment(deploymentID)
+	if err != nil || resp == nil {
+		return ""
+	}
+	for _, url := range resp.Urls {
+		if url.Type == houston.AirflowURLType {
+			return url.URL
+		}
+	}
+	return ""
 }
