@@ -270,7 +270,13 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 
 	if config.CFG.ShowWarnings.GetBool() && !diResp.Data.DeploymentConfig.IsValidTag(tag) {
 		validTags := strings.Join(diResp.Data.DeploymentConfig.GetValidTags(tag), ", ")
-		i, _ := input.Confirm(fmt.Sprintf(messages.WarningInvalidNameTag, tag, validTags))
+
+		msg := fmt.Sprintf(messages.WarningInvalidNameTag, tag, validTags)
+		if validTags == "" {
+			msg = fmt.Sprintf(messages.WarningInvalidNameTagEmptyRecommendations, tag)
+		}
+
+		i, _ := input.Confirm(msg)
 		if !i {
 			fmt.Println("Canceling deploy...")
 			os.Exit(1)
