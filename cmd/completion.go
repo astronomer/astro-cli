@@ -78,6 +78,12 @@ func newCompletionCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCompletion(out, cmd, args)
 		},
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
+			return err
+		},
 		Args:      cobra.ExactValidArgs(1),
 		ValidArgs: shells,
 	}
