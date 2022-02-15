@@ -13,7 +13,7 @@ func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
 	if appConfig != nil || appConfigErr != nil {
 		return appConfig, appConfigErr
 	}
-	
+
 	req := Request{
 		Query: AppConfigRequest,
 	}
