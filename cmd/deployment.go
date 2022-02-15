@@ -136,7 +136,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.GetAppConfig(houstonClient)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else {
@@ -227,7 +227,7 @@ $ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.GetAppConfig(houstonClient)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else {
@@ -478,7 +478,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.GetAppConfig(houstonClient)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		logrus.Debugln("Error checking feature flag", err)
 	} else {
@@ -539,7 +539,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := deployment.GetAppConfig(houstonClient)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		logrus.Debugln("Error checking feature flag", err)
 	} else {

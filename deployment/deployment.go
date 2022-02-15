@@ -69,7 +69,7 @@ func newTableOut() *printutil.Table {
 func checkManualReleaseNames(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 
-	config, err := GetAppConfig(client)
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
@@ -81,7 +81,7 @@ func checkManualReleaseNames(client houston.ClientInterface) bool {
 func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 
-	config, err := GetAppConfig(client)
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
@@ -91,7 +91,7 @@ func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 
 func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for hard delete deployment flag")
-	config, err := GetAppConfig(client)
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
@@ -100,7 +100,7 @@ func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 
 func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for pre created deployment flag")
-	config, err := GetAppConfig(client)
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
@@ -108,7 +108,7 @@ func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 }
 
 func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
-	config, err := GetAppConfig(client)
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
@@ -117,7 +117,7 @@ func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool 
 
 func CheckTriggererEnabled(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for triggerer flag")
-	config, err := GetAppConfig(client)
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}

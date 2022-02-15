@@ -5,8 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/astronomer/astro-cli/deployment"
-
 	"github.com/astronomer/astro-cli/logs"
 
 	"github.com/spf13/cobra"
@@ -52,7 +50,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 		newWorkersLogsCmd(out),
 	)
 
-	appConfig, err := deployment.GetAppConfig(houstonClient)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else if appConfig.Flags.TriggererEnabled {
@@ -77,7 +75,7 @@ func newLogsDeprecatedCmd(out io.Writer) *cobra.Command {
 		newWorkersLogsCmd(out),
 	)
 
-	appConfig, err := deployment.GetAppConfig(houstonClient)
+	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else if appConfig.Flags.TriggererEnabled {

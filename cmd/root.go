@@ -19,7 +19,8 @@ var (
 	role           string
 	skipVerCheck   bool
 	verboseLevel   string
-	initDebugLogs  = []string{}
+	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
+	initDebugLogs = []string{}
 )
 
 // NewRootCmd adds all of the primary commands for the cli
@@ -80,4 +81,6 @@ func printDebugLogs() {
 	for _, log := range initDebugLogs {
 		logrus.Debug(log)
 	}
+	// Free-up memory used by init logs
+	initDebugLogs = nil
 }

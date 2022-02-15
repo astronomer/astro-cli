@@ -14,18 +14,33 @@ import (
 func TestGetAppConfig(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	mockAppConfig := &Response{
-		Data: ResponseData{
-			GetAppConfig: &AppConfig{
-				TriggererEnabled: true,
-			},
+	mockAppConfig := &AppConfig{
+		Version:                "1.0.5",
+		BaseDomain:             "localdev.me",
+		SMTPConfigured:         false,
+		ManualReleaseNames:     false,
+		ConfigureDagDeployment: false,
+		NfsMountDagDeployment:  false,
+		HardDeleteDeployment:   false,
+		ManualNamespaceNames:   true,
+		TriggererEnabled:       true,
+		Flags: FeatureFlags{
+			TriggererEnabled:     true,
+			ManualNamespaceNames: true,
 		},
 	}
-	jsonResponse, err := json.Marshal(mockAppConfig)
-	assert.NoError(t, err)
+	mockResponse := Response{
+		Data: ResponseData{
+			GetAppConfig: mockAppConfig,
+		},
+	}
+	jsonResponse, jsonErr := json.Marshal(mockResponse)
+	assert.NoError(t, jsonErr)
 
 	t.Run("success", func(t *testing.T) {
+		countCalls := 0
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			countCalls++
 			return &http.Response{
 				StatusCode: 200,
 				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
@@ -34,13 +49,21 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		appConfig, err := api.GetAppConfig()
+		config, err := api.GetAppConfig()
 		assert.NoError(t, err)
-		assert.True(t, appConfig.TriggererEnabled)
+		assert.Equal(t, config, mockAppConfig)
+
+		config, err = api.GetAppConfig()
+		assert.NoError(t, err)
+		assert.Equal(t, config, mockAppConfig)
+
+		assert.Equal(t, 1, countCalls)
 	})
 
 	t.Run("error", func(t *testing.T) {
+		countCalls := 0
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			countCalls++
 			return &http.Response{
 				StatusCode: 500,
 				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
@@ -49,8 +72,19 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAppConfig()
+		// reset the local variables
+		appConfig = nil
+		appConfigErr = nil
+
+		config, err := api.GetAppConfig()
 		assert.Contains(t, err.Error(), "Internal Server Error")
+		assert.Nil(t, config)
+
+		config, err = api.GetAppConfig()
+		assert.Contains(t, err.Error(), "Internal Server Error")
+		assert.Nil(t, config)
+
+		assert.Equal(t, 1, countCalls)
 	})
 
 	t.Run("unavailable fields error", func(t *testing.T) {

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/deployment"
-
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/github"
@@ -80,7 +78,7 @@ func isValidVersion(version string) bool {
 
 // printServerVersion outputs current server version
 func printServerVersion(client houston.ClientInterface, out io.Writer) {
-	appCfg, err := deployment.GetAppConfig(client)
+	appCfg, err := client.GetAppConfig()
 	if err != nil {
 		fmt.Fprintf(out, messages.HoustonCurrentVersion+"\n", "Please authenticate to a cluster to see server version")
 	}

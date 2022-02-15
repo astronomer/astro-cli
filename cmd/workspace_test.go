@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/astronomer/astro-cli/deployment"
-
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -42,9 +40,7 @@ func TestWorkspaceList(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
-		return mockAppConfig, nil
-	}
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("ListWorkspaces").Return(mockWorkspaces, nil)
 
 	output, err := executeCommandC(api, "workspace", "list")
@@ -81,9 +77,7 @@ func TestWorkspaceUserRm(t *testing.T) {
 	mockUserID := "ckc0eir8e01gj07608ajmvia1"
 
 	api := new(mocks.ClientInterface)
-	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
-		return mockAppConfig, nil
-	}
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("DeleteWorkspaceUser", mockWorkspace.ID, mockUserID).Return(mockWorkspace, nil)
 	houstonClient = api
 
@@ -113,9 +107,7 @@ func TestWorkspaceSAGetCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	deployment.GetAppConfig = func(client houston.ClientInterface) (*houston.AppConfig, error) {
-		return mockAppConfig, nil
-	}
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("ListWorkspaceServiceAccounts", mockWorkspace.ID).Return([]houston.ServiceAccount{mockSA}, nil)
 
 	output, err := executeCommandC(api, "workspace", "sa", "get", "-w="+mockWorkspace.ID)
