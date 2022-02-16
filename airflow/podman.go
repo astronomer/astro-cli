@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
+	"github.com/google/shlex"
 
 	"github.com/containers/podman/v3/pkg/api/handlers"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
@@ -31,6 +32,8 @@ var (
 	podConfigFile            = "pod-config.yml"
 	podStateFile             = ".astro/pod-state.yaml"
 	podContainerStateRunning = "running"
+
+	webserverHealthStatus = "\"healthy\""
 )
 
 type Podman struct {
@@ -175,12 +178,14 @@ func (p *Podman) Stop() error {
 }
 
 func (p *Podman) ExecCommand(containerID, command string) string {
-	command = strings.TrimLeft(command, " ")
-	command = strings.TrimRight(command, " ")
 	execConfig := new(handlers.ExecCreateConfig)
 	execConfig.AttachStdout = true
 	execConfig.AttachStderr = true
-	execConfig.Cmd = strings.Split(command, " ")
+	cmd, err := parseCommand(command)
+	if err != nil {
+		return err.Error()
+	}
+	execConfig.Cmd = cmd
 
 	execID, err := p.podmanBind.ExecCreate(p.conn, containerID, execConfig)
 	if err != nil {
@@ -404,8 +409,8 @@ func (p *Podman) webserverHealthCheck() {
 		if err != nil {
 			goto sleep
 		}
-		resp = p.ExecCommand(containerID, "airflow db check")
-		if strings.Contains(resp, "Connection successful.") {
+		resp = p.ExecCommand(containerID, "curl --fail http://127.0.0.1:8080/health")
+		if strings.Contains(resp, webserverHealthStatus) {
 			break
 		}
 	sleep:
@@ -416,4 +421,8 @@ func (p *Podman) webserverHealthCheck() {
 
 func (p *Podman) getWebserverContainerID() (string, error) {
 	return p.GetContainerID(config.CFG.WebserverContainerName.GetString())
+}
+
+func parseCommand(command string) ([]string, error) {
+	return shlex.Split(command)
 }
