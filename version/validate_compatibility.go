@@ -1,6 +1,7 @@
 package version
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -20,7 +21,11 @@ func ValidateCompatibility(client houston.ClientInterface, out io.Writer, cliVer
 
 	serverCfg, err := client.GetAppConfig()
 	if err != nil {
-		return err
+		var e *houston.ErrFieldsNotAvailable
+		if errors.As(err, &e) {
+			logrus.Debugln(e.BaseError)
+		}
+		return ErrVersionMismatch{}
 	}
 	// Skip check if AppConfig is nil or is cv is empty
 	if serverCfg != nil && cliVer != "" {
