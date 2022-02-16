@@ -9,7 +9,7 @@ func (h ClientImplementation) CreateWorkspace(label, description string) (*Works
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.CreateWorkspace, nil
@@ -23,7 +23,7 @@ func (h ClientImplementation) ListWorkspaces() ([]Workspace, error) {
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.GetWorkspaces, nil
@@ -38,7 +38,7 @@ func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, e
 
 	res, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return res.Data.DeleteWorkspace, nil
@@ -54,7 +54,7 @@ func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, erro
 
 	res, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	if len(res.Data.GetWorkspaces) < 1 {
@@ -74,7 +74,7 @@ func (h ClientImplementation) UpdateWorkspace(workspaceID string, args map[strin
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.UpdateWorkspace, nil

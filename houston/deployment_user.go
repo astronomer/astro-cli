@@ -33,7 +33,7 @@ func (h ClientImplementation) ListDeploymentUsers(filters ListDeploymentUsersReq
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return []DeploymentUser{}, err
+		return []DeploymentUser{}, handleAPIErr(err)
 	}
 
 	return r.Data.DeploymentUserList, nil
@@ -48,7 +48,7 @@ func (h ClientImplementation) AddDeploymentUser(variables UpdateDeploymentUserRe
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.AddDeploymentUser, nil
@@ -63,7 +63,7 @@ func (h ClientImplementation) UpdateDeploymentUser(variables UpdateDeploymentUse
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.UpdateDeploymentUser, nil
@@ -81,7 +81,7 @@ func (h ClientImplementation) DeleteDeploymentUser(deploymentID, email string) (
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.DeleteDeploymentUser, nil

@@ -9,7 +9,7 @@ func (h ClientImplementation) AuthenticateWithBasicAuth(username, password strin
 
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return "", err
+		return "", handleAPIErr(err)
 	}
 
 	return resp.Data.CreateToken.Token.Value, nil
@@ -23,7 +23,7 @@ func (h ClientImplementation) GetAuthConfig() (*AuthConfig, error) {
 
 	acResp, err := acReq.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 	return acResp.Data.GetAuthConfig, nil
 }
