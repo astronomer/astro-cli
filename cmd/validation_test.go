@@ -29,15 +29,15 @@ func TestValidateDagDeploymentArgs(t *testing.T) {
 		expectedOutput                             string
 		expectedError                              error
 	}{
-		{dagDeploymentType: "volume", nfsLocation: "test:/test", expectedError: nil},
-		{dagDeploymentType: "image", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "https://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "http://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "git@github.com:neel-astro/private-airflow-dags-test.git", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "ssh://login@server.com:8080/~/private-airflow-dags-test.git", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "user@server.com:path/to/repo.git", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "git://server.com/~user/path/to/repo.git/", expectedError: nil},
-		{dagDeploymentType: "git_sync", gitRepoURL: "", acceptEmptyArgs: true, expectedError: nil},
+		{dagDeploymentType: houston.VolumeDeploymentType, nfsLocation: "test:/test", expectedError: nil},
+		{dagDeploymentType: houston.ImageDeploymentType, expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "https://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "http://github.com/neel-astro/private-airflow-dags-test", expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "git@github.com:neel-astro/private-airflow-dags-test.git", expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "ssh://login@server.com:8080/~/private-airflow-dags-test.git", expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "user@server.com:path/to/repo.git", expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "git://server.com/~user/path/to/repo.git/", expectedError: nil},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "", acceptEmptyArgs: true, expectedError: nil},
 	}
 
 	for _, tt := range myTests {
@@ -53,12 +53,12 @@ func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 		expectedOutput                             string
 		expectedError                              string
 	}{
-		{dagDeploymentType: "volume", expectedError: "please specify the nfs location via --nfs-location flag"},
+		{dagDeploymentType: houston.VolumeDeploymentType, expectedError: "please specify the nfs location via --nfs-location flag"},
 		{dagDeploymentType: "unknown", expectedError: "please specify the correct DAG deployment type, one of the following: image, volume, git_sync"},
-		{dagDeploymentType: "image", expectedError: ""},
-		{dagDeploymentType: "git_sync", expectedError: "please specify a valid git repository URL via --git-repository-url"},
-		{dagDeploymentType: "git_sync", gitRepoURL: "/tmp/test/local-repo.git", expectedError: "please specify a valid git repository URL via --git-repository-url"},
-		{dagDeploymentType: "git_sync", gitRepoURL: "http://192.168.0.%31:8080/", expectedError: "please specify a valid git repository URL via --git-repository-url"},
+		{dagDeploymentType: houston.ImageDeploymentType, expectedError: ""},
+		{dagDeploymentType: houston.GitSyncDeploymentType, expectedError: "please specify a valid git repository URL via --git-repository-url"},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "/tmp/test/local-repo.git", expectedError: "please specify a valid git repository URL via --git-repository-url"},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "http://192.168.0.%31:8080/", expectedError: "please specify a valid git repository URL via --git-repository-url"},
 	}
 
 	for _, tt := range myTests {
@@ -83,7 +83,7 @@ func Test_validateWorkspaceRole(t *testing.T) {
 		{
 			name: "basic valid case",
 			args: args{
-				role: "WORKSPACE_ADMIN",
+				role: houston.WorkspaceAdminRole,
 			},
 			wantErr: false,
 		},
@@ -116,7 +116,7 @@ func Test_validateDeploymentRole(t *testing.T) {
 		{
 			name: "basic valid case",
 			args: args{
-				role: houston.DeploymentAdmin,
+				role: houston.DeploymentAdminRole,
 			},
 			wantErr: false,
 		},
@@ -232,20 +232,26 @@ func TestValidateExecutorArg(t *testing.T) {
 	}{
 		{
 			name:        "valid local executor",
-			args:        args{executor: "local"},
-			result:      "LocalExecutor",
+			args:        args{executor: localExecutorArg},
+			result:      houston.LocalExecutorType,
 			expectedErr: "",
 		},
 		{
 			name:        "valid kubernetes executor",
-			args:        args{executor: "kubernetes"},
-			result:      "KubernetesExecutor",
+			args:        args{executor: kubernetesExecutorArg},
+			result:      houston.KubernetesExecutorType,
+			expectedErr: "",
+		},
+		{
+			name:        "valid kubernetes executor",
+			args:        args{executor: k8sExecutorArg},
+			result:      houston.KubernetesExecutorType,
 			expectedErr: "",
 		},
 		{
 			name:        "valid celery executor",
-			args:        args{executor: "celery"},
-			result:      "CeleryExecutor",
+			args:        args{executor: celeryExecutorArg},
+			result:      houston.CeleryExecutorType,
 			expectedErr: "",
 		},
 		{

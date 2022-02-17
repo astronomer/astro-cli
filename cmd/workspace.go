@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/houston"
+
 	sa "github.com/astronomer/astro-cli/serviceaccount"
 	"github.com/astronomer/astro-cli/workspace"
 
@@ -151,7 +153,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
-	cmd.PersistentFlags().StringVar(&workspaceRole, "role", "WORKSPACE_VIEWER", "role assigned to user")
+	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "role assigned to user")
 	return cmd
 }
 
@@ -165,7 +167,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 			return workspaceUserUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceRole, "role", "WORKSPACE_VIEWER", "role assigned to user")
+	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "role assigned to user")
 	return cmd
 }
 
