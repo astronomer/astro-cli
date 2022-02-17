@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
@@ -115,11 +117,14 @@ func TestPodmanStartSuccess(t *testing.T) {
 		mockCall.ReturnArguments = mock.Arguments{nil}
 	}
 
-	err := podmanMock.Start("test-dockerfile")
+	options := types.ContainerStartConfig{
+		DockerfilePath: "test-dockerfile",
+	}
+	err := podmanMock.Start(options)
 	assert.NoError(t, err)
 
 	// Case when pod is already present but in stop state
-	err = podmanMock.Start("test-dockerfile")
+	err = podmanMock.Start(options)
 	assert.NoError(t, err)
 }
 
@@ -135,18 +140,20 @@ func TestPodmanStartFailure(t *testing.T) {
 	podmanMock := &Podman{projectDir: "test", projectName: "test", envFile: ".env", podmanBind: bindMock, conn: context.TODO()}
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{{Names: []string{"test-webserver"}, ID: "test-id", State: "running"}}, nil).Once()
 
-	err := podmanMock.Start("test-dockerfile")
+	options := types.ContainerStartConfig{DockerfilePath: "test-dockerfile"}
+
+	err := podmanMock.Start(options)
 	assert.EqualError(t, err, "cannot start, project already running")
 
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
 	bindMock.On("Build", podmanMock.conn, []string{filepath.Join(projectDir, "Dockerfile")}, mock.AnythingOfType("entities.BuildOptions")).Return(nil, errPodman).Once()
-	err = podmanMock.Start("test-dockerfile")
+	err = podmanMock.Start(options)
 	assert.EqualError(t, err, errPodman.Error())
 
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
 	bindMock.On("Build", podmanMock.conn, []string{filepath.Join(projectDir, "Dockerfile")}, mock.AnythingOfType("entities.BuildOptions")).Return(&entities.BuildReport{}, nil).Once()
 	bindMock.On("GetImage", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
-	err = podmanMock.Start("test-dockerfile")
+	err = podmanMock.Start(options)
 	assert.EqualError(t, err, errPodman.Error())
 
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
@@ -154,13 +161,13 @@ func TestPodmanStartFailure(t *testing.T) {
 	bindMock.On("GetImage", podmanMock.conn, mock.Anything, mock.Anything).Return(&entities.ImageInspectReport{&inspect.ImageData{}}, nil) //nolint
 	bindMock.On("Exists", podmanMock.conn, mock.Anything, mock.Anything).Return(false, nil).Once()
 	bindMock.On("Kube", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
-	err = podmanMock.Start("test-dockerfile")
+	err = podmanMock.Start(options)
 	assert.Contains(t, err.Error(), errPodman.Error())
 
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{}, nil).Once()
 	bindMock.On("Exists", podmanMock.conn, mock.Anything, mock.Anything).Return(true, nil).Once()
 	bindMock.On("Start", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
-	err = podmanMock.Start("test-dockerfile")
+	err = podmanMock.Start(options)
 	assert.Contains(t, err.Error(), errPodman.Error())
 }
 

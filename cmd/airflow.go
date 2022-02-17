@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
@@ -39,6 +41,7 @@ var (
 	schedulerLogs    bool
 	webserverLogs    bool
 	triggererLogs    bool
+	ignoreCacheDev   bool
 
 	runExample = `
 # Create default admin user.
@@ -148,6 +151,7 @@ func newAirflowStartCmd(out io.Writer) *cobra.Command {
 		RunE:    airflowStart,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	cmd.Flags().BoolVarP(&ignoreCacheDev, "no-cache", "", false, "Do not use cache when building docker image")
 	return cmd
 }
 
@@ -364,7 +368,11 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error parsing airflow version from dockerfile: %w", err)
 	}
 
-	err = containerHandler.Start(dockerfile)
+	options := types.ContainerStartConfig{
+		DockerfilePath: dockerfile,
+		NoCache:        ignoreCacheDev,
+	}
+	err = containerHandler.Start(options)
 	if err != nil {
 		return err
 	}

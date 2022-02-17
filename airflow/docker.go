@@ -12,6 +12,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	container_types "github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/pkg/errors"
@@ -72,7 +74,7 @@ func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
 	}, nil
 }
 
-func (d *DockerCompose) Start(dockerfile string) error {
+func (d *DockerCompose) Start(options container_types.ContainerStartConfig) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
@@ -90,7 +92,11 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	}
 
 	// Build this project image
-	err = d.imageHandler.Build(".")
+	buildConfig := container_types.ImageBuildConfig{
+		Path:    ".",
+		NoCache: options.NoCache,
+	}
+	err = d.imageHandler.Build(buildConfig)
 	if err != nil {
 		return err
 	}
