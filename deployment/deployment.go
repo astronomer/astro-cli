@@ -29,6 +29,7 @@ var (
 
 	volumeDeploymentType  = "volume"
 	gitSyncDeploymentType = "git_sync"
+	imageDeploymentType   = "image"
 
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
@@ -544,12 +545,16 @@ func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error
 
 // addDagDeploymentArgs adds dag deployment argument to houston request map
 func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir string, gitSyncInterval int) error {
+	dagDeploymentConfig := map[string]interface{}{}
+	if dagDeploymentType != "" {
+		dagDeploymentConfig["type"] = dagDeploymentType
+	}
+
 	if dagDeploymentType == volumeDeploymentType && nfsLocation != "" {
-		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+		dagDeploymentConfig["nfsLocation"] = nfsLocation
 	}
 
 	if dagDeploymentType == gitSyncDeploymentType {
-		dagDeploymentConfig := map[string]interface{}{"type": dagDeploymentType}
 		if sshKey != "" {
 			sshPubKey, err := readSSHKeyFile(sshKey)
 			if err != nil {
@@ -582,8 +587,8 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 			dagDeploymentConfig["dagDirectoryLocation"] = gitDAGDir
 		}
 		dagDeploymentConfig["syncInterval"] = gitSyncInterval
-		vars["dagDeployment"] = dagDeploymentConfig
 	}
+	vars["dagDeployment"] = dagDeploymentConfig
 	return nil
 }
 

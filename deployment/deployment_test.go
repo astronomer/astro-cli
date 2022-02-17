@@ -1557,3 +1557,54 @@ func TestCheckPreCreateNamespacesDeployment(t *testing.T) {
 	usesPreCreateNamespace := CheckPreCreateNamespaceDeployment(api)
 	assert.Equal(t, true, usesPreCreateNamespace)
 }
+
+func TestAddDagDeploymentArgs(t *testing.T) {
+	tests := []struct {
+		dagDeploymentType string
+		nfsLocation       string
+		sshKey            string
+		knownHosts        string
+		gitRepoURL        string
+		gitRevision       string
+		gitBranchName     string
+		gitDAGDir         string
+		gitSyncInterval   int
+		expectedError     string
+		expectedOutput    map[string]interface{}
+	}{
+		{
+			dagDeploymentType: imageDeploymentType,
+			expectedError:     "",
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": imageDeploymentType}},
+		},
+		{
+			dagDeploymentType: volumeDeploymentType,
+			nfsLocation:       "test",
+			expectedError:     "",
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": volumeDeploymentType, "nfsLocation": "test"}},
+		},
+		{
+			dagDeploymentType: gitSyncDeploymentType,
+			sshKey:            "../cmd/testfiles/ssh_key",
+			knownHosts:        "../cmd/testfiles/known_hosts",
+			gitRepoURL:        "https://github.com/neel-astro/private-airflow-dags-test",
+			gitRevision:       "test-revision",
+			gitBranchName:     "test-branch",
+			gitDAGDir:         "test-dags",
+			gitSyncInterval:   1,
+			expectedError:     "",
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"branchName": "test-branch", "dagDirectoryLocation": "test-dags", "knownHosts": "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRTest1ngUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvTestingTYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTestingFImWwoG6mbUoWf9nzpIoaSjB+weqqUTestingXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydTestingS5ap43JXiUFFAaQ==", "repositoryUrl": "https://github.com/neel-astro/private-airflow-dags-test", "rev": "test-revision", "sshKey": "Test_ssh_key_file_content\n", "syncInterval": 1, "type": gitSyncDeploymentType}},
+		},
+	}
+
+	for _, tt := range tests {
+		output := map[string]interface{}{}
+		err := addDagDeploymentArgs(output, tt.dagDeploymentType, tt.nfsLocation, tt.sshKey, tt.knownHosts, tt.gitRepoURL, tt.gitRevision, tt.gitBranchName, tt.gitDAGDir, tt.gitSyncInterval)
+		if tt.expectedError != "" {
+			assert.Equal(t, tt.expectedError, err.Error())
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, output, tt.expectedOutput)
+	}
+}
