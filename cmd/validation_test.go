@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -262,6 +263,74 @@ func TestValidateExecutorArg(t *testing.T) {
 			assert.Equal(t, tt.result, executorType)
 			if tt.expectedErr != "" {
 				assert.EqualError(t, err, tt.expectedErr)
+			}
+		})
+	}
+}
+
+func TestValidateReleaseName(t *testing.T) {
+	const errBase = "the release name you provided is invalid:"
+	const errInvalidRegex = "must start and end with an alphanumeric character, and must contain only lowercase alphanumeric and '-' characters"
+	const errTooLong = "must not contain more than 45 characters"
+
+	errInvalidRegexComplete := fmt.Sprintf("%s\n\t%s", errBase, errInvalidRegex)
+	errTooLongComplete := fmt.Sprintf("%s\n\t%s", errBase, errTooLong)
+	errBoth := fmt.Sprintf("%s\n\t%s", errTooLongComplete, errInvalidRegex)
+
+	tests := []struct {
+		name        string
+		releaseName string
+		expectedErr string
+	}{
+		{
+			name:        "valid release name",
+			releaseName: "combustible-iceberg-123",
+			expectedErr: "",
+		},
+		{
+			name:        "valid release name numeric",
+			releaseName: "1-combustible-iceberg-3",
+			expectedErr: "",
+		},
+		{
+			name:        "invalid start with -",
+			releaseName: "-combustible-iceberg-123",
+			expectedErr: errInvalidRegexComplete,
+		},
+		{
+			name:        "invalid ends with -",
+			releaseName: "combustible-iceberg-123-",
+			expectedErr: errInvalidRegexComplete,
+		},
+		{
+			name:        "invalid contains uppercase chars",
+			releaseName: "Combustible-Characters-E23",
+			expectedErr: errInvalidRegexComplete,
+		},
+		{
+			name:        "invalid contains special characters",
+			releaseName: "combustible!@test",
+			expectedErr: errInvalidRegexComplete,
+		},
+		{
+			name:        "invalid too long",
+			releaseName: "combustiblereleasenameismorethanfortyfivecharacterslong",
+			expectedErr: errTooLongComplete,
+		},
+		{
+			name:        "invalid too long and contains uppercase and special characters",
+			releaseName: "cOMBUSTI_blereleasenameismorethanfortyfivecharacterslong",
+			expectedErr: errBoth,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateReleaseName(tt.releaseName)
+			if tt.expectedErr != "" {
+				assert.EqualError(t, err, tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
