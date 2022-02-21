@@ -25,12 +25,6 @@ import (
 var (
 	minAirflowVersion = "1.10.14"
 
-	celeryExecutor = "CeleryExecutor"
-
-	volumeDeploymentType  = "volume"
-	gitSyncDeploymentType = "git_sync"
-	imageDeploymentType   = "image"
-
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
 	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
@@ -190,7 +184,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
 
 	// The Flower URL is specific to CeleryExecutor only
-	if executor == celeryExecutor || executor == "" {
+	if executor == houston.CeleryExecutorType || executor == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerURL)
 	}
 	tab.Print(out)
@@ -481,11 +475,11 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 		dagDeploymentConfig["type"] = dagDeploymentType
 	}
 
-	if dagDeploymentType == volumeDeploymentType && nfsLocation != "" {
+	if dagDeploymentType == houston.VolumeDeploymentType && nfsLocation != "" {
 		dagDeploymentConfig["nfsLocation"] = nfsLocation
 	}
 
-	if dagDeploymentType == gitSyncDeploymentType {
+	if dagDeploymentType == houston.GitSyncDeploymentType {
 		if sshKey != "" {
 			sshPubKey, err := readSSHKeyFile(sshKey)
 			if err != nil {

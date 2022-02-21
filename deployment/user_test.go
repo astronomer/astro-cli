@@ -22,10 +22,10 @@ func TestUserList(t *testing.T) {
 		FullName: "Some Person",
 		Username: "somebody",
 		RoleBindings: []houston.RoleBinding{
-			{Role: "SYSTEM_ADMIN"},
-			{Role: "WORKSPACE_ADMIN"},
-			{Role: "WORKSPACE_VIEWER"},
-			{Role: "DEPLOYMENT_ADMIN"},
+			{Role: houston.SystemAdminRole},
+			{Role: houston.WorkspaceAdminRole},
+			{Role: houston.WorkspaceViewerRole},
+			{Role: houston.DeploymentAdminRole},
 		},
 		Emails: []houston.Email{
 			{Address: "somebody@astronomer.io"},
@@ -62,8 +62,8 @@ func TestUserList(t *testing.T) {
 				FullName: "Another Person",
 				Username: "anotherperson",
 				RoleBindings: []houston.RoleBinding{
-					{Role: "WORKSPACE_VIEWER"},
-					{Role: "DEPLOYMENT_EDITOR"},
+					{Role: houston.WorkspaceViewerRole},
+					{Role: houston.DeploymentEditorRole},
 				},
 			},
 		}
@@ -120,7 +120,7 @@ func TestAdd(t *testing.T) {
 
 	t.Run("add user success", func(t *testing.T) {
 		mockUserRole := &houston.RoleBinding{
-			Role: "DEPLOYMENT_ADMIN",
+			Role: houston.DeploymentAdminRole,
 			User: houston.RoleBindingUser{
 				Username: "somebody@astronomer.io",
 			},
@@ -151,7 +151,7 @@ func TestAdd(t *testing.T) {
 
 		deploymentID := "ckggzqj5f4157qtc9lescmehm"
 		email := "somebody@astronomer.com"
-		role := "DEPLOYMENT_ADMIN"
+		role := houston.DeploymentAdminRole
 
 		expectedRequest := houston.UpdateDeploymentUserRequest{
 			Email:        email,
@@ -176,7 +176,7 @@ func TestDeleteUser(t *testing.T) {
 	t.Run("delete user success", func(t *testing.T) {
 		mockUserRole := &houston.RoleBinding{
 			User: houston.RoleBindingUser{Username: "somebody@astronomer.com"},
-			Role: "DEPLOYMENT_ADMIN",
+			Role: houston.DeploymentAdminRole,
 			Deployment: houston.Deployment{
 				ID:          "deploymentid",
 				ReleaseName: "prehistoric-gravity-9229",
@@ -215,7 +215,7 @@ func TestUpdateUser(t *testing.T) {
 
 	t.Run("update user success", func(t *testing.T) {
 		mockUserRole := &houston.RoleBinding{
-			Role: houston.DeploymentEditor,
+			Role: houston.DeploymentEditorRole,
 			User: houston.RoleBindingUser{
 				Username: "somebody@astronomer.com",
 			},
@@ -227,7 +227,7 @@ func TestUpdateUser(t *testing.T) {
 
 		expectedRequest := houston.UpdateDeploymentUserRequest{
 			Email:        mockUserRole.User.Username,
-			Role:         houston.DeploymentEditor,
+			Role:         houston.DeploymentEditorRole,
 			DeploymentID: mockUserRole.Deployment.ID,
 		}
 
@@ -235,7 +235,7 @@ func TestUpdateUser(t *testing.T) {
 		api.On("UpdateDeploymentUser", expectedRequest).Return(mockUserRole, nil)
 
 		buf := new(bytes.Buffer)
-		err := UpdateUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, houston.DeploymentEditor, api, buf)
+		err := UpdateUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, houston.DeploymentEditorRole, api, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Successfully updated somebody@astronomer.com to a DEPLOYMENT_EDITOR")
 		api.AssertExpectations(t)

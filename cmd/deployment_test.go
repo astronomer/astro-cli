@@ -44,7 +44,7 @@ var (
 		Active:     true,
 	}
 	mockDeploymentUserRole = &houston.RoleBinding{
-		Role: "DEPLOYMENT_VIEWER",
+		Role: houston.DeploymentViewerRole,
 		User: houston.RoleBindingUser{
 			Username: "somebody@astronomer.io",
 		},
@@ -78,6 +78,8 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "unknown flag: --dag-deployment-type"},
+		// test default executor is celery if --executor flag is not provided
+		{cmdArgs: []string{"deployment", "create", "new-deployment-name"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"deployment", "create", "new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
@@ -404,7 +406,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 		DeploymentID: "ck1qg6whg001r08691y117hub",
 		Label:        "my_label",
 		Category:     "default",
-		Role:         "DEPLOYMENT_VIEWER",
+		Role:         houston.DeploymentViewerRole,
 	}
 
 	api := new(mocks.ClientInterface)
@@ -477,7 +479,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 
 func TestDeploymentUserUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedNewRole := "DEPLOYMENT_ADMIN"
+	expectedNewRole := houston.DeploymentAdminRole
 	expectedOut := `Successfully updated somebody@astronomer.io to a ` + expectedNewRole
 	mockResponseUserRole := *mockDeploymentUserRole
 	mockResponseUserRole.Role = expectedNewRole

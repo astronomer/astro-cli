@@ -19,7 +19,7 @@ var (
 	mockRoles = houston.WorkspaceUserRoleBindings{
 		RoleBindings: []houston.RoleBindingWorkspace{
 			{
-				Role: "WORKSPACE_VIEWER",
+				Role: houston.WorkspaceViewerRole,
 				Workspace: struct {
 					ID string `json:"id"`
 				}{ID: "ckoixo6o501496qemiwsja1tl"},
@@ -115,7 +115,7 @@ func TestListRoles(t *testing.T) {
 		UpdatedAt: "2020-06-25T20:09:29.917Z",
 		RoleBindings: []houston.RoleBinding{
 			{
-				Role: "WORKSPACE_ADMIN",
+				Role: houston.WorkspaceAdminRole,
 				User: houston.RoleBindingUser{
 					ID:       "ckbv7zpkh00og0760ki4mhl6r",
 					Username: "andrii@astronomer.io",
@@ -149,14 +149,14 @@ func TestListRolesWithServiceAccounts(t *testing.T) {
 		UpdatedAt: "2020-06-25T20:09:29.917Z",
 		RoleBindings: []houston.RoleBinding{
 			{
-				Role: "WORKSPACE_ADMIN",
+				Role: houston.WorkspaceAdminRole,
 				User: houston.RoleBindingUser{
 					ID:       "ckbv7zpkh00og0760ki4mhl6r",
 					Username: "andrii@astronomer.io",
 				},
 			},
 			{
-				Role: "WORKSPACE_ADMIN",
+				Role: houston.WorkspaceAdminRole,
 				ServiceAccount: houston.WorkspaceServiceAccount{
 					ID:    "ckxaolfky0822zsvcrgts3c6a",
 					Label: "WA1",

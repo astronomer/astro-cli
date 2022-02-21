@@ -21,18 +21,12 @@ var (
 	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 )
 
-var (
-	volumeDeploymentType  = "volume"
-	imageDeploymentType   = "image"
-	gitSyncDeploymentType = "git_sync"
-
-	validGitScheme = map[string]struct{}{
-		"git":   {},
-		"ssh":   {},
-		"http":  {},
-		"https": {},
-	}
-)
+var validGitScheme = map[string]struct{}{
+	"git":   {},
+	"ssh":   {},
+	"http":  {},
+	"https": {},
+}
 
 type ErrParsingKV struct {
 	kv string
@@ -110,7 +104,7 @@ func coalesceWorkspace() (string, error) {
 }
 
 func validateWorkspaceRole(role string) error {
-	validRoles := []string{"WORKSPACE_ADMIN", "WORKSPACE_EDITOR", "WORKSPACE_VIEWER"}
+	validRoles := []string{houston.WorkspaceAdminRole, houston.WorkspaceEditorRole, houston.WorkspaceViewerRole}
 
 	for _, validRole := range validRoles {
 		if role == validRole {
@@ -121,7 +115,7 @@ func validateWorkspaceRole(role string) error {
 }
 
 func validateDeploymentRole(role string) error {
-	validRoles := []string{houston.DeploymentAdmin, houston.DeploymentEditor, houston.DeploymentViewer}
+	validRoles := []string{houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole}
 
 	for _, validRole := range validRoles {
 		if role == validRole {
@@ -143,13 +137,16 @@ func validateRole(role string) error {
 }
 
 func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string, acceptEmptyArgs bool) error {
-	if dagDeploymentType != imageDeploymentType && dagDeploymentType != volumeDeploymentType && dagDeploymentType != gitSyncDeploymentType && dagDeploymentType != "" {
+	if dagDeploymentType != houston.ImageDeploymentType &&
+		dagDeploymentType != houston.VolumeDeploymentType &&
+		dagDeploymentType != houston.GitSyncDeploymentType &&
+		dagDeploymentType != "" {
 		return errInvalidDAGDeploymentType
 	}
-	if dagDeploymentType == volumeDeploymentType && nfsLocation == "" {
+	if dagDeploymentType == houston.VolumeDeploymentType && nfsLocation == "" {
 		return errNFSLocationNotFound
 	}
-	if dagDeploymentType == gitSyncDeploymentType && !validURL(gitRepoURL, acceptEmptyArgs) {
+	if dagDeploymentType == houston.GitSyncDeploymentType && !validURL(gitRepoURL, acceptEmptyArgs) {
 		return errGitRepoNotFound
 	}
 	return nil
@@ -158,12 +155,12 @@ func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string
 func validateExecutorArg(executor string) (string, error) {
 	var executorType string
 	switch executor {
-	case "local":
-		executorType = "LocalExecutor"
-	case "celery":
-		executorType = "CeleryExecutor"
-	case "kubernetes", "k8s":
-		executorType = "KubernetesExecutor"
+	case localExecutorArg:
+		executorType = houston.LocalExecutorType
+	case celeryExecutorArg:
+		executorType = houston.CeleryExecutorType
+	case kubernetesExecutorArg, k8sExecutorArg:
+		executorType = houston.KubernetesExecutorType
 	default:
 		return executorType, errInvalidExecutorType
 	}

@@ -186,7 +186,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			WorkspaceUpdateUserRole: DeploymentAdmin,
+			WorkspaceUpdateUserRole: DeploymentAdminRole,
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
@@ -202,7 +202,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.UpdateWorkspaceUserRole("workspace-id", "email", DeploymentAdmin)
+		response, err := api.UpdateWorkspaceUserRole("workspace-id", "email", DeploymentAdminRole)
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.WorkspaceUpdateUserRole)
 	})
@@ -230,10 +230,10 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 			WorkspaceGetUser: WorkspaceUserRoleBindings{
 				RoleBindings: []RoleBindingWorkspace{
 					{
-						Role: DeploymentAdmin,
+						Role: DeploymentAdminRole,
 					},
 					{
-						Role: "WORKSPACE_ADMIN",
+						Role: WorkspaceAdminRole,
 					},
 				},
 			},
