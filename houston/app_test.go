@@ -52,6 +52,21 @@ func TestGetAppConfig(t *testing.T) {
 		_, err := api.GetAppConfig()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("unavailable fields error", func(t *testing.T) {
+		response := `{"errors": [{"message": "Cannot query field \"triggererEnabled\" on type AppConfig."}]}`
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(response)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.GetAppConfig()
+		assert.EqualError(t, err, ErrFieldsNotAvailable{}.Error())
+	})
 }
 
 func TestGetAvailableNamespaces(t *testing.T) {

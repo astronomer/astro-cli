@@ -9,7 +9,7 @@ func (h ClientImplementation) CreateUser(email, password string) (*AuthUser, err
 
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.CreateUser, nil

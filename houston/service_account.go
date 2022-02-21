@@ -17,7 +17,7 @@ func (h ClientImplementation) CreateDeploymentServiceAccount(variables *CreateSe
 	}
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.CreateDeploymentServiceAccount, nil
@@ -31,7 +31,7 @@ func (h ClientImplementation) CreateWorkspaceServiceAccount(variables *CreateSer
 	}
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.CreateWorkspaceServiceAccount, nil
@@ -46,7 +46,7 @@ func (h ClientImplementation) DeleteDeploymentServiceAccount(deploymentID, servi
 
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.DeleteDeploymentServiceAccount, nil
@@ -61,7 +61,7 @@ func (h ClientImplementation) DeleteWorkspaceServiceAccount(workspaceID, service
 
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.DeleteWorkspaceServiceAccount, nil
@@ -76,7 +76,7 @@ func (h ClientImplementation) ListDeploymentServiceAccounts(deploymentID string)
 
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.GetDeploymentServiceAccounts, nil
@@ -91,7 +91,7 @@ func (h ClientImplementation) ListWorkspaceServiceAccounts(workspaceID string) (
 
 	resp, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return resp.Data.GetWorkspaceServiceAccounts, nil

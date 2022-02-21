@@ -9,7 +9,7 @@ func (h ClientImplementation) AddWorkspaceUser(workspaceID, email, role string) 
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.AddWorkspaceUser, nil
@@ -24,7 +24,7 @@ func (h ClientImplementation) DeleteWorkspaceUser(workspaceID, userID string) (*
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.RemoveWorkspaceUser, nil
@@ -39,7 +39,7 @@ func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) (*Wo
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return &r.Data.GetWorkspaces[0], nil
@@ -54,7 +54,7 @@ func (h ClientImplementation) UpdateWorkspaceUserRole(workspaceID, email, role s
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return "", err
+		return "", handleAPIErr(err)
 	}
 
 	return r.Data.WorkspaceUpdateUserRole, nil
@@ -69,7 +69,7 @@ func (h ClientImplementation) GetWorkspaceUserRole(workspaceID, email string) (W
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return WorkspaceUserRoleBindings{}, err
+		return WorkspaceUserRoleBindings{}, handleAPIErr(err)
 	}
 
 	return r.Data.WorkspaceGetUser, nil

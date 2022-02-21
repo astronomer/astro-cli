@@ -8,7 +8,7 @@ func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.GetAppConfig, nil
@@ -22,7 +22,7 @@ func (h ClientImplementation) GetAvailableNamespaces() ([]Namespace, error) {
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return []Namespace{}, err
+		return []Namespace{}, handleAPIErr(err)
 	}
 
 	return r.Data.GetDeploymentNamespaces, nil
