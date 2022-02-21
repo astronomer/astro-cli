@@ -67,6 +67,7 @@ var (
 		SchedulerContainerName: newCfg("scheduler.container_name", "scheduler"),
 		WebserverContainerName: newCfg("webserver.container_name", "webserver"),
 		TriggererContainerName: newCfg("triggerer.container_name", "triggerer"),
+		HoustonDialTimeout:     newCfg("houston.dial_timeout", "10"),
 	}
 
 	// viperHome is the viper object in the users home directory

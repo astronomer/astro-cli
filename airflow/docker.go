@@ -2,6 +2,7 @@ package airflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
-	"github.com/pkg/errors"
 
 	composeInterp "github.com/compose-spec/compose-go/interpolation"
 	"github.com/compose-spec/compose-go/loader"
@@ -114,7 +114,7 @@ func (d *DockerCompose) Start(dockerfile string) error {
 
 	err = d.webserverHealthCheck()
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerRecreate)
+		return fmt.Errorf("%s: %w", messages.ErrContainerRecreate, err)
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
