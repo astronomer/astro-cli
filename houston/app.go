@@ -21,6 +21,7 @@ func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
 	var r *Response
 	r, appConfigErr = req.DoWithClient(h.client)
 	if appConfigErr != nil {
+		appConfigErr = handleAPIErr(appConfigErr)
 		return nil, appConfigErr
 	}
 

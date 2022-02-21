@@ -88,6 +88,10 @@ func TestGetAppConfig(t *testing.T) {
 	})
 
 	t.Run("unavailable fields error", func(t *testing.T) {
+		// reset the local variables
+		appConfig = nil
+		appConfigErr = nil
+		
 		response := `{"errors": [{"message": "Cannot query field \"triggererEnabled\" on type AppConfig."}]}`
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
