@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/workspace"
 
@@ -16,13 +14,12 @@ import (
 )
 
 var (
-	errNotEnoughArgs                = errors.New("requires at least one arg")
-	errNoWorkspaceFound             = errors.New("no valid workspace source found")
-	errInvalidDAGDeploymentType     = errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
-	errNFSLocationNotFound          = errors.New("please specify the nfs location via --nfs-location flag")
-	errGitRepoNotFound              = errors.New("please specify a valid git repository URL via --git-repository-url")
-	errInvalidExecutorType          = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
-	errInvalidValidationReleaseName = errors.New("unable to validate the release name, ignoring validation on this field")
+	errNotEnoughArgs            = errors.New("requires at least one arg")
+	errNoWorkspaceFound         = errors.New("no valid workspace source found")
+	errInvalidDAGDeploymentType = errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync")
+	errNFSLocationNotFound      = errors.New("please specify the nfs location via --nfs-location flag")
+	errGitRepoNotFound          = errors.New("please specify a valid git repository URL via --git-repository-url")
+	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
 )
 
 var (
@@ -30,7 +27,8 @@ var (
 	imageDeploymentType   = "image"
 	gitSyncDeploymentType = "git_sync"
 
-	validGitScheme = map[string]struct{}{
+	releaseNameValidationRegex = regexp.MustCompile("^[a-z0-9]([a-z0-9-]+)?[a-z0-9]$")
+	validGitScheme             = map[string]struct{}{
 		"git":   {},
 		"ssh":   {},
 		"http":  {},
@@ -184,7 +182,6 @@ func validateExecutorArg(executor string) (string, error) {
 }
 
 func validateReleaseName(releaseName string) error {
-	const reg = "^[a-z0-9]([a-z0-9-]+)?[a-z0-9]$"
 	const maxCharacters = 45
 	errs := []string{}
 
@@ -192,12 +189,7 @@ func validateReleaseName(releaseName string) error {
 		errs = append(errs, "must not contain more than 45 characters")
 	}
 
-	re, err := regexp.Compile(reg)
-	if err != nil {
-		logrus.Debug(err)
-		return errInvalidValidationReleaseName
-	}
-	if !re.MatchString(releaseName) {
+	if !releaseNameValidationRegex.MatchString(releaseName) {
 		errs = append(errs, "must start and end with an alphanumeric character, and must contain only lowercase alphanumeric and '-' characters")
 	}
 

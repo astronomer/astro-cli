@@ -476,13 +476,8 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	if releaseName != "" {
-		// if error in regex compilation, we want to skip the validation as it will be validated in houston again
-		// rather than blocking the user's action by throwing an error
 		if err := validateReleaseName(releaseName); err != nil {
-			if errors.Is(err, errInvalidValidationReleaseName) {
-				return err
-			}
-			fmt.Print(err.Error())
+			return err
 		}
 	}
 
