@@ -41,6 +41,7 @@ type cfgs struct {
 	SchedulerContainerName cfg
 	WebserverContainerName cfg
 	TriggererContainerName cfg
+	HoustonDialTimeout     cfg
 }
 
 // Creates a new cfg struct
@@ -84,6 +85,14 @@ func (c cfg) GetBool() bool {
 		return viperProject.GetBool(c.Path)
 	}
 	return viperHome.GetBool(c.Path)
+}
+
+// GetBool will return the integer value of requested config, check working dir and fallback to home
+func (c cfg) GetInt() int {
+	if configExists(viperProject) && viperProject.IsSet(c.Path) {
+		return viperProject.GetInt(c.Path)
+	}
+	return viperHome.GetInt(c.Path)
 }
 
 // GetProjectString will return a project config
