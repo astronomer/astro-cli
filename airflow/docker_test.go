@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	container_types "github.com/astronomer/astro-cli/airflow/types"
+	containerTypes "github.com/astronomer/astro-cli/airflow/types"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
@@ -212,7 +212,7 @@ func TestDockerStartFailure(t *testing.T) {
 	composeMock, docker, _ := getComposeMocks()
 	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "running"}}, nil)
 	composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	options := container_types.ContainerStartConfig{
+	options := containerTypes.ContainerStartConfig{
 		DockerfilePath: "./testfiles/Dockerfile.Airflow1.ok",
 	}
 	err := docker.Start(options)

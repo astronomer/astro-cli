@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 
-	container_types "github.com/astronomer/astro-cli/airflow/types"
+	containerTypes "github.com/astronomer/astro-cli/airflow/types"
 
 	"github.com/astronomer/astro-cli/messages"
 
@@ -31,7 +31,7 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(config container_types.ImageBuildConfig) error {
+func (d *DockerImage) Build(config containerTypes.ImageBuildConfig) error {
 	// Change to location of Dockerfile
 	err := os.Chdir(config.Path)
 	if err != nil {

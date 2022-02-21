@@ -151,7 +151,7 @@ func newAirflowStartCmd(out io.Writer) *cobra.Command {
 		RunE:    airflowStart,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
-	cmd.Flags().BoolVarP(&ignoreCacheDev, "no-cache", "", false, "Do not use cache when building docker image")
+	cmd.Flags().BoolVarP(&ignoreCacheDev, "no-cache", "", false, "Do not use cache when building container image")
 	return cmd
 }
 
