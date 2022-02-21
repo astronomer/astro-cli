@@ -199,9 +199,9 @@ func TestCreate(t *testing.T) {
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
 	role := "test-role"
-	executor := "CeleryExecutor"
+	executor := houston.CeleryExecutorType
 	airflowVersion := "1.10.5"
-	dagDeploymentType := "image"
+	dagDeploymentType := houston.ImageDeploymentType
 	nfsLocation := ""
 	triggerReplicas := 0
 	buf := new(bytes.Buffer)
@@ -1814,18 +1814,18 @@ func TestAddDagDeploymentArgs(t *testing.T) {
 		expectedOutput    map[string]interface{}
 	}{
 		{
-			dagDeploymentType: imageDeploymentType,
+			dagDeploymentType: houston.ImageDeploymentType,
 			expectedError:     "",
-			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": imageDeploymentType}},
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": houston.ImageDeploymentType}},
 		},
 		{
-			dagDeploymentType: volumeDeploymentType,
+			dagDeploymentType: houston.VolumeDeploymentType,
 			nfsLocation:       "test",
 			expectedError:     "",
-			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": volumeDeploymentType, "nfsLocation": "test"}},
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": houston.VolumeDeploymentType, "nfsLocation": "test"}},
 		},
 		{
-			dagDeploymentType: gitSyncDeploymentType,
+			dagDeploymentType: houston.GitSyncDeploymentType,
 			sshKey:            "../cmd/testfiles/ssh_key",
 			knownHosts:        "../cmd/testfiles/known_hosts",
 			gitRepoURL:        "https://github.com/neel-astro/private-airflow-dags-test",
@@ -1834,7 +1834,7 @@ func TestAddDagDeploymentArgs(t *testing.T) {
 			gitDAGDir:         "test-dags",
 			gitSyncInterval:   1,
 			expectedError:     "",
-			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"branchName": "test-branch", "dagDirectoryLocation": "test-dags", "knownHosts": "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRTest1ngUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvTestingTYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTestingFImWwoG6mbUoWf9nzpIoaSjB+weqqUTestingXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydTestingS5ap43JXiUFFAaQ==", "repositoryUrl": "https://github.com/neel-astro/private-airflow-dags-test", "rev": "test-revision", "sshKey": "Test_ssh_key_file_content\n", "syncInterval": 1, "type": gitSyncDeploymentType}},
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"branchName": "test-branch", "dagDirectoryLocation": "test-dags", "knownHosts": "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRTest1ngUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvTestingTYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTestingFImWwoG6mbUoWf9nzpIoaSjB+weqqUTestingXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydTestingS5ap43JXiUFFAaQ==", "repositoryUrl": "https://github.com/neel-astro/private-airflow-dags-test", "rev": "test-revision", "sshKey": "Test_ssh_key_file_content\n", "syncInterval": 1, "type": houston.GitSyncDeploymentType}},
 		},
 	}
 

@@ -152,7 +152,7 @@ func newWorkspaceUserAddCmd(client *houston.Client, out io.Writer) *cobra.Comman
 		},
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
-	cmd.PersistentFlags().StringVar(&workspaceRole, "role", "WORKSPACE_VIEWER", "role assigned to user")
+	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "role assigned to user")
 	return cmd
 }
 
@@ -166,7 +166,7 @@ func newWorkspaceUserUpdateCmd(client *houston.Client, out io.Writer) *cobra.Com
 			return workspaceUserUpdate(cmd, client, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceRole, "role", "WORKSPACE_VIEWER", "role assigned to user")
+	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "role assigned to user")
 	return cmd
 }
 
