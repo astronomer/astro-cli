@@ -146,7 +146,7 @@ func TestCreate(t *testing.T) {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		nfsLocation = ""
-		dagDeploymentType = "git_sync"
+		dagDeploymentType = houston.GitSyncDeploymentType
 
 		myTests := []struct {
 			repoURL              string
