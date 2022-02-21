@@ -177,31 +177,31 @@ func (p *Podman) Stop() error {
 	return err
 }
 
-func (p *Podman) ExecCommand(containerID, command string) string {
+func (p *Podman) ExecCommand(containerID, command string) (string, error) {
 	execConfig := new(handlers.ExecCreateConfig)
 	execConfig.AttachStdout = true
 	execConfig.AttachStderr = true
 	cmd, err := parseCommand(command)
 	if err != nil {
-		return err.Error()
+		return "", err
 	}
 	execConfig.Cmd = cmd
 
 	execID, err := p.podmanBind.ExecCreate(p.conn, containerID, execConfig)
 	if err != nil {
-		return err.Error()
+		return "", err
 	}
 
 	r, w, err := os.Pipe()
 	if err != nil {
-		return err.Error()
+		return "", err
 	}
 	defer r.Close()
 
 	streams := new(containers.ExecStartAndAttachOptions).WithOutputStream(w).WithErrorStream(w).WithAttachOutput(true).WithAttachError(true)
 	err = p.podmanBind.ExecStartAndAttach(p.conn, execID, streams)
 	if err != nil {
-		return err.Error()
+		return "", err
 	}
 
 	outputC := make(chan string)
@@ -214,7 +214,7 @@ func (p *Podman) ExecCommand(containerID, command string) string {
 	}()
 
 	w.Close()
-	return <-outputC
+	return <-outputC, nil
 }
 
 func (p *Podman) Run(args []string, user string) error {
@@ -409,7 +409,7 @@ func (p *Podman) webserverHealthCheck() {
 		if err != nil {
 			goto sleep
 		}
-		resp = p.ExecCommand(containerID, "curl --fail http://127.0.0.1:8080/health")
+		resp, _ = p.ExecCommand(containerID, "curl --fail http://127.0.0.1:8080/health")
 		if strings.Contains(resp, webserverHealthStatus) {
 			break
 		}

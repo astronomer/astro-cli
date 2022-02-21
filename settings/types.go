@@ -1,7 +1,9 @@
 package settings
 
-// Connections contains structure of airflow connections
-type Connections []struct {
+type Connections []Connection
+
+// Connection contains structure of airflow connection
+type Connection struct {
 	ConnID       string `mapstructure:"conn_id"`
 	ConnType     string `mapstructure:"conn_type"`
 	ConnHost     string `mapstructure:"conn_host"`
