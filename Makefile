@@ -59,6 +59,14 @@ uninstall:
 	$(eval DESTDIR ?= $(GOBIN))
 	rm $(GOBIN)/$(OUTPUT)
 
+mock: mock_airflow
+
+mock_airflow:
+	mockery --filename=ContainerHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ContainerHandler
+	mockery --filename=ImageHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ImageHandler
+	mockery --filename=PodmanBind.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name PodmanBind
+	mockery --filename=RegistryHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name RegistryHandler
+
 ifeq (debug,$(firstword $(MAKECMDGOALS)))
   # use the rest as arguments for "debug"
   DEBUG_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))

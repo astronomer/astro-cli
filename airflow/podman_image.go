@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	podmanImages "github.com/astronomer/astro-cli/pkg/podman"
 
 	"github.com/containers/buildah"
@@ -35,8 +37,8 @@ func PodmanImageInit(conn context.Context, image string, bind PodmanBind) (*Podm
 	return &PodmanImage{imageName: image, conn: conn, podmanBind: bind}, nil
 }
 
-func (p *PodmanImage) Build(path string) error {
-	err := os.Chdir(path)
+func (p *PodmanImage) Build(config types.ImageBuildConfig) error {
+	err := os.Chdir(config.Path)
 	if err != nil {
 		return err
 	}
@@ -46,7 +48,7 @@ func (p *PodmanImage) Build(path string) error {
 		return err
 	}
 	buildahOpts := imagebuildah.BuildOptions{
-		NoCache:                 false,
+		NoCache:                 config.NoCache,
 		RemoveIntermediateCtrs:  true,
 		ForceRmIntermediateCtrs: true,
 		ContextDirectory:        projectDir,

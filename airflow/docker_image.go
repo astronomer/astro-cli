@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 
+	containerTypes "github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/messages"
 
 	clicommand "github.com/docker/cli/cli/command"
@@ -29,15 +31,25 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(path string) error {
+func (d *DockerImage) Build(config containerTypes.ImageBuildConfig) error {
 	// Change to location of Dockerfile
-	err := os.Chdir(path)
+	err := os.Chdir(config.Path)
 	if err != nil {
 		return err
 	}
 	imageName := imageName(d.imageName, "latest")
+
+	args := []string{
+		"build",
+		"-t",
+		imageName,
+		".",
+	}
+	if config.NoCache {
+		args = append(args, "--no-cache")
+	}
 	// Build image
-	err = dockerExec(nil, nil, "build", "-t", imageName, ".")
+	err = dockerExec(nil, nil, args...)
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
@@ -123,7 +135,7 @@ func (d *DockerImage) GetImageLabels() (map[string]string, error) {
 }
 
 // Exec executes a docker command
-func dockerExec(stdout, stderr io.Writer, args ...string) error {
+var dockerExec = func(stdout, stderr io.Writer, args ...string) error {
 	_, lookErr := exec.LookPath(Docker)
 	if lookErr != nil {
 		return fmt.Errorf("failed to find the docker binary: %w", lookErr)

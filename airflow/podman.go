@@ -13,6 +13,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
@@ -62,7 +64,7 @@ func PodmanInit(projectDir, envFile string) (*Podman, error) {
 	return &Podman{projectDir: projectDir, envFile: envFile, projectName: projectName, conn: conn, podmanBind: &binder}, nil
 }
 
-func (p *Podman) Start(dockerfile string) error {
+func (p *Podman) Start(options types.ContainerStartConfig) error {
 	psInfo, err := p.listContainers()
 	if err != nil {
 		return fmt.Errorf("%s: %w", messages.ErrContainerStatusCheck, err)
@@ -82,7 +84,12 @@ func (p *Podman) Start(dockerfile string) error {
 	if err != nil {
 		return err
 	}
-	err = imageBuilder.Build(".")
+
+	buildConfig := types.ImageBuildConfig{
+		Path:    ".",
+		NoCache: options.NoCache,
+	}
+	err = imageBuilder.Build(buildConfig)
 	if err != nil {
 		return err
 	}
