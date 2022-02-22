@@ -59,9 +59,16 @@ uninstall:
 	$(eval DESTDIR ?= $(GOBIN))
 	rm $(GOBIN)/$(OUTPUT)
 
-# TODO: WE MIGHT WANT TO ADD A TOP-LEVEL mock COMMAND TO GENERATE ALL OF THE MOCK INTERFACES
+mock: mock_airflow mock_houston
+
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
+
+mock_airflow:
+	mockery --filename=ContainerHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ContainerHandler
+	mockery --filename=ImageHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ImageHandler
+	mockery --filename=PodmanBind.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name PodmanBind
+	mockery --filename=RegistryHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name RegistryHandler
 
 ifeq (debug,$(firstword $(MAKECMDGOALS)))
   # use the rest as arguments for "debug"

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -26,6 +28,8 @@ var (
 	errInvalidDeploymentName     = errors.New(messages.ErrHoustonDeploymentName)
 	errDeploymentNotFound        = errors.New(messages.ErrNoHoustonDeployment)
 	errInvalidDeploymentSelected = errors.New(messages.HoustonInvalidDeploymentKey)
+
+	ignoreCacheDeploy = false
 )
 
 // these are used to monkey patch the function in order to write unit test cases
@@ -61,6 +65,7 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
+	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
@@ -240,7 +245,12 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 	if err != nil {
 		return err
 	}
-	err = imageHandler.Build(config.WorkingPath)
+
+	buildConfig := types.ImageBuildConfig{
+		Path:    config.WorkingPath,
+		NoCache: ignoreCacheDeploy,
+	}
+	err = imageHandler.Build(buildConfig)
 	if err != nil {
 		return err
 	}
