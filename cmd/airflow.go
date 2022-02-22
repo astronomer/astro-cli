@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
@@ -39,6 +41,7 @@ var (
 	schedulerLogs    bool
 	webserverLogs    bool
 	triggererLogs    bool
+	ignoreCacheDev   bool
 
 	runExample = `
 # Create default admin user.
@@ -100,6 +103,7 @@ func newAirflowInitCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -140,12 +144,14 @@ func newAirflowStartCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
 		RunE:    airflowStart,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	cmd.Flags().BoolVarP(&ignoreCacheDev, "no-cache", "", false, "Do not use cache when building container image")
 	return cmd
 }
 
@@ -157,6 +163,7 @@ func newAirflowKillCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -173,6 +180,7 @@ func newAirflowLogsCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -193,6 +201,7 @@ func newAirflowStopCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -209,6 +218,7 @@ func newAirflowPSCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE: ensureProjectDir,
@@ -225,6 +235,7 @@ func newAirflowRunCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE:            ensureProjectDir,
@@ -243,6 +254,7 @@ func newAirflowUpgradeCheckCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		PreRunE:            ensureProjectDir,
@@ -356,7 +368,11 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error parsing airflow version from dockerfile: %w", err)
 	}
 
-	err = containerHandler.Start(dockerfile)
+	options := types.ContainerStartConfig{
+		DockerfilePath: dockerfile,
+		NoCache:        ignoreCacheDev,
+	}
+	err = containerHandler.Start(options)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	containerTypes "github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
@@ -43,7 +45,7 @@ func TestCheckServiceStateFalse(t *testing.T) {
 func TestGenerateConfig(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0777)
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}, DockerEngine)
 	assert.NoError(t, err)
@@ -210,7 +212,10 @@ func TestDockerStartFailure(t *testing.T) {
 	composeMock, docker, _ := getComposeMocks()
 	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "running"}}, nil)
 	composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	err := docker.Start("./testfiles/Dockerfile.Airflow1.ok")
+	options := containerTypes.ContainerStartConfig{
+		DockerfilePath: "./testfiles/Dockerfile.Airflow1.ok",
+	}
+	err := docker.Start(options)
 	assert.Contains(t, err.Error(), "cannot start, project already running")
 }
 

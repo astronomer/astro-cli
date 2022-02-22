@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
@@ -15,16 +17,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	celeryExecutorArg     = "celery"
+	localExecutorArg      = "local"
+	kubernetesExecutorArg = "kubernetes"
+	k8sExecutorArg        = "k8s"
+)
+
 var (
 	errUpdateDeploymentInvalidArgs = errors.New("must specify a deployment ID and at least one attribute to update")
 	errServiceAccountNotPresent    = errors.New("must provide a service-account label with the --label (-l) flag")
 )
 
 var (
-	allDeployments        bool
-	cancel                bool
-	hardDelete            bool
-	executor              string
+	allDeployments bool
+	cancel         bool
+	hardDelete     bool
+	executor       string
+	// have to use two different executor flags for create and update commands otherwhise both commands override this value
+	executorUpdate        string
 	deploymentID          string
 	desiredAirflowVersion string
 	email                 string
@@ -136,7 +147,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
@@ -161,7 +172,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
+	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
@@ -227,14 +238,14 @@ $ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 	}
 
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
+	cmd.Flags().StringVarP(&executorUpdate, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes")
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
@@ -316,7 +327,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "role assigned to user")
 	return cmd
 }
 
@@ -349,7 +360,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment assigned to user")
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewer, "role assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "role assigned to user")
 	return cmd
 }
 
@@ -478,7 +489,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		logrus.Debugln("Error checking feature flag", err)
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -539,7 +550,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		logrus.Debugln("Error checking feature flag", err)
 	} else {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -554,8 +565,8 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	}
 
 	var executorType string
-	if executor != "" {
-		executorType, err = validateExecutorArg(executor)
+	if executorUpdate != "" {
+		executorType, err = validateExecutorArg(executorUpdate)
 		if err != nil {
 			return nil
 		}

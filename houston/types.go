@@ -37,6 +37,7 @@ type ResponseData struct {
 	GetWorkspaceServiceAccounts    []ServiceAccount          `json:"workspaceServiceAccounts,omitempty"`
 	GetUsers                       []User                    `json:"users,omitempty"`
 	GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
+	GetWorkspace                   *Workspace                `json:"workspace,omitempty"`
 	UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
 	UpdateDeploymentAirflow        *Deployment               `json:"updateDeploymentAirflow,omitempty"`
 	UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
@@ -259,9 +260,18 @@ type DeploymentConfig struct {
 }
 
 func (config *DeploymentConfig) GetValidTags(tag string) (tags []string) {
+	tagVersion, err := coerce(tag)
+	// if tag doesn't follow the semver standard return empty array
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	for _, image := range config.AirflowImages {
-		tagVersion := coerce(tag)
-		imageTagVersion := coerce(image.Version)
+		imageTagVersion, err := coerce(image.Version)
+		if err != nil {
+			continue
+		}
 		// i = 1 means version greater than
 		if i := imageTagVersion.Compare(tagVersion); i >= 0 {
 			tags = append(tags, image.Tag)
@@ -303,14 +313,14 @@ type FeatureFlags struct {
 }
 
 // coerce a string into SemVer if possible
-func coerce(version string) *semver.Version {
+func coerce(version string) (*semver.Version, error) {
 	v, err := semver.NewVersion(version)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 	coerceVer, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch()))
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
-	return coerceVer
+	return coerceVer, nil
 }

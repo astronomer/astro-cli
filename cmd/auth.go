@@ -18,6 +18,7 @@ func newAuthRootCmd(out io.Writer) *cobra.Command {
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := SetUpLogs(out, verboseLevel)
+			printDebugLogs()
 			return err
 		},
 		Use:   "auth",

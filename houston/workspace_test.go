@@ -206,24 +206,22 @@ func TestGetWorkspace(t *testing.T) {
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			GetWorkspaces: []Workspace{
-				{
-					ID:          "workspace-id",
-					Label:       "label",
-					Description: "test description",
-					Users: []User{
-						{
-							ID:       "id",
-							Username: "test",
-							Emails: []Email{
-								{Address: "test@astronomer.com"},
-							},
-							Status: "active",
+			GetWorkspace: &Workspace{
+				ID:          "workspace-id",
+				Label:       "label",
+				Description: "test description",
+				Users: []User{
+					{
+						ID:       "id",
+						Username: "test",
+						Emails: []Email{
+							{Address: "test@astronomer.com"},
 						},
+						Status: "active",
 					},
-					CreatedAt: "2020-06-25T22:10:42.385Z",
-					UpdatedAt: "2020-06-25T22:10:42.385Z",
 				},
+				CreatedAt: "2020-06-25T22:10:42.385Z",
+				UpdatedAt: "2020-06-25T22:10:42.385Z",
 			},
 		},
 	}
@@ -242,7 +240,7 @@ func TestGetWorkspace(t *testing.T) {
 
 		response, err := api.GetWorkspace("workspace-id")
 		assert.NoError(t, err)
-		assert.Equal(t, response, &mockResponse.Data.GetWorkspaces[0])
+		assert.Equal(t, response, mockResponse.Data.GetWorkspace)
 	})
 
 	t.Run("error", func(t *testing.T) {

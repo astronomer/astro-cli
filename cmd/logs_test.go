@@ -58,6 +58,7 @@ func TestDeploymentLogsRootCommandTriggererDisabled(t *testing.T) {
 	}
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig").Return(appConfig, nil)
+
 	output, err := executeCommandC(api, "deployment", "logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")

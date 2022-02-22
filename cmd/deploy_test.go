@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -132,13 +131,39 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	houstonMock.AssertExpectations(t)
 }
 
-func TestBuildAstroUIDeploymentLink(t *testing.T) {
+func TestGetAirflowUILink(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
-	houstonHost := testUtil.GetEnv("HOUSTON_HOST", "localhost")
-	expectedResult := fmt.Sprintf("https://app.%s/w/wsID1234/d/test", houstonHost)
-	actualResult := buildAstroUIDeploymentLink("test", "wsID1234")
+
+	mockDeployment = &houston.Deployment{
+		ID:                    "cknz133ra49758zr9w34b87ua",
+		Type:                  "airflow",
+		Label:                 "test",
+		ReleaseName:           "testDeploymentName",
+		Version:               "0.15.6",
+		AirflowVersion:        "2.0.0",
+		DesiredAirflowVersion: "2.0.0",
+		DeploymentInfo:        houston.DeploymentInfo{},
+		Workspace: houston.Workspace{
+			ID:    "ckn4phn1k0104v5xtrer5lpli",
+			Label: "w1",
+		},
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+		},
+		CreatedAt: "2021-04-26T20:03:36.262Z",
+		UpdatedAt: "2021-04-26T20:03:36.262Z",
+	}
+
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetDeployment", mock.Anything).Return(mockDeployment, nil)
+	houstonClient = houstonMock
+
+	expectedResult := "https://deployments.local.astronomer.io/testDeploymentName/airflow"
+	actualResult := getAirflowUILink("testDeploymentID")
 	assert.Equal(t, expectedResult, actualResult)
+	houstonMock.AssertExpectations(t)
 }

@@ -52,7 +52,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else if appConfig.Flags.TriggererEnabled {
 		cmd.AddCommand(newTriggererLogsCmd(out))
 	}
@@ -77,7 +77,7 @@ func newLogsDeprecatedCmd(out io.Writer) *cobra.Command {
 
 	appConfig, err := houstonClient.GetAppConfig()
 	if err != nil {
-		fmt.Println("Error checking feature flag", err)
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	} else if appConfig.Flags.TriggererEnabled {
 		cmd.AddCommand(newTriggererLogsCmd(out))
 	}

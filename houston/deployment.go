@@ -25,7 +25,7 @@ func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*De
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.CreateDeployment, nil
@@ -40,7 +40,7 @@ func (h ClientImplementation) DeleteDeployment(deploymentID string, doHardDelete
 
 	res, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return res.Data.DeleteDeployment, nil
@@ -66,7 +66,7 @@ func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([
 
 	res, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return res.Data.GetDeployments, nil
@@ -81,7 +81,7 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.UpdateDeployment, nil
@@ -96,7 +96,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 
 	res, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return &res.Data.GetDeployment, nil
@@ -111,7 +111,7 @@ func (h ClientImplementation) UpdateDeploymentAirflow(variables map[string]inter
 
 	res, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return res.Data.UpdateDeploymentAirflow, nil
@@ -125,7 +125,7 @@ func (h ClientImplementation) GetDeploymentConfig() (*DeploymentConfig, error) {
 
 	resp, err := dReq.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return &resp.Data.DeploymentConfig, nil
@@ -140,7 +140,7 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, err
+		return nil, handleAPIErr(err)
 	}
 
 	return r.Data.DeploymentLog, nil

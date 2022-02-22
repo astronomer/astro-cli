@@ -127,6 +127,10 @@ var (
 			id
 			airflowVersion
 			desiredAirflowVersion
+			urls {
+				type
+				url
+			}
 		}
 	}`
 
@@ -389,6 +393,33 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			}
 		}
 	}`
+
+	WorkspaceGetRequest = `
+	query GetWorkspace(
+		$workspaceUuid: Uuid!
+	){
+		workspace(
+			workspaceUuid: $workspaceUuid
+		){
+			id
+			label
+			description
+			createdAt
+			updatedAt
+			roleBindings {
+				role
+				user {
+					id
+					username
+				}
+				serviceAccount {
+					id
+					label
+				}
+			}
+		}
+	}
+    `
 
 	WorkspacesGetRequest = `
 	query GetWorkspaces {

@@ -2,6 +2,7 @@ package airflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,9 +13,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	containerTypes "github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
-	"github.com/pkg/errors"
 
 	composeInterp "github.com/compose-spec/compose-go/interpolation"
 	"github.com/compose-spec/compose-go/loader"
@@ -39,6 +41,8 @@ const (
 	healthCheckBreakPoint = 100 // Maximum number of events to wait for health check to pass
 	healthyProjectStatus  = "health_status: healthy"
 	execDieStatus         = "exec_die"
+
+	webserverServiceName = "webserver"
 )
 
 type DockerCompose struct {
@@ -72,7 +76,7 @@ func DockerComposeInit(airflowHome, envFile string) (*DockerCompose, error) {
 	}, nil
 }
 
-func (d *DockerCompose) Start(dockerfile string) error {
+func (d *DockerCompose) Start(options containerTypes.ContainerStartConfig) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.TODO(), d.projectName, api.PsOptions{All: true})
 	if err != nil {
@@ -90,7 +94,11 @@ func (d *DockerCompose) Start(dockerfile string) error {
 	}
 
 	// Build this project image
-	err = d.imageHandler.Build(".")
+	buildConfig := containerTypes.ImageBuildConfig{
+		Path:    ".",
+		NoCache: options.NoCache,
+	}
+	err = d.imageHandler.Build(buildConfig)
 	if err != nil {
 		return err
 	}
@@ -114,7 +122,7 @@ func (d *DockerCompose) Start(dockerfile string) error {
 
 	err = d.webserverHealthCheck()
 	if err != nil {
-		return errors.Wrap(err, messages.ErrContainerRecreate)
+		return fmt.Errorf("%s: %w", messages.ErrContainerRecreate, err)
 	}
 
 	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
@@ -331,7 +339,7 @@ func checkServiceState(serviceState, expectedState string) bool {
 func (d *DockerCompose) webserverHealthCheck() error {
 	healthCheckCounter := 0
 	err := d.composeService.Events(context.Background(), d.projectName, api.EventsOptions{
-		Services: []string{config.CFG.WebserverContainerName.GetString()}, Consumer: func(event api.Event) error {
+		Services: []string{webserverServiceName}, Consumer: func(event api.Event) error {
 			if event.Status == healthyProjectStatus {
 				fmt.Println("\nProject is running! All components are now available.")
 				// have to return an error to break from the event listener loop

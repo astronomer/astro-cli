@@ -25,11 +25,6 @@ import (
 var (
 	minAirflowVersion = "1.10.14"
 
-	celeryExecutor = "CeleryExecutor"
-
-	volumeDeploymentType  = "volume"
-	gitSyncDeploymentType = "git_sync"
-
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
 	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
@@ -68,59 +63,59 @@ func newTableOut() *printutil.Table {
 func checkManualReleaseNames(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 
-	appConfig, err := client.GetAppConfig()
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 
-	return appConfig.ManualReleaseNames
+	return config.ManualReleaseNames
 }
 
 // CheckNFSMountDagDeployment returns true when we can set custom NFS location for dags
 func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 
-	appConfig, err := client.GetAppConfig()
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
 
-	return appConfig.Flags.NfsMountDagDeployment
+	return config.Flags.NfsMountDagDeployment
 }
 
 func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for hard delete deployment flag")
-	appConfig, err := client.GetAppConfig()
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.HardDeleteDeployment
+	return config.Flags.HardDeleteDeployment
 }
 
 func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for pre created deployment flag")
-	appConfig, err := client.GetAppConfig()
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.ManualNamespaceNames
+	return config.Flags.ManualNamespaceNames
 }
 
 func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
-	appConfig, err := client.GetAppConfig()
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.NamespaceFreeFormEntry
+	return config.Flags.NamespaceFreeFormEntry
 }
 
 func CheckTriggererEnabled(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for triggerer flag")
-	appConfig, err := client.GetAppConfig()
+	config, err := client.GetAppConfig()
 	if err != nil {
 		return false
 	}
-	return appConfig.Flags.TriggererEnabled
+	return config.Flags.TriggererEnabled
 }
 
 // Create airflow deployment
@@ -184,13 +179,12 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 		}
 	}
 
-	tab.SuccessMsg =
-		fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
-			". Deployment can be accessed at the following URLs \n" +
-			fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
+	tab.SuccessMsg = fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
+		". Deployment can be accessed at the following URLs \n" +
+		fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
 
 	// The Flower URL is specific to CeleryExecutor only
-	if executor == celeryExecutor || executor == "" {
+	if executor == houston.CeleryExecutorType || executor == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerURL)
 	}
 	tab.Print(out)
@@ -476,12 +470,16 @@ func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error
 
 // addDagDeploymentArgs adds dag deployment argument to houston request map
 func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir string, gitSyncInterval int) error {
-	if dagDeploymentType == volumeDeploymentType && nfsLocation != "" {
-		vars["dagDeployment"] = map[string]string{"nfsLocation": nfsLocation, "type": dagDeploymentType}
+	dagDeploymentConfig := map[string]interface{}{}
+	if dagDeploymentType != "" {
+		dagDeploymentConfig["type"] = dagDeploymentType
 	}
 
-	if dagDeploymentType == gitSyncDeploymentType {
-		dagDeploymentConfig := map[string]interface{}{"type": dagDeploymentType}
+	if dagDeploymentType == houston.VolumeDeploymentType && nfsLocation != "" {
+		dagDeploymentConfig["nfsLocation"] = nfsLocation
+	}
+
+	if dagDeploymentType == houston.GitSyncDeploymentType {
 		if sshKey != "" {
 			sshPubKey, err := readSSHKeyFile(sshKey)
 			if err != nil {
@@ -514,8 +512,8 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 			dagDeploymentConfig["dagDirectoryLocation"] = gitDAGDir
 		}
 		dagDeploymentConfig["syncInterval"] = gitSyncInterval
-		vars["dagDeployment"] = dagDeploymentConfig
 	}
+	vars["dagDeployment"] = dagDeploymentConfig
 	return nil
 }
 

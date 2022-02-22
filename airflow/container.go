@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
@@ -30,7 +32,7 @@ const (
 
 // ContainerHandler defines methods require to handle all operations to run Airflow locally
 type ContainerHandler interface {
-	Start(dockerfile string) error
+	Start(config types.ContainerStartConfig) error
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
 	Stop() error
@@ -42,7 +44,7 @@ type ContainerHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(path string) error
+	Build(config types.ImageBuildConfig) error
 	Push(serverAddress, token, remoteImage string) error
 	GetImageLabels() (map[string]string, error)
 }

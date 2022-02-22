@@ -89,9 +89,9 @@ func TestCreate(t *testing.T) {
 	ws := "ck1qg6whg001r08691y117hub"
 	releaseName := ""
 	role := "test-role"
-	executor := "CeleryExecutor"
+	executor := houston.CeleryExecutorType
 	airflowVersion := "1.10.5"
-	dagDeploymentType := "image"
+	dagDeploymentType := houston.ImageDeploymentType
 	nfsLocation := ""
 	triggerReplicas := 0
 
@@ -146,7 +146,7 @@ func TestCreate(t *testing.T) {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		nfsLocation = ""
-		dagDeploymentType = "git_sync"
+		dagDeploymentType = houston.GitSyncDeploymentType
 
 		myTests := []struct {
 			repoURL              string
@@ -185,7 +185,7 @@ func TestCreate(t *testing.T) {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		releaseName = ""
-		dagDeploymentType = "volume"
+		dagDeploymentType = houston.VolumeDeploymentType
 		nfsLocation = "test:/test"
 
 		buf := new(bytes.Buffer)
@@ -502,8 +502,8 @@ func TestUpdate(t *testing.T) {
 			dagDeploymentType string
 			expectedOutput    string
 		}{
-			{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "", expectedOutput: expected},
-			{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "image", expectedOutput: expected},
+			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: "", expectedOutput: expected},
+			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: houston.ImageDeploymentType, expectedOutput: expected},
 		}
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
@@ -531,8 +531,8 @@ func TestUpdate(t *testing.T) {
 			dagDeploymentType string
 			expectedOutput    string
 		}{
-			{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "", expectedOutput: expected},
-			{deploymentConfig: map[string]string{"executor": "CeleryExecutor"}, dagDeploymentType: "image", expectedOutput: expected},
+			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: "", expectedOutput: expected},
+			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: houston.ImageDeploymentType, expectedOutput: expected},
 		}
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
@@ -550,7 +550,7 @@ func TestUpdate(t *testing.T) {
 		api.On("UpdateDeployment", mock.Anything).Return(nil, mockError)
 
 		deploymentConfig := make(map[string]string)
-		deploymentConfig["executor"] = "CeleryExecutor"
+		deploymentConfig["executor"] = houston.CeleryExecutorType
 
 		buf := new(bytes.Buffer)
 		err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, buf)
@@ -1058,4 +1058,55 @@ func TestGetDeploymentNamespaceNameError(t *testing.T) {
 	name, err := getDeploymentNamespaceName()
 	assert.Equal(t, "", name)
 	assert.EqualError(t, err, "no kubernetes namespaces specified")
+}
+
+func TestAddDagDeploymentArgs(t *testing.T) {
+	tests := []struct {
+		dagDeploymentType string
+		nfsLocation       string
+		sshKey            string
+		knownHosts        string
+		gitRepoURL        string
+		gitRevision       string
+		gitBranchName     string
+		gitDAGDir         string
+		gitSyncInterval   int
+		expectedError     string
+		expectedOutput    map[string]interface{}
+	}{
+		{
+			dagDeploymentType: houston.ImageDeploymentType,
+			expectedError:     "",
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": houston.ImageDeploymentType}},
+		},
+		{
+			dagDeploymentType: houston.VolumeDeploymentType,
+			nfsLocation:       "test",
+			expectedError:     "",
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"type": houston.VolumeDeploymentType, "nfsLocation": "test"}},
+		},
+		{
+			dagDeploymentType: houston.GitSyncDeploymentType,
+			sshKey:            "../cmd/testfiles/ssh_key",
+			knownHosts:        "../cmd/testfiles/known_hosts",
+			gitRepoURL:        "https://github.com/neel-astro/private-airflow-dags-test",
+			gitRevision:       "test-revision",
+			gitBranchName:     "test-branch",
+			gitDAGDir:         "test-dags",
+			gitSyncInterval:   1,
+			expectedError:     "",
+			expectedOutput:    map[string]interface{}{"dagDeployment": map[string]interface{}{"branchName": "test-branch", "dagDirectoryLocation": "test-dags", "knownHosts": "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRTest1ngUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvTestingTYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTestingFImWwoG6mbUoWf9nzpIoaSjB+weqqUTestingXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydTestingS5ap43JXiUFFAaQ==", "repositoryUrl": "https://github.com/neel-astro/private-airflow-dags-test", "rev": "test-revision", "sshKey": "Test_ssh_key_file_content\n", "syncInterval": 1, "type": houston.GitSyncDeploymentType}},
+		},
+	}
+
+	for _, tt := range tests {
+		output := map[string]interface{}{}
+		err := addDagDeploymentArgs(output, tt.dagDeploymentType, tt.nfsLocation, tt.sshKey, tt.knownHosts, tt.gitRepoURL, tt.gitRevision, tt.gitBranchName, tt.gitDAGDir, tt.gitSyncInterval)
+		if tt.expectedError != "" {
+			assert.Equal(t, tt.expectedError, err.Error())
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, output, tt.expectedOutput)
+	}
 }

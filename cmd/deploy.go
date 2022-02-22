@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/types"
+
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -26,6 +28,8 @@ var (
 	errInvalidDeploymentName     = errors.New(messages.ErrHoustonDeploymentName)
 	errDeploymentNotFound        = errors.New(messages.ErrNoHoustonDeployment)
 	errInvalidDeploymentSelected = errors.New(messages.HoustonInvalidDeploymentKey)
+
+	ignoreCacheDeploy = false
 )
 
 // these are used to monkey patch the function in order to write unit test cases
@@ -61,6 +65,7 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
+	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
@@ -164,10 +169,12 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 	}
 
 	nextTag := ""
+	deploymentID = ""
 	for i := range deployments {
 		deployment := deployments[i]
 		if deployment.ReleaseName == name {
 			nextTag = deployment.DeploymentInfo.NextCli
+			deploymentID = deployment.ID
 		}
 	}
 
@@ -179,7 +186,7 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 		return err
 	}
 
-	deploymentLink := buildAstroUIDeploymentLink(name, wsID)
+	deploymentLink := getAirflowUILink(deploymentID)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return nil
@@ -222,7 +229,13 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 
 	if config.CFG.ShowWarnings.GetBool() && !deploymentConfig.IsValidTag(tag) {
 		validTags := strings.Join(deploymentConfig.GetValidTags(tag), ", ")
-		i, _ := input.Confirm(fmt.Sprintf(messages.WarningInvalidNameTag, tag, validTags))
+
+		msg := fmt.Sprintf(messages.WarningInvalidNameTag, tag, validTags)
+		if validTags == "" {
+			msg = fmt.Sprintf(messages.WarningInvalidNameTagEmptyRecommendations, tag)
+		}
+
+		i, _ := input.Confirm(msg)
 		if !i {
 			fmt.Println("Canceling deploy...")
 			os.Exit(1)
@@ -232,7 +245,12 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 	if err != nil {
 		return err
 	}
-	err = imageHandler.Build(config.WorkingPath)
+
+	buildConfig := types.ImageBuildConfig{
+		Path:    config.WorkingPath,
+		NoCache: ignoreCacheDeploy,
+	}
+	err = imageHandler.Build(buildConfig)
 	if err != nil {
 		return err
 	}
@@ -251,10 +269,19 @@ func validImageRepo(image string) bool {
 	return result
 }
 
-func buildAstroUIDeploymentLink(deploymentName, wsID string) string {
-	context, err := config.GetCurrentContext()
-	if err != nil {
+func getAirflowUILink(deploymentID string) string {
+	if deploymentID == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s://app.%s/w/%s/d/%s", config.CFG.CloudAPIProtocol.GetString(), context.Domain, wsID, deploymentName)
+
+	resp, err := houstonClient.GetDeployment(deploymentID)
+	if err != nil || resp == nil {
+		return ""
+	}
+	for _, url := range resp.Urls {
+		if url.Type == houston.AirflowURLType {
+			return url.URL
+		}
+	}
+	return ""
 }

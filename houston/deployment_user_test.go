@@ -25,7 +25,7 @@ func TestListDeploymentUsers(t *testing.T) {
 					},
 					Username: "somebody",
 					RoleBindings: []RoleBinding{
-						{Role: DeploymentAdmin},
+						{Role: DeploymentAdminRole},
 					},
 				},
 			},
@@ -70,7 +70,7 @@ func TestAddDeploymentUser(t *testing.T) {
 	mockResponse := &Response{
 		Data: ResponseData{
 			AddDeploymentUser: &RoleBinding{
-				Role: DeploymentAdmin,
+				Role: DeploymentAdminRole,
 				User: struct {
 					ID       string `json:"id"`
 					Username string `json:"username"`
@@ -124,7 +124,7 @@ func TestUpdateDeploymentUser(t *testing.T) {
 	mockResponse := &Response{
 		Data: ResponseData{
 			UpdateDeploymentUser: &RoleBinding{
-				Role: DeploymentAdmin,
+				Role: DeploymentAdminRole,
 				User: struct {
 					ID       string `json:"id"`
 					Username string `json:"username"`
@@ -178,7 +178,7 @@ func TestDeleteDeploymentUser(t *testing.T) {
 	mockResponse := &Response{
 		Data: ResponseData{
 			DeleteDeploymentUser: &RoleBinding{
-				Role: DeploymentAdmin,
+				Role: DeploymentAdminRole,
 				User: struct {
 					ID       string `json:"id"`
 					Username string `json:"username"`
