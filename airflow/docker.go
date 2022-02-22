@@ -39,6 +39,8 @@ const (
 	healthCheckBreakPoint = 100 // Maximum number of events to wait for health check to pass
 	healthyProjectStatus  = "health_status: healthy"
 	execDieStatus         = "exec_die"
+
+	webserverServiceName = "webserver"
 )
 
 type DockerCompose struct {
@@ -328,7 +330,7 @@ func checkServiceState(serviceState, expectedState string) bool {
 func (d *DockerCompose) webserverHealthCheck() error {
 	healthCheckCounter := 0
 	err := d.composeService.Events(context.Background(), d.projectName, api.EventsOptions{
-		Services: []string{config.CFG.WebserverContainerName.GetString()}, Consumer: func(event api.Event) error {
+		Services: []string{webserverServiceName}, Consumer: func(event api.Event) error {
 			if event.Status == healthyProjectStatus {
 				fmt.Println("\nProject is running! All components are now available.")
 				// have to return an error to break from the event listener loop
