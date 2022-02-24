@@ -13,68 +13,57 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 )
 
-func TestGetDefaultImageTag(t *testing.T) {
+func TestGetAstronomerCertifiedTag(t *testing.T) {
 	testUtil.InitTestConfig()
-	okResponse := `{
-  "version": "1.0",
-  "available_releases": [
-    {
-      "version": "1.10.5",
-      "level": "new_feature",
-      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
-      "release_date": "2020-10-05T20:03:00+00:00",
-      "tags": [
-        "1.10.5-alpine3.10-onbuild",
-        "1.10.5-buster-onbuild",
-        "1.10.5-alpine3.10",
-        "1.10.5-buster"
-      ],
-      "channel": "stable"
-    },
-    {
-      "version": "1.10.5-11",
-      "level": "bug_fix",
-      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.5-11",
-      "release_date": "2020-10-05T20:03:00+00:00",
-      "tags": [
-        "1.10.5-11-alpine3.10-onbuild",
-        "1.10.5-11-buster-onbuild",
-        "1.10.5-11-alpine3.10",
-        "1.10.5-11-buster"
-      ],
-      "channel": "stable"
-    },
-    {
-      "version": "1.10.4-11",
-      "level": "bug_fix",
-      "url": "https://github.com/astronomer/airflow/releases/tag/1.10.4-11",
-      "release_date": "2020-9-05T20:03:00+00:00",
-      "tags": [
-        "1.10.4-11-alpine3.10-onbuild",
-        "1.10.4-11-buster-onbuild",
-        "1.10.4-11-alpine3.10",
-        "1.10.4-11-buster"
-      ],
-      "channel": "stable"
-    },
-    {
-      "version": "2.2.0",
-      "level": "new_feature",
-      "url": "https://github.com/astronomer/airflow/releases/tag/v2.2.0%2Bastro.2",
-      "release_date": "2021-10-14T12:46:00+00:00",
-      "tags": ["2.2.0", "2.2.0-onbuild"],
-      "channel": "stable"
-    }
-  ]
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	httpClient := NewClient(client)
+
+	availableReleases := []AirflowVersionRaw{
+		{
+			Version:     "1.10.5",
+			Level:       "new_feature",
+			ReleaseDate: "2020-10-05T20:03:00+00:00",
+			Tags: []string{
+				"1.10.5-alpine3.10-onbuild",
+				"1.10.5-buster-onbuild",
+				"1.10.5-alpine3.10",
+				"1.10.5-buster",
+			},
+			Channel: VersionChannelStable,
+		},
+		{
+			Version:     "1.10.5-11",
+			Level:       "bug_fix",
+			ReleaseDate: "2020-10-05T20:03:00+00:00",
+			Tags: []string{
+				"1.10.5-11-alpine3.10-onbuild",
+				"1.10.5-11-buster-onbuild",
+				"1.10.5-11-alpine3.10",
+				"1.10.5-11-buster",
+			},
+			Channel: VersionChannelStable,
+		},
+		{
+			Version:     "1.10.4-11",
+			Level:       "bug_fix",
+			ReleaseDate: "2020-9-05T20:03:00+00:00",
+			Tags: []string{
+				"1.10.4-11-alpine3.10-onbuild",
+				"1.10.4-11-buster-onbuild",
+				"1.10.4-11-alpine3.10",
+				"1.10.4-11-buster",
+			},
+			Channel: VersionChannelStable,
+		},
+		{
+			Version:     "2.2.0",
+			Level:       "new_feature",
+			ReleaseDate: "2021-10-14T12:46:00+00:00",
+			Tags: []string{
+				"2.2.0",
+				"2.2.0-onbuild",
+			},
+			Channel: VersionChannelStable,
+		},
+	}
 
 	tests := []struct {
 		airflowVersion string
@@ -90,7 +79,82 @@ func TestGetDefaultImageTag(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		defaultImageTag, err := GetDefaultImageTag(httpClient, tt.airflowVersion)
+		defaultImageTag, err := getAstronomerCertifiedTag(availableReleases, tt.airflowVersion)
+		if tt.err == nil {
+			assert.NoError(t, err)
+		} else {
+			assert.EqualError(t, err, tt.err.Error())
+		}
+		assert.Equal(t, tt.output, defaultImageTag)
+	}
+}
+
+func TestGetAstroRuntimeTag(t *testing.T) {
+	tagToRuntimeVersion := map[string]RuntimeVersion{
+		"2.1.1": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "2.1.1",
+				Channel:        "deprecated",
+				ReleaseDate:    "2021-07-20",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: true,
+			},
+		},
+		"3.0.0": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "2.1.1",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2021-08-12",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+		"3.0.1": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "2.1.1",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2021-08-31",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+		"3.1.0": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "2.1.1",
+				Channel:        "alpha",
+				ReleaseDate:    "2021-08-31",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+		"4.0.0": {
+			Metadata: RuntimeVersionMetadata{
+				AirflowVersion: "2.2.0",
+				Channel:        VersionChannelStable,
+				ReleaseDate:    "2021-10-12",
+			},
+			Migrations: RuntimeVersionMigrations{
+				AirflowDatabase: false,
+			},
+		},
+	}
+
+	tests := []struct {
+		airflowVersion string
+		output         string
+		err            error
+	}{
+		{airflowVersion: "", output: "4.0.0", err: nil},
+		{airflowVersion: "2.1.1", output: "3.0.1", err: nil},
+		{airflowVersion: "2.2.2", output: "", err: ErrNoTagAvailable{airflowVersion: "2.2.2"}},
+	}
+
+	for _, tt := range tests {
+		defaultImageTag, err := getAstroRuntimeTag(tagToRuntimeVersion, tt.airflowVersion)
 		if tt.err == nil {
 			assert.NoError(t, err)
 		} else {
@@ -110,7 +174,7 @@ func TestGetDefaultImageTagError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	httpClient := NewClient(client)
+	httpClient := NewClient(client, true)
 
 	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
 	assert.Error(t, err)

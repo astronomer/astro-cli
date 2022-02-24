@@ -74,7 +74,7 @@ func TestInit(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "test")
+	err = Init(tmpDir, AstronomerCertifiedImageName, "test")
 	assert.NoError(t, err)
 
 	expectedFiles := []string{

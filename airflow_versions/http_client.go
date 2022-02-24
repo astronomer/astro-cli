@@ -12,14 +12,14 @@ import (
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
-	HTTPClient *httputil.HTTPClient
+	HTTPClient             *httputil.HTTPClient
 	useAstronomerCertified bool
 }
 
 // NewClient returns a new Client with the logger and HTTP client setup.
 func NewClient(c *httputil.HTTPClient, useAstronomerCertified bool) *Client {
 	return &Client{
-		HTTPClient: c,
+		HTTPClient:             c,
 		useAstronomerCertified: useAstronomerCertified,
 	}
 }

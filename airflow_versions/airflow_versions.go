@@ -6,7 +6,17 @@ import (
 	"strings"
 )
 
+const VersionChannelStable = "stable"
+
 var tagPrefixOrder = []string{"buster-onbuild", "onbuild", "buster"}
+
+type ErrNoTagAvailable struct {
+	airflowVersion string
+}
+
+func (e ErrNoTagAvailable) Error() string {
+	return fmt.Sprintf("there is no tag available for provided airflow version: %s, you might want to try a different airflow version.", e.airflowVersion)
+}
 
 // GetDefaultImageTag returns default airflow image tag
 func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, error) {
@@ -31,7 +41,7 @@ func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersio
 	availableVersions := []string{}
 
 	for runtimeVersion, r := range runtimeVersions {
-		if r.Metadata.Channel != "stable" {
+		if r.Metadata.Channel != VersionChannelStable {
 			continue
 		}
 
@@ -46,6 +56,10 @@ func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersio
 	tagsToUse := availableVersions
 	if airflowVersion != "" {
 		tagsToUse = availableTags
+	}
+
+	if len(tagsToUse) == 0 {
+		return "", ErrNoTagAvailable{airflowVersion: airflowVersion}
 	}
 
 	// get latest runtime version

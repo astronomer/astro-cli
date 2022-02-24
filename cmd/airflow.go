@@ -31,17 +31,17 @@ var (
 )
 
 var (
-	projectName      string
-	airflowVersion   string
-	envFile          string
-	followLogs       bool
-	forceDeploy      bool
-	forcePrompt      bool
-	saveDeployConfig bool
-	schedulerLogs    bool
-	webserverLogs    bool
-	triggererLogs    bool
-	ignoreCacheDev   bool
+	projectName            string
+	airflowVersion         string
+	envFile                string
+	followLogs             bool
+	forceDeploy            bool
+	forcePrompt            bool
+	saveDeployConfig       bool
+	schedulerLogs          bool
+	webserverLogs          bool
+	triggererLogs          bool
+	ignoreCacheDev         bool
 	useAstronomerCertified bool
 
 	runExample = `
