@@ -51,7 +51,7 @@ func FindDirInPath(search string) (string, error) {
 		}
 
 		// Check if our file exists
-		exists, err := Exists(filepath.Join(workingDir, search))
+		exists, err := Exists(filepath.Join(workingDir, search), nil)
 		if err != nil {
 			return "", fmt.Errorf("failed to check existence of '%s': %w", filepath.Join(workingDir, search), err)
 		}
