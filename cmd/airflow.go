@@ -270,7 +270,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 
 	projectConfigFile := filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt)
 
-	configExists, err := fileutil.Exists(projectConfigFile)
+	configExists, err := fileutil.Exists(projectConfigFile, nil)
 	if err != nil {
 		return fmt.Errorf("failed to check existence of '%s': %w", projectConfigFile, err)
 	}
@@ -370,7 +370,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fileState, err := fileutil.Exists("airflow_settings.yaml")
+	fileState, err := fileutil.Exists("airflow_settings.yaml", nil)
 	if err != nil {
 		return fmt.Errorf("%s: %w", messages.SettingsPath, err)
 	}
