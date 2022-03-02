@@ -47,6 +47,7 @@ func TestGenerateConfig(t *testing.T) {
 	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
+	config.CFG.ProjectName.SetHomeString("test")
 	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}, DockerEngine)
 	assert.NoError(t, err)
 	expectedCfg := `version: '3.1'
@@ -83,7 +84,7 @@ services:
 
   scheduler:
     image: test-project-name/airflow:latest
-    container_name: scheduler
+    container_name: test-scheduler
     command: >
       bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
     restart: unless-stopped
@@ -110,7 +111,7 @@ services:
 
   webserver:
     image: test-project-name/airflow:latest
-    container_name: webserver
+    container_name: test-webserver
     command: >
       bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
@@ -152,7 +153,7 @@ services:
 
   triggerer:
     image: test-project-name/airflow:latest
-    container_name: triggerer
+    container_name: test-triggerer
     command: >
       bash -c "(airflow upgradedb || airflow db upgrade) && airflow triggerer"
     restart: unless-stopped
