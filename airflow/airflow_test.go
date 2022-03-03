@@ -26,7 +26,7 @@ func TestInitDirs(t *testing.T) {
 	err = initDirs(tmpDir, dirs)
 	assert.NoError(t, err)
 
-	exist, err := fileutil.Exists(filepath.Join(tmpDir, "dags"))
+	exist, err := fileutil.Exists(filepath.Join(tmpDir, "dags"), nil)
 
 	assert.NoError(t, err)
 	assert.True(t, exist)
@@ -57,7 +57,7 @@ func TestInitFiles(t *testing.T) {
 	err = initFiles(tmpDir, files)
 	assert.NoError(t, err)
 
-	exist, err := fileutil.Exists(filepath.Join(tmpDir, "requirements.txt"))
+	exist, err := fileutil.Exists(filepath.Join(tmpDir, "requirements.txt"), nil)
 
 	assert.NoError(t, err)
 	assert.True(t, exist)
@@ -88,7 +88,7 @@ func TestInit(t *testing.T) {
 		"dags/example-dag.py",
 	}
 	for _, file := range expectedFiles {
-		exist, err := fileutil.Exists(filepath.Join(tmpDir, file))
+		exist, err := fileutil.Exists(filepath.Join(tmpDir, file), nil) // passing afero.Fs as nil since none of the files in expectedFiles are created using fs
 		assert.NoError(t, err)
 		assert.True(t, exist)
 	}

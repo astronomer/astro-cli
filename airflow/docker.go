@@ -43,6 +43,8 @@ const (
 	execDieStatus         = "exec_die"
 
 	webserverServiceName = "webserver"
+	schedulerServiceName = "scheduler"
+	triggererServiceName = "triggerer"
 )
 
 type DockerCompose struct {

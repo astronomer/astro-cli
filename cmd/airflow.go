@@ -277,7 +277,7 @@ func ensureProjectDir(cmd *cobra.Command, args []string) error {
 
 	projectConfigFile := filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt)
 
-	configExists, err := fileutil.Exists(projectConfigFile)
+	configExists, err := fileutil.Exists(projectConfigFile, nil)
 	if err != nil {
 		return fmt.Errorf("failed to check existence of '%s': %w", projectConfigFile, err)
 	}
@@ -377,7 +377,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fileState, err := fileutil.Exists("airflow_settings.yaml")
+	fileState, err := fileutil.Exists("airflow_settings.yaml", nil)
 	if err != nil {
 		return fmt.Errorf("%s: %w", messages.SettingsPath, err)
 	}
@@ -411,16 +411,16 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	containersNames := make([]string, 0)
 	// default is to display all logs
 	if !schedulerLogs && !webserverLogs && !triggererLogs {
-		containersNames = append(containersNames, []string{config.CFG.SchedulerContainerName.GetString(), config.CFG.WebserverContainerName.GetString(), config.CFG.TriggererContainerName.GetString()}...)
+		containersNames = append(containersNames, []string{airflow.GetWebserverServiceName(), airflow.GetSchedulerServiceName(), airflow.GetTriggererServiceName()}...)
 	}
 	if schedulerLogs {
-		containersNames = append(containersNames, config.CFG.SchedulerContainerName.GetString())
+		containersNames = append(containersNames, airflow.GetSchedulerServiceName())
 	}
 	if webserverLogs {
-		containersNames = append(containersNames, config.CFG.WebserverContainerName.GetString())
+		containersNames = append(containersNames, airflow.GetWebserverServiceName())
 	}
 	if triggererLogs {
-		containersNames = append(containersNames, config.CFG.TriggererContainerName.GetString())
+		containersNames = append(containersNames, airflow.GetTriggererServiceName())
 	}
 
 	// Silence Usage as we have now validated command input

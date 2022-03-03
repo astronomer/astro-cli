@@ -186,7 +186,7 @@ func getFmtEnvFile(envFile string, containerEngine Container) (string, error) {
 		return "", nil
 	}
 
-	envExists, err := fileutil.Exists(envFile)
+	envExists, err := fileutil.Exists(envFile, nil)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", fmt.Sprintf(messages.EnvPath, envFile), err)
 	}
@@ -203,5 +203,41 @@ func getFmtEnvFile(envFile string, containerEngine Container) (string, error) {
 		return fmtPodmanEnvVars(envFile)
 	default:
 		return "", nil
+	}
+}
+
+func GetWebserverServiceName() string {
+	containerEngine := config.CFG.ContainerEngine.GetString()
+	switch containerEngine {
+	case string(DockerEngine):
+		return webserverServiceName
+	case string(PodmanEngine):
+		return config.CFG.WebserverContainerName.GetString()
+	default:
+		return webserverServiceName
+	}
+}
+
+func GetSchedulerServiceName() string {
+	containerEngine := config.CFG.ContainerEngine.GetString()
+	switch containerEngine {
+	case string(DockerEngine):
+		return schedulerServiceName
+	case string(PodmanEngine):
+		return config.CFG.SchedulerContainerName.GetString()
+	default:
+		return schedulerServiceName
+	}
+}
+
+func GetTriggererServiceName() string {
+	containerEngine := config.CFG.ContainerEngine.GetString()
+	switch containerEngine {
+	case string(DockerEngine):
+		return triggererServiceName
+	case string(PodmanEngine):
+		return config.CFG.TriggererContainerName.GetString()
+	default:
+		return triggererServiceName
 	}
 }
