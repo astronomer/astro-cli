@@ -18,7 +18,9 @@ type ResponseData struct {
 	UpdateDeploymentUser           *RoleBinding              `json:"deploymentUpdateUserRole,omitempty"`
 	DeploymentUserList             []DeploymentUser          `json:"deploymentUsers,omitempty"`
 	AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
+	AddWorkspaceTeam               *Workspace                `json:"workspaceAddTeam,omitempty"`
 	RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
+	RemoveWorkspaceTeam            *Workspace                `json:"workspaceRemoveTeam,omitempty"`
 	CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
 	CreateToken                    *AuthUser                 `json:"createToken,omitempty"`
 	CreateWorkspaceServiceAccount  *WorkspaceServiceAccount  `json:"createWorkspaceServiceAccount,omitempty"`
@@ -43,7 +45,9 @@ type ResponseData struct {
 	UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
 	WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
+	WorkspaceUpdateTeamRole        string                    `json:"workspaceUpdateTeamRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
+	WorkspaceGetTeams              WorkspaceTeamRoleBindings `json:"workspaceTeams,omitempty"`
 	DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
 }
@@ -198,6 +202,7 @@ type User struct {
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
+	Teams    []Team  `json:"teams"`
 	// created at
 	// updated at
 	// profile
@@ -214,11 +219,16 @@ type WorkspaceUserRoleBindings struct {
 	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
 }
 
+type WorkspaceTeamRoleBindings struct {
+	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
+}
+
 type RoleBinding struct {
 	Role           string                  `json:"role"`
 	User           RoleBindingUser         `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
 	Deployment     Deployment              `json:"deployment"`
+	Team           Team                    `json:"team"`
 }
 
 type RoleBindingUser struct {
@@ -257,6 +267,16 @@ type DeploymentConfig struct {
 	AirflowImages          []AirflowImage `json:"airflowImages"`
 	DefaultAirflowImageTag string         `json:"defaultAirflowImageTag"`
 	AirflowVersions        []string       `json:"airflowVersions"`
+}
+
+// Team contains all components of an Astronomer Team
+type Team struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	SortId       int           `json:"sortid"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 func (config *DeploymentConfig) GetValidTags(tag string) (tags []string) {

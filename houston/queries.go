@@ -606,4 +606,73 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			featureFlags
 		}
 	}`
+	// Teams
+	WorkspaceTeamAddRequest = `
+	mutation AddWorkspaceTeam(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role! = WORKSPACE_VIEWER
+		) {
+		workspaceAddTeam(
+			workspaceUuid: $workspaceUuid
+			teamUuid: $teamUuid
+			role: $role) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspaceTeamUpdateRequest = `
+	mutation workspaceUpdateTeamRole(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role!
+		) {
+		workspaceUpdateTeamRole(
+      workspaceUuid: $workspaceUuid
+      teamUuid: $teamUuid
+      role: $role
+    )
+	}`
+
+	WorkspaceGetTeamsRequest = `
+	query workspaceGetTeams($workspaceUuid: Uuid!) {
+		workspaceTeams(
+			workspaceUuid: $workspaceUuid
+			) {
+				id
+      	name
+				roleBindings {
+					role
+					workspace {
+						id
+						label
+					}
+					deployment {
+						id
+						label
+					}
+				}
+			}
+		}
+	`
+
+	WorkspaceTeamRemoveRequest = `
+	mutation RemoveWorkspaceTeam(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+	  ) {
+		workspaceRemoveTeam(
+		  workspaceUuid: $workspaceUuid
+		  teamUuid: $teamUuid
+		) {
+		  id
+		  label
+		  createdAt
+		  updatedAt
+		}
+	  }`
 )
