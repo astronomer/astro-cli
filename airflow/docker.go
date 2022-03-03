@@ -35,6 +35,10 @@ const (
 
 	// Docker is the docker command.
 	Docker = "docker"
+
+	webserverServiceName = "webserver"
+	schedulerServiceName = "scheduler"
+	triggererServiceName = "triggerer"
 )
 
 type DockerCompose struct {
