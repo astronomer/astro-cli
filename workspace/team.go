@@ -52,7 +52,7 @@ func RemoveTeam(workspaceID, teamUuid string, client houston.ClientInterface, ou
 
 // ListRoles print teams and roles from a workspace
 func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Writer) error {
-	workspace, err := client.ListWorkspaceTeamsAndRoles(workspaceID)
+	workspaceTeams, err := client.ListWorkspaceTeamsAndRoles(workspaceID)
 	if err != nil {
 		return err
 	}
@@ -60,15 +60,16 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 	tab := printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"TEAM NAME", "ID", "ROLE"},
+		Header:         []string{"ID", "TEAM NAME", "ROLE"},
 	}
-	for i := range workspace.RoleBindings {
-		role := workspace.RoleBindings[i]
-		var color bool
-		if role.Team.Name != "" {
-			tab.AddRow([]string{role.Team.Name, role.Team.ID, role.Role}, color)
-		} else {
-			tab.AddRow([]string{role.ServiceAccount.Label, role.ServiceAccount.ID, role.Role}, color)
+	for i := range workspaceTeams {
+		teamName := workspaceTeams[i].Name
+		teamID := workspaceTeams[i].ID
+		teamRoleBindings := workspaceTeams[i].RoleBindings
+		for j := range teamRoleBindings {
+			teamRole := teamRoleBindings[j].Role
+			var color bool
+			tab.AddRow([]string{teamID, teamName, teamRole}, color)
 		}
 	}
 	tab.Print(out)

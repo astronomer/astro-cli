@@ -47,7 +47,8 @@ type ResponseData struct {
 	WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
 	WorkspaceUpdateTeamRole        string                    `json:"workspaceUpdateTeamRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
-	WorkspaceGetTeams              WorkspaceTeamRoleBindings `json:"workspaceTeams,omitempty"`
+	WorkspaceGetTeam               WorkspaceTeamRoleBindings `json:"team,omitempty"`
+	WorkspaceGetTeams              []Team                    `json:"workspaceTeams,omitempty"`
 	DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
 }

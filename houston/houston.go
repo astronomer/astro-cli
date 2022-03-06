@@ -37,7 +37,7 @@ type ClientInterface interface {
 	// workspace teams and roles
 	AddWorkspaceTeam(workspaceID, teamUuid, role string) (*Workspace, error)
 	DeleteWorkspaceTeam(workspaceID, teamUuid string) (*Workspace, error)
-	ListWorkspaceTeamsAndRoles(workspaceID string) (*Workspace, error)
+	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
 	UpdateWorkspaceTeamRole(workspaceID, teamUuid, role string) (string, error)
 	GetWorkspaceTeamRole(workspaceID, teamUuid string) (WorkspaceTeamRoleBindings, error)
 	// auth

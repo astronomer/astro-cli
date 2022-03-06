@@ -19,7 +19,7 @@ func (h ClientImplementation) AddWorkspaceTeam(workspaceUUID, teamUuid, role str
 func (h ClientImplementation) DeleteWorkspaceTeam(workspaceUUID, teamUuid string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceTeamRemoveRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceUUID, "teamUuid": teamUuid},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID, "teamUuid": teamUuid},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -31,10 +31,10 @@ func (h ClientImplementation) DeleteWorkspaceTeam(workspaceUUID, teamUuid string
 }
 
 // ListTeamAndRolesFromWorkspace - list teams and roles from a workspace
-func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceUUID string) (*Workspace, error) {
+func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceUUID string) ([]Team, error) {
 	req := Request{
-		Query:     WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceUUID},
+		Query:     WorkspaceGetTeamsRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -42,7 +42,7 @@ func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceUUID string) (
 		return nil, handleAPIErr(err)
 	}
 
-	return &r.Data.GetWorkspaces[0], nil
+	return r.Data.WorkspaceGetTeams, nil
 }
 
 // UpdateTeamRoleInWorkspace - update a team role in a workspace
@@ -63,7 +63,7 @@ func (h ClientImplementation) UpdateWorkspaceTeamRole(workspaceUUID, teamUuid, r
 // GetTeamRoleInWorkspace - get a team role in a workspace
 func (h ClientImplementation) GetWorkspaceTeamRole(workspaceUUID, teamUuid string) (WorkspaceTeamRoleBindings, error) {
 	req := Request{
-		Query:     WorkspaceGetTeamsRequest,
+		Query:     WorkspaceGetTeamRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID, "teamUuid": teamUuid},
 	}
 
@@ -72,5 +72,5 @@ func (h ClientImplementation) GetWorkspaceTeamRole(workspaceUUID, teamUuid strin
 		return WorkspaceTeamRoleBindings{}, handleAPIErr(err)
 	}
 
-	return r.Data.WorkspaceGetTeams, nil
+	return r.Data.WorkspaceGetTeam, nil
 }

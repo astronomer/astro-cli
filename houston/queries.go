@@ -493,7 +493,10 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}`
 
 	WorkspaceUserUpdateRequest = `
-	mutation workspaceUpdateUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
+	mutation workspaceUpdateUserRole(
+		$workspaceUuid: Uuid!, 
+		$email: String!, 
+		$role: Role!) {
 		workspaceUpdateUserRole(
         	workspaceUuid: $workspaceUuid
             email: $email
@@ -660,19 +663,36 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	`
 
-	WorkspaceTeamRemoveRequest = `
-	mutation RemoveWorkspaceTeam(
-		$workspaceUuid: Uuid!
-		$teamUuid: Uuid!
-	  ) {
-		workspaceRemoveTeam(
-		  workspaceUuid: $workspaceUuid
-		  teamUuid: $teamUuid
-		) {
-		  id
-		  label
-		  createdAt
-		  updatedAt
+	WorkspaceGetTeamRequest = `
+	query team($teamUuid: Uuid!, $workspaceUuid: Uuid) {
+		team(teamUuid: $teamUuid, workspaceUuid: $workspaceUuid) {
+			name
+			id
+			createdAt
+			roleBindings {
+				id
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+					releaseName
+				}
+			}
 		}
-	  }`
+	}
+	`
+
+	WorkspaceTeamRemoveRequest = `
+	mutation workspaceRemoveTeam(
+		$workspaceUuid: Uuid!, 
+		$teamUuid: Uuid!) {
+		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamUuid: $teamUuid) {
+			id
+		}
+	}
+		`
 )
