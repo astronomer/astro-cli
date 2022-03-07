@@ -22,10 +22,11 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 	testUtil.InitTestConfig()
 	mockResponse := &Response{
 		Data: ResponseData{},
-		Errors: []Error{{
-			Message: ErrAuthTokenRefreshFailed.Error(),
-			Name:    "",
-		},
+		Errors: []Error{
+			{
+				Message: ErrAuthTokenRefreshFailed.Error(),
+				Name:    "",
+			},
 		},
 	}
 	jsonResponse, _ := json.Marshal(mockResponse)
