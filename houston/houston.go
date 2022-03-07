@@ -15,7 +15,7 @@ import (
 
 var (
 	ErrInaptPermissions        = errors.New("You do not have the appropriate permissions for that") //nolint
-	ErrAuthTokenRefreshFailed        = errors.New("AUTH_TOKEN_REFRESH_FAILED")
+	ErrAuthTokenRefreshFailed  = errors.New("AUTH_TOKEN_REFRESH_FAILED")
 	ErrVerboseInaptPermissions = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 
