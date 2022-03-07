@@ -3,7 +3,6 @@ package airflow
 import (
 	"context"
 
-	podmanImages "github.com/astronomer/astro-cli/pkg/podman"
 	"github.com/containers/common/pkg/auth"
 	"github.com/containers/image/v5/types"
 	"github.com/containers/podman/v3/pkg/api/handlers"
@@ -32,7 +31,7 @@ type PodmanBind interface {
 	// Methods to handle image operations
 	Build(ctx context.Context, containerFiles []string, options entities.BuildOptions) (*entities.BuildReport, error)
 	Tag(ctx context.Context, nameOrID, tag, repo string, options *images.TagOptions) error
-	Push(ctx context.Context, source, destination string, options *podmanImages.PushOptions) error
+	Push(ctx context.Context, source, destination string, options *images.PushOptions) error
 	Untag(ctx context.Context, nameOrID, tag, repo string, options *images.UntagOptions) error
 	GetImage(ctx context.Context, nameOrID string, options *images.GetOptions) (*entities.ImageInspectReport, error)
 	// Method to handle registry operations
@@ -91,8 +90,8 @@ func (p *PodmanBinder) Tag(ctx context.Context, nameOrID, tag, repo string, opti
 	return images.Tag(ctx, nameOrID, tag, repo, options)
 }
 
-func (p *PodmanBinder) Push(ctx context.Context, source, destination string, options *podmanImages.PushOptions) error {
-	return podmanImages.Push(ctx, source, destination, options)
+func (p *PodmanBinder) Push(ctx context.Context, source, destination string, options *images.PushOptions) error {
+	return images.Push(ctx, source, destination, options)
 }
 
 func (p *PodmanBinder) Untag(ctx context.Context, nameOrID, tag, repo string, options *images.UntagOptions) error {
