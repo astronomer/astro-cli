@@ -8,10 +8,9 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow/types"
 
-	podmanImages "github.com/astronomer/astro-cli/pkg/podman"
-
 	"github.com/containers/buildah"
 	"github.com/containers/buildah/imagebuildah"
+	"github.com/containers/podman/v3/pkg/bindings/images"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 )
 
@@ -74,7 +73,7 @@ func (p *PodmanImage) Push(cloudDomain, token, remoteImageTag string) error {
 	if err != nil {
 		return fmt.Errorf("command 'podman tag %s %s' failed: %w", p.imageName, remoteImage, err)
 	}
-	options := new(podmanImages.PushOptions).WithIdentityToken(token)
+	options := new(images.PushOptions)
 	if err := p.podmanBind.Push(p.conn, p.imageName, remoteImage, options); err != nil {
 		return fmt.Errorf("error pushing %s image to %s: %w", p.imageName, registry, err)
 	}
