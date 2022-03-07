@@ -18,8 +18,6 @@ import (
 
 	play "github.com/containers/podman/v3/pkg/bindings/play"
 
-	podman "github.com/astronomer/astro-cli/pkg/podman"
-
 	pods "github.com/containers/podman/v3/pkg/bindings/pods"
 
 	types "github.com/containers/image/v5/types"
@@ -230,11 +228,11 @@ func (_m *PodmanBind) NewConnection(ctx context.Context, uri string) (context.Co
 }
 
 // Push provides a mock function with given fields: ctx, source, destination, options
-func (_m *PodmanBind) Push(ctx context.Context, source string, destination string, options *podman.PushOptions) error {
+func (_m *PodmanBind) Push(ctx context.Context, source string, destination string, options *images.PushOptions) error {
 	ret := _m.Called(ctx, source, destination, options)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, *podman.PushOptions) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, *images.PushOptions) error); ok {
 		r0 = rf(ctx, source, destination, options)
 	} else {
 		r0 = ret.Error(0)
