@@ -330,7 +330,7 @@ func TestUpdateUser(t *testing.T) {
 	api := houston.NewHoustonClient(client)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"
 	email := "somebody@astronomer.com"
-	role := houston.DeploymentEditor
+	role := houston.DeploymentEditorRole
 
 	buf := new(bytes.Buffer)
 	err := UpdateUser(deploymentID, email, role, api, buf)
