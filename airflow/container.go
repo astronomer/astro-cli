@@ -30,7 +30,7 @@ type ContainerHandler interface {
 	Stop() error
 	PS() error
 	Run(args []string, user string) error
-	ExecCommand(containerID, command string) string
+	ExecCommand(containerID, command string) (string, error)
 	GetContainerID(containerName string) (string, error)
 }
 

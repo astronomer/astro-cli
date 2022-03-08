@@ -240,18 +240,18 @@ func (d *DockerCompose) Run(args []string, user string) error {
 }
 
 // ExecCommand executes a command on webserver container, and sends the response as string, this can be clubbed with Run()
-func (d *DockerCompose) ExecCommand(containerID, command string) string {
+func (d *DockerCompose) ExecCommand(containerID, command string) (string, error) {
 	cmd := exec.Command("docker", "exec", "-it", containerID, "bash", "-c", command)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 
 	out, err := cmd.Output()
 	if err != nil {
-		_ = errors.Wrapf(err, "error encountered")
+		return "", err
 	}
 
 	stringOut := string(out)
-	return stringOut
+	return stringOut, nil
 }
 
 func (d *DockerCompose) GetContainerID(containerName string) (string, error) {
