@@ -401,7 +401,7 @@ github.com/docker/compose/v2/pkg/compose
 github.com/docker/compose/v2/pkg/progress
 github.com/docker/compose/v2/pkg/prompt
 github.com/docker/compose/v2/pkg/utils
-# github.com/docker/distribution v2.7.1+incompatible
+# github.com/docker/distribution v2.8.0+incompatible
 ## explicit
 github.com/docker/distribution
 github.com/docker/distribution/digestset
