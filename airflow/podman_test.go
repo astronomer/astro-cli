@@ -296,3 +296,40 @@ func TestPodmanRunFailure(t *testing.T) {
 	err := podmanMock.Run([]string{"db", "check"}, "user")
 	assert.Contains(t, err.Error(), errPodman.Error())
 }
+
+func TestParseCommand(t *testing.T) {
+	tests := []struct {
+		name           string
+		command        string
+		expectedOutput []string
+		expectedError  string
+	}{
+		{
+			name:           "test with intentional extra white spaces",
+			command:        `   airflow  connections add   "local_postgres" --conn-type "postgres" --conn-host 'test.db.sql.com' --conn-login 'user' --conn-password 'pass' --conn-schema 'schema' --conn-port 5432`,
+			expectedOutput: []string{"airflow", "connections", "add", "local_postgres", "--conn-type", "postgres", "--conn-host", "test.db.sql.com", "--conn-login", "user", "--conn-password", "pass", "--conn-schema", "schema", "--conn-port", "5432"},
+			expectedError:  "",
+		},
+		{
+			name:           "test with spaces inside quoted strings",
+			command:        `airflow connections add   "azure_batch_default" --conn-type "azure_batch" --conn-extra '{"account_url": "<ACCOUNT_URL>"}' --conn-host '<ACCOUNT_URL>' --conn-login '<ACCOUNT_NAME>' --conn-password '<ACCOUNT_KEY>'`,
+			expectedOutput: []string{"airflow", "connections", "add", "azure_batch_default", "--conn-type", "azure_batch", "--conn-extra", "{\"account_url\": \"<ACCOUNT_URL>\"}", "--conn-host", "<ACCOUNT_URL>", "--conn-login", "<ACCOUNT_NAME>", "--conn-password", "<ACCOUNT_KEY>"},
+			expectedError:  "",
+		},
+		{
+			name:           "test with intentional comments, new line and back slash",
+			command:        "one two \"three four\" \"five \\\"six\\\"\" seven#eight # nine # ten\n eleven 'twelve\\' thirteen=13 fourteen/14",
+			expectedOutput: []string{"one", "two", "three four", "five \"six\"", "seven#eight", "eleven", "twelve\\", "thirteen=13", "fourteen/14"},
+			expectedError:  "",
+		},
+	}
+	for _, tt := range tests {
+		output, err := parseCommand(tt.command)
+		if tt.expectedError != "" {
+			assert.EqualError(t, err, tt.expectedError)
+		} else {
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, tt.expectedOutput, output)
+	}
+}

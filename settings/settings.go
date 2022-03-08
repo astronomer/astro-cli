@@ -87,8 +87,12 @@ func AddVariables(containerEngine airflow.ContainerHandler, id string, version u
 
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 
-			containerEngine.ExecCommand(id, airflowCommand)
-			fmt.Printf("Added Variable: %s\n", variable.VariableName)
+			_, err := containerEngine.ExecCommand(id, airflowCommand)
+			if err != nil {
+				fmt.Printf("Error adding variable %s: %s\n", variable.VariableName, err.Error())
+			} else {
+				fmt.Printf("Added Variable: %s\n", variable.VariableName)
+			}
 		}
 	}
 }
@@ -131,7 +135,7 @@ func AddConnections(containerEngine airflow.ContainerHandler, id string, airflow
 	}
 
 	airflowCommand := baseListCmd
-	out := containerEngine.ExecCommand(id, airflowCommand)
+	out, _ := containerEngine.ExecCommand(id, airflowCommand)
 	for idx := range connections {
 		conn := connections[idx]
 		if !objectValidator(0, conn.ConnID) {
@@ -142,40 +146,23 @@ func AddConnections(containerEngine airflow.ContainerHandler, id string, airflow
 		if strings.Contains(out, quotedConnID) {
 			fmt.Printf("Found Connection: \"%s\"...replacing...\n", conn.ConnID)
 			airflowCommand = fmt.Sprintf("%s %s \"%s\"", baseRmCmd, connIDArg, conn.ConnID)
-			containerEngine.ExecCommand(id, airflowCommand)
+			_, err := containerEngine.ExecCommand(id, airflowCommand)
+			if err != nil {
+				fmt.Printf("Error replacing connection %s: %s\n", conn.ConnID, err.Error())
+			}
 		}
 
 		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
 			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
 			continue
 		}
-		airflowCommand = fmt.Sprintf("%s %s \"%s\" ", baseAddCmd, connIDArg, conn.ConnID)
-		if objectValidator(0, conn.ConnType) {
-			airflowCommand += fmt.Sprintf("%s \"%s\" ", connTypeArg, conn.ConnType)
+		airflowCommand = prepareAddConnCmd(baseAddCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg, &conn)
+		_, err := containerEngine.ExecCommand(id, airflowCommand)
+		if err != nil {
+			fmt.Printf("Error adding connection %s: %s\n", conn.ConnID, err.Error())
+		} else {
+			fmt.Printf("Added Connection: %s\n", conn.ConnID)
 		}
-		if objectValidator(0, conn.ConnURI) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
-		}
-		if objectValidator(0, conn.ConnExtra) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, conn.ConnExtra)
-		}
-		if objectValidator(0, conn.ConnHost) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
-		}
-		if objectValidator(0, conn.ConnLogin) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
-		}
-		if objectValidator(0, conn.ConnPassword) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
-		}
-		if objectValidator(0, conn.ConnSchema) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
-		}
-		if conn.ConnPort != 0 {
-			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
-		}
-		containerEngine.ExecCommand(id, airflowCommand)
-		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
 
@@ -204,13 +191,49 @@ func AddPools(containerEngine airflow.ContainerHandler, id string, airflowVersio
 				} else {
 					airflowCommand += ""
 				}
-				containerEngine.ExecCommand(id, airflowCommand)
-				fmt.Printf("Added Pool: %s\n", pool.PoolName)
+				_, err := containerEngine.ExecCommand(id, airflowCommand)
+				if err != nil {
+					fmt.Printf("Error adding pool %s: %s\n", pool.PoolName, err.Error())
+				} else {
+					fmt.Printf("Added Pool: %s\n", pool.PoolName)
+				}
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
 			}
 		}
 	}
+}
+
+func prepareAddConnCmd(baseAddCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string, conn *Connection) string {
+	if conn == nil {
+		return ""
+	}
+	airflowCommand := fmt.Sprintf("%s %s \"%s\" ", baseAddCmd, connIDArg, conn.ConnID)
+	if objectValidator(0, conn.ConnType) {
+		airflowCommand += fmt.Sprintf("%s \"%s\" ", connTypeArg, conn.ConnType)
+	}
+	if objectValidator(0, conn.ConnURI) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
+	}
+	if objectValidator(0, conn.ConnExtra) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, conn.ConnExtra)
+	}
+	if objectValidator(0, conn.ConnHost) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
+	}
+	if objectValidator(0, conn.ConnLogin) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
+	}
+	if objectValidator(0, conn.ConnPassword) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
+	}
+	if objectValidator(0, conn.ConnSchema) {
+		airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
+	}
+	if conn.ConnPort != 0 {
+		airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
+	}
+	return airflowCommand
 }
 
 func objectValidator(bound int, args ...string) bool {
