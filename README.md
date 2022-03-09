@@ -220,7 +220,7 @@ Steps to regenerate already existing interface mocks:
 
 Steps to generate mocks for new interface:
 1. Run `mockery --filename=<file_name_where_interface_is_present> --output=<output_dir_to store_mocks> --dir=<directory_where_to_search_for_interface_file> --outpkg=<mock_package_name> --name <name_of_the_interface>` to generate mock for an interface.
-2. Add the above command in appropriate section in `Makefile`.
+2. Add the above command in appropriate target under `mock` rule in `Makefile`.
 
 ## Docs
 
