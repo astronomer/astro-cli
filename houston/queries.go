@@ -627,7 +627,11 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		)	{
 			username
 			id
-			emails
+			emails{
+				address
+				verified
+				primary
+			      }
 			status
 		}
 	}

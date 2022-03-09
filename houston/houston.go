@@ -63,7 +63,7 @@ type ClientInterface interface {
 	GetAvailableNamespaces() ([]Namespace, error)
 	// teams
 	GetTeam(teamID string) (*Team, error)
-	GetTeamUsers(teamId string) ([]User, error)
+	GetTeamUsers(teamID string) ([]User, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface
