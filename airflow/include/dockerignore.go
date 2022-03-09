@@ -10,5 +10,4 @@ var Dockerignore = strings.TrimSpace(`
 airflow_settings.yaml
 pod-config.yml
 logs/
-Dockerfile
 `)
