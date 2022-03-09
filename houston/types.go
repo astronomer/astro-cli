@@ -318,7 +318,7 @@ type FeatureFlags struct {
 type Team struct {
 	ID           string        `json:"id"`
 	Name         string        `json:"name"`
-	SortId       int           `json:"sortid"`
+	SortID       int           `json:"sortid"`
 	CreatedAt    string        `json:"createdAt"`
 	UpdatedAt    string        `json:"updatedAt"`
 	RoleBindings []RoleBinding `json:"roleBindings"`
