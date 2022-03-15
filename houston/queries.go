@@ -613,12 +613,12 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	WorkspaceTeamAddRequest = `
 	mutation AddWorkspaceTeam(
 		$workspaceUuid: Uuid!
-		$teamUuid: Uuid!
+		$teamID: Uuid!
 		$role: Role! = WORKSPACE_VIEWER
 		) {
 		workspaceAddTeam(
 			workspaceUuid: $workspaceUuid
-			teamUuid: $teamUuid
+			teamID: $teamID
 			role: $role) {
 			id
 			label
@@ -631,12 +631,12 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	WorkspaceTeamUpdateRequest = `
 	mutation workspaceUpdateTeamRole(
 		$workspaceUuid: Uuid!
-		$teamUuid: Uuid!
+		$teamID: Uuid!
 		$role: Role!
 		) {
 		workspaceUpdateTeamRole(
       workspaceUuid: $workspaceUuid
-      teamUuid: $teamUuid
+      teamID: $teamID
       role: $role
     )
 	}`
@@ -664,8 +664,8 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	`
 
 	WorkspaceGetTeamRequest = `
-	query team($teamUuid: Uuid!, $workspaceUuid: Uuid) {
-		team(teamUuid: $teamUuid, workspaceUuid: $workspaceUuid) {
+	query team($teamID: Uuid!, $workspaceUuid: Uuid) {
+		team(teamID: $teamID, workspaceUuid: $workspaceUuid) {
 			name
 			id
 			createdAt
@@ -689,8 +689,8 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	WorkspaceTeamRemoveRequest = `
 	mutation workspaceRemoveTeam(
 		$workspaceUuid: Uuid!, 
-		$teamUuid: Uuid!) {
-		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamUuid: $teamUuid) {
+		$teamID: Uuid!) {
+		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamID: $teamID) {
 			id
 		}
 	}

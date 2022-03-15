@@ -38,7 +38,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.AddWorkspaceTeam("workspace-id", "teamUuid", "role")
+		response, err := api.AddWorkspaceTeam("workspace-id", "teamID", "role")
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.AddWorkspaceTeam)
 	})

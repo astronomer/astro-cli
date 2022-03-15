@@ -13,8 +13,8 @@ import (
 var errTeamNotInWorkspace = errors.New("the team you are trying to change is not part of this workspace")
 
 // Add a team to a workspace with specified role
-func AddTeam(workspaceID, teamUuid, role string, client houston.ClientInterface, out io.Writer) error {
-	w, err := client.AddWorkspaceTeam(workspaceID, teamUuid, role)
+func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
+	w, err := client.AddWorkspaceTeam(workspaceID, teamID, role)
 	if err != nil {
 		return err
 	}
@@ -25,16 +25,16 @@ func AddTeam(workspaceID, teamUuid, role string, client houston.ClientInterface,
 		Header:         []string{"NAME", "WORKSPACE ID", "TEAM ID", "ROLE"},
 	}
 
-	tab.AddRow([]string{w.Label, w.ID, teamUuid, role}, false)
-	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", teamUuid, w.Label)
+	tab.AddRow([]string{w.Label, w.ID, teamID, role}, false)
+	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", teamID, w.Label)
 	tab.Print(out)
 
 	return nil
 }
 
 // Remove a team from a workspace
-func RemoveTeam(workspaceID, teamUuid string, client houston.ClientInterface, out io.Writer) error {
-	w, err := client.DeleteWorkspaceTeam(workspaceID, teamUuid)
+func RemoveTeam(workspaceID, teamID string, client houston.ClientInterface, out io.Writer) error {
+	w, err := client.DeleteWorkspaceTeam(workspaceID, teamID)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func RemoveTeam(workspaceID, teamUuid string, client houston.ClientInterface, ou
 		Header:  []string{"NAME", "WORKSPACE ID", "TEAM ID"},
 	}
 
-	utab.AddRow([]string{w.Label, w.ID, teamUuid}, false)
+	utab.AddRow([]string{w.Label, w.ID, teamID}, false)
 	utab.SuccessMsg = "Successfully removed team from workspace"
 	utab.Print(out)
 	return nil
@@ -77,9 +77,9 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 }
 
 // Update workspace team role
-func UpdateTeamRole(workspaceID, teamUuid, role string, client houston.ClientInterface, out io.Writer) error {
+func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	// get team you are updating to show role from before change
-	roles, err := client.GetWorkspaceTeamRole(workspaceID, teamUuid)
+	roles, err := client.GetWorkspaceTeamRole(workspaceID, teamID)
 	if err != nil {
 		return err
 	}
@@ -96,11 +96,11 @@ func UpdateTeamRole(workspaceID, teamUuid, role string, client houston.ClientInt
 		return errTeamNotInWorkspace
 	}
 
-	newRole, err := client.UpdateWorkspaceTeamRole(workspaceID, teamUuid, role)
+	newRole, err := client.UpdateWorkspaceTeamRole(workspaceID, teamID, role)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "Role has been changed from %s to %s for team %s", rb.Role, newRole, teamUuid)
+	fmt.Fprintf(out, "Role has been changed from %s to %s for team %s", rb.Role, newRole, teamID)
 	return nil
 }
