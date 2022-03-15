@@ -688,7 +688,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 
 	WorkspaceTeamRemoveRequest = `
 	mutation workspaceRemoveTeam(
-		$workspaceUuid: Uuid!, 
+		$workspaceUuid: Uuid!,
 		$teamID: Uuid!) {
 		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamID: $teamID) {
 			id
