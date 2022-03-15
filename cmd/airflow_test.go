@@ -121,15 +121,40 @@ func TestAirflowKillFailure(t *testing.T) {
 	mockContainer.AssertExpectations(t)
 }
 
-func TestAirflowLogsSuccess(t *testing.T) {
+func TestAirflowLogsDockerSuccess(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
-
+	config.CFG.WebserverContainerName.SetHomeString("webserver_tmp")
+	config.CFG.SchedulerContainerName.SetHomeString("scheduler_tmp")
+	config.CFG.TriggererContainerName.SetHomeString("triggerer_tmp")
 	mockContainer := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Logs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockContainer.On("Logs", mock.Anything, "scheduler", "webserver", "triggerer").Return(nil)
+		return mockContainer, nil
+	}
+
+	cmd := newAirflowLogsCmd(os.Stdout)
+	cmd.Flags().Set("scheduler", "true")
+	cmd.Flags().Set("webserver", "true")
+	cmd.Flags().Set("triggerer", "true")
+	err := airflowLogs(cmd, []string{})
+	assert.NoError(t, err)
+	mockContainer.AssertExpectations(t)
+}
+
+func TestAirflowLogsPodmanSuccess(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtils.NewTestConfig("podman")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+	config.CFG.WebserverContainerName.SetHomeString("webserver_tmp")
+	config.CFG.SchedulerContainerName.SetHomeString("scheduler_tmp")
+	config.CFG.TriggererContainerName.SetHomeString("triggerer_tmp")
+	mockContainer := new(mocks.ContainerHandler)
+	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
+		mockContainer.On("Logs", mock.Anything, "scheduler_tmp", "webserver_tmp", "triggerer_tmp").Return(nil)
 		return mockContainer, nil
 	}
 
