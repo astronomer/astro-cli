@@ -20,16 +20,26 @@ var (
 	workspaceUpdateAttrs   = []string{"label"}
 	createDesc             string
 	workspaceDeleteExample = `
-  $ astro workspace delete <workspace-id>
-`
-
+	$ astro workspace delete <workspace-id>
+	`
 	workspaceSaCreateExample = `
   # Create service-account
   $ astro workspace service-account create --workspace-id=<workspace-id> --label=my_label --role=ROLE
-`
+	`
 	workspaceSaGetExample = `
-$ astro workspace service-account get --workspace-id=<workspace-id>
-`
+	$ astro workspace service-account get --workspace-id=<workspace-id>
+	`
+	workspaceTeamAddExample = `
+	$ astro workspace team add --workspace-id=<workspace-id> --team-id=<team-id> --role=ROLE
+	`
+	workspaceTeamRemoveExample = `
+	$ astro workspace team remove cl0ck2snm0064jexu3ljfn9um --workspace-id ckwwb09aj0048u8xuts287erj
+	`
+	workspaceTeamUpdateExample = `
+	$ astro workspace team update cl0ck2snm0064jexu3ljfn9um --workspace-id ckwwb09aj0048u8xuts287erj --role WORKSPACE_EDITOR
+	`
+	workspaceTeamsListExample = `
+	$ astro workspace team list --workspace-id ckwwb09aj0048u8xuts287erj`
 )
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
@@ -128,9 +138,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-/*
-	Workspace user commands
-*/
+// Workspace user commands
 
 func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -203,9 +211,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-/*
-	Workspace teams commands
-*/
+// Workspace teams commands
 
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -213,10 +219,11 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 		Short: "Manage Workspace Team resources",
 		Long:  "Teams can be added or removed from Workspaces",
 	}
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace to associate team to")
 	cmd.AddCommand(
 		newWorkspaceTeamAddCmd(out),
 		newWorkspaceTeamUpdateCmd(out),
-		newWorkspaceTeamRmCmd(out),
+		newWorkspaceTeamRemoveCmd(out),
 		newWorkspaceTeamListCmd(out),
 	)
 	return cmd
@@ -224,47 +231,46 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "add TEAM",
+		Use:     "add",
 		Short:   "Add a Team to a Workspace",
 		Long:    "Add a Team to a Workspace",
-		Example: "astro workspace team add <team-id> --workspace-id <workspace-id> --role <role>",
-		Args:    cobra.ExactArgs(1),
+		Example: workspaceTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamAdd(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace to add the team to")
+	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team id to be assigned to workspace")
 	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "workspace role assigned to team")
 	return cmd
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update team role",
-		Short: "Update a Team's Role for a Workspace",
-		Long:  "Update a Team's Role for a Workspace",
-		Args:  cobra.ExactArgs(1),
+		Use:     "update",
+		Short:   "Update a Team inside a workspace",
+		Long:    "Update a Team inside a workspace",
+		Example: workspaceTeamUpdateExample,
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to team")
 	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "workspace role assigned to team")
 	return cmd
 }
 
-func newWorkspaceTeamRmCmd(out io.Writer) *cobra.Command {
+func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove TEAM",
 		Aliases: []string{"rm"},
 		Short:   "Remove a Team from a Workspace",
 		Long:    "Remove a Team from a Workspace",
+		Example: workspaceTeamRemoveExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamRm(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to the team")
 	return cmd
 }
 
@@ -272,13 +278,13 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List Astronomer Workspace Teams",
-		Long:    "List Astronomer Workspace Teams",
+		Short:   "List Teams inside an Astronomer Workspace",
+		Long:    "List Teams inside an Astronomer Workspace",
+		Example: workspaceTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamsList(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
 	return cmd
 }
 
@@ -447,7 +453,7 @@ func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.AddTeam(ws, args[0], workspaceRole, houstonClient, out)
+	return workspace.AddTeam(ws, teamID, workspaceRole, houstonClient, out)
 }
 
 func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
