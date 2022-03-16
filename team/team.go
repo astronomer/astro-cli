@@ -10,8 +10,10 @@ import (
 )
 
 // retrieves a team and all of its users if passed optional param
-func Get(args []string, usersEnabled bool, client houston.ClientInterface, out io.Writer) error {
-	teamID := args[0]
+func Get(teamID string, usersEnabled bool, client houston.ClientInterface, out io.Writer) error {
+	if teamID == "" {
+		return fmt.Errorf("missing team Id")
+	}
 	team, err := client.GetTeam(teamID)
 	if err != nil {
 		return err
@@ -26,7 +28,7 @@ func Get(args []string, usersEnabled bool, client houston.ClientInterface, out i
 		if err != nil {
 			return err
 		}
-		teamUsers := printutil.Table{
+		teamUsersTable := printutil.Table{
 			Padding:        []int{44, 50},
 			DynamicPadding: true,
 			Header:         []string{"USERNAME", "ID"},
@@ -34,9 +36,9 @@ func Get(args []string, usersEnabled bool, client houston.ClientInterface, out i
 		}
 		for i := range users {
 			user := users[i]
-			teamUsers.AddRow([]string{user.Username, user.ID}, false)
+			teamUsersTable.AddRow([]string{user.Username, user.ID}, false)
 		}
-		return teamUsers.Print(out)
+		return teamUsersTable.Print(out)
 	}
 
 	return nil
