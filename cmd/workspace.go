@@ -224,7 +224,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTeamAddCmd(out),
 		newWorkspaceTeamUpdateCmd(out),
 		newWorkspaceTeamRemoveCmd(out),
-		newWorkspaceTeamListCmd(out),
+		newWorkspaceTeamsListCmd(out),
 	)
 	return cmd
 }
@@ -274,7 +274,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
+func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},

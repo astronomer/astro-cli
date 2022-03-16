@@ -38,7 +38,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.AddWorkspaceTeam("workspace-id", "teamID", "role")
+		response, err := api.AddWorkspaceTeam("workspace-id", "team-id", "role")
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.AddWorkspaceTeam)
 	})
@@ -53,7 +53,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.AddWorkspaceTeam("workspace-id", "email", "role")
+		_, err := api.AddWorkspaceTeam("workspace-id", "team-id", "role")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -200,16 +200,7 @@ func TestGetWorkspaceTeamRole(t *testing.T) {
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			WorkspaceGetTeams: WorkspaceTeamRoleBindings{
-				RoleBindings: []RoleBindingWorkspace{
-					{
-						Role: DeploymentAdminRole,
-					},
-					{
-						Role: WorkspaceAdminRole,
-					},
-				},
-			},
+			WorkspaceGetTeams: []Team{},
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
