@@ -198,9 +198,20 @@ type User struct {
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
+	Teams    []Team  `json:"teams"`
 	// created at
 	// updated at
 	// profile
+}
+
+// Team contains all components of an Astronomer Team
+type Team struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	SortID       int           `json:"sortId"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 type RoleBindingWorkspace struct {
@@ -219,6 +230,7 @@ type RoleBinding struct {
 	User           RoleBindingUser         `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
 	Deployment     Deployment              `json:"deployment"`
+	Team           Team                    `json:"team"`
 }
 
 type RoleBindingUser struct {
