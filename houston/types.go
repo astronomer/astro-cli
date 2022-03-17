@@ -209,6 +209,16 @@ type User struct {
 	// profile
 }
 
+// Team contains all components of an Astronomer Team
+type Team struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	SortID       int           `json:"sortId"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
+}
+
 type RoleBindingWorkspace struct {
 	Role      string `json:"role"`
 	Workspace struct {
