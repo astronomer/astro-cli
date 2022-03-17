@@ -31,6 +31,18 @@ var (
 			Name: "test-team",
 		},
 	}
+	mockWorkspaceTeamRoleBindings = houston.WorkspaceTeamRoleBindings{
+		RoleBindings: []houston.RoleBindingWorkspace{
+			{
+				Role: houston.WorkspaceViewerRole,
+				Workspace: struct {
+					ID string "json:\"id\""
+				}{
+					ID: "ck05r3bor07h40d02y2hw4n4v",
+				},
+			},
+		},
+	}
 )
 
 func TestWorkspaceList(t *testing.T) {
@@ -173,13 +185,13 @@ Successfully removed team from workspace
 
 func TestWorkspaceTeamUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := `Role has been changed from WORKSPACE_VIEWER to WORKSPACE_EDITOR for team cl0evnxfl0120dxxu1s4nbnk7`
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("UpdateWorkspaceTeam", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID, mockWorkspaceTeamRole.Role).Return(mockWorkspace.Label, nil)
+	api.On("GetWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID).Return(mockWorkspaceTeamRoleBindings, nil)
+	api.On("UpdateWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID, mockWorkspaceTeamRole.Role).Return(mockWorkspace.Label, nil)
 
-	output, err := executeCommandC(api,
+	_, err := executeCommandC(api,
 		"workspace",
 		"team",
 		"update",
@@ -188,5 +200,4 @@ func TestWorkspaceTeamUpdateCommand(t *testing.T) {
 		"--role="+mockWorkspaceTeamRole.Role,
 	)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
 }

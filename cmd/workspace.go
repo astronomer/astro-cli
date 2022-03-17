@@ -441,7 +441,7 @@ func workspaceUserList(_ *cobra.Command, out io.Writer, _ []string) error {
 	return workspace.ListRoles(ws, houstonClient, out)
 }
 
-func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -483,7 +483,7 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 	return workspace.RemoveTeam(ws, args[0], houstonClient, out)
 }
 
-func workspaceTeamsList(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)

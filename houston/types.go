@@ -280,16 +280,6 @@ type DeploymentConfig struct {
 	AirflowVersions        []string       `json:"airflowVersions"`
 }
 
-// Team contains all components of an Astronomer Team
-type Team struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	SortId       int           `json:"sortid"`
-	CreatedAt    string        `json:"createdAt"`
-	UpdatedAt    string        `json:"updatedAt"`
-	RoleBindings []RoleBinding `json:"roleBindings"`
-}
-
 func (config *DeploymentConfig) GetValidTags(tag string) (tags []string) {
 	tagVersion, err := coerce(tag)
 	// if tag doesn't follow the semver standard return empty array

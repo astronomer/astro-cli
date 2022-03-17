@@ -13,6 +13,7 @@ import (
 var errTeamNotInWorkspace = errors.New("the team you are trying to change is not part of this workspace")
 
 // Add a team to a workspace with specified role
+// nolint: dupl
 func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	w, err := client.AddWorkspaceTeam(workspaceID, teamID, role)
 	if err != nil {
@@ -77,6 +78,7 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 }
 
 // Update workspace team role
+// nolint: dupl
 func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	// get team you are updating to show role from before change
 	roles, err := client.GetWorkspaceTeamRole(workspaceID, teamID)
