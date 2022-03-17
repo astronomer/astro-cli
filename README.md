@@ -136,8 +136,9 @@ Run `astro dev start` to start a local version of airflow on your machine. This 
 ## Requirements
 
 The CLI interacts with Docker or Podman in order to run `astro dev` commands, and the minimum supported versions for them are as following:
-Docker Engine: 1.13.1
-Podman: 3.1.0
+
+- Docker Engine: 1.13.1
+- Podman: 3.1.0
 
 ## Help
 
@@ -208,6 +209,18 @@ To run unit-tests you can run:
 ```bash
 make test
 ```
+
+### Generating Mocks
+
+We currently use [mockery](https://github.com/vektra/mockery) to generate mocks for interfaces.
+Installation guide for mockery: https://github.com/vektra/mockery#installation
+
+Steps to regenerate already existing interface mocks:
+1. Run `make mock`.
+
+Steps to generate mocks for new interface:
+1. Run `mockery --filename=<file_name_where_interface_is_present> --output=<output_dir_to store_mocks> --dir=<directory_where_to_search_for_interface_file> --outpkg=<mock_package_name> --name <name_of_the_interface>` to generate mock for an interface.
+2. Add the above command in appropriate target under `mock` rule in `Makefile`.
 
 ## Docs
 
