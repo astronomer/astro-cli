@@ -108,20 +108,18 @@ func TestDeleteWorkspaceTeam(t *testing.T) {
 func TestListWorkspaceTeamsAndRoles(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	mockResponse := &Response{
-		Data: ResponseData{
-			GetWorkspaces: []Workspace{
-				{
-					ID:          "workspace-id",
-					Label:       "label",
-					Description: "description",
-					CreatedAt:   "2020-06-25T22:10:42.385Z",
-					UpdatedAt:   "2020-06-25T22:10:42.385Z",
-				},
-			},
+	mockResponse := []Team{
+		{
+			ID: "test-id",
 		},
 	}
-	jsonResponse, err := json.Marshal(mockResponse)
+	jsonResponse, err := json.Marshal(Response{Data: ResponseData{
+		WorkspaceGetTeams: []Team{
+			{
+				ID: "test-id",
+			},
+		},
+	}})
 	assert.NoError(t, err)
 
 	t.Run("success", func(t *testing.T) {
@@ -136,7 +134,7 @@ func TestListWorkspaceTeamsAndRoles(t *testing.T) {
 
 		response, err := api.ListWorkspaceTeamsAndRoles("workspace-id")
 		assert.NoError(t, err)
-		assert.Equal(t, response, &mockResponse.Data.GetWorkspaces[0])
+		assert.Equal(t, mockResponse, response)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -198,11 +196,7 @@ func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
 func TestGetWorkspaceTeamRole(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	mockResponse := &Response{
-		Data: ResponseData{
-			WorkspaceGetTeams: []Team{},
-		},
-	}
+	mockResponse := WorkspaceTeamRoleBindings{}
 	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
 
@@ -218,7 +212,7 @@ func TestGetWorkspaceTeamRole(t *testing.T) {
 
 		response, err := api.GetWorkspaceTeamRole("workspace-id", "team-id")
 		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspaceGetTeams)
+		assert.Equal(t, mockResponse, response)
 	})
 
 	t.Run("error", func(t *testing.T) {
