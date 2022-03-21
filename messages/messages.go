@@ -67,6 +67,8 @@ var (
 
 	HoustonInvalidDeploymentUsers = "No users were found for this deployment.  Check the deploymentId and try again.\n"
 
+	HoustonInvalidDeploymentTeams = "No teams were found for this deployment.  Check the deploymentId and try again.\n"
+
 	InputPassword   = "Password: "
 	InputUsername   = "Username (leave blank for oAuth): "
 	InputOAuthToken = "oAuth Token: " // nolint:gosec // false positive

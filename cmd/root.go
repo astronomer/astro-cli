@@ -14,6 +14,7 @@ import (
 var (
 	houstonClient  houston.ClientInterface
 	workspaceID    string
+	teamID         string
 	workspaceRole  string
 	deploymentRole string
 	role           string

@@ -14,9 +14,13 @@ type Response struct {
 
 type ResponseData struct {
 	AddDeploymentUser              *RoleBinding              `json:"deploymentAddUserRole,omitempty"`
+	AddDeploymentTeam              *RoleBinding              `json:"deploymentAddTeamRole,omitempty"`
 	DeleteDeploymentUser           *RoleBinding              `json:"deploymentRemoveUserRole,omitempty"`
+	DeleteDeploymentTeam           *RoleBinding              `json:"deploymentRemoveTeamRole,omitempty"`
 	UpdateDeploymentUser           *RoleBinding              `json:"deploymentUpdateUserRole,omitempty"`
+	UpdateDeploymentTeam           *RoleBinding              `json:"deploymentUpdateTeamRole,omitempty"`
 	DeploymentUserList             []DeploymentUser          `json:"deploymentUsers,omitempty"`
+	DeploymentTeamsList            []DeploymentTeam          `json:"deploymentTeams,omitempty"`
 	AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
 	RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
 	CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
@@ -162,6 +166,12 @@ type DeploymentUser struct {
 	Emails       []Email       `json:"emails"`
 	FullName     string        `json:"fullName"`
 	Username     string        `json:"username"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
+}
+
+// DeploymentTeam defines a structure of RBAC deployment teams
+type DeploymentTeam struct {
+	ID           string        `json:"id"`
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
