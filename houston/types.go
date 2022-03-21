@@ -326,16 +326,6 @@ type FeatureFlags struct {
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
 }
 
-// Team contains all components of an Astronomer Team
-type Team struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	SortID       int           `json:"sortId"`
-	CreatedAt    string        `json:"createdAt"`
-	UpdatedAt    string        `json:"updatedAt"`
-	RoleBindings []RoleBinding `json:"roleBindings"`
-}
-
 // coerce a string into SemVer if possible
 func coerce(version string) (*semver.Version, error) {
 	v, err := semver.NewVersion(version)
