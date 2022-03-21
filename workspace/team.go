@@ -63,9 +63,9 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 		DynamicPadding: true,
 		Header:         []string{"ID", "TEAM NAME", "ROLE"},
 	}
-	for _, team := range workspaceTeams {
-		for _, roleBinding := range team.RoleBindings {
-			tab.AddRow([]string{team.ID, team.Name, roleBinding.Role}, false)
+	for i := range workspaceTeams {
+		for j := range workspaceTeams[i].RoleBindings {
+			tab.AddRow([]string{workspaceTeams[i].ID, workspaceTeams[i].Name, workspaceTeams[i].RoleBindings[j].Role}, false)
 		}
 	}
 	tab.Print(out)
