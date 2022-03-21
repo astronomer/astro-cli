@@ -10,12 +10,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var errGetMissingTeamID = errors.New("missing team Id")
+var errMissingTeamID = errors.New("missing team ID")
 
 // retrieves a team and all of its users if passed optional param
 func Get(teamID string, usersEnabled bool, client houston.ClientInterface, out io.Writer) error {
 	if teamID == "" {
-		return errGetMissingTeamID
+		return errMissingTeamID
 	}
 	team, err := client.GetTeam(teamID)
 	if err != nil {

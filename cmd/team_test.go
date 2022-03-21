@@ -29,6 +29,7 @@ func TestNewGetTeamCmd(t *testing.T) {
 	output, err := executeCommandC(api, "team", "get", "test-id")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "")
+	api.AssertExpectations(t)
 }
 
 func TestNewGetTeamUsersCmd(t *testing.T) {
@@ -56,4 +57,5 @@ func TestNewGetTeamUsersCmd(t *testing.T) {
 	output, err := executeCommandC(api, "team", "get", "-u", "test-id")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "USERNAME            ID          \n email@email.com     test-id")
+	api.AssertExpectations(t)
 }
