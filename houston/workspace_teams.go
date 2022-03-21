@@ -1,10 +1,10 @@
 package houston
 
 // AddTeamToWorkspace - add a team to a workspace
-func (h ClientImplementation) AddWorkspaceTeam(workspaceUUID, teamID, role string) (*Workspace, error) {
+func (h ClientImplementation) AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceTeamAddRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID, "teamUuid": teamID, "role": role},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "teamUuid": teamID, "role": role},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -16,10 +16,10 @@ func (h ClientImplementation) AddWorkspaceTeam(workspaceUUID, teamID, role strin
 }
 
 // RemoveTeamFromWorkspace - remove a team from a workspace
-func (h ClientImplementation) DeleteWorkspaceTeam(workspaceUUID, teamID string) (*Workspace, error) {
+func (h ClientImplementation) DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceTeamRemoveRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID, "teamUuid": teamID},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "teamUuid": teamID},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -31,10 +31,10 @@ func (h ClientImplementation) DeleteWorkspaceTeam(workspaceUUID, teamID string) 
 }
 
 // ListTeamAndRolesFromWorkspace - list teams and roles from a workspace
-func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceUUID string) ([]Team, error) {
+func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error) {
 	req := Request{
 		Query:     WorkspaceGetTeamsRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -46,10 +46,10 @@ func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceUUID string) (
 }
 
 // UpdateTeamRoleInWorkspace - update a team role in a workspace
-func (h ClientImplementation) UpdateWorkspaceTeamRole(workspaceUUID, teamID, role string) (string, error) {
+func (h ClientImplementation) UpdateWorkspaceTeamRole(workspaceID, teamID, role string) (string, error) {
 	req := Request{
 		Query:     WorkspaceTeamUpdateRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID, "teamUuid": teamID, "role": role},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "teamUuid": teamID, "role": role},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -61,10 +61,10 @@ func (h ClientImplementation) UpdateWorkspaceTeamRole(workspaceUUID, teamID, rol
 }
 
 // GetTeamRoleInWorkspace - get a team role in a workspace
-func (h ClientImplementation) GetWorkspaceTeamRole(workspaceUUID, teamID string) (WorkspaceTeamRoleBindings, error) {
+func (h ClientImplementation) GetWorkspaceTeamRole(workspaceID, teamID string) (WorkspaceTeamRoleBindings, error) {
 	req := Request{
 		Query:     WorkspaceGetTeamRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceUUID, "teamUuid": teamID},
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "teamUuid": teamID},
 	}
 
 	r, err := req.DoWithClient(h.client)

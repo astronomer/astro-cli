@@ -240,6 +240,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team id to be assigned to workspace")
+	_ = cmd.MarkFlagRequired("team-id")
 	cmd.PersistentFlags().StringVar(&workspaceRole, "role", houston.WorkspaceViewerRole, "workspace role assigned to team")
 	return cmd
 }
