@@ -2,6 +2,7 @@
 .DS_Store
 .idea/
 .vscode/
+airflow/pod-config.yml
 astro
 astro-cli
 cover.out
@@ -9,4 +10,5 @@ coverage.txt
 dist/
 packages.txt
 requirements.txt
+testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile

@@ -606,4 +606,34 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			featureFlags
 		}
 	}`
+	TeamGetRequest = `
+	query GetTeam(
+		$teamUuid: Uuid
+	) {
+		team(
+			teamUuid: $teamUuid
+		)	{
+			name
+			id
+		}
+	}
+	`
+	TeamGetUsersRequest = `
+	query GetTeamUsers(
+		$teamUuid: Uuid!
+	) {
+		teamUsers(
+			teamUuid: $teamUuid
+		)	{
+			username
+			id
+			emails {
+				address
+				verified
+				primary
+			}
+			status
+		}
+	}
+	`
 )

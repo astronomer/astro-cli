@@ -46,6 +46,8 @@ type ResponseData struct {
 	WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
 	DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
+	GetTeam                        *Team                     `json:"team,omitempty"`
+	GetTeamUsers                   []User                    `json:"teamUsers,omitempty"`
 }
 
 type Namespace struct {
@@ -322,6 +324,16 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+}
+
+// Team contains all components of an Astronomer Team
+type Team struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	SortID       int           `json:"sortId"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // coerce a string into SemVer if possible
