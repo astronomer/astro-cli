@@ -61,11 +61,11 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 	tab := printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"ID", "TEAM NAME", "ROLE"},
+		Header:         []string{"WORKSPACE ID", "TEAM ID", "TEAM NAME", "ROLE"},
 	}
 	for i := range workspaceTeams {
 		for j := range workspaceTeams[i].RoleBindings {
-			tab.AddRow([]string{workspaceTeams[i].ID, workspaceTeams[i].Name, workspaceTeams[i].RoleBindings[j].Role}, false)
+			tab.AddRow([]string{workspaceID, workspaceTeams[i].ID, workspaceTeams[i].Name, workspaceTeams[i].RoleBindings[j].Role}, false)
 		}
 	}
 	tab.Print(out)
@@ -77,12 +77,13 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	// get team you are updating to show role from before change
 	teams, err := client.GetWorkspaceTeamRole(workspaceID, teamID)
-	if err != nil {
-		return err
-	}
 
 	if teams == nil {
 		return errTeamNotInWorkspace
+	}
+
+	if err != nil {
+		return err
 	}
 
 	var rb *houston.RoleBinding

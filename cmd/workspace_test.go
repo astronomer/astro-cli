@@ -198,3 +198,19 @@ func TestWorkspaceTeamUpdateCommand(t *testing.T) {
 	)
 	assert.NoError(t, err)
 }
+
+func TestWorkspaceTeamsListCmd(t *testing.T) {
+	testUtil.InitTestConfig()
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewBufferString("")),
+			Header:     make(http.Header),
+		}
+	})
+	houstonClient = houston.NewClient(client)
+	buf := new(bytes.Buffer)
+	cmd := newWorkspaceTeamsListCmd(buf)
+	assert.NotNil(t, cmd)
+	assert.Nil(t, cmd.Args)
+}
