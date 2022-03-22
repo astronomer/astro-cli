@@ -34,6 +34,12 @@ type ClientInterface interface {
 	ListWorkspaceUserAndRoles(workspaceID string) (*Workspace, error)
 	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
 	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
+	// workspace teams and roles
+	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
+	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
+	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
+	UpdateWorkspaceTeamRole(workspaceID, teamID, role string) (string, error)
+	GetWorkspaceTeamRole(workspaceID, teamID string) (*Team, error)
 	// auth
 	AuthenticateWithBasicAuth(username, password string) (string, error)
 	GetAuthConfig() (*AuthConfig, error)
@@ -66,6 +72,9 @@ type ClientInterface interface {
 	// app
 	GetAppConfig() (*AppConfig, error)
 	GetAvailableNamespaces() ([]Namespace, error)
+	// teams
+	GetTeam(teamID string) (*Team, error)
+	GetTeamUsers(teamID string) ([]User, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

@@ -18,6 +18,7 @@ var (
 	workspaceRole  string
 	deploymentRole string
 	role           string
+	teamID         string
 	skipVerCheck   bool
 	verboseLevel   string
 	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
@@ -59,6 +60,7 @@ func NewRootCmd(client houston.ClientInterface, out io.Writer) *cobra.Command {
 		// TODO: remove newAirflowRootCmd, after 1.0 we have only devRootCmd
 		newAirflowRootCmd(out),
 		newLogsDeprecatedCmd(out),
+		newTeamCmd(out),
 	)
 	return rootCmd
 }
