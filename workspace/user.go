@@ -13,6 +13,7 @@ import (
 var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
 
 // Add a user to a workspace with specified role
+// nolint: dupl
 func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	w, err := client.AddWorkspaceUser(workspaceID, email, role)
 	if err != nil {
@@ -76,6 +77,7 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 }
 
 // Update workspace user role
+// nolint: dupl
 func UpdateRole(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	// get user you are updating to show role from before change
 	roles, err := client.GetWorkspaceUserRole(workspaceID, email)

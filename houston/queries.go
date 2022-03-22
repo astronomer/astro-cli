@@ -493,7 +493,10 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}`
 
 	WorkspaceUserUpdateRequest = `
-	mutation workspaceUpdateUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
+	mutation workspaceUpdateUserRole(
+		$workspaceUuid: Uuid!,
+		$email: String!,
+		$role: Role!) {
 		workspaceUpdateUserRole(
         	workspaceUuid: $workspaceUuid
             email: $email
@@ -606,18 +609,95 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			featureFlags
 		}
 	}`
-	TeamGetRequest = `
-	query GetTeam(
-		$teamUuid: Uuid
-	) {
-		team(
+	// Teams
+	WorkspaceTeamAddRequest = `
+	mutation AddWorkspaceTeam(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role! = WORKSPACE_VIEWER
+		$deploymentRoles: [DeploymentRoles!] = []
+		) {
+		workspaceAddTeam(
+			workspaceUuid: $workspaceUuid
 			teamUuid: $teamUuid
-		)	{
+			role: $role
+			deploymentRoles: $deploymentRoles) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspaceTeamUpdateRequest = `
+	mutation workspaceUpdateTeamRole(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role!
+		) {
+		workspaceUpdateTeamRole(
+      workspaceUuid: $workspaceUuid
+      teamUuid: $teamUuid
+      role: $role
+    )
+	}`
+
+	WorkspaceGetTeamsRequest = `
+	query workspaceGetTeams($workspaceUuid: Uuid!) {
+		workspaceTeams(
+			workspaceUuid: $workspaceUuid
+			) {
+				id
+      	name
+				roleBindings {
+					role
+					workspace {
+						id
+						label
+					}
+					deployment {
+						id
+						label
+					}
+				}
+			}
+		}
+	`
+
+	TeamGetRequest = `
+	query team($teamUuid: Uuid!, $workspaceUuid: Uuid) {
+		team(teamUuid: $teamUuid, workspaceUuid: $workspaceUuid) {
 			name
 			id
+			createdAt
+			roleBindings {
+				id
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+					releaseName
+				}
+			}
 		}
 	}
 	`
+
+	WorkspaceTeamRemoveRequest = `
+	mutation workspaceRemoveTeam(
+		$workspaceUuid: Uuid!,
+		$teamUuid: Uuid!) {
+		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamUuid: $teamUuid) {
+			id
+		}
+	}
+		`
+
 	TeamGetUsersRequest = `
 	query GetTeamUsers(
 		$teamUuid: Uuid!

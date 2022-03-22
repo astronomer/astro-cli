@@ -30,8 +30,7 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			teamID := args[0]
-			return team.Get(teamID, usersEnabled, houstonClient, out)
+			return team.Get(args[0], usersEnabled, houstonClient, out)
 		},
 	}
 	cmd.Flags().BoolVarP(&usersEnabled, "users", "u", false, "add team Users")

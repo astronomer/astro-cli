@@ -18,7 +18,9 @@ type ResponseData struct {
 	UpdateDeploymentUser           *RoleBinding              `json:"deploymentUpdateUserRole,omitempty"`
 	DeploymentUserList             []DeploymentUser          `json:"deploymentUsers,omitempty"`
 	AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
+	AddWorkspaceTeam               *Workspace                `json:"workspaceAddTeam,omitempty"`
 	RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
+	RemoveWorkspaceTeam            *Workspace                `json:"workspaceRemoveTeam,omitempty"`
 	CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
 	CreateToken                    *AuthUser                 `json:"createToken,omitempty"`
 	CreateWorkspaceServiceAccount  *WorkspaceServiceAccount  `json:"createWorkspaceServiceAccount,omitempty"`
@@ -43,7 +45,9 @@ type ResponseData struct {
 	UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
 	WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
+	WorkspaceUpdateTeamRole        string                    `json:"workspaceUpdateTeamRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
+	WorkspaceGetTeams              []Team                    `json:"workspaceTeams,omitempty"`
 	DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
 	GetTeam                        *Team                     `json:"team,omitempty"`
@@ -227,11 +231,16 @@ type WorkspaceUserRoleBindings struct {
 	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
 }
 
+type WorkspaceTeamRoleBindings struct {
+	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
+}
+
 type RoleBinding struct {
 	Role           string                  `json:"role"`
 	User           RoleBindingUser         `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
 	Deployment     Deployment              `json:"deployment"`
+	Workspace      Workspace               `json:"workspace"`
 	Team           Team                    `json:"team"`
 }
 
