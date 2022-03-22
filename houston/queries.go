@@ -665,7 +665,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	`
 
-	WorkspaceGetTeamRequest = `
+	TeamGetRequest = `
 	query team($teamUuid: Uuid!, $workspaceUuid: Uuid) {
 		team(teamUuid: $teamUuid, workspaceUuid: $workspaceUuid) {
 			name
@@ -697,4 +697,23 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	}
 		`
+
+	TeamGetUsersRequest = `
+	query GetTeamUsers(
+		$teamUuid: Uuid!
+	) {
+		teamUsers(
+			teamUuid: $teamUuid
+		)	{
+			username
+			id
+			emails {
+				address
+				verified
+				primary
+			}
+			status
+		}
+	}
+	`
 )

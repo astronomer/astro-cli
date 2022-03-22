@@ -493,6 +493,52 @@ func (_m *ClientInterface) GetDeploymentConfig() (*houston.DeploymentConfig, err
 	return r0, r1
 }
 
+// GetTeam provides a mock function with given fields: teamID
+func (_m *ClientInterface) GetTeam(teamID string) (*houston.Team, error) {
+	ret := _m.Called(teamID)
+
+	var r0 *houston.Team
+	if rf, ok := ret.Get(0).(func(string) *houston.Team); ok {
+		r0 = rf(teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Team)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTeamUsers provides a mock function with given fields: teamID
+func (_m *ClientInterface) GetTeamUsers(teamID string) ([]houston.User, error) {
+	ret := _m.Called(teamID)
+
+	var r0 []houston.User
+	if rf, ok := ret.Get(0).(func(string) []houston.User); ok {
+		r0 = rf(teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.User)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspace provides a mock function with given fields: workspaceID
 func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID)
@@ -517,14 +563,16 @@ func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace,
 }
 
 // GetWorkspaceTeamRole provides a mock function with given fields: workspaceID, teamID
-func (_m *ClientInterface) GetWorkspaceTeamRole(workspaceID string, teamID string) (houston.WorkspaceTeamRoleBindings, error) {
+func (_m *ClientInterface) GetWorkspaceTeamRole(workspaceID string, teamID string) (*houston.Team, error) {
 	ret := _m.Called(workspaceID, teamID)
 
-	var r0 houston.WorkspaceTeamRoleBindings
-	if rf, ok := ret.Get(0).(func(string, string) houston.WorkspaceTeamRoleBindings); ok {
+	var r0 *houston.Team
+	if rf, ok := ret.Get(0).(func(string, string) *houston.Team); ok {
 		r0 = rf(workspaceID, teamID)
 	} else {
-		r0 = ret.Get(0).(houston.WorkspaceTeamRoleBindings)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Team)
+		}
 	}
 
 	var r1 error

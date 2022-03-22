@@ -61,16 +61,16 @@ func (h ClientImplementation) UpdateWorkspaceTeamRole(workspaceID, teamID, role 
 }
 
 // GetTeamRoleInWorkspace - get a team role in a workspace
-func (h ClientImplementation) GetWorkspaceTeamRole(workspaceID, teamID string) (WorkspaceTeamRoleBindings, error) {
+func (h ClientImplementation) GetWorkspaceTeamRole(workspaceID, teamID string) (*Team, error) {
 	req := Request{
-		Query:     WorkspaceGetTeamRequest,
+		Query:     TeamGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "teamUuid": teamID},
 	}
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return WorkspaceTeamRoleBindings{}, handleAPIErr(err)
+		return nil, handleAPIErr(err)
 	}
 
-	return r.Data.WorkspaceGetTeam, nil
+	return r.Data.GetTeam, nil
 }

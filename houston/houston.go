@@ -39,7 +39,7 @@ type ClientInterface interface {
 	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
 	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
 	UpdateWorkspaceTeamRole(workspaceID, teamID, role string) (string, error)
-	GetWorkspaceTeamRole(workspaceID, teamID string) (WorkspaceTeamRoleBindings, error)
+	GetWorkspaceTeamRole(workspaceID, teamID string) (*Team, error)
 	// auth
 	AuthenticateWithBasicAuth(username, password string) (string, error)
 	GetAuthConfig() (*AuthConfig, error)
@@ -67,6 +67,9 @@ type ClientInterface interface {
 	// app
 	GetAppConfig() (*AppConfig, error)
 	GetAvailableNamespaces() ([]Namespace, error)
+	// teams
+	GetTeam(teamID string) (*Team, error)
+	GetTeamUsers(teamID string) ([]User, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

@@ -30,17 +30,14 @@ var (
 			ID:   "cl0evnxfl0120dxxu1s4nbnk7",
 			Name: "test-team",
 		},
+		Workspace: houston.Workspace{
+			ID:    "ck05r3bor07h40d02y2hw4n4v",
+			Label: "airflow",
+		},
 	}
-	mockWorkspaceTeamRoleBindings = houston.WorkspaceTeamRoleBindings{
-		RoleBindings: []houston.RoleBindingWorkspace{
-			{
-				Role: houston.WorkspaceViewerRole,
-				Workspace: struct {
-					ID string "json:\"id\""
-				}{
-					ID: "ck05r3bor07h40d02y2hw4n4v",
-				},
-			},
+	mockWorkspaceTeam = &houston.Team{
+		RoleBindings: []houston.RoleBinding{
+			*mockWorkspaceTeamRole,
 		},
 	}
 )
@@ -188,7 +185,7 @@ func TestWorkspaceTeamUpdateCommand(t *testing.T) {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("GetWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID).Return(mockWorkspaceTeamRoleBindings, nil)
+	api.On("GetWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID).Return(mockWorkspaceTeam, nil)
 	api.On("UpdateWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID, mockWorkspaceTeamRole.Role).Return(mockWorkspace.Label, nil)
 
 	_, err := executeCommandC(api,

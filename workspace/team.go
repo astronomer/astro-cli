@@ -76,20 +76,25 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 // nolint: dupl
 func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	// get team you are updating to show role from before change
-	roles, err := client.GetWorkspaceTeamRole(workspaceID, teamID)
+	teams, err := client.GetWorkspaceTeamRole(workspaceID, teamID)
 	if err != nil {
 		return err
 	}
 
-	var rb houston.RoleBindingWorkspace
-	for _, val := range roles.RoleBindings {
-		if val.Workspace.ID == workspaceID && strings.Contains(val.Role, "WORKSPACE") {
-			rb = val
+	if teams == nil {
+		return errTeamNotInWorkspace
+	}
+
+	var rb *houston.RoleBinding
+	roles := teams.RoleBindings
+	for i := range roles {
+		if roles[i].Workspace.ID == workspaceID && strings.Contains(roles[i].Role, "WORKSPACE") {
+			rb = &roles[i]
 			break
 		}
 	}
 	// check if rolebinding is an empty structure
-	if (rb == houston.RoleBindingWorkspace{}) {
+	if rb == nil {
 		return errTeamNotInWorkspace
 	}
 

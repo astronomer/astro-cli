@@ -196,7 +196,7 @@ func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
 func TestGetWorkspaceTeamRole(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	mockResponse := WorkspaceTeamRoleBindings{}
+	var mockResponse *Team
 	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
 
