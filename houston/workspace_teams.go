@@ -33,8 +33,10 @@ func (h ClientImplementation) DeleteWorkspaceTeam(workspaceID, teamID string) (*
 // ListTeamAndRolesFromWorkspace - list teams and roles from a workspace
 func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error) {
 	req := Request{
-		Query:     WorkspaceGetTeamsRequest,
-		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
+		Query: WorkspaceGetTeamsRequest,
+		Variables: map[string]interface{}{
+			"workspaceUuid": workspaceID,
+		},
 	}
 
 	r, err := req.DoWithClient(h.client)

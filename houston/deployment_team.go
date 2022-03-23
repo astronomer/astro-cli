@@ -1,39 +1,30 @@
 package houston
 
-// ListDeploymentUsersRequest - properties to filter users in a deployment
-type ListDeploymentTeamsRequest struct {
-	DeploymentID string `json:"deploymentId"`
-}
-
-// UpdateDeploymentUserRequest - properties to create a user in a deployment
-type UpdateDeploymentTeamRequest struct {
-	TeamID       string `json:"teamUuid"`
-	DeploymentID string `json:"deploymentId"`
-}
-
-// ListUsersInDeployment - list users with deployment access
-func (h ClientImplementation) ListDeploymentTeams(variables ListDeploymentTeamsRequest) ([]DeploymentTeam, error) {
+// ListTeamsInDeployment - list teams with deployment access
+func (h ClientImplementation) ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error) {
 	req := Request{
-		Query:     DeploymentGetTeamsRequest,
-		Variables: variables,
+		Query: DeploymentGetTeamsRequest,
+		Variables: map[string]interface{}{
+			"deploymentUuid": deploymentID,
+		},
 	}
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return []DeploymentTeam{}, handleAPIErr(err)
+		return nil, handleAPIErr(err)
 	}
 
-	return r.Data.DeploymentTeamsList, nil
+	return r.Data.DeploymentGetTeams, nil
 }
 
 // AddUserToDeployment - Add a user to a deployment with specified role
-func (h ClientImplementation) AddDeploymentTeam(deploymentID, teamID string, role string) (*RoleBinding, error) {
+func (h ClientImplementation) AddDeploymentTeam(deploymentID, teamID, role string) (*RoleBinding, error) {
 	req := Request{
 		Query: DeploymentTeamAddRequest,
 		Variables: map[string]interface{}{
-			"teamId":       teamID,
-			"deploymentId": deploymentID,
-			"role":         role,
+			"teamUuid":       teamID,
+			"deploymentUuid": deploymentID,
+			"role":           role,
 		},
 	}
 
@@ -45,11 +36,15 @@ func (h ClientImplementation) AddDeploymentTeam(deploymentID, teamID string, rol
 	return r.Data.AddDeploymentTeam, nil
 }
 
-// UpdateUserInDeployment - update a user's role inside a deployment
-func (h ClientImplementation) UpdateDeploymentTeam(variables UpdateDeploymentTeamRequest) (*RoleBinding, error) {
+// UpdateTeamInDeployment - update a team's role inside a deployment
+func (h ClientImplementation) UpdateDeploymentTeam(deploymentID, teamID, role string) (*RoleBinding, error) {
 	req := Request{
-		Query:     DeploymentTeamUpdateRequest,
-		Variables: variables,
+		Query: DeploymentTeamUpdateRequest,
+		Variables: map[string]interface{}{
+			"teamUuid":       teamID,
+			"deploymentUuid": deploymentID,
+			"role":           role,
+		},
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -60,13 +55,13 @@ func (h ClientImplementation) UpdateDeploymentTeam(variables UpdateDeploymentTea
 	return r.Data.UpdateDeploymentTeam, nil
 }
 
-// DeleteUserFromDeployment - remove a user from a deployment
+// DeleteTeamFromDeployment - remove a team from a deployment
 func (h ClientImplementation) DeleteDeploymentTeam(deploymentID, teamID string) (*RoleBinding, error) {
 	req := Request{
 		Query: DeploymentTeamRemoveRequest,
 		Variables: map[string]interface{}{
-			"teamId":       teamID,
-			"deploymentId": deploymentID,
+			"teamUuid":       teamID,
+			"deploymentUuid": deploymentID,
 		},
 	}
 
@@ -75,5 +70,5 @@ func (h ClientImplementation) DeleteDeploymentTeam(deploymentID, teamID string) 
 		return nil, handleAPIErr(err)
 	}
 
-	return r.Data.DeleteDeploymentTeam, nil
+	return r.Data.RemoveDeploymentTeam, nil
 }

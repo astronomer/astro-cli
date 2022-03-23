@@ -319,7 +319,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		Long:  "Teams can be added or removed from deployment",
 	}
 	_ = cmd.MarkFlagRequired("deployment-id")
-	cmd.PersistentFlags().StringVar(&workspaceID, "deployment-id", "", "deployment to associate team to")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to associate team to")
 	cmd.AddCommand(
 		newDeploymentTeamListCmd(out),
 		newDeploymentTeamAddCmd(out),
@@ -336,17 +336,17 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 		Long:    "Add a team to a deployment",
 		Example: deploymentTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserAdd(cmd, out, args)
+			return deploymentTeamAdd(cmd, out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "team-id", "", "team to be added to deployment")
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "role assigned to user")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "deployment role assigned to team")
 	return cmd
 }
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove TEAM",
 		Short:   "Remove a team from a deployment",
 		Long:    "Remove a team from a deployment",
 		Args:    cobra.ExactArgs(1),
@@ -355,7 +355,6 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamRemove(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team to be removed from deployment")
 	return cmd
 }
 
@@ -370,7 +369,6 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentID, "team-id", "", "team to be updated")
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "role assigned to team")
 	return cmd
 }
@@ -378,9 +376,9 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
+		Aliases: []string{"ls"},
 		Short:   "List Teams inside an Astronomer Deployment",
 		Long:    "List Teams inside an Astronomer Deployment",
-		Args:    cobra.ExactArgs(1),
 		Example: deploymentTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentTeamsList(cmd, out, args)
@@ -730,13 +728,13 @@ func deploymentTeamsList(cmd *cobra.Command, out io.Writer, args []string) error
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.TeamsList(deploymentID, args[0], houstonClient, out)
+	return deployment.ListTeamRoles(deploymentID, houstonClient, out)
 }
 
-func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 	_, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("failed to find a valid deployment: %w", err)
 	}
 
 	if err := validateDeploymentRole(deploymentRole); err != nil {
@@ -745,7 +743,7 @@ func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.AddTeam(deploymentID, args[0], deploymentRole, houstonClient, out)
+	return deployment.AddTeam(deploymentID, teamID, deploymentRole, houstonClient, out)
 }
 
 func deploymentTeamRemove(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -771,7 +769,7 @@ func deploymentTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) erro
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UpdateTeam(deploymentID, args[0], deploymentRole, houstonClient, out)
+	return deployment.UpdateTeamRole(deploymentID, args[0], deploymentRole, houstonClient, out)
 }
 
 func deploymentSaCreate(cmd *cobra.Command, _ []string, out io.Writer) error {

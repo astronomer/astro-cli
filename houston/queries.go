@@ -711,7 +711,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	mutation deploymentAddTeamRole(
 		$teamUuid: Uuid!
 		$deploymentUuid: Uuid!
-		$role: Role!
+		$role: Role! = WORKSPACE_VIEWER
 	) {
 		deploymentAddTeamRole(
 			teamUuid: $teamUuid
