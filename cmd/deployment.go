@@ -339,7 +339,8 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamAdd(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentID, "team-id", "", "team to be added to deployment")
+	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team to be added to deployment")
+	_ = cmd.MarkFlagRequired("team-id")
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "deployment role assigned to team")
 	return cmd
 }
@@ -721,22 +722,12 @@ func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) erro
 
 // Deployment teams
 func deploymentTeamsList(cmd *cobra.Command, out io.Writer, args []string) error {
-	_, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return deployment.ListTeamRoles(deploymentID, houstonClient, out)
 }
 
 func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
-	_, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid deployment: %w", err)
-	}
-
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
@@ -747,22 +738,12 @@ func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 }
 
 func deploymentTeamRemove(cmd *cobra.Command, out io.Writer, args []string) error {
-	_, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return deployment.RemoveTeam(deploymentID, args[0], houstonClient, out)
 }
 
 func deploymentTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	_, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
-	}
-
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}

@@ -12,6 +12,29 @@ type ClientInterface struct {
 	mock.Mock
 }
 
+// AddDeploymentTeam provides a mock function with given fields: deploymentID, teamID, role
+func (_m *ClientInterface) AddDeploymentTeam(deploymentID string, teamID string, role string) (*houston.RoleBinding, error) {
+	ret := _m.Called(deploymentID, teamID, role)
+
+	var r0 *houston.RoleBinding
+	if rf, ok := ret.Get(0).(func(string, string, string) *houston.RoleBinding); ok {
+		r0 = rf(deploymentID, teamID, role)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.RoleBinding)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(deploymentID, teamID, role)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AddDeploymentUser provides a mock function with given fields: variables
 func (_m *ClientInterface) AddDeploymentUser(variables houston.UpdateDeploymentUserRequest) (*houston.RoleBinding, error) {
 	ret := _m.Called(variables)
@@ -652,6 +675,29 @@ func (_m *ClientInterface) ListDeploymentServiceAccounts(deploymentID string) ([
 	return r0, r1
 }
 
+// ListDeploymentTeamsAndRoles provides a mock function with given fields: deploymentID
+func (_m *ClientInterface) ListDeploymentTeamsAndRoles(deploymentID string) ([]houston.Team, error) {
+	ret := _m.Called(deploymentID)
+
+	var r0 []houston.Team
+	if rf, ok := ret.Get(0).(func(string) []houston.Team); ok {
+		r0 = rf(deploymentID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.Team)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(deploymentID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListDeploymentUsers provides a mock function with given fields: filters
 func (_m *ClientInterface) ListDeploymentUsers(filters houston.ListDeploymentUsersRequest) ([]houston.DeploymentUser, error) {
 	ret := _m.Called(filters)
@@ -790,6 +836,29 @@ func (_m *ClientInterface) ListWorkspaces() ([]houston.Workspace, error) {
 	return r0, r1
 }
 
+// RemoveDeploymentTeam provides a mock function with given fields: deploymentID, teamID
+func (_m *ClientInterface) RemoveDeploymentTeam(deploymentID string, teamID string) (*houston.RoleBinding, error) {
+	ret := _m.Called(deploymentID, teamID)
+
+	var r0 *houston.RoleBinding
+	if rf, ok := ret.Get(0).(func(string, string) *houston.RoleBinding); ok {
+		r0 = rf(deploymentID, teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.RoleBinding)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(deploymentID, teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdateDeployment provides a mock function with given fields: variables
 func (_m *ClientInterface) UpdateDeployment(variables map[string]interface{}) (*houston.Deployment, error) {
 	ret := _m.Called(variables)
@@ -829,6 +898,29 @@ func (_m *ClientInterface) UpdateDeploymentAirflow(variables map[string]interfac
 	var r1 error
 	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
 		r1 = rf(variables)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeploymentTeamRole provides a mock function with given fields: deploymentID, teamID, role
+func (_m *ClientInterface) UpdateDeploymentTeamRole(deploymentID string, teamID string, role string) (*houston.RoleBinding, error) {
+	ret := _m.Called(deploymentID, teamID, role)
+
+	var r0 *houston.RoleBinding
+	if rf, ok := ret.Get(0).(func(string, string, string) *houston.RoleBinding); ok {
+		r0 = rf(deploymentID, teamID, role)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.RoleBinding)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(deploymentID, teamID, role)
 	} else {
 		r1 = ret.Error(1)
 	}

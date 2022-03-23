@@ -7,13 +7,14 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	log "github.com/sirupsen/logrus"
 )
 
 // TeamsList returns a list of teams with deployment access
 func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.Writer) error {
 	deploymentTeams, err := client.ListDeploymentTeamsAndRoles(deploymentID)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return err
 	}
 
@@ -85,7 +86,7 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out io.Writer) error {
 	d, err := client.RemoveDeploymentTeam(deploymentID, teamID)
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 		return err
 	}
 
