@@ -11,6 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var errHoustonInvalidDeploymentTeams = errors.New(messages.HoustonInvalidDeploymentTeams)
+
 // TeamsList returns a list of teams with deployment access
 func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.Writer) error {
 	deploymentTeams, err := client.ListDeploymentTeamsAndRoles(deploymentID)
@@ -20,7 +22,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 	}
 
 	if len(deploymentTeams) < 1 {
-		return errors.New(messages.HoustonInvalidDeploymentTeams)
+		return errHoustonInvalidDeploymentTeams
 	}
 
 	tab := printutil.Table{
@@ -43,7 +45,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 
 // nolint:dupl
 // AddTeam add's a team to a deployment with specified role
-func AddTeam(deploymentID, teamID string, role string, client houston.ClientInterface, out io.Writer) error {
+func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	d, err := client.AddDeploymentTeam(deploymentID, teamID, role)
 	if err != nil {
 		return err

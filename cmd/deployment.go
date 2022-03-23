@@ -316,7 +316,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "team",
 		Short: "Manage deployment team resources",
-		Long:  "Teams can be added or removed from deployment",
+		Long:  "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
 	_ = cmd.MarkFlagRequired("deployment-id")
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to associate team to")
@@ -721,7 +721,7 @@ func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) erro
 }
 
 // Deployment teams
-func deploymentTeamsList(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return deployment.ListTeamRoles(deploymentID, houstonClient, out)

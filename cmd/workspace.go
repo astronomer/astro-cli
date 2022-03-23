@@ -217,7 +217,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "team",
 		Short: "Manage Workspace Team resources",
-		Long:  "Teams can be added or removed from Workspaces",
+		Long:  "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace to associate team to")
 	cmd.AddCommand(
