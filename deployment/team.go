@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -19,8 +20,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 	}
 
 	if len(deploymentTeams) < 1 {
-		_, err = out.Write([]byte(messages.HoustonInvalidDeploymentTeams))
-		return err
+		return errors.New(messages.HoustonInvalidDeploymentTeams)
 	}
 
 	tab := printutil.Table{
