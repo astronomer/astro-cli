@@ -63,8 +63,9 @@ var (
 			Name: "test-team",
 		},
 		Deployment: houston.Deployment{
-			ID:    "ck05r3bor07h40d02y2hw4n4v",
-			Label: "airflow",
+			ID:          "ck05r3bor07h40d02y2hw4n4v",
+			Label:       "airflow",
+			ReleaseName: "airflow",
 		},
 	}
 	mockDeploymentTeam = &houston.Team{
@@ -693,14 +694,15 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 // Deployment Teams
 func TestDeploymentTeamAddCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` NAME        DEPLOYMENT ID                  TEAM ID                       ROLE                 
+	expectedOut := ` NAME        DEPLOYMENT ID                 TEAM ID                       ROLE                  
  airflow     ck05r3bor07h40d02y2hw4n4v     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
-Successfully added cl0evnxfl0120dxxu1s4nbnk7 to airflow
+
+Successfully added cl0evnxfl0120dxxu1s4nbnk7 as a DEPLOYMENT_VIEWER
 `
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("AddDeploymentTeam", mockDeployment.ID, mockDeploymentTeamRole.Team.ID, mockDeploymentTeamRole.Role).Return(mockDeployment, nil)
+	api.On("AddDeploymentTeam", mockDeployment.ID, mockDeploymentTeamRole.Team.ID, mockDeploymentTeamRole.Role).Return(mockDeploymentTeamRole, nil)
 
 	output, err := executeCommandC(api,
 		"deployment",
@@ -716,24 +718,25 @@ Successfully added cl0evnxfl0120dxxu1s4nbnk7 to airflow
 
 func TestDeploymentTeamRm(t *testing.T) {
 	testUtil.InitTestConfig()
+	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       ROLE                  
+ cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
 
-	mockTeamID := "ckc0eir8e01gj07608ajmvia1"
+ Successfully removed the DEPLOYMENT_VIEWER role for test-team from deployment cknz133ra49758zr9w34b87ua
+`
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("DeleteDeploymentTeam", mockDeployment.ID, mockTeamID).Return(mockDeployment, nil)
-	houstonClient = api
+	api.On("RemoveDeploymentTeam", mockDeployment.ID, mockDeploymentTeamRole.Team.ID).Return(mockDeploymentTeamRole, nil)
+	output, err := executeCommandC(api,
+		"deployment",
+		"team",
+		"remove",
+		mockDeploymentTeamRole.Team.ID,
+		"--deployment-id="+mockDeployment.ID,
+	)
 
-	expected := ` NAME                          DEPLOYMENT ID                                      TEAM ID                                           
- airflow                       ck05r3bor07h40d02y2hw4n4v                         ckc0eir8e01gj07608ajmvia1                         
-Successfully removed team from deployment
-`
-
-	buf := new(bytes.Buffer)
-	cmd := newDeploymentTeamRemoveCmd(buf)
-	err := cmd.RunE(cmd, []string{mockTeamID})
 	assert.NoError(t, err)
-	assert.Equal(t, expected, buf.String())
+	assert.Equal(t, expectedOut, output)
 }
 
 func TestDeploymentTeamUpdateCommand(t *testing.T) {
@@ -742,7 +745,7 @@ func TestDeploymentTeamUpdateCommand(t *testing.T) {
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("GetDeploymentTeamRole", mockDeployment.ID, mockDeploymentTeamRole.Team.ID).Return(mockDeploymentTeam, nil)
-	api.On("UpdateDeploymentTeamRole", mockDeployment.ID, mockDeploymentTeamRole.Team.ID, mockDeploymentTeamRole.Role).Return(mockDeployment.Label, nil)
+	api.On("UpdateDeploymentTeamRole", mockDeployment.ID, mockDeploymentTeamRole.Team.ID, mockDeploymentTeamRole.Role).Return(mockDeploymentTeamRole, nil)
 
 	_, err := executeCommandC(api,
 		"deployment",

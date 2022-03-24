@@ -56,8 +56,8 @@ func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, 
 		DynamicPadding: true,
 		Header:         []string{"NAME", "DEPLOYMENT ID", "TEAM ID", "ROLE"},
 	}
-	tab.AddRow([]string{d.Deployment.ReleaseName, d.Deployment.ID, d.Team.ID, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully added %s as a %s", teamID, role)
+	tab.AddRow([]string{d.Deployment.Label, d.Deployment.ID, d.Team.ID, d.Role}, false)
+	tab.SuccessMsg = fmt.Sprintf("\nSuccessfully added %s as a %s", teamID, role)
 	tab.Print(out)
 
 	return nil
