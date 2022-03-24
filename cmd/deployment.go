@@ -361,7 +361,7 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update",
+		Use:     "update TEAM",
 		Short:   "Update a team's role for a deployment",
 		Long:    "Update a team's role for a deployment",
 		Args:    cobra.ExactArgs(1),
