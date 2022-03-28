@@ -694,10 +694,10 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 // Deployment Teams
 func TestDeploymentTeamAddCommand(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` NAME        DEPLOYMENT ID                 TEAM ID                       ROLE                  
- airflow     ck05r3bor07h40d02y2hw4n4v     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
+	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       ROLE                  
+ cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
 
-Successfully added cl0evnxfl0120dxxu1s4nbnk7 as a DEPLOYMENT_VIEWER
+Successfully added team cl0evnxfl0120dxxu1s4nbnk7 to deployment cknz133ra49758zr9w34b87ua as a DEPLOYMENT_VIEWER
 `
 
 	api := new(mocks.ClientInterface)
@@ -718,10 +718,10 @@ Successfully added cl0evnxfl0120dxxu1s4nbnk7 as a DEPLOYMENT_VIEWER
 
 func TestDeploymentTeamRm(t *testing.T) {
 	testUtil.InitTestConfig()
-	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       ROLE                  
- cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
+	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       
+ cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     
 
- Successfully removed the DEPLOYMENT_VIEWER role for test-team from deployment cknz133ra49758zr9w34b87ua
+ Successfully removed team cl0evnxfl0120dxxu1s4nbnk7 from deployment cknz133ra49758zr9w34b87ua
 `
 
 	api := new(mocks.ClientInterface)

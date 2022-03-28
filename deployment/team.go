@@ -46,7 +46,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 // nolint:dupl
 // AddTeam add's a team to a deployment with specified role
 func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	d, err := client.AddDeploymentTeam(deploymentID, teamID, role)
+	_, err := client.AddDeploymentTeam(deploymentID, teamID, role)
 	if err != nil {
 		return err
 	}
@@ -54,10 +54,10 @@ func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, 
 	tab := printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "DEPLOYMENT ID", "TEAM ID", "ROLE"},
+		Header:         []string{"DEPLOYMENT ID", "TEAM ID", "ROLE"},
 	}
-	tab.AddRow([]string{d.Deployment.Label, d.Deployment.ID, d.Team.ID, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\nSuccessfully added %s as a %s", teamID, role)
+	tab.AddRow([]string{deploymentID, teamID, role}, false)
+	tab.SuccessMsg = fmt.Sprintf("\nSuccessfully added team %s to deployment %s as a %s", teamID, deploymentID, role)
 	tab.Print(out)
 
 	return nil
@@ -66,7 +66,7 @@ func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, 
 // nolint:dupl
 // UpdateTeam updates a team's deployment role
 func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	d, err := client.UpdateDeploymentTeamRole(deploymentID, teamID, role)
+	_, err := client.UpdateDeploymentTeamRole(deploymentID, teamID, role)
 	if err != nil {
 		return err
 	}
@@ -77,8 +77,8 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 		Header:         []string{"DEPLOYMENT ID", "TEAM ID", "ROLE"},
 	}
 
-	tab.AddRow([]string{d.Deployment.ID, d.Team.ID, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated %s to a %s", teamID, role)
+	tab.AddRow([]string{deploymentID, teamID, role}, false)
+	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated team %s to a %s", teamID, role)
 	tab.Print(out)
 
 	return nil
@@ -86,7 +86,7 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 
 // DeleteTeam removes team access for a deployment
 func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out io.Writer) error {
-	d, err := client.RemoveDeploymentTeam(deploymentID, teamID)
+	_, err := client.RemoveDeploymentTeam(deploymentID, teamID)
 	if err != nil {
 		log.Error(err)
 		return err
@@ -95,11 +95,11 @@ func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out
 	tab := printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"DEPLOYMENT ID", "TEAM ID", "ROLE"},
+		Header:         []string{"DEPLOYMENT ID", "TEAM ID"},
 	}
 
-	tab.AddRow([]string{deploymentID, teamID, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", d.Role, d.Team.Name, deploymentID)
+	tab.AddRow([]string{deploymentID, teamID}, false)
+	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed team %s from deployment %s", teamID, deploymentID)
 	tab.Print(out)
 
 	return nil
