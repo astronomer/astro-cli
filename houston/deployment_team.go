@@ -55,7 +55,7 @@ func (h ClientImplementation) UpdateDeploymentTeamRole(deploymentID, teamID, rol
 	return r.Data.UpdateDeploymentTeam, nil
 }
 
-// DeleteTeamFromDeployment - remove a team from a deployment
+// RemoveDeploymentTeam - remove a team from a deployment
 func (h ClientImplementation) RemoveDeploymentTeam(deploymentID, teamID string) (*RoleBinding, error) {
 	req := Request{
 		Query: DeploymentTeamRemoveRequest,

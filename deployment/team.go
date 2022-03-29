@@ -82,7 +82,7 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 	return nil
 }
 
-// DeleteTeam removes team access for a deployment
+// RemoveTeam removes team access for a deployment
 func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out io.Writer) error {
 	_, err := client.RemoveDeploymentTeam(deploymentID, teamID)
 	if err != nil {

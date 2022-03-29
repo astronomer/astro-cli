@@ -57,70 +57,70 @@ var (
 	sshKey                string
 	knowHosts             string
 	CreateExample         = `
-	# Create new deployment with Celery executor (default: celery without params).
-  $ astro deployment create new-deployment-name --executor=celery
+# Create new deployment with Celery executor (default: celery without params).
+$ astro deployment create new-deployment-name --executor=celery
 
-	# Create new deployment with Local executor.
-  $ astro deployment create new-deployment-name-local --executor=local
+# Create new deployment with Local executor.
+$ astro deployment create new-deployment-name-local --executor=local
 
-	# Create new deployment with Kubernetes executor.
-  $ astro deployment create new-deployment-name-k8s --executor=k8s
+# Create new deployment with Kubernetes executor.
+$ astro deployment create new-deployment-name-k8s --executor=k8s
 
-	# Create new deployment with Kubernetes executor.
-  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10
+# Create new deployment with Kubernetes executor.
+$ astro deployment create my-new-deployment --executor=k8s --airflow-version=1.10.10
 `
 	createExampleDagDeployment = `
-	# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
-  $ astro deployment create my-new-deployment --executor=k8s --airflow-version=2.0.0 --dag-deployment-type=volume --nfs-location=test:/test
+# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
+$ astro deployment create my-new-deployment --executor=k8s --airflow-version=2.0.0 --dag-deployment-type=volume --nfs-location=test:/test
 `
 	deploymentUserListExample = `
-	# Search for deployment users
-  $ astro deployment user list <deployment-id> --email=EMAIL_ADDRESS --user-id=ID --name=NAME
+# Search for deployment users
+$ astro deployment user list <deployment-id> --email=EMAIL_ADDRESS --user-id=ID --name=NAME
 `
 	deploymentUserCreateExample = `
-	# Add a workspace user to a deployment with a particular role
-  $ astro deployment user add --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
+# Add a workspace user to a deployment with a particular role
+$ astro deployment user add --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
 `
 	deploymentUserDeleteExample = `
-	# Delete user access to a deployment
-	$ astro deployment user delete --deployment-id=xxxxx <user-email-address>
+# Delete user access to a deployment
+$ astro deployment user delete --deployment-id=xxxxx <user-email-address>
 `
 	deploymentUserUpdateExample = `
-	# Update a workspace user's deployment role
-  $ astro deployment user update --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
+# Update a workspace user's deployment role
+$ astro deployment user update --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
 `
 	deploymentTeamAddExample = `
-	# Add a workspace team to a deployment with a particular role
-  $ astro deployment team add --deployment-id=xxxxx --team-id=<team-id> --role=DEPLOYMENT_ROLE
+# Add a workspace team to a deployment with a particular role
+$ astro deployment team add --deployment-id=xxxxx --team-id=<team-id> --role=DEPLOYMENT_ROLE
 `
 	deploymentTeamRemoveExample = `
-	# Remove team access to a deployment
-	$ astro deployment team remove <team-id> --deployment-id=xxxxx
+# Remove team access to a deployment
+$ astro deployment team remove <team-id> --deployment-id=xxxxx
 `
 	deploymentTeamUpdateExample = `
-	# Update a workspace team's deployment role
-  $ astro deployment team update <team-id> --deployment-id=xxxxx --role=DEPLOYMENT_ROLE
+# Update a workspace team's deployment role
+$ astro deployment team update <team-id> --deployment-id=xxxxx --role=DEPLOYMENT_ROLE
 `
 	deploymentTeamsListExample = `
-	# List all teams added to a deployment
-  $ astro deployment teams list <deployment-id>
+# List all teams added to a deployment
+$ astro deployment teams list <deployment-id>
 `
 	deploymentSaCreateExample = `
-	# Create service-account
-  $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
+# Create service-account
+$ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
 `
 	deploymentSaGetExample = `
-  # Get deployment service-accounts
-  $ astro deployment service-account get --deployment-id=<deployment-id>
+# Get deployment service-accounts
+$ astro deployment service-account get --deployment-id=<deployment-id>
 `
 	deploymentSaDeleteExample = `
-  $ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
+$ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
 `
 	deploymentAirflowUpgradeExample = `
-  $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
+$ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
 
-	# Abort the initial airflow upgrade step:
-  $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
+# Abort the initial airflow upgrade step:
+$ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
 `
 
 	deploymentUpdateAttrs = []string{"label"}
