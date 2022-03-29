@@ -57,6 +57,11 @@ type ClientInterface interface {
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
 	UpdateDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
 	DeleteDeploymentUser(deploymentID, email string) (*RoleBinding, error)
+	// deployment teams
+	AddDeploymentTeam(deploymentID string, teamID string, role string) (*RoleBinding, error)
+	RemoveDeploymentTeam(deploymentID string, teamID string) (*RoleBinding, error)
+	ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error)
+	UpdateDeploymentTeamRole(deploymentID string, teamID string, role string) (*RoleBinding, error)
 	// service account
 	CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error)
 	DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error)

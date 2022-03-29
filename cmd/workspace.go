@@ -33,13 +33,13 @@ var (
 	$ astro workspace team add --workspace-id=<workspace-id> --team-id=<team-id> --role=ROLE
 	`
 	workspaceTeamRemoveExample = `
-	$ astro workspace team remove cl0ck2snm0064jexu3ljfn9um --workspace-id ckwwb09aj0048u8xuts287erj
+	$ astro workspace team remove <team-id> --workspace-id=<workspace-id>
 	`
 	workspaceTeamUpdateExample = `
-	$ astro workspace team update cl0ck2snm0064jexu3ljfn9um --workspace-id ckwwb09aj0048u8xuts287erj --role WORKSPACE_EDITOR
+	$ astro workspace team update <team-id> --workspace-id=<workspace-id> --role WORKSPACE_EDITOR
 	`
 	workspaceTeamsListExample = `
-	$ astro workspace team list --workspace-id ckwwb09aj0048u8xuts287erj`
+	$ astro workspace team list --workspace-id=<workspace-id>`
 )
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
@@ -217,7 +217,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "team",
 		Short: "Manage Workspace Team resources",
-		Long:  "Teams can be added or removed from Workspaces",
+		Long:  "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace to associate team to")
 	cmd.AddCommand(

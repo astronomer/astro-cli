@@ -8,7 +8,7 @@ type ListDeploymentUsersRequest struct {
 	DeploymentID string `json:"deploymentId"`
 }
 
-// UpdateDeploymentUserRequest - properties to create a user in a deployment
+// UpdateDeploymentUserRequest - properties to update a user in a deployment
 type UpdateDeploymentUserRequest struct {
 	Email        string `json:"email"`
 	Role         string `json:"role"`

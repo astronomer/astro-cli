@@ -14,10 +14,10 @@ import (
 var (
 	houstonClient  houston.ClientInterface
 	workspaceID    string
+	teamID         string
 	workspaceRole  string
 	deploymentRole string
 	role           string
-	teamID         string
 	skipVerCheck   bool
 	verboseLevel   string
 	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
