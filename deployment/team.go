@@ -8,7 +8,6 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	log "github.com/sirupsen/logrus"
 )
 
 var errHoustonInvalidDeploymentTeams = errors.New(messages.HoustonInvalidDeploymentTeams)
@@ -17,7 +16,6 @@ var errHoustonInvalidDeploymentTeams = errors.New(messages.HoustonInvalidDeploym
 func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.Writer) error {
 	deploymentTeams, err := client.ListDeploymentTeamsAndRoles(deploymentID)
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 
@@ -44,7 +42,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 }
 
 // nolint:dupl
-// AddTeam add's a team to a deployment with specified role
+// AddTeam adds a team to a deployment with specified role
 func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	_, err := client.AddDeploymentTeam(deploymentID, teamID, role)
 	if err != nil {
@@ -88,7 +86,6 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out io.Writer) error {
 	_, err := client.RemoveDeploymentTeam(deploymentID, teamID)
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 
