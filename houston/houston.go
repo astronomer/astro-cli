@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrInaptPermissions        = errors.New("You do not have the appropriate permissions for that") //nolint
+	ErrAuthTokenRefreshFailed  = errors.New("AUTH_TOKEN_REFRESH_FAILED")
 	ErrVerboseInaptPermissions = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 
@@ -154,7 +155,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	// Houston Specific Errors
 	if decode.Errors != nil {
 		err = fmt.Errorf("%s", decode.Errors[0].Message) //nolint:goerr113
-		if err.Error() == ErrInaptPermissions.Error() {
+		if err.Error() == ErrInaptPermissions.Error() || err.Error() == ErrAuthTokenRefreshFailed.Error() {
 			return nil, ErrVerboseInaptPermissions
 		}
 		return nil, err
