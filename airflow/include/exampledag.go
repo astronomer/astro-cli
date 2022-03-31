@@ -21,7 +21,7 @@ def my_custom_function(ts, **kwargs):
         f"I am task number {kwargs['task_number']}. "
         f"This DAG Run execution date is {ts} and the current time is {datetime.now()}"
     )
-    print("Here is the full DAG Run context. It is available because provide_context=True")
+    print("Here is the full DAG run context:")
     print(kwargs)
 
 
