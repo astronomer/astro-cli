@@ -93,8 +93,8 @@ spec:
       if [[ -z "$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
         else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
-        { airflow create_user "$@" || airflow users create "$@" ; } &&
-        { airflow sync_perm || airflow sync-perm ;} &&
+        { airflow users create "$@" || airflow create_user "$@" ; } &&
+        { airflow sync-perm || airflow sync_perm ;} &&
         airflow webserver
     - --
     - -r
