@@ -85,7 +85,7 @@ services:
     image: test-project-name/airflow:latest
     container_name: scheduler
     command: >
-      bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow scheduler"
     restart: unless-stopped
     networks:
       - airflow
@@ -154,7 +154,7 @@ services:
     image: test-project-name/airflow:latest
     container_name: triggerer
     command: >
-      bash -c "(airflow upgradedb || airflow db upgrade) && airflow triggerer"
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow triggerer"
     restart: unless-stopped
     networks:
       - airflow

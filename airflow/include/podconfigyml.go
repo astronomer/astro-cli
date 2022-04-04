@@ -41,7 +41,7 @@ spec:
   - args:
     - bash
     - -c
-    - (airflow upgradedb || airflow db upgrade) && airflow scheduler
+    - (airflow db upgrade || airflow upgradedb) && airflow scheduler
     command:
     - /entrypoint
     env:
@@ -154,7 +154,7 @@ spec:
   - args:
     - bash
     - -c
-    - (airflow upgradedb || airflow db upgrade) && airflow triggerer
+    - (airflow db upgrade || airflow upgradedb) && airflow triggerer
     command:
     - /entrypoint
     env:

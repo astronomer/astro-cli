@@ -40,7 +40,7 @@ services:
     image: {{ .AirflowImage }}
     container_name: {{ .SchedulerContainerName }}
     command: >
-      bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow scheduler"
     restart: unless-stopped
     networks:
       - airflow
@@ -109,7 +109,7 @@ services:
     image: {{ .AirflowImage }}
     container_name: {{ .TriggererContainerName }}
     command: >
-      bash -c "(airflow upgradedb || airflow db upgrade) && airflow triggerer"
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow triggerer"
     restart: unless-stopped
     networks:
       - airflow
