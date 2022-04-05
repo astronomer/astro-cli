@@ -1,11 +1,16 @@
 package airflow
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/docker"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/spf13/afero"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,4 +85,84 @@ func TestGetTriggererServiceNamePodman(t *testing.T) {
 	config.CFG.TriggererContainerName.SetHomeString("triggerer_tmp")
 	triggererName := GetTriggererServiceName()
 	assert.Equal(t, triggererName, "triggerer_tmp")
+}
+
+func TestCheckTriggererEnabled(t *testing.T) {
+	oldParseFile := docker.ParseFile
+
+	t.Run("astro-runtime supported version", func(t *testing.T) {
+		image := fmt.Sprintf("%s:%s", FullAstroRuntimeImageName, triggererAllowedRuntimeVersion)
+		docker.ParseFile = func(filename string) ([]docker.Command, error) {
+			return []docker.Command{
+				{
+					Cmd:   command.From,
+					Value: []string{image},
+				},
+			}, nil
+		}
+
+		triggererEnabled, err := CheckTriggererEnabled("testing", "Dockerfile", runtimeVersionCheck)
+		assert.NoError(t, err)
+		assert.True(t, triggererEnabled)
+	})
+
+	t.Run("astro-runtime unsupported version", func(t *testing.T) {
+		image := fmt.Sprintf("%s:3.0.0", FullAstroRuntimeImageName)
+		docker.ParseFile = func(filename string) ([]docker.Command, error) {
+			return []docker.Command{
+				{
+					Cmd:   command.From,
+					Value: []string{image},
+				},
+			}, nil
+		}
+
+		triggererEnabled, err := CheckTriggererEnabled("testing", "Dockerfile", runtimeVersionCheck)
+		assert.NoError(t, err)
+		assert.False(t, triggererEnabled)
+	})
+
+	t.Run("astronomer-certified supported version", func(t *testing.T) {
+		image := fmt.Sprintf("%s:2.4.0-onbuild", FullAstronomerCertifiedImageName)
+		docker.ParseFile = func(filename string) ([]docker.Command, error) {
+			return []docker.Command{
+				{
+					Cmd:   command.From,
+					Value: []string{image},
+				},
+			}, nil
+		}
+
+		triggererEnabled, err := CheckTriggererEnabled("testing", "Dockerfile", runtimeVersionCheck)
+		assert.NoError(t, err)
+		assert.True(t, triggererEnabled)
+	})
+
+	t.Run("astronomer-certified unsupported version", func(t *testing.T) {
+		image := fmt.Sprintf("%s:2.1.0", FullAstronomerCertifiedImageName)
+		docker.ParseFile = func(filename string) ([]docker.Command, error) {
+			return []docker.Command{
+				{
+					Cmd:   command.From,
+					Value: []string{image},
+				},
+			}, nil
+		}
+
+		triggererEnabled, err := CheckTriggererEnabled("testing", "Dockerfile", runtimeVersionCheck)
+		assert.NoError(t, err)
+		assert.False(t, triggererEnabled)
+	})
+
+	t.Run("parse image error", func(t *testing.T) {
+		docker.ParseFile = func(filename string) ([]docker.Command, error) {
+			return []docker.Command{}, errors.New("test error") //nolint: goerr113
+		}
+
+		triggererEnabled, err := CheckTriggererEnabled("testing", "Dockerfile", runtimeVersionCheck)
+		assert.Error(t, err)
+		assert.False(t, triggererEnabled)
+	})
+
+	docker.ParseFile = oldParseFile
 }

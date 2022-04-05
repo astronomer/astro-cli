@@ -87,6 +87,12 @@ func TestPodmanGetContainerIDFailure(t *testing.T) {
 }
 
 func TestPodmanStartSuccess(t *testing.T) {
+	oldCheckTriggererEnabled := CheckTriggererEnabled
+
+	CheckTriggererEnabled = func(airflowHome, dockerfile, runtimeConstraint string) (bool, error) {
+		return true, nil
+	}
+
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -126,6 +132,8 @@ func TestPodmanStartSuccess(t *testing.T) {
 	// Case when pod is already present but in stop state
 	err = podmanMock.Start(options)
 	assert.NoError(t, err)
+
+	CheckTriggererEnabled = oldCheckTriggererEnabled
 }
 
 func TestPodmanStartFailure(t *testing.T) {

@@ -21,13 +21,16 @@ const (
 	defaultAirflowVersion = uint64(0x1) //nolint:gomnd
 	componentName         = "airflow"
 
-	airflowVersionLabelName        = "io.astronomer.docker.airflow.version"
 	triggererAllowedAirflowVersion = "2.2.0"
+	triggererAllowedRuntimeVersion = "4.0.0"
 
 	webserverHealthCheckInterval = 10 * time.Second
 )
 
-var repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number
+var (
+	repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number
+	runtimeVersionCheck    = fmt.Sprintf(">= %s", triggererAllowedRuntimeVersion)
+)
 
 func initDirs(root string, dirs []string) error {
 	// Create the dirs
