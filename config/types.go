@@ -34,7 +34,7 @@ type cfgs struct {
 	WebserverPort          cfg
 	ShowWarnings           cfg
 	AirflowReleasesURL     cfg
-	RuntimeReleaseURL      cfg
+	RuntimeReleasesURL     cfg
 	SkipVerifyTLS          cfg
 	Verbosity              cfg
 	ContainerEngine        cfg

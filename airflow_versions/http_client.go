@@ -46,7 +46,7 @@ func (r *Request) Do() (*Response, error) {
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
 func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	var response httputil.HTTPResponse
-	url := config.CFG.RuntimeReleaseURL.GetString()
+	url := config.CFG.RuntimeReleasesURL.GetString()
 	if c.useAstronomerCertified {
 		url = config.CFG.AirflowReleasesURL.GetString()
 	}
