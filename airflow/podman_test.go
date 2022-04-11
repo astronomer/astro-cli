@@ -137,6 +137,12 @@ func TestPodmanStartSuccess(t *testing.T) {
 }
 
 func TestPodmanStartFailure(t *testing.T) {
+	oldCheckTriggererEnabled := CheckTriggererEnabled
+
+	CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
+		return true, nil
+	}
+
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -177,6 +183,8 @@ func TestPodmanStartFailure(t *testing.T) {
 	bindMock.On("Start", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
 	err = podmanMock.Start(options)
 	assert.Contains(t, err.Error(), errPodman.Error())
+
+	CheckTriggererEnabled = oldCheckTriggererEnabled
 }
 
 func TestPodmanKillSuccess(t *testing.T) {

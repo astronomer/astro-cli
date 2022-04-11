@@ -100,7 +100,12 @@ func (p *Podman) Start(options types.ContainerStartConfig) error {
 		return err
 	}
 
-	_, err = p.startPod(p.projectName, p.projectDir, p.envFile)
+	labels, err := imageBuilder.GetImageLabels()
+	if err != nil {
+		return err
+	}
+
+	_, err = p.startPod(p.projectName, p.projectDir, p.envFile, labels)
 	if err != nil {
 		return fmt.Errorf("%s: %w", messages.ErrContainerRecreate, err)
 	}
@@ -310,7 +315,7 @@ func (p *Podman) listContainers() ([]entities.ListContainer, error) {
 	return containerInfo, err
 }
 
-func (p *Podman) startPod(projectName, projectDir, envFile string) (string, error) {
+func (p *Podman) startPod(projectName, projectDir, envFile string, imageLabels map[string]string) (string, error) {
 	var podID string
 	// in case pod already there, try running pod start
 	exists, _ := p.podmanBind.Exists(p.conn, projectName, nil)
@@ -321,7 +326,7 @@ func (p *Podman) startPod(projectName, projectDir, envFile string) (string, erro
 		}
 		return report.Id, nil
 	}
-	err := generatePodState(projectName, projectDir, envFile)
+	err := generatePodState(projectName, projectDir, envFile, imageLabels)
 	if err != nil {
 		return podID, err
 	}
@@ -340,7 +345,7 @@ func (p *Podman) startPod(projectName, projectDir, envFile string) (string, erro
 	return "", nil
 }
 
-func generatePodState(projectName, projectDir, envFile string) error {
+func generatePodState(projectName, projectDir, envFile string, imageLabels map[string]string) error {
 	// Create the podman config yaml if not exists
 	if _, err := os.Stat(podConfigFile); errors.Is(err, os.ErrNotExist) {
 		err = initFiles("", map[string]string{podConfigFile: include.PodmanConfigYml})
@@ -348,8 +353,7 @@ func generatePodState(projectName, projectDir, envFile string) error {
 			return err
 		}
 	}
-	labels := map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}
-	configYAML, err := generateConfig(projectName, projectDir, envFile, labels, PodmanEngine)
+	configYAML, err := generateConfig(projectName, projectDir, envFile, imageLabels, PodmanEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create pod state file: %w", err)
 	}

@@ -274,6 +274,9 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
 	if !ok {
 		// image doesn't have either runtime version or airflow version
+		// we don't want to block the user's experience in case this happens, so we disabled triggerer and warn error
+		fmt.Println(messages.WarningTriggererDisabledNoVersionDetected)
+
 		return false, nil
 	}
 
