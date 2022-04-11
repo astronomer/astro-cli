@@ -99,7 +99,7 @@ func TestPodmanStartSuccess(t *testing.T) {
 	config.InitConfig(fs)
 	projectDir, _ := os.Getwd()
 
-	mockResponse := []byte("Connection successful.")
+	mockResponse := []byte(webserverHealthStatus)
 
 	bindMock := new(mocks.PodmanBind)
 	bindMock.On("NewConnection", mock.Anything, mock.Anything).Return(context.TODO(), nil)
@@ -112,14 +112,10 @@ func TestPodmanStartSuccess(t *testing.T) {
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{{Names: []string{"test-webserver"}, ID: "test-id"}}, nil)
 	bindMock.On("ExecCreate", podmanMock.conn, mock.Anything, mock.Anything).Return("test-exec-id", nil)
 
-	respCounter := 0
 	mockCall := bindMock.On("ExecStartAndAttach", podmanMock.conn, mock.Anything, mock.Anything)
 	mockCall.RunFn = func(args mock.Arguments) {
-		if respCounter >= 1 {
-			streams := args.Get(2).(*containers.ExecStartAndAttachOptions)
-			streams.GetOutputStream().Write(mockResponse)
-		}
-		respCounter++
+		streams := args.Get(2).(*containers.ExecStartAndAttachOptions)
+		streams.GetOutputStream().Write(mockResponse)
 		mockCall.ReturnArguments = mock.Arguments{nil}
 	}
 

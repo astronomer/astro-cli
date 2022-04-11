@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
@@ -280,16 +279,5 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 		return false, nil
 	}
 
-	// check if runtime version matches minimum compatible for triggerer feature
-	semVer, err := semver.NewVersion(runtimeVersion)
-	if err != nil {
-		return false, err
-	}
-	// create semver constraint to check runtime version against minimum compatible one
-	c, err := semver.NewConstraint(runtimeVersionCheck)
-	if err != nil {
-		return false, err
-	}
-	// Check if the version meets the constraints
-	return c.Check(semVer), nil
+	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
 }

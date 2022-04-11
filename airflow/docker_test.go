@@ -219,9 +219,14 @@ func TestExecPipeNils(t *testing.T) {
 }
 
 func TestDockerStartFailure(t *testing.T) {
-	composeMock, docker, _ := getComposeMocks()
+	composeMock, docker, imageMock := getComposeMocks()
 	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "running"}}, nil)
 	composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	composeMock.On("Events", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	imageMock.On("Build", mock.Anything).Return(nil)
+	mockLabels := map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}
+	imageMock.On("GetImageLabels").Return(mockLabels)
 	options := containerTypes.ContainerStartConfig{
 		DockerfilePath: "./testfiles/Dockerfile.Airflow1.ok",
 	}

@@ -27,10 +27,7 @@ const (
 	webserverHealthCheckInterval = 10 * time.Second
 )
 
-var (
-	repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number
-	runtimeVersionCheck    = fmt.Sprintf(">= %s", triggererAllowedRuntimeVersion)
-)
+var repoNameSanitizeRegexp = regexp.MustCompile(`^[^a-z0-9]*`) // must not start with anything except lowercase letter or number
 
 func initDirs(root string, dirs []string) error {
 	// Create the dirs
