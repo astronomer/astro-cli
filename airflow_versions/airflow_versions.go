@@ -67,10 +67,8 @@ func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersio
 	for i := 1; i < len(tagsToUse); i++ {
 		tag := tagsToUse[i]
 		nextVersion, err := NewAirflowVersion(tag, []string{tag})
-		if err == nil {
-			if nextVersion.GreaterThan(latestVersion) {
-				latestVersion = nextVersion
-			}
+		if err == nil && nextVersion.GreaterThan(latestVersion) {
+			latestVersion = nextVersion
 		}
 	}
 

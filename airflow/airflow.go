@@ -22,7 +22,7 @@ const (
 	componentName         = "airflow"
 
 	triggererAllowedAirflowVersion = "2.2.0"
-	triggererAllowedRuntimeVersion = "4.0.0"
+	triggererAllowedRuntimeVersion = "4.2.5"
 
 	webserverHealthCheckInterval = 10 * time.Second
 )
