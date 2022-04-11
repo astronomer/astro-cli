@@ -45,7 +45,7 @@ func TestCheckServiceStateFalse(t *testing.T) {
 func TestGenerateConfig(t *testing.T) {
 	oldCheckTriggererEnabled := CheckTriggererEnabled
 
-	CheckTriggererEnabled = func(airflowHome, dockerfile, runtimeConstraint string) (bool, error) {
+	CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 		return true, nil
 	}
 
@@ -54,7 +54,8 @@ func TestGenerateConfig(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 	config.CFG.ProjectName.SetHomeString("test")
-	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", DockerEngine)
+	labels := map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}
+	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", labels, DockerEngine)
 	assert.NoError(t, err)
 	expectedCfg := `version: '3.1'
 

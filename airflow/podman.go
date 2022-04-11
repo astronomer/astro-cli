@@ -348,7 +348,8 @@ func generatePodState(projectName, projectDir, envFile string) error {
 			return err
 		}
 	}
-	configYAML, err := generateConfig(projectName, projectDir, envFile, PodmanEngine)
+	labels := map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}
+	configYAML, err := generateConfig(projectName, projectDir, envFile, labels, PodmanEngine)
 	if err != nil {
 		return fmt.Errorf("failed to create pod state file: %w", err)
 	}

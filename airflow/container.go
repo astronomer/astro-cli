@@ -5,14 +5,12 @@ import (
 	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
-	"path/filepath"
 	"text/template"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/docker/docker/api/types/versions"
@@ -30,7 +28,6 @@ type Container string
 const (
 	DockerEngine Container = "docker"
 	PodmanEngine Container = "podman"
-	dockerfile             = "Dockerfile"
 )
 
 // ContainerHandler defines methods require to handle all operations to run Airflow locally
@@ -113,7 +110,7 @@ func RegistryHandlerInit(registry string) (RegistryHandler, error) {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile string, containerEngine Container) (string, error) {
+func generateConfig(projectName, airflowHome, envFile string, imageLabels map[string]string, containerEngine Container) (string, error) {
 	var tmplFile string
 	switch containerEngine {
 	case DockerEngine:
@@ -135,7 +132,7 @@ func generateConfig(projectName, airflowHome, envFile string, containerEngine Co
 	}
 
 	// check if Airflow triggerer is enabled, on AC images, look if version is > 2.1.0, for runtime if version >= 4.1.0
-	triggererEnabled, err := CheckTriggererEnabled(airflowHome, dockerfile, runtimeVersionCheck)
+	triggererEnabled, err := CheckTriggererEnabled(imageLabels)
 	if err != nil {
 		return "", err
 	}
@@ -264,32 +261,32 @@ func GetTriggererServiceName() string {
 // CheckTriggererEnabled checks if the airflow triggerer component should be enabled.
 // for astro-runtime users: check if compatible runtime version
 // for AC users, triggerer is only compatible with Airflow versions >= 2.2.0
-var CheckTriggererEnabled = func(airflowHome, dockerfile, runtimeConstraint string) (bool, error) {
-	// parse dockerfile
-	cmd, err := docker.ParseFile(filepath.Join(airflowHome, dockerfile))
+// the runtime version and airflow version can be found as a label on the user's docker image
+var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if versions.GreaterThanOrEqualTo(airflowVersion, triggererAllowedAirflowVersion) {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+	if !ok {
+		// image doesn't have either runtime version or airflow version
+		return false, nil
+	}
+
+	// check if runtime version matches minimum compatible for triggerer feature
+	semVer, err := semver.NewVersion(runtimeVersion)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse dockerfile: %s", filepath.Join(airflowHome, dockerfile)) //nolint: goerr113
+		return false, err
 	}
-
-	imageName, imageTag := docker.GetImageTagFromParsedFile(cmd)
-
-	if imageName == FullAstroRuntimeImageName {
-		semVer, err := semver.NewVersion(imageTag)
-		if err != nil {
-			return false, err
-		}
-		// create semver constraint to check runtime version against minimum compatible one
-		c, err := semver.NewConstraint(runtimeConstraint)
-		if err != nil {
-			return false, err
-		}
-		// Check if the version meets the constraints
-		return c.Check(semVer), nil
+	// create semver constraint to check runtime version against minimum compatible one
+	c, err := semver.NewConstraint(runtimeVersionCheck)
+	if err != nil {
+		return false, err
 	}
-
-	if versions.GreaterThanOrEqualTo(imageTag, triggererAllowedAirflowVersion) {
-		return true, nil
-	}
-
-	return false, nil
+	// Check if the version meets the constraints
+	return c.Check(semVer), nil
 }

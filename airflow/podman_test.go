@@ -89,7 +89,7 @@ func TestPodmanGetContainerIDFailure(t *testing.T) {
 func TestPodmanStartSuccess(t *testing.T) {
 	oldCheckTriggererEnabled := CheckTriggererEnabled
 
-	CheckTriggererEnabled = func(airflowHome, dockerfile, runtimeConstraint string) (bool, error) {
+	CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 		return true, nil
 	}
 
