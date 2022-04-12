@@ -130,7 +130,6 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 		return "", err
 	}
 
-	// check if Airflow triggerer is enabled, on AC images, look if version is > 2.1.0, for runtime if version >= 4.1.0
 	triggererEnabled, err := CheckTriggererEnabled(imageLabels)
 	if err != nil {
 		return "", err
@@ -273,7 +272,7 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
 	if !ok {
 		// image doesn't have either runtime version or airflow version
-		// we don't want to block the user's experience in case this happens, so we disabled triggerer and warn error
+		// we don't want to block the user's experience in case this happens, so we disable triggerer and warn error
 		fmt.Println(messages.WarningTriggererDisabledNoVersionDetected)
 
 		return false, nil
