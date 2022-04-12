@@ -137,6 +137,22 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 		triggererEnabled = true
 	}
 
+	dirName := config.CFG.ProjectName.GetString()
+	schedulerName := config.CFG.SchedulerContainerName.GetString()
+	if schedulerName == config.DefaultSchedulerName && containerEngine != PodmanEngine {
+		schedulerName = fmt.Sprintf("%s-%s", dirName, schedulerName)
+	}
+
+	webserverName := config.CFG.WebserverContainerName.GetString()
+	if webserverName == config.DefaultWebserverName && containerEngine != PodmanEngine {
+		webserverName = fmt.Sprintf("%s-%s", dirName, webserverName)
+	}
+
+	triggererName := config.CFG.TriggererContainerName.GetString()
+	if triggererName == config.DefaultTriggererName && containerEngine != PodmanEngine {
+		triggererName = fmt.Sprintf("%s-%s", dirName, triggererName)
+	}
+
 	cfg := ComposeConfig{
 		PostgresUser:           config.CFG.PostgresUser.GetString(),
 		PostgresPassword:       config.CFG.PostgresPassword.GetString(),
@@ -150,9 +166,9 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 		MountLabel:             "z",
 		ProjectName:            sanitizeRepoName(projectName),
 		TriggererEnabled:       triggererEnabled,
-		SchedulerContainerName: config.CFG.SchedulerContainerName.GetString(),
-		WebserverContainerName: config.CFG.WebserverContainerName.GetString(),
-		TriggererContainerName: config.CFG.TriggererContainerName.GetString(),
+		SchedulerContainerName: schedulerName,
+		WebserverContainerName: webserverName,
+		TriggererContainerName: triggererName,
 	}
 
 	buff := new(bytes.Buffer)

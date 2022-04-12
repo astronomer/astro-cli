@@ -15,6 +15,10 @@ import (
 const (
 	defaultDirPerm os.FileMode = 0770
 	newFilePerm    os.FileMode = 0600
+
+	DefaultWebserverName = "webserver"
+	DefaultSchedulerName = "scheduler"
+	DefaultTriggererName = "triggerer"
 )
 
 var (
@@ -64,9 +68,9 @@ var (
 		Verbosity:              newCfg("verbosity", "warning"),
 		ContainerEngine:        newCfg("container.engine", "docker"),
 		PodmanConnectionURI:    newCfg("podman.connection_uri", ""),
-		SchedulerContainerName: newCfg("scheduler.container_name", "scheduler"),
-		WebserverContainerName: newCfg("webserver.container_name", "webserver"),
-		TriggererContainerName: newCfg("triggerer.container_name", "triggerer"),
+		SchedulerContainerName: newCfg("scheduler.container_name", DefaultSchedulerName),
+		WebserverContainerName: newCfg("webserver.container_name", DefaultWebserverName),
+		TriggererContainerName: newCfg("triggerer.container_name", DefaultTriggererName),
 		HoustonDialTimeout:     newCfg("houston.dial_timeout", "10"),
 	}
 
