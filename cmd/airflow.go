@@ -397,7 +397,7 @@ func airflowKill(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "")
 	if err != nil {
 		return err
 	}
@@ -426,7 +426,7 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "")
 	if err != nil {
 		return err
 	}
@@ -439,7 +439,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "")
 	if err != nil {
 		return err
 	}
@@ -452,7 +452,7 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "")
 	if err != nil {
 		return err
 	}
@@ -469,7 +469,7 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 	args = append([]string{"airflow"}, args...)
 	// ignore last user parameter
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "")
 	if err != nil {
 		return err
 	}
@@ -485,7 +485,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	// Add airflow command, to simplify astro cli usage
 	args = append([]string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}, args...)
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "")
 	if err != nil {
 		return err
 	}
