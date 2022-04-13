@@ -343,6 +343,7 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 }
 
 // coerce a string into SemVer if possible
