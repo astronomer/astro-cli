@@ -46,6 +46,8 @@ type ResponseData struct {
 	GetWorkspace                   *Workspace                `json:"workspace,omitempty"`
 	UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
 	UpdateDeploymentAirflow        *Deployment               `json:"updateDeploymentAirflow,omitempty"`
+	UpdateDeploymentRuntime        *Deployment               `json:"updateDeploymentRuntime,omitempty"`
+	CancelUpdateDeploymentRuntime  *Deployment               `json:"cancelRuntimeUpdate,omitempty"`
 	UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
 	WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
@@ -56,6 +58,7 @@ type ResponseData struct {
 	GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
 	GetTeam                        *Team                     `json:"team,omitempty"`
 	GetTeamUsers                   []User                    `json:"teamUsers,omitempty"`
+	RuntimeReleases                RuntimeReleases           `json:"runtimeReleases,omitempty"`
 }
 
 type Namespace struct {
@@ -97,6 +100,9 @@ type Deployment struct {
 	ReleaseName           string          `json:"releaseName"`
 	Version               string          `json:"version"`
 	AirflowVersion        string          `json:"airflowVersion"`
+	RuntimeVersion        string          `json:"runtimeVersion"`
+	RuntimeAirflowVersion string          `json:"runtimeAirflowVersion"`
+	DesiredRuntimeVersion string          `json:"desiredRuntimeVersion"`
 	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
 	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
 	Workspace             Workspace       `json:"workspace"`
@@ -285,6 +291,15 @@ type AirflowImage struct {
 	Tag     string `json:"tag"`
 }
 
+// RuntimeRelease contains info releated to a runtime release
+type RuntimeRelease struct {
+	Version           string `json:"version"`
+	AirflowVersion    string `json:"airflowVersion"`
+	AirflowDBMigraion bool   `json:"airflowDatabaseMigrations"`
+}
+
+type RuntimeReleases []RuntimeRelease
+
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
 	AirflowImages          []AirflowImage `json:"airflowImages"`
@@ -320,6 +335,33 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 		}
 	}
 	return false
+}
+
+func (r RuntimeReleases) IsValidVersion(version string) bool {
+	for idx := range r {
+		if r[idx].Version == version {
+			return true
+		}
+	}
+	return false
+}
+
+func (r RuntimeReleases) GreaterVersions(version string) []string {
+	greaterVersions := []string{}
+	currentVersion, err := coerce(version)
+	if err != nil {
+		return greaterVersions
+	}
+	for idx := range r {
+		runtimeVersion, err := coerce(r[idx].Version)
+		if err != nil {
+			continue
+		}
+		if runtimeVersion.Compare(currentVersion) >= 0 {
+			greaterVersions = append(greaterVersions, r[idx].Version)
+		}
+	}
+	return greaterVersions
 }
 
 // AppConfig contains current houston config

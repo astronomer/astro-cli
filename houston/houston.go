@@ -51,6 +51,8 @@ type ClientInterface interface {
 	UpdateDeployment(variables map[string]interface{}) (*Deployment, error)
 	GetDeployment(deploymentID string) (*Deployment, error)
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
+	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
+	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	GetDeploymentConfig() (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
 	// deployment users
@@ -76,6 +78,8 @@ type ClientInterface interface {
 	// teams
 	GetTeam(teamID string) (*Team, error)
 	GetTeamUsers(teamID string) ([]User, error)
+	// runtime
+	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

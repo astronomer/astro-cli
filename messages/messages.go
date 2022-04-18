@@ -82,7 +82,7 @@ var (
 	NA                                        = "N/A"
 	ValidDockerfileBaseImage                  = "quay.io/astronomer/ap-airflow"
 	WarningDowngradeVersion                   = "Your Astro CLI Version (%s) is ahead of the server version (%s).\nConsider downgrading your Astro CLI to match. See https://www.astronomer.io/docs/cli-quickstart for more information.\n"
-	WarningInvalidImageName                   = "WARNING! The image in your Dockerfile is pulling from '%s', which is not supported. We strongly recommend that you use Astronomer Certified images that pull from 'astronomerinc/ap-airflow' or 'quay.io/astronomer/ap-airflow'. If you're running a custom image, you can override this. Are you sure you want to continue?\n"
+	WarningInvalidImageName                   = "WARNING! The image in your Dockerfile is pulling from '%s', which is not supported. We strongly recommend that you use Astronomer Certified or Runtime images that pull from 'astronomerinc/ap-airflow' or 'quay.io/astronomer/ap-airflow' or 'quay.io/astronomer/astro-runtime'. If you're running a custom image, you can override this. Are you sure you want to continue?\n"
 	WarningInvalidNameTag                     = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
 	WarningInvalidNameTagEmptyRecommendations = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nAre you sure you want to continue?"
 	WarningNewMinorVersion                    = "A new minor version of Astro CLI is available. Your version is %s and %s is the latest.\nSee https://www.astronomer.io/docs/cli-quickstart for more information.\n"

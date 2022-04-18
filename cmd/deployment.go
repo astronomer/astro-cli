@@ -56,6 +56,8 @@ var (
 	gitSyncInterval       int
 	sshKey                string
 	knowHosts             string
+	runtimeVersion        string
+	desiredRuntimeVersion string
 	CreateExample         = `
 # Create new deployment with Celery executor (default: celery without params).
 $ astro deployment create new-deployment-name --executor=celery
@@ -122,6 +124,18 @@ $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-air
 # Abort the initial airflow upgrade step:
 $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
 `
+	deploymentRuntimeUpgradeExample = `
+$ astro deployment runtime upgrade --deployment-id=<deployment-id> --desired-runtime-version=<desired-runtime-version>
+
+# Abort the initial runtime upgrade step:
+$ astro deployment runtime upgrade --deployment-id=<deployment-id> --cancel
+`
+	deploymentRuntimeMigrateExample = `
+$ astro deployment runtime migrate --deployment-id=<deployment-id>
+
+# Abort the initial runtime migrate step:
+$ astro deployment runtime migrate --deployment-id=<deployment-id> --cancel
+`
 
 	deploymentUpdateAttrs = []string{"label"}
 )
@@ -144,6 +158,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentUserRootCmd(out),
 		newDeploymentTeamRootCmd(out),
 		newDeploymentAirflowRootCmd(out),
+		newDeploymentRuntimeRootCmd(out),
 	)
 	return cmd
 }
@@ -191,6 +206,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
+	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
@@ -565,6 +581,61 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newDeploymentRuntimeRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "runtime",
+		Aliases: []string{"r"},
+		Short:   "Manage runtime deployments",
+		Long:    "Manage runtime deployments",
+	}
+	cmd.AddCommand(
+		newDeploymentRuntimeUpgradeCmd(out),
+		newDeploymentRuntimeMigrateCmd(out),
+	)
+	return cmd
+}
+
+func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Aliases: []string{"up"},
+		Short:   "Upgrade Runtime image version",
+		Long:    "Upgrade Runtime image version",
+		Example: deploymentRuntimeUpgradeExample,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return deploymentRuntimeUpgrade(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
+	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime upgrade step")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
+	return cmd
+}
+
+func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "migrate",
+		Aliases: []string{"m"},
+		Short:   "Migrate to runtime image based deployment",
+		Long:    "Migrate to runtime image based deployment",
+		Example: deploymentRuntimeMigrateExample,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return deploymentRuntimeMigrate(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime migrate step")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
+	return cmd
+}
+
 func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -596,7 +667,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 		}
 	}
 
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, houstonClient, out)
+	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, runtimeVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, houstonClient, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -788,4 +859,22 @@ func deploymentAirflowUpgrade(cmd *cobra.Command, _ []string, out io.Writer) err
 		return deployment.AirflowUpgradeCancel(deploymentID, houstonClient, out)
 	}
 	return deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, out)
+}
+
+func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	if cancel {
+		return deployment.RuntimeUpgradeCancel(deploymentID, houstonClient, out)
+	}
+	return deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient, out)
+}
+
+func deploymentRuntimeMigrate(cmd *cobra.Command, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	if cancel {
+		return deployment.RuntimeMigrateCancel(deploymentID, houstonClient, out)
+	}
+	return deployment.RuntimeMigrate(deploymentID, houstonClient, out)
 }

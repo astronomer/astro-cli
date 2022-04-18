@@ -23,8 +23,6 @@ import (
 )
 
 var (
-	minAirflowVersion = "1.10.14"
-
 	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
 	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your DAGs and configs are 2.0 compatible", minAirflowVersion) //nolint:golint,stylecheck
@@ -32,6 +30,19 @@ var (
 	errInvalidSSHKeyPath               = errors.New("wrong path specified, no file exists for ssh key")
 	errInvalidKnownHostsPath           = errors.New("wrong path specified, no file exists for known hosts")
 	errHostNotPresent                  = errors.New("git repository host not present in known hosts file")
+
+	errDeploymentNotOnRuntime     = errors.New("deployment is not using Runtime image, please migrate to Runtime image via `astro deployment runtime migrate` before trying to upgrade Runtime version")
+	errDeploymentNotOnAirflow     = errors.New("deployment is not using Airflow image, please make sure deployment is using Airflow image before trying to upgrade Airflow version")
+	errDeploymentAlreadyOnRuntime = errors.New("deployment is already using runtime image")
+	errRuntimeUpdateFailed        = errors.New("failed to update the deployment runtime version")
+	errInvalidAirflowVersion      = errors.New("invalid Airflow version to migrate the deployment to Runtime, please upgrade the deployment to 2.2.4 Airflow version before trying to migrate to Runtime image")
+)
+
+const (
+	minAirflowVersion = "1.10.14"
+
+	runtimeImageType   = "Runtime"
+	certifiedImageType = "Astronomer-Certified"
 )
 
 type ErrParsingInt struct {
@@ -52,11 +63,21 @@ func (e ErrInvalidAirflowVersion) Error() string {
 		"is already running %s. Please indicate a higher version of Airflow and try again.", e.desiredVersion, e.currentVersion)
 }
 
+type ErrInvalidRuntimeVersion struct {
+	desiredVersion string
+	currentVersion *semver.Version
+}
+
+func (e ErrInvalidRuntimeVersion) Error() string {
+	return fmt.Sprintf("Error: You tried to set --desired-runtime-version to %s, but this Runtime Deployment "+
+		"is already running %s. Please indicate a higher version of Runtime and try again.", e.desiredVersion, e.currentVersion)
+}
+
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 30, 10, 50, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG", "AIRFLOW VERSION"},
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "TAG", "IMAGE VERSION"},
 	}
 }
 
@@ -119,7 +140,7 @@ func CheckTriggererEnabled(client houston.ClientInterface) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
+func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, runtimeVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
 	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
@@ -144,6 +165,8 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 
 	if airflowVersion != "" {
 		vars["airflowVersion"] = airflowVersion
+	} else if runtimeVersion != "" {
+		vars["runtimeVersion"] = runtimeVersion
 	}
 
 	err := addDagDeploymentArgs(vars, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
@@ -160,7 +183,13 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, dagDepl
 	}
 
 	tab := newTableOut()
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, "-", d.AirflowVersion}, false)
+	var resp []string
+	if d.AirflowVersion != "" {
+		resp = []string{d.Label, d.ReleaseName, d.Version, d.ID, "-", fmt.Sprintf("%s-%s", certifiedImageType, d.AirflowVersion)}
+	} else {
+		resp = []string{d.Label, d.ReleaseName, d.Version, d.ID, "-", fmt.Sprintf("%s-%s", runtimeImageType, d.RuntimeVersion)}
+	}
+	tab.AddRow(resp, false)
 
 	splitted := []string{"Celery", ""}
 
@@ -279,7 +308,13 @@ func List(ws string, all bool, client houston.ClientInterface, out io.Writer) er
 		if currentTag == "" {
 			currentTag = "?"
 		}
-		tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, currentTag, d.AirflowVersion}, false)
+		var resp []string
+		if d.AirflowVersion != "" {
+			resp = []string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, currentTag, fmt.Sprintf("%s-%s", certifiedImageType, d.AirflowVersion)}
+		} else {
+			resp = []string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, currentTag, fmt.Sprintf("%s-%s", runtimeImageType, d.RuntimeVersion)}
+		}
+		tab.AddRow(resp, false)
 	}
 
 	return tab.Print(out)
@@ -318,7 +353,13 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 	if currentTag == "" {
 		currentTag = "?"
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, currentTag, d.AirflowVersion}, false)
+	var resp []string
+	if d.AirflowVersion != "" {
+		resp = []string{d.Label, d.ReleaseName, d.Version, d.ID, currentTag, fmt.Sprintf("%s-%s", certifiedImageType, d.AirflowVersion)}
+	} else {
+		resp = []string{d.Label, d.ReleaseName, d.Version, d.ID, currentTag, fmt.Sprintf("%s-%s", runtimeImageType, d.RuntimeVersion)}
+	}
+	tab.AddRow(resp, false)
 	tab.SuccessMsg = "\n Successfully updated deployment"
 	tab.Print(out)
 
@@ -330,6 +371,10 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 	deployment, err := client.GetDeployment(id)
 	if err != nil {
 		return err
+	}
+
+	if deployment.RuntimeVersion != "" {
+		return errDeploymentNotOnAirflow
 	}
 
 	if desiredAirflowVersion == "" {
@@ -354,9 +399,9 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 	tab := &printutil.Table{
 		Padding:        []int{30, 30, 10, 50, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "AIRFLOW VERSION"},
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "IMAGE VERSION"},
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, d.AirflowVersion}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, fmt.Sprintf("%s-%s", certifiedImageType, d.DesiredAirflowVersion)}, false)
 
 	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started. ", d.AirflowVersion, d.DesiredAirflowVersion) +
 		fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to Astronomer.\n", d.DesiredAirflowVersion) +
@@ -368,6 +413,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 }
 
 // Upgrade airflow deployment
+// nolint:dupl
 func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
 	deployment, err := client.GetDeployment(id)
 	if err != nil {
@@ -389,6 +435,159 @@ func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 
 	text := "\nNothing to cancel. You are currently running Airflow %s and you have not indicated that you want to upgrade."
 	fmt.Fprintf(out, text, deployment.AirflowVersion)
+	return nil
+}
+
+// RuntimeUpgrade is to upgrade a deployment to newer runtime version
+func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInterface, out io.Writer) error {
+	deployment, err := client.GetDeployment(id)
+	if err != nil {
+		return err
+	}
+
+	if deployment.RuntimeVersion == "" || deployment.AirflowVersion != "" {
+		return errDeploymentNotOnRuntime
+	}
+
+	if desiredRuntimeVersion == "" {
+		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, client, out)
+		if err != nil {
+			return err
+		}
+		desiredRuntimeVersion = selectedVersion
+	}
+	err = meetsRuntimeUpgradeReqs(deployment.RuntimeVersion, desiredRuntimeVersion)
+	if err != nil {
+		return err
+	}
+
+	vars := map[string]interface{}{"deploymentUuid": id, "desiredRuntimeVersion": desiredRuntimeVersion}
+
+	d, err := client.UpdateDeploymentRuntime(vars)
+	if err != nil {
+		return err
+	} else if d == nil {
+		return errRuntimeUpdateFailed
+	}
+
+	runtimeVersion := fmt.Sprintf("%s-%s", runtimeImageType, d.DesiredRuntimeVersion)
+	tab := &printutil.Table{
+		Padding:        []int{30, 30, 10, 50, 10},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "IMAGE VERSION"},
+	}
+	tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, runtimeVersion}, false)
+
+	tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Runtime %s to %s has been started. ", d.RuntimeVersion, desiredRuntimeVersion) +
+		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to Astronomer.\n", desiredRuntimeVersion) +
+		"To cancel, run: \n $ astro deployment runtime upgrade --cancel\n"
+
+	tab.Print(out)
+
+	return nil
+}
+
+// RuntimeUpgradeCancel is to cancel an upgrade operation for a deployment
+// nolint:dupl
+func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
+	deployment, err := client.GetDeployment(id)
+	if err != nil {
+		return err
+	}
+
+	if deployment.DesiredRuntimeVersion != deployment.RuntimeVersion {
+		vars := map[string]interface{}{"deploymentUuid": id}
+
+		_, err := client.CancelUpdateDeploymentRuntime(vars)
+		if err != nil {
+			return err
+		}
+
+		text := "\nRuntime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Runtime %s.\n"
+		fmt.Fprintf(out, text, deployment.RuntimeVersion)
+		return nil
+	}
+
+	text := "\nNothing to cancel. You are currently running Runtime %s and you have not indicated that you want to upgrade."
+	fmt.Fprintf(out, text, deployment.RuntimeVersion)
+	return nil
+}
+
+// RuntimeMigrate is to migrate a deployment from using airflow version to runtime version
+func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.Writer) error {
+	deployment, err := client.GetDeployment(deploymentID)
+	if err != nil {
+		return err
+	}
+
+	if deployment.AirflowVersion == "" || deployment.RuntimeVersion != "" {
+		return errDeploymentAlreadyOnRuntime
+	}
+
+	runtimeReleases, err := client.GetRuntimeReleases(deployment.AirflowVersion)
+	if err != nil {
+		return err
+	}
+
+	var latestRuntimeRelease *semver.Version
+	for idx := range runtimeReleases {
+		if latestRuntimeRelease == nil {
+			latestRuntimeRelease = semver.MustParse(runtimeReleases[idx].Version)
+		} else if !latestRuntimeRelease.GreaterThan(semver.MustParse(runtimeReleases[idx].Version)) {
+			latestRuntimeRelease = semver.MustParse(runtimeReleases[idx].Version)
+		}
+	}
+
+	if latestRuntimeRelease == nil {
+		return errInvalidAirflowVersion
+	}
+	desiredRuntimeVersion := latestRuntimeRelease.String()
+
+	vars := map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
+	resp, err := client.UpdateDeploymentRuntime(vars)
+	if err != nil {
+		return err
+	} else if resp == nil {
+		return errRuntimeUpdateFailed
+	}
+
+	tab := &printutil.Table{
+		Padding:        []int{30, 30, 10, 50, 10},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "DEPLOYMENT NAME", "ASTRO", "DEPLOYMENT ID", "IMAGE VERSION"},
+	}
+	tab.AddRow([]string{resp.Label, resp.ReleaseName, "v" + resp.Version, resp.ID, fmt.Sprintf("%s-%s", runtimeImageType, desiredRuntimeVersion)}, false)
+
+	tab.SuccessMsg = fmt.Sprintf("\nThe migration from Airflow %s image to Runtime %s has been started. ", deployment.AirflowVersion, desiredRuntimeVersion) +
+		fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to Astronomer.\n", desiredRuntimeVersion) +
+		"To cancel, run: \n $ astro deployment runtime migrate --cancel\n"
+
+	tab.Print(out)
+
+	return nil
+}
+
+// RuntimeMigrateCancel is to cancel migration operation for a deployment
+func RuntimeMigrateCancel(id string, client houston.ClientInterface, out io.Writer) error {
+	deployment, err := client.GetDeployment(id)
+	if err != nil {
+		return err
+	}
+
+	if deployment.RuntimeVersion == "" && deployment.DesiredRuntimeVersion != "" && deployment.AirflowVersion != "" {
+		vars := map[string]interface{}{"deploymentUuid": id}
+		_, err := client.CancelUpdateDeploymentRuntime(vars)
+		if err != nil {
+			return err
+		}
+
+		text := "\nRuntime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow %s.\n"
+		fmt.Fprintf(out, text, deployment.AirflowVersion)
+		return nil
+	}
+
+	text := "\nNothing to cancel. You are already running Runtime %s and you have either not indicated that you want to migrate or migration has been completed."
+	fmt.Fprintf(out, text, deployment.RuntimeVersion)
 	return nil
 }
 
@@ -418,7 +617,57 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 		// false means no colors
 		if currentAirflowVersion.LessThan(vv) {
 			filteredVersions = append(filteredVersions, v)
-			t.AddRow([]string{v}, false)
+			t.AddRow([]string{fmt.Sprintf("%s-%s", certifiedImageType, v)}, false)
+		}
+	}
+
+	t.Print(out)
+
+	in := input.Text("\n> ")
+	i, err := strconv.ParseInt(in, 10, 64)
+	if err != nil {
+		return "", err
+	}
+	return filteredVersions[i-1], nil
+}
+
+func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client houston.ClientInterface, out io.Writer) (string, error) {
+	currentRuntimeVersion, err := semver.NewVersion(runtimeVersion)
+	if err != nil {
+		return "", err
+	}
+	currentAirflowVersion, err := semver.NewVersion(airflowVersion)
+	if err != nil {
+		return "", err
+	}
+
+	// prepare list of AC airflow versions
+	runtimeVersions, err := client.GetRuntimeReleases("")
+	if err != nil {
+		return "", err
+	}
+
+	t := &printutil.Table{
+		Padding:        []int{10},
+		DynamicPadding: true,
+		Header:         []string{"RUNTIME VERSION"},
+	}
+	t.GetUserInput = true
+
+	var filteredVersions []string
+
+	for _, v := range runtimeVersions {
+		runtimeVersion, err := semver.NewVersion(v.Version)
+		if err != nil {
+			continue
+		}
+		airflowVersion, err := semver.NewVersion(v.AirflowVersion)
+		if err != nil {
+			continue
+		}
+		if currentRuntimeVersion.LessThan(runtimeVersion) && !currentAirflowVersion.GreaterThan(airflowVersion) {
+			filteredVersions = append(filteredVersions, v.Version)
+			t.AddRow([]string{fmt.Sprintf("%s-%s", runtimeImageType, v.Version)}, false)
 		}
 	}
 
@@ -463,6 +712,24 @@ func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error
 		if currentVersion.Compare(minUpgrade) < 0 {
 			return ErrMajorAirflowVersionUpgrade
 		}
+	}
+
+	return nil
+}
+
+func meetsRuntimeUpgradeReqs(runtimeVersion, desiredRuntimeVersion string) error {
+	desiredVersion, err := semver.NewVersion(desiredRuntimeVersion)
+	if err != nil {
+		return err
+	}
+
+	currentVersion, err := semver.NewVersion(runtimeVersion)
+	if err != nil {
+		return err
+	}
+
+	if currentVersion.Compare(desiredVersion) == 0 {
+		return ErrInvalidRuntimeVersion{desiredVersion: desiredRuntimeVersion, currentVersion: currentVersion}
 	}
 
 	return nil
