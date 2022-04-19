@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/astronomer/astro-cli/airflow/types"
-
 	"github.com/astronomer/astro-cli/airflow/include"
+	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -131,10 +130,9 @@ func generateConfig(projectName, airflowHome, envFile string, imageLabels map[st
 		return "", err
 	}
 
-	var triggererEnabled bool
-	airflowVersion := imageLabels[airflowVersionLabelName]
-	if versions.GreaterThanOrEqualTo(airflowVersion, triggererAllowedAirflowVersion) {
-		triggererEnabled = true
+	triggererEnabled, err := CheckTriggererEnabled(imageLabels)
+	if err != nil {
+		return "", err
 	}
 
 	dirName := config.CFG.ProjectName.GetString()
@@ -256,4 +254,29 @@ func GetTriggererServiceName() string {
 	default:
 		return triggererServiceName
 	}
+}
+
+// CheckTriggererEnabled checks if the airflow triggerer component should be enabled.
+// for astro-runtime users: check if compatible runtime version
+// for AC users, triggerer is only compatible with Airflow versions >= 2.2.0
+// the runtime version and airflow version can be found as a label on the user's docker image
+var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if versions.GreaterThanOrEqualTo(airflowVersion, triggererAllowedAirflowVersion) {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+	if !ok {
+		// image doesn't have either runtime version or airflow version
+		// we don't want to block the user's experience in case this happens, so we disable triggerer and warn error
+		fmt.Println(messages.WarningTriggererDisabledNoVersionDetected)
+
+		return false, nil
+	}
+
+	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
 }

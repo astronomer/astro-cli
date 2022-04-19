@@ -86,8 +86,8 @@ func ParseReader(file io.Reader) ([]Command, error) {
 	return ret, nil
 }
 
-// Parse a Dockerfile from a filename.  An IOError or ParseError may occur.
-func ParseFile(filename string) ([]Command, error) {
+// ParseFile parses a Dockerfile from a filename.  An IOError or ParseError may occur.
+var ParseFile = func(filename string) ([]Command, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, IOError{err.Error()}

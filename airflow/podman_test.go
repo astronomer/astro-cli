@@ -87,13 +87,19 @@ func TestPodmanGetContainerIDFailure(t *testing.T) {
 }
 
 func TestPodmanStartSuccess(t *testing.T) {
+	oldCheckTriggererEnabled := CheckTriggererEnabled
+
+	CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
+		return true, nil
+	}
+
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 	projectDir, _ := os.Getwd()
 
-	mockResponse := []byte("Connection successful.")
+	mockResponse := []byte(webserverHealthStatus)
 
 	bindMock := new(mocks.PodmanBind)
 	bindMock.On("NewConnection", mock.Anything, mock.Anything).Return(context.TODO(), nil)
@@ -106,14 +112,10 @@ func TestPodmanStartSuccess(t *testing.T) {
 	bindMock.On("List", podmanMock.conn, mock.Anything).Return([]entities.ListContainer{{Names: []string{"test-webserver"}, ID: "test-id"}}, nil)
 	bindMock.On("ExecCreate", podmanMock.conn, mock.Anything, mock.Anything).Return("test-exec-id", nil)
 
-	respCounter := 0
 	mockCall := bindMock.On("ExecStartAndAttach", podmanMock.conn, mock.Anything, mock.Anything)
 	mockCall.RunFn = func(args mock.Arguments) {
-		if respCounter >= 1 {
-			streams := args.Get(2).(*containers.ExecStartAndAttachOptions)
-			streams.GetOutputStream().Write(mockResponse)
-		}
-		respCounter++
+		streams := args.Get(2).(*containers.ExecStartAndAttachOptions)
+		streams.GetOutputStream().Write(mockResponse)
 		mockCall.ReturnArguments = mock.Arguments{nil}
 	}
 
@@ -126,9 +128,17 @@ func TestPodmanStartSuccess(t *testing.T) {
 	// Case when pod is already present but in stop state
 	err = podmanMock.Start(options)
 	assert.NoError(t, err)
+
+	CheckTriggererEnabled = oldCheckTriggererEnabled
 }
 
 func TestPodmanStartFailure(t *testing.T) {
+	oldCheckTriggererEnabled := CheckTriggererEnabled
+
+	CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
+		return true, nil
+	}
+
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("podman")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -169,6 +179,8 @@ func TestPodmanStartFailure(t *testing.T) {
 	bindMock.On("Start", podmanMock.conn, mock.Anything, mock.Anything).Return(nil, errPodman).Once()
 	err = podmanMock.Start(options)
 	assert.Contains(t, err.Error(), errPodman.Error())
+
+	CheckTriggererEnabled = oldCheckTriggererEnabled
 }
 
 func TestPodmanKillSuccess(t *testing.T) {
