@@ -32,7 +32,11 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, airflowVersion)
 
 	if defaultImageTag == "" {
-		defaultImageTag = "2.0.0-buster-onbuild"
+		if useAstronomerCertified {
+			defaultImageTag = "2.0.0-buster-onbuild"
+		} else {
+			defaultImageTag = "3.0.0"
+		}
 		fmt.Fprintf(out, "Initializing Airflow project, pulling Airflow development files from %s\n", defaultImageTag)
 	}
 	return defaultImageTag, nil

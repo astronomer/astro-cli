@@ -59,7 +59,7 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	httpClient := airflowversions.NewClient(client)
+	httpClient := airflowversions.NewClient(client, true)
 
 	// prepare fake response from houston
 	api := new(mocks.ClientInterface)
@@ -92,42 +92,57 @@ func Test_prepareDefaultAirflowImageTag(t *testing.T) {
 func Test_fallbackDefaultAirflowImageTag(t *testing.T) {
 	testUtil.InitTestConfig()
 
-	// prepare fake response from updates.astronomer.io
-	okResponse := `{
+	t.Run("astronomer certified", func(t *testing.T) {
+		useAstronomerCertified = true
+		okResponse := `{
   "version": "1.0",
   "available_releases": []
 }`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		httpClient := airflowversions.NewClient(client, true)
+
+		// prepare fake response from houston
+		api := new(mocks.ClientInterface)
+		api.On("GetDeploymentConfig").Return(mockDeploymentConfig, nil)
+
+		output := new(bytes.Buffer)
+
+		defaultTag, err := prepareDefaultAirflowImageTag("", httpClient, api, output)
+		assert.NoError(t, err)
+		assert.Equal(t, "2.0.0-buster-onbuild", defaultTag)
 	})
-	httpClient := airflowversions.NewClient(client)
 
-	// prepare fake response from houston
-	api := new(mocks.ClientInterface)
-	api.On("GetDeploymentConfig").Return(mockDeploymentConfig, nil)
+	t.Run("astro runtime", func(t *testing.T) {
+		useAstronomerCertified = false
+		okResponse := `{
+		"runtimeVersions: {}"
+}`
 
-	output := new(bytes.Buffer)
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(okResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		httpClient := airflowversions.NewClient(client, false)
 
-	myTests := []struct {
-		airflowVersion   string
-		expectedImageTag string
-		expectedError    string
-	}{
-		{airflowVersion: "", expectedImageTag: "2.0.0-buster-onbuild", expectedError: ""},
-	}
-	for _, tt := range myTests {
-		defaultTag, err := prepareDefaultAirflowImageTag(tt.airflowVersion, httpClient, api, output)
-		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
-		} else {
-			assert.NoError(t, err)
-		}
-		assert.Equal(t, tt.expectedImageTag, defaultTag)
-	}
+		// prepare fake response from houston
+		api := new(mocks.ClientInterface)
+		api.On("GetDeploymentConfig").Return(mockDeploymentConfig, nil)
+
+		output := new(bytes.Buffer)
+
+		defaultTag, err := prepareDefaultAirflowImageTag("", httpClient, api, output)
+		assert.NoError(t, err)
+		assert.Equal(t, "3.0.0", defaultTag)
+	})
 }
 
 func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
@@ -160,7 +175,7 @@ func Test_prepareDefaultAirflowImageTagHoustonBadRequest(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	httpClient := airflowversions.NewClient(client)
+	httpClient := airflowversions.NewClient(client, true)
 
 	// prepare fake response from houston
 	api := new(mocks.ClientInterface)
@@ -203,7 +218,7 @@ func Test_prepareDefaultAirflowImageTagHoustonUnauthedRequest(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	httpClient := airflowversions.NewClient(client)
+	httpClient := airflowversions.NewClient(client, true)
 
 	// prepare fake response from houston
 	api := new(mocks.ClientInterface)

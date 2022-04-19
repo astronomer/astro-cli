@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/astronomer/astro-cli/airflow/types"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -31,17 +33,18 @@ var (
 )
 
 var (
-	projectName      string
-	airflowVersion   string
-	envFile          string
-	followLogs       bool
-	forceDeploy      bool
-	forcePrompt      bool
-	saveDeployConfig bool
-	schedulerLogs    bool
-	webserverLogs    bool
-	triggererLogs    bool
-	ignoreCacheDev   bool
+	projectName            string
+	airflowVersion         string
+	envFile                string
+	followLogs             bool
+	forceDeploy            bool
+	forcePrompt            bool
+	saveDeployConfig       bool
+	schedulerLogs          bool
+	webserverLogs          bool
+	triggererLogs          bool
+	ignoreCacheDev         bool
+	useAstronomerCertified bool
 
 	runExample = `
 # Create default admin user.
@@ -112,6 +115,7 @@ func newAirflowInitCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
+	cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 	return cmd
 }
 
@@ -304,10 +308,24 @@ func airflowInit(cmd *cobra.Command, _ []string, out io.Writer) error {
 		projectDirectory := filepath.Base(config.WorkingPath)
 		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
 	}
-	httpClient := airflowversions.NewClient(httputil.NewHTTPClient())
+
+	// check feature flag if AstroRuntime is enabled, if not, fallback to astronomer certified, if not able to get feature flag, we don't want to block the user
+	appConfig, err := houstonClient.GetAppConfig()
+	if err != nil {
+		logrus.Debugln("Error checking feature flag", err)
+	} else if !appConfig.Flags.AstroRuntimeEnabled {
+		useAstronomerCertified = true
+	}
+
+	httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
 	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, httpClient, houstonClient, out)
 	if err != nil {
 		return err
+	}
+
+	defaultImageName := airflow.AstroRuntimeImageName
+	if useAstronomerCertified {
+		defaultImageName = airflow.AstronomerCertifiedImageName
 	}
 
 	emtpyDir := fileutil.IsEmptyDir(config.WorkingPath)
@@ -333,7 +351,7 @@ func airflowInit(cmd *cobra.Command, _ []string, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag)
 	if err != nil {
 		return err
 	}

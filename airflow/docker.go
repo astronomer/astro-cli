@@ -105,12 +105,12 @@ func (d *DockerCompose) Start(options containerTypes.ContainerStartConfig) error
 		return err
 	}
 
+	// recreate the project, to pass the labels
 	labels, err := d.imageHandler.GetImageLabels()
 	if err != nil {
 		return err
 	}
 
-	// recreate the project, to pass the labels
 	project, err := createProject(d.projectName, d.airflowHome, d.envFile, labels)
 	if err != nil {
 		return err
@@ -290,9 +290,9 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 }
 
 // createProject creates project with yaml config as context
-func createProject(projectName, airflowHome, envFile string, labels map[string]string) (*composeTypes.Project, error) {
+func createProject(projectName, airflowHome, envFile string, imageLabels map[string]string) (*composeTypes.Project, error) {
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile, labels, DockerEngine)
+	yaml, err := generateConfig(projectName, airflowHome, envFile, imageLabels, DockerEngine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create project: %w", err)
 	}

@@ -6,7 +6,17 @@ import (
 	"strings"
 )
 
+const VersionChannelStable = "stable"
+
 var tagPrefixOrder = []string{"buster-onbuild", "onbuild", "buster"}
+
+type ErrNoTagAvailable struct {
+	airflowVersion string
+}
+
+func (e ErrNoTagAvailable) Error() string {
+	return fmt.Sprintf("there is no tag available for provided airflow version: %s, you might want to try a different airflow version.", e.airflowVersion)
+}
 
 // GetDefaultImageTag returns default airflow image tag
 func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, error) {
@@ -17,9 +27,58 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 		return "", err
 	}
 
+	if httpClient.useAstronomerCertified {
+		return getAstronomerCertifiedTag(resp.AvailableReleases, airflowVersion)
+	}
+
+	return getAstroRuntimeTag(resp.RuntimeVersions, airflowVersion)
+}
+
+// get latest runtime tag associated to provided airflow version
+// if no airflow version is provided, returns the latest astro runtime version available
+func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersion string) (string, error) {
 	availableTags := []string{}
-	vs := make(AirflowVersions, len(resp.AvailableReleases))
-	for i, r := range resp.AvailableReleases {
+	availableVersions := []string{}
+
+	for runtimeVersion, r := range runtimeVersions {
+		if r.Metadata.Channel != VersionChannelStable {
+			continue
+		}
+
+		// if user wants specific airflow version, get all runtime version associated to this airflow version
+		if r.Metadata.AirflowVersion == airflowVersion {
+			availableTags = append(availableTags, runtimeVersion)
+		} else {
+			availableVersions = append(availableVersions, runtimeVersion)
+		}
+	}
+
+	tagsToUse := availableVersions
+	if airflowVersion != "" {
+		tagsToUse = availableTags
+	}
+
+	if len(tagsToUse) == 0 {
+		return "", ErrNoTagAvailable{airflowVersion: airflowVersion}
+	}
+
+	// get latest runtime version
+	latestVersion, _ := NewAirflowVersion(tagsToUse[0], []string{tagsToUse[0]})
+	for i := 1; i < len(tagsToUse); i++ {
+		tag := tagsToUse[i]
+		nextVersion, err := NewAirflowVersion(tag, []string{tag})
+		if err == nil && nextVersion.GreaterThan(latestVersion) {
+			latestVersion = nextVersion
+		}
+	}
+
+	return latestVersion.Version.String(), nil
+}
+
+func getAstronomerCertifiedTag(availableReleases []AirflowVersionRaw, airflowVersion string) (string, error) {
+	availableTags := []string{}
+	vs := make(AirflowVersions, len(availableReleases))
+	for i, r := range availableReleases {
 		if r.Version == airflowVersion {
 			availableTags = r.Tags
 			break
@@ -31,6 +90,7 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 	}
 
 	var selectedVersion *AirflowVersion
+	var err error
 	if airflowVersion == "" && len(vs) != 0 {
 		sort.Sort(vs)
 		selectedVersion = vs[len(vs)-1]
