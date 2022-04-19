@@ -140,8 +140,8 @@ func CheckTriggererEnabled(client houston.ClientInterface) bool {
 }
 
 // Create airflow deployment
-func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, runtimeVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, out io.Writer) error {
-	vars := map[string]interface{}{"label": label, "workspaceId": ws, "executor": executor, "cloudRole": cloudRole}
+func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer) error {
+	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
 	if CheckPreCreateNamespaceDeployment(client) {
 		namespace, err := getDeploymentSelectionNamespaces(client, out)
@@ -159,23 +159,23 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, runtime
 		vars["namespace"] = namespace
 	}
 
-	if releaseName != "" && checkManualReleaseNames(client) {
-		vars["releaseName"] = releaseName
+	if req.ReleaseName != "" && checkManualReleaseNames(client) {
+		vars["releaseName"] = req.ReleaseName
 	}
 
-	if airflowVersion != "" {
-		vars["airflowVersion"] = airflowVersion
-	} else if runtimeVersion != "" {
-		vars["runtimeVersion"] = runtimeVersion
+	if req.AirflowVersion != "" {
+		vars["airflowVersion"] = req.AirflowVersion
+	} else if req.RuntimeVersion != "" {
+		vars["runtimeVersion"] = req.RuntimeVersion
 	}
 
-	err := addDagDeploymentArgs(vars, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
+	err := addDagDeploymentArgs(vars, req.DagDeploymentType, req.NFSLocation, req.SSHKey, req.KnownHosts, req.GitRepoURL, req.GitRevision, req.GitBranchName, req.GitDAGDir, req.GitSyncInterval)
 	if err != nil {
 		return err
 	}
 
 	if CheckTriggererEnabled(client) {
-		vars["triggererReplicas"] = triggererReplicas
+		vars["triggererReplicas"] = req.TriggererReplicas
 	}
 	d, err := client.CreateDeployment(vars)
 	if err != nil {
@@ -193,9 +193,9 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, runtime
 
 	splitted := []string{"Celery", ""}
 
-	if executor != "" {
+	if req.Executor != "" {
 		// trim executor from console message
-		splitted = camelcase.Split(executor)
+		splitted = camelcase.Split(req.Executor)
 	}
 
 	var airflowURL, flowerURL string
@@ -213,7 +213,7 @@ func Create(label, ws, releaseName, cloudRole, executor, airflowVersion, runtime
 		fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
 
 	// The Flower URL is specific to CeleryExecutor only
-	if executor == houston.CeleryExecutorType || executor == "" {
+	if req.Executor == houston.CeleryExecutorType || req.Executor == "" {
 		tab.SuccessMsg += fmt.Sprintf("\n Flower Dashboard: %s", flowerURL)
 	}
 	tab.Print(out)

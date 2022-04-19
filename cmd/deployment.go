@@ -606,8 +606,8 @@ func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command {
 			return deploymentRuntimeUpgrade(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
-	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "[DESIRED_AIRFLOW_VERSION]")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to upgrade")
+	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "Desired Runtime version you wish to upgrade your deployment to")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime upgrade step")
 	err := cmd.MarkFlagRequired("deployment-id")
 	if err != nil {
@@ -627,7 +627,7 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 			return deploymentRuntimeMigrate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "[ID]")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to migrate")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime migrate step")
 	err := cmd.MarkFlagRequired("deployment-id")
 	if err != nil {
@@ -667,7 +667,26 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 		}
 	}
 
-	return deployment.Create(args[0], ws, releaseName, cloudRole, executorType, airflowVersion, runtimeVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, houstonClient, out)
+	req := &deployment.CreateDeploymentRequest{
+		Label:             args[0],
+		WS:                ws,
+		ReleaseName:       releaseName,
+		CloudRole:         cloudRole,
+		Executor:          executorType,
+		AirflowVersion:    airflowVersion,
+		RuntimeVersion:    runtimeVersion,
+		DagDeploymentType: dagDeploymentType,
+		NFSLocation:       nfsLocation,
+		GitRepoURL:        gitRepoURL,
+		GitRevision:       gitRevision,
+		GitBranchName:     gitBranchName,
+		GitDAGDir:         gitDAGDir,
+		SSHKey:            sshKey,
+		KnownHosts:        knowHosts,
+		GitSyncInterval:   gitSyncInterval,
+		TriggererReplicas: triggererReplicas,
+	}
+	return deployment.Create(req, houstonClient, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {

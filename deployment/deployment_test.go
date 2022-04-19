@@ -94,6 +94,7 @@ func TestCreate(t *testing.T) {
 	dagDeploymentType := houston.ImageDeploymentType
 	nfsLocation := ""
 	triggerReplicas := 0
+	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
 
 	t.Run("create success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
@@ -102,7 +103,7 @@ func TestCreate(t *testing.T) {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
-		err := Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err := Create(req, api, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(t)
@@ -117,7 +118,7 @@ func TestCreate(t *testing.T) {
 
 		triggerReplicas = 1
 		buf := new(bytes.Buffer)
-		err := Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err := Create(req, api, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(t)
@@ -134,7 +135,7 @@ func TestCreate(t *testing.T) {
 		triggerReplicas = 0
 
 		buf := new(bytes.Buffer)
-		err := Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err := Create(req, api, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(t)
@@ -169,7 +170,8 @@ func TestCreate(t *testing.T) {
 
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			err := Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, api, buf)
+			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas}
+			err := Create(createReq, api, buf)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
@@ -206,7 +208,7 @@ func TestCreate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err = Create(req, api, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(t)
@@ -244,7 +246,7 @@ func TestCreate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err = Create(req, api, buf)
 		assert.EqualError(t, err, "number is out of available range")
 		api.AssertExpectations(t)
 	})
@@ -261,7 +263,7 @@ func TestCreate(t *testing.T) {
 		api.On("GetAvailableNamespaces").Return([]houston.Namespace{}, mockError)
 
 		buf := new(bytes.Buffer)
-		err := Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err := Create(req, api, buf)
 		assert.EqualError(t, err, mockError.Error())
 		api.AssertExpectations(t)
 	})
@@ -274,7 +276,7 @@ func TestCreate(t *testing.T) {
 		api.On("CreateDeployment", mock.Anything).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
-		err := Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err := Create(req, api, buf)
 		assert.EqualError(t, err, mockError.Error())
 		api.AssertExpectations(t)
 	})
@@ -303,7 +305,7 @@ func TestCreate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err = Create(req, api, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
 		api.AssertExpectations(t)
@@ -333,7 +335,7 @@ func TestCreate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, api, buf)
+		err = Create(req, api, buf)
 		assert.EqualError(t, err, "no kubernetes namespaces specified")
 	})
 }
