@@ -41,7 +41,7 @@ spec:
   - args:
     - bash
     - -c
-    - (airflow upgradedb || airflow db upgrade) && airflow scheduler
+    - (airflow db upgrade || airflow upgradedb) && airflow scheduler
     command:
     - /entrypoint
     env:
@@ -93,8 +93,8 @@ spec:
       if [[ -z "$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
         else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
-        { airflow create_user "$@" || airflow users create "$@" ; } &&
-        { airflow sync_perm || airflow sync-perm ;} &&
+        { airflow users create "$@" || airflow create_user "$@" ; } &&
+        { airflow sync-perm || airflow sync_perm ;} &&
         airflow webserver
     - --
     - -r
@@ -154,7 +154,7 @@ spec:
   - args:
     - bash
     - -c
-    - (airflow upgradedb || airflow db upgrade) && airflow triggerer
+    - (airflow db upgrade || airflow upgradedb) && airflow triggerer
     command:
     - /entrypoint
     env:
