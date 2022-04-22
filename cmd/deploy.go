@@ -178,15 +178,20 @@ func deployAirflow(path, name, wsID string, prompt bool) error {
 		}
 	}
 
+	deploymentInfo, err := houstonClient.GetDeployment(deploymentID)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment info: %w", err)
+	}
+
 	fmt.Printf(messages.HoustonDeploymentPrompt, name)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(c, name, path, nextTag, cloudDomain)
+	err = buildPushDockerImage(c, deploymentInfo, name, path, nextTag, cloudDomain)
 	if err != nil {
 		return err
 	}
 
-	deploymentLink := getAirflowUILink(deploymentID)
+	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
 	fmt.Printf("Successfully pushed Docker image to Astronomer registry, it can take a few minutes to update the deployment with the new image. Navigate to the Astronomer UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
 	return nil
@@ -203,7 +208,7 @@ func deploymentNameExists(name string, deployments []houston.Deployment) bool {
 	return false
 }
 
-func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain string) error {
+func buildPushDockerImage(c config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain string) error {
 	// Build our image
 	fmt.Println(messages.ImageBuildingPrompt)
 
@@ -214,7 +219,7 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 	}
 
 	image, tag := docker.GetImageTagFromParsedFile(cmds)
-	if config.CFG.ShowWarnings.GetBool() && !validImageRepo(image) {
+	if config.CFG.ShowWarnings.GetBool() && !validAirflowImageRepo(image) && !validRuntimeImageRepo(image) {
 		i, _ := input.Confirm(fmt.Sprintf(messages.WarningInvalidImageName, image))
 		if !i {
 			fmt.Println("Canceling deploy...")
@@ -227,9 +232,16 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 		return err
 	}
 
-	if config.CFG.ShowWarnings.GetBool() && !deploymentConfig.IsValidTag(tag) {
-		validTags := strings.Join(deploymentConfig.GetValidTags(tag), ", ")
-
+	// ignoring the error as user can be connected to platform where runtime is not enabled
+	runtimeReleases, _ := houstonClient.GetRuntimeReleases("")
+	var validTags string
+	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
+		validTags = strings.Join(deploymentConfig.GetValidTags(tag), ", ")
+	}
+	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredRuntimeVersion != "" && !runtimeReleases.IsValidVersion(tag) {
+		validTags = strings.Join(runtimeReleases.GreaterVersions(tag), ", ")
+	}
+	if validTags != "" {
 		msg := fmt.Sprintf(messages.WarningInvalidNameTag, tag, validTags)
 		if validTags == "" {
 			msg = fmt.Sprintf(messages.WarningInvalidNameTagEmptyRecommendations, tag)
@@ -241,6 +253,7 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 			os.Exit(1)
 		}
 	}
+
 	imageHandler, err := imageHandlerInit(name)
 	if err != nil {
 		return err
@@ -257,7 +270,7 @@ func buildPushDockerImage(c config.Context, name, path, nextTag, cloudDomain str
 	return imageHandler.Push(cloudDomain, c.Token, nextTag)
 }
 
-func validImageRepo(image string) bool {
+func validAirflowImageRepo(image string) bool {
 	validDockerfileBaseImages := map[string]bool{
 		"quay.io/astronomer/ap-airflow": true,
 		"astronomerinc/ap-airflow":      true,
@@ -269,16 +282,23 @@ func validImageRepo(image string) bool {
 	return result
 }
 
-func getAirflowUILink(deploymentID string) string {
+func validRuntimeImageRepo(image string) bool {
+	validDockerfileBaseImages := map[string]bool{
+		"quay.io/astronomer/astro-runtime": true,
+	}
+	result, ok := validDockerfileBaseImages[image]
+	if !ok {
+		return false
+	}
+	return result
+}
+
+func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
 	if deploymentID == "" {
 		return ""
 	}
 
-	resp, err := houstonClient.GetDeployment(deploymentID)
-	if err != nil || resp == nil {
-		return ""
-	}
-	for _, url := range resp.Urls {
+	for _, url := range deploymentURLs {
 		if url.Type == houston.AirflowURLType {
 			return url.URL
 		}

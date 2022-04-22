@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/config"
@@ -21,11 +22,19 @@ var (
 	verboseLevel   string
 	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
 	initDebugLogs = []string{}
+
+	appConfig *houston.AppConfig
 )
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd(client houston.ClientInterface, out io.Writer) *cobra.Command {
 	houstonClient = client
+
+	var err error
+	appConfig, err = houstonClient.GetAppConfig()
+	if err != nil {
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
+	}
 
 	rootCmd := &cobra.Command{
 		Use:   "astro",

@@ -9,8 +9,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/astronomer/astro-cli/airflow/types"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -310,10 +308,7 @@ func airflowInit(cmd *cobra.Command, _ []string, out io.Writer) error {
 	}
 
 	// check feature flag if AstroRuntime is enabled, if not, fallback to astronomer certified, if not able to get feature flag, we don't want to block the user
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		logrus.Debugln("Error checking feature flag", err)
-	} else if !appConfig.Flags.AstroRuntimeEnabled {
+	if appConfig != nil && !appConfig.Flags.AstroRuntimeEnabled {
 		useAstronomerCertified = true
 	}
 

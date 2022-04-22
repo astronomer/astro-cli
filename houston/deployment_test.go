@@ -464,3 +464,114 @@ func TestListDeploymentLogs(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestUpdateDeploymentRuntime(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	mockDeployment := &Response{
+		Data: ResponseData{
+			UpdateDeploymentRuntime: &Deployment{
+				ID:                    "deployment-test-id",
+				Type:                  "airflow",
+				Label:                 "test deployment",
+				ReleaseName:           "prehistoric-gravity-930",
+				Version:               "2.2.0",
+				AirflowVersion:        "",
+				DesiredAirflowVersion: "",
+				RuntimeVersion:        "4.2.4",
+				DesiredRuntimeVersion: "4.2.4",
+				RuntimeAirflowVersion: "2.2.5",
+				DeploymentInfo:        DeploymentInfo{},
+				Workspace: Workspace{
+					ID: "test-workspace-id",
+				},
+				Urls: []DeploymentURL{
+					{Type: "airflow", URL: "http://airflow.com"},
+					{Type: "flower", URL: "http://flower.com"},
+				},
+				CreatedAt: "2020-06-25T22:10:42.385Z",
+				UpdatedAt: "2020-06-25T22:10:42.385Z",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockDeployment)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
+		assert.NoError(t, err)
+		assert.Equal(t, deployment, mockDeployment.Data.UpdateDeploymentRuntime)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestCancelUpdateDeploymentRuntime(t *testing.T) {
+	testUtil.InitTestConfig()
+
+	mockDeployment := &Response{
+		Data: ResponseData{
+			CancelUpdateDeploymentRuntime: &Deployment{
+				ID:                    "deployment-test-id",
+				Label:                 "test deployment",
+				ReleaseName:           "prehistoric-gravity-930",
+				Version:               "2.2.0",
+				RuntimeVersion:        "4.2.4",
+				DesiredRuntimeVersion: "4.2.4",
+				RuntimeAirflowVersion: "2.2.5",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockDeployment)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
+		assert.NoError(t, err)
+		assert.Equal(t, deployment, mockDeployment.Data.CancelUpdateDeploymentRuntime)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}

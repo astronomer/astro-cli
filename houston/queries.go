@@ -24,6 +24,7 @@ var (
 		$workspaceId: Uuid!
 		$executor: ExecutorType!
 		$airflowVersion: String
+		$runtimeVersion: String
 		$namespace: String
 		$config: JSON
 		$cloudRole: String
@@ -36,7 +37,8 @@ var (
 			workspaceUuid: $workspaceId
 			releaseName: $releaseName
 			executor: $executor
-		        airflowVersion: $airflowVersion
+			airflowVersion: $airflowVersion
+			runtimeVersion: $runtimeVersion
 			namespace: $namespace
 			config: $config
 			cloudRole: $cloudRole
@@ -51,6 +53,7 @@ var (
 			releaseName
 			version
 			airflowVersion
+			runtimeVersion
 			urls {
 				type
 				url
@@ -105,6 +108,7 @@ var (
 			}
 			version
 			airflowVersion
+			runtimeVersion
 			createdAt
 			updatedAt
 		}
@@ -127,6 +131,9 @@ var (
 			id
 			airflowVersion
 			desiredAirflowVersion
+			runtimeVersion
+			desiredRuntimeVersion
+			runtimeAirflowVersion
 			urls {
 				type
 				url
@@ -164,6 +171,32 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			releaseName
 			airflowVersion
 			desiredAirflowVersion
+		}
+	}`
+
+	UpdateDeploymentRuntimeRequest = `
+	mutation updateDeploymentRuntime($deploymentUuid: Uuid!, $desiredRuntimeVersion: String!) {
+		updateDeploymentRuntime(deploymentUuid: $deploymentUuid, desiredRuntimeVersion: $desiredRuntimeVersion) {
+		  	id
+			label
+			version
+			releaseName
+		  	runtimeVersion
+		  	desiredRuntimeVersion
+		  	runtimeAirflowVersion
+		}
+	}`
+
+	CancelUpdateDeploymentRuntimeRequest = `
+	mutation cancelRuntimeUpdate($deploymentUuid: Uuid!) {
+		cancelRuntimeUpdate(deploymentUuid: $deploymentUuid) {
+			id
+			label
+			version
+			releaseName
+			runtimeVersion
+			desiredRuntimeVersion
+			runtimeAirflowVersion
 		}
 	}`
 
@@ -604,6 +637,15 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			hardDeleteDeployment
 			triggererEnabled
 			featureFlags
+		}
+	}`
+
+	GetRuntimeReleases = `
+	query runtimeReleases($airflowVersion: String) {
+		runtimeReleases(airflowVersion: $airflowVersion) {
+		  	version
+		  	airflowVersion
+		  	airflowDatabaseMigrations
 		}
 	}`
 )
