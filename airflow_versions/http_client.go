@@ -12,13 +12,15 @@ import (
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
-	HTTPClient *httputil.HTTPClient
+	HTTPClient             *httputil.HTTPClient
+	useAstronomerCertified bool
 }
 
 // NewClient returns a new Client with the logger and HTTP client setup.
-func NewClient(c *httputil.HTTPClient) *Client {
+func NewClient(c *httputil.HTTPClient, useAstronomerCertified bool) *Client {
 	return &Client{
-		HTTPClient: c,
+		HTTPClient:             c,
+		useAstronomerCertified: useAstronomerCertified,
 	}
 }
 
@@ -38,13 +40,16 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 
 // Do executes the given HTTP request and returns the HTTP Response
 func (r *Request) Do() (*Response, error) {
-	return r.DoWithClient(NewClient(httputil.NewHTTPClient()))
+	return r.DoWithClient(NewClient(httputil.NewHTTPClient(), false))
 }
 
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
 func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	var response httputil.HTTPResponse
-	url := config.CFG.AirflowReleasesURL.GetString()
+	url := config.CFG.RuntimeReleasesURL.GetString()
+	if c.useAstronomerCertified {
+		url = config.CFG.AirflowReleasesURL.GetString()
+	}
 	httpResponse, err := c.HTTPClient.Do("GET", url, &doOpts)
 	if err != nil {
 		return nil, err

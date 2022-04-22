@@ -6,6 +6,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,4 +81,43 @@ func TestGetTriggererServiceNamePodman(t *testing.T) {
 	config.CFG.TriggererContainerName.SetHomeString("triggerer_tmp")
 	triggererName := GetTriggererServiceName()
 	assert.Equal(t, triggererName, "triggerer_tmp")
+}
+
+func TestCheckTriggererEnabled(t *testing.T) {
+	t.Run("astro-runtime supported version", func(t *testing.T) {
+		labels := map[string]string{
+			runtimeVersionLabelName: triggererAllowedRuntimeVersion,
+		}
+		triggererEnabled, err := CheckTriggererEnabled(labels)
+		assert.NoError(t, err)
+		assert.True(t, triggererEnabled)
+	})
+
+	t.Run("astro-runtime unsupported version", func(t *testing.T) {
+		labels := map[string]string{
+			runtimeVersionLabelName: "3.0.0",
+		}
+		triggererEnabled, err := CheckTriggererEnabled(labels)
+		assert.NoError(t, err)
+		assert.False(t, triggererEnabled)
+	})
+
+	t.Run("astronomer-certified supported version", func(t *testing.T) {
+		labels := map[string]string{
+			airflowVersionLabelName: "2.4.0",
+		}
+		triggererEnabled, err := CheckTriggererEnabled(labels)
+		assert.NoError(t, err)
+		assert.True(t, triggererEnabled)
+	})
+
+	t.Run("astronomer-certified unsupported version", func(t *testing.T) {
+		labels := map[string]string{
+			airflowVersionLabelName: "2.1.0",
+		}
+
+		triggererEnabled, err := CheckTriggererEnabled(labels)
+		assert.NoError(t, err)
+		assert.False(t, triggererEnabled)
+	})
 }

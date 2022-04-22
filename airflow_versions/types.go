@@ -13,10 +13,26 @@ import (
 // only fixed: error parsing regexp: invalid or unsupported Perl syntax: `(?<` via replace `?<` with `?P<`
 var AirflowVersionReg = regexp.MustCompile(`v?(?:(?:(?P<epoch>[0-9]+)!)?(?P<release>[0-9]+(?:\.[0-9]+)*)(?P<pre>[-_.]?(?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))[-_.]?(?P<pre_n>[0-9]+)?)?(?P<post>(?:-(?P<post_n1>[0-9]+))|(?:[-_.]?(?P<post_l>post|rev|r)[-_.]?(?P<post_n2>[0-9]+)?))?(?P<dev>[-_.]?(?P<dev_l>dev)[-_.]?(?P<dev_n>[0-9]+)?)?)(?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?`)
 
-// Response wraps all updates.astronomer.io response structs used for json marashalling
+// Response wraps all updates.astronomer.io response structs used for json marshaling
 type Response struct {
-	AvailableReleases []AirflowVersionRaw `json:"available_releases"`
-	Version           string              `json:"version"`
+	AvailableReleases []AirflowVersionRaw       `json:"available_releases"`
+	Version           string                    `json:"version"`
+	RuntimeVersions   map[string]RuntimeVersion `json:"runtimeVersions"`
+}
+
+type RuntimeVersion struct {
+	Metadata   RuntimeVersionMetadata   `json:"metadata"`
+	Migrations RuntimeVersionMigrations `json:"migrations"`
+}
+
+type RuntimeVersionMetadata struct {
+	AirflowVersion string `json:"airflowVersion"`
+	Channel        string `json:"channel"`
+	ReleaseDate    string `json:"releaseDate"`
+}
+
+type RuntimeVersionMigrations struct {
+	AirflowDatabase bool `json:"airflowDatabase"`
 }
 
 // AirflowVersionRaw represents a single airflow version.

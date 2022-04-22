@@ -43,12 +43,19 @@ func TestCheckServiceStateFalse(t *testing.T) {
 }
 
 func TestGenerateConfig(t *testing.T) {
+	oldCheckTriggererEnabled := CheckTriggererEnabled
+
+	CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
+		return true, nil
+	}
+
 	fs := afero.NewMemMapFs()
 	configYaml := testUtils.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 	config.CFG.ProjectName.SetHomeString("test")
-	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}, DockerEngine)
+	labels := map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}
+	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", labels, DockerEngine)
 	assert.NoError(t, err)
 	expectedCfg := `version: '3.1'
 
@@ -86,7 +93,7 @@ services:
     image: test-project-name/airflow:latest
     container_name: test-scheduler
     command: >
-      bash -c "(airflow upgradedb || airflow db upgrade) && airflow scheduler"
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow scheduler"
     restart: unless-stopped
     networks:
       - airflow
@@ -116,8 +123,8 @@ services:
       bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
         else export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.default ; fi &&
-        { airflow create_user "$$@" || airflow users create "$$@" ; } &&
-        { airflow sync_perm || airflow sync-perm ;} &&
+        { airflow users create "$$@" || airflow create_user "$$@" ; } &&
+        { airflow sync-perm || airflow sync_perm ;} &&
         airflow webserver' -- -r Admin -u admin -e admin@example.com -f admin -l user -p admin
     restart: unless-stopped
     networks:
@@ -155,7 +162,7 @@ services:
     image: test-project-name/airflow:latest
     container_name: test-triggerer
     command: >
-      bash -c "(airflow upgradedb || airflow db upgrade) && airflow triggerer"
+      bash -c "(airflow db upgrade || airflow upgradedb) && airflow triggerer"
     restart: unless-stopped
     networks:
       - airflow
@@ -180,6 +187,8 @@ services:
     
 `
 	assert.Equal(t, cfg, expectedCfg)
+
+	CheckTriggererEnabled = oldCheckTriggererEnabled
 }
 
 func TestExecVersion(t *testing.T) {
@@ -210,9 +219,14 @@ func TestExecPipeNils(t *testing.T) {
 }
 
 func TestDockerStartFailure(t *testing.T) {
-	composeMock, docker, _ := getComposeMocks()
+	composeMock, docker, imageMock := getComposeMocks()
 	composeMock.On("Ps", mock.Anything, mock.Anything, mock.Anything).Return([]api.ContainerSummary{{ID: "testID", Name: "test", State: "running"}}, nil)
 	composeMock.On("Up", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	composeMock.On("Events", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	imageMock.On("Build", mock.Anything).Return(nil)
+	mockLabels := map[string]string{airflowVersionLabelName: triggererAllowedAirflowVersion}
+	imageMock.On("GetImageLabels").Return(mockLabels)
 	options := containerTypes.ContainerStartConfig{
 		DockerfilePath: "./testfiles/Dockerfile.Airflow1.ok",
 	}
