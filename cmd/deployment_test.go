@@ -35,7 +35,11 @@ var (
 		CreatedAt: "2021-04-26T20:03:36.262Z",
 		UpdatedAt: "2021-04-26T20:03:36.262Z",
 	}
-	mockAppConfig    = &houston.AppConfig{}
+	mockAppConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
 	mockDeploymentSA = &houston.ServiceAccount{
 		ID:         "q1w2e3r4t5y6u7i8o9p0",
 		APIKey:     "000000000000000000000000",
@@ -772,4 +776,134 @@ func TestDeploymentTeamsListCmd(t *testing.T) {
 	cmd := newDeploymentTeamListCmd(buf)
 	assert.NotNil(t, cmd)
 	assert.Nil(t, cmd.Args)
+}
+
+func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = ""
+	mockDeploymentResponse.DesiredAirflowVersion = ""
+	mockDeploymentResponse.RuntimeVersion = "4.2.4"
+	mockDeploymentResponse.RuntimeAirflowVersion = "2.2.5"
+	mockDeploymentResponse.DesiredRuntimeVersion = "4.2.5"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid":        mockDeploymentResponse.ID,
+		"desiredRuntimeVersion": mockDeploymentResponse.DesiredRuntimeVersion,
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"runtime",
+		"upgrade",
+		"--deployment-id="+mockDeploymentResponse.ID,
+		"--desired-runtime-version="+mockDeploymentResponse.DesiredRuntimeVersion,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `Runtime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Runtime 4.2.4.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = ""
+	mockDeploymentResponse.DesiredAirflowVersion = ""
+	mockDeploymentResponse.RuntimeVersion = "4.2.4"
+	mockDeploymentResponse.DesiredRuntimeVersion = "4.2.5"
+	mockDeploymentResponse.RuntimeAirflowVersion = "2.2.5"
+
+	expectedUpdateRequest := map[string]interface{}{
+		"deploymentUuid": mockDeploymentResponse.ID,
+	}
+
+	mockDeploymentUpdated := mockDeploymentResponse
+	mockDeploymentUpdated.DesiredRuntimeVersion = mockDeploymentUpdated.RuntimeVersion
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("CancelUpdateDeploymentRuntime", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"runtime",
+		"upgrade",
+		"--cancel",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "2.2.4"
+	mockDeploymentResponse.DesiredAirflowVersion = "2.2.4"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid":        mockDeploymentResponse.ID,
+		"desiredRuntimeVersion": "4.2.4",
+	}
+
+	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: "2.2.4", Version: "4.2.4"}}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"runtime",
+		"migrate",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
+	testUtil.InitTestConfig()
+	expectedOut := `Runtime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 2.2.4.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "2.2.4"
+	mockDeploymentResponse.DesiredAirflowVersion = "2.2.4"
+	mockDeploymentResponse.RuntimeVersion = ""
+	mockDeploymentResponse.DesiredRuntimeVersion = "4.2.4"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid": mockDeploymentResponse.ID,
+	}
+
+	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: mockDeploymentResponse.AirflowVersion, Version: mockDeploymentResponse.DesiredRuntimeVersion}}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("CancelUpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
+
+	output, err := executeCommandC(api,
+		"deployment",
+		"runtime",
+		"migrate",
+		"--cancel",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
 }

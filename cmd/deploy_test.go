@@ -43,95 +43,19 @@ func TestDeploymentNameDoesntExists(t *testing.T) {
 	}
 }
 
-func Test_validImageRepo(t *testing.T) {
-	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
-	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
-	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
+func TestValidAirflowImageRepo(t *testing.T) {
+	assert.True(t, validAirflowImageRepo("quay.io/astronomer/ap-airflow"))
+	assert.True(t, validAirflowImageRepo("astronomerinc/ap-airflow"))
+	assert.False(t, validAirflowImageRepo("personal-repo/ap-airflow"))
+}
+
+func TestValidRuntimeImageRepo(t *testing.T) {
+	assert.False(t, validRuntimeImageRepo("quay.io/astronomer/ap-airflow"))
+	assert.True(t, validRuntimeImageRepo("quay.io/astronomer/astro-runtime"))
+	assert.False(t, validRuntimeImageRepo("personal-repo/ap-airflow"))
 }
 
 func TestBuildPushDockerImageSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
-
-	mockImageHandler := new(mocks.ImageHandler)
-	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		return mockImageHandler, nil
-	}
-
-	mockedDeploymentConfig := &houston.DeploymentConfig{
-		AirflowVersions: []string{
-			"2.1.0",
-			"2.0.2",
-			"2.0.0",
-			"1.10.15",
-			"1.10.14",
-			"1.10.12",
-			"1.10.10",
-			"1.10.7",
-			"1.10.5",
-		},
-	}
-	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
-	houstonClient = houstonMock
-
-	err := buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
-	assert.NoError(t, err)
-	mockImageHandler.AssertExpectations(t)
-	houstonMock.AssertExpectations(t)
-}
-
-func TestBuildPushDockerImageFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
-
-	mockedDeploymentConfig := &houston.DeploymentConfig{
-		AirflowVersions: []string{
-			"2.1.0",
-			"2.0.2",
-			"2.0.0",
-			"1.10.15",
-			"1.10.14",
-			"1.10.12",
-			"1.10.10",
-			"1.10.7",
-			"1.10.5",
-		},
-	}
-	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
-	houstonClient = houstonMock
-
-	mockImageHandler := new(mocks.ImageHandler)
-	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
-		mockImageHandler.On("Build", mock.Anything).Return(errSomeContainerIssue)
-		return mockImageHandler, nil
-	}
-
-	err := buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockImageHandler.AssertExpectations(t)
-
-	mockImageHandler = new(mocks.ImageHandler)
-	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
-		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
-		return mockImageHandler, nil
-	}
-
-	err = buildPushDockerImage(config.Context{}, "test", "./testfiles/", "test", "test")
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockImageHandler.AssertExpectations(t)
-	houstonMock.AssertExpectations(t)
-}
-
-func TestGetAirflowUILink(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("docker")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
@@ -158,12 +82,117 @@ func TestGetAirflowUILink(t *testing.T) {
 		UpdatedAt: "2021-04-26T20:03:36.262Z",
 	}
 
+	mockImageHandler := new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
+		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		return mockImageHandler, nil
+	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowVersions: []string{
+			"2.1.0",
+			"2.0.2",
+			"2.0.0",
+			"1.10.15",
+			"1.10.14",
+			"1.10.12",
+			"1.10.10",
+			"1.10.7",
+			"1.10.5",
+		},
+	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeployment", mock.Anything).Return(mockDeployment, nil)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
 	houstonClient = houstonMock
 
-	expectedResult := "https://deployments.local.astronomer.io/testDeploymentName/airflow"
-	actualResult := getAirflowUILink("testDeploymentID")
-	assert.Equal(t, expectedResult, actualResult)
+	err := buildPushDockerImage(config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test")
+	assert.NoError(t, err)
+	mockImageHandler.AssertExpectations(t)
 	houstonMock.AssertExpectations(t)
+}
+
+func TestBuildPushDockerImageFailure(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("docker")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+
+	mockDeployment = &houston.Deployment{
+		ID:                    "cknz133ra49758zr9w34b87ua",
+		Type:                  "airflow",
+		Label:                 "test",
+		ReleaseName:           "testDeploymentName",
+		Version:               "0.15.6",
+		AirflowVersion:        "2.0.0",
+		DesiredAirflowVersion: "2.0.0",
+		DeploymentInfo:        houston.DeploymentInfo{},
+		Workspace: houston.Workspace{
+			ID:    "ckn4phn1k0104v5xtrer5lpli",
+			Label: "w1",
+		},
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+		},
+		CreatedAt: "2021-04-26T20:03:36.262Z",
+		UpdatedAt: "2021-04-26T20:03:36.262Z",
+	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowVersions: []string{
+			"2.1.0",
+			"2.0.2",
+			"2.0.0",
+			"1.10.15",
+			"1.10.14",
+			"1.10.12",
+			"1.10.10",
+			"1.10.7",
+			"1.10.5",
+		},
+	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
+	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	houstonClient = houstonMock
+
+	mockImageHandler := new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
+		mockImageHandler.On("Build", mock.Anything).Return(errSomeContainerIssue)
+		return mockImageHandler, nil
+	}
+
+	err := buildPushDockerImage(config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test")
+	assert.Error(t, err, errSomeContainerIssue.Error())
+	mockImageHandler.AssertExpectations(t)
+
+	mockImageHandler = new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) (airflow.ImageHandler, error) {
+		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
+		return mockImageHandler, nil
+	}
+
+	err = buildPushDockerImage(config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test")
+	assert.Error(t, err, errSomeContainerIssue.Error())
+	mockImageHandler.AssertExpectations(t)
+	houstonMock.AssertExpectations(t)
+}
+
+func TestGetAirflowUILink(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("docker")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+
+	mockURLs := []houston.DeploymentURL{
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+	}
+
+	expectedResult := "https://deployments.local.astronomer.io/testDeploymentName/airflow"
+	actualResult := getAirflowUILink("testDeploymentID", mockURLs)
+	assert.Equal(t, expectedResult, actualResult)
 }
