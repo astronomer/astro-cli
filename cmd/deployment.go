@@ -6,8 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/astronomer/astro-cli/deployment"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/messages"
@@ -158,8 +156,11 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentUserRootCmd(out),
 		newDeploymentTeamRootCmd(out),
 		newDeploymentAirflowRootCmd(out),
-		newDeploymentRuntimeRootCmd(out),
 	)
+
+	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
+		cmd.AddCommand(newDeploymentRuntimeRootCmd(out))
+	}
 	return cmd
 }
 
@@ -176,14 +177,12 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
-	} else {
+	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled bool
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+		runtimeEnabled = appConfig.Flags.AstroRuntimeEnabled
 	}
 
 	// let's hide under feature flag
@@ -204,9 +203,12 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
+	if runtimeEnabled {
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
+	}
+
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "Add executor parameter: local, celery, or kubernetes")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired airflow version parameter: e.g: 1.10.5 or 1.10.7")
-	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	return cmd
@@ -269,10 +271,7 @@ $ astro deployment update UUID --dag-deployment-type=volume --nfs-location=test:
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
-	} else {
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -651,10 +650,7 @@ func deploymentCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		logrus.Debugln("Error checking feature flag", err)
-	} else {
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 	}
@@ -731,10 +727,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		logrus.Debugln("Error checking feature flag", err)
-	} else {
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 	}

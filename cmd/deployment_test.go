@@ -35,7 +35,11 @@ var (
 		CreatedAt: "2021-04-26T20:03:36.262Z",
 		UpdatedAt: "2021-04-26T20:03:36.262Z",
 	}
-	mockAppConfig    = &houston.AppConfig{}
+	mockAppConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
 	mockDeploymentSA = &houston.ServiceAccount{
 		ID:         "q1w2e3r4t5y6u7i8o9p0",
 		APIKey:     "000000000000000000000000",
