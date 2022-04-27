@@ -41,8 +41,12 @@ func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersio
 	availableVersions := []string{}
 
 	// If user wants a specific runtime version, check that it is a valid runtime released version
-	if _, ok := runtimeVersions[userRuntimeVersion]; userRuntimeVersion != "" && ok {
-		return userRuntimeVersion, nil
+	if userRuntimeVersion != "" {
+		if _, ok := runtimeVersions[userRuntimeVersion]; ok {
+			return userRuntimeVersion, nil
+		}
+		// user provided invalid runtime version, print warning
+		fmt.Printf("You provided an invalid runtime version %s, ignoring provided version...", userRuntimeVersion)
 	}
 
 	for runtimeVersion, r := range runtimeVersions {
