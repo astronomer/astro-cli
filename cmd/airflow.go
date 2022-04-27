@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	errNotProjectDir         = errors.New("not in a project directory")
-	errProjectConfigNotFound = errors.New("project config file does not exists")
-	errInvalidProjectName    = errors.New(messages.ErrInvalidConfigProjectName)
+	errNotProjectDir                        = errors.New("not in a project directory")
+	errProjectConfigNotFound                = errors.New("project config file does not exists")
+	errInvalidProjectName                   = errors.New(messages.ErrInvalidConfigProjectName)
+	errInvalidBothAirflowAndRuntimeVersions = errors.New("You provided both a runtime version and an Airflow version. You have to provide only one of these to initialize your project.") //nolint
 )
 
 var (
@@ -112,8 +113,12 @@ func newAirflowInitCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of airflow project")
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy")
+	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "v", "", "Version of airflow you want to deploy. Only used if --use-astronomer-certified is true.")
 	cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
+	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "r", "", "Version of astro-runtime you want to deploy. Only used if --use-astronomer-certified is false.")
+	}
+
 	return cmd
 }
 
@@ -312,8 +317,18 @@ func airflowInit(cmd *cobra.Command, _ []string, out io.Writer) error {
 		useAstronomerCertified = true
 	}
 
+	// Validate runtimeVersion and airflowVersion
+	if airflowVersion != "" && runtimeVersion != "" {
+		return errInvalidBothAirflowAndRuntimeVersions
+	}
+	if useAstronomerCertified && runtimeVersion != "" {
+		fmt.Println("You provided a runtime version with the --use-astronomer-certified flag. Thus, this command will ignore the --runtime-version value you provided.")
+		runtimeVersion = ""
+	}
+
+	// if runtime version is set, use runtime version. If user specifies --use-astronomer-certified, or use runtime but didn't provide version, get default image tag
 	httpClient := airflowversions.NewClient(httputil.NewHTTPClient(), useAstronomerCertified)
-	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, httpClient, houstonClient, out)
+	defaultImageTag, err := prepareDefaultAirflowImageTag(airflowVersion, runtimeVersion, httpClient, houstonClient, out)
 	if err != nil {
 		return err
 	}
