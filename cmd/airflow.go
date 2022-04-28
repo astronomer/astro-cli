@@ -28,7 +28,7 @@ var (
 	errNotProjectDir                        = errors.New("not in a project directory")
 	errProjectConfigNotFound                = errors.New("project config file does not exists")
 	errInvalidProjectName                   = errors.New(messages.ErrInvalidConfigProjectName)
-	errInvalidBothAirflowAndRuntimeVersions = errors.New("You provided both a runtime version and an Airflow version. You have to provide only one of these to initialize your project.") //nolint
+	errInvalidBothAirflowAndRuntimeVersions = errors.New("You provided both a Runtime version and an Airflow version. You have to provide only one of these to initialize your project.") //nolint
 )
 
 var (
