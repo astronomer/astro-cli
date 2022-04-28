@@ -43,7 +43,7 @@ jobs:
       - checkout
       - run:
           name: goreleaser
-          command: curl -sL https://git.io/goreleaser | bash
+          command: curl -sL https://raw.githubusercontent.com/goreleaser/get/master/get | bash
 workflows:
   version: 2.1
   build-images:
