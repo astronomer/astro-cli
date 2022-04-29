@@ -19,7 +19,7 @@ func (e ErrNoTagAvailable) Error() string {
 }
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, error) {
+func GetDefaultImageTag(httpClient *Client, airflowVersion, userRuntimeVersion string) (string, error) {
 	r := Request{}
 
 	resp, err := r.DoWithClient(httpClient)
@@ -31,14 +31,23 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, erro
 		return getAstronomerCertifiedTag(resp.AvailableReleases, airflowVersion)
 	}
 
-	return getAstroRuntimeTag(resp.RuntimeVersions, airflowVersion)
+	return getAstroRuntimeTag(resp.RuntimeVersions, airflowVersion, userRuntimeVersion)
 }
 
 // get latest runtime tag associated to provided airflow version
 // if no airflow version is provided, returns the latest astro runtime version available
-func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersion string) (string, error) {
+func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersion, userRuntimeVersion string) (string, error) {
 	availableTags := []string{}
 	availableVersions := []string{}
+
+	// If user wants a specific runtime version, check that it is a valid runtime released version
+	if userRuntimeVersion != "" {
+		if _, ok := runtimeVersions[userRuntimeVersion]; ok {
+			return userRuntimeVersion, nil
+		}
+		// user provided invalid runtime version, print warning
+		fmt.Printf("You provided an invalid runtime version %s, ignoring provided version...", userRuntimeVersion)
+	}
 
 	for runtimeVersion, r := range runtimeVersions {
 		if r.Metadata.Channel != VersionChannelStable {

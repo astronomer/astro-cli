@@ -145,16 +145,19 @@ func TestGetAstroRuntimeTag(t *testing.T) {
 
 	tests := []struct {
 		airflowVersion string
+		runtimeVersion string
 		output         string
 		err            error
 	}{
 		{airflowVersion: "", output: "4.0.0", err: nil},
+		{airflowVersion: "", runtimeVersion: "9.9.9", output: "4.0.0", err: nil},
 		{airflowVersion: "2.1.1", output: "3.0.1", err: nil},
+		{airflowVersion: "", runtimeVersion: "3.1.0", output: "3.1.0", err: nil},
 		{airflowVersion: "2.2.2", output: "", err: ErrNoTagAvailable{airflowVersion: "2.2.2"}},
 	}
 
 	for _, tt := range tests {
-		defaultImageTag, err := getAstroRuntimeTag(tagToRuntimeVersion, tt.airflowVersion)
+		defaultImageTag, err := getAstroRuntimeTag(tagToRuntimeVersion, tt.airflowVersion, tt.runtimeVersion)
 		if tt.err == nil {
 			assert.NoError(t, err)
 		} else {
@@ -176,7 +179,7 @@ func TestGetDefaultImageTagError(t *testing.T) {
 	})
 	httpClient := NewClient(client, true)
 
-	defaultImageTag, err := GetDefaultImageTag(httpClient, "")
+	defaultImageTag, err := GetDefaultImageTag(httpClient, "", "")
 	assert.Error(t, err)
 	assert.Equal(t, "", defaultImageTag)
 }
