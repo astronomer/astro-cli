@@ -13,7 +13,7 @@ import (
 
 var errAirflowVersionNotSupported = errors.New("the --airflow-version flag is not supported if you're not authenticated to Astronomer. Please authenticate and try again")
 
-func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client, houstonClient houston.ClientInterface, out io.Writer) (string, error) {
+func prepareDefaultAirflowImageTag(airflowVersion, userRuntimeVersion string, httpClient *airflowversions.Client, houstonClient houston.ClientInterface, out io.Writer) (string, error) {
 	deploymentConfig, err := houstonClient.GetDeploymentConfig()
 	if err == nil {
 		acceptableAirflowVersions := deploymentConfig.AirflowVersions
@@ -29,7 +29,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 
-	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, airflowVersion)
+	defaultImageTag, _ := airflowversions.GetDefaultImageTag(httpClient, airflowVersion, userRuntimeVersion)
 
 	if defaultImageTag == "" {
 		if useAstronomerCertified {
