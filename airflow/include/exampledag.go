@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 
 
@@ -45,9 +45,9 @@ with DAG(
     # catchup=False # enable if you don't want historical dag runs to run
 ) as dag:
 
-    t0 = DummyOperator(task_id='start')
+    t0 = EmptyOperator(task_id='start')
 
-    t1 = DummyOperator(task_id='group_bash_tasks')
+    t1 = EmptyOperator(task_id='group_bash_tasks')
     t2 = BashOperator(task_id='bash_print_date1', bash_command='sleep $[ ( $RANDOM % 30 )  + 1 ]s && date')
     t3 = BashOperator(task_id='bash_print_date2', bash_command='sleep $[ ( $RANDOM % 30 )  + 1 ]s && date')
 
