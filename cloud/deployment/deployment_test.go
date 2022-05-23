@@ -145,12 +145,12 @@ func TestCreate(t *testing.T) {
 	})
 
 	t.Run("invalid resources", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", 10, 5, 15, mockClient)
+		err := Create("", ws, "test-desc", csID, "4.2.5", 10, 5, 15, nil)
 		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		// mockClient.AssertExpectations(t)
 	})
 
 	t.Run("list workspace failure", func(t *testing.T) {
@@ -177,26 +177,26 @@ func TestCreate(t *testing.T) {
 
 func TestValidateResources(t *testing.T) {
 	t.Run("invalid workerAU", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 		resp := validateResources(0, 3, 3)
 		assert.False(t, resp)
-		mockClient.AssertExpectations(t)
+		// mockClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid schedulerAU", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		// mockClient := new(astro_mocks.Client)
+		// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 		resp := validateResources(10, 0, 3)
 		assert.False(t, resp)
-		mockClient.AssertExpectations(t)
+		// mockClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid runtime version", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Twice()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 		resp, err := validateRuntimeVersion("4.2.4", mockClient)
 		assert.NoError(t, err)
@@ -291,7 +291,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Twice()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
+		// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Twice()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 
 		// mock os.Stdin
@@ -399,7 +399,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("update deployment failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		// mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
 		err := Update("test-id", "", ws, "", 0, 0, 0, true, mockClient)

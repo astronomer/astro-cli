@@ -121,7 +121,6 @@ func TestDeploymentUpdate(t *testing.T) {
 
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 	mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
