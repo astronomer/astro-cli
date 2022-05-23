@@ -5,51 +5,66 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
-	containerTypes "github.com/astronomer/astro-cli/airflow/types"
-
-	"github.com/astronomer/astro-cli/messages"
-
-	clicommand "github.com/docker/cli/cli/command"
-	cliconfig "github.com/docker/cli/cli/config"
+	cliCommand "github.com/docker/cli/cli/command"
+	cliConfig "github.com/docker/cli/cli/config"
+	cliTypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	log "github.com/sirupsen/logrus"
+
+	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 )
+
+const (
+	DockerCmd          = "docker"
+	EchoCmd            = "echo"
+	pushingImagePrompt = "Pushing image to Astronomer registry"
+)
+
+var errGetImageLabel = errors.New("error getting image label")
 
 type DockerImage struct {
 	imageName string
 }
 
 func DockerImageInit(image string) *DockerImage {
-	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(config containerTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	// Change to location of Dockerfile
 	err := os.Chdir(config.Path)
 	if err != nil {
 		return err
 	}
-	imageName := imageName(d.imageName, "latest")
 
 	args := []string{
 		"build",
 		"-t",
-		imageName,
+		d.imageName,
 		".",
 	}
 	if config.NoCache {
 		args = append(args, "--no-cache")
 	}
 	// Build image
-	err = dockerExec(nil, nil, args...)
+	var stdout, stderr io.Writer
+	if config.Output {
+		stdout = os.Stdout
+		stderr = os.Stderr
+	} else {
+		stdout = nil
+		stderr = nil
+	}
+	err = cmdExec(DockerCmd, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
@@ -57,36 +72,37 @@ func (d *DockerImage) Build(config containerTypes.ImageBuildConfig) error {
 	return nil
 }
 
-func (d *DockerImage) Push(cloudDomain, token, remoteImageTag string) error {
-	registry := "registry." + cloudDomain
-	remoteImage := fmt.Sprintf("%s/%s", registry, imageName(d.imageName, remoteImageTag))
-
-	err := dockerExec(nil, nil, "tag", imageName(d.imageName, "latest"), remoteImage)
+func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
+	err := cmdExec(DockerCmd, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
 		return fmt.Errorf("command 'docker tag %s %s' failed: %w", d.imageName, remoteImage, err)
 	}
 
 	// Push image to registry
-	fmt.Println(messages.PushingImagePrompt)
+	fmt.Println(pushingImagePrompt)
 
-	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+	configFile := cliConfig.LoadDefaultConfigFile(os.Stderr)
 
 	authConfig, err := configFile.GetAuthConfig(registry)
-	// TODO: rethink how to reuse creds store
-	authConfig.Password = token
-
-	log.Debugf("Exec Push docker creds %v \n", authConfig)
 	if err != nil {
 		log.Debugf("Error reading credentials: %v", err)
 		return fmt.Errorf("error reading credentials: %w", err)
 	}
+
+	if username != "" {
+		authConfig.Username = username
+	}
+	authConfig.Password = token
+	authConfig.ServerAddress = registry
+	log.Debugf("Exec Push docker creds %v \n", authConfig)
 
 	ctx := context.Background()
 
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		log.Debugf("Error setting up new Client ops %v", err)
-		panic(err)
+		// if NewClientWithOpt does not work use bash to run docker commands
+		return useBash(&authConfig, remoteImage)
 	}
 	cli.NegotiateAPIVersion(ctx)
 	buf, err := json.Marshal(authConfig)
@@ -98,29 +114,56 @@ func (d *DockerImage) Push(cloudDomain, token, remoteImageTag string) error {
 	responseBody, err := cli.ImagePush(ctx, remoteImage, types.ImagePushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
 		log.Debugf("Error pushing image to docker: %v", err)
-		return err
+		// if NewClientWithOpt does not work use bash to run docker commands
+		return useBash(&authConfig, remoteImage)
 	}
 	defer responseBody.Close()
-	out := clicommand.NewOutStream(os.Stdout)
-	err = jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
+	err = displayJSONMessagesToStream(responseBody, nil)
 	if err != nil {
 		return err
 	}
 
 	// Delete the image tags we just generated
-	err = dockerExec(nil, nil, "rmi", remoteImage)
+	err = cmdExec(DockerCmd, nil, nil, "rmi", remoteImage)
 	if err != nil {
 		return fmt.Errorf("command 'docker rmi %s' failed: %w", remoteImage, err)
 	}
 	return nil
 }
 
-func (d *DockerImage) GetImageLabels() (map[string]string, error) {
+var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
+	out := cliCommand.NewOutStream(os.Stdout)
+	err := jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DockerImage) GetLabel(labelName string) (string, error) {
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	labelFmt := fmt.Sprintf("{{ index .Config.Labels %q }}", labelName)
+	var label string
+	err := cmdExec(DockerCmd, stdout, stderr, "inspect", "--format", labelFmt, d.imageName)
+	if err != nil {
+		return label, err
+	}
+	if execErr := stderr.String(); execErr != "" {
+		return label, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
+	}
+	label = stdout.String()
+	label = strings.Trim(label, "\n")
+	return label, nil
+}
+
+func (d *DockerImage) ListLabels() (map[string]string, error) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
 	var labels map[string]string
-	err := dockerExec(stdout, stderr, "inspect", "--format", "{{ json .Config.Labels }}", imageName(d.imageName, "latest"))
+	err := cmdExec(DockerCmd, stdout, stderr, "inspect", "--format", "{{ json .Config.Labels }}", d.imageName)
 	if err != nil {
 		return labels, err
 	}
@@ -135,29 +178,37 @@ func (d *DockerImage) GetImageLabels() (map[string]string, error) {
 }
 
 // Exec executes a docker command
-var dockerExec = func(stdout, stderr io.Writer, args ...string) error {
-	_, lookErr := exec.LookPath(Docker)
+var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+	_, lookErr := exec.LookPath(cmd)
 	if lookErr != nil {
-		return fmt.Errorf("failed to find the docker binary: %w", lookErr)
+		return fmt.Errorf("failed to find the %s command: %w", cmd, lookErr)
 	}
 
-	cmd := exec.Command(Docker, args...)
-	cmd.Stdin = os.Stdin
-	if stdout == nil {
-		cmd.Stdout = os.Stdout
-	} else {
-		cmd.Stdout = stdout
-	}
+	execCMD := exec.Command(cmd, args...)
+	execCMD.Stdin = os.Stdin
+	execCMD.Stdout = stdout
+	execCMD.Stderr = stderr
 
-	if stderr == nil {
-		cmd.Stderr = os.Stderr
-	} else {
-		cmd.Stderr = stderr
-	}
-
-	if cmdErr := cmd.Run(); cmdErr != nil {
+	if cmdErr := execCMD.Run(); cmdErr != nil {
 		return fmt.Errorf("failed to execute cmd: %w", cmdErr)
 	}
 
+	return nil
+}
+
+// When login and push do not work use bash to run docker commands
+func useBash(authConfig *cliTypes.AuthConfig, image string) error {
+	var err error
+	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
+		err = cmdExec(EchoCmd, nil, nil, fmt.Sprintf("%q", authConfig.Password), "|", DockerCmd, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
+	}
+	if err != nil {
+		return err
+	}
+	// docker push <image>
+	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "push", image)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -3,7 +3,7 @@ package houston
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func TestAddWorkspaceUser(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -41,7 +41,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -56,7 +56,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -68,7 +68,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 }
 
 func TestDeleteWorkspaceUser(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -97,7 +97,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -112,7 +112,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -124,26 +124,21 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 }
 
 func TestListWorkspaceUserAndRoles(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			GetWorkspaces: []Workspace{
+			WorkspaceGetUsers: []WorkspaceUserRoleBindings{
 				{
-					ID:          "workspace-id",
-					Label:       "label",
-					Description: "description",
-					Users: []User{
+					ID:       "user-id",
+					Username: "test@astronomer.com",
+					FullName: "test",
+					Emails:   []Email{{Address: "test@astronomer.com"}},
+					RoleBindings: []RoleBindingWorkspace{
 						{
-							ID: "id",
-							Emails: []Email{
-								{Address: "test@astronomer.com"},
-							},
-							Username: "test",
+							Role: WorkspaceViewerRole,
 						},
 					},
-					CreatedAt: "2020-06-25T22:10:42.385Z",
-					UpdatedAt: "2020-06-25T22:10:42.385Z",
 				},
 			},
 		},
@@ -155,7 +150,7 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -163,14 +158,14 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 
 		response, err := api.ListWorkspaceUserAndRoles("workspace-id")
 		assert.NoError(t, err)
-		assert.Equal(t, response, &mockResponse.Data.GetWorkspaces[0])
+		assert.Equal(t, response, mockResponse.Data.WorkspaceGetUsers)
 	})
 
 	t.Run("error", func(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -182,7 +177,7 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 }
 
 func TestUpdateWorkspaceUserAndRole(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -196,7 +191,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -211,7 +206,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -223,7 +218,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 }
 
 func TestGetWorkspaceUserRole(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -246,7 +241,7 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -261,7 +256,7 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})

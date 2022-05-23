@@ -3,7 +3,7 @@ package houston
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func TestListDeploymentUsers(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -38,7 +38,7 @@ func TestListDeploymentUsers(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -53,7 +53,7 @@ func TestListDeploymentUsers(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -65,7 +65,7 @@ func TestListDeploymentUsers(t *testing.T) {
 }
 
 func TestAddDeploymentUser(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -92,7 +92,7 @@ func TestAddDeploymentUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -107,7 +107,7 @@ func TestAddDeploymentUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -119,7 +119,7 @@ func TestAddDeploymentUser(t *testing.T) {
 }
 
 func TestUpdateDeploymentUser(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -146,7 +146,7 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -161,7 +161,7 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -173,7 +173,7 @@ func TestUpdateDeploymentUser(t *testing.T) {
 }
 
 func TestDeleteDeploymentUser(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -200,7 +200,7 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -215,7 +215,7 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})

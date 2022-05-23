@@ -13,52 +13,40 @@ type Response struct {
 }
 
 type ResponseData struct {
-	AddDeploymentUser              *RoleBinding              `json:"deploymentAddUserRole,omitempty"`
-	AddDeploymentTeam              *RoleBinding              `json:"deploymentAddTeamRole,omitempty"`
-	DeleteDeploymentUser           *RoleBinding              `json:"deploymentRemoveUserRole,omitempty"`
-	RemoveDeploymentTeam           *RoleBinding              `json:"deploymentRemoveTeamRole,omitempty"`
-	UpdateDeploymentUser           *RoleBinding              `json:"deploymentUpdateUserRole,omitempty"`
-	UpdateDeploymentTeam           *RoleBinding              `json:"deploymentUpdateTeamRole,omitempty"`
-	DeploymentUserList             []DeploymentUser          `json:"deploymentUsers,omitempty"`
-	DeploymentGetTeams             []Team                    `json:"deploymentTeams,omitempty"`
-	AddWorkspaceUser               *Workspace                `json:"workspaceAddUser,omitempty"`
-	AddWorkspaceTeam               *Workspace                `json:"workspaceAddTeam,omitempty"`
-	RemoveWorkspaceUser            *Workspace                `json:"workspaceRemoveUser,omitempty"`
-	RemoveWorkspaceTeam            *Workspace                `json:"workspaceRemoveTeam,omitempty"`
-	CreateDeployment               *Deployment               `json:"createDeployment,omitempty"`
-	CreateToken                    *AuthUser                 `json:"createToken,omitempty"`
-	CreateWorkspaceServiceAccount  *WorkspaceServiceAccount  `json:"createWorkspaceServiceAccount,omitempty"`
-	CreateDeploymentServiceAccount *DeploymentServiceAccount `json:"createDeploymentServiceAccount,omitempty"`
-	CreateUser                     *AuthUser                 `json:"createUser,omitempty"`
-	CreateWorkspace                *Workspace                `json:"createWorkspace,omitempty"`
-	DeleteDeployment               *Deployment               `json:"deleteDeployment,omitempty"`
-	DeleteWorkspaceServiceAccount  *ServiceAccount           `json:"deleteWorkspaceServiceAccount,omitempty"`
-	DeleteDeploymentServiceAccount *ServiceAccount           `json:"deleteDeploymentServiceAccount,omitempty"`
-	DeleteWorkspace                *Workspace                `json:"deleteWorkspace,omitempty"`
-	GetDeployment                  Deployment                `json:"deployment,omitempty"`
-	GetDeployments                 []Deployment              `json:"workspaceDeployments,omitempty"`
-	GetAuthConfig                  *AuthConfig               `json:"authConfig,omitempty"`
-	GetAppConfig                   *AppConfig                `json:"appConfig,omitempty"`
-	GetDeploymentServiceAccounts   []ServiceAccount          `json:"deploymentServiceAccounts,omitempty"`
-	GetWorkspaceServiceAccounts    []ServiceAccount          `json:"workspaceServiceAccounts,omitempty"`
-	GetUsers                       []User                    `json:"users,omitempty"`
-	GetWorkspaces                  []Workspace               `json:"workspaces,omitempty"`
-	GetWorkspace                   *Workspace                `json:"workspace,omitempty"`
-	UpdateDeployment               *Deployment               `json:"updateDeployment,omitempty"`
-	UpdateDeploymentAirflow        *Deployment               `json:"updateDeploymentAirflow,omitempty"`
-	UpdateDeploymentRuntime        *Deployment               `json:"updateDeploymentRuntime,omitempty"`
-	CancelUpdateDeploymentRuntime  *Deployment               `json:"cancelRuntimeUpdate,omitempty"`
-	UpdateWorkspace                *Workspace                `json:"updateWorkspace,omitempty"`
-	DeploymentLog                  []DeploymentLog           `json:"logs,omitempty"`
-	WorkspaceUpdateUserRole        string                    `json:"workspaceUpdateUserRole,omitempty"`
-	WorkspaceUpdateTeamRole        string                    `json:"workspaceUpdateTeamRole,omitempty"`
-	WorkspaceGetUser               WorkspaceUserRoleBindings `json:"workspaceUser,omitempty"`
-	WorkspaceGetTeams              []Team                    `json:"workspaceTeams,omitempty"`
-	DeploymentConfig               DeploymentConfig          `json:"deploymentConfig,omitempty"`
-	GetDeploymentNamespaces        []Namespace               `json:"availableNamespaces,omitempty"`
-	GetTeam                        *Team                     `json:"team,omitempty"`
-	GetTeamUsers                   []User                    `json:"teamUsers,omitempty"`
-	RuntimeReleases                RuntimeReleases           `json:"runtimeReleases,omitempty"`
+	AddDeploymentUser              *RoleBinding                `json:"deploymentAddUserRole,omitempty"`
+	DeleteDeploymentUser           *RoleBinding                `json:"deploymentRemoveUserRole,omitempty"`
+	UpdateDeploymentUser           *RoleBinding                `json:"deploymentUpdateUserRole,omitempty"`
+	DeploymentUserList             []DeploymentUser            `json:"deploymentUsers,omitempty"`
+	AddWorkspaceUser               *Workspace                  `json:"workspaceAddUser,omitempty"`
+	RemoveWorkspaceUser            *Workspace                  `json:"workspaceRemoveUser,omitempty"`
+	CreateDeployment               *Deployment                 `json:"createDeployment,omitempty"`
+	CreateToken                    *AuthUser                   `json:"createToken,omitempty"`
+	CreateWorkspaceServiceAccount  *WorkspaceServiceAccount    `json:"createWorkspaceServiceAccount,omitempty"`
+	CreateDeploymentServiceAccount *DeploymentServiceAccount   `json:"createDeploymentServiceAccount,omitempty"`
+	CreateUser                     *AuthUser                   `json:"createUser,omitempty"`
+	CreateWorkspace                *Workspace                  `json:"createWorkspace,omitempty"`
+	DeleteDeployment               *Deployment                 `json:"deleteDeployment,omitempty"`
+	DeleteWorkspaceServiceAccount  *ServiceAccount             `json:"deleteWorkspaceServiceAccount,omitempty"`
+	DeleteDeploymentServiceAccount *ServiceAccount             `json:"deleteDeploymentServiceAccount,omitempty"`
+	DeleteWorkspace                *Workspace                  `json:"deleteWorkspace,omitempty"`
+	GetDeployment                  Deployment                  `json:"deployment,omitempty"`
+	GetDeployments                 []Deployment                `json:"workspaceDeployments,omitempty"`
+	GetAuthConfig                  *AuthConfig                 `json:"authConfig,omitempty"`
+	GetAppConfig                   *AppConfig                  `json:"appConfig,omitempty"`
+	GetDeploymentServiceAccounts   []ServiceAccount            `json:"deploymentServiceAccounts,omitempty"`
+	GetWorkspaceServiceAccounts    []ServiceAccount            `json:"workspaceServiceAccounts,omitempty"`
+	GetUsers                       []User                      `json:"users,omitempty"`
+	GetWorkspaces                  []Workspace                 `json:"workspaces,omitempty"`
+	GetWorkspace                   *Workspace                  `json:"workspace,omitempty"`
+	UpdateDeployment               *Deployment                 `json:"updateDeployment,omitempty"`
+	UpdateDeploymentAirflow        *Deployment                 `json:"updateDeploymentAirflow,omitempty"`
+	UpdateWorkspace                *Workspace                  `json:"updateWorkspace,omitempty"`
+	DeploymentLog                  []DeploymentLog             `json:"logs,omitempty"`
+	WorkspaceUpdateUserRole        string                      `json:"workspaceUpdateUserRole,omitempty"`
+	WorkspaceGetUser               WorkspaceUserRoleBindings   `json:"workspaceUser,omitempty"`
+	WorkspaceGetUsers              []WorkspaceUserRoleBindings `json:"workspaceUsers,omitempty"`
+	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
+	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
 }
 
 type Namespace struct {
@@ -100,9 +88,6 @@ type Deployment struct {
 	ReleaseName           string          `json:"releaseName"`
 	Version               string          `json:"version"`
 	AirflowVersion        string          `json:"airflowVersion"`
-	RuntimeVersion        string          `json:"runtimeVersion"`
-	RuntimeAirflowVersion string          `json:"runtimeAirflowVersion"`
-	DesiredRuntimeVersion string          `json:"desiredRuntimeVersion"`
 	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
 	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
 	Workspace             Workspace       `json:"workspace"`
@@ -181,12 +166,6 @@ type DeploymentUser struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
-// DeploymentTeam defines a structure of RBAC deployment teams
-type DeploymentTeam struct {
-	ID           string        `json:"id"`
-	RoleBindings []RoleBinding `json:"roleBindings"`
-}
-
 // DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object
 type DeploymentServiceAccount struct {
 	ID             string `json:"id"`
@@ -220,20 +199,9 @@ type User struct {
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
-	Teams    []Team  `json:"teams"`
 	// created at
 	// updated at
 	// profile
-}
-
-// Team contains all components of an Astronomer Team
-type Team struct {
-	ID           string        `json:"id"`
-	Name         string        `json:"name"`
-	SortID       int           `json:"sortId"`
-	CreatedAt    string        `json:"createdAt"`
-	UpdatedAt    string        `json:"updatedAt"`
-	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 type RoleBindingWorkspace struct {
@@ -244,10 +212,10 @@ type RoleBindingWorkspace struct {
 }
 
 type WorkspaceUserRoleBindings struct {
-	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
-}
-
-type WorkspaceTeamRoleBindings struct {
+	ID           string                 `json:"id"`
+	Username     string                 `json:"username"`
+	FullName     string                 `json:"fullName"`
+	Emails       []Email                `json:"emails"`
 	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
 }
 
@@ -256,8 +224,6 @@ type RoleBinding struct {
 	User           RoleBindingUser         `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
 	Deployment     Deployment              `json:"deployment"`
-	Workspace      Workspace               `json:"workspace"`
-	Team           Team                    `json:"team"`
 }
 
 type RoleBindingUser struct {
@@ -290,15 +256,6 @@ type AirflowImage struct {
 	Version string `json:"version"`
 	Tag     string `json:"tag"`
 }
-
-// RuntimeRelease contains info releated to a runtime release
-type RuntimeRelease struct {
-	Version           string `json:"version"`
-	AirflowVersion    string `json:"airflowVersion"`
-	AirflowDBMigraion bool   `json:"airflowDatabaseMigrations"`
-}
-
-type RuntimeReleases []RuntimeRelease
 
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
@@ -337,33 +294,6 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 	return false
 }
 
-func (r RuntimeReleases) IsValidVersion(version string) bool {
-	for idx := range r {
-		if r[idx].Version == version {
-			return true
-		}
-	}
-	return false
-}
-
-func (r RuntimeReleases) GreaterVersions(version string) []string {
-	greaterVersions := []string{}
-	currentVersion, err := coerce(version)
-	if err != nil {
-		return greaterVersions
-	}
-	for idx := range r {
-		runtimeVersion, err := coerce(r[idx].Version)
-		if err != nil {
-			continue
-		}
-		if runtimeVersion.Compare(currentVersion) >= 0 {
-			greaterVersions = append(greaterVersions, r[idx].Version)
-		}
-	}
-	return greaterVersions
-}
-
 // AppConfig contains current houston config
 type AppConfig struct {
 	Version                string       `json:"version"`
@@ -385,7 +315,6 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
-	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 }
 
 // coerce a string into SemVer if possible

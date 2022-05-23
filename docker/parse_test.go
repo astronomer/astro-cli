@@ -13,23 +13,23 @@ func TestAllCmds(t *testing.T) {
 }
 
 func TestParseReaderParseError(t *testing.T) {
-	dockerfile := "FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild\nCMD [\"echo\", 1]"
+	dockerfile := "FROM quay.io/astronomer/astro-runtime:3.0.2\nCMD [\"echo\", 1]"
 	_, err := ParseReader(bytes.NewBufferString(dockerfile))
 	assert.IsType(t, ParseError{}, err)
 }
 
 func TestParseReader(t *testing.T) {
-	dockerfile := `FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild`
+	dockerfile := `FROM quay.io/astronomer/astro-runtime:3.0.2`
 	cmds, err := ParseReader(bytes.NewBufferString(dockerfile))
 	assert.Nil(t, err)
 	expected := []Command{
 		{
-			Cmd:       "FROM",
-			Original:  "FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild",
+			Cmd:       "from",
+			Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
 			StartLine: 1,
 			EndLine:   1,
 			Flags:     []string{},
-			Value:     []string{"quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild"},
+			Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
 		},
 	}
 	assert.Equal(t, expected, cmds)
@@ -46,31 +46,81 @@ func TestParseFile(t *testing.T) {
 	assert.Nil(t, err)
 	expected := []Command{
 		{
-			Cmd:       "FROM",
-			Original:  "FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild",
+			Cmd:       "from",
+			Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
 			StartLine: 1,
 			EndLine:   1,
 			Flags:     []string{},
-			Value:     []string{"quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild"},
+			Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
 		},
 	}
 	assert.Equal(t, expected, cmds)
 }
 
+func TestGetImageFromParsedFile(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmds := []Command{
+			{
+				Cmd:       "from",
+				Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
+			},
+		}
+		image := GetImageFromParsedFile(cmds)
+		assert.Equal(t, "quay.io/astronomer/astro-runtime:3.0.2", image)
+	})
+
+	t.Run("no image name found", func(t *testing.T) {
+		cmds := []Command{
+			{
+				Cmd:       "echo",
+				Original:  "echo $?",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{"$?"},
+			},
+		}
+		image := GetImageFromParsedFile(cmds)
+		assert.Equal(t, "", image)
+	})
+}
+
 func TestGetImageTagFromParsedFile(t *testing.T) {
-	cmds := []Command{
-		{
-			Cmd:       "from",
-			Original:  "FROM quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild",
-			StartLine: 1,
-			EndLine:   1,
-			Flags:     []string{},
-			Value:     []string{"quay.io/astronomer/ap-airflow:2.0.0-buster-onbuild"},
-		},
-	}
-	image, tag := GetImageTagFromParsedFile(cmds)
-	assert.Equal(t, "quay.io/astronomer/ap-airflow", image)
-	assert.Equal(t, "2.0.0-buster-onbuild", tag)
+	t.Run("success", func(t *testing.T) {
+		cmds := []Command{
+			{
+				Cmd:       "from",
+				Original:  "FROM quay.io/astronomer/astro-runtime:3.0.2",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
+			},
+		}
+		image, tag := GetImageTagFromParsedFile(cmds)
+		assert.Equal(t, "quay.io/astronomer/astro-runtime", image)
+		assert.Equal(t, "3.0.2", tag)
+	})
+
+	t.Run("no image name found", func(t *testing.T) {
+		cmds := []Command{
+			{
+				Cmd:       "echo",
+				Original:  "echo $?",
+				StartLine: 1,
+				EndLine:   1,
+				Flags:     []string{},
+				Value:     []string{"$?"},
+			},
+		}
+		image, tag := GetImageTagFromParsedFile(cmds)
+		assert.Equal(t, "", image)
+		assert.Equal(t, "", tag)
+	})
 }
 
 func TestParseImageName(t *testing.T) {

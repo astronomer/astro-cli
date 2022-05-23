@@ -86,7 +86,7 @@ func ParseReader(file io.Reader) ([]Command, error) {
 	return ret, nil
 }
 
-// ParseFile parses a Dockerfile from a filename.  An IOError or ParseError may occur.
+// ParseFile a Dockerfile from a filename.  An IOError or ParseError may occur.
 var ParseFile = func(filename string) ([]Command, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -95,6 +95,18 @@ var ParseFile = func(filename string) ([]Command, error) {
 	defer file.Close()
 
 	return ParseReader(file)
+}
+
+// Parse image from parsed dockerfile:
+// e.g. FROM ubuntu:xenial returns "ubuntu:xenial"
+func GetImageFromParsedFile(cmds []Command) (image string) {
+	for _, cmd := range cmds {
+		if cmd.Cmd == command.From {
+			from := cmd.Value[0]
+			return from
+		}
+	}
+	return ""
 }
 
 // Parse tag from parsed dockerfile:

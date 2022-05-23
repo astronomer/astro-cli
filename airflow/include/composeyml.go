@@ -13,15 +13,12 @@ networks:
 volumes:
   postgres_data:
     driver: local
-    name: {{ .ProjectName }}_postgres_data
   airflow_logs:
     driver: local
-    name: {{ .ProjectName }}_airflow_logs
 
 services:
   postgres:
-    image: postgres:12.2
-    container_name: {{ .ProjectName }}-postgres
+    image: postgres:12.6
     restart: unless-stopped
     networks:
       - airflow
@@ -38,7 +35,6 @@ services:
 
   scheduler:
     image: {{ .AirflowImage }}
-    container_name: {{ .SchedulerContainerName }}
     command: >
       bash -c "(airflow db upgrade || airflow upgradedb) && airflow scheduler"
     restart: unless-stopped
@@ -56,16 +52,17 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://{{ .PostgresUser }}:{{ .PostgresPassword }}@{{ .PostgresHost }}:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+      ASTRONOMER_ENVIRONMENT: local
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
+      - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 
   webserver:
     image: {{ .AirflowImage }}
-    container_name: {{ .WebserverContainerName }}
     command: >
       bash -c 'if [[ -z "$$AIRFLOW__API__AUTH_BACKEND" ]] && [[ $$(pip show -f apache-airflow | grep basic_auth.py) ]];
         then export AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth ;
@@ -90,24 +87,25 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
+      ASTRONOMER_ENVIRONMENT: local
     ports:
       - {{ .AirflowWebserverPort }}:8080
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
+      - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:{{ .MountLabel }}
       - airflow_logs:/usr/local/airflow/logs
     healthcheck:
       test: curl --fail http://webserver:8080/health || exit 1
-      interval: 10s
-      retries: 50
-      start_period: 10s
-      timeout: 10s
+      interval: 2s
+      retries: 15
+      start_period: 5s
+      timeout: 60s
     {{ .AirflowEnvFile }}
 {{if .TriggererEnabled}}
   triggerer:
     image: {{ .AirflowImage }}
-    container_name: {{ .TriggererContainerName }}
     command: >
       bash -c "(airflow db upgrade || airflow upgradedb) && airflow triggerer"
     restart: unless-stopped

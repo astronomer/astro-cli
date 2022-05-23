@@ -3,16 +3,20 @@ package houston
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAuthenticateWithBasicAuth(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
 
 	mockToken := &Response{
 		Data: ResponseData{
@@ -30,13 +34,13 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
 		api := NewClient(client)
 
-		token, err := api.AuthenticateWithBasicAuth("username", "password")
+		token, err := api.AuthenticateWithBasicAuth("username", "password", &ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, token, mockToken.Data.CreateToken.Token.Value)
 	})
@@ -45,19 +49,22 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
 		api := NewClient(client)
 
-		_, err := api.AuthenticateWithBasicAuth("username", "password")
+		_, err := api.AuthenticateWithBasicAuth("username", "password", &ctx)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
 
 func TestGetAuthConfig(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
 
 	mockAuthConfig := &Response{
 		Data: ResponseData{
@@ -74,13 +81,13 @@ func TestGetAuthConfig(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
 		api := NewClient(client)
 
-		authConfig, err := api.GetAuthConfig()
+		authConfig, err := api.GetAuthConfig(&ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, authConfig, mockAuthConfig.Data.GetAuthConfig)
 	})
@@ -89,13 +96,13 @@ func TestGetAuthConfig(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAuthConfig()
+		_, err := api.GetAuthConfig(&ctx)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

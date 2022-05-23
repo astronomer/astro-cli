@@ -1,0 +1,1 @@
+FROM quay.io/astronomer/ap-airflow:4.5.6

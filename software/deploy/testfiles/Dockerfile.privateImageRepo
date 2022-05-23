@@ -1,0 +1,1 @@
+FROM quay.io/test-org/airflow:2.1.0-onbuild

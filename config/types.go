@@ -1,12 +1,5 @@
 package config
 
-import "errors"
-
-var (
-	ErrHomeConfigNotFound    = errors.New("home config doesn't exists")
-	ErrProjectConfigNotFound = errors.New("project config doesn't exists")
-)
-
 // cfg defines settings a single configuration setting can have
 type cfg struct {
 	Path    string
@@ -15,61 +8,63 @@ type cfg struct {
 
 // cfgs houses all configurations for an astro project
 type cfgs struct {
-	CloudAPIProtocol       cfg
-	CloudAPIPort           cfg
-	CloudWSProtocol        cfg
-	CloudAPIToken          cfg
-	Context                cfg
-	Contexts               cfg
-	LocalEnabled           cfg
-	LocalHouston           cfg
-	LocalOrbit             cfg
-	PostgresUser           cfg
-	PostgresPassword       cfg
-	PostgresHost           cfg
-	PostgresPort           cfg
-	ProjectName            cfg
-	ProjectDeployment      cfg
-	ProjectWorkspace       cfg
-	WebserverPort          cfg
-	ShowWarnings           cfg
-	AirflowReleasesURL     cfg
-	RuntimeReleasesURL     cfg
-	SkipVerifyTLS          cfg
-	Verbosity              cfg
-	ContainerEngine        cfg
-	PodmanConnectionURI    cfg
-	SchedulerContainerName cfg
-	WebserverContainerName cfg
-	TriggererContainerName cfg
-	HoustonDialTimeout     cfg
+	CloudAPIProtocol     cfg
+	CloudAPIPort         cfg
+	CloudWSProtocol      cfg
+	CloudAPIToken        cfg
+	Context              cfg
+	Contexts             cfg
+	LocalEnabled         cfg
+	LocalAstro           cfg
+	LocalPublicAstro     cfg
+	LocalRegistry        cfg
+	LocalHouston         cfg
+	LocalPlatform        cfg
+	PostgresUser         cfg
+	PostgresPassword     cfg
+	PostgresHost         cfg
+	PostgresPort         cfg
+	ProjectName          cfg
+	ProjectDeployment    cfg
+	ProjectWorkspace     cfg
+	WebserverPort        cfg
+	ShowWarnings         cfg
+	Verbosity            cfg
+	HoustonDialTimeout   cfg
+	HoustonSkipVerifyTLS cfg
 }
 
 // Creates a new cfg struct
 func newCfg(path, dflt string) cfg {
-	config := cfg{path, dflt}
-	CFGStrMap[path] = config
-	return config
+	ncfg := cfg{path, dflt}
+	CFGStrMap[path] = ncfg
+	return ncfg
 }
 
 // SetHomeString sets a string value in home config
 func (c cfg) SetHomeString(value string) error {
 	if !configExists(viperHome) {
-		return ErrHomeConfigNotFound
+		return nil
 	}
 	viperHome.Set(c.Path, value)
 	err := saveConfig(viperHome, HomeConfigFile)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetProjectString sets a string value in project config
 func (c cfg) SetProjectString(value string) error {
 	if !configExists(viperProject) {
-		return ErrProjectConfigNotFound
+		return nil
 	}
 	viperProject.Set(c.Path, value)
 	err := saveConfig(viperProject, viperProject.ConfigFileUsed())
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetString will return the requested config, check working dir and fallback to home
@@ -88,7 +83,7 @@ func (c cfg) GetBool() bool {
 	return viperHome.GetBool(c.Path)
 }
 
-// GetBool will return the integer value of requested config, check working dir and fallback to home
+// GetInt will return the integer value of requested config, check working dir and fallback to home
 func (c cfg) GetInt() int {
 	if configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return viperProject.GetInt(c.Path)

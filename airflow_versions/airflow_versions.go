@@ -6,7 +6,11 @@ import (
 	"strings"
 )
 
-const VersionChannelStable = "stable"
+const (
+	VersionChannelStable  = "stable"
+	DefaultRuntimeVersion = "5.0.1"
+	DefaultAirflowVersion = "2.3.0-onbuild"
+)
 
 var tagPrefixOrder = []string{"buster-onbuild", "onbuild", "buster"}
 
@@ -19,7 +23,7 @@ func (e ErrNoTagAvailable) Error() string {
 }
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(httpClient *Client, airflowVersion, userRuntimeVersion string) (string, error) {
+func GetDefaultImageTag(httpClient *Client, airflowVersion string) (string, error) {
 	r := Request{}
 
 	resp, err := r.DoWithClient(httpClient)
@@ -31,23 +35,14 @@ func GetDefaultImageTag(httpClient *Client, airflowVersion, userRuntimeVersion s
 		return getAstronomerCertifiedTag(resp.AvailableReleases, airflowVersion)
 	}
 
-	return getAstroRuntimeTag(resp.RuntimeVersions, airflowVersion, userRuntimeVersion)
+	return getAstroRuntimeTag(resp.RuntimeVersions, airflowVersion)
 }
 
-// get latest runtime tag associated to provided airflow version
+// get latest runtime tag associated to provided airflow version or directly runtimeVersion
 // if no airflow version is provided, returns the latest astro runtime version available
-func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersion, userRuntimeVersion string) (string, error) {
+func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersion string) (string, error) {
 	availableTags := []string{}
 	availableVersions := []string{}
-
-	// If user wants a specific runtime version, check that it is a valid runtime released version
-	if userRuntimeVersion != "" {
-		if _, ok := runtimeVersions[userRuntimeVersion]; ok {
-			return userRuntimeVersion, nil
-		}
-		// user provided invalid runtime version, print warning
-		fmt.Printf("You provided an invalid runtime version %s, ignoring provided version...", userRuntimeVersion)
-	}
 
 	for runtimeVersion, r := range runtimeVersions {
 		if r.Metadata.Channel != VersionChannelStable {
@@ -76,8 +71,10 @@ func getAstroRuntimeTag(runtimeVersions map[string]RuntimeVersion, airflowVersio
 	for i := 1; i < len(tagsToUse); i++ {
 		tag := tagsToUse[i]
 		nextVersion, err := NewAirflowVersion(tag, []string{tag})
-		if err == nil && nextVersion.GreaterThan(latestVersion) {
-			latestVersion = nextVersion
+		if err == nil {
+			if nextVersion.GreaterThan(latestVersion) {
+				latestVersion = nextVersion
+			}
 		}
 	}
 

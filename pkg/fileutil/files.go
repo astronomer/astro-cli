@@ -7,14 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
-const (
-	defaultFilePerm os.FileMode = 0777
-)
+var perm os.FileMode = 0o777
 
-// Exists returns a boolean indicating if the given path already exists in fs or os in case fs is nil
+// Exists returns a boolean indicating if the given path already exists
 func Exists(path string, fs afero.Fs) (bool, error) {
 	if path == "" {
 		return false, nil
@@ -27,7 +26,7 @@ func Exists(path string, fs afero.Fs) (bool, error) {
 		}
 
 		if !os.IsNotExist(err) {
-			return false, fmt.Errorf("cannot determine if path exists, error ambiguous: %w", err)
+			return false, errors.Wrap(err, "cannot determine if path exists, error ambiguous")
 		}
 	} else {
 		res, err := afero.Exists(fs, path)
@@ -51,7 +50,7 @@ func WriteStringToFile(path, s string) error {
 func WriteToFile(path string, r io.Reader) error {
 	dir := filepath.Dir(path)
 	if dir != "" {
-		if err := os.MkdirAll(dir, defaultFilePerm); err != nil {
+		if err := os.MkdirAll(dir, perm); err != nil {
 			return err
 		}
 	}

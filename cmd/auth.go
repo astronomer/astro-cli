@@ -3,88 +3,101 @@ package cmd
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/auth"
-	"github.com/astronomer/astro-cli/cluster"
+	astro "github.com/astronomer/astro-cli/astro-client"
+	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/context"
+	softwareAuth "github.com/astronomer/astro-cli/software/auth"
+
 	"github.com/spf13/cobra"
 )
 
 var (
-	oAuthOnly bool
-	domain    string
+	loginLink bool
+	oAuth     bool
+
+	cloudLogin     = cloudAuth.Login
+	cloudLogout    = cloudAuth.Logout
+	softwareLogin  = softwareAuth.Login
+	softwareLogout = softwareAuth.Logout
 )
 
-func newAuthRootCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		// ignore PersistentPreRunE of root command
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			err := SetUpLogs(out, verboseLevel)
-			printDebugLogs()
-			return err
-		},
-		Use:   "auth",
-		Short: "Authenticate with an Astronomer Cluster",
-		Long:  "Handles authentication to an Astronomer Cluster",
-	}
-
-	cmd.AddCommand(
-		newAuthLoginCmd(out),
-		newAuthLogoutCmd(),
-	)
-	return cmd
-}
-
-func newAuthLoginCmd(out io.Writer) *cobra.Command {
+func newLoginCommand(astroClient astro.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
-		Short: "Login to Astronomer",
-		Long:  "Authenticate to houston-api using oAuth or basic auth.",
+		Short: "Log in to Astronomer",
+		Long:  "Authenticate to Astro or Astronomer Software",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return authLogin(cmd, args, out)
+			return login(cmd, args, astroClient, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&oAuthOnly, "oauth", "o", false, "do not prompt for local auth")
+	cmd.Flags().BoolVarP(&loginLink, "login-link", "l", false, "Get login link to login on a separate device for browserless cloud CLI login")
+	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
 	return cmd
 }
 
-func newAuthLogoutCmd() *cobra.Command {
+func newLogoutCommand(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Short: "Logout of Astronomer",
-		Long:  "Logout of Astronomer",
-		RunE:  authLogout,
-		Args:  cobra.MaximumNArgs(1),
+		Short: "Log out of Astronomer",
+		Long:  "Log out of Astronomer",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return logout(cmd, args, out)
+		},
+		Args: cobra.MaximumNArgs(1),
 	}
 	return cmd
 }
 
-func authLogin(cmd *cobra.Command, args []string, out io.Writer) error {
-	if len(args) == 1 {
-		domain = args[0]
-	}
-
+func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	// by using "" we are delegating username/password to Login by asking input
-	err := auth.Login(domain, oAuthOnly, "", "", houstonClient, out)
-	if err != nil {
-		return err
+	if len(args) == 1 {
+		if !context.IsCloudDomain(args[0]) {
+			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)
+		}
+		return cloudLogin(args[0], astroClient, out, loginLink)
 	}
-
-	return nil
+	// Log back into the current context in case no domain is passed
+	ctx, err := context.GetCurrentContext()
+	if err != nil || ctx.Domain == "" {
+		// Default case when no domain is passed, and error getting current context
+		return cloudLogin(cloudAuth.Domain, astroClient, out, loginLink)
+	} else if context.IsCloudDomain(ctx.Domain) {
+		return cloudLogin(ctx.Domain, astroClient, out, loginLink)
+	}
+	return softwareLogin(ctx.Domain, oAuth, "", "", houstonClient, out)
 }
 
-func authLogout(cmd *cobra.Command, args []string) error {
+func logout(cmd *cobra.Command, args []string, out io.Writer) error {
+	var domain string
 	if len(args) == 1 {
 		domain = args[0]
 	} else {
-		c, _ := cluster.GetCurrentCluster()
+		c, err := context.GetCurrentContext()
+		if err != nil {
+			return err
+		}
 		domain = c.Domain
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	auth.Logout(domain)
+	if context.IsCloudDomain(domain) {
+		cloudLogout(domain, out)
+	} else {
+		softwareLogout(domain)
+	}
 	return nil
+}
+
+// This is to ensure we throw a meaningful error in case someone is using deprecated `astro auth login` or `astro auth logout` cmd
+func newAuthCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:        "auth",
+		Deprecated: "use 'astro login' or 'astro logout' instead",
+		Hidden:     true,
+	}
+	return cmd
 }

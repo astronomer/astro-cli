@@ -39,12 +39,28 @@ func TestNewAirflowVersionWithPostN1(t *testing.T) {
 	assert.Equal(t, uint64(11), av.postN1)
 }
 
-func TestCompareAirflowVersions(t *testing.T) {
+func TestCompareAirflowVersionsHighPostN1(t *testing.T) {
 	av1, err := NewAirflowVersion("1.10.5-11", []string{"1.10.5-11-alpine3.10-onbuild"})
 	assert.NoError(t, err)
 	av2, err := NewAirflowVersion("1.10.5", []string{"1.10.5-alpine3.10-onbuild"})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, av1.Compare(av2))
+}
+
+func TestCompareAirflowVersionsLowPostN1(t *testing.T) {
+	av1, err := NewAirflowVersion("1.10.5", []string{"1.10.5-alpine3.10-onbuild"})
+	assert.NoError(t, err)
+	av2, err := NewAirflowVersion("1.10.5-11", []string{"1.10.5-11-alpine3.10-onbuild"})
+	assert.NoError(t, err)
+	assert.Equal(t, -1, av1.Compare(av2))
+}
+
+func TestCompareAirflowVersionsSamePostN1(t *testing.T) {
+	av1, err := NewAirflowVersion("1.10.5-11", []string{"1.10.5-11-alpine3.10-onbuild"})
+	assert.NoError(t, err)
+	av2, err := NewAirflowVersion("1.10.5-11", []string{"1.10.5-11-alpine3.10-onbuild"})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, av1.Compare(av2))
 }
 
 func TestCompareAirflowVersionsMajor(t *testing.T) {

@@ -2,50 +2,30 @@ package airflow
 
 import (
 	"bytes"
-	"crypto/md5" //nolint:gosec
-	"errors"
+	"crypto/md5" // nolint:gosec
 	"fmt"
-	"text/template"
+	"html/template"
+	"regexp"
+	"strings"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 )
 
-var (
-	errProjectAlreadyRunning   = errors.New("cannot start, project already running")
-	errNoLogsProjectNotRunning = errors.New("cannot view logs, project not running")
-	errAirflowNotRunning       = errors.New("airflow is not running, Start it with 'astro airflow start'")
-	errEmptyExecID             = errors.New("exec ID is empty")
-)
-
-type Container string
-
-const (
-	DockerEngine Container = "docker"
-	PodmanEngine Container = "podman"
-)
-
-// ContainerHandler defines methods require to handle all operations to run Airflow locally
 type ContainerHandler interface {
-	Start(config types.ContainerStartConfig) error
-	Kill() error
-	Logs(follow bool, containerNames ...string) error
+	Start(noCache bool) error
 	Stop() error
 	PS() error
+	Kill() error
+	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
-	ExecCommand(containerID, command string) (string, error)
-	GetContainerID(containerName string) (string, error)
-}
-
-// ImageHandler defines methods require to handle all operations on/for container images
-type ImageHandler interface {
-	Build(config types.ImageBuildConfig) error
-	Push(serverAddress, token, remoteImage string) error
-	GetImageLabels() (map[string]string, error)
+	Pytest(pytestFile, projectImageName string) (string, error)
+	Parse(buildImage string) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -53,230 +33,124 @@ type RegistryHandler interface {
 	Login(username, token string) error
 }
 
-// ComposeConfig is input data to docker compose yaml template
-type ComposeConfig struct {
-	PostgresUser           string
-	PostgresPassword       string
-	PostgresHost           string
-	PostgresPort           string
-	AirflowEnvFile         string
-	AirflowImage           string
-	AirflowHome            string
-	AirflowUser            string
-	AirflowWebserverPort   string
-	MountLabel             string
-	ProjectName            string
-	TriggererEnabled       bool
-	SchedulerContainerName string
-	WebserverContainerName string
-	TriggererContainerName string
+// ImageHandler defines methods require to handle all operations on/for container images
+type ImageHandler interface {
+	Build(config types.ImageBuildConfig) error
+	Push(registry, username, token, remoteImage string) error
+	GetLabel(labelName string) (string, error)
+	ListLabels() (map[string]string, error)
 }
 
-func ContainerHandlerInit(airflowHome, envFile string) (ContainerHandler, error) {
-	containerEngine := config.CFG.ContainerEngine.GetString()
-	switch containerEngine {
-	case string(DockerEngine):
-		return DockerComposeInit(airflowHome, envFile)
-	case string(PodmanEngine):
-		return PodmanInit(airflowHome, envFile)
-	default:
-		return DockerComposeInit(airflowHome, envFile)
-	}
+type DockerComposeAPI interface {
+	api.Service
 }
 
-func ImageHandlerInit(image string) (ImageHandler, error) {
-	containerEngine := config.CFG.ContainerEngine.GetString()
-	switch containerEngine {
-	case string(DockerEngine):
-		return DockerImageInit(image), nil
-	case string(PodmanEngine):
-		return PodmanImageInit(nil, image, nil) //nolint:staticcheck
-	default:
-		return DockerImageInit(image), nil
-	}
+type DockerCLIClient interface {
+	client.APIClient
+}
+
+type DockerRegistryAPI interface {
+	client.CommonAPIClient
+}
+
+func ContainerHandlerInit(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (ContainerHandler, error) {
+	return DockerComposeInit(airflowHome, envFile, dockerfile, isPyTestCompose)
 }
 
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
-	containerEngine := config.CFG.ContainerEngine.GetString()
-	switch containerEngine {
-	case string(DockerEngine):
-		return DockerRegistryInit(registry), nil
-	case string(PodmanEngine):
-		return PodmanRegistryInit(nil, registry) //nolint:staticcheck
-	default:
-		return DockerRegistryInit(registry), nil
-	}
+	return DockerRegistryInit(registry)
 }
 
-// generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile string, imageLabels map[string]string, containerEngine Container) (string, error) {
-	var tmplFile string
-	switch containerEngine {
-	case DockerEngine:
-		tmplFile = include.Composeyml
-	case PodmanEngine:
-		tmplFile = readPodConfigFile()
-	default:
-		tmplFile = include.Composeyml
-	}
-
-	tmpl, err := template.New("yml").Parse(tmplFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate config: %w", err)
-	}
-
-	envFile, err = getFmtEnvFile(envFile, containerEngine)
-	if err != nil {
-		return "", err
-	}
-
-	triggererEnabled, err := CheckTriggererEnabled(imageLabels)
-	if err != nil {
-		return "", err
-	}
-
-	dirName := config.CFG.ProjectName.GetString()
-	schedulerName := config.CFG.SchedulerContainerName.GetString()
-	if schedulerName == config.DefaultSchedulerName && containerEngine != PodmanEngine {
-		schedulerName = fmt.Sprintf("%s-%s", dirName, schedulerName)
-	}
-
-	webserverName := config.CFG.WebserverContainerName.GetString()
-	if webserverName == config.DefaultWebserverName && containerEngine != PodmanEngine {
-		webserverName = fmt.Sprintf("%s-%s", dirName, webserverName)
-	}
-
-	triggererName := config.CFG.TriggererContainerName.GetString()
-	if triggererName == config.DefaultTriggererName && containerEngine != PodmanEngine {
-		triggererName = fmt.Sprintf("%s-%s", dirName, triggererName)
-	}
-
-	cfg := ComposeConfig{
-		PostgresUser:           config.CFG.PostgresUser.GetString(),
-		PostgresPassword:       config.CFG.PostgresPassword.GetString(),
-		PostgresHost:           config.CFG.PostgresHost.GetString(),
-		PostgresPort:           config.CFG.PostgresPort.GetString(),
-		AirflowImage:           imageName(projectName, "latest"),
-		AirflowHome:            airflowHome,
-		AirflowUser:            "astro",
-		AirflowWebserverPort:   config.CFG.WebserverPort.GetString(),
-		AirflowEnvFile:         envFile,
-		MountLabel:             "z",
-		ProjectName:            sanitizeRepoName(projectName),
-		TriggererEnabled:       triggererEnabled,
-		SchedulerContainerName: schedulerName,
-		WebserverContainerName: webserverName,
-		TriggererContainerName: triggererName,
-	}
-
-	buff := new(bytes.Buffer)
-	err = tmpl.Execute(buff, cfg)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate config: %w", err)
-	}
-	return buff.String(), nil
+func ImageHandlerInit(image string) ImageHandler {
+	return DockerImageInit(image)
 }
 
 // projectNameUnique creates a reasonably unique project name based on the hashed
 // path of the project. This prevents collisions of projects with identical dir names
 // in different paths. ie (~/dev/project1 vs ~/prod/project1)
-func projectNameUnique() (string, error) {
+func projectNameUnique(pytest bool) (string, error) {
 	projectName := config.CFG.ProjectName.GetString()
 
 	pwd, err := fileutil.GetWorkingDir()
 	if err != nil {
-		return "", fmt.Errorf("error retrieving working directory: %w", err)
+		return "", errors.Wrap(err, "error retrieving working directory")
 	}
 
 	// #nosec
 	b := md5.Sum([]byte(pwd))
 	s := fmt.Sprintf("%x", b[:])
 
+	if pytest {
+		return s[0:6], nil
+	}
 	return projectName + "_" + s[0:6], nil
 }
 
-func getFmtEnvFile(envFile string, containerEngine Container) (string, error) {
-	if envFile == "" {
-		return "", nil
+func normalizeName(s string) string {
+	r := regexp.MustCompile("[a-z0-9_-]")
+	s = strings.ToLower(s)
+	s = strings.Join(r.FindAllString(s, -1), "")
+	return strings.TrimLeft(s, "_-")
+}
+
+// generateConfig generates the docker-compose config
+func generateConfig(projectName, airflowHome, envFile, pytestFile, buildImage string, imageLabels map[string]string, pytest bool) (string, error) {
+	var tmpl *template.Template
+	var err error
+
+	if pytest {
+		tmpl, err = template.New("yml").Parse(include.Pytestyml)
+	} else {
+		tmpl, err = template.New("yml").Parse(include.Composeyml)
+	}
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate config")
 	}
 
 	envExists, err := fileutil.Exists(envFile, nil)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", fmt.Sprintf(messages.EnvPath, envFile), err)
+		return "", errors.Wrapf(err, envPathMsg, envFile)
 	}
 
-	if !envExists {
-		fmt.Printf(messages.EnvNotFound, envFile)
-		return "", nil
-	}
-
-	switch containerEngine {
-	case DockerEngine:
-		return fmt.Sprintf("env_file: %s", envFile), nil
-	case PodmanEngine:
-		return fmtPodmanEnvVars(envFile)
-	default:
-		return "", nil
-	}
-}
-
-func GetWebserverServiceName() string {
-	containerEngine := config.CFG.ContainerEngine.GetString()
-	switch containerEngine {
-	case string(DockerEngine):
-		return webserverServiceName
-	case string(PodmanEngine):
-		return config.CFG.WebserverContainerName.GetString()
-	default:
-		return webserverServiceName
-	}
-}
-
-func GetSchedulerServiceName() string {
-	containerEngine := config.CFG.ContainerEngine.GetString()
-	switch containerEngine {
-	case string(DockerEngine):
-		return schedulerServiceName
-	case string(PodmanEngine):
-		return config.CFG.SchedulerContainerName.GetString()
-	default:
-		return schedulerServiceName
-	}
-}
-
-func GetTriggererServiceName() string {
-	containerEngine := config.CFG.ContainerEngine.GetString()
-	switch containerEngine {
-	case string(DockerEngine):
-		return triggererServiceName
-	case string(PodmanEngine):
-		return config.CFG.TriggererContainerName.GetString()
-	default:
-		return triggererServiceName
-	}
-}
-
-// CheckTriggererEnabled checks if the airflow triggerer component should be enabled.
-// for astro-runtime users: check if compatible runtime version
-// for AC users, triggerer is only compatible with Airflow versions >= 2.2.0
-// the runtime version and airflow version can be found as a label on the user's docker image
-var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
-	airflowVersion, ok := imageLabels[airflowVersionLabelName]
-	if ok {
-		if versions.GreaterThanOrEqualTo(airflowVersion, triggererAllowedAirflowVersion) {
-			return true, nil
+	if envFile != "" {
+		if !envExists {
+			fmt.Printf(envNotFoundMsg, envFile)
+			envFile = ""
+		} else {
+			fmt.Printf(envFoundMsg, envFile)
+			envFile = fmt.Sprintf("env_file: %s", envFile)
 		}
-		return false, nil
 	}
 
-	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
-	if !ok {
-		// image doesn't have either runtime version or airflow version
-		// we don't want to block the user's experience in case this happens, so we disable triggerer and warn error
-		fmt.Println(messages.WarningTriggererDisabledNoVersionDetected)
-
-		return false, nil
+	triggererEnabled, err := CheckTriggererEnabled(imageLabels)
+	if err != nil {
+		fmt.Println("unable to check runtime version Triggerer is disabled")
 	}
 
-	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
+	airflowImage := ImageName(projectName, "latest")
+	if buildImage != "" {
+		airflowImage = buildImage
+	}
+
+	cfg := ComposeConfig{
+		PytestFile:           pytestFile,
+		PostgresUser:         config.CFG.PostgresUser.GetString(),
+		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
+		PostgresHost:         config.CFG.PostgresHost.GetString(),
+		PostgresPort:         config.CFG.PostgresPort.GetString(),
+		AirflowImage:         airflowImage,
+		AirflowHome:          airflowHome,
+		AirflowUser:          "astro",
+		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
+		AirflowEnvFile:       envFile,
+		MountLabel:           "z",
+		TriggererEnabled:     triggererEnabled,
+	}
+
+	buff := new(bytes.Buffer)
+	err = tmpl.Execute(buff, cfg)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate config")
+	}
+	return buff.String(), nil
 }

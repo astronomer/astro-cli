@@ -1,13 +1,31 @@
 package houston
 
+import (
+	"encoding/json"
+
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+)
+
 // AuthenticateWithBasicAuth - authentiate to Houston using basic auth
-func (h ClientImplementation) AuthenticateWithBasicAuth(username, password string) (string, error) {
+func (h ClientImplementation) AuthenticateWithBasicAuth(username, password string, ctx *config.Context) (string, error) {
 	req := Request{
 		Query:     TokenBasicCreateRequest,
 		Variables: map[string]interface{}{"identity": username, "password": password},
 	}
 
-	resp, err := req.DoWithClient(h.client)
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		return "", handleAPIErr(err)
+	}
+	doOpts := httputil.DoOptions{
+		Data: reqData,
+		Headers: map[string]string{
+			"Accept": "application/json",
+		},
+	}
+
+	resp, err := h.client.DoWithContext(doOpts, ctx)
 	if err != nil {
 		return "", handleAPIErr(err)
 	}
@@ -16,12 +34,22 @@ func (h ClientImplementation) AuthenticateWithBasicAuth(username, password strin
 }
 
 // GetAuthConfig - get authentication configuration
-func (h ClientImplementation) GetAuthConfig() (*AuthConfig, error) {
+func (h ClientImplementation) GetAuthConfig(ctx *config.Context) (*AuthConfig, error) {
 	acReq := Request{
 		Query: AuthConfigGetRequest,
 	}
+	reqData, err := json.Marshal(acReq)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+	doOpts := httputil.DoOptions{
+		Data: reqData,
+		Headers: map[string]string{
+			"Accept": "application/json",
+		},
+	}
 
-	acResp, err := acReq.DoWithClient(h.client)
+	acResp, err := h.client.DoWithContext(doOpts, ctx)
 	if err != nil {
 		return nil, handleAPIErr(err)
 	}

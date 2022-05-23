@@ -26,8 +26,29 @@ func (_m *ImageHandler) Build(config types.ImageBuildConfig) error {
 	return r0
 }
 
-// GetImageLabels provides a mock function with given fields:
-func (_m *ImageHandler) GetImageLabels() (map[string]string, error) {
+// GetLabel provides a mock function with given fields: labelName
+func (_m *ImageHandler) GetLabel(labelName string) (string, error) {
+	ret := _m.Called(labelName)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(labelName)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(labelName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListLabels provides a mock function with given fields:
+func (_m *ImageHandler) ListLabels() (map[string]string, error) {
 	ret := _m.Called()
 
 	var r0 map[string]string
@@ -49,13 +70,13 @@ func (_m *ImageHandler) GetImageLabels() (map[string]string, error) {
 	return r0, r1
 }
 
-// Push provides a mock function with given fields: serverAddress, token, remoteImage
-func (_m *ImageHandler) Push(serverAddress string, token string, remoteImage string) error {
-	ret := _m.Called(serverAddress, token, remoteImage)
+// Push provides a mock function with given fields: registry, username, token, remoteImage
+func (_m *ImageHandler) Push(registry string, username string, token string, remoteImage string) error {
+	ret := _m.Called(registry, username, token, remoteImage)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(serverAddress, token, remoteImage)
+	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
+		r0 = rf(registry, username, token, remoteImage)
 	} else {
 		r0 = ret.Error(0)
 	}
