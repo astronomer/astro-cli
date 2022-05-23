@@ -44,7 +44,7 @@ def example_dag_basic():
         """
         data_string = '{"1001": 301.27, "1002": 433.21, "1003": 502.22}'
 
-        order_data_dict = json.loads(data_string) 
+        order_data_dict = json.loads(data_string)
         return order_data_dict
 
     @task(multiple_outputs=True) # multiple_outputs=True unrolls dictionaries into separate XCom values

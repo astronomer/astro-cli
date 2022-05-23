@@ -171,11 +171,11 @@ How to get started as a developer:
 
     ```golangci-lint run .```
 3. Install `pre-commit` to run lint on every commit
-    
+
     ```brew install pre-commit```
 
     ```pre-commit install```
-    
+
     Run lint locally:
 
     ```pre-commit run --all-files```
@@ -184,7 +184,7 @@ How to get started as a developer:
 ```
 $ cd ~go/src/github.com/astronomer/astro-cli
 $ git clone git@github.com:astronomer/astro-cli.git
-$ cd astro-cli 
+$ cd astro-cli
 $ make build
 ```
 
