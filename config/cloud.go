@@ -17,12 +17,12 @@ func (c *Context) PrintCloudContext(out io.Writer) error {
 
 	ctx := context.Domain
 	if ctx == "" {
-		ctx = "N/A"
+		ctx = noApply
 	}
 
 	workspace := context.Workspace
 	if workspace == "" {
-		workspace = "N/A"
+		workspace = noApply
 	}
 	tab := printutil.Table{
 		Padding: []int{36, 36},

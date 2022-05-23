@@ -18,7 +18,7 @@ import (
 
 var (
 	errInvalidDeploymentKey = errors.New("invalid deployment selection")
-	errNoDeployments        = errors.New("No Deployments found in this Workspace")
+	errNoDeployments        = errors.New("no Deployments found in this Workspace")
 )
 
 const (
@@ -239,7 +239,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	return nil
 }
 
-func validateResources(workerAU, schedulerAU, schedulerReplicas int) (bool) {
+func validateResources(workerAU, schedulerAU, schedulerReplicas int) bool {
 	if workerAU > workerAuMax || workerAU < WorkerAuMin {
 		fmt.Printf("\nWorker AUs must be between a min of %d and a max of %d AUs", WorkerAuMin, workerAuMax)
 		return false
@@ -421,7 +421,6 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 	if !resourcesValid {
 		return nil
 	}
-
 
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)

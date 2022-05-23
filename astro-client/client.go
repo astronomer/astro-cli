@@ -71,7 +71,7 @@ func (c *HTTPClient) Do(doOpts httputil.DoOptions) (*Response, error) {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-	doOpts.Headers["apollographql-client-name"] = "cli"
+	doOpts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
 	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
 
 	var response httputil.HTTPResponse
@@ -139,7 +139,7 @@ func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-	doOpts.Headers["apollographql-client-name"] = "cli"
+	doOpts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
 	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
 
 	var response httputil.HTTPResponse

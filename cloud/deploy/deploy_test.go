@@ -259,7 +259,7 @@ func TestCheckPyTest(t *testing.T) {
 	mockContainerHandler.On("Pytest", "", mockDeployImage).Return("exit code 1", errMock).Once()
 	err = checkPytest("", mockDeployImage, mockContainerHandler)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Pytests failed, please fix failures or rerun the command without the '--pytest' flag to deploy")
+	assert.Contains(t, err.Error(), "pytests failed, please fix failures or rerun the command without the '--pytest' flag to deploy")
 	mockContainerHandler.AssertExpectations(t)
 }
 

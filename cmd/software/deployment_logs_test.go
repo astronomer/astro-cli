@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var errMock = errors.New("test error")
+
 func getTestLogs(component string) []houston.DeploymentLog {
 	return []houston.DeploymentLog{
 		{
@@ -99,14 +101,13 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 		})
 
 		t.Run(fmt.Sprintf("list %s logs error", test.component), func(t *testing.T) {
-			mockErr := errors.New("test error")
 			api := new(mocks.ClientInterface)
 			api.On("GetAppConfig").Return(appConfig, nil)
-			api.On("ListDeploymentLogs", mock.Anything).Return(nil, mockErr)
+			api.On("ListDeploymentLogs", mock.Anything).Return(nil, errMock)
 
 			houstonClient = api
 			_, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
-			assert.ErrorIs(t, mockErr, err)
+			assert.ErrorIs(t, errMock, err)
 		})
 	}
 }

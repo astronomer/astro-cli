@@ -8,6 +8,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+var noApply = "N/A"
+
 // PrintSoftwareContext prints current context to stdOut
 func (c *Context) PrintSoftwareContext(out io.Writer) error {
 	context, err := c.GetContext()
@@ -17,12 +19,12 @@ func (c *Context) PrintSoftwareContext(out io.Writer) error {
 
 	ctx := context.Domain
 	if ctx == "" {
-		ctx = "N/A"
+		ctx = noApply
 	}
 
 	workspace := context.Workspace
 	if workspace == "" {
-		workspace = "N/A"
+		workspace = noApply
 	}
 	tab := printutil.Table{
 		Padding: []int{36, 36},

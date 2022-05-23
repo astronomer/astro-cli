@@ -32,7 +32,7 @@ func GetCurrentWorkspace() (string, error) {
 	}
 
 	if c.Workspace == "" {
-		return "", errors.New("Current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
+		return "", errors.New("current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
 	}
 
 	return c.Workspace, nil

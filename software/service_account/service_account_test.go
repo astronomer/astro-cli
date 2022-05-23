@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var errMock = errors.New("api error")
+
 func TestCreateUsingDeploymentUUID(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockSA := &houston.DeploymentServiceAccount{
@@ -50,13 +52,12 @@ func TestCreateUsingDeploymentUUID(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		mockError := errors.New("api error")
 		api := new(mocks.ClientInterface)
-		api.On("CreateDeploymentServiceAccount", expectedRequest).Return(nil, mockError)
+		api.On("CreateDeploymentServiceAccount", expectedRequest).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := CreateUsingDeploymentUUID(mockSA.DeploymentUUID, mockSA.Label, mockSA.Category, "test", api, buf)
-		assert.EqualError(t, err, mockError.Error())
+		assert.EqualError(t, err, errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -102,14 +103,12 @@ func TestCreateUsingWorkspaceUUID(t *testing.T) {
 	})
 
 	t.Run("api error", func(t *testing.T) {
-		mockError := errors.New("api error")
-
 		api := new(mocks.ClientInterface)
-		api.On("CreateWorkspaceServiceAccount", expectedRequest).Return(nil, mockError)
+		api.On("CreateWorkspaceServiceAccount", expectedRequest).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := CreateUsingWorkspaceUUID(mockSA.WorkspaceUUID, label, category, role, api, buf)
-		assert.EqualError(t, err, mockError.Error())
+		assert.EqualError(t, err, errMock.Error())
 	})
 }
 
@@ -136,13 +135,12 @@ func TestDeleteUsingWorkspaceUUID(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		mockError := errors.New("api error")
 		api := new(mocks.ClientInterface)
-		api.On("DeleteWorkspaceServiceAccount", workspaceUUID, mockSA.ID).Return(nil, mockError)
+		api.On("DeleteWorkspaceServiceAccount", workspaceUUID, mockSA.ID).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
+		assert.EqualError(t, err, errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -168,13 +166,12 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		mockError := errors.New("api error")
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentServiceAccount", deploymentUUID, mockSA.ID).Return(nil, mockError)
+		api.On("DeleteDeploymentServiceAccount", deploymentUUID, mockSA.ID).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
+		assert.EqualError(t, err, errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -206,13 +203,12 @@ func TestGetDeploymentServiceAccount(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		mockError := errors.New("api error")
 		api := new(mocks.ClientInterface)
-		api.On("ListDeploymentServiceAccounts", deploymentUUID).Return([]houston.ServiceAccount{}, mockError)
+		api.On("ListDeploymentServiceAccounts", deploymentUUID).Return([]houston.ServiceAccount{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
+		assert.EqualError(t, err, errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -245,13 +241,12 @@ func TestGetWorkspaceServiceAccount(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		mockError := errors.New("api error")
 		api := new(mocks.ClientInterface)
-		api.On("ListWorkspaceServiceAccounts", workspaceUUID).Return([]houston.ServiceAccount{}, mockError)
+		api.On("ListWorkspaceServiceAccounts", workspaceUUID).Return([]houston.ServiceAccount{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := GetWorkspaceServiceAccounts(workspaceUUID, api, buf)
-		assert.EqualError(t, err, mockError.Error())
+		assert.EqualError(t, err, errMock.Error())
 		api.AssertExpectations(t)
 	})
 }

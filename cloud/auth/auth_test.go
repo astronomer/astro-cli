@@ -196,7 +196,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallbackHandler()
-		assert.Contains(t, err.Error(), "The operation has timed out")
+		assert.Contains(t, err.Error(), "the operation has timed out")
 	})
 }
 

@@ -21,13 +21,13 @@ func TestEnsureProjectDir(t *testing.T) {
 	config.WorkingPath = "./\000x"
 	err := EnsureProjectDir(&cobra.Command{}, []string{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed to verify that your working directory is an Astro project.\nTry running astro dev init to turn your working directory into an Astro project")
+	assert.Contains(t, err.Error(), "failed to verify that your working directory is an Astro project.\nTry running astro dev init to turn your working directory into an Astro project")
 
 	// error case when no such file or dir
 	config.WorkingPath = "./test"
 	err = EnsureProjectDir(&cobra.Command{}, []string{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "This is not an Astro project directory.\nChange to another directory or run astro dev init to turn your working directory into an Astro project")
+	assert.Contains(t, err.Error(), "this is not an Astro project directory.\nChange to another directory or run astro dev init to turn your working directory into an Astro project")
 
 	// success case
 	config.WorkingPath = currentWorkingPath

@@ -29,6 +29,7 @@ var (
 
 const (
 	accessTokenExpThreshold = 5 * time.Minute
+	topLvlCmd               = "astro"
 )
 
 type TokenResponse struct {
@@ -47,17 +48,17 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	}
 
 	// If the user is using dev commands no need to go through auth setup.
-	if cmd.CalledAs() == "dev" && cmd.Parent().Use == "astro" {
+	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
 
 	// help command does not need auth setup
-	if cmd.CalledAs() == "help" && cmd.Parent().Use == "astro" {
+	if cmd.CalledAs() == "help" && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
 
 	// version command does not need auth setup
-	if cmd.CalledAs() == "version" && cmd.Parent().Use == "astro" {
+	if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
 
@@ -72,7 +73,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	}
 
 	// deploy command can use API keys
-	if cmd.CalledAs() == "deploy" && cmd.Parent().Use == "astro" {
+	if cmd.CalledAs() == "deploy" && cmd.Parent().Use == topLvlCmd {
 		apiKey, err := checkAPIKeys()
 		if err != nil {
 			fmt.Println(err)

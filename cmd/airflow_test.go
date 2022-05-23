@@ -712,7 +712,7 @@ func TestAirflowPytest(t *testing.T) {
 		}
 
 		err := airflowPytest(cmd, args)
-		assert.Contains(t, err.Error(), "Pytests failed")
+		assert.Contains(t, err.Error(), "pytests failed")
 		mockContainerHandler.AssertExpectations(t)
 	})
 

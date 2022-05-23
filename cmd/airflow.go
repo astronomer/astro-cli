@@ -501,7 +501,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 	}
 
 	if !fileExist {
-		return errors.New("The 'tests' directory does not exist, please run `astro dev init` to create it")
+		return errors.New("the 'tests' directory does not exist, please run `astro dev init` to create it")
 	}
 
 	fmt.Println("Running Pytest\nThis may take a minute if you have not run this command before…")
@@ -514,7 +514,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 	exitCode, err := containerHandler.Pytest(pytestFile, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New("Pytests failed")
+			return errors.New("pytests failed")
 		}
 		return err
 	}

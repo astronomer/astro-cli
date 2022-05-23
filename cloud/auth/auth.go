@@ -170,7 +170,7 @@ func authorizeCallbackHandler() (string, error) {
 			if err != nil {
 				fmt.Printf("error: %s", err)
 			}
-			return "", errors.New("The operation has timed out")
+			return "", errors.New("the operation has timed out")
 		}
 	}
 	err := s.Shutdown(http_context.Background())
@@ -442,7 +442,7 @@ func formatDomain(domain string) string {
 		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
 		domain = splitDomain[1]
 	} else if domain == "" {
-		domain = "astronomer.io"
+		domain = Domain
 	}
 
 	return domain
@@ -497,5 +497,5 @@ func ValidateDomain(domain string) (astro.AuthConfig, error) {
 
 		return authConfig, nil
 	}
-	return authConfig, errors.New("Something went wrong! Try again or contact Astronomer Support")
+	return authConfig, errors.New("something went wrong! Try again or contact Astronomer Support")
 }

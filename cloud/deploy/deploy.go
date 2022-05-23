@@ -26,6 +26,8 @@ import (
 )
 
 const (
+	parse                  = "parse"
+	astroDomain            = "astronomer.io"
 	registryUsername       = "cli"
 	runtimeImageLabel      = "io.astronomer.docker.runtime.version"
 	defaultRuntimeVersion  = "4.2.5"
@@ -60,8 +62,8 @@ var (
 
 var (
 	errInvalidDeploymentKey = errors.New("invalid deployment selection")
-	errDagsParseFailed      = errors.New("Your local DAGs did not parse. Please fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy.") //nolint:revive
-	errNoDeploymentsMsg     = errors.New("No Deployments found in this Workspace")
+	errDagsParseFailed      = errors.New("your local DAGs did not parse. Please fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	errNoDeploymentsMsg     = errors.New("no Deployments found in this Workspace")
 )
 
 type deploymentInfo struct {
@@ -204,7 +206,7 @@ func parseDAG(pytest, version, envFile, deployImage string) error {
 	}
 
 	// parse dags
-	if pytest == "parse" && dagParseVersionCheck {
+	if pytest == parse && dagParseVersionCheck {
 		fmt.Println("Testing image...")
 		err := containerHandler.Parse(deployImage)
 		if err != nil {
@@ -212,7 +214,7 @@ func parseDAG(pytest, version, envFile, deployImage string) error {
 			return errDagsParseFailed
 		}
 		// check pytests
-	} else if pytest != "" && pytest != "parse" {
+	} else if pytest != "" && pytest != parse {
 		fmt.Println("Testing image...")
 		err := checkPytest(pytest, deployImage, containerHandler)
 		if err != nil {
@@ -231,7 +233,7 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	exitCode, err := containerHandler.Pytest(pytestFile, deployImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New("Pytests failed, please fix failures or rerun the command without the '--pytest' flag to deploy")
+			return errors.New("pytests failed, please fix failures or rerun the command without the '--pytest' flag to deploy")
 		}
 		return errors.Wrap(err, "Something went wrong while Pytesting your local DAGs,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
 	}
@@ -273,7 +275,7 @@ func promptUserForDeployment(cloudDomain string, currentWorkspace *astro.Workspa
 		return "", "", "", "", errNoDeploymentsMsg
 	}
 
-	if cloudDomain == "astronomer.io" {
+	if cloudDomain == astroDomain {
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
 		fmt.Printf(deploymentHeaderMsg, cloudDomain)
@@ -314,7 +316,7 @@ func promptUserForDeployment(cloudDomain string, currentWorkspace *astro.Workspa
 }
 
 func getImageName(cloudDomain, deploymentID string, client astro.Client) (deployImage, currentVersion, organizationID, webserverURL string, err error) {
-	if cloudDomain == "astronomer.io" {
+	if cloudDomain == astroDomain {
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
 		fmt.Printf(deploymentHeaderMsg, cloudDomain)
@@ -330,7 +332,7 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 	}
 
 	if len(deployments) == 0 {
-		return "", "", "", "", errors.New("Invalid Deployment ID")
+		return "", "", "", "", errors.New("invalid Deployment ID")
 	}
 	currentVersion = deployments[0].RuntimeRelease.Version
 	namespace := deployments[0].ReleaseName

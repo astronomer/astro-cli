@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var errMock = errors.New("build error")
+
 func TestDockerImageBuild(t *testing.T) {
 	handler := DockerImage{
 		imageName: "testing",
@@ -47,12 +49,11 @@ func TestDockerImageBuild(t *testing.T) {
 	})
 
 	t.Run("build error", func(t *testing.T) {
-		mockError := errors.New("build error")
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return mockError
+			return errMock
 		}
 		err = handler.Build(options)
-		assert.Contains(t, err.Error(), mockError.Error())
+		assert.Contains(t, err.Error(), errMock.Error())
 	})
 
 	cmdExec = previousCmdExec

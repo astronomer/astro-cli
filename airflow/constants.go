@@ -19,8 +19,8 @@ const (
 
 var (
 	// Pytest constants
-	DefaultTestPath = ".astro/test_dag_integrity_default.py"
 
+	DefaultTestPath                  = ".astro/test_dag_integrity_default.py"
 	FullAstronomerCertifiedImageName = fmt.Sprintf("%s/%s", BaseImageName, AstronomerCertifiedImageName)
 	FullAstroRuntimeImageName        = fmt.Sprintf("%s/%s", BaseImageName, AstroRuntimeImageName)
 )

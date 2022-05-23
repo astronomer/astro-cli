@@ -2,7 +2,6 @@ package deployment
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
@@ -99,17 +98,16 @@ func TestUserList(t *testing.T) {
 	})
 
 	t.Run("api error", func(t *testing.T) {
-		mockErr := errors.New("api error")
 		deploymentID := "ckgqw2k2600081qc90nbamgno"
 		expectedRequest := houston.ListDeploymentUsersRequest{
 			DeploymentID: deploymentID,
 		}
 		api := new(mocks.ClientInterface)
-		api.On("ListDeploymentUsers", expectedRequest).Return([]houston.DeploymentUser{}, mockErr)
+		api.On("ListDeploymentUsers", expectedRequest).Return([]houston.DeploymentUser{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := UserList(deploymentID, "", "", "", api, buf)
-		assert.EqualError(t, err, mockErr.Error())
+		assert.EqualError(t, err, errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -144,10 +142,7 @@ func TestAdd(t *testing.T) {
 		assert.Contains(t, buf.String(), "Successfully added somebody@astronomer.io as a DEPLOYMENT_ADMIN")
 		api.AssertExpectations(t)
 	})
-
 	t.Run("add user api error", func(t *testing.T) {
-		mockErr := errors.New("api error")
-
 		deploymentID := "ckggzqj5f4157qtc9lescmehm"
 		email := "somebody@astronomer.com"
 		role := houston.DeploymentAdminRole
@@ -159,12 +154,12 @@ func TestAdd(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("AddDeploymentUser", expectedRequest).Return(nil, mockErr)
+		api.On("AddDeploymentUser", expectedRequest).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := Add(deploymentID, email, role, api, buf)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), mockErr.Error())
+		assert.Contains(t, err.Error(), errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -191,20 +186,17 @@ func TestDeleteUser(t *testing.T) {
 		assert.Contains(t, buf.String(), "Successfully removed the DEPLOYMENT_ADMIN role for somebody@astronomer.com from deployment deploymentid")
 		api.AssertExpectations(t)
 	})
-
 	t.Run("delete user api error", func(t *testing.T) {
-		mockError := errors.New("api error")
-
 		deploymentID := "deploymentid"
 		email := "somebody@astronomer.com"
 
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentUser", deploymentID, email).Return(nil, mockError)
+		api.On("DeleteDeploymentUser", deploymentID, email).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := RemoveUser(deploymentID, email, api, buf)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), mockError.Error())
+		assert.Contains(t, err.Error(), errMock.Error())
 		api.AssertExpectations(t)
 	})
 }
@@ -241,8 +233,6 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("update user api error", func(t *testing.T) {
-		mockError := errors.New("api error")
-
 		deploymentID := "ckggzqj5f4157qtc9lescmehm"
 		email := "somebody@astronomer.com"
 		role := "DEPLOYMENT_FAKE_ROLE"
@@ -253,12 +243,12 @@ func TestUpdateUser(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("UpdateDeploymentUser", expectedRequest).Return(nil, mockError)
+		api.On("UpdateDeploymentUser", expectedRequest).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := UpdateUser(deploymentID, email, role, api, buf)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), mockError.Error())
+		assert.Contains(t, err.Error(), errMock.Error())
 		api.AssertExpectations(t)
 	})
 }

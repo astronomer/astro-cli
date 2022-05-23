@@ -7,18 +7,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	errServer = errors.New("internal server error")
+	errQuery  = errors.New("error: Cannot query field \"triggererEnabled\" on AppConfig")
+)
+
 func TestHandleAPIError(t *testing.T) {
 	t.Run("should return same error", func(t *testing.T) {
-		err := errors.New("internal server error")
-
-		gotErr := handleAPIErr(err)
-		assert.EqualError(t, gotErr, err.Error())
+		gotErr := handleAPIErr(errServer)
+		assert.EqualError(t, gotErr, errServer.Error())
 	})
 
 	t.Run("should return query fields error", func(t *testing.T) {
-		err := errors.New("error: Cannot query field \"triggererEnabled\" on AppConfig")
-
-		gotErr := handleAPIErr(err)
+		gotErr := handleAPIErr(errQuery)
 		assert.EqualError(t, gotErr, ErrFieldsNotAvailable{}.Error())
 	})
 }

@@ -311,7 +311,7 @@ func TestGetCurrentWorkspace(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = GetCurrentWorkspace()
-	assert.EqualError(t, err, "Current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
+	assert.EqualError(t, err, "current workspace context not set, you can switch to a workspace with \n\astro workspace switch WORKSPACEID")
 
 	config.ResetCurrentContext()
 	_, err = GetCurrentWorkspace()

@@ -551,7 +551,7 @@ func TestDockerComposeRun(t *testing.T) {
 		mockDockerCompose.cliClient = mockCLIClient
 
 		err := mockDockerCompose.Run(testCmd, "test-user")
-		assert.Contains(t, err.Error(), "Airflow is not running. To start a local Airflow environment, run 'astro dev start'")
+		assert.Contains(t, err.Error(), "airflow is not running. To start a local Airflow environment, run 'astro dev start'")
 		composeMock.AssertExpectations(t)
 		mockCLIClient.AssertExpectations(t)
 	})
@@ -616,7 +616,7 @@ func TestDockerComposePytest(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		resp, err := mockDockerCompose.Pytest("test", "")
-		assert.Contains(t, err.Error(), "Something went wrong while Pytesting your DAGs")
+		assert.Contains(t, err.Error(), "something went wrong while Pytesting your DAGs")
 		assert.Equal(t, mockResponse, resp)
 		composeMock.AssertExpectations(t)
 		imageHandler.AssertExpectations(t)
@@ -661,7 +661,7 @@ func TestDockerComposePytest(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		_, err := mockDockerCompose.Pytest("test", "")
-		assert.Contains(t, err.Error(), "Error finding the testing container")
+		assert.Contains(t, err.Error(), "error finding the testing container")
 		composeMock.AssertExpectations(t)
 		imageHandler.AssertExpectations(t)
 	})

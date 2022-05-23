@@ -39,7 +39,7 @@ import (
 const (
 	componentName                  = "airflow"
 	dockerStateUp                  = "running"
-	defaultAirflowVersion          = uint64(0x2)
+	defaultAirflowVersion          = uint64(0x2) // nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 
@@ -305,7 +305,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 	response, err := d.cliClient.ContainerExecCreate(context.Background(), containerID, *execConfig)
 	if err != nil {
 		fmt.Println(err)
-		return errors.New("Airflow is not running. To start a local Airflow environment, run 'astro dev start'")
+		return errors.New("airflow is not running. To start a local Airflow environment, run 'astro dev start'")
 	}
 
 	execID := response.ID
@@ -395,7 +395,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 	}
 
 	if len(refs) == 0 {
-		return "", errors.New("Error finding the testing container")
+		return "", errors.New("error finding the testing container")
 	}
 
 	ctx := context.Background()
@@ -416,7 +416,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 	if strings.Contains(buf.String(), "0") { // if the error code is 0 the pytests passed
 		return "", nil
 	}
-	return buf.String(), errors.New("Something went wrong while Pytesting your DAGs")
+	return buf.String(), errors.New("something went wrong while Pytesting your DAGs")
 }
 
 func (d *DockerCompose) Parse(buildImage string) error {

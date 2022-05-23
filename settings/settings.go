@@ -24,7 +24,7 @@ var (
 
 	settings Config
 
-	// Version 2.0.0
+	// AirflowVersionTwo 2.0.0
 	AirflowVersionTwo uint64 = 2
 
 	// Monkey patched as of now to write unit tests

@@ -2,7 +2,6 @@ package deployment
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -26,13 +25,12 @@ func TestLog(t *testing.T) {
 	})
 
 	t.Run("houston error", func(t *testing.T) {
-		mockErr := errors.New("api error")
 		api := new(mocks.ClientInterface)
-		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Return([]houston.DeploymentLog{}, mockErr)
+		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Return([]houston.DeploymentLog{}, errMock)
 		out := new(bytes.Buffer)
 
 		err := Log("test-id", "test-component", "test", 0, api, out)
-		assert.ErrorIs(t, err, mockErr)
+		assert.ErrorIs(t, err, errMock)
 	})
 }
 
@@ -49,12 +47,11 @@ func TestSubscribeDeploymentLog(t *testing.T) {
 	})
 
 	t.Run("houston failure", func(t *testing.T) {
-		mockErr := errors.New("api error")
 		subscribe = func(jwtToken, url, queryMessage string) error {
-			return mockErr
+			return errMock
 		}
 
 		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
-		assert.ErrorIs(t, err, mockErr)
+		assert.ErrorIs(t, err, errMock)
 	})
 }
