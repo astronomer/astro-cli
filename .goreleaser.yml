@@ -1,53 +1,32 @@
----
-project_name: astro
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod download
+    - go mod tidy -compat=1.17
 release:
   github:
     owner: astronomer
     name: astro-cli
   # If set to auto, will mark the release as not ready for production
-  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
   prerelease: true
 builds:
-  - main: main.go
-    binary: astro
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-    goarch:
-      - 386
-      - amd64
-      - arm64
-    goarm:
-      - 7
-    flags:
-      - -mod=vendor
-    ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
-    tags:
-      - containers_image_openpgp
-      - exclude_graphdriver_btrfs
-      - exclude_graphdriver_devicemapper
-  - id: astro-windows
-    main: main.go
-    binary: astro
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - windows
-    goarch:
-      - 386
-      - amd64
-    goarm:
-      - 7
-    flags:
-      - -mod=vendor
-    ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }} -X github.com/astronomer/astro-cli/version.CurrCommit={{ .Commit }}
-    tags:
-      - containers_image_openpgp
-      - exclude_graphdriver_btrfs
-      - exclude_graphdriver_devicemapper
-      - remote
+-
+  binary: astro
+  env:
+    - CGO_ENABLED=0
+  goos:
+    - linux
+    - darwin
+    - windows
+  goarch:
+    - 386
+    - arm64
+    - amd64
+  goarm:
+    - 7
+  ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
 brews:
   - tap:
       owner: astronomer
