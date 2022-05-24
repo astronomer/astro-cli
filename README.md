@@ -164,7 +164,7 @@ $ astro deploy --help
 
 How to get started as a developer:
 
-1. Install `go` 1.7+ - https://go.dev/doc/install
+1. Install `go` 1.11+ - https://go.dev/doc/install
 2. Install `golangci-lint` to run linter locally
 
     ```brew install golangci-lint```
@@ -182,7 +182,7 @@ How to get started as a developer:
 4. Clone and Build:
 
 ```
-$ cd ~go/src/github.com/astronomer/astro-cli
+$ cd $GOPATH/src/github.com/astronomer/astro-cli
 $ git clone git@github.com:astronomer/astro-cli.git
 $ cd astro-cli 
 $ make build

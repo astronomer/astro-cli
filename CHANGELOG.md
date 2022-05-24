@@ -1,6 +1,136 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.0] - 2022-06-23
+
+### New Features
+- The Astro CLI v1.0.0 works with [Astro](https://www.astronomer.io/product/), Astronomer's new cloud product. The Astro CLI deployment, workspace, and deploy commands will work with the Astro when a user logs into [astronomer.io](https://www.astronomer.io/). The function of these commands change slightly when logged into Astro. Details on how these commands change when working with Astro cna be found in the [Astro CLI Command Reference](https://docs.astronomer.io/astro/cli-reference)
+- You can now specify a custom image name in your Astro project's Dockerfile as long as the image is based on an existing Astro Runtime image
+- New `astro dev restart` command to test local changes. This command will restart your local Astro project
+- After running `astro dev start`, the CLI know shows you the status of the Webserver container as it spins up on your local machine
+- You can now run custom unit tests for all DAGs in your Astro project with `astro dev pytest`, a new Astro CLI command that uses pytest, a common testing framework for Python. As part of this change, new Astro projects created via astrocloud dev init now include a tests directory, which includes one example pytest built by Astronomer. In addition to running tests locally, you can also run pytest as part of the Astro deploy process. More information in [Release Notes](https://docs.astronomer.io/astro/cli-release-notes#new-command-to-run-dag-unit-tests-with-pytest)
+- New `astro dev parse` command that allows you to run a basic test against your Astro project to ensure that your DAGs are able to to render in the Airflow UI. `astro deploy` now automatically applies tests from astrocloud dev parse to your Astro project before completing the deploy process. More information in [Release Notes](https://docs.astronomer.io/astro/cli-release-notes#new-command-to-parse-dags-for-errors)
+- You can now use [Deployment API keys](https://docs.astronomer.io/astro/api-keys) to run `astro deploy` with Astro either from the CLI directly or via a CI/CD script. This update simplifies deploying code to Astro via CI/CD. More information in [Release Notes](https://docs.astronomer.io/astro/cli-release-notes#new-command-to-parse-dags-for-errors).
+
+### Breaking changes
+- `astro dev init`: the flag `-v` (used to provide a specific airflow version) has been moved to `-a` since `-v` is used to provide the runtime version for runtime users.
+- `astro workspace create` now takes all workspace properties as flags instead of named arguments. Also, the `--desc` flag for description is renamed `--description`.
+  ```bash
+  # before
+  astro workspace create label=my-workspace --desc="my description"
+  # now
+  astro workspace create --label=my-workspace --description="my description"
+  ```
+- `astro workspace update` now takes the workspace ID as an argument and the updated properties as flags (previously named arguments):
+  ```bash
+  # before
+  astro workspace update ckw12x02830 label="new-label"
+  # now
+  astro workspace update ck21dx0834 --label="my-label" --description="updated description"
+  ```
+  Also, it is now possible to update the description of a workspace with the CLI.
+- In every `astro workspace user` commands, you can now use the flag `--workspace-id` to provide the workspace ID in which you want to manage users. If this flag is not provided, these commands will read workspace ID from context.
+- `astro workspace user add`: the email of the user you wish to add to the workspace is now passed as a flag instead of an argument:
+  ```bash
+  # before
+  astro workspace user add email-to-add@astronomer.io --role WORKSPACE_VIEWER
+  # now
+  astro workspace user add --email email-to-add@astronomer.io --role WORKSPACE_VIEWER 
+  ```
+  Also, this new `--email` flag is required to run the command.
+- In every `astro workspace sa` commands, you can now use the flag `--workspace-id` to provide the workspace ID in which you want to manage service accounts. If this flag is not provided, these commands will read workspace ID from context.
+- `astro workspace sa get` becomes `astro workspace sa list` as we wish to harmonize the CLI commands by using the verb `list` to retrieve a list of objects
+  ```bash
+  # before
+  astro workspace sa get
+  # now
+  astro workspace sa list
+  ```
+- In `astro workspace sa create`, the `--role` property accepted values has changed from `viewer|admin|editor` to `WORKSPACE_VIEWER|WORKSPACE_ADMIN|WORKSPACE_EDITOR`.
+  ```bash
+  # before
+  astro workspace sa create --role viewer
+  # now
+  astro workspace sa create --role WORKSPACE_VIEWER
+  ```
+  This change has been made to harmonize the whole CLI project, because in other commands (`workspace user add` and `deployment user add`) we use the full permission name (DEPLOYMENT_VIEWER or WORKSPACE_VIEWER).
+- `astro deployment create` now takes all deployment properties as flags (`--label=my-deployment-label` instead of argument)
+  ```bash
+  # before
+  astro deployment create my-deployment --executor=local
+  # now
+  astro deployment create --label=my-deployment --executor=local
+  ```
+- `astro deployment update` now takes all deployment properties as flags instead of named arguments. Also, the `--description` flag has been added to allow users to update their deployment's description.
+  ```bash
+  # before
+  astro deployment update ck129384ejf9 label=my-label --executor=celery
+  # now
+  astro deployment update ckw1289r0dake92 --label=new-label --description="My new description" --exectur=celery
+  ```
+- In `astro deployment sa create`, the `--role` property accepted values has changed from `viewer|admin|editor` to `DEPLOYMENT_VIEWER|DEPLOYMENT_ADMIN|DEPLOYMENT_EDITOR`.
+  ```bash
+  # before
+  astro deployment sa create --role viewer
+  # now
+  astro deployment sa create --role DEPLOYMENT_VIEWER
+  ```
+  This change has been made to harmonize the whole CLI project, because in other commands (`workspace user add` and `deployment user add`) we use the full permission name (DEPLOYMENT_VIEWER or WORKSPACE_VIEWER).
+- A few flags have been removed since they are not used anymore (`--system-sa` and `--user-id`)
+- `astro deployment user` do not require a workspace set in context anymore (since each command will require a specific `--deployment-id` to manage users into).
+- `astro deployment user list`: the deployment-id is now passed as a flag instead of an argument
+  ```bash
+  # before
+  astro deployment user list <deployment-id>
+  # now
+  astro deployment user list --deployment-id=<deployment-id>
+  ```
+- `astro deployment user add`: the email of the user to add to the deployment is now passed as a flag `--email` (required flag) instead of an argument.
+  ```bash
+  # before
+  astro deployment user add <email> --deployment-id=<deployment-id>
+  # now
+  astro deployment user add --email=<email> --deployment-id=<deployment-id>
+  ```
+- `astro deployment user delete` now becomes `astro deployment user remove`
+  ```bash
+  # before
+  astro deployment user delete <email> --deployment-id=<deployment-id>
+  # now
+  astro deployment user remove <email> --deployment-id=<deployment-id>
+  ```
+- `astro logs <component>` commands have been deprecated for a long time now, and we wish to remove it.
+  Instead, you can use the `astro deployment logs <component>` commands like in the following example:
+  ```bash
+  astro deployment logs webserver ckw129df023940 --since=1h
+  ```
+- Both `astro cluster list` and `astro cluster switch` commands has been deprecated and have been replaced by corresponding `astro context list` and `astro context switch` commands.
+- `astro deploy` command will now accept deployment-id as argument instead of deployment release name, to make it consistent with other deployment commands
+  ```bash
+  # before
+  astro deploy <release-name> -f
+  # now
+  astro deploy <deployment-id> -f
+  ```
+- Both `astro auth login` & `astro auth logout` has been renamed to `astro login` & `astro logout` respectively.
+  ```bash
+  # before
+  astro auth login <domain>
+  astro auth logout
+  # after
+  astro login <domain>
+  astro logout
+  ```
+
+### Changes
+- `astro context delete` command has been newly introduced in the CLI. The functionality of this command is to delete a particular locally stored context in `~/.astro/config.yaml` based on domain passed as argument to the command.
+  ```bash
+  # usage
+  astro context delete <domain>
+  ```
+- This command has only one flag, which is `--force` which when passed assume \"yes\" as answer to all prompts which would pop up during command execution. As of now there is a prompt only when someone tries to delete a context which is current in use.
+
+
 ## [0.25.2] - 2021-06-23
 - Add error message for airflow upgrade no-op #3055 (#417)
 

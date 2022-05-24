@@ -8,9 +8,6 @@ OUTPUT ?= astro
 # golangci-lint version
 GOLANGCI_LINT_VERSION ?=v1.45.0
 
-dep:
-	dep ensure
-
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
 	${ENVTEST_ASSETS_DIR}/golangci-lint version
