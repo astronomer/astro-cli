@@ -300,6 +300,10 @@ http_copy() {
 github_release() {
   owner_repo=$1
   version=$2
+  if [[ "$version" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+    escaped_version=$(echo $version | sed -e 's/[]\/$*.^[]/\\&/g') # escape the version string
+    version=$(curl https://api.github.com/repos/${owner_repo}/releases -s | jq -r '.[] | .tag_name' | grep '^'"$escaped_version"'\.[0-9]*$' -m1)
+  fi
   test -z "$version" && version="latest"
   giturl="https://github.com/${owner_repo}/releases/${version}"
   json=$(http_copy "$giturl" "Accept:application/json")
