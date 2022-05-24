@@ -228,14 +228,6 @@ Steps to generate mocks for new interface:
 1. Run `mockery --filename=<file_name_where_interface_is_present> --output=<output_dir_to store_mocks> --dir=<directory_where_to_search_for_interface_file> --outpkg=<mock_package_name> --name <name_of_the_interface>` to generate mock for an interface.
 2. Add the above command in appropriate target under `mock` rule in `Makefile`.
 
-## Docs
-
-Docs (/docs) are generated using the `github.com/spf13/cobra/doc` pkg. Currently this pkg is broken with go vendoring, the following instructions include a workaround
-
-1. Remove the `/vendor/github.com/spf13/cobra` pkg, forcing Go to search your go path for the package instead
-2. `go run gendocs/gendocs.go`
-3. restore `/vendor/github.com/spf13/cobra`
-
 ## Versions
 
 The Astronomer platform is under very active development. Because of this we cannot make backwards compatibility guarantees between versions.
