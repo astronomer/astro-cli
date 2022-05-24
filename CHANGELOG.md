@@ -35,7 +35,7 @@ All notable changes to this project will be documented in this file.
   # before
   astro workspace user add email-to-add@astronomer.io --role WORKSPACE_VIEWER
   # now
-  astro workspace user add --email email-to-add@astronomer.io --role WORKSPACE_VIEWER 
+  astro workspace user add --email email-to-add@astronomer.io --role WORKSPACE_VIEWER
   ```
   Also, this new `--email` flag is required to run the command.
 - In every `astro workspace sa` commands, you can now use the flag `--workspace-id` to provide the workspace ID in which you want to manage service accounts. If this flag is not provided, these commands will read workspace ID from context.
