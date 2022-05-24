@@ -29,7 +29,7 @@ BaseHook.get_connection = basehook_get_connection_monkeypatch
 # =========== MONKEYPATCH OS.GETENV() ===========
 def os_getenv_monkeypatch(key: str, *args, default=None, **kwargs):
 	print(f"Attempted to fetch os environment variable during parse, returning a mocked value for {key}")
-	if default: 
+	if default:
 		return default
 	return "NON_DEFAULT_OS_ENV_VALUE"
 
@@ -42,7 +42,7 @@ os.getenv = os_getenv_monkeypatch
 class magic_dict(dict):
 	def __init__(self,*args,**kwargs):
 		self.update(*args,**kwargs)
-	
+
 	def __getitem__(self,key):
 		return {}.get(key, 'MOCKED_KEY_VALUE')
 
@@ -50,7 +50,7 @@ class magic_dict(dict):
 def variable_get_monkeypatch(key: str, default_var=None, deserialize_json=False):
 	print(f"Attempted to get Variable value during parse, returning a mocked value for {key}")
 
-	if default_var: 
+	if default_var:
 		return default_var
 	if deserialize_json:
 		return magic_dict()
@@ -83,11 +83,11 @@ def get_import_errors():
 		def strip_path_prefix(path):
 			return os.path.relpath(path ,os.environ.get('AIRFLOW_HOME'))
 
-		
+
 		# we prepend "(None,None)" to ensure that a test object is always created even if its a no op.
 		return [(None,None)] +[ ( strip_path_prefix(k) , v.strip() ) for k,v in dag_bag.import_errors.items()]
 
-	
+
 @pytest.mark.parametrize("rel_path,rv", get_import_errors(), ids=[x[0] for x in get_import_errors()])
 def test_file_imports(rel_path,rv):
 	""" Test for import errors on a file """
