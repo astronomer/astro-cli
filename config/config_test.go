@@ -2,63 +2,14 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestInitHome(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configRaw := []byte(`cloud:
-  api:
-    port: "443"
-    protocol: https
-    ws_protocol: wss
-local:
-  enabled: true
-  houston: http://HOUSTON_HOST:8871/v1
-context: HOUSTON_HOST
-contexts:
-  HOUSTON_HOST:
-    domain: HOUSTON_HOST
-    token: token
-    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
-    workspace: ck05r3bor07h40d02y2hw4n4v
-`)
-	afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
-	initHome(fs)
-}
-
-func TestInitProject(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configRaw := []byte(`cloud:
-  api:
-    port: "443"
-    protocol: https
-    ws_protocol: wss
-local:
-  enabled: true
-  houston: http://HOUSTON_HOST:8871/v1
-context: HOUSTON_HOST
-contexts:
-  HOUSTON_HOST:
-    domain: HOUSTON_HOST
-    token: token
-    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
-    workspace: ck05r3bor07h40d02y2hw4n4v
-`)
-	afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
-	initProject(fs)
-	homeDir, _ := fileutil.GetHomeDir()
-	_, err := fs.Stat(homeDir)
-	if os.IsNotExist(err) {
-		t.Error("home does not exist.\n")
-	}
-}
 
 func TestIsProjectDir(t *testing.T) {
 	homeDir, _ := fileutil.GetHomeDir()
@@ -79,40 +30,42 @@ func TestIsProjectDir(t *testing.T) {
 	}
 }
 
-func TestConfigExists(t *testing.T) {
+func TestInitHome(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configRaw := []byte(`cloud:
-  api:
-    port: "443"
-    protocol: https
-    ws_protocol: wss
-local:
-  enabled: true
-  houston: http://HOUSTON_HOST:8871/v1
-context: HOUSTON_HOST
-contexts:
-  HOUSTON_HOST:
-    domain: HOUSTON_HOST
-    token: token
-    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
-    workspace: ck05r3bor07h40d02y2hw4n4v
-`)
-	afero.WriteFile(fs, HomeConfigFile, configRaw, 0777)
-	initProject(fs)
+	initHome(fs)
+	assert.Contains(t, viperHome.ConfigFileUsed(), "config.yaml")
+}
 
-	viperWOConfig := viper.New()
-	tests := []struct {
-		name string
-		in   *viper.Viper
-		out  bool
-	}{
-		{"exists", viperHome, true},
-		{"doesnt exists", viperWOConfig, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := configExists(tt.in)
-			assert.Equal(t, actual, tt.out)
-		})
-	}
+func TestInitProject(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	workingConfigPath := filepath.Join(WorkingPath, ConfigDir)
+	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
+	fs.Create(workingConfigFile)
+	initProject(fs)
+	assert.Contains(t, viperProject.ConfigFileUsed(), "config.yaml")
+}
+
+func TestProjectConfigExists(t *testing.T) {
+	initTestConfig()
+	val := ProjectConfigExists()
+	assert.Equal(t, false, val)
+
+	viperProject.SetConfigFile("test.yaml")
+	defer os.Remove("test.yaml")
+	val = ProjectConfigExists()
+	assert.Equal(t, true, val)
+}
+
+func TestCreateConfig(t *testing.T) {
+	viperTest := viper.New()
+	defer os.RemoveAll("./test")
+	err := CreateConfig(viperTest, "./test", "test.yaml")
+	assert.NoError(t, err)
+}
+
+func TestCreateProjectConfig(t *testing.T) {
+	viperProject = viper.New()
+	defer os.RemoveAll("./test")
+	CreateProjectConfig("./test")
+	assert.Equal(t, "test/.astro/config.yaml", viperProject.ConfigFileUsed())
 }

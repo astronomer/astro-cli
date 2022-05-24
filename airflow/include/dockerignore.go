@@ -4,10 +4,9 @@ import "strings"
 
 // Dockerignore is the .dockerignore template
 var Dockerignore = strings.TrimSpace(`
-.astro
+astro
 .git
 .env
 airflow_settings.yaml
-pod-config.yml
 logs/
 `)

@@ -18,7 +18,9 @@ Related astronomer/issues#XXXX
 
 - [ ] Rebased from the main (or release if patching) branch (before testing)
 - [ ] Ran `make test` before taking out of draft
+- [ ] Ran `make lint` before taking out of draft
 - [ ] Added/updated applicable tests
+- [ ] Tested against [Astro-API](https://github.com/astronomer/astro/) (if necessary).
 - [ ] Tested against [Houston-API](https://github.com/astronomer/houston-api/) and [Astronomer](https://github.com/astronomer/astronomer/) (if necessary).
 - [ ] Communicated to/tagged owners of respective clients potentially impacted by these changes.
 - [ ] Updated any related [documentation](https://github.com/astronomer/docs/)

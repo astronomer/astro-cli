@@ -1,5 +1,6 @@
 package settings
 
+// Connections is an array of airflow connection
 type Connections []Connection
 
 // Connection contains structure of airflow connection

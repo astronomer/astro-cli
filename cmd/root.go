@@ -1,97 +1,81 @@
 package cmd
 
 import (
-	"fmt"
-	"io"
+	"crypto/tls"
+	"net"
+	"net/http"
+	"os"
+	"time"
 
+	astro "github.com/astronomer/astro-cli/astro-client"
+	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/version"
-
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var (
-	houstonClient  houston.ClientInterface
-	workspaceID    string
-	teamID         string
-	workspaceRole  string
-	deploymentRole string
-	role           string
-	skipVerCheck   bool
-	verboseLevel   string
-	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
-	initDebugLogs = []string{}
-
-	appConfig *houston.AppConfig
+	houstonClient houston.ClientInterface
+	verboseLevel  string
 )
 
 // NewRootCmd adds all of the primary commands for the cli
-func NewRootCmd(client houston.ClientInterface, out io.Writer) *cobra.Command {
-	houstonClient = client
-
-	var err error
-	appConfig, err = houstonClient.GetAppConfig()
-	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
+func NewRootCmd() *cobra.Command {
+	httpClient := httputil.NewHTTPClient()
+	// configure http transport
+	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
+	// #nosec
+	httpClient.HTTPClient.Transport = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: time.Duration(dialTimeout) * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
 	}
+	houstonClient = houston.NewClient(httpClient)
 
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	rootCmd := &cobra.Command{
 		Use:   "astro",
-		Short: "Astronomer - CLI",
-		Long:  "astro is a command line interface for working with the Astronomer Platform.",
+		Short: "Run Apache Airflow locally and interact with Astronomer",
+		Long:  "Welcome to the Astro CLI. Astro is the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or local development.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := SetUpLogs(out, verboseLevel); err != nil {
+			if context.IsCloudContext() {
+				return cloudCmd.Setup(cmd, args, astroClient)
+			}
+			// Software PersistentPreRunE component
+			// setting up log verbosity and dumping debug logs collected during CLI-initialization
+			if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
 				return err
 			}
-			printDebugLogs()
-			return version.ValidateCompatibility(houstonClient, out, version.CurrVersion, skipVerCheck)
+			softwareCmd.PrintDebugLogs()
+			return nil
 		},
 	}
 
-	rootCmd.PersistentFlags().BoolVarP(&skipVerCheck, "skip-version-check", "", false, "skip version compatibility check")
-	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	rootCmd.AddCommand(
-		newAuthRootCmd(out),
-		newWorkspaceCmd(out),
-		newVersionCmd(out),
-		newUpgradeCheckCmd(out),
-		newUserCmd(out),
-		newClusterRootCmd(out),
-		newDevRootCmd(out),
-		newCompletionCmd(out),
-		newConfigRootCmd(out),
-		newDeploymentRootCmd(out),
-		newDeployCmd(),
-		newSaRootCmd(out),
-		// TODO: remove newAirflowRootCmd, after 1.0 we have only devRootCmd
-		newAirflowRootCmd(out),
-		newLogsDeprecatedCmd(out),
-		newTeamCmd(out),
+		newLoginCommand(astroClient, os.Stdout),
+		newLogoutCommand(os.Stdout),
+		newVersionCommand(),
+		newDevRootCmd(),
+		newContextCmd(os.Stdout),
+		newConfigRootCmd(os.Stdout),
+		newAuthCommand(),
 	)
+
+	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
+		rootCmd.AddCommand(
+			cloudCmd.AddCmds(astroClient, os.Stdout)...,
+		)
+	} else { // Include all the commands to be exposed for software users
+		rootCmd.AddCommand(
+			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
+		)
+		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
+	}
 	return rootCmd
-}
-
-// setUpLogs set the log output and the log level
-func SetUpLogs(out io.Writer, level string) error {
-	// if level is default means nothing was passed override with config setting
-	if level == "warning" {
-		level = config.CFG.Verbosity.GetString()
-	}
-	logrus.SetOutput(out)
-	lvl, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
-	}
-	logrus.SetLevel(lvl)
-	return nil
-}
-
-func printDebugLogs() {
-	for _, log := range initDebugLogs {
-		logrus.Debug(log)
-	}
-	// Free-up memory used by init logs
-	initDebugLogs = nil
 }

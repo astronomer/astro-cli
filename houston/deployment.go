@@ -145,31 +145,3 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 
 	return r.Data.DeploymentLog, nil
 }
-
-func (h ClientImplementation) UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error) {
-	req := Request{
-		Query:     UpdateDeploymentRuntimeRequest,
-		Variables: variables,
-	}
-
-	res, err := req.DoWithClient(h.client)
-	if err != nil {
-		return nil, handleAPIErr(err)
-	}
-
-	return res.Data.UpdateDeploymentRuntime, nil
-}
-
-func (h ClientImplementation) CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error) {
-	req := Request{
-		Query:     CancelUpdateDeploymentRuntimeRequest,
-		Variables: variables,
-	}
-
-	res, err := req.DoWithClient(h.client)
-	if err != nil {
-		return nil, handleAPIErr(err)
-	}
-
-	return res.Data.CancelUpdateDeploymentRuntime, nil
-}

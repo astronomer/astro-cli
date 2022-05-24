@@ -3,7 +3,7 @@ package houston
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -19,12 +19,12 @@ func TestNewHoustonClient(t *testing.T) {
 }
 
 func TestErrAuthTokenRefreshFailed(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockResponse := &Response{
 		Data: ResponseData{},
 		Errors: []Error{
 			{
-				Message: ErrAuthTokenRefreshFailed.Error(),
+				Message: errAuthTokenRefreshFailedMsg,
 				Name:    "",
 			},
 		},
@@ -35,7 +35,7 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})

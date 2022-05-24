@@ -5,20 +5,22 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/astronomer/astro-cli/messages"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 )
 
 const (
-	defaultDirPerm os.FileMode = 0770
-	newFilePerm    os.FileMode = 0600
+	CloudPlatform    = "cloud"
+	SoftwarePlatform = "software"
 
-	DefaultWebserverName = "webserver"
-	DefaultSchedulerName = "scheduler"
-	DefaultTriggererName = "triggerer"
+	localhostDomain = "localhost"
+	astrohubDomain  = "astrohub"
+	cloudDomain     = "cloud"
+	houstonDomain   = "houston"
+
+	configCreateHomeErrorMsg = "Error creating default config in home dir: %s"
+	configReadErrorMsg       = "Error reading config in home dir: %s\n"
 )
 
 var (
@@ -46,39 +48,38 @@ var (
 
 	// CFG Houses configuration meta
 	CFG = cfgs{
-		CloudAPIProtocol:       newCfg("cloud.api.protocol", "https"),
-		CloudAPIPort:           newCfg("cloud.api.port", "443"),
-		CloudWSProtocol:        newCfg("cloud.api.ws_protocol", "wss"),
-		CloudAPIToken:          newCfg("cloud.api.token", ""),
-		Context:                newCfg("context", ""),
-		Contexts:               newCfg("contexts", ""),
-		LocalHouston:           newCfg("local.houston", ""),
-		LocalOrbit:             newCfg("local.orbit", ""),
-		PostgresUser:           newCfg("postgres.user", "postgres"),
-		PostgresPassword:       newCfg("postgres.password", "postgres"),
-		PostgresHost:           newCfg("postgres.host", "postgres"),
-		PostgresPort:           newCfg("postgres.port", "5432"),
-		ProjectDeployment:      newCfg("project.deployment", ""),
-		ProjectName:            newCfg("project.name", ""),
-		ProjectWorkspace:       newCfg("project.workspace", ""),
-		WebserverPort:          newCfg("webserver.port", "8080"),
-		ShowWarnings:           newCfg("show_warnings", "true"),
-		AirflowReleasesURL:     newCfg("airflow_releases_url", "https://updates.astronomer.io/astronomer-certified"),
-		RuntimeReleasesURL:     newCfg("runtime_releases_url", "https://updates.astronomer.io/astronomer-runtime"),
-		SkipVerifyTLS:          newCfg("skip_verify_tls", "false"),
-		Verbosity:              newCfg("verbosity", "warning"),
-		ContainerEngine:        newCfg("container.engine", "docker"),
-		PodmanConnectionURI:    newCfg("podman.connection_uri", ""),
-		SchedulerContainerName: newCfg("scheduler.container_name", DefaultSchedulerName),
-		WebserverContainerName: newCfg("webserver.container_name", DefaultWebserverName),
-		TriggererContainerName: newCfg("triggerer.container_name", DefaultTriggererName),
-		HoustonDialTimeout:     newCfg("houston.dial_timeout", "10"),
+		CloudAPIProtocol:     newCfg("cloud.api.protocol", "https"),
+		CloudAPIPort:         newCfg("cloud.api.port", "443"),
+		CloudWSProtocol:      newCfg("cloud.api.ws_protocol", "wss"),
+		CloudAPIToken:        newCfg("cloud.api.token", ""),
+		Context:              newCfg("context", ""),
+		Contexts:             newCfg("contexts", ""),
+		LocalAstro:           newCfg("local.astrohub", ""),
+		LocalPublicAstro:     newCfg("local.public_astrohub", "http://localhost:8871/graphql"),
+		LocalRegistry:        newCfg("local.registry", "localhost:5555"),
+		LocalHouston:         newCfg("local.houston", ""),
+		LocalPlatform:        newCfg("local.platform", CloudPlatform),
+		PostgresUser:         newCfg("postgres.user", "postgres"),
+		PostgresPassword:     newCfg("postgres.password", "postgres"),
+		PostgresHost:         newCfg("postgres.host", "postgres"),
+		PostgresPort:         newCfg("postgres.port", "5432"),
+		ProjectDeployment:    newCfg("project.deployment", ""),
+		ProjectName:          newCfg("project.name", ""),
+		ProjectWorkspace:     newCfg("project.workspace", ""),
+		WebserverPort:        newCfg("webserver.port", "8080"),
+		ShowWarnings:         newCfg("show_warnings", "true"),
+		Verbosity:            newCfg("verbosity", "warning"),
+		HoustonDialTimeout:   newCfg("houston.dial_timeout", "10"),
+		HoustonSkipVerifyTLS: newCfg("houston.skip_verify_tls", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory
 	viperHome *viper.Viper
 	// viperProject is the viper object in a project directory
 	viperProject *viper.Viper
+	// createConfigPath dir path, file path
+	dirPerm  os.FileMode = 0o775
+	filePerm os.FileMode = 0o600
 )
 
 // InitConfig initializes the config files
@@ -103,11 +104,10 @@ func initHome(fs afero.Fs) {
 
 	// If home config does not exist, create it
 	homeConfigExists, _ := fileutil.Exists(HomeConfigFile, fs)
-
 	if !homeConfigExists {
 		err := CreateConfig(viperHome, HomeConfigPath, HomeConfigFile)
 		if err != nil {
-			fmt.Printf(messages.ErrConfigHomeCreation, err)
+			fmt.Printf(configCreateHomeErrorMsg, err)
 			return
 		}
 	}
@@ -115,7 +115,7 @@ func initHome(fs afero.Fs) {
 	// Read in home config
 	err := viperHome.ReadInConfig()
 	if err != nil {
-		fmt.Printf(messages.ErrReadingConfig, err)
+		fmt.Printf(configReadErrorMsg, err)
 		return
 	}
 }
@@ -125,7 +125,7 @@ func initHome(fs afero.Fs) {
 func initProject(fs afero.Fs) {
 	// Set up viper object for project config
 	viperProject = viper.New()
-	viperHome.SetFs(fs)
+	viperProject.SetFs(fs)
 	viperProject.SetConfigName(ConfigFileName)
 	viperProject.SetConfigType(ConfigFileType)
 
@@ -146,7 +146,7 @@ func initProject(fs afero.Fs) {
 	// Read in project config
 	readErr := viperProject.ReadInConfig()
 	if readErr != nil {
-		fmt.Printf(messages.ErrReadingConfig, readErr)
+		fmt.Printf(configReadErrorMsg, readErr)
 	}
 }
 
@@ -157,7 +157,7 @@ func CreateProjectConfig(projectPath string) {
 
 	err := CreateConfig(viperProject, projectConfigDir, projectConfigFile)
 	if err != nil {
-		fmt.Printf(messages.ErrConfigHomeCreation, err)
+		fmt.Printf(configCreateHomeErrorMsg, err)
 		return
 	}
 
@@ -172,17 +172,18 @@ func configExists(v *viper.Viper) bool {
 
 // CreateConfig creates a config file in the given directory
 func CreateConfig(v *viper.Viper, path, file string) error {
-	err := os.MkdirAll(path, defaultDirPerm)
+	err := os.MkdirAll(path, dirPerm)
 	if err != nil {
-		return fmt.Errorf("%s: %w", messages.ErrConfigDirCreation, err)
+		return fmt.Errorf("error creating config directory: %w", err)
 	}
 
 	_, err = os.Create(file)
 	if err != nil {
-		return fmt.Errorf("%s: %w", messages.ErrConfigFileCreation, err)
+		return fmt.Errorf("error creating config file: %w", err)
 	}
-	if err = os.Chmod(file, newFilePerm); err != nil {
-		return fmt.Errorf("%s: %w", messages.ErrConfigFileCreation, err)
+	err = os.Chmod(file, filePerm)
+	if err != nil {
+		return fmt.Errorf("error creating config file: %w", err)
 	}
 
 	return saveConfig(v, file)
@@ -210,7 +211,7 @@ func IsProjectDir(path string) (bool, error) {
 func saveConfig(v *viper.Viper, file string) error {
 	err := v.WriteConfigAs(file)
 	if err != nil {
-		return fmt.Errorf("%s: %w", messages.ErrSavingConfig, err)
+		return fmt.Errorf("error saving config: %w", err)
 	}
 	return nil
 }

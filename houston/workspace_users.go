@@ -31,18 +31,18 @@ func (h ClientImplementation) DeleteWorkspaceUser(workspaceID, userID string) (*
 }
 
 // ListUserAndRolesFromWorkspace - list users and roles from a workspace
-func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) (*Workspace, error) {
+func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error) {
 	req := Request{
-		Query:     WorkspacesGetRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceID},
+		Query:     WorkspaceGetUsersRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
 	}
 
 	r, err := req.DoWithClient(h.client)
 	if err != nil {
-		return nil, handleAPIErr(err)
+		return []WorkspaceUserRoleBindings{}, handleAPIErr(err)
 	}
 
-	return &r.Data.GetWorkspaces[0], nil
+	return r.Data.WorkspaceGetUsers, nil
 }
 
 // UpdateUserRoleInWorkspace - update a user role in a workspace

@@ -1,26 +1,25 @@
-# Astronomer CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/astronomer/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
+# Astro CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/astronomer/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
 
-The Astronomer CLI can be used to build Airflow DAGs locally and run them via docker-compose, as well as to deploy those DAGs to Astronomer-managed Airflow clusters and interact with the Astronomer API in general.
+The Astro CLI is the modern command-line interface for data orchestration. It is the easiest way to run Apache Airflow on your local machine. With the Astro CLI, you can both develop and test DAGs locally as well as interact with our Astro and Astronomer Software offerings.
 
 ```
-astro is a command line interface for working with the Astronomer Platform.
+astro is a command line interface for Airflow working within the Astronomer Cloud or Software
 
 Usage:
   astro [command]
 
 Available Commands:
-  auth            Manage astronomer identity
-  cluster         Manage Astronomer EE clusters
-  completion      Generate autocompletions script for the specified shell (bash or zsh)
-  config          Manage astro project configurations
-  deploy          Deploy an airflow project
-  deployment      Manage airflow deployments
-  dev             Manage airflow projects
-  help            Help about any command
-  upgrade         Check for newer version of Astronomer CLI
-  user            Manage astronomer user
-  version         Astronomer CLI version
-  workspace       Manage Astronomer workspaces
+  completion  generate the autocompletion script for the specified shell
+  config      Manage project configuration
+  context     Manage Astro & Software contexts
+  deploy      Deploy your project to a Deployment on Astro
+  deployment  Manage your Deployments running on Astronomer
+  dev         Run your Astro project locally
+  help        Help about any command
+  login       Log in to Astronomer
+  logout      Log out of Astronomer
+  version     astro version
+  workspace   Manage Astronomer Workspaces
 
 Flags:
   -h, --help   help for astro
@@ -28,89 +27,93 @@ Flags:
 Use "astro [command] --help" for more information about a command.
 ```
 
-## Installing `astro`
+## Install `astro`
 
-The Astronomer CLI is an open-source project. Installing it to your machine allows you to easily spin up a local instance of Apache Airflow and allows you to easily deploy code to remote Airflow environments if you are an Astronomer customer.
+To install and use the Astro CLI on Mac, you must have:
+- [Docker Desktop](https://docs.docker.com/get-docker/) (v18.09 or higher)
 
-> **Note:** If you are an Astronomer customer, your CLI version _must_ match the version of Astronomer you are running. If you are using Astronomer Cloud, the latest version should always be correct. If you have a custom Astronomer Enterprise installation, you may be on a different version, which means you may need to ensure that your CLI and platform match up; you can check which version of Astronomer you're running by clicking the user icon in the top right corner of our UI.
+To install and use the Astro CLI on Linux, you must have:
+- [Docker Engine](https://docs.docker.com/engine/install/) (v0.13.1 or higher).
+
+To install and use the Astro CLI on Windows, you must have:
+- Windows 10
+- [Docker Desktop WSL 2 backend](https://docs.docker.com/desktop/windows/wsl/) (v0.13.1 or higher).
 
 ### Latest Version
 
-#### Via `Homebrew`
+#### via Homebrew
 
 ```sh
 brew install astronomer/tap/astro
 ```
 
-#### Via `curl`
+#### via cURL
 
-> Note: If you are a Mac user on Catalina make sure you are using the latest version of `curl` or you may receive certificate errors.
-
-```
-curl -sSL https://install.astronomer.io | sudo bash -s
+```sh
+curl -sSL install.astronomer.io | sudo bash -s
 ```
 
 ### Previous Versions
 
 #### Via `Homebrew`
 
-To install a specific version Astro CLI use @major.minor.patch. For example, to install v0.13.1 run:
+To install a specific version Astro CLI use @major.minor.patch. For example, to install v1.0.0 run:
 
 ```sh
-brew install astronomer/tap/astro@0.13.1
+brew install astronomer/tap/astro@1.0.0
 ```
 
 #### Via `curl`
 
 To install a previous version of Astronomer, you can add the tag at the end of your `curl` command via the following syntax:
 
-```
+```sh
 curl -sSL https://install.astronomer.io | sudo bash -s -- [TAGNAME]
 ```
 
 ie:
-
-```
-curl -sSL https://install.astronomer.io | sudo bash -s -- v0.7.5
+```sh
+curl -sSL https://install.astronomer.io | sudo bash -s -- v1.0.0
 ```
 
 > Note: If you get mkdir error during installation please download and run [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh) script locally.
 
     $ cat godownloader.sh | bash -s -- -b /usr/local/bin
 
-### Installing on Windows
 
-> Note: Make sure you have Windows 10 and Docker installed
+### Install on Windows
 
-1. Download the latest release of the Astro CLI from [this page](https://github.com/astronomer/astro-cli/releases/)
-2. Extract the file ending in `windows_386.zip` and copy `astro.exe` somewhere in your `%PATH%`
+
+1. Download the latest release of the Astro CLI from [this page](https://github.com/astronomer/astro-cli/releases/) into your project
+2. Copy `astro.exe` somewhere in your `%PATH%`
 3. Open cmd or PowerShell console and run the `astro version` command. Your output should look something like this:
 
    ```
    C:\Windows\system32>astro version
    Astro CLI Version: x.y.z
-   Git Commit: 829e4702ca36dd725f1a98d82b6fdf889e5f4dc3
    ```
+
 
 #### Troubleshooting
 
 1. Make sure you go through instruction to install Docker on windows properly https://docs.docker.com/docker-for-windows/install/
-2. Make sure you enabled Hyper-V, it's required for Docker and Linux Containers, also please review this document
-   https://docs.docker.com/docker-for-windows/troubleshoot/
+2. Install Windows WSL2 and [Docker Desktop for WSL 2 Backend](https://docs.docker.com/desktop/windows/wsl/) which is the recommend way to run the Astro CLI on Windows.
+3. Alternativly, you can run the Astro CLI natively by enabling Hyper-V, which is required for Docker and Linux Containers. Review this document
+   https://docs.docker.com/docker-for-windows/troubleshoot/ if you have issues.
 
 ## Getting Started
 
-1. Confirm the install worked:
-
-```
-$ astro
-```
-
-2. Create a project:
+1. Create a project:
 
 ```
 $ mkdir hello-astro && cd hello-astro
 $ astro dev init
+```
+
+1. Install the binary and Confirm the install worked:
+
+```
+$ ./astro
 ```
 
 This will generate a skeleton project directory:
@@ -118,7 +121,11 @@ This will generate a skeleton project directory:
 ```
 .
 ├── dags
-│   ├── example-dag.py
+│   ├── example-dag-advanced.py
+│   ├── example-dag-basic.py
+├── tests
+│   ├── dags
+│       ├── test_dag_integrity.py
 ├── Dockerfile
 ├── include
 ├── packages.txt
@@ -131,14 +138,7 @@ DAGs can go in the `dags` folder, custom Airflow plugins in `plugins`, python pa
 1. Start airflow
 
 Run `astro dev start` to start a local version of airflow on your machine. This will spin up a few locally running docker containers - one for the airflow scheduler, one for the webserver, and one for postgres.
-(Run `docker ps` to verify)
-
-## Requirements
-
-The CLI interacts with Docker or Podman in order to run `astro dev` commands, and the minimum supported versions for them are as following:
-
-- Docker Engine: 1.13.1
-- Podman: 3.1.0
+(Run `astro dev ps` to verify)
 
 ## Help
 
@@ -160,51 +160,57 @@ $ astro dev --help
 $ astro deploy --help
 ```
 
-## Development
+## Local Development
 
 How to get started as a developer:
 
-1. Build:
+1. Install `go` 1.11+ - https://go.dev/doc/install
+2. Install `golangci-lint` to run linter locally
+
+    ```brew install golangci-lint```
+
+    ```golangci-lint run .```
+3. Install `pre-commit` to run lint on every commit
+
+    ```brew install pre-commit```
+
+    ```pre-commit install```
+
+    Run lint locally:
+
+    ```pre-commit run --all-files```
+4. Clone and Build:
 
 ```
+$ cd $GOPATH/src/github.com/astronomer/astro-cli
 $ git clone git@github.com:astronomer/astro-cli.git
 $ cd astro-cli
 $ make build
 ```
 
-1. (Optional) Install to `$GOBIN`:
+## Testing Locally
+The Astro CLI is a single command-line interface that allows users to interact with both Astro and Astronomer Software.
 
-```
-$ make install
-```
-
-1. Run:
-
-```
-$ astro
-```
-
-### Testing Locally
-
-astro-cli is a single component of the much larger Astronomer Enterprise platform. In order to test locally you will need to
-
-1. setup both [houston-api](https://github.com/astronomer/houston-api) and [astro-ui](https://github.com/astronomer/astro-ui).
-2. edit your global or project config to enable local development
-
-ex.
-
+In order to test cloud locally you will need to update your global or local config to point to right platform type and local astro endpoint.
+Ex.
 ```yaml
 local:
-  enabled: true
+  platform: cloud
+  astro: http://localhost:8871/v1
+```
+
+Similarly in order to test software locally you will need to update to right platform type and local houston endpoint:
+```yaml
+local:
+  platform: software
   houston: http://localhost:8871/v1
-  orbit: http://localhost:5000
 ```
 
 ### Run tests
 
 To run unit-tests you can run:
 
-> Note: Make sure you have running locally houston on http://localhost:8871/v1 it required for running tests
+> Note: Make sure you have running locally houston or Astro on http://localhost:8871/v1 it is required for running some tests
 
 ```bash
 make test
@@ -252,7 +258,7 @@ verbosity: debug
 
 ## Support
 
-If you need support, start with the [Astronomer documentation](https://www.astronomer.io/docs/).
+If you need support, start with the [Astronomer documentation](https://docs.astronomer.io/astro/).
 
 If you still have questions, you can post on the [Astronomer web forum](https://forum.astronomer.io) or if you are a customer, you can [open a support ticket](https://support.astronomer.io).
 

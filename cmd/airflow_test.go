@@ -1,330 +1,868 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
+	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/houston"
-	"github.com/astronomer/astro-cli/pkg/httputil"
-	testUtils "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/spf13/afero"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
-var errSomeContainerIssue = errors.New("some container issue")
-
-func executeCommandC(client houston.ClientInterface, args ...string) (output string, err error) {
-	buf := new(bytes.Buffer)
-	rootCmd := NewRootCmd(client, buf)
-	rootCmd.SetOut(buf)
-	rootCmd.SetArgs(args)
-	_, err = rootCmd.ExecuteC()
-	return buf.String(), err
-}
-
-func executeCommand(args ...string) (output string, err error) {
-	httpClient := httputil.NewHTTPClient()
-	client := houston.NewClient(httpClient)
-	output, err = executeCommandC(client, args...)
-	httpClient.HTTPClient.CloseIdleConnections()
-	return output, err
-}
+var errMock = errors.New("mock error")
 
 func TestDevRootCommand(t *testing.T) {
-	testUtils.InitTestConfig()
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("dev")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro dev", output)
 }
 
 func TestNewAirflowInitCmd(t *testing.T) {
-	cmd := newAirflowInitCmd(os.Stdout)
+	cmd := newAirflowInitCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowStartCmd(t *testing.T) {
-	cmd := newAirflowStartCmd(os.Stdout)
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func TestNewAirflowKillCmd(t *testing.T) {
-	cmd := newAirflowKillCmd(os.Stdout)
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func TestNewAirflowLogsCmd(t *testing.T) {
-	cmd := newAirflowLogsCmd(os.Stdout)
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func TestNewAirflowStopCmd(t *testing.T) {
-	cmd := newAirflowStopCmd(os.Stdout)
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
-}
-
-func TestNewAirflowPSCmd(t *testing.T) {
-	cmd := newAirflowPSCmd(os.Stdout)
+	cmd := newAirflowStartCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowRunCmd(t *testing.T) {
-	cmd := newAirflowRunCmd(os.Stdout)
+	cmd := newAirflowRunCmd()
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowPSCmd(t *testing.T) {
+	cmd := newAirflowPSCmd()
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowLogsCmd(t *testing.T) {
+	cmd := newAirflowLogsCmd()
+	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+}
+
+func TestNewAirflowKillCmd(t *testing.T) {
+	cmd := newAirflowKillCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
 func TestNewAirflowUpgradeCheckCmd(t *testing.T) {
-	cmd := newAirflowUpgradeCheckCmd(os.Stdout)
+	cmd := newAirflowUpgradeCheckCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestAirflowKillSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("podman")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func Test_airflowInitNonEmptyDir(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	cmd := newAirflowInitCmd()
+	var args []string
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Kill").Return(nil)
-		return mockContainer, nil
-	}
+	defer testUtil.MockUserInput(t, "y")()
+	err := airflowInit(cmd, args)
+	assert.Nil(t, err)
 
-	cmd := newAirflowKillCmd(os.Stdout)
-	err := airflowKill(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+	b, _ := os.ReadFile("Dockerfile")
+	dockerfileContents := string(b)
+	assert.True(t, strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+
+	// Clean up init files after test
+	cleanUpInitFiles(t)
 }
 
-func TestAirflowKillFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("podman")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func Test_airflowInitNoDefaultImageTag(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	cmd := newAirflowInitCmd()
+	var args []string
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Kill").Return(errSomeContainerIssue)
-		return mockContainer, nil
-	}
+	defer testUtil.MockUserInput(t, "y")()
 
-	cmd := newAirflowKillCmd(os.Stdout)
-	err := airflowKill(cmd, []string{})
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockContainer.AssertExpectations(t)
+	err := airflowInit(cmd, args)
+	assert.Nil(t, err)
+	// assert contents of Dockerfile
+	b, _ := os.ReadFile("Dockerfile")
+	dockerfileContents := string(b)
+	assert.True(t, strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+
+	// Clean up init files after test
+	cleanUpInitFiles(t)
 }
 
-func TestAirflowLogsDockerSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
-	config.CFG.WebserverContainerName.SetHomeString("webserver_tmp")
-	config.CFG.SchedulerContainerName.SetHomeString("scheduler_tmp")
-	config.CFG.TriggererContainerName.SetHomeString("triggerer_tmp")
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Logs", mock.Anything, "scheduler", "webserver", "triggerer").Return(nil)
-		return mockContainer, nil
+func cleanUpInitFiles(t *testing.T) {
+	files := []string{
+		".dockerignore",
+		".gitignore",
+		".env",
+		"Dockerfile",
+		"airflow_settings.yaml",
+		"packages.txt",
+		"requirements.txt",
+		"dags/example-dag-advanced.py",
+		"dags/example-dag-basic.py",
+		"plugins/example-plugin.py",
+		"dags",
+		"include",
+		"plugins",
+		"README.md",
+		".astro/config.yaml",
+		"./astro",
+		"tests/dags/test_dag_integrity.py",
+		"tests/dags",
+		"tests",
 	}
-
-	cmd := newAirflowLogsCmd(os.Stdout)
-	cmd.Flags().Set("scheduler", "true")
-	cmd.Flags().Set("webserver", "true")
-	cmd.Flags().Set("triggerer", "true")
-	err := airflowLogs(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+	for _, f := range files {
+		e := os.Remove(f)
+		if e != nil {
+			t.Log(e)
+		}
+	}
 }
 
-func TestAirflowLogsPodmanSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("podman")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
-	config.CFG.WebserverContainerName.SetHomeString("webserver_tmp")
-	config.CFG.SchedulerContainerName.SetHomeString("scheduler_tmp")
-	config.CFG.TriggererContainerName.SetHomeString("triggerer_tmp")
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Logs", mock.Anything, "scheduler_tmp", "webserver_tmp", "triggerer_tmp").Return(nil)
-		return mockContainer, nil
+func mockUserInput(t *testing.T, i string) (r, stdin *os.File) {
+	input := []byte(i)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	cmd := newAirflowLogsCmd(os.Stdout)
-	cmd.Flags().Set("scheduler", "true")
-	cmd.Flags().Set("webserver", "true")
-	cmd.Flags().Set("triggerer", "true")
-	err := airflowLogs(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin = os.Stdin
+	return r, stdin
 }
 
-func TestAirflowLogsFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowInit(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		var args []string
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Logs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errSomeContainerIssue)
-		return mockContainer, nil
-	}
+		r, stdin := mockUserInput(t, "y")
 
-	cmd := newAirflowLogsCmd(os.Stdout)
-	err := airflowLogs(cmd, []string{})
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockContainer.AssertExpectations(t)
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+		assert.Nil(t, err)
+
+		b, _ := os.ReadFile("Dockerfile")
+		dockerfileContents := string(b)
+		assert.True(t, strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+	})
+
+	t.Run("invalid args", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		args := []string{"invalid-arg"}
+
+		r, stdin := mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+		assert.ErrorIs(t, err, errProjectNameSpaces)
+	})
+
+	t.Run("invalid project name", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test@project-name")
+		args := []string{}
+
+		r, stdin := mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+		assert.ErrorIs(t, err, errConfigProjectName)
+	})
+
+	t.Run("both runtime & AC version passed", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("airflow-version").Value.Set("2.2.5")
+		cmd.Flag("runtime-version").Value.Set("4.2.4")
+		args := []string{}
+
+		r, stdin := mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersions)
+	})
+
+	t.Run("runtime version passed alongside AC flag", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("use-astronomer-certified").Value.Set("true")
+		cmd.Flag("runtime-version").Value.Set("4.2.4")
+		args := []string{}
+
+		r, stdin := mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+
+		assert.NoError(t, err)
+		assert.Contains(t, string(out), "You provided a runtime version with the --use-astronomer-certified flag. Thus, this command will ignore the --runtime-version value you provided.")
+	})
+
+	t.Run("use AC flag", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		cmd.Flag("use-astronomer-certified").Value.Set("true")
+		args := []string{}
+
+		r, stdin := mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+
+		assert.NoError(t, err)
+		assert.Contains(t, string(out), "Pulling Airflow development files from Astronomer Certified Airflow Version")
+	})
+
+	t.Run("cancel non empty dir warning", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		args := []string{}
+
+		r, stdin := mockUserInput(t, "n")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+
+		assert.NoError(t, err)
+		assert.Contains(t, string(out), "Canceling project initialization...")
+	})
+
+	t.Run("reinitialize the same project", func(t *testing.T) {
+		cmd := newAirflowInitCmd()
+		cmd.Flag("name").Value.Set("test-project-name")
+		args := []string{}
+
+		r, stdin := mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		err := airflowInit(cmd, args)
+		assert.NoError(t, err)
+
+		r, stdin = mockUserInput(t, "y")
+
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err = airflowInit(cmd, args)
+		// Clean up init files after test
+		defer func() { cleanUpInitFiles(t) }()
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+
+		assert.NoError(t, err)
+		assert.Contains(t, string(out), "Reinitialized existing Astro project in")
+	})
 }
 
-func TestAirflowStopSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowStart(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{"test-env-file"}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Stop").Return(nil)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Start", false).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowStopCmd(os.Stdout)
-	err := airflowStop(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+		err := airflowStart(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{"test-env-file"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Start", false).Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowStart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowStart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowStopFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowRun(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowRunCmd()
+		args := []string{"test", "command"}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Stop").Return(errSomeContainerIssue)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Run", append([]string{"airflow"}, args...), "").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowStopCmd(os.Stdout)
-	err := airflowStop(cmd, []string{})
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockContainer.AssertExpectations(t)
+		err := airflowRun(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowRunCmd()
+		args := []string{"test", "command"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Run", append([]string{"airflow"}, args...), "").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRun(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowRunCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowRun(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowPSSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("podman")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowPS(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowPSCmd()
+		args := []string{}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("PS").Return(nil)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("PS").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowPSCmd(os.Stdout)
-	err := airflowPS(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+		err := airflowPS(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowPSCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("PS").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowPS(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowPSCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowPS(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowPSFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowLogs(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowLogsCmd()
+		cmd.Flag("webserver").Value.Set("true")
+		cmd.Flag("scheduler").Value.Set("true")
+		cmd.Flag("triggerer").Value.Set("true")
+		args := []string{}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("PS").Return(errSomeContainerIssue)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Logs", false, "webserver", "scheduler", "triggerer").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowPSCmd(os.Stdout)
-	err := airflowPS(cmd, []string{})
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockContainer.AssertExpectations(t)
+		err := airflowLogs(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("without any component flag", func(t *testing.T) {
+		cmd := newAirflowLogsCmd()
+		cmd.Flag("follow").Value.Set("true")
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Logs", true, "webserver", "scheduler", "triggerer").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowLogs(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowLogsCmd()
+		cmd.Flag("webserver").Value.Set("true")
+		cmd.Flag("scheduler").Value.Set("true")
+		cmd.Flag("triggerer").Value.Set("true")
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Logs", false, "webserver", "scheduler", "triggerer").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowLogs(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowLogsCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowLogs(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowRunSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("podman")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowKill(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowKillCmd()
+		args := []string{}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Run", mock.Anything, mock.Anything).Return(nil)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowRunCmd(os.Stdout)
-	err := airflowRun(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+		err := airflowKill(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowKillCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Kill").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowKill(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowKillCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowKill(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowRunFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowStop(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowStopCmd()
+		args := []string{}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Run", mock.Anything, mock.Anything).Return(errSomeContainerIssue)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Stop").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowRunCmd(os.Stdout)
-	err := airflowRun(cmd, []string{})
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockContainer.AssertExpectations(t)
+		err := airflowStop(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowStopCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Stop").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowStop(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowStopCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowStop(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowUpgradeCheckSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("podman")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowRestart(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowRestartCmd()
+		cmd.Flag("no-cache").Value.Set("true")
+		args := []string{"test-env-file"}
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Run", mock.Anything, mock.Anything).Return(nil)
-		return mockContainer, nil
-	}
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Stop").Return(nil).Once()
+			mockContainerHandler.On("Start", true).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
 
-	cmd := newAirflowUpgradeCheckCmd(os.Stdout)
-	err := airflowUpgradeCheck(cmd, []string{})
-	assert.NoError(t, err)
-	mockContainer.AssertExpectations(t)
+		err := airflowRestart(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("stop failure", func(t *testing.T) {
+		cmd := newAirflowRestartCmd()
+		cmd.Flag("no-cache").Value.Set("true")
+		args := []string{"test-env-file"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Stop").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRestart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("start failure", func(t *testing.T) {
+		cmd := newAirflowRestartCmd()
+		cmd.Flag("no-cache").Value.Set("true")
+		args := []string{"test-env-file"}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Stop").Return(nil).Once()
+			mockContainerHandler.On("Start", true).Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowRestart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowRestartCmd()
+		cmd.Flag("no-cache").Value.Set("true")
+		args := []string{"test-env-file"}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowRestart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
-func TestAirflowUpgradeCheckFailure(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtils.NewTestConfig("docker")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+func TestAirflowPytest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowPytestCmd()
+		args := []string{"test-pytest-file"}
+		pytestDir = ""
 
-	mockContainer := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile string) (airflow.ContainerHandler, error) {
-		mockContainer.On("Run", mock.Anything, mock.Anything).Return(errSomeContainerIssue)
-		return mockContainer, nil
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("0", nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowPytest(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("exit code 1", func(t *testing.T) {
+		cmd := newAirflowPytestCmd()
+		args := []string{"test-pytest-file"}
+		pytestDir = ""
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("exit code 1", errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowPytest(cmd, args)
+		assert.Contains(t, err.Error(), "pytests failed")
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("pytest file doesnot exists", func(t *testing.T) {
+		cmd := newAirflowPytestCmd()
+		args := []string{"test-pytest-file"}
+		pytestDir = "/testfile-not-exists"
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("0", nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowPytest(cmd, args)
+		assert.Contains(t, err.Error(), "directory does not exist, please run `astro dev init` to create it")
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowPytestCmd()
+		args := []string{"test-pytest-file"}
+		pytestDir = ""
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("0", errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowPytest(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowPytestCmd()
+		args := []string{"test-pytest-file"}
+		pytestDir = ""
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowPytest(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+}
+
+func TestAirflowParse(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowParseCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Parse", "").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowParse(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowParseCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Parse", "").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowParse(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowParseCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowParse(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+}
+
+func TestAirflowUpgradeCheck(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowUpgradeCheckCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Run", airflowUpgradeCheckCmd, "root").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowUpgradeCheck(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowUpgradeCheckCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Run", airflowUpgradeCheckCmd, "root").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowUpgradeCheck(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowUpgradeCheckCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowUpgradeCheck(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+}
+
+func TestPrepareDefaultAirflowImageTag(t *testing.T) {
+	getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string) (string, error) {
+		return "", nil
 	}
+	t.Run("default airflow version", func(t *testing.T) {
+		useAstronomerCertified = true
+		resp := prepareDefaultAirflowImageTag("", nil)
+		assert.Equal(t, airflowversions.DefaultAirflowVersion, resp)
+	})
 
-	cmd := newAirflowUpgradeCheckCmd(os.Stdout)
-	err := airflowUpgradeCheck(cmd, []string{})
-	assert.Error(t, err, errSomeContainerIssue.Error())
-	mockContainer.AssertExpectations(t)
+	t.Run("default runtime version", func(t *testing.T) {
+		useAstronomerCertified = false
+		resp := prepareDefaultAirflowImageTag("", nil)
+		assert.Equal(t, airflowversions.DefaultRuntimeVersion, resp)
+	})
 }

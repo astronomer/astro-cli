@@ -1,81 +1,40 @@
-OUTPUT ?= astro
-
-GIT_COMMIT=$(shell git rev-parse HEAD)
 GIT_COMMIT_SHORT=$(shell git rev-parse --short HEAD)
 VERSION ?= SNAPSHOT-${GIT_COMMIT_SHORT}
 
-LDFLAGS_VERSION=-X github.com/astronomer/astro-cli/version.CurrVersion=${VERSION}
-LDFLAGS_GIT_COMMIT=-X github.com/astronomer/astro-cli/version.CurrCommit=${GIT_COMMIT}
-
-.DEFAULT_GOAL := build
-# golangci-lint version
-GOLANGCI_LINT_VERSION ?=v1.37.1
-
-SHELL := /bin/bash
-
-GOFMT ?= gofumpt -l -s -extra
-GOFILES := $(shell find . -name "*.go" -type f | grep -v /vendor/)
+LDFLAGS_VERSION=-X github.com/astro-projects/astro-cli/version.CurrVersion=${VERSION}
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
-GO_PODMAN_BUILD_TAGS=containers_image_openpgp,exclude_graphdriver_btrfs,exclude_graphdriver_devicemapper
-GO_BUILD_TAGS=$(GO_PODMAN_BUILD_TAGS)
-
-mod:
-	go mod vendor
-
-build:
-	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION} ${LDFLAGS_GIT_COMMIT}" -tags=${GO_BUILD_TAGS} main.go
-
-test: lint
-	go test -tags=${GO_BUILD_TAGS} -count=1 -cover ./...
-	go test -tags=${GO_BUILD_TAGS} -coverprofile=coverage.txt -covermode=atomic ./...
-
-codecov:
-	@eval $$(curl -s https://codecov.io/bash)
-
-cover:
-	rm -f cover.out
-	go test -tags=${GO_BUILD_TAGS} -coverprofile=cover.out ./...
-	go tool cover -func=cover.out
-
-format:
-	@echo "--> Running go fmt"
-	@go fmt ./...
+OUTPUT ?= astro
+# golangci-lint version
+GOLANGCI_LINT_VERSION ?=v1.45.0
 
 lint:
-	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint -o -f /go/bin/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
-	@if (test -f ${ENVTEST_ASSETS_DIR}/golangci-lint) then (${ENVTEST_ASSETS_DIR}/golangci-lint run --build-tags=${GO_BUILD_TAGS}) else (/go/bin/golangci-lint run --build-tags=${GO_BUILD_TAGS}) fi
+	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
+	${ENVTEST_ASSETS_DIR}/golangci-lint version
+	${ENVTEST_ASSETS_DIR}/golangci-lint run --timeout 3m0s
 
-tools:
-	@echo ">> installing some extra tools"
-	@go get -u -v honnef.co/go/tools/...
+build:
+	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
-install: build
-	$(eval DESTDIR ?= $(GOBIN))
-	mkdir -p $(DESTDIR)
-	cp ${OUTPUT} $(DESTDIR)
+test:
+	go test -count=1 -cover ./...
+	go test -coverprofile=coverage.txt -covermode=atomic ./...
 
-uninstall:
-	$(eval DESTDIR ?= $(GOBIN))
-	rm $(GOBIN)/$(OUTPUT)
-
-mock: mock_airflow mock_houston
+mock: mock_airflow mock_houston mock_astro
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
 
 mock_airflow:
-	mockery --filename=ContainerHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ContainerHandler
-	mockery --filename=ImageHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ImageHandler
-	mockery --filename=PodmanBind.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name PodmanBind
 	mockery --filename=RegistryHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name RegistryHandler
+	mockery --filename=ImageHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ImageHandler
+	mockery --filename=ContainerHandler.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name ContainerHandler
+	mockery --filename=DockerComposeAPI.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerComposeAPI
+	mockery --filename=DockerRegistryAPI.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerRegistryAPI
+	mockery --filename=DockerCLIClient.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerCLIClient
 
-ifeq (debug,$(firstword $(MAKECMDGOALS)))
-  # use the rest as arguments for "debug"
-  DEBUG_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-  $(eval $(DEBUG_ARGS):;@:)
-endif
+mock_astro:
+	mockery --filename=Client.go --output=astro-client/mocks --dir=astro-client --outpkg=astro_mocks --name Client
 
-debug:
-	echo $(RUN_ARGS)
-	dlv debug github.com/astronomer/astro-cli -- $(DEBUG_ARGS)
+codecov:
+	@eval $$(curl -s https://codecov.io/bash)

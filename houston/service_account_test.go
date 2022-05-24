@@ -3,7 +3,7 @@ package houston
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func TestCreateDeploymentServiceAccount(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -37,7 +37,7 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -52,7 +52,7 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -64,7 +64,7 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 }
 
 func TestCreateWorkspaceServiceAccount(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -89,7 +89,7 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -104,7 +104,7 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -116,7 +116,7 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 }
 
 func TestDeleteDeploymentServiceAccount(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -139,7 +139,7 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -154,7 +154,7 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -166,7 +166,7 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 }
 
 func TestDeleteWorkspaceServiceAccount(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -189,7 +189,7 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -204,7 +204,7 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -216,7 +216,7 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 }
 
 func TestListDeploymentServiceAccounts(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -251,7 +251,7 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -266,7 +266,7 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -278,7 +278,7 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 }
 
 func TestListWorkspaceServiceAccounts(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -313,7 +313,7 @@ func TestListWorkspaceServiceAccounts(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -328,7 +328,7 @@ func TestListWorkspaceServiceAccounts(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})

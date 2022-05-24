@@ -89,7 +89,7 @@ func (t *Table) PrintHeader(out io.Writer) {
 		t.altPadding = t.Padding
 	}
 
-	p := t.GetPadding(t.altPadding)
+	p := getPadding(t.altPadding)
 
 	headerSelectPrefix := ""
 	if t.GetUserInput {
@@ -105,7 +105,7 @@ func (t *Table) PrintHeader(out io.Writer) {
 // PrintRows prints rows with an "S"
 func (t *Table) PrintRows(out io.Writer) {
 	if t.RenderedPadding == "" {
-		p := t.GetPadding(t.altPadding)
+		p := getPadding(t.altPadding)
 		t.RenderedPadding = p
 	}
 
@@ -127,7 +127,7 @@ func (t *Table) PrintRows(out io.Writer) {
 }
 
 // GetPadding converts an array of ints into template padding for str fmting
-func (t *Table) GetPadding(padding []int) string {
+func getPadding(padding []int) string {
 	padStr := " "
 	for _, x := range padding {
 		temp := "%ds"

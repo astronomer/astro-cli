@@ -15,38 +15,39 @@ import (
 
 type DockerRegistry struct {
 	registry string
+	cli      DockerRegistryAPI
 }
 
-func DockerRegistryInit(registryName string) *DockerRegistry {
-	return &DockerRegistry{registry: registryName}
+func DockerRegistryInit(registryName string) (*DockerRegistry, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+	return &DockerRegistry{registry: registryName, cli: cli}, nil
 }
 
 // Login executes a docker login similar to docker login command
 func (d *DockerRegistry) Login(username, token string) error {
 	ctx := context.Background()
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		panic(err)
-	}
-	cli.NegotiateAPIVersion(ctx)
+	d.cli.NegotiateAPIVersion(ctx)
 
 	// Remove http|https from serverAddress
 	serverAddress := registry.ConvertToHostname(d.registry)
 
-	authConfig := &types.AuthConfig{
+	authConfig := types.AuthConfig{
 		ServerAddress: serverAddress,
 		Username:      username,
 		Password:      token,
 	}
 
 	log.Debugf("docker creds %v \n", authConfig)
-	_, err = cli.RegistryLogin(ctx, *authConfig)
+	_, err := d.cli.RegistryLogin(ctx, authConfig)
 	if err != nil {
 		return fmt.Errorf("registry login error: %w", err)
 	}
 
-	cliAuthConfig := cliTypes.AuthConfig(*authConfig)
+	cliAuthConfig := cliTypes.AuthConfig(authConfig)
 
 	// Get this idea from docker login cli
 	cliAuthConfig.RegistryToken = ""

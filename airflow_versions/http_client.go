@@ -3,11 +3,15 @@ package airflowversions
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+)
+
+const (
+	RuntimeReleaseURL = "https://updates.astronomer.io/astronomer-runtime"
+	AirflowReleaseURL = "https://updates.astronomer.io/astronomer-certified"
 )
 
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
@@ -46,9 +50,9 @@ func (r *Request) Do() (*Response, error) {
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
 func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	var response httputil.HTTPResponse
-	url := config.CFG.RuntimeReleasesURL.GetString()
+	url := RuntimeReleaseURL
 	if c.useAstronomerCertified {
-		url = config.CFG.AirflowReleasesURL.GetString()
+		url = AirflowReleaseURL
 	}
 	httpResponse, err := c.HTTPClient.Do("GET", url, &doOpts)
 	if err != nil {
@@ -56,7 +60,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	}
 	defer httpResponse.Body.Close()
 
-	body, err := ioutil.ReadAll(httpResponse.Body)
+	body, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, err
 	}

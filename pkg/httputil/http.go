@@ -3,15 +3,11 @@ package httputil
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"net/http/httputil"
-	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
 
@@ -28,10 +24,9 @@ type HTTPResponse struct {
 
 // DoOptions are options passed to the HTTPClient.Do function
 type DoOptions struct {
-	Data      interface{}
-	Context   context.Context
-	Headers   map[string]string
-	ForceJSON bool
+	Data    []byte
+	Context context.Context
+	Headers map[string]string
 }
 
 // NewHTTPClient returns a new HTTP Client
@@ -44,51 +39,38 @@ func NewHTTPClient() *HTTPClient {
 // Do executes the given HTTP request and returns the HTTP Response
 func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Response, error) {
 	var body io.Reader
-	if doOptions.Data != nil || doOptions.ForceJSON {
-		buf, err := json.Marshal(doOptions.Data)
-		if err != nil {
-			return nil, err
-		}
-		body = bytes.NewBuffer(buf)
+	if len(doOptions.Data) > 0 {
+		body = bytes.NewBuffer(doOptions.Data)
 	}
 
-	req, err := http.NewRequest(method, path, body) //nolint:noctx
-	// req = req.WithContext(context.TODO())
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, path, body)
 	if err != nil {
 		return nil, err
 	}
-	if doOptions.Data != nil {
+	if len(doOptions.Data) > 0 {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
 	for k, v := range doOptions.Headers {
 		req.Header.Set(k, v)
 	}
-	debug(httputil.DumpRequest(req, true))
-	ctx := doOptions.Context
-	if ctx == nil {
-		ctx = context.Background()
+
+	doCtx := doOptions.Context
+	if doCtx == nil {
+		doCtx = context.Background()
 	}
 
-	start := time.Now()
-	resp, err := ctxhttp.Do(ctx, c.HTTPClient, req)
-	log.Debugf("Total time %v", time.Since(start))
+	resp, err := ctxhttp.Do(doCtx, c.HTTPClient, req)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP DO Failed: %w", chooseError(ctx, err))
+		return nil, errors.Wrap(chooseError(doCtx, err), "HTTP DO Failed")
 	}
-	debug(httputil.DumpResponse(resp, true))
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return nil, newError(resp)
 	}
 	return resp, nil
-}
-
-func debug(data []byte, err error) {
-	if err == nil {
-		log.Debugf("%s\n\n", data)
-	} else {
-		log.Fatalf("%s\n\n", err)
-	}
 }
 
 // if error in context, return that instead of generic http error
@@ -109,7 +91,7 @@ type Error struct {
 
 func newError(resp *http.Response) *Error {
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return &Error{Status: resp.StatusCode, Message: fmt.Sprintf("cannot read body, err: %v", err)}
 	}

@@ -79,6 +79,39 @@ func TestGetValidTagsSimpleSemVer(t *testing.T) {
 	})
 }
 
+func TestIsValidTag(t *testing.T) {
+	dCfg := DeploymentConfig{
+		AirflowImages: []AirflowImage{
+			{Tag: "1.10.5-11-alpine3.10-onbuild", Version: "1.10.5-11"},
+			{Tag: "1.10.5-11-buster-onbuild", Version: "1.10.5-11"},
+			{Tag: "1.10.5-11-alpine3.10", Version: "1.10.5-11"},
+			{Tag: "1.10.5-11-buster", Version: "1.10.5-11"},
+			{Tag: "1.10.5-buster-onbuild", Version: "1.10.5"},
+			{Tag: "1.10.5-alpine3.10", Version: "1.10.5"},
+			{Tag: "1.10.5-buster", Version: "1.10.5"},
+			{Tag: "1.10.5-alpine3.10-onbuild", Version: "1.10.5"},
+			{Tag: "1.10.7-7-buster-onbuild", Version: "1.10.7-7"},
+			{Tag: "1.10.7-7-alpine3.10", Version: "1.10.7-7"},
+			{Tag: "1.10.7-7-buster", Version: "1.10.7-7"},
+			{Tag: "1.10.7-7-alpine3.10-onbuild", Version: "1.10.7-7"},
+			{Tag: "1.10.7-8-alpine3.10-onbuild", Version: "1.10.7-8"},
+			{Tag: "1.10.7-8-buster-onbuild", Version: "1.10.7-8"},
+			{Tag: "1.10.7-8-alpine3.10", Version: "1.10.7-8"},
+			{Tag: "1.10.7-8-buster", Version: "1.10.7-8"},
+		},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		resp := dCfg.IsValidTag("1.10.5-11-buster-onbuild")
+		assert.True(t, resp)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		resp := dCfg.IsValidTag("2.2.5-onbuild")
+		assert.False(t, resp)
+	})
+}
+
 func Test_coerce(t *testing.T) {
 	tests := []struct {
 		tag             string

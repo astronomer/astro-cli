@@ -1,33 +1,37 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/messages"
 
 	"github.com/spf13/cobra"
 )
 
-var (
-	errMissingConfigPath = errors.New(messages.ErrMissingConfigPathKey)
-	errInvalidSetArgs    = errors.New(messages.ConfigInvalidSetArgs)
-	errInvalidConfigPath = errors.New(messages.ErrInvalidConfigPathKey)
+const (
+	configSetSuccessMsg           = "Setting %s to %s successfully\n"
+	configUseOutsideProjectDirMsg = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s\n"
 )
 
-var globalFlag bool
+var (
+	globalFlag       bool
+	configGetExample = `
+		# Get your current project's name
+		$ astro config get project.name
+		`
+	configSetExample = `
+		# Set your current project's postgres user
+		$ astro config set postgres.user postgres
+		`
+)
 
 func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Manage project configuration",
-		Long:  "Manage project configuration",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			ensureGlobalFlag(cmd, args)
-		},
+		Use:               "config",
+		Short:             "Manage a project's configuration settings",
+		Long:              "Manage the project configuration settings stored at '.astro/config.yaml'",
+		PersistentPreRunE: ensureGlobalFlag,
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
 	cmd.AddCommand(
@@ -39,38 +43,38 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 
 func newConfigGetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get",
-		Short: "Get project configuration",
-		Long:  "Get project configuration",
-		RunE:  configGet,
+		Use:     "get [setting-name]",
+		Short:   "Get project's configuration settings",
+		Long:    "List the value for a particular setting in your config.yaml file",
+		Args:    cobra.ExactArgs(1),
+		Example: configGetExample,
+		RunE:    configGet,
 	}
 	return cmd
 }
 
 func newConfigSetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set",
-		Short: "Set project configuration",
-		Long:  "Set project configuration",
-		RunE:  configSet,
+		Use:     "set [setting-name]",
+		Short:   "Set project's configuration settings",
+		Long:    "Update or override a particular setting in your config.yaml file",
+		Example: configSetExample,
+		RunE:    configSet,
 	}
 	return cmd
 }
 
-func ensureGlobalFlag(cmd *cobra.Command, args []string) {
+func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	isProjectDir, _ := config.IsProjectDir(config.WorkingPath)
 
 	if !isProjectDir && !globalFlag {
 		c := "astro config " + cmd.Use + " " + args[0] + " -g"
-		fmt.Printf(messages.ConfigUseOutsideProjectDir, cmd.Use, cmd.Use, c)
-		os.Exit(1)
+		return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Use, cmd.Use, c) // nolint
 	}
+	return nil
 }
 
 func configGet(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errMissingConfigPath
-	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
@@ -114,6 +118,6 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf(messages.ConfigSetSuccess+"\n", cfg.Path, args[1])
+	fmt.Printf(configSetSuccessMsg+"\n", cfg.Path, args[1])
 	return nil
 }

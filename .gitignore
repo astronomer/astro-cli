@@ -1,5 +1,6 @@
 .astro/
 .DS_Store
+.env
 .idea/
 .vscode/
 airflow/pod-config.yml
@@ -8,6 +9,7 @@ astro-cli
 cover.out
 coverage.txt
 dist/
+meta/
 packages.txt
 requirements.txt
 testbin/golangci-lint

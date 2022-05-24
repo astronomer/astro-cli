@@ -1,81 +1,55 @@
 package config
 
 import (
+	"os"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewCfg(t *testing.T) {
-	c := newCfg("foo", "bar")
-	assert.NotNil(t, c)
+	cfg := newCfg("foo", "bar")
+	assert.NotNil(t, cfg)
 }
 
-func Test_cfg_GetString(t *testing.T) {
-	type fields struct {
-		Path    string
-		Default string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		{
-			name: "basic test case",
-			fields: fields{
-				Path:    "foo",
-				Default: "bar",
-			},
-			want: "bar",
-		},
-	}
-	for _, tt := range tests {
-		fs := afero.NewOsFs()
-		InitConfig(fs)
-		t.Run(tt.name, func(t *testing.T) {
-			c := cfg{
-				Path:    tt.fields.Path,
-				Default: tt.fields.Default,
-			}
-			if got := c.GetString(); got != tt.want {
-				t.Errorf("cfg.GetString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+func TestGetString(t *testing.T) {
+	initTestConfig()
+	cfg := newCfg("foo", "0")
+	cfg.SetHomeString("1")
+	val := cfg.GetString()
+	assert.Equal(t, "1", val)
+
+	viperProject.SetConfigFile("test.yaml")
+	defer os.Remove("test.yaml")
+	cfg.SetProjectString("2")
+	val = cfg.GetString()
+	assert.Equal(t, "2", val)
 }
 
-func Test_cfg_GetBool(t *testing.T) {
-	type fields struct {
-		Path    string
-		Default string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   bool
-	}{
-		{
-			name: "basic test case",
-			fields: fields{
-				Path:    "foo",
-				Default: "bar",
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		fs := afero.NewOsFs()
-		InitConfig(fs)
-		t.Run(tt.name, func(t *testing.T) {
-			c := cfg{
-				Path:    tt.fields.Path,
-				Default: tt.fields.Default,
-			}
-			if got := c.GetBool(); got != tt.want {
-				t.Errorf("cfg.GetString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+func TestGetInt(t *testing.T) {
+	initTestConfig()
+	cfg := newCfg("foo", "0")
+	cfg.SetHomeString("1")
+	val := cfg.GetInt()
+	assert.Equal(t, 1, val)
+
+	viperProject.SetConfigFile("test.yaml")
+	defer os.Remove("test.yaml")
+	cfg.SetProjectString("2")
+	val = cfg.GetInt()
+	assert.Equal(t, 2, val)
+}
+
+func TestGetBool(t *testing.T) {
+	initTestConfig()
+	cfg := newCfg("foo", "false")
+	cfg.SetHomeString("true")
+	val := cfg.GetBool()
+	assert.Equal(t, true, val)
+
+	viperProject.SetConfigFile("test.yaml")
+	defer os.Remove("test.yaml")
+	cfg.SetProjectString("false")
+	val = cfg.GetBool()
+	assert.Equal(t, false, val)
 }

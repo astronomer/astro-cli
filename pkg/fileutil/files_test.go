@@ -11,7 +11,7 @@ import (
 func TestExists(t *testing.T) {
 	filePath := "test.yaml"
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, filePath, []byte(`test`), 0777)
+	_ = afero.WriteFile(fs, filePath, []byte(`test`), 0o777)
 	tempFile, _ := os.CreateTemp("", "test.yaml")
 	defer os.Remove(tempFile.Name())
 	type args struct {
@@ -89,5 +89,33 @@ func TestExists(t *testing.T) {
 			assert.NoError(t, actualErr)
 		}
 		assert.Equal(t, tt.expectedResp, actualResp)
+	}
+}
+
+func TestWriteStringToFile(t *testing.T) {
+	type args struct {
+		path string
+		s    string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "basic case",
+			args:    args{path: "./test.out", s: "testing"},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := WriteStringToFile(tt.args.path, tt.args.s); (err != nil) != tt.wantErr {
+				t.Errorf("WriteStringToFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if _, err := os.Open(tt.args.path); err != nil {
+				t.Errorf("Error opening file %s", tt.args.path)
+			}
+		})
 	}
 }

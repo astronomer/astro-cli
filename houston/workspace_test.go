@@ -3,7 +3,7 @@ package houston
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func TestCreateWorkspace(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -42,7 +42,7 @@ func TestCreateWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -57,7 +57,7 @@ func TestCreateWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -69,7 +69,7 @@ func TestCreateWorkspace(t *testing.T) {
 }
 
 func TestListWorkspaces(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -118,7 +118,7 @@ func TestListWorkspaces(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -133,7 +133,7 @@ func TestListWorkspaces(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -145,7 +145,7 @@ func TestListWorkspaces(t *testing.T) {
 }
 
 func TestDeleteWorkspace(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -175,7 +175,7 @@ func TestDeleteWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -190,7 +190,7 @@ func TestDeleteWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -202,7 +202,7 @@ func TestDeleteWorkspace(t *testing.T) {
 }
 
 func TestGetWorkspace(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -232,7 +232,7 @@ func TestGetWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -247,7 +247,7 @@ func TestGetWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
@@ -259,7 +259,7 @@ func TestGetWorkspace(t *testing.T) {
 }
 
 func TestUpdateWorkspace(t *testing.T) {
-	testUtil.InitTestConfig()
+	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -289,7 +289,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
 				Header:     make(http.Header),
 			}
 		})
@@ -304,7 +304,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
-				Body:       ioutil.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
 				Header:     make(http.Header),
 			}
 		})
