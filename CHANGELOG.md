@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [1.0.0] - 2022-06-23
+## [1.0.0] - 2022-05-23
 
 ### New Features
 - The Astro CLI v1.0.0 works with [Astro](https://www.astronomer.io/product/), Astronomer's new cloud product. The Astro CLI deployment, workspace, and deploy commands will work with the Astro when a user logs into [astronomer.io](https://www.astronomer.io/). The function of these commands change slightly when logged into Astro. Details on how these commands change when working with Astro cna be found in the [Astro CLI Command Reference](https://docs.astronomer.io/astro/cli-reference)

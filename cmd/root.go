@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -21,6 +23,11 @@ import (
 var (
 	houstonClient houston.ClientInterface
 	verboseLevel  string
+)
+
+const (
+	softwarePlatform = "Astronomer Software"
+	cloudPlatform    = "Astro"
 )
 
 // NewRootCmd adds all of the primary commands for the cli
@@ -39,12 +46,19 @@ func NewRootCmd() *cobra.Command {
 	houstonClient = houston.NewClient(httpClient)
 
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+
+	ctx := cloudPlatform
+	currCtx := context.IsCloudContext()
+	if !currCtx {
+		ctx = softwarePlatform
+	}
+
 	rootCmd := &cobra.Command{
 		Use:   "astro",
 		Short: "Run Apache Airflow locally and interact with Astronomer",
 		Long:  "Welcome to the Astro CLI. Astro is the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or local development.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if context.IsCloudContext() {
+			if currCtx {
 				return cloudCmd.Setup(cmd, args, astroClient)
 			}
 			// Software PersistentPreRunE component
@@ -56,6 +70,8 @@ func NewRootCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(ctx))
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroClient, os.Stdout),
@@ -78,4 +94,13 @@ func NewRootCmd() *cobra.Command {
 		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
 	return rootCmd
+}
+
+func getResourcesHelpTemplate(context string) string {
+	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
+
+Current Context: %s
+
+{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
+`, ansi.Bold(context))
 }
