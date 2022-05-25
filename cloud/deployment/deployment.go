@@ -261,7 +261,7 @@ func validateRuntimeVersion(runtimeVersion string, client astro.Client) (bool, e
 		return false, err
 	}
 	if !util.Contains(runtimeReleases, runtimeVersion) {
-		fmt.Printf("\nRuntime version not valid. Must one of the following: %v", runtimeReleases)
+		fmt.Printf("\nRuntime version not valid. Must be one of the following: %v\n", runtimeReleases)
 		return false, nil
 	}
 	return true, nil
