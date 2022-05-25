@@ -96,7 +96,7 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 func newAuthCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:        "auth",
-		Deprecated: "use 'astro login' or 'astro logout' instead",
+		Deprecated: "use 'astro login' or 'astro logout' instead.\n\nWelcome to the Astro CLI v1.0.0, go to https://github.com/astronomer/astro-cli/blob/main/CHANGELOG.md#100---2022-05-23 to see a full list of breaking changes.\n",
 		Hidden:     true,
 	}
 	return cmd
