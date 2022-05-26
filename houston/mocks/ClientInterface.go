@@ -81,6 +81,29 @@ func (_m *ClientInterface) AuthenticateWithBasicAuth(username string, password s
 	return r0, r1
 }
 
+// CancelUpdateDeploymentRuntime provides a mock function with given fields: variables
+func (_m *ClientInterface) CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*houston.Deployment, error) {
+	ret := _m.Called(variables)
+
+	var r0 *houston.Deployment
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) *houston.Deployment); ok {
+		r0 = rf(variables)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Deployment)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(variables)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateDeployment provides a mock function with given fields: vars
 func (_m *ClientInterface) CreateDeployment(vars map[string]interface{}) (*houston.Deployment, error) {
 	ret := _m.Called(vars)
@@ -449,6 +472,29 @@ func (_m *ClientInterface) GetDeploymentConfig() (*houston.DeploymentConfig, err
 	return r0, r1
 }
 
+// GetRuntimeReleases provides a mock function with given fields: airflowVersion
+func (_m *ClientInterface) GetRuntimeReleases(airflowVersion string) (houston.RuntimeReleases, error) {
+	ret := _m.Called(airflowVersion)
+
+	var r0 houston.RuntimeReleases
+	if rf, ok := ret.Get(0).(func(string) houston.RuntimeReleases); ok {
+		r0 = rf(airflowVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(houston.RuntimeReleases)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(airflowVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspace provides a mock function with given fields: workspaceID
 func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID)
@@ -679,6 +725,29 @@ func (_m *ClientInterface) UpdateDeployment(variables map[string]interface{}) (*
 
 // UpdateDeploymentAirflow provides a mock function with given fields: variables
 func (_m *ClientInterface) UpdateDeploymentAirflow(variables map[string]interface{}) (*houston.Deployment, error) {
+	ret := _m.Called(variables)
+
+	var r0 *houston.Deployment
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) *houston.Deployment); ok {
+		r0 = rf(variables)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Deployment)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(variables)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeploymentRuntime provides a mock function with given fields: variables
+func (_m *ClientInterface) UpdateDeploymentRuntime(variables map[string]interface{}) (*houston.Deployment, error) {
 	ret := _m.Called(variables)
 
 	var r0 *houston.Deployment

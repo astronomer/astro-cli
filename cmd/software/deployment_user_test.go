@@ -64,7 +64,6 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 func TestDeploymentUserList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("ListDeploymentUsers", houston.ListDeploymentUsersRequest{UserID: "test-user-id", Email: "test-email", FullName: "test-name", DeploymentID: "test-id"}).Return([]houston.DeploymentUser{{ID: "test-id", Emails: []houston.Email{{Address: "test-email"}}, FullName: "test-name"}}, nil).Once()
 
 	houstonClient = api

@@ -53,6 +53,11 @@ var (
 			ReleaseName: "prehistoric-gravity-9229",
 		},
 	}
+	mockAppConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
 )
 
 func execDeploymentCmd(args ...string) (string, error) {
@@ -73,7 +78,7 @@ func TestDeploymentRootCommand(t *testing.T) {
 
 func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfig := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: false,
 	}
 
@@ -105,10 +110,10 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 
 func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{TriggererEnabled: false}
+	appConfig = &houston.AppConfig{TriggererEnabled: false}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -133,14 +138,14 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 
 func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags: houston.FeatureFlags{
 			TriggererEnabled: true,
 		},
 	}
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -164,7 +169,7 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 
 func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
 		Flags: houston.FeatureFlags{
 			NfsMountDagDeployment: true,
@@ -172,7 +177,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(2)
 
 	myTests := []struct {
@@ -198,14 +203,14 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 
 func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
 			GitSyncEnabled: true,
 		},
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
 
 	myTests := []struct {
@@ -234,12 +239,12 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 
 func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{GitSyncEnabled: false},
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -264,13 +269,13 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 
 func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags:            houston.FeatureFlags{TriggererEnabled: true},
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
 
 	myTests := []struct {
@@ -295,7 +300,7 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 
 func TestDeploymentUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
 		Flags: houston.FeatureFlags{
 			NfsMountDagDeployment: true,
@@ -304,7 +309,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
 
 	myTests := []struct {
@@ -336,7 +341,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 
 func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfigResponse := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
 		Flags: houston.FeatureFlags{
 			NfsMountDagDeployment: true,
@@ -345,7 +350,7 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfigResponse, nil)
+	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -446,7 +451,6 @@ func TestDeploymentDelete(t *testing.T) {
 func TestDeploymentList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("ListDeployments", houston.ListDeploymentsRequest{}).Return([]houston.Deployment{*mockDeployment}, nil)
 	allDeployments = true
 
@@ -459,7 +463,7 @@ func TestDeploymentList(t *testing.T) {
 
 func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfig := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
 		Flags: houston.FeatureFlags{
 			HardDeleteDeployment: true,
@@ -493,7 +497,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := `Successfully deleted deployment`
-	appConfig := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
 		Flags: houston.FeatureFlags{
 			HardDeleteDeployment: true,
@@ -522,6 +526,164 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", "--hard", mockDeployment.ID)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
+
+	expectedOut := `The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = ""
+	mockDeploymentResponse.DesiredAirflowVersion = ""
+	mockDeploymentResponse.RuntimeVersion = "4.2.4"
+	mockDeploymentResponse.RuntimeAirflowVersion = "2.2.5"
+	mockDeploymentResponse.DesiredRuntimeVersion = "4.2.5"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid":        mockDeploymentResponse.ID,
+		"desiredRuntimeVersion": mockDeploymentResponse.DesiredRuntimeVersion,
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+
+	houstonClient = api
+	output, err := execDeploymentCmd(
+		"runtime",
+		"upgrade",
+		"--deployment-id="+mockDeploymentResponse.ID,
+		"--desired-runtime-version="+mockDeploymentResponse.DesiredRuntimeVersion,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
+
+	expectedOut := `Runtime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Runtime 4.2.4.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = ""
+	mockDeploymentResponse.DesiredAirflowVersion = ""
+	mockDeploymentResponse.RuntimeVersion = "4.2.4"
+	mockDeploymentResponse.DesiredRuntimeVersion = "4.2.5"
+	mockDeploymentResponse.RuntimeAirflowVersion = "2.2.5"
+
+	expectedUpdateRequest := map[string]interface{}{
+		"deploymentUuid": mockDeploymentResponse.ID,
+	}
+
+	mockDeploymentUpdated := mockDeploymentResponse
+	mockDeploymentUpdated.DesiredRuntimeVersion = mockDeploymentUpdated.RuntimeVersion
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("CancelUpdateDeploymentRuntime", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
+
+	houstonClient = api
+	output, err := execDeploymentCmd(
+		"runtime",
+		"upgrade",
+		"--cancel",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
+
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to Astronomer.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "2.2.4"
+	mockDeploymentResponse.DesiredAirflowVersion = "2.2.4"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid":        mockDeploymentResponse.ID,
+		"desiredRuntimeVersion": "4.2.4",
+	}
+
+	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: "2.2.4", Version: "4.2.4"}}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
+
+	houstonClient = api
+	output, err := execDeploymentCmd(
+		"runtime",
+		"migrate",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
+	assert.NoError(t, err)
+	assert.Contains(t, output, expectedOut)
+}
+
+func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	appConfig = &houston.AppConfig{
+		Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true,
+		},
+	}
+
+	expectedOut := `Runtime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 2.2.4.`
+
+	mockDeploymentResponse := *mockDeployment
+	mockDeploymentResponse.AirflowVersion = "2.2.4"
+	mockDeploymentResponse.DesiredAirflowVersion = "2.2.4"
+	mockDeploymentResponse.RuntimeVersion = ""
+	mockDeploymentResponse.DesiredRuntimeVersion = "4.2.4"
+
+	mockUpdateRequest := map[string]interface{}{
+		"deploymentUuid": mockDeploymentResponse.ID,
+	}
+
+	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: mockDeploymentResponse.AirflowVersion, Version: mockDeploymentResponse.DesiredRuntimeVersion}}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
+	api.On("CancelUpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
+	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
+
+	houstonClient = api
+	output, err := execDeploymentCmd(
+		"runtime",
+		"migrate",
+		"--cancel",
+		"--deployment-id="+mockDeploymentResponse.ID,
+	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
 }

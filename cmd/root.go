@@ -96,11 +96,11 @@ func NewRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func getResourcesHelpTemplate(context string) string {
+func getResourcesHelpTemplate(ctx string) string {
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
 Current Context: %s
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(context))
+`, ansi.Bold(ctx))
 }

@@ -36,16 +36,13 @@ func getTestLogs(component string) []houston.DeploymentLog {
 func TestDeploymentLogsRootCommandTriggererEnabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	appConfig := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags: houston.FeatureFlags{
 			TriggererEnabled: true,
 		},
 	}
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
 
-	houstonClient = api
 	output, err := execDeploymentCmd("logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")
@@ -54,16 +51,13 @@ func TestDeploymentLogsRootCommandTriggererEnabled(t *testing.T) {
 
 func TestDeploymentLogsRootCommandTriggererDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	appConfig := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		TriggererEnabled: false,
 		Flags: houston.FeatureFlags{
 			TriggererEnabled: false,
 		},
 	}
-	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
 
-	houstonClient = api
 	output, err := execDeploymentCmd("logs")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro deployment logs")
@@ -80,7 +74,7 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 		{component: "triggerer"},
 	} {
 		mockLogs := getTestLogs(test.component)
-		appConfig := &houston.AppConfig{
+		appConfig = &houston.AppConfig{
 			TriggererEnabled: true,
 			Flags: houston.FeatureFlags{
 				TriggererEnabled: true,
@@ -89,7 +83,6 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 
 		t.Run(fmt.Sprintf("list %s logs success", test.component), func(t *testing.T) {
 			api := new(mocks.ClientInterface)
-			api.On("GetAppConfig").Return(appConfig, nil)
 			// Have to use mock.Anything because since is computed in the function by using time.Now()
 			api.On("ListDeploymentLogs", mock.Anything).Return(mockLogs, nil)
 
@@ -102,7 +95,6 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 
 		t.Run(fmt.Sprintf("list %s logs error", test.component), func(t *testing.T) {
 			api := new(mocks.ClientInterface)
-			api.On("GetAppConfig").Return(appConfig, nil)
 			api.On("ListDeploymentLogs", mock.Anything).Return(nil, errMock)
 
 			houstonClient = api

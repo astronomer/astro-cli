@@ -14,18 +14,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var (
-	mockWorkspace = &houston.Workspace{
-		ID:           "ck05r3bor07h40d02y2hw4n4v",
-		Label:        "airflow",
-		Description:  "test description",
-		Users:        nil,
-		CreatedAt:    "2019-10-16T21:14:22.105Z",
-		UpdatedAt:    "2019-10-16T21:14:22.105Z",
-		RoleBindings: nil,
-	}
-	mockAppConfig = &houston.AppConfig{}
-)
+var mockWorkspace = &houston.Workspace{
+	ID:           "ck05r3bor07h40d02y2hw4n4v",
+	Label:        "airflow",
+	Description:  "test description",
+	Users:        nil,
+	CreatedAt:    "2019-10-16T21:14:22.105Z",
+	UpdatedAt:    "2019-10-16T21:14:22.105Z",
+	RoleBindings: nil,
+}
 
 func execWorkspaceCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
@@ -52,7 +49,7 @@ func TestWorkspaceList(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig").Return(&houston.AppConfig{}, nil)
 	api.On("ListWorkspaces").Return(mockWorkspaces, nil)
 
 	houstonClient = api

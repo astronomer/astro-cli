@@ -1,6 +1,7 @@
 package software
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -15,11 +16,19 @@ var (
 	initDebugLogs = []string{}
 	houstonClient houston.ClientInterface
 	workspaceID   string
+	appConfig     *houston.AppConfig
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
 func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	houstonClient = client
+
+	var err error
+	appConfig, err = houstonClient.GetAppConfig()
+	if err != nil {
+		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
+	}
+
 	return []*cobra.Command{
 		newDeploymentRootCmd(out),
 		newWorkspaceCmd(out),
