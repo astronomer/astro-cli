@@ -61,7 +61,7 @@ astro dev init
 astro dev init --runtime-version 4.1.0
 
 # Initialize a new Astro project with the latest Astro Runtime version based on Airflow 2.2.3
-astro dev init --airflow-version 2.2.3	
+astro dev init --airflow-version 2.2.3
 `
 	dockerfile = "Dockerfile"
 
