@@ -68,8 +68,7 @@ get_binaries() {
     linux/amd64) BINARIES="astro" ;;
     windows/386) BINARIES="astro" ;;
     windows/amd64) BINARIES="astro" ;;
-    darwin/arm64) ;;
-    linux/arm64)
+    linux/arm64|darwin/arm64)
       # MANUALLY ADDED LOGIC: darwin/arm64 only available from 0.27.2 release onwards
       if version_gte "0.27.2" $VERSION; then
         BINARIES="astro"
