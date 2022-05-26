@@ -225,6 +225,7 @@ func TestAirflowInit(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersions)
 	})
 
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	t.Run("runtime version passed alongside AC flag", func(t *testing.T) {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
