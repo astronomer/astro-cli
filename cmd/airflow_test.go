@@ -24,6 +24,20 @@ func TestDevRootCommand(t *testing.T) {
 	assert.Contains(t, output, "astro dev", output)
 }
 
+func TestDevInitCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	output, err := executeCommand("dev", "init", "--help")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "astro dev", output)
+	assert.NotContains(t, output, "--use-astronomer-certified")
+
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	output, err = executeCommand("dev", "init", "--help")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "astro dev", output)
+	assert.Contains(t, output, "--use-astronomer-certified")
+}
+
 func TestNewAirflowInitCmd(t *testing.T) {
 	cmd := newAirflowInitCmd()
 	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
@@ -211,6 +225,7 @@ func TestAirflowInit(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersions)
 	})
 
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	t.Run("runtime version passed alongside AC flag", func(t *testing.T) {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")

@@ -10,6 +10,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -35,7 +36,7 @@ var (
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
 `
-	initExample = `
+	initSoftwareExample = `
 # Initialize a new Astro project with the latest version of Astro Runtime
 astro dev init
 
@@ -50,6 +51,17 @@ astro dev init --use-astronomer-certified
 
 # Initialize a new Astro project with the latest version of Astronomer Certified based on Airflow 2.2.3
 astro dev init --use-astronomer-certified --airflow-version 2.2.3
+`
+
+	initCloudExample = `
+# Initialize a new Astro project with the latest version of Astro Runtime
+astro dev init
+
+# Initialize a new Astro project with Astro Runtime 4.1.0
+astro dev init --runtime-version 4.1.0
+
+# Initialize a new Astro project with the latest Astro Runtime version based on Airflow 2.2.3
+astro dev init --airflow-version 2.2.3
 `
 	dockerfile = "Dockerfile"
 
@@ -93,7 +105,7 @@ func newAirflowInitCmd() *cobra.Command {
 		Use:     "init",
 		Short:   "Create a new Astro project in your working directory",
 		Long:    "Create a new Astro project in your working directory. This generates the files you need to start an Airflow environment on your local machine and deploy your project to a Deployment on Astro or Astronomer Software.",
-		Example: initExample,
+		Example: initCloudExample,
 		Args:    cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -103,8 +115,18 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
-	cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+
+	if !context.IsCloudContext() {
+		cmd.Example = initSoftwareExample
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
+	}
+
+	_, err := context.GetCurrentContext()
+	if err != nil { // Case when user is not logged in to any platform
+		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
+		cmd.Flags().MarkHidden("use-astronomer-certified")
+	}
 	return cmd
 }
 
