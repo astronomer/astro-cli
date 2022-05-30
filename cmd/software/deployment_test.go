@@ -554,7 +554,6 @@ func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
 
@@ -595,7 +594,6 @@ func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
 	mockDeploymentUpdated.DesiredRuntimeVersion = mockDeploymentUpdated.RuntimeVersion
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("CancelUpdateDeploymentRuntime", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
 
@@ -608,6 +606,7 @@ func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
+	api.AssertExpectations(t)
 }
 
 func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
@@ -633,7 +632,6 @@ func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
 	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: "2.2.4", Version: "4.2.4"}}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
 	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
@@ -646,6 +644,7 @@ func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
+	api.AssertExpectations(t)
 }
 
 func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
@@ -669,13 +668,9 @@ func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
 		"deploymentUuid": mockDeploymentResponse.ID,
 	}
 
-	mockRuntimeReleaseResp := houston.RuntimeReleases{houston.RuntimeRelease{AirflowVersion: mockDeploymentResponse.AirflowVersion, Version: mockDeploymentResponse.DesiredRuntimeVersion}}
-
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("CancelUpdateDeploymentRuntime", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
-	api.On("GetRuntimeReleases", mockDeploymentResponse.AirflowVersion).Return(mockRuntimeReleaseResp, nil)
 
 	houstonClient = api
 	output, err := execDeploymentCmd(
@@ -686,4 +681,5 @@ func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.Contains(t, output, expectedOut)
+	api.AssertExpectations(t)
 }

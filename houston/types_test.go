@@ -134,3 +134,36 @@ func Test_coerce(t *testing.T) {
 		}
 	}
 }
+
+func TestRuntimeReleasesIsValidVersion(t *testing.T) {
+	r := RuntimeReleases{
+		RuntimeRelease{Version: "5.0.1", AirflowVersion: "2.2.5", AirflowDBMigraion: false},
+		RuntimeRelease{Version: "5.0.2", AirflowVersion: "2.2.6", AirflowDBMigraion: false},
+	}
+	t.Run("valid", func(t *testing.T) {
+		out := r.IsValidVersion("5.0.1")
+		assert.True(t, out)
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		out := r.IsValidVersion("5.0.0")
+		assert.False(t, out)
+	})
+}
+
+func TestRuntimeReleasesGreaterVersions(t *testing.T) {
+	r := RuntimeReleases{
+		RuntimeRelease{Version: "5.0.1", AirflowVersion: "2.2.5", AirflowDBMigraion: false},
+		RuntimeRelease{Version: "5.0.2", AirflowVersion: "2.2.6", AirflowDBMigraion: false},
+	}
+
+	t.Run("valid version", func(t *testing.T) {
+		out := r.GreaterVersions("5.0.0")
+		assert.Equal(t, []string{"5.0.1", "5.0.2"}, out)
+	})
+
+	t.Run("invalid version", func(t *testing.T) {
+		out := r.GreaterVersions("invalid version")
+		assert.Empty(t, out)
+	})
+}

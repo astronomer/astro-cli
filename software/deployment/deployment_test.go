@@ -3,6 +3,7 @@ package deployment
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 
@@ -98,6 +99,7 @@ func TestCreate(t *testing.T) {
 	role := "test-role"
 	executor := houston.CeleryExecutorType
 	airflowVersion := "1.10.5"
+	runtimeVersion := "5.0.1"
 	dagDeploymentType := houston.ImageDeploymentType
 	nfsLocation := ""
 	triggerReplicas := 0
@@ -177,7 +179,7 @@ func TestCreate(t *testing.T) {
 
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas}
+			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas}
 			err := Create(createReq, api, buf)
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
@@ -1152,6 +1154,19 @@ To cancel, run:
 		api.AssertExpectations(t)
 	})
 
+	t.Run("not on runtime", func(t *testing.T) {
+		mockResp := *mockDeployment
+		mockResp.AirflowVersion = "2.2.5"
+		mockResp.RuntimeVersion = ""
+
+		api := new(mocks.ClientInterface)
+		api.On("GetDeployment", mockDeployment.ID).Return(&mockResp, nil)
+
+		buf := new(bytes.Buffer)
+		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		assert.ErrorIs(t, err, errDeploymentNotOnRuntime)
+	})
+
 	t.Run("upgrade runtime get deployment error", func(t *testing.T) {
 		mockError := errors.New("get deployment error") //nolint:goerr113
 		api := new(mocks.ClientInterface)
@@ -1469,6 +1484,16 @@ func TestMeetsRuntimeUpgradeReqs(t *testing.T) {
 			name:        "invalid case",
 			args:        args{runtimeVersion: "4.2.4", desiredRuntimeVersion: "4.2.4"},
 			expectedErr: ErrInvalidRuntimeVersion{currentVersion: semver.MustParse("4.2.4"), desiredVersion: "4.2.4"},
+		},
+		{
+			name:        "error parsing runtime version",
+			args:        args{runtimeVersion: "invalid version", desiredRuntimeVersion: "4.2.5"},
+			expectedErr: fmt.Errorf("Invalid Semantic Version"), //nolint
+		},
+		{
+			name:        "error parsing desired runtime version",
+			args:        args{runtimeVersion: "4.2.5", desiredRuntimeVersion: "invalid version"},
+			expectedErr: fmt.Errorf("Invalid Semantic Version"), //nolint
 		},
 	}
 	for _, tt := range tests {
