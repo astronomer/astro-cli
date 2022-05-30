@@ -70,6 +70,7 @@ commands:
           environment:
             HOUSTON_HOST: houston
           command: |
+            make lint
             make test
             bash -c "bash <(curl -s https://codecov.io/bash)"
   commit-next-tag:
