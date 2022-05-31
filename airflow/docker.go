@@ -52,7 +52,7 @@ const (
 	composeLinkWebserverMsg = "Airflow Webserver: %s"
 	composeLinkPostgresMsg  = "Postgres Database: %s"
 	composeUserPasswordMsg  = "The default Airflow UI credentials are: %s"
-	postgresUserPasswordMsg = "The default Postrgres DB credentials are: %s"
+	postgresUserPasswordMsg = "The default Postgres DB credentials are: %s"
 
 	envPathMsg     = "Error looking for \"%s\""
 	envFoundMsg    = "Env file \"%s\" found. Loading...\n"
