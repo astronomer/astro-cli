@@ -1,10 +1,16 @@
 ---
 version: 2.1
 jobs:
+  lint:
+    working_directory: /go/src/github.com/astronomer/astro-cli
+    docker:
+      - image: quay.io/astronomer/ap-dind-golang:20.10.14-1
+    steps:
+      - lint
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:20.10.11
+      - image: quay.io/astronomer/ap-dind-golang:20.10.14-1
     steps:
       - test
   new-tag:
@@ -25,6 +31,7 @@ workflows:
   version: 2.1
   build-images:
     jobs:
+      - lint
       - test
       - approve-release:
           type: approval
@@ -55,6 +62,13 @@ executors:
     docker:
       - image: circleci/python:3
 commands:
+  lint:
+    description: "Run linting checks"
+    steps:
+      - checkout
+      - run:
+          name: Run golangci-lint
+          command: make lint
   test:
     description: "Run tests and code coverage"
     steps:
