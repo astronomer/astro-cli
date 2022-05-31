@@ -424,6 +424,7 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)
+	fmt.Println(d.ID)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}

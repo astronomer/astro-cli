@@ -72,19 +72,42 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 		return nil
 	}
 
-	// deploy command can use API keys
-	if cmd.CalledAs() == "deploy" && cmd.Parent().Use == topLvlCmd {
-		apiKey, err := checkAPIKeys()
-		if err != nil {
-			fmt.Println(err)
-			fmt.Println("\nThere was an error using API keys, using regular auth instead")
-		}
-		if apiKey {
-			return nil
-		}
-	}
+
+
+	// // deploy command can use API keys
+	// if cmd.CalledAs() == "deploy" && cmd.Parent().Use == topLvlCmd {
+	// 	apiKey, err := checkAPIKeys()
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+	// 	}
+	// 	if apiKey {
+	// 		return nil
+	// 	}
+	// }
+
+	// // deployment commands can use API keys
+	// if cmd.CalledAs() == "deployment" && cmd.Parent().Use == topLvlCmd {
+	// 	apiKey, err := checkAPIKeys()
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+	// 	}
+	// 	if apiKey {
+	// 		return nil
+	// 	}
+	// }
 
 	// run auth setup for any command that requires auth
+
+	apiKey, err := checkAPIKeys()
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+	}
+	if apiKey {
+		return nil
+	}
 	return checkToken(client, os.Stdout)
 }
 
