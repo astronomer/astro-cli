@@ -23,13 +23,13 @@ func Coerce(version string) *semver.Version {
 	return coerceVer
 }
 
-func Contains(elems []string, v string) bool {
-	for _, s := range elems {
-		if v == s {
+func Contains[T comparable](elems []T, v T) bool {
+	for _, elem := range elems {
+		if v == elem {
 			return true
 		}
 	}
-	return false
+	return true
 }
 
 func GetStringInBetweenTwoString(str, startS, endS string) (result string, found bool) {

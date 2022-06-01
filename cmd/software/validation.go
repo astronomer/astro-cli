@@ -3,6 +3,7 @@ package software
 import (
 	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"net/url"
 	"strings"
 
@@ -64,22 +65,20 @@ func coalesceWorkspace() (string, error) {
 func validateWorkspaceRole(role string) error {
 	validRoles := []string{houston.WorkspaceAdminRole, houston.WorkspaceEditorRole, houston.WorkspaceViewerRole}
 
-	for _, validRole := range validRoles {
-		if role == validRole {
-			return nil
-		}
+	if util.Contains(validRoles, role) {
+		return nil
 	}
+
 	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
 }
 
 func validateDeploymentRole(role string) error {
 	validRoles := []string{houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole}
 
-	for _, validRole := range validRoles {
-		if role == validRole {
-			return nil
-		}
+	if util.Contains(validRoles, role) {
+		return nil
 	}
+
 	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", ")) //nolint:goerr113
 }
 

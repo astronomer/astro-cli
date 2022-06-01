@@ -452,13 +452,7 @@ func ValidateDomain(domain string) (astro.AuthConfig, error) {
 	validDomainsList := []string{"astronomer-dev.io", "astronomer-stage.io", "astronomer-perf.io", "astronomer.io", "localhost"}
 	var authConfig astro.AuthConfig
 
-	validDomain := false
-	for _, x := range validDomainsList {
-		if x == domain {
-			validDomain = true
-			break
-		}
-	}
+	validDomain := util.Contains(validDomainsList, domain)
 	if !validDomain {
 		return authConfig, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
 			"Are you trying to authenticate to Astronomer Software? If so, please change your current context with 'astro context switch'")
