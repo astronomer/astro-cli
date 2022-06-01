@@ -29,7 +29,7 @@ func Contains[T comparable](elems []T, v T) bool {
 			return true
 		}
 	}
-	return true
+	return false
 }
 
 func GetStringInBetweenTwoString(str, startS, endS string) (result string, found bool) {
