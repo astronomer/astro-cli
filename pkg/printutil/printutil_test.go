@@ -2,12 +2,138 @@ package printutil
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// duplicate to avoid circular import
+func mockUserInput(t *testing.T, i string) func() {
+	input := []byte(i)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+
+	// set os.Stdin = new stdin, and return function to defer in the test
+	realStdin := os.Stdin
+	os.Stdin = r
+	return func() { os.Stdin = realStdin }
+}
+
+type test struct {
+	Name   string
+	Num    int
+	Ignore bool
+}
+
+func (t test) Before(other test) bool {
+	return t.Num < other.Num
+}
+
+var collection = []test{
+	{Name: "test", Num: 0, Ignore: true},
+	{Name: "test1", Num: 1, Ignore: true},
+	{Name: "test2", Num: 2, Ignore: true},
+}
+
+func TestWithContents(t *testing.T) {
+	t.Run("test table provided extract function", func(t *testing.T) {
+		tab := TableT[test]{
+			Padding: []int{10, 10, 10},
+			Header:  []string{"#", "name", "num"},
+			ExtractRowFn: func(t test, i int) []string {
+				return []string{strconv.Itoa(i + 1), t.Name, fmt.Sprintf("%d", t.Num)}
+			},
+		}.WithContents(collection, nil, func(w test) (bool, error) {
+			return false, nil
+		})
+		assert.Equal(t, collection, tab.Contents)
+		expectedRows := []Row{
+			{Raw: []string{"1", "test", "0"}, Rendered: "", Colored: false},
+			{Raw: []string{"2", "test1", "1"}, Rendered: "", Colored: false},
+			{Raw: []string{"3", "test2", "2"}, Rendered: "", Colored: false},
+		}
+		assert.Equal(t, expectedRows, tab.Rows)
+	})
+
+	t.Run("test function provided extract function", func(t *testing.T) {
+		tab := TableT[test]{
+			Padding: []int{10, 10, 10},
+			Header:  []string{"#", "name", "num"},
+		}.WithContents(collection, func(t test, i int) []string {
+			return []string{strconv.Itoa(i + 1), t.Name, fmt.Sprintf("%d", t.Num)}
+		}, func(w test) (bool, error) {
+			return false, nil
+		})
+		assert.Equal(t, collection, tab.Contents)
+		expectedRows := []Row{
+			{Raw: []string{"1", "test", "0"}, Rendered: "", Colored: false},
+			{Raw: []string{"2", "test1", "1"}, Rendered: "", Colored: false},
+			{Raw: []string{"3", "test2", "2"}, Rendered: "", Colored: false},
+		}
+		assert.Equal(t, expectedRows, tab.Rows)
+	})
+}
+
+func TestTableTSelect(t *testing.T) {
+	tab := TableT[test]{
+		Padding: []int{10, 10, 10},
+		Header:  []string{"#", "name", "num"},
+		ExtractRowFn: func(t test, i int) []string {
+			return []string{strconv.Itoa(i + 1), t.Name, fmt.Sprintf("%d", t.Num)}
+		},
+	}.WithContents(collection, nil, func(w test) (bool, error) {
+		return false, nil
+	})
+
+	t.Run("test generic select", func(t *testing.T) {
+		defer mockUserInput(t, "1")()
+		actual, err := tab.Select()
+		assert.NoError(t, err)
+		assert.Equal(t, collection[0], actual)
+	})
+
+	t.Run("select empty contents", func(t *testing.T) {
+		emptyTable := TableT[test]{
+			Padding: []int{10, 10, 10},
+			Header:  []string{"#", "name", "num"},
+			ExtractRowFn: func(t test, i int) []string {
+				return []string{strconv.Itoa(i + 1), t.Name, fmt.Sprintf("%d", t.Num)}
+			},
+		}
+		_, err := emptyTable.Select()
+		assert.Error(t, err)
+	})
+
+	t.Run("bad choice out of range", func(t *testing.T) {
+		defer mockUserInput(t, "5")()
+		_, err := tab.Select()
+		assert.Error(t, err)
+	})
+
+	t.Run("bad choice negative", func(t *testing.T) {
+		defer mockUserInput(t, "-1")()
+		_, err := tab.Select()
+		assert.Error(t, err)
+	})
+
+	t.Run("bad choice random string", func(t *testing.T) {
+		defer mockUserInput(t, "asdf")()
+		_, err := tab.Select()
+		assert.Error(t, err)
+	})
+}
 
 func TestTableAddRow(t *testing.T) {
 	type args struct {

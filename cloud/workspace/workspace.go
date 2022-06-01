@@ -12,7 +12,15 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var errInvalidWorkspaceKey = errors.New("invalid workspace selection")
+var (
+	errInvalidWorkspaceKey = errors.New("invalid workspace selection")
+	workspaceTab           = printutil.TableT[astro.Workspace]{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "ID"},
+		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	}
+)
 
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
@@ -45,26 +53,20 @@ func List(client astro.Client, out io.Writer) error {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	tab := newTableOut()
-	for i := range ws {
-		name := ws[i].Label
-		workspace := ws[i].ID
-
-		var color bool
-
-		if c.Workspace == ws[i].ID {
-			color = true
-		} else {
-			color = false
+	colorFn := func(w astro.Workspace) (bool, error) {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return false, err
 		}
-		tab.AddRow([]string{name, workspace}, color)
+		if c.Workspace == w.ID {
+			return true, nil
+		}
+		return false, nil
 	}
 
+	tab := workspaceTab.WithContents(ws, func(w astro.Workspace, _ int) []string {
+		return []string{w.Label, w.ID}
+	}, colorFn)
 	tab.Print(out)
 
 	return nil

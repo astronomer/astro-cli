@@ -157,6 +157,10 @@ type Workspace struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
+func (w Workspace) Before(other Workspace) bool {
+	return true
+}
+
 type Image struct {
 	ID           string   `json:"id"`
 	DeploymentID string   `json:"deploymentId"`
