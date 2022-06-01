@@ -125,7 +125,7 @@ func newAirflowInitCmd() *cobra.Command {
 	_, err := context.GetCurrentContext()
 	if err != nil { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
-		cmd.Flags().MarkHidden("use-astronomer-certified")
+		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
 	}
 	return cmd
 }

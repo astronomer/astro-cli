@@ -1,7 +1,7 @@
 GIT_COMMIT_SHORT=$(shell git rev-parse --short HEAD)
 VERSION ?= SNAPSHOT-${GIT_COMMIT_SHORT}
 
-LDFLAGS_VERSION=-X github.com/astro-projects/astro-cli/version.CurrVersion=${VERSION}
+LDFLAGS_VERSION=-X github.com/astronomer/astro-cli/version.CurrVersion=${VERSION}
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
 OUTPUT ?= astro
