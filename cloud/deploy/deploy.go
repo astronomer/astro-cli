@@ -5,8 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -170,22 +169,17 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 			return deploymentInfo{}, err
 		}
 
-		deploymentsInput := astro.DeploymentsInput{
-			WorkspaceID: currentWorkspace.ID,
-		}
-
-		deployments, err := client.ListDeployments(deploymentsInput)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, client)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
 
-		// Prompt user for deployment if no deployment passed in
-		deployImage, id, currentVersion, webserverURL, err := promptUserForDeployment(cloudDomain, &currentWorkspace, deployments)
-		if err != nil {
-			return deploymentInfo{}, err
-		}
-
-		return deploymentInfo{id, deployImage, currentVersion, currentWorkspace.OrganizationID, webserverURL}, nil
+		return deploymentInfo{
+			currentDeployment.ID, 
+			airflow.ImageName(currentDeployment.ReleaseName, "latest"), 
+			currentDeployment.RuntimeRelease.Version, 
+			currentWorkspace.OrganizationID, 
+			currentDeployment.DeploymentSpec.Webserver.URL}, nil
 	}
 	deployImage, currentVersion, organizationID, webserverURL, err := getImageName(cloudDomain, deploymentID, client)
 	if err != nil {
@@ -267,52 +261,6 @@ func validateWorkspace(wsID string, client astro.Client) (astro.Workspace, error
 	}
 
 	return currentWorkspace, nil
-}
-
-// Prompt user for deployment if no deployment passed in
-func promptUserForDeployment(cloudDomain string, currentWorkspace *astro.Workspace, deployments []astro.Deployment) (deployImage, deploymentID, currentVersion, webserverURL string, err error) {
-	if len(deployments) == 0 {
-		return "", "", "", "", errNoDeploymentsMsg
-	}
-
-	if cloudDomain == astroDomain {
-		fmt.Printf(deploymentHeaderMsg, "Astro")
-	} else {
-		fmt.Printf(deploymentHeaderMsg, cloudDomain)
-	}
-
-	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Label)
-	fmt.Println(selectDeploymentPromptMsg)
-
-	sort.Slice(deployments, func(i, j int) bool {
-		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
-	})
-
-	deployMap := map[string]astro.Deployment{}
-	for i := range deployments {
-		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID}, false)
-
-		deployMap[strconv.Itoa(index)] = deployments[i]
-	}
-
-	tab.Print(os.Stdout)
-	choice := input.Text("\n> ")
-	selected, ok := deployMap[choice]
-	if !ok {
-		return "", "", "", "", errInvalidDeploymentKey
-	}
-	deploymentID = selected.ID
-	currentVersion = selected.RuntimeRelease.Version
-	namespace := selected.ReleaseName
-	webserverURL = selected.DeploymentSpec.Webserver.URL
-
-	fmt.Printf(deployingPromptMsg, namespace)
-
-	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
-	deployImage = airflow.ImageName(namespace, "latest")
-
-	return deployImage, deploymentID, currentVersion, webserverURL, nil
 }
 
 func getImageName(cloudDomain, deploymentID string, client astro.Client) (deployImage, currentVersion, organizationID, webserverURL string, err error) {

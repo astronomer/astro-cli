@@ -20,29 +20,10 @@ func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool
 		Header:         []string{"#", "KEY", "VALUE", "SECRET"},
 	}
 
-	// get deployments
-	deployments, err := getDeployments(ws, client)
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, client)
 	if err != nil {
 		return err
-	}
-
-	// select deployment
-	if deploymentID == "" {
-		deploymentID, err = selectDeployment(deployments, "Select a Deployment to list its variables")
-		if err != nil {
-			return err
-		}
-	}
-
-	// validate deployment id
-	var currentDeployment astro.Deployment
-	for i := range deployments {
-		if deployments[i].ID == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.ID == "" {
-		return errInvalidDeploymentKey
 	}
 
 	environmentVariablesObjects := currentDeployment.DeploymentSpec.EnvironmentVariablesObjects
@@ -84,33 +65,11 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 		DynamicPadding: true,
 		Header:         []string{"#", "KEY", "VALUE", "SECRET"},
 	}
-	// get deployments
-	deployments, err := getDeployments(ws, client)
+
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, client)
 	if err != nil {
 		return err
-	}
-
-	// select deployment
-	if deploymentID == "" {
-		selectText := "Select a deployment to create variables for:"
-		if updateVars {
-			selectText = "Select a deployment to update variables for:"
-		}
-		deploymentID, err = selectDeployment(deployments, selectText)
-		if err != nil {
-			return err
-		}
-	}
-
-	// validate deployment id
-	var currentDeployment astro.Deployment
-	for i := range deployments {
-		if deployments[i].ID == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.ID == "" {
-		return errInvalidDeploymentKey
 	}
 
 	// build query input

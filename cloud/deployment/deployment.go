@@ -8,6 +8,8 @@ import (
 	"strconv"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -17,8 +19,9 @@ import (
 )
 
 var (
-	errInvalidDeploymentKey = errors.New("invalid deployment selection")
-	errNoDeployments        = errors.New("no Deployments found in this Workspace")
+	errInvalidDeployment = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	errInvalidDeploymentKey = errors.New("invaled Deployment selected")
+	noDeployments = "no Deployments found in this Workspace, would you like to create one now?"
 )
 
 const (
@@ -90,20 +93,15 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 		logLevels = []string{"WARN", "ERROR", "INFO"}
 	}
 
-	// select a deployment
-	if deploymentID == "" {
-		// get deployments
-		deployments, err := getDeployments(ws, client)
-		if err != nil {
-			return err
-		}
-
-		// select deployment
-		deploymentID, err = selectDeployment(deployments, "Select a Deployment to view its logs")
-		if err != nil {
-			return err
-		}
+	// get deployment
+	deployment, err := GetDeployment(ws, deploymentID, client)
+	if err != nil {
+		return err
 	}
+
+	fmt.Println(deployment.ID)
+
+	deploymentID = deployment.ID
 
 	// deployment logs request
 	vars := map[string]interface{}{
@@ -332,29 +330,10 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 }
 
 func Update(deploymentID, label, ws, description string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
-	// get deployments
-	deployments, err := getDeployments(ws, client)
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, client)
 	if err != nil {
 		return err
-	}
-
-	// select deployment
-	if deploymentID == "" {
-		deploymentID, err = selectDeployment(deployments, "Select which Deployment you want to update")
-		if err != nil {
-			return err
-		}
-	}
-
-	// validate deployment id
-	var currentDeployment astro.Deployment
-	for i := range deployments {
-		if deployments[i].ID == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.ID == "" {
-		return errInvalidDeploymentKey
 	}
 
 	// prompt user
@@ -449,29 +428,10 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 }
 
 func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) error {
-	// get deployments
-	deployments, err := getDeployments(ws, client)
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, client)
 	if err != nil {
 		return err
-	}
-
-	// select deployment
-	if deploymentID == "" {
-		deploymentID, err = selectDeployment(deployments, "Select the deployment that you want to delete")
-		if err != nil {
-			return err
-		}
-	}
-
-	// validate deployment id
-	var currentDeployment astro.Deployment
-	for i := range deployments {
-		if deployments[i].ID == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.ID == "" {
-		return errInvalidDeploymentKey
 	}
 
 	// prompt user
@@ -503,6 +463,7 @@ func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) erro
 	return nil
 }
 
+
 func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) {
 	deploymentsInput := astro.DeploymentsInput{
 		WorkspaceID: ws,
@@ -516,10 +477,21 @@ func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) 
 	return deployments, nil
 }
 
-func selectDeployment(deployments []astro.Deployment, message string) (string, error) {
+func selectDeployment(deployments []astro.Deployment, client astro.Client, ws, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
-		return "", errNoDeployments
+
+		i, _ := input.Confirm(noDeployments)
+		if !i {
+			fmt.Println("Exiting command...")
+			os.Exit(1)
+		}
+		return astro.Deployment{}, nil
+	}
+
+	if len(deployments) == 1 {
+		fmt.Printf("Deployment %s(Deployment ID: %s) is the only Deployment available in the Workspace. Using this Deployment by default\n", deployments[0].Label, deployments[0].ID )
+		return deployments[0], nil
 	}
 
 	tab := printutil.Table{
@@ -546,7 +518,55 @@ func selectDeployment(deployments []astro.Deployment, message string) (string, e
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
-		return "", errInvalidDeploymentKey
+		return astro.Deployment{}, errInvalidDeploymentKey
 	}
-	return selected.ID, nil
+	return selected, nil
+}
+
+func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployment, error) {
+	deployments, err := getDeployments(ws, client)
+	if err != nil {
+		return astro.Deployment{}, err
+	}
+
+	var currentDeployment astro.Deployment
+
+	// select deployment if deploymentID is empty
+	if deploymentID == "" {
+		currentDeployment, err := selectDeployment(deployments, client, ws, "Select which Deployment you want to update")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+		if currentDeployment.ID == "" {
+			// get latest runtime veresion
+			airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+			runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+			if err != nil {
+				return astro.Deployment{}, err
+			}
+			
+			// walk user through creating a deployment
+			Create("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+
+			// get a new deployment list
+			deployments, err = getDeployments(ws, client)
+			if err != nil {
+				return astro.Deployment{}, err
+			}
+			currentDeployment, err = selectDeployment(deployments, client, ws, "Select which Deployment you want to update")
+		}
+		return currentDeployment, nil
+	} else {
+		for i := range deployments {
+			if deployments[i].ID == deploymentID {
+				currentDeployment = deployments[i]
+			}
+		}
+		fmt.Println(currentDeployment.ID)
+		if currentDeployment.ID == "" {
+			fmt.Println("deployment id is blank")
+			return astro.Deployment{}, errInvalidDeployment
+		}
+		return currentDeployment, nil
+	}
 }
