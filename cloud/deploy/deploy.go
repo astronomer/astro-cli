@@ -12,8 +12,8 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -175,10 +175,10 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 		}
 
 		return deploymentInfo{
-			currentDeployment.ID, 
-			airflow.ImageName(currentDeployment.ReleaseName, "latest"), 
-			currentDeployment.RuntimeRelease.Version, 
-			currentWorkspace.OrganizationID, 
+			currentDeployment.ID,
+			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
+			currentDeployment.RuntimeRelease.Version,
+			currentWorkspace.OrganizationID,
 			currentDeployment.DeploymentSpec.Webserver.URL}, nil
 	}
 	deployImage, currentVersion, organizationID, webserverURL, err := getImageName(cloudDomain, deploymentID, client)
