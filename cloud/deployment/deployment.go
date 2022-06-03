@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strconv"
 
-	astro "github.com/astronomer/astro-cli/astro-client"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	errInvalidDeployment = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	errInvalidDeploymentKey = errors.New("invaled Deployment selected")
-	noDeployments = "no Deployments found in this Workspace, would you like to create one now?"
+	noDeployments           = "no Deployments found in this Workspace, would you like to create one now?"
 )
 
 const (
@@ -463,7 +463,6 @@ func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) erro
 	return nil
 }
 
-
 func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) {
 	deploymentsInput := astro.DeploymentsInput{
 		WorkspaceID: ws,
@@ -490,7 +489,7 @@ func selectDeployment(deployments []astro.Deployment, client astro.Client, ws, m
 	}
 
 	if len(deployments) == 1 {
-		fmt.Printf("Deployment %s(Deployment ID: %s) is the only Deployment available in the Workspace. Using this Deployment by default\n", deployments[0].Label, deployments[0].ID )
+		fmt.Printf("Deployment %s(Deployment ID: %s) is the only Deployment available in the Workspace. Using this Deployment by default\n", deployments[0].Label, deployments[0].ID)
 		return deployments[0], nil
 	}
 
@@ -544,7 +543,7 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 			if err != nil {
 				return astro.Deployment{}, err
 			}
-			
+
 			// walk user through creating a deployment
 			Create("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
 
