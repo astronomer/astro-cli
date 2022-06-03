@@ -164,10 +164,10 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
 		// Validate workspace
-		currentWorkspace, err := validateWorkspace(wsID, client)
-		if err != nil {
-			return deploymentInfo{}, err
-		}
+		// currentWorkspace, err := validateWorkspace(wsID, client)
+		// if err != nil {
+		// 	return deploymentInfo{}, err
+		// }
 
 		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, client)
 		if err != nil {
@@ -178,7 +178,7 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 			currentDeployment.ID, 
 			airflow.ImageName(currentDeployment.ReleaseName, "latest"), 
 			currentDeployment.RuntimeRelease.Version, 
-			currentWorkspace.OrganizationID, 
+			currentDeployment.Workspace.OrganizationID,
 			currentDeployment.DeploymentSpec.Webserver.URL}, nil
 	}
 	deployImage, currentVersion, organizationID, webserverURL, err := getImageName(cloudDomain, deploymentID, client)
@@ -207,7 +207,7 @@ func parseDAG(pytest, version, envFile, deployImage string) error {
 			fmt.Println(err)
 			return errDagsParseFailed
 		}
-		// check pytests
+	// check pytests
 	} else if pytest != "" && pytest != parse {
 		fmt.Println("Testing image...")
 		err := checkPytest(pytest, deployImage, containerHandler)
