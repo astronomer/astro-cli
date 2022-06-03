@@ -175,9 +175,9 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 		}
 
 		return deploymentInfo{
-			currentDeployment.ID, 
-			airflow.ImageName(currentDeployment.ReleaseName, "latest"), 
-			currentDeployment.RuntimeRelease.Version, 
+			currentDeployment.ID,
+			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
+			currentDeployment.RuntimeRelease.Version,
 			currentDeployment.Workspace.OrganizationID,
 			currentDeployment.DeploymentSpec.Webserver.URL}, nil
 	}
@@ -207,7 +207,7 @@ func parseDAG(pytest, version, envFile, deployImage string) error {
 			fmt.Println(err)
 			return errDagsParseFailed
 		}
-	// check pytests
+		// check pytests
 	} else if pytest != "" && pytest != parse {
 		fmt.Println("Testing image...")
 		err := checkPytest(pytest, deployImage, containerHandler)
