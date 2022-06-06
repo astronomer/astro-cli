@@ -180,7 +180,7 @@ func TestCheckTriggererEnabled(t *testing.T) {
 
 func TestDockerComposeInit(t *testing.T) {
 	testUtils.InitTestConfig(testUtils.LocalPlatform)
-	_, err := DockerComposeInit("./testfiles", "", "Dockerfile", false)
+	_, err := DockerComposeInit("./testfiles", "", "Dockerfile", "", false)
 	assert.NoError(t, err)
 }
 

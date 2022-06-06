@@ -390,7 +390,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -407,7 +407,7 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 	args = append([]string{"airflow"}, args...)
 	// ignore last user parameter
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -420,7 +420,7 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -449,7 +449,7 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -462,7 +462,7 @@ func airflowKill(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -475,7 +475,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "", false)
 	if err != nil {
 		return err
 	}
@@ -526,9 +526,14 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return errors.New("the 'tests' directory does not exist, please run `astro dev init` to create it")
 	}
 
+	imageName, err := airflow.ProjectNameUnique(false)
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("Running Pytest\nThis may take a minute if you have not run this command before…")
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, true)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName, true)
 	if err != nil {
 		return err
 	}
@@ -549,7 +554,12 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, true)
+	imageName, err := airflow.ProjectNameUnique(false)
+	if err != nil {
+		return err
+	}
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName, true)
 	if err != nil {
 		return err
 	}
@@ -565,7 +575,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	// Add airflow command, to simplify astro cli usage
 	args = append(airflowUpgradeCheckCmd, args...)
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
 	if err != nil {
 		return err
 	}
