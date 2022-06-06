@@ -14,7 +14,7 @@ type ResponseData struct {
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetClusters          []Cluster              `json:"clusters,omitempty"`
+	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	DeploymentCreate          Deployment                   `json:"DeploymentCreate,omitempty"`
