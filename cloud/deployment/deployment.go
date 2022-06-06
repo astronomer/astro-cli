@@ -291,7 +291,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	}
 	// cluster request
 	clusterInput := map[string]interface{}{"organizationId": organizationID}
-	cs, err := client.ListOrchestrators(clusterInput)
+	cs, err := client.ListClusters(clusterInput)
 	if err != nil {
 		return "", errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -300,7 +300,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	if clusterID == "" {
 		fmt.Println("\nPlease select a Cluster for your Deployment:")
 
-		clusterMap := map[string]astro.Orchestrator{}
+		clusterMap := map[string]astro.Cluster{}
 		for i := range cs {
 			index := i + 1
 			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, cs[i].CloudProvider, cs[i].ID}, false)

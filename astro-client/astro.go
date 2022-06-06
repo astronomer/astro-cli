@@ -21,8 +21,8 @@ type Client interface {
 	// Image
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
-	// Orchestrator
-	ListOrchestrators(vars map[string]interface{}) ([]Orchestrator, error)
+	// Cluster
+	ListClusters(vars map[string]interface{}) ([]Cluster, error)
 	// RuntimeRelease
 	ListInternalRuntimeReleases() ([]RuntimeRelease, error)
 	ListPublicRuntimeReleases() ([]RuntimeRelease, error)
@@ -174,17 +174,17 @@ func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
 	return resp.Data.DeployImage, nil
 }
 
-func (c *HTTPClient) ListOrchestrators(vars map[string]interface{}) ([]Orchestrator, error) {
+func (c *HTTPClient) ListClusters(vars map[string]interface{}) ([]Cluster, error) {
 	req := Request{
-		Query:     GetOrchestrators,
+		Query:     GetClusters,
 		Variables: map[string]interface{}{"input": vars},
 	}
 
 	resp, err := req.DoWithClient(c)
 	if err != nil {
-		return []Orchestrator{}, err
+		return []Cluster{}, err
 	}
-	return resp.Data.GetOrchestrators, nil
+	return resp.Data.GetClusters, nil
 }
 
 func (c *HTTPClient) ListInternalRuntimeReleases() ([]RuntimeRelease, error) {
