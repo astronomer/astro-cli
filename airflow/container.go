@@ -53,8 +53,8 @@ type DockerRegistryAPI interface {
 	client.CommonAPIClient
 }
 
-func ContainerHandlerInit(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (ContainerHandler, error) {
-	return DockerComposeInit(airflowHome, envFile, dockerfile, isPyTestCompose)
+func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string, isPyTestCompose bool) (ContainerHandler, error) {
+	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName, isPyTestCompose)
 }
 
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
@@ -65,10 +65,10 @@ func ImageHandlerInit(image string) ImageHandler {
 	return DockerImageInit(image)
 }
 
-// projectNameUnique creates a reasonably unique project name based on the hashed
+// ProjectNameUnique creates a reasonably unique project name based on the hashed
 // path of the project. This prevents collisions of projects with identical dir names
 // in different paths. ie (~/dev/project1 vs ~/prod/project1)
-func projectNameUnique(pytest bool) (string, error) {
+func ProjectNameUnique(pytest bool) (string, error) {
 	projectName := config.CFG.ProjectName.GetString()
 
 	pwd, err := fileutil.GetWorkingDir()
