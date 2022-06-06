@@ -61,6 +61,8 @@ spec:
       value: "False"
     - name: ASTRONOMER_USER
       value: astro
+    - name: ASTRONOMER_ENVIRONMENT
+      value: local
 {{ .AirflowEnvFile }}
     image: {{ .AirflowImage }}
     name: {{ .SchedulerContainerName }}
@@ -130,6 +132,8 @@ spec:
       value: ASTRONOMER
     - name: AIRFLOW__CORE__LOAD_EXAMPLES
       value: "False"
+    - name: ASTRONOMER_ENVIRONMENT
+      value: local
 {{ .AirflowEnvFile }}
     image: {{ .AirflowImage }}
     name: {{ .WebserverContainerName }}
@@ -176,6 +180,8 @@ spec:
       value: ASTRONOMER
     - name: AIRFLOW__CORE__LOAD_EXAMPLES
       value: "False"
+    - name: ASTRONOMER_ENVIRONMENT
+      value: local
 {{ .AirflowEnvFile }}
     image: {{ .AirflowImage }}
     name: {{ .TriggererContainerName }}
