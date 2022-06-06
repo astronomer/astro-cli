@@ -71,6 +71,7 @@ astro dev init --airflow-version 2.2.3
 	// this is used to monkey patch the function in order to write unit test cases
 	containerHandlerInit = airflow.ContainerHandlerInit
 	getDefaultImageTag   = airflowversions.GetDefaultImageTag
+	projectNameUnique    = airflow.ProjectNameUnique
 
 	pytestDir = "/tests"
 
@@ -526,7 +527,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return errors.New("the 'tests' directory does not exist, please run `astro dev init` to create it")
 	}
 
-	imageName, err := airflow.ProjectNameUnique(false)
+	imageName, err := projectNameUnique(false)
 	if err != nil {
 		return err
 	}
@@ -554,7 +555,7 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	imageName, err := airflow.ProjectNameUnique(false)
+	imageName, err := projectNameUnique(false)
 	if err != nil {
 		return err
 	}

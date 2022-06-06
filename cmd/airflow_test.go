@@ -775,6 +775,19 @@ func TestAirflowPytest(t *testing.T) {
 		err := airflowPytest(cmd, args)
 		assert.ErrorIs(t, err, errMock)
 	})
+
+	t.Run("projectNameUnique failure", func(t *testing.T) {
+		cmd := newAirflowParseCmd()
+		args := []string{}
+
+		projectNameUnique = func(pytest bool) (string, error) {
+			return "", errMock
+		}
+		defer func() { projectNameUnique = airflow.ProjectNameUnique }()
+
+		err := airflowPytest(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
 }
 
 func TestAirflowParse(t *testing.T) {
@@ -815,6 +828,19 @@ func TestAirflowParse(t *testing.T) {
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			return nil, errMock
 		}
+
+		err := airflowParse(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+
+	t.Run("projectNameUnique failure", func(t *testing.T) {
+		cmd := newAirflowParseCmd()
+		args := []string{}
+
+		projectNameUnique = func(pytest bool) (string, error) {
+			return "", errMock
+		}
+		defer func() { projectNameUnique = airflow.ProjectNameUnique }()
 
 		err := airflowParse(cmd, args)
 		assert.ErrorIs(t, err, errMock)
