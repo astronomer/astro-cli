@@ -108,6 +108,7 @@ func TestWriteStringToFile(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	defer os.Remove("./test.out")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := WriteStringToFile(tt.args.path, tt.args.s); (err != nil) != tt.wantErr {

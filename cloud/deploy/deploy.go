@@ -200,7 +200,7 @@ func parseDAG(pytest, version, envFile, deployImage string) error {
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", true)
+	containerHandler, err := containerHandlerInit(deployImage, envFile, "Dockerfile", false)
 	if err != nil {
 		return err
 	}
