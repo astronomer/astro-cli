@@ -107,12 +107,21 @@ var (
 	}
 	`
 
-	GetOrchestrators = `
-	query orchestrators($input: OrchestratorInput!) {
-		orchestrators(input: $input) {
+	// GetOrchestrators = `
+	// query orchestrators($input: OrchestratorInput!) {
+	// 	orchestrators(input: $input) {
+	// 		id
+	// 		cloudProvider
+	// 		name
+	// 	}
+	// }
+	// `
+	GetClusters = `
+	query clusters($organizationId: Id) {
+		clusters(organizationId: $organizationId) {
 			id
-			cloudProvider
 			name
+			cloudProvider
 		}
 	}
 	`

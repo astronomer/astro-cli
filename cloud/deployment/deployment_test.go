@@ -111,7 +111,7 @@ func TestCreate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
-		mockClient.On("ListOrchestrators", map[string]interface{}{"organizationId": "test-org-id"}).Return([]astro.Orchestrator{{ID: csID}}, nil).Once()
+		mockClient.On("ListClusters", map[string]interface{}{"organizationId": "test-org-id"}).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
 		// mock os.Stdin
@@ -198,9 +198,9 @@ func TestSelectCluster(t *testing.T) {
 
 	orgID := "test-org-id"
 	csID := "test-cluster-id"
-	t.Run("list orchestrator failure", func(t *testing.T) {
+	t.Run("list cluster failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListOrchestrators", map[string]interface{}{"organizationId": orgID}).Return([]astro.Orchestrator{}, errMock).Once()
+		mockClient.On("ListClusters", map[string]interface{}{"organizationId": orgID}).Return([]astro.Cluster{}, errMock).Once()
 
 		_, err := selectCluster("", orgID, mockClient)
 		assert.ErrorIs(t, err, errMock)
@@ -209,7 +209,7 @@ func TestSelectCluster(t *testing.T) {
 
 	t.Run("cluster id via selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListOrchestrators", map[string]interface{}{"organizationId": orgID}).Return([]astro.Orchestrator{{ID: csID}}, nil).Once()
+		mockClient.On("ListClusters", map[string]interface{}{"organizationId": orgID}).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -234,7 +234,7 @@ func TestSelectCluster(t *testing.T) {
 
 	t.Run("cluster id invalid selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListOrchestrators", map[string]interface{}{"organizationId": orgID}).Return([]astro.Orchestrator{{ID: csID}}, nil).Once()
+		mockClient.On("ListClusters", map[string]interface{}{"organizationId": orgID}).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("4")
@@ -258,7 +258,7 @@ func TestSelectCluster(t *testing.T) {
 
 	t.Run("not able to find cluster", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListOrchestrators", map[string]interface{}{"organizationId": orgID}).Return([]astro.Orchestrator{{ID: csID}}, nil).Once()
+		mockClient.On("ListClusters", map[string]interface{}{"organizationId": orgID}).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 
 		_, err := selectCluster("test-invalid-id", orgID, mockClient)
 		assert.Error(t, err)
