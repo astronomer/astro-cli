@@ -14,7 +14,7 @@ type ResponseData struct {
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetOrchestrators          []Orchestrator               `json:"orchestrators,omitempty"`
+	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	DeploymentCreate          Deployment                   `json:"DeploymentCreate,omitempty"`
@@ -64,7 +64,14 @@ type Deployment struct {
 	UpdatedAt       string         `json:"updatedAt"`
 }
 
-// Orchestrator contains all components of an Astronomer Orchestrator
+// Cluster contains all components of an Astronomer Cluster
+type Cluster struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	IsManaged     bool   `json:"isManaged"`
+	CloudProvider string `json:"cloudProvider"`
+}
+
 type Orchestrator struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`

@@ -52,7 +52,7 @@ const (
 	composeLinkWebserverMsg = "Airflow Webserver: %s"
 	composeLinkPostgresMsg  = "Postgres Database: %s"
 	composeUserPasswordMsg  = "The default Airflow UI credentials are: %s"
-	postgresUserPasswordMsg = "The default Postrgres DB credentials are: %s"
+	postgresUserPasswordMsg = "The default Postgres DB credentials are: %s"
 
 	envPathMsg     = "Error looking for \"%s\""
 	envFoundMsg    = "Env file \"%s\" found. Loading...\n"
@@ -96,11 +96,15 @@ type DockerCompose struct {
 	imageHandler   ImageHandler
 }
 
-func DockerComposeInit(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (*DockerCompose, error) {
+func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (*DockerCompose, error) {
 	// Get project name from config
-	projectName, err := projectNameUnique(isPyTestCompose)
+	projectName, err := ProjectNameUnique(isPyTestCompose)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving working directory: %w", err)
+	}
+
+	if imageName == "" {
+		imageName = projectName
 	}
 
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
@@ -108,7 +112,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile string, isPyTestCompose 
 		return nil, fmt.Errorf("error initializing docker client: %w", err)
 	}
 	composeService := compose.NewComposeService(dockerClient, &configfile.ConfigFile{})
-	imageHandler := DockerImageInit(ImageName(projectName, "latest"))
+	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
 
 	composeFile := include.Composeyml
 	if isPyTestCompose {
@@ -330,7 +334,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 		var err error
 		// get same image as what's used for other dev commands
 		// This makes it so we don't have to rebuild this image if it was used in other commands
-		projectImageName, err = projectNameUnique(false)
+		projectImageName, err = ProjectNameUnique(false)
 		if err != nil {
 			return "", errors.Wrap(err, "error retrieving working directory")
 		}

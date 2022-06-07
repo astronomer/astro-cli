@@ -1,33 +1,16 @@
 ---
 version: 2.1
 jobs:
+  lint:
+    working_directory: /go/src/github.com/astronomer/astro-cli
+    docker:
+      - image: quay.io/astronomer/ap-dind-golang:20.10.14-1
+    steps:
+      - lint
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:20.10.11
-      - image: postgres
-        name: postgres
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-      - image: quay.io/astronomer/ap-houston-api:0.28.4
-        name: houston
-        entrypoint: "yarn start"
-        environment:
-          NODE_ENV: "development"
-          WEBSERVER__PORT: "8871"
-          ORBIT__PORT: "8080"
-          DATABASE_URL: "postgres://postgres:postgres@postgres:5432/postgres"
-          DATABASE__CONNECTION: "postgresql://postgres:postgres@postgres:5432/postgres"
-          DATABASE__SCHEMA: "public"
-          PUBLIC_SIGNUPS: "true"
-          EMAIL_CONFIRMATION: "false"
-          EMAIL__ENABLED: "false"
-          JWT__PASSPHRASE: "secretpassword"
-          DEPLOYMENTS__DATABASE__CONNECTION: "postgres://postgres:postgres@postgres:5432/postgres"
-          DEPLOYMENTS__DATABASE__ENABLED: "true"
-          DEPLOYMENTS__LOG_HELM_VALUES: "true"
-          HELM__RELEASE_VERSION: "0.7.5"
+      - image: quay.io/astronomer/ap-dind-golang:20.10.14-1
     steps:
       - test
   new-tag:
@@ -48,6 +31,7 @@ workflows:
   version: 2.1
   build-images:
     jobs:
+      - lint
       - test
       - approve-release:
           type: approval
@@ -78,6 +62,13 @@ executors:
     docker:
       - image: circleci/python:3
 commands:
+  lint:
+    description: "Run linting checks"
+    steps:
+      - checkout
+      - run:
+          name: Run golangci-lint
+          command: make lint
   test:
     description: "Run tests and code coverage"
     steps:
@@ -88,12 +79,6 @@ commands:
           command: wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
           environment:
             DOCKERIZE_VERSION: v0.6.1
-      - run:
-          name: Wait for db
-          command: dockerize -wait tcp://postgres:5432 -timeout 1m
-      - run:
-          name: Wait for houston
-          command: dockerize -wait tcp://houston:8871 -timeout 2m
       - run:
           name: Run unit tests
           environment:

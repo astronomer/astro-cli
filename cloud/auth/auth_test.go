@@ -70,13 +70,6 @@ func Test_validateDomain(t *testing.T) {
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
 
-	domain = "astronomer-perf.io"
-	actual, err = ValidateDomain(domain)
-	assert.NoError(t, err)
-	assert.Equal(t, actual.ClientID, "3PKxm3e1ldZYP1xWh5rXbOgFzIWbxnTN")
-	assert.Equal(t, actual.Audience, "astronomer-ee")
-	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-perf.io/")
-
 	domain = "fail.astronomer-perf.io"
 	actual, err = ValidateDomain(domain)
 	assert.Error(t, err)

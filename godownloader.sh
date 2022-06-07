@@ -68,7 +68,7 @@ get_binaries() {
     linux/amd64) BINARIES="astro" ;;
     windows/386) BINARIES="astro" ;;
     windows/amd64) BINARIES="astro" ;;
-    darwin/arm64)
+    linux/arm64|darwin/arm64)
       # MANUALLY ADDED LOGIC: darwin/arm64 only available from 0.27.2 release onwards
       if version_gte "0.27.2" $VERSION; then
         BINARIES="astro"
@@ -300,6 +300,10 @@ http_copy() {
 github_release() {
   owner_repo=$1
   version=$2
+  if [[ "$version" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+    escaped_version=$(echo $version | sed -e 's/[]\/$*.^[]/\\&/g') # escape the version string
+    version=$(curl https://api.github.com/repos/${owner_repo}/releases -s | jq -r '.[] | .tag_name' | grep '^'"$escaped_version"'\.[0-9]*$' -m1)
+  fi
   test -z "$version" && version="latest"
   giturl="https://github.com/${owner_repo}/releases/${version}"
   json=$(http_copy "$giturl" "Accept:application/json")
