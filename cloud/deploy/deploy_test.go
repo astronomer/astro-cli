@@ -60,7 +60,7 @@ func TestDeploySuccess(t *testing.T) {
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
@@ -137,7 +137,7 @@ func TestDeployFailure(t *testing.T) {
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything).Return(errMock)
 		return mockContainerHandler, nil
 	}
@@ -236,6 +236,7 @@ func TestCheckVersionBeta(t *testing.T) {
 	assert.Contains(t, buf.String(), "")
 }
 
+<<<<<<< HEAD
 // func TestPromptUserForDeployment(t *testing.T) {
 // 	_, _, _, _, err := promptUserForDeployment("", &astro.Workspace{}, []astro.Deployment{}) //nolint:dogsled
 // 	assert.ErrorIs(t, err, errNoDeploymentsMsg)
@@ -243,6 +244,15 @@ func TestCheckVersionBeta(t *testing.T) {
 // 	_, _, _, _, err = promptUserForDeployment("astrodev.io", &astro.Workspace{}, []astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}) //nolint:dogsled
 // 	assert.ErrorIs(t, err, errInvalidDeploymentKey)
 // }
+=======
+func TestPromptUserForDeployment(t *testing.T) {
+	_, err := promptUserForDeployment("", &astro.Workspace{}, []astro.Deployment{}) //nolint:dogsled
+	assert.ErrorIs(t, err, errNoDeploymentsMsg)
+
+	_, err = promptUserForDeployment("astrodev.io", &astro.Workspace{}, []astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}) //nolint:dogsled
+	assert.ErrorIs(t, err, errInvalidDeploymentKey)
+}
+>>>>>>> main
 
 func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"

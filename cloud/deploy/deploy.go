@@ -67,6 +67,7 @@ var (
 
 type deploymentInfo struct {
 	deploymentID   string
+	namespace      string
 	deployImage    string
 	currentVersion string
 	organizationID string
@@ -97,7 +98,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, clien
 		return err
 	}
 
-	err = parseDAG(pytest, version, envFile, deployInfo.deployImage)
+	err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
 	if err != nil {
 		return err
 	}
@@ -176,25 +177,28 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 
 		return deploymentInfo{
 			currentDeployment.ID,
+			currentDeployment.ReleaseName,
 			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
 			currentDeployment.RuntimeRelease.Version,
 			currentDeployment.Workspace.OrganizationID,
 			currentDeployment.DeploymentSpec.Webserver.URL}, nil
 	}
-	deployImage, currentVersion, organizationID, webserverURL, err := getImageName(cloudDomain, deploymentID, client)
+	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
-	return deploymentInfo{deploymentID, deployImage, currentVersion, organizationID, webserverURL}, nil
+	deployInfo.deploymentID = deploymentID
+	return deployInfo, nil
 }
 
-func parseDAG(pytest, version, envFile, deployImage string) error {
+func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 	dagParseVersionCheck := versions.GreaterThanOrEqualTo(version, dagParseAllowedVersion)
 	if !dagParseVersionCheck {
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", true)
+	fmt.Println("testing", deployImage)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace, false)
 	if err != nil {
 		return err
 	}
@@ -263,7 +267,7 @@ func validateWorkspace(wsID string, client astro.Client) (astro.Workspace, error
 	return currentWorkspace, nil
 }
 
-func getImageName(cloudDomain, deploymentID string, client astro.Client) (deployImage, currentVersion, organizationID, webserverURL string, err error) {
+func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploymentInfo, error) {
 	if cloudDomain == astroDomain {
 		fmt.Printf(deploymentHeaderMsg, "Astro")
 	} else {
@@ -276,21 +280,21 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 	}
 	deployments, err := client.ListDeployments(deploymentsInput)
 	if err != nil {
-		return "", "", "", "", err
+		return deploymentInfo{}, err
 	}
 
 	if len(deployments) == 0 {
-		return "", "", "", "", errors.New("invalid Deployment ID")
+		return deploymentInfo{}, errors.New("invalid Deployment ID")
 	}
-	currentVersion = deployments[0].RuntimeRelease.Version
+	currentVersion := deployments[0].RuntimeRelease.Version
 	namespace := deployments[0].ReleaseName
-	organizationID = deployments[0].Workspace.OrganizationID
-	webserverURL = deployments[0].DeploymentSpec.Webserver.URL
+	organizationID := deployments[0].Workspace.OrganizationID
+	webserverURL := deployments[0].DeploymentSpec.Webserver.URL
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
-	deployImage = airflow.ImageName(namespace, "latest")
+	deployImage := airflow.ImageName(namespace, "latest")
 
-	return deployImage, currentVersion, organizationID, webserverURL, nil
+	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, webserverURL: webserverURL}, nil
 }
 
 func buildImage(c *config.Context, path, currentVersion, deployImage string, client astro.Client) (string, error) {

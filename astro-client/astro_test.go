@@ -565,11 +565,11 @@ func TestDeployImage(t *testing.T) {
 	})
 }
 
-func TestListOrchestrators(t *testing.T) {
+func TestListClusters(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			GetOrchestrators: []Orchestrator{
+			GetClusters: []Cluster{
 				{
 					ID:            "test-id",
 					Name:          "test-name",
@@ -592,9 +592,9 @@ func TestListOrchestrators(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		resp, err := astroClient.ListOrchestrators(map[string]interface{}{})
+		resp, err := astroClient.ListClusters(map[string]interface{}{})
 		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.GetOrchestrators)
+		assert.Equal(t, resp, mockResponse.Data.GetClusters)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -607,7 +607,7 @@ func TestListOrchestrators(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.ListOrchestrators(map[string]interface{}{})
+		_, err := astroClient.ListClusters(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
