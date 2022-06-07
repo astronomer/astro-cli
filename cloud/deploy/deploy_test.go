@@ -236,13 +236,13 @@ func TestCheckVersionBeta(t *testing.T) {
 	assert.Contains(t, buf.String(), "")
 }
 
-func TestPromptUserForDeployment(t *testing.T) {
-	_, _, _, _, err := promptUserForDeployment("", &astro.Workspace{}, []astro.Deployment{}) //nolint:dogsled
-	assert.ErrorIs(t, err, errNoDeploymentsMsg)
+// func TestPromptUserForDeployment(t *testing.T) {
+// 	_, _, _, _, err := promptUserForDeployment("", &astro.Workspace{}, []astro.Deployment{}) //nolint:dogsled
+// 	assert.ErrorIs(t, err, errNoDeploymentsMsg)
 
-	_, _, _, _, err = promptUserForDeployment("astrodev.io", &astro.Workspace{}, []astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}) //nolint:dogsled
-	assert.ErrorIs(t, err, errInvalidDeploymentKey)
-}
+// 	_, _, _, _, err = promptUserForDeployment("astrodev.io", &astro.Workspace{}, []astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}) //nolint:dogsled
+// 	assert.ErrorIs(t, err, errInvalidDeploymentKey)
+// }
 
 func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"

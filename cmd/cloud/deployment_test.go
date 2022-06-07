@@ -64,6 +64,7 @@ func TestDeploymentLogs(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
+	mockClient.On("ListDeployments", mock.Anything).Return([]astro.Deployment{{ID: "test-id"}, {ID: "test-id-2"}}, nil).Once()
 	mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 	astroClient = mockClient
 

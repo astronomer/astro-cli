@@ -56,6 +56,7 @@ func TestLogs(t *testing.T) {
 	}
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 
 		err := Logs(deploymentID, ws, true, true, true, logCount, mockClient)
@@ -93,6 +94,7 @@ func TestLogs(t *testing.T) {
 
 	t.Run("failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{}, errMock).Once()
 
 		err := Logs(deploymentID, ws, true, true, true, logCount, mockClient)
@@ -332,7 +334,7 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("invalid deployment id", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}, {ID: "test-id-2", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -354,7 +356,7 @@ func TestUpdate(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 
 		err = Update("test-invalid-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -441,7 +443,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("invalid deployment id", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}, {ID: "test-id-2", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -463,7 +465,7 @@ func TestDelete(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 
 		err = Delete("test-invalid-id", ws, false, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
 

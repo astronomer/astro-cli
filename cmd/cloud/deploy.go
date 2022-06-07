@@ -8,7 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/git"
 
-	"github.com/pkg/errors"
+	// "github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -69,13 +69,13 @@ func deploy(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	if deploymentID == "" || forcePrompt {
-		var err error
-		ws, err = coalesceWorkspace()
-		if err != nil {
-			return errors.Wrap(err, "failed to find a valid workspace")
-		}
-	}
+	// if deploymentID == "" || forcePrompt {
+	// 	var err error
+	// 	ws, err = coalesceWorkspace()
+	// 	if err != nil {
+	// 		return errors.Wrap(err, "failed to find a valid workspace")
+	// 	}
+	// }
 
 	// Save release name in config if specified
 	if len(deploymentID) > 0 && saveDeployConfig {
