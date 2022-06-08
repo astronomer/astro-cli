@@ -164,12 +164,6 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		// Validate workspace
-		// currentWorkspace, err := validateWorkspace(wsID, client)
-		// if err != nil {
-		// 	return deploymentInfo{}, err
-		// }
-
 		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, client)
 		if err != nil {
 			return deploymentInfo{}, err

@@ -75,7 +75,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 
 	// run auth setup for any command that requires auth
 
-	apiKey, err := checkAPIKeys()
+	apiKey, err := checkAPIKeys(client)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
@@ -181,7 +181,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys() (bool, error) {
+func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -208,6 +208,7 @@ func checkAPIKeys() (bool, error) {
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
+
 		return false, err
 	}
 	authConfig, err := auth.ValidateDomain(c.Domain)
@@ -249,6 +250,12 @@ func checkAPIKeys() (bool, error) {
 	if tokenRes.Error != nil {
 		return false, errors.New(tokenRes.ErrorDescription)
 	}
+	// get workspace ID
+	deployments, err := astroClient.ListDeployments(astro.DeploymentsInput{})
+	if err != nil {
+		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+	}
+	workspaceID := deployments[0].Workspace.ID
 
 	// persist the updated context with the access token from API keys
 	err = c.SetContextKey("token", "Bearer "+tokenRes.AccessToken)
@@ -259,13 +266,9 @@ func checkAPIKeys() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	err = c.SetContextKey("workspace", c.Workspace)
+	err = c.SetContextKey("workspace", workspaceID) // c.Workspace)
 	if err != nil {
 		fmt.Println("no workspace set")
-	}
-	err = c.SetContextKey("workspace", c.LastUsedWorkspace)
-	if err != nil {
-		fmt.Println("no last used workspace")
 	}
 	err = c.SetSystemAdmin(false)
 	if err != nil {

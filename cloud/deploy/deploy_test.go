@@ -45,11 +45,11 @@ func TestDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-ws-id"}}, nil).Once()
-	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Twice()
-	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Twice()
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Twice()
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Twice()
+	// mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-ws-id"}}, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Times(3)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -94,6 +94,10 @@ func TestDeploySuccess(t *testing.T) {
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", false, mockClient)
 	assert.NoError(t, err)
 
+	// no workspace id provided
+	err = Deploy("./testfiles/", "test-id", "", "pytest", "", false, mockClient)
+	assert.NoError(t, err)
+
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
@@ -106,11 +110,6 @@ func TestDeployFailure(t *testing.T) {
 	assert.NoError(t, err)
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", true, nil)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-
-	// no workspace id provided
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	err = Deploy("./testfiles/", "", "", "parse", "", true, nil)
-	assert.EqualError(t, err, "no workspace id provided")
 
 	// airflow parse failure
 	mockDeplyResp := []astro.Deployment{
@@ -125,7 +124,6 @@ func TestDeployFailure(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-ws-id"}}, nil).Once()
 	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Once()
 	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Once()
 
@@ -235,24 +233,6 @@ func TestCheckVersionBeta(t *testing.T) {
 	CheckVersion("10.0.0", buf)
 	assert.Contains(t, buf.String(), "")
 }
-
-<<<<<<< HEAD
-// func TestPromptUserForDeployment(t *testing.T) {
-// 	_, _, _, _, err := promptUserForDeployment("", &astro.Workspace{}, []astro.Deployment{}) //nolint:dogsled
-// 	assert.ErrorIs(t, err, errNoDeploymentsMsg)
-
-// 	_, _, _, _, err = promptUserForDeployment("astrodev.io", &astro.Workspace{}, []astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}) //nolint:dogsled
-// 	assert.ErrorIs(t, err, errInvalidDeploymentKey)
-// }
-=======
-func TestPromptUserForDeployment(t *testing.T) {
-	_, err := promptUserForDeployment("", &astro.Workspace{}, []astro.Deployment{}) //nolint:dogsled
-	assert.ErrorIs(t, err, errNoDeploymentsMsg)
-
-	_, err = promptUserForDeployment("astrodev.io", &astro.Workspace{}, []astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}) //nolint:dogsled
-	assert.ErrorIs(t, err, errInvalidDeploymentKey)
-}
->>>>>>> main
 
 func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"
