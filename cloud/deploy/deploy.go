@@ -18,7 +18,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
@@ -32,12 +31,8 @@ const (
 	defaultRuntimeVersion  = "4.2.5"
 	dagParseAllowedVersion = "4.1.0"
 
-	noWorkspaceMsg = "no workspaces with id (%s) found"
-
 	composeImageBuildingPromptMsg = "Building image..."
-	deployingPromptMsg            = "Deploying: %s\n"
 	deploymentHeaderMsg           = "Authenticated to %s \n\n"
-	selectDeploymentPromptMsg     = "Select which Deployment you want to deploy to:"
 
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nPlease use one of the following supported tags: %s"
@@ -46,12 +41,6 @@ const (
 var (
 	splitNum   = 2
 	pytestFile string
-	tab        = printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
-	}
-
 	dockerfile = "Dockerfile"
 
 	// Monkey patched to write unit tests
@@ -59,11 +48,7 @@ var (
 	containerHandlerInit = airflow.ContainerHandlerInit
 )
 
-var (
-	errInvalidDeploymentKey = errors.New("invalid deployment selection")
-	errDagsParseFailed      = errors.New("your local DAGs did not parse. Please fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	errNoDeploymentsMsg     = errors.New("no Deployments found in this Workspace")
-)
+var errDagsParseFailed = errors.New("your local DAGs did not parse. Please fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 
 type deploymentInfo struct {
 	deploymentID   string
@@ -175,7 +160,8 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
 			currentDeployment.RuntimeRelease.Version,
 			currentDeployment.Workspace.OrganizationID,
-			currentDeployment.DeploymentSpec.Webserver.URL}, nil
+			currentDeployment.DeploymentSpec.Webserver.URL,
+		}, nil
 	}
 	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
 	if err != nil {
@@ -232,33 +218,6 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 
 	fmt.Print("\nAll Pytests passed!\n")
 	return err
-}
-
-// Validate workspace
-func validateWorkspace(wsID string, client astro.Client) (astro.Workspace, error) {
-	if wsID == "" {
-		return astro.Workspace{}, errors.New("no workspace id provided")
-	}
-
-	wsResp, err := client.ListWorkspaces()
-	if err != nil {
-		return astro.Workspace{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
-
-	var currentWorkspace astro.Workspace
-	for i := range wsResp {
-		if wsResp[i].ID == wsID {
-			currentWorkspace = wsResp[i]
-			break
-		}
-	}
-
-	if currentWorkspace.ID == "" {
-		err = fmt.Errorf(noWorkspaceMsg, wsID) // nolint:goerr113
-		return astro.Workspace{}, err
-	}
-
-	return currentWorkspace, nil
 }
 
 func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploymentInfo, error) {

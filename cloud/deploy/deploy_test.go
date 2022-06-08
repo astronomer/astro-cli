@@ -45,11 +45,10 @@ func TestDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
-	// mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-ws-id"}}, nil).Once()
-	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Times(3)
-	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Times(3)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
+	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Twice()
+	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Twice()
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Twice()
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Twice()
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -92,10 +91,6 @@ func TestDeploySuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", false, mockClient)
-	assert.NoError(t, err)
-
-	// no workspace id provided
-	err = Deploy("./testfiles/", "test-id", "", "pytest", "", false, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -251,19 +246,4 @@ func TestCheckPyTest(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "pytests failed, please fix failures or rerun the command without the '--pytest' flag to deploy")
 	mockContainerHandler.AssertExpectations(t)
-}
-
-func TestValidateWorkspace(t *testing.T) {
-	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListWorkspaces").Return([]astro.Workspace{}, errMock).Once()
-
-	_, err := validateWorkspace("test-ws-id", mockClient)
-	assert.ErrorIs(t, err, errMock)
-
-	mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-ws-id"}}, nil).Once()
-	_, err = validateWorkspace("test-invalid-id", mockClient)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no workspaces with id")
-
-	mockClient.AssertExpectations(t)
 }

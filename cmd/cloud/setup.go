@@ -208,13 +208,14 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
-
 		return false, err
 	}
+
 	authConfig, err := auth.ValidateDomain(c.Domain)
 	if err != nil {
 		return false, err
 	}
+
 	// setup request
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
@@ -250,29 +251,33 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	if tokenRes.Error != nil {
 		return false, errors.New(tokenRes.ErrorDescription)
 	}
+
+	err = c.SetContextKey("token", "Bearer "+tokenRes.AccessToken)
+	if err != nil {
+		return false, err
+	}
+
+	err = c.SetExpiresIn(tokenRes.ExpiresIn)
+	if err != nil {
+		return false, err
+	}
+
+	err = c.SetSystemAdmin(false)
+	if err != nil {
+		fmt.Println("admin settings incorrectly set you may experince permissions issues")
+	}
+
 	// get workspace ID
 	deployments, err := astroClient.ListDeployments(astro.DeploymentsInput{})
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
-	workspaceID := deployments[0].Workspace.ID
+	workspaceID = deployments[0].Workspace.ID
 
-	// persist the updated context with the access token from API keys
-	err = c.SetContextKey("token", "Bearer "+tokenRes.AccessToken)
-	if err != nil {
-		return false, err
-	}
-	err = c.SetExpiresIn(tokenRes.ExpiresIn)
-	if err != nil {
-		return false, err
-	}
 	err = c.SetContextKey("workspace", workspaceID) // c.Workspace)
 	if err != nil {
 		fmt.Println("no workspace set")
 	}
-	err = c.SetSystemAdmin(false)
-	if err != nil {
-		fmt.Println("admin settings incorrectly set you may experince permissions issues")
-	}
+
 	return true, nil
 }

@@ -99,8 +99,6 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 		return err
 	}
 
-	fmt.Println(deployment.ID)
-
 	deploymentID = deployment.ID
 
 	// deployment logs request
@@ -119,7 +117,7 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 	Logs := deploymentHistoryResp.SchedulerLogs
 
 	if len(Logs) == 0 {
-		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deploymentID)
+		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deployment.Label)
 		return nil
 	}
 
@@ -476,10 +474,9 @@ func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) 
 	return deployments, nil
 }
 
-func selectDeployment(deployments []astro.Deployment, client astro.Client, ws, message string) (astro.Deployment, error) {
+func selectDeployment(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
-
 		i, _ := input.Confirm(noDeployments)
 		if !i {
 			fmt.Println("Exiting command...")
@@ -490,10 +487,9 @@ func selectDeployment(deployments []astro.Deployment, client astro.Client, ws, m
 
 	if len(deployments) == 1 {
 		fmt.Println("Only one deployment was found. Using the following Deployment by default: \n" +
-		fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
-		fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
+			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
+			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
 
-		// fmt.Printf(ansi.bold("Deployment %s (Deployment ID: %s)") + "is the only Deployment available in the Workspace. Using this Deployment by default\n", deployments[0].Label, deployments[0].ID)
 		return deployments[0], nil
 	}
 
@@ -536,7 +532,7 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err := selectDeployment(deployments, client, ws, "Select which Deployment you want to update")
+		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
 		if err != nil {
 			return astro.Deployment{}, err
 		}
@@ -549,27 +545,32 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 			}
 
 			// walk user through creating a deployment
-			Create("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+			err = Create("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+			if err != nil {
+				return astro.Deployment{}, err
+			}
 
 			// get a new deployment list
 			deployments, err = getDeployments(ws, client)
 			if err != nil {
 				return astro.Deployment{}, err
 			}
-			currentDeployment, err = selectDeployment(deployments, client, ws, "Select which Deployment you want to update")
-		}
-		return currentDeployment, nil
-	} else {
-		for i := range deployments {
-			if deployments[i].ID == deploymentID {
-				currentDeployment = deployments[i]
+			currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
+			if err != nil {
+				return astro.Deployment{}, err
 			}
-		}
-		fmt.Println(currentDeployment.ID)
-		if currentDeployment.ID == "" {
-			fmt.Println("deployment id is blank")
-			return astro.Deployment{}, errInvalidDeployment
 		}
 		return currentDeployment, nil
 	}
+	for i := range deployments {
+		if deployments[i].ID == deploymentID {
+			currentDeployment = deployments[i]
+		}
+	}
+	fmt.Println(currentDeployment.ID)
+	if currentDeployment.ID == "" {
+		fmt.Println("deployment id is blank")
+		return astro.Deployment{}, errInvalidDeployment
+	}
+	return currentDeployment, nil
 }
