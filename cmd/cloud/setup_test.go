@@ -144,5 +144,6 @@ func TestSetup(t *testing.T) {
 
 		err = Setup(cmd, []string{}, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 }

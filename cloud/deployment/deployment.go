@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	errInvalidDeployment    = errors.New("the Deployment specified was not found in this Workspace. Your account or API Key may not have access to the Deployment specified")
 	errInvalidDeploymentKey = errors.New("invaled Deployment selected")
 	noDeployments           = "no Deployments found in this Workspace, would you like to create one now?"
 )
