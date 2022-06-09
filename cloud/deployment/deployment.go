@@ -22,6 +22,8 @@ var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
 	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
+	// Monkey patched to write unit tests
+	createDeployment  = Create
 )
 
 const (
@@ -544,7 +546,7 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 			}
 
 			// walk user through creating a deployment
-			err = Create("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+			err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
 			if err != nil {
 				return astro.Deployment{}, err
 			}
