@@ -40,6 +40,8 @@ type ResponseData struct {
 	GetWorkspace                   *Workspace                  `json:"workspace,omitempty"`
 	UpdateDeployment               *Deployment                 `json:"updateDeployment,omitempty"`
 	UpdateDeploymentAirflow        *Deployment                 `json:"updateDeploymentAirflow,omitempty"`
+	UpdateDeploymentRuntime        *Deployment                 `json:"updateDeploymentRuntime,omitempty"`
+	CancelUpdateDeploymentRuntime  *Deployment                 `json:"cancelRuntimeUpdate,omitempty"`
 	UpdateWorkspace                *Workspace                  `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog             `json:"logs,omitempty"`
 	WorkspaceUpdateUserRole        string                      `json:"workspaceUpdateUserRole,omitempty"`
@@ -47,6 +49,7 @@ type ResponseData struct {
 	WorkspaceGetUsers              []WorkspaceUserRoleBindings `json:"workspaceUsers,omitempty"`
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
+	RuntimeReleases                RuntimeReleases             `json:"runtimeReleases,omitempty"`
 }
 
 type Namespace struct {
@@ -89,6 +92,9 @@ type Deployment struct {
 	Version               string          `json:"version"`
 	AirflowVersion        string          `json:"airflowVersion"`
 	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
+	RuntimeVersion        string          `json:"runtimeVersion"`
+	RuntimeAirflowVersion string          `json:"runtimeAirflowVersion"`
+	DesiredRuntimeVersion string          `json:"desiredRuntimeVersion"`
 	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
 	Workspace             Workspace       `json:"workspace"`
 	Urls                  []DeploymentURL `json:"urls"`
@@ -315,6 +321,7 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 }
 
 // coerce a string into SemVer if possible
@@ -328,4 +335,40 @@ func coerce(version string) (*semver.Version, error) {
 		return nil, err
 	}
 	return coerceVer, nil
+}
+
+// RuntimeRelease contains info releated to a runtime release
+type RuntimeRelease struct {
+	Version           string `json:"version"`
+	AirflowVersion    string `json:"airflowVersion"`
+	AirflowDBMigraion bool   `json:"airflowDatabaseMigrations"`
+}
+
+type RuntimeReleases []RuntimeRelease
+
+func (r RuntimeReleases) IsValidVersion(version string) bool {
+	for idx := range r {
+		if r[idx].Version == version {
+			return true
+		}
+	}
+	return false
+}
+
+func (r RuntimeReleases) GreaterVersions(version string) []string {
+	greaterVersions := []string{}
+	currentVersion, err := coerce(version)
+	if err != nil {
+		return greaterVersions
+	}
+	for idx := range r {
+		runtimeVersion, err := coerce(r[idx].Version)
+		if err != nil {
+			continue
+		}
+		if runtimeVersion.Compare(currentVersion) >= 0 {
+			greaterVersions = append(greaterVersions, r[idx].Version)
+		}
+	}
+	return greaterVersions
 }
