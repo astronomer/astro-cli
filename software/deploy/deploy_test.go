@@ -20,6 +20,27 @@ import (
 var (
 	errSomeContainerIssue = errors.New("some container issue")
 	errMockHouston        = errors.New("some houston error")
+
+	mockDeployment = &houston.Deployment{
+		ID:                    "cknz133ra49758zr9w34b87ua",
+		Type:                  "airflow",
+		Label:                 "test",
+		ReleaseName:           "testDeploymentName",
+		Version:               "0.15.6",
+		AirflowVersion:        "2.0.0",
+		DesiredAirflowVersion: "2.0.0",
+		DeploymentInfo:        houston.DeploymentInfo{},
+		Workspace: houston.Workspace{
+			ID:    "ckn4phn1k0104v5xtrer5lpli",
+			Label: "w1",
+		},
+		Urls: []houston.DeploymentURL{
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
+		},
+		CreatedAt: "2021-04-26T20:03:36.262Z",
+		UpdatedAt: "2021-04-26T20:03:36.262Z",
+	}
 )
 
 var mockAirflowImageList = []houston.AirflowImage{
@@ -55,10 +76,16 @@ func TestDeploymentNameDoesntExists(t *testing.T) {
 	}
 }
 
-func Test_validImageRepo(t *testing.T) {
-	assert.True(t, validImageRepo("quay.io/astronomer/ap-airflow"))
-	assert.True(t, validImageRepo("astronomerinc/ap-airflow"))
-	assert.False(t, validImageRepo("personal-repo/ap-airflow"))
+func TestValidAirflowImageRepo(t *testing.T) {
+	assert.True(t, validAirflowImageRepo("quay.io/astronomer/ap-airflow"))
+	assert.True(t, validAirflowImageRepo("astronomerinc/ap-airflow"))
+	assert.False(t, validAirflowImageRepo("personal-repo/ap-airflow"))
+}
+
+func TestValidRuntimeImageRepo(t *testing.T) {
+	assert.False(t, validRuntimeImageRepo("quay.io/astronomer/ap-airflow"))
+	assert.True(t, validRuntimeImageRepo("quay.io/astronomer/astro-runtime"))
+	assert.False(t, validRuntimeImageRepo("personal-repo/ap-airflow"))
 }
 
 func TestBuildPushDockerImageSuccessWithTagWarning(t *testing.T) {
@@ -83,9 +110,10 @@ func TestBuildPushDockerImageSuccessWithTagWarning(t *testing.T) {
 		AirflowImages: mockAirflowImageList,
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
 	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
 
-	err := buildPushDockerImage(houstonMock, &config.Context{}, "test", "./testfiles/", "test", "test", false)
+	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", false)
 	assert.NoError(t, err)
 	mockImageHandler.AssertExpectations(t)
 	houstonMock.AssertExpectations(t)
@@ -114,8 +142,9 @@ func TestBuildPushDockerImageSuccessWithImageRepoWarning(t *testing.T) {
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
 
-	err := buildPushDockerImage(houstonMock, &config.Context{}, "test", "./testfiles/", "test", "test", false)
+	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", false)
 	assert.NoError(t, err)
 	mockImageHandler.AssertExpectations(t)
 	houstonMock.AssertExpectations(t)
@@ -124,7 +153,7 @@ func TestBuildPushDockerImageSuccessWithImageRepoWarning(t *testing.T) {
 func TestBuildPushDockerImageFailure(t *testing.T) {
 	// invalid dockerfile test
 	dockerfile = "Dockerfile.invalid"
-	err := buildPushDockerImage(nil, &config.Context{}, "test", "./testfiles/", "test", "test", false)
+	err := buildPushDockerImage(nil, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", false)
 	assert.EqualError(t, err, "failed to parse dockerfile: testfiles/Dockerfile.invalid: when using JSON array syntax, arrays must be comprised of strings only")
 	dockerfile = "Dockerfile"
 
@@ -138,8 +167,9 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetDeploymentConfig").Return(nil, errMockHouston).Once()
+	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
 	// houston GetDeploymentConfig call failure
-	err = buildPushDockerImage(houstonMock, &config.Context{}, "test", "./testfiles/", "test", "test", false)
+	err = buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", false)
 	assert.Error(t, err, errMockHouston)
 
 	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
@@ -151,7 +181,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	}
 
 	// build error test case
-	err = buildPushDockerImage(houstonMock, &config.Context{}, "test", "./testfiles/", "test", "test", false)
+	err = buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", false)
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockImageHandler.AssertExpectations(t)
 
@@ -163,7 +193,7 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 	}
 
 	// push error test case
-	err = buildPushDockerImage(houstonMock, &config.Context{}, "test", "./testfiles/", "test", "test", false)
+	err = buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", false)
 	assert.Error(t, err, errSomeContainerIssue.Error())
 	mockImageHandler.AssertExpectations(t)
 	houstonMock.AssertExpectations(t)
@@ -175,38 +205,18 @@ func TestGetAirflowUILink(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	mockDeployment := &houston.Deployment{
-		ID:                    "cknz133ra49758zr9w34b87ua",
-		Type:                  "airflow",
-		Label:                 "test",
-		ReleaseName:           "testDeploymentName",
-		Version:               "0.15.6",
-		AirflowVersion:        "2.0.0",
-		DesiredAirflowVersion: "2.0.0",
-		DeploymentInfo:        houston.DeploymentInfo{},
-		Workspace: houston.Workspace{
-			ID:    "ckn4phn1k0104v5xtrer5lpli",
-			Label: "w1",
-		},
-		Urls: []houston.DeploymentURL{
-			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
-			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
-		},
-		CreatedAt: "2021-04-26T20:03:36.262Z",
-		UpdatedAt: "2021-04-26T20:03:36.262Z",
+	mockURLs := []houston.DeploymentURL{
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
+		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 	}
 
-	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeployment", mock.Anything).Return(mockDeployment, nil)
-
 	expectedResult := "https://deployments.local.astronomer.io/testDeploymentName/airflow"
-	actualResult := getAirflowUILink(houstonMock, "testDeploymentID")
+	actualResult := getAirflowUILink("testDeploymentID", mockURLs)
 	assert.Equal(t, expectedResult, actualResult)
-	houstonMock.AssertExpectations(t)
 }
 
 func TestGetAirflowUILinkFailure(t *testing.T) {
-	actualResult := getAirflowUILink(nil, "")
+	actualResult := getAirflowUILink("", []houston.DeploymentURL{})
 	assert.Equal(t, actualResult, "")
 
 	fs := afero.NewMemMapFs()
@@ -214,36 +224,8 @@ func TestGetAirflowUILinkFailure(t *testing.T) {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeployment", mock.Anything).Return(nil, errMockHouston).Once()
-	actualResult = getAirflowUILink(houstonMock, "testDeploymentID")
+	actualResult = getAirflowUILink("testDeploymentID", []houston.DeploymentURL{})
 	assert.Equal(t, actualResult, "")
-	houstonMock.AssertExpectations(t)
-
-	mockDeployment := &houston.Deployment{
-		ID:                    "cknz133ra49758zr9w34b87ua",
-		Type:                  "airflow",
-		Label:                 "test",
-		ReleaseName:           "testDeploymentName",
-		Version:               "0.15.6",
-		AirflowVersion:        "2.0.0",
-		DesiredAirflowVersion: "2.0.0",
-		DeploymentInfo:        houston.DeploymentInfo{},
-		Workspace: houston.Workspace{
-			ID:    "ckn4phn1k0104v5xtrer5lpli",
-			Label: "w1",
-		},
-		Urls: []houston.DeploymentURL{
-			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
-		},
-		CreatedAt: "2021-04-26T20:03:36.262Z",
-		UpdatedAt: "2021-04-26T20:03:36.262Z",
-	}
-
-	houstonMock.On("GetDeployment", mock.Anything).Return(mockDeployment, nil).Once()
-	actualResult = getAirflowUILink(houstonMock, "testDeploymentID")
-	assert.Equal(t, actualResult, "")
-	houstonMock.AssertExpectations(t)
 }
 
 func TestAirflowFailure(t *testing.T) {
@@ -297,6 +279,7 @@ func TestAirflowFailure(t *testing.T) {
 	assert.ErrorIs(t, err, errInvalidDeploymentSelected)
 
 	// buildPushDockerImage failure case
+	houstonMock.On("GetDeployment", "test-deployment-id").Return(&houston.Deployment{}, nil)
 	dockerfile = "Dockerfile.invalid"
 	err = Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false)
 	dockerfile = "Dockerfile"
@@ -320,11 +303,16 @@ func TestAirflowSuccess(t *testing.T) {
 	mockedDeploymentConfig := &houston.DeploymentConfig{
 		AirflowImages: mockAirflowImageList,
 	}
+	mockRuntimeReleases := houston.RuntimeReleases{
+		houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.5"},
+		houston.RuntimeRelease{Version: "4.2.5", AirflowVersion: "2.2.5"},
+	}
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
 	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Once()
-	houstonMock.On("GetDeployment", mock.Anything).Return(nil, nil).Once()
+	houstonMock.On("GetDeployment", mock.Anything).Return(&houston.Deployment{}, nil).Once()
+	houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
 
 	err := Airflow(houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false)
 	assert.Nil(t, err)

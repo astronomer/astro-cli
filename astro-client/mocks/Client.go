@@ -188,16 +188,16 @@ func (_m *Client) ListInternalRuntimeReleases() ([]astro.RuntimeRelease, error) 
 	return r0, r1
 }
 
-// ListOrchestrators provides a mock function with given fields: vars
-func (_m *Client) ListOrchestrators(vars map[string]interface{}) ([]astro.Orchestrator, error) {
+// ListClusters provides a mock function with given fields: vars
+func (_m *Client) ListClusters(vars map[string]interface{}) ([]astro.Cluster, error) {
 	ret := _m.Called(vars)
 
-	var r0 []astro.Orchestrator
-	if rf, ok := ret.Get(0).(func(map[string]interface{}) []astro.Orchestrator); ok {
+	var r0 []astro.Cluster
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) []astro.Cluster); ok {
 		r0 = rf(vars)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Orchestrator)
+			r0 = ret.Get(0).([]astro.Cluster)
 		}
 	}
 
