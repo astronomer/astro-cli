@@ -298,6 +298,7 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 type AppConfig struct {
 	Version                string       `json:"version"`
 	BaseDomain             string       `json:"baseDomain"`
+	BYORegistryDomain      string       `json:"byoUpdateRegistryHost"`
 	SMTPConfigured         bool         `json:"smtpConfigured"`
 	ManualReleaseNames     bool         `json:"manualReleaseNames"`
 	ConfigureDagDeployment bool         `json:"configureDagDeployment"`
@@ -315,6 +316,7 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+	BYORegistryEnabled     bool `json:"byoUpdateRegistryEnabled"`
 }
 
 // coerce a string into SemVer if possible

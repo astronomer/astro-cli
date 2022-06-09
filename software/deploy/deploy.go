@@ -42,6 +42,8 @@ const (
 	warningInvalidImageName                   = "WARNING! The image in your Dockerfile is pulling from '%s', which is not supported. We strongly recommend that you use Astronomer Certified images that pull from 'astronomerinc/ap-airflow' or 'quay.io/astronomer/ap-airflow'. If you're running a custom image, you can override this. Are you sure you want to continue?\n"
 	warningInvalidNameTag                     = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
 	warningInvalidNameTagEmptyRecommendations = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nAre you sure you want to continue?"
+
+	registryDomainPrefix = "registry."
 )
 
 var tab = printutil.Table{
@@ -50,7 +52,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool) error {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
 	if wsID == "" {
 		return errNoWorkspaceID
 	}
@@ -129,7 +131,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, releaseName, path, nextTag, cloudDomain, ignoreCacheDeploy)
+	err = buildPushDockerImage(houstonClient, &c, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled)
 	if err != nil {
 		return err
 	}
@@ -151,7 +153,7 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 	return false
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, name, path, nextTag, cloudDomain string, ignoreCacheDeploy bool) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool) error {
 	// Build our image
 	fmt.Println(imageBuildingPrompt)
 
@@ -200,9 +202,26 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if err != nil {
 		return err
 	}
-	registry := "registry." + cloudDomain
-	remoteImage := fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-	return imageHandler.Push(registry, "", c.Token, remoteImage)
+
+	var registry, remoteImage string
+	if byoRegistryEnabled {
+		registry = byoRegistryDomain
+		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
+	} else {
+		registry = registryDomainPrefix + cloudDomain
+		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+	}
+
+	err = imageHandler.Push(registry, "", "", remoteImage)
+	if err != nil {
+		return err
+	}
+
+	if byoRegistryEnabled {
+		return houstonClient.UpdateDeploymentImage(houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: "", RuntimeVersion: ""})
+	}
+
+	return nil
 }
 
 func validImageRepo(image string) bool {

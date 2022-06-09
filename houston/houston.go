@@ -48,6 +48,7 @@ type ClientInterface interface {
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	GetDeploymentConfig() (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
+	UpdateDeploymentImage(req UpdateDeploymentImageRequest) error
 	// deployment users
 	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
