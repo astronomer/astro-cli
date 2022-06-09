@@ -20,8 +20,8 @@ import (
 
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	errInvalidDeploymentKey = errors.New("invaled Deployment selected")
-	noDeployments           = "no Deployments found in this Workspace, would you like to create one now?"
+	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 )
 
 const (
@@ -401,7 +401,6 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)
-	fmt.Println(d.ID)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -525,7 +524,7 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployment, error) {
 	deployments, err := getDeployments(ws, client)
 	if err != nil {
-		return astro.Deployment{}, err
+		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
 
 	var currentDeployment astro.Deployment
@@ -569,7 +568,6 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 	}
 	fmt.Println(currentDeployment.ID)
 	if currentDeployment.ID == "" {
-		fmt.Println("deployment id is blank")
 		return astro.Deployment{}, errInvalidDeployment
 	}
 	return currentDeployment, nil

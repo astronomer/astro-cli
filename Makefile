@@ -37,4 +37,4 @@ mock_astro:
 	mockery --filename=Client.go --output=astro-client/mocks --dir=astro-client --outpkg=astro_mocks --name Client
 
 codecov:
-	@eval $$(curl -s https://codecov.io/bash
+	@eval $$(curl -s https://codecov.io/bash)
