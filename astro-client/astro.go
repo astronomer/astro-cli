@@ -177,7 +177,7 @@ func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
 func (c *HTTPClient) ListClusters(vars map[string]interface{}) ([]Cluster, error) {
 	req := Request{
 		Query:     GetClusters,
-		Variables: map[string]interface{}{"input": vars},
+		Variables: map[string]interface{}{"organizationId": vars["organizationId"]},
 	}
 
 	resp, err := req.DoWithClient(c)
