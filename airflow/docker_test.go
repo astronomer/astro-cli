@@ -109,6 +109,7 @@ services:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+      ASTRONOMER_ENVIRONMENT: local
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:ro
       - airflow_home/plugins:/usr/local/airflow/plugins:z
@@ -143,6 +144,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
+      ASTRONOMER_ENVIRONMENT: local
     ports:
       - 8080:8080
     volumes:
@@ -179,6 +181,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
       AIRFLOW__WEBSERVER__RBAC: "True"
+      ASTRONOMER_ENVIRONMENT: local
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
