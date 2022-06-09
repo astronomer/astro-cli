@@ -23,7 +23,7 @@ var (
 	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
 	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 	// Monkey patched to write unit tests
-	createDeployment  = Create
+	createDeployment = Create
 )
 
 const (
