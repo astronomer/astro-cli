@@ -665,17 +665,20 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 
 	DeploymentImageUpdateRequest = `
 	mutation updateDeploymentImage(
-		$releaseName: String!,
-		$image: String!,
-		$airflowVersion: String,
-		$runtimeVersion: String
+		$releaseName:String!,
+		$image:String!,
+		$airflowVersion:String,
+		$runtimeVersion:String,
 	) {
 		updateDeploymentImage(
-			releaseName: $releaseName,
-			image: $image,
-			airflowVersion: $airflowVersion,
-			runtimeVersion: $runtimeVersion
+			releaseName:$releaseName,
+			image:$image,
+			airflowVersion:$airflowVersion,
+			runtimeVersion:$runtimeVersion
 		) {
+			releaseName
+			airflowVersion
+			runtimeVersion
 		}
 	}
 	`

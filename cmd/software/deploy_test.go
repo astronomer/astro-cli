@@ -21,7 +21,7 @@ func TestDeploy(t *testing.T) {
 	ensureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	deployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool) error {
+	deployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
 		return nil
 	}
 

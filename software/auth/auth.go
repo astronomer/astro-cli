@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
@@ -27,7 +28,7 @@ const (
 	configSetDefaultWorkspace = "\n\"%s\" Workspace found. This is your default Workspace.\n"
 
 	registryAuthSuccessMsg      = "\nSuccessfully authenticated to %s\n"
-	defaultRegistryLoginFailMsg = "\nFailed to authenticate to the registry using saved credentials.\nPlease provide the credentials to login to the registry: %s\n"
+	defaultRegistryLoginFailMsg = "\nNot able to login to the private registry, please use `docker login %s` to manually login to the registry\n"
 	registryAuthFailMsg         = "\nFailed to authenticate to the registry. Do you have Docker running?\nYou will not be able to push new images to your Airflow Deployment unless Docker is running.\nIf Docker is running and you are seeing this message, the registry is down or cannot be reached.\n"
 
 	localhostDomain      = "localhost"
@@ -76,7 +77,7 @@ func oAuth(oAuthURL string) string {
 }
 
 // registryAuth authenticates with the private registry
-func registryAuth(client houston.ClientInterface) error {
+func registryAuth(client houston.ClientInterface, out io.Writer) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -104,22 +105,20 @@ func registryAuth(client houston.ClientInterface) error {
 		return err
 	}
 	err = registryHandler.Login("user", token)
-	fmt.Println("testing", err, token, registry, appConfig.Flags.BYORegistryEnabled)
 
 	if err != nil && appConfig.Flags.BYORegistryEnabled {
-		fmt.Printf(defaultRegistryLoginFailMsg, registry)
-		user := input.Text("Please enter registry username: ")
-		pass, _ := input.Password("Please enter registry password: ")
-		err = registryHandler.Login(user, pass)
+		registryDomain := strings.Split(registry, "/")[0]
+		fmt.Fprintf(out, defaultRegistryLoginFailMsg, registryDomain)
+		return nil
 	}
 
 	if err != nil {
-		fmt.Print(registryAuthFailMsg)
-	} else {
-		fmt.Printf(registryAuthSuccessMsg, registry)
+		fmt.Fprint(out, registryAuthFailMsg)
+		return err
 	}
 
-	return err
+	fmt.Fprintf(out, registryAuthSuccessMsg, registry)
+	return nil
 }
 
 // Login handles authentication to houston and registry
@@ -196,7 +195,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		}
 	}
 
-	err = registryAuth(client)
+	err = registryAuth(client, out)
 	if err != nil {
 		log.Debugf("There was an error logging into registry: %s", err.Error())
 	}

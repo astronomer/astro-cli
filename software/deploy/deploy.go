@@ -219,16 +219,17 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		return err
 	}
 
-	var registry, remoteImage string
+	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
 		registry = registryDomainPrefix + cloudDomain
 		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+		token = c.Token
 	}
 
-	err = imageHandler.Push(registry, "", "", remoteImage)
+	err = imageHandler.Push(registry, "", token, remoteImage)
 	if err != nil {
 		return err
 	}
