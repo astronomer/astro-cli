@@ -18,6 +18,12 @@ func execDeployCmd(args ...string) error {
 
 func TestDeploy(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	appConfig = &houston.AppConfig{
+		BYORegistryDomain: "test.registry.io",
+		Flags: houston.FeatureFlags{
+			BYORegistryEnabled: true,
+		},
+	}
 	ensureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}

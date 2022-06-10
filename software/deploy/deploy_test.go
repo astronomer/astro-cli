@@ -150,6 +150,38 @@ func TestBuildPushDockerImageSuccessWithImageRepoWarning(t *testing.T) {
 	houstonMock.AssertExpectations(t)
 }
 
+func TestBuildPushDockerImageSuccessWithBYORegistry(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtil.NewTestConfig("docker")
+	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	config.InitConfig(fs)
+
+	dockerfile = "Dockerfile"
+	defer func() { dockerfile = "Dockerfile" }()
+
+	mockImageHandler := new(mocks.ImageHandler)
+	imageHandlerInit = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil).Once()
+		mockImageHandler.On("GetLabel", airflowImageLabel).Return("1.10.12", nil).Once()
+		return mockImageHandler
+	}
+
+	mockedDeploymentConfig := &houston.DeploymentConfig{
+		AirflowImages: mockAirflowImageList,
+	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
+	houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil)
+
+	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true)
+	assert.NoError(t, err)
+	mockImageHandler.AssertExpectations(t)
+	houstonMock.AssertExpectations(t)
+}
+
 func TestBuildPushDockerImageFailure(t *testing.T) {
 	// invalid dockerfile test
 	dockerfile = "Dockerfile.invalid"

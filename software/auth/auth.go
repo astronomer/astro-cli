@@ -111,6 +111,7 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 	} else {
 		err = registryHandler.Login("", "")
 	}
+
 	if err != nil && appConfig.Flags.BYORegistryEnabled {
 		fmt.Fprintf(out, defaultRegistryLoginFailMsg, registryDomain)
 		return nil

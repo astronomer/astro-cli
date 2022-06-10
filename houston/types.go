@@ -50,6 +50,7 @@ type ResponseData struct {
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
 	RuntimeReleases                RuntimeReleases             `json:"runtimeReleases,omitempty"`
+	UpdateDeploymentImage          UpdateDeploymentImageResp   `json:"updateDeploymentImage,omitempty"`
 }
 
 type Namespace struct {
@@ -261,6 +262,12 @@ type DeploymentLog struct {
 type AirflowImage struct {
 	Version string `json:"version"`
 	Tag     string `json:"tag"`
+}
+
+type UpdateDeploymentImageResp struct {
+	ReleaseName    string `json:"releaseName"`
+	AirflowVersion string `json:"airflowVersion"`
+	RuntimeVersion string `json:"runtimeVersion"`
 }
 
 // DeploymentConfig contains current airflow image tag

@@ -20,7 +20,10 @@ const (
 	mockToken = "token"
 )
 
-var errMockRegistry = errors.New("some error on registry side")
+var (
+	errMockRegistry = errors.New("some error on registry side")
+	errMockHouston  = errors.New("some error on houston side")
+)
 
 func TestBasicAuth(t *testing.T) {
 	houstonMock := new(houstonMocks.ClientInterface)
@@ -179,30 +182,49 @@ func TestRegistryAuthSuccess(t *testing.T) {
 
 func TestRegistryAuthFailure(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("software")
+	configYaml := testUtil.NewTestConfig(testUtil.SoftwarePlatform)
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
-		return nil, errMockRegistry
-	}
+	t.Run("registry failures", func(t *testing.T) {
+		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+			return nil, errMockRegistry
+		}
 
-	out := new(bytes.Buffer)
-	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
+		out := new(bytes.Buffer)
+		houstonMock := new(houstonMocks.ClientInterface)
+		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: true}}, nil).Twice()
 
-	err := registryAuth(houstonMock, out)
-	assert.ErrorIs(t, err, errMockRegistry)
+		err := registryAuth(houstonMock, out)
+		assert.ErrorIs(t, err, errMockRegistry)
 
-	mockRegistryHandler := new(mocks.RegistryHandler)
-	registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
-		mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(errMockRegistry).Once()
-		return mockRegistryHandler, nil
-	}
+		mockRegistryHandler := new(mocks.RegistryHandler)
+		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(errMockRegistry).Once()
+			return mockRegistryHandler, nil
+		}
 
-	err = registryAuth(houstonMock, out)
-	assert.ErrorIs(t, err, errMockRegistry)
-	mockRegistryHandler.AssertExpectations(t)
+		err = registryAuth(houstonMock, out)
+		assert.NoError(t, err)
+
+		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil).Once()
+
+		err = registryAuth(houstonMock, out)
+		assert.ErrorIs(t, err, errMockRegistry)
+
+		mockRegistryHandler.AssertExpectations(t)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("houston get app config failure", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		houstonMock := new(houstonMocks.ClientInterface)
+		houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMockHouston).Once()
+
+		err := registryAuth(houstonMock, out)
+		assert.ErrorIs(t, err, errMockHouston)
+		houstonMock.AssertExpectations(t)
+	})
 }
 
 func TestLoginSuccess(t *testing.T) {
