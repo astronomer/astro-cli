@@ -5,8 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,12 +12,12 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
@@ -33,12 +31,8 @@ const (
 	defaultRuntimeVersion  = "4.2.5"
 	dagParseAllowedVersion = "4.1.0"
 
-	noWorkspaceMsg = "no workspaces with id (%s) found"
-
 	composeImageBuildingPromptMsg = "Building image..."
-	deployingPromptMsg            = "Deploying: %s\n"
 	deploymentHeaderMsg           = "Authenticated to %s \n\n"
-	selectDeploymentPromptMsg     = "Select which Deployment you want to deploy to:"
 
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nPlease use one of the following supported tags: %s"
@@ -47,12 +41,6 @@ const (
 var (
 	splitNum   = 2
 	pytestFile string
-	tab        = printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
-	}
-
 	dockerfile = "Dockerfile"
 
 	// Monkey patched to write unit tests
@@ -60,11 +48,7 @@ var (
 	containerHandlerInit = airflow.ContainerHandlerInit
 )
 
-var (
-	errInvalidDeploymentKey = errors.New("invalid deployment selection")
-	errDagsParseFailed      = errors.New("your local DAGs did not parse. Please fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	errNoDeploymentsMsg     = errors.New("no Deployments found in this Workspace")
-)
+var errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 
 type deploymentInfo struct {
 	deploymentID   string
@@ -165,28 +149,19 @@ func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain strin
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		// Validate workspace
-		currentWorkspace, err := validateWorkspace(wsID, client)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, client)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
 
-		deploymentsInput := astro.DeploymentsInput{
-			WorkspaceID: currentWorkspace.ID,
-		}
-
-		deployments, err := client.ListDeployments(deploymentsInput)
-		if err != nil {
-			return deploymentInfo{}, err
-		}
-
-		// Prompt user for deployment if no deployment passed in
-		deployInfo, err := promptUserForDeployment(cloudDomain, &currentWorkspace, deployments)
-		if err != nil {
-			return deploymentInfo{}, err
-		}
-		deployInfo.organizationID = currentWorkspace.OrganizationID
-		return deployInfo, nil
+		return deploymentInfo{
+			currentDeployment.ID,
+			currentDeployment.ReleaseName,
+			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
+			currentDeployment.RuntimeRelease.Version,
+			currentDeployment.Workspace.OrganizationID,
+			currentDeployment.DeploymentSpec.Webserver.URL,
+		}, nil
 	}
 	deployInfo, err := getImageName(cloudDomain, deploymentID, client)
 	if err != nil {
@@ -236,86 +211,13 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	exitCode, err := containerHandler.Pytest(pytestFile, deployImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New("pytests failed, please fix failures or rerun the command without the '--pytest' flag to deploy")
+			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 		}
 		return errors.Wrap(err, "Something went wrong while Pytesting your local DAGs,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
 	}
 
 	fmt.Print("\nAll Pytests passed!\n")
 	return err
-}
-
-// Validate workspace
-func validateWorkspace(wsID string, client astro.Client) (astro.Workspace, error) {
-	if wsID == "" {
-		return astro.Workspace{}, errors.New("no workspace id provided")
-	}
-
-	wsResp, err := client.ListWorkspaces()
-	if err != nil {
-		return astro.Workspace{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
-
-	var currentWorkspace astro.Workspace
-	for i := range wsResp {
-		if wsResp[i].ID == wsID {
-			currentWorkspace = wsResp[i]
-			break
-		}
-	}
-
-	if currentWorkspace.ID == "" {
-		err = fmt.Errorf(noWorkspaceMsg, wsID) // nolint:goerr113
-		return astro.Workspace{}, err
-	}
-
-	return currentWorkspace, nil
-}
-
-// Prompt user for deployment if no deployment passed in
-func promptUserForDeployment(cloudDomain string, currentWorkspace *astro.Workspace, deployments []astro.Deployment) (deploymentInfo, error) {
-	if len(deployments) == 0 {
-		return deploymentInfo{}, errNoDeploymentsMsg
-	}
-
-	if cloudDomain == astroDomain {
-		fmt.Printf(deploymentHeaderMsg, "Astro")
-	} else {
-		fmt.Printf(deploymentHeaderMsg, cloudDomain)
-	}
-
-	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Label)
-	fmt.Println(selectDeploymentPromptMsg)
-
-	sort.Slice(deployments, func(i, j int) bool {
-		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
-	})
-
-	deployMap := map[string]astro.Deployment{}
-	for i := range deployments {
-		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID}, false)
-
-		deployMap[strconv.Itoa(index)] = deployments[i]
-	}
-
-	tab.Print(os.Stdout)
-	choice := input.Text("\n> ")
-	selected, ok := deployMap[choice]
-	if !ok {
-		return deploymentInfo{}, errInvalidDeploymentKey
-	}
-	deploymentID := selected.ID
-	currentVersion := selected.RuntimeRelease.Version
-	namespace := selected.ReleaseName
-	webserverURL := selected.DeploymentSpec.Webserver.URL
-
-	fmt.Printf(deployingPromptMsg, namespace)
-
-	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
-	deployImage := airflow.ImageName(namespace, "latest")
-
-	return deploymentInfo{deploymentID: deploymentID, namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, webserverURL: webserverURL}, nil
 }
 
 func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploymentInfo, error) {

@@ -54,7 +54,7 @@ func TestVariableList(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-invalid-id", "test-key-1", ws, "", false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -170,7 +170,7 @@ func TestVariableModify(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", false, false, false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		// mock os.Stdin
 		input := []byte("0")

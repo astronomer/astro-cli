@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestSetup(t *testing.T) {
@@ -100,7 +102,17 @@ func TestSetup(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("use refresh token", func(t *testing.T) {
+	t.Run("use API token", func(t *testing.T) {
+		mockDeplyResp := []astro.Deployment{
+			{
+				ID:        "test-id",
+				Workspace: astro.Workspace{ID: "workspace-id"},
+			},
+		}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Once()
+
 		cmd := &cobra.Command{Use: "deploy"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -130,7 +142,8 @@ func TestSetup(t *testing.T) {
 			}
 		})
 
-		err = Setup(cmd, []string{}, nil)
+		err = Setup(cmd, []string{}, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 }
