@@ -290,8 +290,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
 	// cluster request
-	clusterInput := map[string]interface{}{"organizationId": organizationID}
-	cs, err := client.ListClusters(clusterInput)
+	cs, err := client.ListClusters(organizationID)
 	if err != nil {
 		return "", errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}

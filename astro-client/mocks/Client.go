@@ -142,6 +142,29 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	return r0, r1
 }
 
+// ListClusters provides a mock function with given fields: organizationId
+func (_m *Client) ListClusters(organizationId string) ([]astro.Cluster, error) {
+	ret := _m.Called(organizationId)
+
+	var r0 []astro.Cluster
+	if rf, ok := ret.Get(0).(func(string) []astro.Cluster); ok {
+		r0 = rf(organizationId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]astro.Cluster)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(organizationId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListDeployments provides a mock function with given fields: input
 func (_m *Client) ListDeployments(input astro.DeploymentsInput) ([]astro.Deployment, error) {
 	ret := _m.Called(input)
@@ -181,29 +204,6 @@ func (_m *Client) ListInternalRuntimeReleases() ([]astro.RuntimeRelease, error) 
 	var r1 error
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListClusters provides a mock function with given fields: vars
-func (_m *Client) ListClusters(vars map[string]interface{}) ([]astro.Cluster, error) {
-	ret := _m.Called(vars)
-
-	var r0 []astro.Cluster
-	if rf, ok := ret.Get(0).(func(map[string]interface{}) []astro.Cluster); ok {
-		r0 = rf(vars)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Cluster)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
-		r1 = rf(vars)
 	} else {
 		r1 = ret.Error(1)
 	}
