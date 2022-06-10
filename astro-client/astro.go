@@ -22,7 +22,7 @@ type Client interface {
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
 	// Cluster
-	ListClusters(organizationId string) ([]Cluster, error)
+	ListClusters(organizationID string) ([]Cluster, error)
 	// RuntimeRelease
 	ListInternalRuntimeReleases() ([]RuntimeRelease, error)
 	ListPublicRuntimeReleases() ([]RuntimeRelease, error)
@@ -174,10 +174,10 @@ func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
 	return resp.Data.DeployImage, nil
 }
 
-func (c *HTTPClient) ListClusters(organizationId string) ([]Cluster, error) {
+func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
 	req := Request{
 		Query:     GetClusters,
-		Variables: map[string]interface{}{"organizationId": organizationId},
+		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
 	resp, err := req.DoWithClient(c)
