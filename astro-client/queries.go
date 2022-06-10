@@ -49,6 +49,7 @@ var (
 				}
 			}
 			workspace {
+				id
 				organizationId
 			}
 		}

@@ -32,7 +32,6 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
-	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
 
@@ -107,13 +106,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 		imageName = projectName
 	}
 
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing docker client: %w", err)
-	}
-	composeService := compose.NewComposeService(dockerClient, &configfile.ConfigFile{})
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
-
 	composeFile := include.Composeyml
 	if isPyTestCompose {
 		composeFile = include.Pytestyml
@@ -128,6 +121,8 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 	if err != nil {
 		log.Fatalf("error init compose client %s", err)
 	}
+
+	composeService := compose.NewComposeService(dockerCli.Client(), &configfile.ConfigFile{})
 
 	return &DockerCompose{
 		airflowHome:    airflowHome,

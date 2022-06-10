@@ -142,13 +142,13 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	return r0, r1
 }
 
-// ListClusters provides a mock function with given fields: vars
-func (_m *Client) ListClusters(vars map[string]interface{}) ([]astro.Cluster, error) {
-	ret := _m.Called(vars)
+// ListClusters provides a mock function with given fields: organizationID
+func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
+	ret := _m.Called(organizationID)
 
 	var r0 []astro.Cluster
-	if rf, ok := ret.Get(0).(func(map[string]interface{}) []astro.Cluster); ok {
-		r0 = rf(vars)
+	if rf, ok := ret.Get(0).(func(string) []astro.Cluster); ok {
+		r0 = rf(organizationID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]astro.Cluster)
@@ -156,8 +156,8 @@ func (_m *Client) ListClusters(vars map[string]interface{}) ([]astro.Cluster, er
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
-		r1 = rf(vars)
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(organizationID)
 	} else {
 		r1 = ret.Error(1)
 	}
