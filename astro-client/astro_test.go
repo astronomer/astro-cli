@@ -592,7 +592,7 @@ func TestListClusters(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		resp, err := astroClient.ListClusters(map[string]interface{}{})
+		resp, err := astroClient.ListClusters("test-org-id")
 		assert.NoError(t, err)
 		assert.Equal(t, resp, mockResponse.Data.GetClusters)
 	})
@@ -607,7 +607,7 @@ func TestListClusters(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.ListClusters(map[string]interface{}{})
+		_, err := astroClient.ListClusters("test-org-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
