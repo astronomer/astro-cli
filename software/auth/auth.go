@@ -100,14 +100,18 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 	}
 
 	token := c.Token
-	registryHandler, err := registryHandlerInit(registry)
+	registryDomain := strings.Split(registry, "/")[0]
+	registryHandler, err := registryHandlerInit(registryDomain)
 	if err != nil {
 		return err
 	}
-	err = registryHandler.Login("user", token)
 
+	if !appConfig.Flags.BYORegistryEnabled {
+		err = registryHandler.Login("user", token)
+	} else {
+		err = registryHandler.Login("", "")
+	}
 	if err != nil && appConfig.Flags.BYORegistryEnabled {
-		registryDomain := strings.Split(registry, "/")[0]
 		fmt.Fprintf(out, defaultRegistryLoginFailMsg, registryDomain)
 		return nil
 	}
