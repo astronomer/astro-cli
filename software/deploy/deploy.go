@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -128,6 +129,10 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 			nextTag = deployment.DeploymentInfo.NextCli
 			releaseName = deployment.ReleaseName
 		}
+	}
+
+	if byoRegistryEnabled {
+		nextTag = "deploy-" + time.Now().UTC().Format("2006-01-02T15-04") // updating nextTag logic for private registry, since houston won't maintain next tag in case of BYO registry
 	}
 
 	deploymentInfo, err := houstonClient.GetDeployment(deploymentID)
