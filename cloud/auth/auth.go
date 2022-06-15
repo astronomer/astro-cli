@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	Domain = "astronomer.io"
-	inputOAuthToken          = "OAuth Token: " // nolint:gosec // false positive
+	Domain          = "astronomer.io"
+	inputOAuthToken = "OAuth Token: " // nolint:gosec // false positive
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -382,7 +382,7 @@ func Login(domain string, client astro.Client, out io.Writer, loginLink, tokenLo
 		token := input.Text(inputOAuthToken)
 		res = Result{
 			AccessToken: token,
-			ExpiresIn: time.Now().Add(24 * time.Hour).Unix(),
+			ExpiresIn:   time.Now().Add(24 * time.Hour).Unix(),
 		}
 	}
 
