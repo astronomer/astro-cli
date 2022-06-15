@@ -444,6 +444,19 @@ func TestLogin(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("oauth token success", func(t *testing.T) {
+		// token := "OAuth Token"
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
+		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+
+		defer testUtil.MockUserInput(t, "OAuth Token")()
+
+		err := Login("astronomer.io", mockClient, os.Stdout, false, true)
+		assert.NoError(t, err)
+	})
+
 	t.Run("invalid domain", func(t *testing.T) {
 		err := Login("fail.astronomer.io", nil, os.Stdout, false, false)
 		assert.Error(t, err)
