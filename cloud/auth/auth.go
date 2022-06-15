@@ -29,6 +29,7 @@ import (
 
 const (
 	Domain = "astronomer.io"
+	inputOAuthToken          = "OAuth Token: " // nolint:gosec // false positive
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -356,7 +357,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain string, client astro.Client, out io.Writer, loginLink bool) error {
+func Login(domain string, client astro.Client, out io.Writer, loginLink bool, tokenLogin bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -369,9 +370,20 @@ func Login(domain string, client astro.Client, out io.Writer, loginLink bool) er
 
 	c, _ := context.GetCurrentContext()
 
-	res, err = authenticator.authDeviceLogin(c, authConfig, loginLink, domain)
-	if err != nil {
-		return err
+	if !tokenLogin {
+		res, err = authenticator.authDeviceLogin(c, authConfig, loginLink, domain)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
+		fmt.Printf("\nPlease visit the following URL, authenticate and paste token in next prompt\n")
+		fmt.Println("cloud." + domain + "/token\n")
+		token := input.Text(inputOAuthToken)
+		res = Result{
+			AccessToken: token,
+			ExpiresIn: time.Now().Add(24 * time.Hour).Unix(),
+		}
 	}
 
 	// If no domain specified
