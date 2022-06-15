@@ -37,19 +37,19 @@ var (
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
 		# List a deployment's variables and save them to a file
-		$ astro deployment variable list <deployment-id> --save --env .env.my-deployment
+		$ astro deployment variable list  --deployment-id <deployment-id> --save --env .env.my-deployment
 		`
 	deploymentVariableCreateExample = `
 		# Create a deployment variable
-		$ astro deployment variable create <deployment-id> --key FOO --value BAR --secret
+		$ astro deployment variable create --deployment-id <deployment-id> --key FOO --value BAR --secret
 		# Create a deployment variables from a file
-		$ astro deployment variable create <deployment-id> --load --env .env.my-deployment
+		$ astro deployment variable create  --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 	deploymentVariableUpdateExample = `
 		# Update a deployment variable
-		$ astro deployment variable update <deployment-id> --key KEY --value NEWVALUE --secret
+		$ astro deployment variable update --deployment-id <deployment-id> --key KEY --value NEWVALUE --secret
 		# Update a deployment variables from a file
-		$ astro deployment variable update <deployment-id> --load --env .env.my-deployment
+		$ astro deployment variable update  --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 
 	httpClient = httputil.NewHTTPClient()
