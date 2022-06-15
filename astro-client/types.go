@@ -68,14 +68,12 @@ type Deployment struct {
 type Cluster struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
-	IsManaged     bool   `json:"isManaged"`
 	CloudProvider string `json:"cloudProvider"`
 }
 
 type Orchestrator struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
-	IsManaged     bool   `json:"isManaged"`
 	CloudProvider string `json:"cloudProvider"`
 }
 
