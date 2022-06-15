@@ -357,7 +357,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain string, client astro.Client, out io.Writer, loginLink bool, tokenLogin bool) error {
+func Login(domain string, client astro.Client, out io.Writer, loginLink, tokenLogin bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
