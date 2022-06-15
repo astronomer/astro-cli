@@ -445,8 +445,6 @@ func TestLogin(t *testing.T) {
 	})
 
 	t.Run("oauth token success", func(t *testing.T) {
-		// token := "OAuth Token"
-
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
 		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
