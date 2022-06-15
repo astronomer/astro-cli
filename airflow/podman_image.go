@@ -69,19 +69,11 @@ func (p *PodmanImage) Push(cloudDomain, token, remoteImageTag string) error {
 	registry := "registry." + cloudDomain
 	remoteImage := fmt.Sprintf("%s/%s", registry, imageName(p.imageName, remoteImageTag))
 
-	err := p.podmanBind.Tag(p.conn, imageName(p.imageName, "latest"), remoteImageTag, fmt.Sprintf("%s/%s", registry, p.imageName), nil)
-	if err != nil {
-		return fmt.Errorf("command 'podman tag %s %s' failed: %w", p.imageName, remoteImage, err)
-	}
 	options := new(images.PushOptions)
-	if err := p.podmanBind.Push(p.conn, p.imageName, remoteImage, options); err != nil {
+	if err := p.podmanBind.Push(p.conn, imageName(p.imageName, "latest"), remoteImage, options); err != nil {
 		return fmt.Errorf("error pushing %s image to %s: %w", p.imageName, registry, err)
 	}
 
-	err = p.podmanBind.Untag(p.conn, imageName(p.imageName, "latest"), remoteImageTag, fmt.Sprintf("%s/%s", registry, p.imageName), nil)
-	if err != nil {
-		return fmt.Errorf("command 'podman untag %s' failed: %w", remoteImage, err)
-	}
 	return nil
 }
 
