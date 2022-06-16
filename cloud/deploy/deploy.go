@@ -182,7 +182,7 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 	}
 
 	fmt.Println("testing", deployImage)
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace, false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace, true)
 	if err != nil {
 		return err
 	}
