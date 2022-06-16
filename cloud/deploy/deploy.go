@@ -83,9 +83,13 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, clien
 		return err
 	}
 
-	err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
-	if err != nil {
-		return err
+	if !config.CFG.SkipParse.GetBool() && !CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
+		err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environemnt variables")
 	}
 
 	// Create the image
@@ -405,4 +409,14 @@ func CheckVersion(version string, out io.Writer) {
 	default:
 		fmt.Fprintf(out, "Runtime Version: %s\n", version)
 	}
+}
+
+func CheckEnvBool(envBool string) bool {
+	if envBool == "False" || envBool == "false" {
+		return false
+	}
+	if envBool == "True" || envBool == "true" {
+		return true
+	}
+	return false
 }
