@@ -32,6 +32,7 @@ type cfgs struct {
 	Verbosity            cfg
 	HoustonDialTimeout   cfg
 	HoustonSkipVerifyTLS cfg
+	SkipParse            cfg
 }
 
 // Creates a new cfg struct
