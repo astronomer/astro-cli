@@ -193,7 +193,7 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 				return errDagsParseFailed
 			}
 		} else {
-			fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environemnt variables")
+			fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
 		}
 		// check pytests
 	} else if pytest != "" && pytest != parse {
