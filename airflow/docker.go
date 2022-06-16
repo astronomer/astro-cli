@@ -347,6 +347,19 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 		return "", err
 	}
 
+	fmt.Println("pytest file1: "+pytestFile)
+
+	// Determine pytest file
+	if pytestFile != ".astro/test_dag_integrity_default.py" {
+		if !strings.Contains(pytestFile, "tests") {
+			pytestFile = "tests/" + pytestFile
+		} else  if pytestFile == "" {
+			pytestFile = "tests/"
+		}
+	}
+
+	fmt.Println("pytest file2: "+pytestFile)
+
 	// Create a compose project
 	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, pytestFile, projectImageName, imageLabels, true)
 	if err != nil {
