@@ -66,3 +66,13 @@ func Base64URLEncode(arg []byte) string {
 	s = strings.Replace(s, "/", "_", -1)
 	return s
 }
+
+func CheckEnvBool(envBool string) bool {
+	if envBool == "False" || envBool == "false" {
+		return false
+	}
+	if envBool == "True" || envBool == "true" {
+		return true
+	}
+	return false
+}
