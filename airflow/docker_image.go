@@ -89,11 +89,21 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 		return fmt.Errorf("error reading credentials: %w", err)
 	}
 
-	if username != "" {
-		authConfig.Username = username
+	if username == "" && token == "" {
+		registryDomain := strings.Split(registry, "/")[0]
+		creds := configFile.GetCredentialsStore(registryDomain)
+		authConfig, err = creds.Get(registryDomain)
+		if err != nil {
+			log.Debugf("Error reading credentials for domain: %s from docker credentials store: %v", registryDomain, err)
+		}
+	} else {
+		if username != "" {
+			authConfig.Username = username
+		}
+		authConfig.Password = token
+		authConfig.ServerAddress = registry
 	}
-	authConfig.Password = token
-	authConfig.ServerAddress = registry
+
 	log.Debugf("Exec Push docker creds %v \n", authConfig)
 
 	ctx := context.Background()
