@@ -56,6 +56,7 @@ type ResponseData struct {
 	RemoveWorkspaceTeam            *Workspace                  `json:"workspaceRemoveTeam,omitempty"`
 	WorkspaceUpdateTeamRole        string                      `json:"workspaceUpdateTeamRole,omitempty"`
 	WorkspaceGetTeams              []Team                      `json:"workspaceTeams,omitempty"`
+	UpdateDeploymentImage          UpdateDeploymentImageResp   `json:"updateDeploymentImage,omitempty"`
 }
 
 type Namespace struct {
@@ -286,6 +287,12 @@ type AirflowImage struct {
 	Tag     string `json:"tag"`
 }
 
+type UpdateDeploymentImageResp struct {
+	ReleaseName    string `json:"releaseName"`
+	AirflowVersion string `json:"airflowVersion"`
+	RuntimeVersion string `json:"runtimeVersion"`
+}
+
 // DeploymentConfig contains current airflow image tag
 type DeploymentConfig struct {
 	AirflowImages          []AirflowImage `json:"airflowImages"`
@@ -327,6 +334,7 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 type AppConfig struct {
 	Version                string       `json:"version"`
 	BaseDomain             string       `json:"baseDomain"`
+	BYORegistryDomain      string       `json:"byoUpdateRegistryHost"`
 	SMTPConfigured         bool         `json:"smtpConfigured"`
 	ManualReleaseNames     bool         `json:"manualReleaseNames"`
 	ConfigureDagDeployment bool         `json:"configureDagDeployment"`
@@ -344,6 +352,7 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+	BYORegistryEnabled     bool `json:"byoUpdateRegistryEnabled"`
 	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 }
 

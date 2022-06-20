@@ -86,7 +86,20 @@ func TestDockerImagePush(t *testing.T) {
 			return nil
 		}
 
-		err := handler.Push("test", "", "test", "test")
+		err := handler.Push("test", "test-username", "test", "test")
+		assert.NoError(t, err)
+	})
+
+	t.Run("success with docker cred store", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
+			return nil
+		}
+
+		err := handler.Push("test", "", "", "test")
 		assert.NoError(t, err)
 	})
 }

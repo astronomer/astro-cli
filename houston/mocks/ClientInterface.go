@@ -884,6 +884,20 @@ func (_m *ClientInterface) UpdateDeploymentAirflow(variables map[string]interfac
 	return r0, r1
 }
 
+// UpdateDeploymentImage provides a mock function with given fields: req
+func (_m *ClientInterface) UpdateDeploymentImage(req houston.UpdateDeploymentImageRequest) error {
+	ret := _m.Called(req)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(houston.UpdateDeploymentImageRequest) error); ok {
+		r0 = rf(req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateDeploymentRuntime provides a mock function with given fields: variables
 func (_m *ClientInterface) UpdateDeploymentRuntime(variables map[string]interface{}) (*houston.Deployment, error) {
 	ret := _m.Called(variables)

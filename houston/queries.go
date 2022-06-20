@@ -651,6 +651,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		appConfig {
 			version
 			baseDomain
+			byoUpdateRegistryHost
 			smtpConfigured
 			manualReleaseNames
 			configureDagDeployment
@@ -662,6 +663,25 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	}`
 
+	DeploymentImageUpdateRequest = `
+	mutation updateDeploymentImage(
+		$releaseName:String!,
+		$image:String!,
+		$airflowVersion:String,
+		$runtimeVersion:String,
+	) {
+		updateDeploymentImage(
+			releaseName:$releaseName,
+			image:$image,
+			airflowVersion:$airflowVersion,
+			runtimeVersion:$runtimeVersion
+		) {
+			releaseName
+			airflowVersion
+			runtimeVersion
+		}
+	}
+	`
 	GetRuntimeReleases = `
 	query runtimeReleases($airflowVersion: String) {
 		runtimeReleases(airflowVersion: $airflowVersion) {
