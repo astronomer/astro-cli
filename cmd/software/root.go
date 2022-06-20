@@ -14,9 +14,12 @@ import (
 var (
 	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
 	initDebugLogs = []string{}
+
 	houstonClient houston.ClientInterface
-	workspaceID   string
 	appConfig     *houston.AppConfig
+
+	workspaceID string
+	teamID      string
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
@@ -34,6 +37,7 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 		newWorkspaceCmd(out),
 		newDeployCmd(),
 		newUserCmd(out),
+		newTeamCmd(out),
 	}
 }
 

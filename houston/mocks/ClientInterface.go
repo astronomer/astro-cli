@@ -37,6 +37,29 @@ func (_m *ClientInterface) AddDeploymentUser(variables houston.UpdateDeploymentU
 	return r0, r1
 }
 
+// AddWorkspaceTeam provides a mock function with given fields: workspaceID, teamID, role
+func (_m *ClientInterface) AddWorkspaceTeam(workspaceID string, teamID string, role string) (*houston.Workspace, error) {
+	ret := _m.Called(workspaceID, teamID, role)
+
+	var r0 *houston.Workspace
+	if rf, ok := ret.Get(0).(func(string, string, string) *houston.Workspace); ok {
+		r0 = rf(workspaceID, teamID, role)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Workspace)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(workspaceID, teamID, role)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AddWorkspaceUser provides a mock function with given fields: workspaceID, email, role
 func (_m *ClientInterface) AddWorkspaceUser(workspaceID string, email string, role string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID, email, role)
@@ -334,6 +357,29 @@ func (_m *ClientInterface) DeleteWorkspaceServiceAccount(workspaceID string, ser
 	return r0, r1
 }
 
+// DeleteWorkspaceTeam provides a mock function with given fields: workspaceID, teamID
+func (_m *ClientInterface) DeleteWorkspaceTeam(workspaceID string, teamID string) (*houston.Workspace, error) {
+	ret := _m.Called(workspaceID, teamID)
+
+	var r0 *houston.Workspace
+	if rf, ok := ret.Get(0).(func(string, string) *houston.Workspace); ok {
+		r0 = rf(workspaceID, teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Workspace)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(workspaceID, teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteWorkspaceUser provides a mock function with given fields: workspaceID, userID
 func (_m *ClientInterface) DeleteWorkspaceUser(workspaceID string, userID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID, userID)
@@ -495,6 +541,52 @@ func (_m *ClientInterface) GetRuntimeReleases(airflowVersion string) (houston.Ru
 	return r0, r1
 }
 
+// GetTeam provides a mock function with given fields: teamID
+func (_m *ClientInterface) GetTeam(teamID string) (*houston.Team, error) {
+	ret := _m.Called(teamID)
+
+	var r0 *houston.Team
+	if rf, ok := ret.Get(0).(func(string) *houston.Team); ok {
+		r0 = rf(teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Team)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTeamUsers provides a mock function with given fields: teamID
+func (_m *ClientInterface) GetTeamUsers(teamID string) ([]houston.User, error) {
+	ret := _m.Called(teamID)
+
+	var r0 []houston.User
+	if rf, ok := ret.Get(0).(func(string) []houston.User); ok {
+		r0 = rf(teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.User)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspace provides a mock function with given fields: workspaceID
 func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID)
@@ -511,6 +603,29 @@ func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace,
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(workspaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspaceTeamRole provides a mock function with given fields: workspaceID, teamID
+func (_m *ClientInterface) GetWorkspaceTeamRole(workspaceID string, teamID string) (*houston.Team, error) {
+	ret := _m.Called(workspaceID, teamID)
+
+	var r0 *houston.Team
+	if rf, ok := ret.Get(0).(func(string, string) *houston.Team); ok {
+		r0 = rf(workspaceID, teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Team)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(workspaceID, teamID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -641,6 +756,29 @@ func (_m *ClientInterface) ListWorkspaceServiceAccounts(workspaceID string) ([]h
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.ServiceAccount)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(workspaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListWorkspaceTeamsAndRoles provides a mock function with given fields: workspaceID
+func (_m *ClientInterface) ListWorkspaceTeamsAndRoles(workspaceID string) ([]houston.Team, error) {
+	ret := _m.Called(workspaceID)
+
+	var r0 []houston.Team
+	if rf, ok := ret.Get(0).(func(string) []houston.Team); ok {
+		r0 = rf(workspaceID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.Team)
 		}
 	}
 
@@ -808,6 +946,27 @@ func (_m *ClientInterface) UpdateWorkspace(workspaceID string, args map[string]s
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, map[string]string) error); ok {
 		r1 = rf(workspaceID, args)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateWorkspaceTeamRole provides a mock function with given fields: workspaceID, teamID, role
+func (_m *ClientInterface) UpdateWorkspaceTeamRole(workspaceID string, teamID string, role string) (string, error) {
+	ret := _m.Called(workspaceID, teamID, role)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, string, string) string); ok {
+		r0 = rf(workspaceID, teamID, role)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(workspaceID, teamID, role)
 	} else {
 		r1 = ret.Error(1)
 	}

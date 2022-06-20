@@ -38,6 +38,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUpdateCmd(out),
 		newWorkspaceUserRootCmd(out),
 		newWorkspaceSaRootCmd(out),
+		newWorkspaceTeamRootCmd(out),
 	)
 	return cmd
 }
