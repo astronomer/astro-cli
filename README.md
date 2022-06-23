@@ -164,7 +164,7 @@ $ astro deploy --help
 
 How to get started as a developer:
 
-1. Install `go` 1.11+ - https://go.dev/doc/install
+1. Install `go` 1.18+ - https://go.dev/doc/install
 2. Install `golangci-lint` to run linter locally
 
     ```brew install golangci-lint```
