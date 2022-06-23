@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"log"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -19,6 +20,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
 )
@@ -60,7 +63,7 @@ type deploymentInfo struct {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, client astro.Client) error {
+func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags bool, client astro.Client) error {
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -77,66 +80,105 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, clien
 		return err
 	}
 
-	// Build our image
-	version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, client)
-	if err != nil {
-		return err
-	}
-
-	err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
-	if err != nil {
-		return err
-	}
-
-	// Create the image
-	imageCreateInput := astro.ImageCreateInput{
-		Tag:          version,
-		DeploymentID: deployInfo.deploymentID,
-	}
-	imageCreateRes, err := client.CreateImage(imageCreateInput)
-	if err != nil {
-		return err
-	}
-
 	domain := c.Domain
 	if strings.Contains(domain, "cloud") {
 		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
 		domain = splitDomain[1]
 	}
 
-	nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
-	var registry string
-	if domain == "localhost" {
-		registry = config.CFG.LocalRegistry.GetString()
+	if dags {
+		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
+		dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, deployInfo.organizationID, client);
+		if err != nil {
+			return err
+		}
+
+		// Check the dags directory
+		dagsPath := path + "/dags"
+		// _, err := fileutil.Exists(dagsPath, nil);
+		// if err != nil {
+		// 	return errors.Wrapf(err, "failed to find dags '%s'", dagsPath)
+		// }
+
+		// Generate the dags tar
+		fileutil.Tar(dagsPath, "/tmp");
+
+		sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagUrl)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dagFile, err := os.Open("/tmp/dags.tar")
+		if err != nil {
+			return err
+		}
+		err = sasDagClient.Upload(dagFile)
+		if err != nil {
+			return err
+		}
 	} else {
-		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
-	}
-	repository := registry + "/" + deployInfo.organizationID + "/" + deployInfo.deploymentID
-	// TODO: Resolve the edge case where two people push the same nextTag at the same time
-	remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
+		// Build our image
+		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, client)
+		if err != nil {
+			return err
+		}
 
-	token := c.Token
-	// Splitting out the Bearer part from the token
-	splittedToken := strings.Split(token, " ")[1]
+		err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+		if err != nil {
+			return err
+		}
 
-	imageHandler := airflowImageHandler(deployInfo.deployImage)
-	err = imageHandler.Push(registry, registryUsername, splittedToken, remoteImage)
-	if err != nil {
-		return err
-	}
+		// Create the image
+		imageCreateInput := astro.ImageCreateInput{
+			Tag:          version,
+			DeploymentID: deployInfo.deploymentID,
+		}
+		imageCreateRes, err := client.CreateImage(imageCreateInput)
+		if err != nil {
+			return err
+		}
 
-	// Deploy the image
-	err = imageDeploy(imageCreateRes.ID, repository, nextTag, client)
-	if err != nil {
-		return err
+		nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
+		var registry string
+		if domain == "localhost" {
+			registry = config.CFG.LocalRegistry.GetString()
+		} else {
+			registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
+		}
+		repository := registry + "/" + deployInfo.organizationID + "/" + deployInfo.deploymentID
+		// TODO: Resolve the edge case where two people push the same nextTag at the same time
+		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
+
+		token := c.Token
+		// Splitting out the Bearer part from the token
+		splittedToken := strings.Split(token, " ")[1]
+
+		imageHandler := airflowImageHandler(deployInfo.deployImage)
+		err = imageHandler.Push(registry, registryUsername, splittedToken, remoteImage)
+		if err != nil {
+			return err
+		}
+
+		// Deploy the image
+		err = imageDeploy(imageCreateRes.ID, repository, nextTag, client)
+		if err != nil {
+			return err
+		}
+
+		deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+
+		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
+			"\n\n Deployment can be accessed at the following URLs: \n" +
+			fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+			fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	}
 
 	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
 
-	fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
-		"\n\n Deployment can be accessed at the following URLs: \n" +
-		fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-		fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
+	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Astronomer UI to confirm that your deploy was successful." +
+		"\n\nDeployment can be accessed at the following URLs: \n" +
+		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 
 	return nil
 }

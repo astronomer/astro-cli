@@ -101,4 +101,11 @@ var (
 	  }
 	}
   `
+  DagDeploymentInitiate = `
+  mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
+    initiateDagDeployment(input: $input) {
+        dagUrl
+    }
+  }
+  `
 )

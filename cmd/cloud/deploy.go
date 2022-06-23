@@ -17,6 +17,7 @@ var (
 	forcePrompt      bool
 	saveDeployConfig bool
 	pytest           bool
+	dags		 bool
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
@@ -57,6 +58,7 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&pytest, "pytest", false, "Deploy code to Astro only if the specified Pytests are passed")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
+	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
 	return cmd
 }
 
@@ -100,6 +102,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, forcePrompt, astroClient)
+	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, forcePrompt, dags, astroClient)
 }

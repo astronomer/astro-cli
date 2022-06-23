@@ -23,6 +23,7 @@ type ResponseData struct {
 	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
 	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
+	InitiateDagDeployment	  InitiateDagDeployment		   `json:"initiateDagDeployment,omitempty"`
 }
 
 type Self struct {
@@ -92,6 +93,15 @@ type DeploymentSpec struct {
 	Workers                     Workers                      `json:"workers"`
 	Scheduler                   Scheduler                    `json:"scheduler"`
 	EnvironmentVariablesObjects []EnvironmentVariablesObject `json:"environmentVariablesObjects"`
+}
+
+type InitiateDagDeployment struct {
+	DagUrl string `json:"dagUrl"`
+}
+
+type InitiateDagDeploymentInput struct {
+	OrganizationID string `json:"organizationId"`
+	DeploymentID   string `json:"deploymentId"`
 }
 
 type EnvironmentVariablesObject struct {

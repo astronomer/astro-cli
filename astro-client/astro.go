@@ -18,6 +18,7 @@ type Client interface {
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
+	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
 	// Image
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
@@ -146,6 +147,19 @@ func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) (
 		return []EnvironmentVariablesObject{}, err
 	}
 	return resp.Data.DeploymentVariablesUpdate, nil
+}
+
+func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error) {
+	req := Request{
+		Query:     DagDeploymentInitiate,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return InitiateDagDeployment{}, err
+	}
+	return resp.Data.InitiateDagDeployment, nil
 }
 
 func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
