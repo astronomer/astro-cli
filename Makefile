@@ -6,7 +6,7 @@ ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
 OUTPUT ?= astro
 # golangci-lint version
-GOLANGCI_LINT_VERSION ?=v1.46.2
+GOLANGCI_LINT_VERSION ?=v1.45.0
 
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
