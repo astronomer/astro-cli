@@ -20,7 +20,7 @@ jobs:
       - commit-next-tag
   release:
     docker:
-      - image: circleci/golang:1.17
+      - image: circleci/golang:1.18
     working_directory: /go/src/github.com/astronomer/astro-cli
     steps:
       - checkout
