@@ -1,0 +1,15 @@
+name: Label all new GitHub Issues with App CLI
+on:
+  issues:
+    types: ['opened']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Renato66/auto-label@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          ignore-comments: false
+          labels-synonyms: false
+          labels-not-allowed: false
+          default-labels: '["app/astro-cli"]'

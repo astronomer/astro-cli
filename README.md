@@ -44,7 +44,7 @@ To install and use the Astro CLI on Windows, you must have:
 #### via Homebrew
 
 ```sh
-brew install astronomer/tap/astro
+brew install astro
 ```
 
 #### via cURL

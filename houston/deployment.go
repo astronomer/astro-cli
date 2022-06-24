@@ -16,6 +16,13 @@ type ListDeploymentLogsRequest struct {
 	Timestamp    time.Time `json:"timestamp"`
 }
 
+type UpdateDeploymentImageRequest struct {
+	ReleaseName    string `json:"releaseName"`
+	Image          string `json:"image"`
+	AirflowVersion string `json:"airflowVersion"`
+	RuntimeVersion string `json:"runtimeVersion"`
+}
+
 // CreateDeployment - create a deployment
 func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
 	req := Request{
@@ -144,6 +151,20 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 	}
 
 	return r.Data.DeploymentLog, nil
+}
+
+func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) error {
+	req := Request{
+		Query:     DeploymentImageUpdateRequest,
+		Variables: updateReq,
+	}
+
+	_, err := req.DoWithClient(h.client)
+	if err != nil {
+		return handleAPIErr(err)
+	}
+
+	return nil
 }
 
 func (h ClientImplementation) UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error) {
