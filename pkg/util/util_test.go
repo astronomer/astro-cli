@@ -200,6 +200,11 @@ func TestCheckEnvBool(t *testing.T) {
 			args: args{"true"},
 			want: true,
 		},
+		{
+			name: "third false case",
+			args: args{""},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
