@@ -351,7 +351,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 	// Determine pytest file
 	if pytestFile != ".astro/test_dag_integrity_default.py" {
 		if !strings.Contains(pytestFile, pytestDirectory) {
-			pytestFile = pytestDirectory+ "/" + pytestFile
+			pytestFile = pytestDirectory + "/" + pytestFile
 		} else if pytestFile == "" {
 			pytestFile = pytestDirectory + "/"
 		}
