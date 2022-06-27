@@ -108,4 +108,19 @@ var (
     }
   }
   `
+  ReportDagDeploymentStatus = `
+  mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
+    reportDagDeploymentStatus(input: $input) {
+        id
+        deploymentId
+        action
+        versionId
+        status
+        message
+        createdAt
+        initiatorId
+        initiatorType
+    }
+  }
+  `
 )

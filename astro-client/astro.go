@@ -19,6 +19,7 @@ type Client interface {
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
 	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
+	ReportDagDeploymentStatus(input ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
@@ -160,6 +161,19 @@ func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (In
 		return InitiateDagDeployment{}, err
 	}
 	return resp.Data.InitiateDagDeployment, nil
+}
+
+func (c *HTTPClient) ReportDagDeploymentStatus(input ReportDagDeploymentStatusInput) (DagDeploymentStatus, error) {
+	req := Request{
+		Query:     ReportDagDeploymentStatus,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return DagDeploymentStatus{}, err
+	}
+	return resp.Data.ReportDagDeploymentStatus, nil
 }
 
 func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {

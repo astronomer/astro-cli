@@ -24,6 +24,7 @@ type ResponseData struct {
 	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
 	InitiateDagDeployment	  InitiateDagDeployment		   `json:"initiateDagDeployment,omitempty"`
+	ReportDagDeploymentStatus DagDeploymentStatus		   `json:"reportDagDeploymentStatus,omitempty"`
 }
 
 type Self struct {
@@ -102,6 +103,26 @@ type InitiateDagDeployment struct {
 type InitiateDagDeploymentInput struct {
 	OrganizationID string `json:"organizationId"`
 	DeploymentID   string `json:"deploymentId"`
+}
+
+type DagDeploymentStatus struct {
+	ID           	string `json:"id"`
+	DeploymentID	string `json:"deploymentId"`
+	Action		   	string `json:"action"`
+	VersionID	   	string `json:"versionId"`
+	Status		   	string `json:"status"`
+	Message		   	string `json:"message"`
+	createdAt		string `json:"createdAt"`
+	initiatorId		string `json:"initiatorId"`
+	initiatorType	string `json:"initiatorType"`
+}
+
+type ReportDagDeploymentStatusInput struct {
+	DeploymentID   string `json:"deploymentId"`
+	Action		   string `json:"action"`
+	VersionID	   string `json:"versionId"`
+	Status		   string `json:"status"`
+	Message		   string `json:"message"`
 }
 
 type EnvironmentVariablesObject struct {

@@ -112,7 +112,22 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 		if err != nil {
 			return err
 		}
-		err = sasDagClient.Upload(dagFile)
+		versionId, err := sasDagClient.Upload(dagFile)
+		if err != nil {
+			return err
+		}
+
+		var status string
+		if versionId != "" {
+			status = "SUCCEEDED"
+		} else {
+			status = "FAILED"
+		}
+
+		message := "Dags uploaded successfully"
+		action := "UPLOAD"
+		dagDeploymentStatus, err := deployment.ReportDagDeploymentStatus(deployInfo.deploymentID, action, versionId, status, message, client);
+		fmt.Println(dagDeploymentStatus)
 		if err != nil {
 			return err
 		}
