@@ -795,6 +795,45 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	){
 		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamUuid: $teamUuid) {
 			id
+			label
+		}
+	}
+	`
+
+	ListTeamsRequest = `
+	query paginatedTeams (
+		$take: Int
+		$cursor: Uuid
+		$workspaceUuid: Uuid
+	) {
+		paginatedTeams(take:$take, cursor:$cursor, workspaceUuid:$workspaceUuid) {
+			count
+			teams {
+				id
+				name
+			}
+		}
+	}
+	`
+
+	CreateTeamSystemRoleBindingRequest = `
+	mutation createTeamSystemRoleBinding (
+		$teamUuid: Uuid!
+		$role: Role!
+	) {
+		createTeamSystemRoleBinding(teamUuid:$teamUuid, role:$role) {
+			role
+		}
+	}
+	`
+
+	DeleteTeamSystemRoleBindingRequest = `
+	mutation deleteTeamSystemRoleBinding (
+		$teamUuid: Uuid!
+		$role: Role!
+	) {
+		deleteTeamSystemRoleBinding(teamUuid:$teamUuid, role:$role) {
+			role
 		}
 	}
 	`

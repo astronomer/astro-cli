@@ -4,6 +4,8 @@ package houston
 const (
 	// RBAC
 	SystemAdminRole      = "SYSTEM_ADMIN"
+	SystemEditorRole     = "SYSTEM_EDITOR"
+	SystemViewerRole     = "SYSTEM_VIEWER"
 	WorkspaceAdminRole   = "WORKSPACE_ADMIN"
 	WorkspaceViewerRole  = "WORKSPACE_VIEWER"
 	WorkspaceEditorRole  = "WORKSPACE_EDITOR"
@@ -11,6 +13,7 @@ const (
 	DeploymentAdminRole  = "DEPLOYMENT_ADMIN"
 	DeploymentEditorRole = "DEPLOYMENT_EDITOR"
 	DeploymentViewerRole = "DEPLOYMENT_VIEWER"
+	NoneTeamRole         = "NONE"
 
 	// Deployment
 	AirflowURLType = "airflow"

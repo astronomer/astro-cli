@@ -100,6 +100,6 @@ func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInter
 		return err
 	}
 
-	fmt.Fprintf(out, "Role has been changed from %s to %s for team %s", rb.Role, newRole, teamID)
+	fmt.Fprintf(out, "Role has been changed from %s to %s for team %s\n", rb.Role, newRole, teamID)
 	return nil
 }
