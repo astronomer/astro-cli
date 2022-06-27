@@ -185,11 +185,15 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 
 	// parse dags
 	if pytest == parse && dagParseVersionCheck {
-		fmt.Println("Testing image...")
-		err := containerHandler.Parse(deployImage)
-		if err != nil {
-			fmt.Println(err)
-			return errDagsParseFailed
+		if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
+			fmt.Println("Testing image...")
+			err := containerHandler.Parse(deployImage)
+			if err != nil {
+				fmt.Println(err)
+				return errDagsParseFailed
+			}
+		} else {
+			fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
 		}
 		// check pytests
 	} else if pytest != "" && pytest != parse {
