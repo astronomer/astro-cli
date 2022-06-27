@@ -575,3 +575,47 @@ func TestCancelUpdateDeploymentRuntime(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestUpdateDeploymentImage(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	mockDeployment := &Response{
+		Data: ResponseData{
+			UpdateDeploymentImage: UpdateDeploymentImageResp{
+				ReleaseName:    "prehistoric-gravity-930",
+				AirflowVersion: "2.2.0",
+				RuntimeVersion: "",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockDeployment)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		assert.NoError(t, err)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}

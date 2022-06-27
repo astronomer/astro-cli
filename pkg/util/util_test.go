@@ -170,3 +170,47 @@ func TestBase64URLEncode(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckEnvBool(t *testing.T) {
+	type args struct {
+		arg string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "first false case",
+			args: args{"False"},
+			want: false,
+		},
+		{
+			name: "second false case",
+			args: args{"false"},
+			want: false,
+		},
+		{
+			name: "first true case",
+			args: args{"True"},
+			want: true,
+		},
+		{
+			name: "second true case",
+			args: args{"true"},
+			want: true,
+		},
+		{
+			name: "third false case",
+			args: args{""},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CheckEnvBool(tt.args.arg); got != tt.want {
+				t.Errorf("CheckEnvBool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

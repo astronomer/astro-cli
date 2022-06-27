@@ -44,7 +44,7 @@ To install and use the Astro CLI on Windows, you must have:
 #### via Homebrew
 
 ```sh
-brew install astronomer/tap/astro
+brew install astro
 ```
 
 #### via cURL
@@ -164,7 +164,7 @@ $ astro deploy --help
 
 How to get started as a developer:
 
-1. Install `go` 1.11+ - https://go.dev/doc/install
+1. Install `go` 1.18+ - https://go.dev/doc/install
 2. Install `golangci-lint` to run linter locally
 
     ```brew install golangci-lint```

@@ -50,6 +50,13 @@ type ResponseData struct {
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
 	RuntimeReleases                RuntimeReleases             `json:"runtimeReleases,omitempty"`
+	GetTeam                        *Team                       `json:"team,omitempty"`
+	GetTeamUsers                   []User                      `json:"teamUsers,omitempty"`
+	AddWorkspaceTeam               *Workspace                  `json:"workspaceAddTeam,omitempty"`
+	RemoveWorkspaceTeam            *Workspace                  `json:"workspaceRemoveTeam,omitempty"`
+	WorkspaceUpdateTeamRole        string                      `json:"workspaceUpdateTeamRole,omitempty"`
+	WorkspaceGetTeams              []Team                      `json:"workspaceTeams,omitempty"`
+	UpdateDeploymentImage          UpdateDeploymentImageResp   `json:"updateDeploymentImage,omitempty"`
 }
 
 type Namespace struct {
@@ -205,9 +212,20 @@ type User struct {
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
+	Teams    []Team  `json:"teams"`
 	// created at
 	// updated at
 	// profile
+}
+
+// Team contains all components of an Astronomer Team
+type Team struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	SortID       int           `json:"sortId"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 type RoleBindingWorkspace struct {
@@ -225,11 +243,17 @@ type WorkspaceUserRoleBindings struct {
 	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
 }
 
+type WorkspaceTeamRoleBindings struct {
+	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
+}
+
 type RoleBinding struct {
 	Role           string                  `json:"role"`
 	User           RoleBindingUser         `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
 	Deployment     Deployment              `json:"deployment"`
+	Team           Team                    `json:"team"`
+	Workspace      Workspace               `json:"workspace"`
 }
 
 type RoleBindingUser struct {
@@ -261,6 +285,12 @@ type DeploymentLog struct {
 type AirflowImage struct {
 	Version string `json:"version"`
 	Tag     string `json:"tag"`
+}
+
+type UpdateDeploymentImageResp struct {
+	ReleaseName    string `json:"releaseName"`
+	AirflowVersion string `json:"airflowVersion"`
+	RuntimeVersion string `json:"runtimeVersion"`
 }
 
 // DeploymentConfig contains current airflow image tag
@@ -304,6 +334,7 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 type AppConfig struct {
 	Version                string       `json:"version"`
 	BaseDomain             string       `json:"baseDomain"`
+	BYORegistryDomain      string       `json:"byoUpdateRegistryHost"`
 	SMTPConfigured         bool         `json:"smtpConfigured"`
 	ManualReleaseNames     bool         `json:"manualReleaseNames"`
 	ConfigureDagDeployment bool         `json:"configureDagDeployment"`
@@ -321,6 +352,7 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+	BYORegistryEnabled     bool `json:"byoUpdateRegistryEnabled"`
 	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 }
 

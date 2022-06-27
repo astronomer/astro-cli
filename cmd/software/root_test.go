@@ -25,7 +25,7 @@ func TestAddCmds(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace"}, cmds[cmdIdx].Use)
+		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(t)
 }
@@ -36,7 +36,7 @@ func TestAppConfigFailure(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace"}, cmds[cmdIdx].Use)
+		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(t)
 	assert.Contains(t, initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
