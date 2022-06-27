@@ -8,14 +8,14 @@ import (
 func Initiate(deploymentID, organizationID string, client astro.Client) (astro.InitiateDagDeployment, error) {
 	// create initiate dag deployment input
 	initiateDagDeploymentInput := astro.InitiateDagDeploymentInput{
-		DeploymentID: deploymentID,
+		DeploymentID:   deploymentID,
 		OrganizationID: organizationID,
 	}
 
 	// initiate dag deployment
 	dagDeployment, err := client.InitiateDagDeployment(initiateDagDeploymentInput)
 	if err != nil {
-		return astro.InitiateDagDeployment{} , errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return astro.InitiateDagDeployment{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
 	return dagDeployment, nil
@@ -25,16 +25,16 @@ func ReportDagDeploymentStatus(deploymentID, action, versionID, status, message 
 	// create report dag deployment status input
 	reportDagDeploymentStatusInput := astro.ReportDagDeploymentStatusInput{
 		DeploymentID: deploymentID,
-		Action: action,
-		VersionID: versionID,
-		Status: status,
-		Message: message,
+		Action:       action,
+		VersionID:    versionID,
+		Status:       status,
+		Message:      message,
 	}
 
 	// report dag deployment status
 	dagDeploymentStatus, err := client.ReportDagDeploymentStatus(reportDagDeploymentStatusInput)
 	if err != nil {
-		return astro.DagDeploymentStatus{} , errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return astro.DagDeploymentStatus{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
 	return dagDeploymentStatus, nil
