@@ -17,7 +17,7 @@ var (
 	forcePrompt      bool
 	saveDeployConfig bool
 	pytest           bool
-	dags		 bool
+	dags             bool
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 

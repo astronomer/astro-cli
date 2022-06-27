@@ -3,11 +3,11 @@ package deploy
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"log"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -17,11 +17,11 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/azure"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
 )
@@ -88,7 +88,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 
 	if dags {
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-		dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, deployInfo.organizationID, client);
+		dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, deployInfo.organizationID, client)
 		if err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 		// }
 
 		// Generate the dags tar
-		fileutil.Tar(dagsPath, "/tmp");
+		fileutil.Tar(dagsPath, "/tmp")
 
 		sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagUrl)
 		if err != nil {
@@ -126,7 +126,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 
 		message := "Dags uploaded successfully"
 		action := "UPLOAD"
-		dagDeploymentStatus, err := deployment.ReportDagDeploymentStatus(deployInfo.deploymentID, action, versionId, status, message, client);
+		dagDeploymentStatus, err := deployment.ReportDagDeploymentStatus(deployInfo.deploymentID, action, versionId, status, message, client)
 		fmt.Println(dagDeploymentStatus)
 		if err != nil {
 			return err

@@ -23,8 +23,8 @@ type ResponseData struct {
 	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
 	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
-	InitiateDagDeployment	  InitiateDagDeployment		   `json:"initiateDagDeployment,omitempty"`
-	ReportDagDeploymentStatus DagDeploymentStatus		   `json:"reportDagDeploymentStatus,omitempty"`
+	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
+	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
 }
 
 type Self struct {
@@ -106,23 +106,23 @@ type InitiateDagDeploymentInput struct {
 }
 
 type DagDeploymentStatus struct {
-	ID           	string `json:"id"`
-	DeploymentID	string `json:"deploymentId"`
-	Action		   	string `json:"action"`
-	VersionID	   	string `json:"versionId"`
-	Status		   	string `json:"status"`
-	Message		   	string `json:"message"`
-	createdAt		string `json:"createdAt"`
-	initiatorId		string `json:"initiatorId"`
-	initiatorType	string `json:"initiatorType"`
+	ID            string `json:"id"`
+	DeploymentID  string `json:"deploymentId"`
+	Action        string `json:"action"`
+	VersionID     string `json:"versionId"`
+	Status        string `json:"status"`
+	Message       string `json:"message"`
+	createdAt     string `json:"createdAt"`
+	initiatorId   string `json:"initiatorId"`
+	initiatorType string `json:"initiatorType"`
 }
 
 type ReportDagDeploymentStatusInput struct {
-	DeploymentID   string `json:"deploymentId"`
-	Action		   string `json:"action"`
-	VersionID	   string `json:"versionId"`
-	Status		   string `json:"status"`
-	Message		   string `json:"message"`
+	DeploymentID string `json:"deploymentId"`
+	Action       string `json:"action"`
+	VersionID    string `json:"versionId"`
+	Status       string `json:"status"`
+	Message      string `json:"message"`
 }
 
 type EnvironmentVariablesObject struct {

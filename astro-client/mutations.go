@@ -101,14 +101,14 @@ var (
 	  }
 	}
   `
-  DagDeploymentInitiate = `
+	DagDeploymentInitiate = `
   mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
     initiateDagDeployment(input: $input) {
         dagUrl
     }
   }
   `
-  ReportDagDeploymentStatus = `
+	ReportDagDeploymentStatus = `
   mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
     reportDagDeploymentStatus(input: $input) {
         id
