@@ -191,11 +191,12 @@ func TestDockerComposeStart(t *testing.T) {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Twice()
+		imageHandler.On("RenameLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
-		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Once()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Twice()
+		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
 
 		orgCheckWebserverHealthFunc := checkWebserverHealth
 		checkWebserverHealth = func(project *types.Project, composeService api.Service, airflowDockerVersion uint64) error {
@@ -207,6 +208,9 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.Start("", noCache)
+		assert.NoError(t, err)
+
+		err = mockDockerCompose.Start("custom-image", noCache)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
