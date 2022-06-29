@@ -39,6 +39,7 @@ type ImageHandler interface {
 	Push(registry, username, token, remoteImage string) error
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
+	RenameLocalImage(localImage string) error
 }
 
 type DockerComposeAPI interface {
