@@ -259,7 +259,7 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 	fmt.Println(composeImageBuildingPromptMsg)
 
 	imageHandler := airflowImageHandler(deployImage)
-	
+
 	if imageName == "" {
 		err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true})
 		if err != nil {

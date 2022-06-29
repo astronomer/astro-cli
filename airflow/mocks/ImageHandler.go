@@ -112,4 +112,3 @@ func NewImageHandler(t mockConstructorTestingTNewImageHandler) *ImageHandler {
 
 	return mock
 }
-
