@@ -206,7 +206,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start(noCache)
+		err := mockDockerCompose.Start("", noCache)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -219,7 +219,7 @@ func TestDockerComposeStart(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Start(false)
+		err := mockDockerCompose.Start("", false)
 		assert.Contains(t, err.Error(), "cannot start, project already running")
 
 		composeMock.AssertExpectations(t)
@@ -231,7 +231,7 @@ func TestDockerComposeStart(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Start(false)
+		err := mockDockerCompose.Start("", false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		composeMock.AssertExpectations(t)
@@ -254,7 +254,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start(noCache)
+		err := mockDockerCompose.Start("", noCache)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -279,7 +279,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start(noCache)
+		err := mockDockerCompose.Start("", noCache)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -305,7 +305,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start(noCache)
+		err := mockDockerCompose.Start("", noCache)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -331,7 +331,7 @@ func TestDockerComposeStart(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Start(noCache)
+		err := mockDockerCompose.Start("", noCache)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)

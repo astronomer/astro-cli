@@ -18,7 +18,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(noCache bool) error
+	Start(imageName string, noCache bool) error
 	Stop() error
 	PS() error
 	Kill() error

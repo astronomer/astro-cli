@@ -138,7 +138,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(noCache bool) error {
+func (d *DockerCompose) Start(imageName string, noCache bool) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -156,9 +156,17 @@ func (d *DockerCompose) Start(noCache bool) error {
 	}
 
 	// Build this project image
-	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
-	if err != nil {
-		return err
+	if imageName == "" {
+		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		if err != nil {
+			return err
+		}
+	} else {
+		// skip build if an imageName is passed
+		err := d.imageHandler.RenameLocalImage(imageName)
+		if err != nil {
+			return err
+		}
 	}
 
 	imageLabels, err := d.imageHandler.ListLabels()

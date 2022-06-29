@@ -354,7 +354,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", false).Return(nil).Once()
+			mockContainerHandler.On("Start", "", false).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -369,7 +369,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", false).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", false).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -642,7 +642,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", true).Return(nil).Once()
+			mockContainerHandler.On("Start", "", true).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -675,7 +675,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", true).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", true).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
