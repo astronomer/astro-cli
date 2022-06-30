@@ -41,7 +41,7 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 func newTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
-		Aliases: []string{"g"},
+		Aliases: []string{"l"},
 		Short:   "List all teams in the Astronomer Platform",
 		Long:    "List all teams in the Astronomer Platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,7 +56,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	var teamRole string
 	cmd := &cobra.Command{
 		Use:     "update [TEAM ID]",
-		Aliases: []string{"g"},
+		Aliases: []string{"u"},
 		Short:   "Update a team in the Astronomer Platform",
 		Long:    "Update a team in the Astronomer Platform",
 		Args:    cobra.ExactArgs(1),
@@ -66,5 +66,6 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&teamRole, "role", "r", "", "Role assigned to the team, one of: SYSTEM_VIEWER, SYSTEM_EDITOR, SYSTEM_ADMIN, NONE")
+	_ = cmd.MarkFlagRequired("role")
 	return cmd
 }

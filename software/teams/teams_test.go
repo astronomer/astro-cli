@@ -100,14 +100,6 @@ func TestUpdate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("no role specified", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-
-		err := Update("test-id", "", nil, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), noRoleSpecifiedMsg)
-	})
-
 	t.Run("invalid role", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 
@@ -156,4 +148,23 @@ func TestUpdate(t *testing.T) {
 		assert.ErrorIs(t, err, errMockHouston)
 		mockClient.AssertExpectations(t)
 	})
+}
+
+func TestIsValidSystemRole(t *testing.T) {
+	tests := []struct {
+		role   string
+		result bool
+	}{
+		{role: houston.SystemAdminRole, result: true},
+		{role: houston.SystemEditorRole, result: true},
+		{role: houston.SystemViewerRole, result: true},
+		{role: houston.NoneTeamRole, result: true},
+		{role: "invalid-role", result: false},
+		{role: "", result: false},
+	}
+
+	for _, tt := range tests {
+		resp := isValidSystemAdminRole(tt.role)
+		assert.Equal(t, tt.result, resp, "expected: %v, actual: %v, for: %s", tt.result, resp, tt.role)
+	}
 }

@@ -28,7 +28,7 @@ func (h ClientImplementation) GetTeamUsers(teamID string) ([]User, error) {
 	return r.Data.GetTeamUsers, nil
 }
 
-// ListTeams - return a specific team
+// ListTeams - return list of available teams
 func (h ClientImplementation) ListTeams(cursor string, take int) (ListTeamsResp, error) {
 	req := Request{
 		Query:     ListTeamsRequest,
@@ -42,6 +42,7 @@ func (h ClientImplementation) ListTeams(cursor string, take int) (ListTeamsResp,
 	return r.Data.ListTeams, nil
 }
 
+// CreateTeamSystemRoleBinding - create system role binding for a team
 func (h ClientImplementation) CreateTeamSystemRoleBinding(teamID, role string) (string, error) {
 	req := Request{
 		Query:     CreateTeamSystemRoleBindingRequest,
@@ -56,6 +57,7 @@ func (h ClientImplementation) CreateTeamSystemRoleBinding(teamID, role string) (
 	return r.Data.CreateTeamSystemRoleBinding.Role, nil
 }
 
+// DeleteTeamSystemRoleBinding - delete system role binding for a team
 func (h ClientImplementation) DeleteTeamSystemRoleBinding(teamID, role string) (string, error) {
 	req := Request{
 		Query:     DeleteTeamSystemRoleBindingRequest,

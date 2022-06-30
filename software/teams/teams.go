@@ -10,11 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	ListTeamLimit = 25
-
-	noRoleSpecifiedMsg = "No role specified, nothing to update"
-)
+const ListTeamLimit = 25
 
 var errMissingTeamID = errors.New("missing team ID")
 
@@ -53,7 +49,7 @@ func Get(teamID string, usersEnabled bool, client houston.ClientInterface, out i
 	return nil
 }
 
-// retrieves all teams
+// retrieves all teams present with the platform
 func List(client houston.ClientInterface, out io.Writer) error {
 	var teams []houston.Team
 	var cursor string
@@ -81,11 +77,9 @@ func List(client houston.ClientInterface, out io.Writer) error {
 	return teamsTable.Print(out)
 }
 
+// Update will update the system role associated with the team
 func Update(teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	if role == "" {
-		fmt.Fprintln(out, noRoleSpecifiedMsg)
-		return nil
-	} else if role != houston.SystemAdminRole && role != houston.SystemEditorRole && role != houston.SystemViewerRole && role != houston.NoneTeamRole {
+	if !isValidSystemAdminRole(role) {
 		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneTeamRole) //nolint:goerr113
 	}
 
@@ -97,7 +91,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 		}
 
 		for idx := range team.RoleBindings {
-			if team.RoleBindings[idx].Role == houston.SystemAdminRole || team.RoleBindings[idx].Role == houston.SystemEditorRole || team.RoleBindings[idx].Role == houston.SystemViewerRole {
+			if isValidSystemAdminRole(team.RoleBindings[idx].Role) {
 				role = team.RoleBindings[idx].Role
 				break
 			}
@@ -123,4 +117,13 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 
 	fmt.Fprintf(out, "Role has been changed to %s for team %s\n\n", newRole, teamID)
 	return nil
+}
+
+// isValidSystemAdminRole checks if the role is amongst valid system adming role
+func isValidSystemAdminRole(role string) bool {
+	switch role {
+	case houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneTeamRole:
+		return true
+	}
+	return false
 }
