@@ -198,7 +198,7 @@ func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
 	return userEmail, err
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, loginLink bool, domain string) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain string) (Result, error) { //nolint:gocritic
 	// try to get UserEmail from config first
 	userEmail, err := getUserEmail(c)
 	if err != nil {
@@ -239,7 +239,7 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
 
 	// open browser
-	if !loginLink {
+	if !shouldDisplayLoginLink {
 		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
 		fmt.Scanln()
 		err = openURL(authorizeURL)
@@ -357,7 +357,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain string, client astro.Client, out io.Writer, loginLink, tokenLogin bool) error {
+func Login(domain string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -370,8 +370,8 @@ func Login(domain string, client astro.Client, out io.Writer, loginLink, tokenLo
 
 	c, _ := context.GetCurrentContext()
 
-	if !tokenLogin {
-		res, err = authenticator.authDeviceLogin(c, authConfig, loginLink, domain)
+	if !shouldLoginWithToken {
+		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain)
 		if err != nil {
 			return err
 		}
