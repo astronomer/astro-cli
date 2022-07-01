@@ -195,7 +195,7 @@ func TestDockerImageListLabel(t *testing.T) {
 	})
 }
 
-func TestDockerRenameLocalImage(t *testing.T) {
+func TestDockerTagLocalImage(t *testing.T) {
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -206,7 +206,7 @@ func TestDockerRenameLocalImage(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err := handler.RenameLocalImage("custom-image")
+		err := handler.TagLocalImage("custom-image")
 		assert.NoError(t, err)
 	})
 
@@ -214,7 +214,7 @@ func TestDockerRenameLocalImage(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err := handler.RenameLocalImage("custom-image")
+		err := handler.TagLocalImage("custom-image")
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 

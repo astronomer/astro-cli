@@ -84,8 +84,8 @@ func (_m *ImageHandler) Push(registry string, username string, token string, rem
 	return r0
 }
 
-// RenameLocalImage provides a mock function with given fields: localImage
-func (_m *ImageHandler) RenameLocalImage(localImage string) error {
+// TagLocalImage provides a mock function with given fields: localImage
+func (_m *ImageHandler) TagLocalImage(localImage string) error {
 	ret := _m.Called(localImage)
 
 	var r0 error

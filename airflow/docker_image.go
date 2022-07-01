@@ -187,7 +187,7 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 	return labels, nil
 }
 
-func (d *DockerImage) RenameLocalImage(localImage string) error {
+func (d *DockerImage) TagLocalImage(localImage string) error {
 	err := cmdExec(DockerCmd, nil, nil, "tag", localImage, d.imageName)
 	if err != nil {
 		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
@@ -213,8 +213,6 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 
 	return nil
 }
-
-var CmdExec = cmdExec
 
 // When login and push do not work use bash to run docker commands
 func useBash(authConfig *cliTypes.AuthConfig, image string) error {

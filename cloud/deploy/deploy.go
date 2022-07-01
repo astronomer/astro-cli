@@ -267,7 +267,7 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 		}
 	} else {
 		// skip build if an imageName is passed
-		err := imageHandler.RenameLocalImage(imageName)
+		err := imageHandler.TagLocalImage(imageName)
 		if err != nil {
 			return "", err
 		}

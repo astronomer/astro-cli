@@ -163,7 +163,7 @@ func (d *DockerCompose) Start(imageName string, noCache bool) error {
 		}
 	} else {
 		// skip build if an imageName is passed
-		err := d.imageHandler.RenameLocalImage(imageName)
+		err := d.imageHandler.TagLocalImage(imageName)
 		if err != nil {
 			return err
 		}
