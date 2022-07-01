@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	shouldDisplayLoginLink  bool
-	shouldLoginWithToken bool
-	oAuth      bool
+	shouldDisplayLoginLink bool
+	shouldLoginWithToken   bool
+	oAuth                  bool
 
 	cloudLogin     = cloudAuth.Login
 	cloudLogout    = cloudAuth.Logout
