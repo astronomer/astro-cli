@@ -27,6 +27,7 @@ var (
 	airflowVersion         string
 	envFile                string
 	pytestFile             string
+	imageName              string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -146,6 +147,7 @@ func newAirflowStartCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
 	return cmd
 }
 
@@ -243,6 +245,7 @@ func newAirflowRestartCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
 	return cmd
 }
 
@@ -396,7 +399,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(noCache)
+	return containerHandler.Start(imageName, noCache)
 }
 
 // airflowRun
@@ -504,7 +507,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	return containerHandler.Start(noCache)
+	return containerHandler.Start(imageName, noCache)
 }
 
 // run pytest on an airflow project

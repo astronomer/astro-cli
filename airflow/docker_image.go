@@ -187,6 +187,14 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 	return labels, nil
 }
 
+func (d *DockerImage) TagLocalImage(localImage string) error {
+	err := cmdExec(DockerCmd, nil, nil, "tag", localImage, d.imageName)
+	if err != nil {
+		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
+	}
+	return nil
+}
+
 // Exec executes a docker command
 var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	_, lookErr := exec.LookPath(cmd)

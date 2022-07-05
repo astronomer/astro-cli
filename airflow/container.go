@@ -18,7 +18,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(noCache bool) error
+	Start(imageName string, noCache bool) error
 	Stop() error
 	PS() error
 	Kill() error
@@ -39,6 +39,7 @@ type ImageHandler interface {
 	Push(registry, username, token, remoteImage string) error
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
+	TagLocalImage(localImage string) error
 }
 
 type DockerComposeAPI interface {
