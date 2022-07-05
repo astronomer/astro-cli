@@ -102,7 +102,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 		// Generate the dags tar
 		fileutil.Tar(dagsPath, "/tmp")
 
-		sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagUrl)
+		sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagURL)
 		if err != nil {
 			log.Fatal(err)
 		}

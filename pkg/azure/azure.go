@@ -20,8 +20,8 @@ func upload(blobClient *azblob.BlockBlobClient, uploadFileReader io.Reader) (str
 	return *uploadRes.VersionID, nil
 }
 
-func getBlockBlobClientFromSAS(blobUrl string) (*azblob.BlockBlobClient, error) {
-	blobClient, err := azblob.NewBlockBlobClientWithNoCredential(blobUrl, nil)
+func getBlockBlobClientFromSAS(blobURL string) (*azblob.BlockBlobClient, error) {
+	blobClient, err := azblob.NewBlockBlobClientWithNoCredential(blobURL, nil)
 	if err != nil {
 		return nil, err
 	}

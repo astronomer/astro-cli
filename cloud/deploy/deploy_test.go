@@ -88,14 +88,14 @@ func TestDeploySuccess(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", true, mockClient)
+	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", true, false, mockClient)
 	assert.NoError(t, err)
 
-	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", false, mockClient)
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", false, false, mockClient)
 	assert.NoError(t, err)
 
 	// test custom image
-	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", false, mockClient)
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", false, false, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -108,7 +108,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
-	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", true, nil)
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", true, false, nil)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
 	// airflow parse failure

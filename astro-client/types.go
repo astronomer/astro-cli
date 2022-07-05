@@ -98,7 +98,7 @@ type DeploymentSpec struct {
 
 type InitiateDagDeployment struct {
 	ID     string `json:"id"`
-	DagUrl string `json:"dagUrl"`
+	DagURL string `json:"dagUrl"`
 }
 
 type InitiateDagDeploymentInput struct {
@@ -113,12 +113,12 @@ type DagDeploymentStatus struct {
 	Status        string `json:"status"`
 	Message       string `json:"message"`
 	CreatedAt     string `json:"createdAt"`
-	InitiatorId   string `json:"initiatorId"`
+	InitiatorID   string `json:"initiatorId"`
 	InitiatorType string `json:"initiatorType"`
 }
 
 type ReportDagDeploymentStatusInput struct {
-	InitiatedDagDeploymentId string `json:"initiatedDagDeploymentId"`
+	InitiatedDagDeploymentID string `json:"initiatedDagDeploymentId"`
 	DeploymentID             string `json:"deploymentId"`
 	Action                   string `json:"action"`
 	VersionID                string `json:"versionId"`

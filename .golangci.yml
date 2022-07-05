@@ -134,5 +134,7 @@ issues:
         - goconst
         - errcheck
         - gosec
+        - typecheck
+        - gocritic
   exclude:
     - "shadow: declaration of .err. shadows declaration"

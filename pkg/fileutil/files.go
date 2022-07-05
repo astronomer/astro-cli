@@ -71,7 +71,6 @@ func Tar(source, target string) error {
 	filename := filepath.Base(source)
 	target = filepath.Join(target, fmt.Sprintf("%s.tar", filename))
 	tarfile, err := os.Create(target)
-
 	if err != nil {
 		return err
 	}
