@@ -45,16 +45,17 @@ func TestDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Twice()
-	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Twice()
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Twice()
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Twice()
+	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Times(3)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
 
@@ -87,10 +88,14 @@ func TestDeploySuccess(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", true, mockClient)
+	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", true, mockClient)
 	assert.NoError(t, err)
 
-	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", false, mockClient)
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", false, mockClient)
+	assert.NoError(t, err)
+
+	// test custom image
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", false, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -103,7 +108,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
-	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", true, nil)
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", true, nil)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
 	// airflow parse failure
@@ -151,7 +156,7 @@ func TestDeployFailure(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", true, mockClient)
+	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", true, mockClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
 	mockClient.AssertExpectations(t)
@@ -174,7 +179,7 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", nil)
+	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
@@ -182,7 +187,7 @@ func TestBuildImageFailure(t *testing.T) {
 	dockerfile = "Dockerfile"
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListInternalRuntimeReleases").Return([]astro.RuntimeRelease{}, errMock).Once()
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", mockClient)
+	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
 	assert.ErrorIs(t, err, errMock)
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)

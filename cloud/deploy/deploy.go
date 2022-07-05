@@ -63,7 +63,7 @@ type deploymentInfo struct {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags bool, client astro.Client) error {
+func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt bool, client astro.Client) error {
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -76,6 +76,27 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 	}
 
 	deployInfo, err := getDeploymentInfo(deploymentID, wsID, prompt, cloudDomain, client)
+	if err != nil {
+		return err
+	}
+
+	// Build our image
+	version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
+	if err != nil {
+		return err
+	}
+
+	err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+	if err != nil {
+		return err
+	}
+
+	// Create the image
+	imageCreateInput := astro.ImageCreateInput{
+		Tag:          version,
+		DeploymentID: deployInfo.deploymentID,
+	}
+	imageCreateRes, err := client.CreateImage(imageCreateInput)
 	if err != nil {
 		return err
 	}
@@ -310,14 +331,23 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, webserverURL: webserverURL}, nil
 }
 
-func buildImage(c *config.Context, path, currentVersion, deployImage string, client astro.Client) (string, error) {
+func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, client astro.Client) (string, error) {
 	// Build our image
 	fmt.Println(composeImageBuildingPromptMsg)
 
 	imageHandler := airflowImageHandler(deployImage)
-	err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true})
-	if err != nil {
-		return "", err
+
+	if imageName == "" {
+		err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true})
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// skip build if an imageName is passed
+		err := imageHandler.TagLocalImage(imageName)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// parse dockerfile

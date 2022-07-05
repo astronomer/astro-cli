@@ -9,7 +9,7 @@ func newVersionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "List running version of Astro CLI",
-		Long:  `The astro semantic version and git commit tied to that release.`,
+		Long:  `The astro semantic version.`,
 		Run:   printVersion,
 	}
 
