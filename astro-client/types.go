@@ -102,7 +102,7 @@ type InitiateDagDeployment struct {
 }
 
 type InitiateDagDeploymentInput struct {
-	DeploymentID   string `json:"deploymentId"`
+	DeploymentID string `json:"deploymentId"`
 }
 
 type DagDeploymentStatus struct {
@@ -118,12 +118,12 @@ type DagDeploymentStatus struct {
 }
 
 type ReportDagDeploymentStatusInput struct {
-	InitiatedDagDeploymentId	string `json:"initiatedDagDeploymentId"`
-	DeploymentID 				string `json:"deploymentId"`
-	Action       				string `json:"action"`
-	VersionID    				string `json:"versionId"`
-	Status       				string `json:"status"`
-	Message      				string `json:"message"`
+	InitiatedDagDeploymentId string `json:"initiatedDagDeploymentId"`
+	DeploymentID             string `json:"deploymentId"`
+	Action                   string `json:"action"`
+	VersionID                string `json:"versionId"`
+	Status                   string `json:"status"`
+	Message                  string `json:"message"`
 }
 
 type EnvironmentVariablesObject struct {

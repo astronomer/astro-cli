@@ -8,7 +8,7 @@ import (
 func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeployment, error) {
 	// create initiate dag deployment input
 	initiateDagDeploymentInput := astro.InitiateDagDeploymentInput{
-		DeploymentID:   deploymentID,
+		DeploymentID: deploymentID,
 	}
 
 	// initiate dag deployment
@@ -24,11 +24,11 @@ func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, v
 	// create report dag deployment status input
 	reportDagDeploymentStatusInput := astro.ReportDagDeploymentStatusInput{
 		InitiatedDagDeploymentId: initiatedDagDeploymentID,
-		DeploymentID: deploymentID,
-		Action:       action,
-		VersionID:    versionID,
-		Status:       status,
-		Message:      message,
+		DeploymentID:             deploymentID,
+		Action:                   action,
+		VersionID:                versionID,
+		Status:                   status,
+		Message:                  message,
 	}
 
 	// report dag deployment status
