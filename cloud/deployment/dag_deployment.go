@@ -5,11 +5,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Initiate(deploymentID, organizationID string, client astro.Client) (astro.InitiateDagDeployment, error) {
+func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeployment, error) {
 	// create initiate dag deployment input
 	initiateDagDeploymentInput := astro.InitiateDagDeploymentInput{
 		DeploymentID:   deploymentID,
-		OrganizationID: organizationID,
 	}
 
 	// initiate dag deployment
@@ -21,9 +20,10 @@ func Initiate(deploymentID, organizationID string, client astro.Client) (astro.I
 	return dagDeployment, nil
 }
 
-func ReportDagDeploymentStatus(deploymentID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
+func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
 	// create report dag deployment status input
 	reportDagDeploymentStatusInput := astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentId: initiatedDagDeploymentID,
 		DeploymentID: deploymentID,
 		Action:       action,
 		VersionID:    versionID,

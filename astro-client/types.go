@@ -97,11 +97,11 @@ type DeploymentSpec struct {
 }
 
 type InitiateDagDeployment struct {
+	ID     string `json:"id"`
 	DagUrl string `json:"dagUrl"`
 }
 
 type InitiateDagDeploymentInput struct {
-	OrganizationID string `json:"organizationId"`
 	DeploymentID   string `json:"deploymentId"`
 }
 
@@ -112,17 +112,18 @@ type DagDeploymentStatus struct {
 	VersionID     string `json:"versionId"`
 	Status        string `json:"status"`
 	Message       string `json:"message"`
-	createdAt     string `json:"createdAt"`
-	initiatorId   string `json:"initiatorId"`
-	initiatorType string `json:"initiatorType"`
+	CreatedAt     string `json:"createdAt"`
+	InitiatorId   string `json:"initiatorId"`
+	InitiatorType string `json:"initiatorType"`
 }
 
 type ReportDagDeploymentStatusInput struct {
-	DeploymentID string `json:"deploymentId"`
-	Action       string `json:"action"`
-	VersionID    string `json:"versionId"`
-	Status       string `json:"status"`
-	Message      string `json:"message"`
+	InitiatedDagDeploymentId	string `json:"initiatedDagDeploymentId"`
+	DeploymentID 				string `json:"deploymentId"`
+	Action       				string `json:"action"`
+	VersionID    				string `json:"versionId"`
+	Status       				string `json:"status"`
+	Message      				string `json:"message"`
 }
 
 type EnvironmentVariablesObject struct {

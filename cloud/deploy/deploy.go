@@ -88,7 +88,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 
 	if dags {
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-		dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, deployInfo.organizationID, client)
+		dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
 		if err != nil {
 			return err
 		}
@@ -126,8 +126,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile string, prompt bool, dags 
 
 		message := "Dags uploaded successfully"
 		action := "UPLOAD"
-		dagDeploymentStatus, err := deployment.ReportDagDeploymentStatus(deployInfo.deploymentID, action, versionId, status, message, client)
-		fmt.Println(dagDeploymentStatus)
+		_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionId, status, message, client)
 		if err != nil {
 			return err
 		}

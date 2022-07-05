@@ -102,25 +102,26 @@ var (
 	}
   `
 	DagDeploymentInitiate = `
-  mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
-    initiateDagDeployment(input: $input) {
-        dagUrl
-    }
-  }
+	mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
+		initiateDagDeployment(input: $input) {
+			id
+			dagUrl
+		}
+	}
   `
 	ReportDagDeploymentStatus = `
-  mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
-    reportDagDeploymentStatus(input: $input) {
-        id
-        deploymentId
-        action
-        versionId
-        status
-        message
-        createdAt
-        initiatorId
-        initiatorType
-    }
-  }
+	mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
+		reportDagDeploymentStatus(input: $input) {
+			id
+			deploymentId
+			action
+			versionId
+			status
+			message
+			createdAt
+			initiatorId
+			initiatorType
+		}
+	}
   `
 )
