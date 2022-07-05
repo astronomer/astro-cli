@@ -63,48 +63,26 @@ type deploymentInfo struct {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt bool, client astro.Client) error {
+func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt, dags bool, client astro.Client) error {
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	cloudDomain := c.Domain
-	if cloudDomain == "" {
+	domain := c.Domain
+	if domain == "" {
 		return errors.New("no domain set, re-authenticate")
 	}
 
-	deployInfo, err := getDeploymentInfo(deploymentID, wsID, prompt, cloudDomain, client)
-	if err != nil {
-		return err
-	}
-
-	// Build our image
-	version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
-	if err != nil {
-		return err
-	}
-
-	err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
-	if err != nil {
-		return err
-	}
-
-	// Create the image
-	imageCreateInput := astro.ImageCreateInput{
-		Tag:          version,
-		DeploymentID: deployInfo.deploymentID,
-	}
-	imageCreateRes, err := client.CreateImage(imageCreateInput)
-	if err != nil {
-		return err
-	}
-
-	domain := c.Domain
 	if strings.Contains(domain, "cloud") {
 		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
 		domain = splitDomain[1]
+	}
+
+	deployInfo, err := getDeploymentInfo(deploymentID, wsID, prompt, domain, client)
+	if err != nil {
+		return err
 	}
 
 	if dags {
@@ -151,9 +129,16 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt 
 		if err != nil {
 			return err
 		}
+
+		deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+
+		fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Astronomer UI to confirm that your deploy was successful." +
+			"\n\nDeployment can be accessed at the following URLs: \n" +
+			fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		// Build our image
-		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, client)
+		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
 		if err != nil {
 			return err
 		}
@@ -207,13 +192,6 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt 
 			fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	}
-
-	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
-
-	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Astronomer UI to confirm that your deploy was successful." +
-		"\n\nDeployment can be accessed at the following URLs: \n" +
-		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 
 	return nil
 }
