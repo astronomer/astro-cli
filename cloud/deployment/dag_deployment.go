@@ -22,7 +22,7 @@ func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeploy
 
 func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
 	// create report dag deployment status input
-	reportDagDeploymentStatusInput := astro.ReportDagDeploymentStatusInput{
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
 		InitiatedDagDeploymentID: initiatedDagDeploymentID,
 		DeploymentID:             deploymentID,
 		Action:                   action,

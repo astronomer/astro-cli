@@ -19,7 +19,7 @@ type Client interface {
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
 	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
-	ReportDagDeploymentStatus(input ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
+	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
@@ -163,7 +163,7 @@ func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (In
 	return resp.Data.InitiateDagDeployment, nil
 }
 
-func (c *HTTPClient) ReportDagDeploymentStatus(input ReportDagDeploymentStatusInput) (DagDeploymentStatus, error) {
+func (c *HTTPClient) ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error) {
 	req := Request{
 		Query:     ReportDagDeploymentStatus,
 		Variables: map[string]interface{}{"input": input},
