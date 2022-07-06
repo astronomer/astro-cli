@@ -27,7 +27,7 @@ var (
 	airflowVersion         string
 	envFile                string
 	pytestFile             string
-	customImageName              string
+	customImageName        string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
