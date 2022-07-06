@@ -38,6 +38,14 @@ func TestDockerImageBuild(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("build custom-image", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		err = handler.Build("custom-image", options)
+		assert.NoError(t, err)
+	})
+
 	t.Run("build --no-cache", func(t *testing.T) {
 		options.NoCache = true
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {

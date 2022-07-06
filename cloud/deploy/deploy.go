@@ -260,18 +260,10 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 
 	imageHandler := airflowImageHandler(deployImage)
 
-	// if imageName == "" {
 	err := imageHandler.Build(imageName, types.ImageBuildConfig{Path: path, Output: true})
 	if err != nil {
 		return "", err
 	}
-	// } else {
-	// 	// skip build if an imageName is passed
-	// 	err := imageHandler.TagLocalImage(imageName)
-	// 	if err != nil {
-	// 		return "", err
-	// 	}
-	// }
 
 	// parse dockerfile
 	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
