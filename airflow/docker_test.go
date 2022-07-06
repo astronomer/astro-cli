@@ -736,6 +736,17 @@ func TestDockerComposePytest(t *testing.T) {
 		assert.ErrorIs(t, err, errMockDocker)
 		imageHandler.AssertExpectations(t)
 	})
+
+	t.Run("image Tag local image failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Return(errMockDocker).Once()
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		_, err := mockDockerCompose.Pytest("custom-image", "test", "")
+		assert.ErrorIs(t, err, errMockDocker)
+		imageHandler.AssertExpectations(t)
+	})
 }
 
 func TestDockerComposeParse(t *testing.T) {
