@@ -55,7 +55,6 @@ func TestDeploySuccess(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
-		// mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
 
