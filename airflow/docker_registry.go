@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	cliconfig "github.com/docker/cli/cli/config"
+	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -41,6 +41,18 @@ func (d *DockerRegistry) Login(username, token string) error {
 		Password:      token,
 	}
 
+	if username == "" && token == "" {
+		configFile := cliConfig.LoadDefaultConfigFile(os.Stderr)
+
+		creds := configFile.GetCredentialsStore(d.registry)
+		auth, err := creds.Get(d.registry)
+		if err != nil {
+			return err
+		}
+		authConfig.Username = auth.Username
+		authConfig.Password = auth.Password
+	}
+
 	log.Debugf("docker creds %v \n", authConfig)
 	_, err := d.cli.RegistryLogin(ctx, authConfig)
 	if err != nil {
@@ -52,7 +64,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	// Get this idea from docker login cli
 	cliAuthConfig.RegistryToken = ""
 
-	configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
+	configFile := cliConfig.LoadDefaultConfigFile(os.Stderr)
 
 	creds := configFile.GetCredentialsStore(serverAddress)
 

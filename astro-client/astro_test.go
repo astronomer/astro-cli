@@ -573,7 +573,6 @@ func TestListClusters(t *testing.T) {
 				{
 					ID:            "test-id",
 					Name:          "test-name",
-					IsManaged:     false,
 					CloudProvider: "test-cloud-provider",
 				},
 			},

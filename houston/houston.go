@@ -50,6 +50,7 @@ type ClientInterface interface {
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	GetDeploymentConfig() (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
+	UpdateDeploymentImage(req UpdateDeploymentImageRequest) error
 	// deployment users
 	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
@@ -67,6 +68,15 @@ type ClientInterface interface {
 	GetAvailableNamespaces() ([]Namespace, error)
 	// runtime
 	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
+	// teams
+	GetTeam(teamID string) (*Team, error)
+	GetTeamUsers(teamID string) ([]User, error)
+	// workspace teams and roles
+	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
+	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
+	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
+	UpdateWorkspaceTeamRole(workspaceID, teamID, role string) (string, error)
+	GetWorkspaceTeamRole(workspaceID, teamID string) (*Team, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

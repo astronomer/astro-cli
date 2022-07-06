@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -42,6 +43,10 @@ const (
 	warningInvalidImageName                   = "WARNING! The image in your Dockerfile is pulling from '%s', which is not supported. We strongly recommend that you use Astronomer Certified or Runtime images that pull from 'astronomerinc/ap-airflow', 'quay.io/astronomer/ap-airflow' or 'quay.io/astronomer/astro-runtime'. If you're running a custom image, you can override this. Are you sure you want to continue?\n"
 	warningInvalidNameTag                     = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
 	warningInvalidNameTagEmptyRecommendations = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nAre you sure you want to continue?"
+
+	registryDomainPrefix = "registry."
+	runtimeImageLabel    = "io.astronomer.docker.runtime.version"
+	airflowImageLabel    = "io.astronomer.docker.airflow.version"
 )
 
 var tab = printutil.Table{
@@ -50,7 +55,7 @@ var tab = printutil.Table{
 	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
 }
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool) error {
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
 	if wsID == "" {
 		return errNoWorkspaceID
 	}
@@ -126,6 +131,10 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		}
 	}
 
+	if byoRegistryEnabled {
+		nextTag = "deploy-" + time.Now().UTC().Format("2006-01-02T15-04") // updating nextTag logic for private registry, since houston won't maintain next tag in case of BYO registry
+	}
+
 	deploymentInfo, err := houstonClient.GetDeployment(deploymentID)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
@@ -134,7 +143,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	fmt.Printf(houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, ignoreCacheDeploy)
+	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled)
 	if err != nil {
 		return err
 	}
@@ -156,7 +165,7 @@ func deploymentExists(deploymentID string, deployments []houston.Deployment) boo
 	return false
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain string, ignoreCacheDeploy bool) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool) error {
 	// Build our image
 	fmt.Println(imageBuildingPrompt)
 
@@ -214,9 +223,29 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	if err != nil {
 		return err
 	}
-	registry := "registry." + cloudDomain
-	remoteImage := fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
-	return imageHandler.Push(registry, "", c.Token, remoteImage)
+
+	var registry, remoteImage, token string
+	if byoRegistryEnabled {
+		registry = byoRegistryDomain
+		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
+	} else {
+		registry = registryDomainPrefix + cloudDomain
+		remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+		token = c.Token
+	}
+
+	err = imageHandler.Push(registry, "", token, remoteImage)
+	if err != nil {
+		return err
+	}
+
+	if byoRegistryEnabled {
+		runtimeVersion, _ := imageHandler.GetLabel(runtimeImageLabel)
+		airflowVersion, _ := imageHandler.GetLabel(airflowImageLabel)
+		return houstonClient.UpdateDeploymentImage(houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion})
+	}
+
+	return nil
 }
 
 func validAirflowImageRepo(image string) bool {

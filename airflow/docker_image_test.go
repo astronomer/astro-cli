@@ -86,7 +86,20 @@ func TestDockerImagePush(t *testing.T) {
 			return nil
 		}
 
-		err := handler.Push("test", "", "test", "test")
+		err := handler.Push("test", "test-username", "test", "test")
+		assert.NoError(t, err)
+	})
+
+	t.Run("success with docker cred store", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
+			return nil
+		}
+
+		err := handler.Push("test", "", "", "test")
 		assert.NoError(t, err)
 	})
 }
@@ -180,6 +193,32 @@ func TestDockerImageListLabel(t *testing.T) {
 		_, err := handler.ListLabels()
 		assert.ErrorIs(t, err, errGetImageLabel)
 	})
+}
+
+func TestDockerTagLocalImage(t *testing.T) {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	previousCmdExec := cmdExec
+
+	t.Run("rename local image success", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		err := handler.TagLocalImage("custom-image")
+		assert.NoError(t, err)
+	})
+
+	t.Run("rename local image error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
+		err := handler.TagLocalImage("custom-image")
+		assert.Contains(t, err.Error(), errMock.Error())
+	})
+
+	cmdExec = previousCmdExec
 }
 
 func TestExecCmd(t *testing.T) {

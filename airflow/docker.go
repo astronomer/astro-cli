@@ -41,6 +41,7 @@ const (
 	defaultAirflowVersion          = uint64(0x2) // nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
+	pytestDirectory                = "tests"
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -137,7 +138,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(noCache bool) error {
+func (d *DockerCompose) Start(imageName string, noCache bool) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -155,9 +156,17 @@ func (d *DockerCompose) Start(noCache bool) error {
 	}
 
 	// Build this project image
-	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
-	if err != nil {
-		return err
+	if imageName == "" {
+		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		if err != nil {
+			return err
+		}
+	} else {
+		// skip build if an imageName is passed
+		err := d.imageHandler.TagLocalImage(imageName)
+		if err != nil {
+			return err
+		}
 	}
 
 	imageLabels, err := d.imageHandler.ListLabels()
@@ -345,6 +354,15 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return "", err
+	}
+
+	// Determine pytest file
+	if pytestFile != ".astro/test_dag_integrity_default.py" {
+		if !strings.Contains(pytestFile, pytestDirectory) {
+			pytestFile = pytestDirectory + "/" + pytestFile
+		} else if pytestFile == "" {
+			pytestFile = pytestDirectory + "/"
+		}
 	}
 
 	// Create a compose project

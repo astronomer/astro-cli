@@ -83,5 +83,12 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt)
+	var byoRegistryEnabled bool
+	var byoRegistryDomain string
+	if appConfig != nil && appConfig.Flags.BYORegistryEnabled {
+		byoRegistryEnabled = true
+		byoRegistryDomain = appConfig.BYORegistryDomain
+	}
+
+	return deployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 }
