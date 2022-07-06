@@ -155,19 +155,10 @@ func (d *DockerCompose) Start(imageName string, noCache bool) error {
 		}
 	}
 
-	// Build this project image
-	// if imageName == "" {
 	err = d.imageHandler.Build(imageName, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 	if err != nil {
 		return err
 	}
-	// } else {
-	// 	// skip build if an imageName is passed
-	// 	err := d.imageHandler.TagLocalImage(imageName)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
