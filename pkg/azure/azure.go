@@ -7,7 +7,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
-type azureDagClient struct {
+type DagClient struct {
 	blobClient *azblob.BlockBlobClient
 }
 
@@ -28,14 +28,14 @@ func getBlockBlobClientFromSAS(blobURL string) (*azblob.BlockBlobClient, error) 
 	return blobClient, nil
 }
 
-func CreateSASDagClient(sasLink string) (azureDagClient, error) {
+func CreateSASDagClient(sasLink string) (DagClient, error) {
 	blobClient, err := getBlockBlobClientFromSAS(sasLink)
 	if err != nil {
-		return azureDagClient{}, err
+		return DagClient{}, err
 	}
-	return azureDagClient{blobClient: blobClient}, nil
+	return DagClient{blobClient: blobClient}, nil
 }
 
-func (ac azureDagClient) Upload(dagFileReader io.Reader) (string, error) {
+func (ac DagClient) Upload(dagFileReader io.Reader) (string, error) {
 	return upload(ac.blobClient, dagFileReader)
 }
