@@ -12,13 +12,13 @@ type ImageHandler struct {
 	mock.Mock
 }
 
-// Build provides a mock function with given fields: config
-func (_m *ImageHandler) Build(config types.ImageBuildConfig) error {
-	ret := _m.Called(config)
+// Build provides a mock function with given fields: localImage, config
+func (_m *ImageHandler) Build(localImage string, config types.ImageBuildConfig) error {
+	ret := _m.Called(localImage, config)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(types.ImageBuildConfig) error); ok {
-		r0 = rf(config)
+	if rf, ok := ret.Get(0).(func(string, types.ImageBuildConfig) error); ok {
+		r0 = rf(localImage, config)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -77,20 +77,6 @@ func (_m *ImageHandler) Push(registry string, username string, token string, rem
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
 		r0 = rf(registry, username, token, remoteImage)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// TagLocalImage provides a mock function with given fields: localImage
-func (_m *ImageHandler) TagLocalImage(localImage string) error {
-	ret := _m.Called(localImage)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(localImage)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -219,7 +219,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		Path:    config.WorkingPath,
 		NoCache: ignoreCacheDeploy,
 	}
-	err = imageHandler.Build(buildConfig)
+	err = imageHandler.Build("", buildConfig)
 	if err != nil {
 		return err
 	}

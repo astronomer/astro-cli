@@ -39,8 +39,17 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(localImage string, config airflowTypes.ImageBuildConfig) error {
 	// Change to location of Dockerfile
+	if localImage != "" {
+		// skip build if an local image is passed
+		err := cmdExec(DockerCmd, nil, nil, "tag", localImage, d.imageName)
+		if err != nil {
+			return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
+		}
+		return nil
+	}
+
 	err := os.Chdir(config.Path)
 	if err != nil {
 		return err
@@ -185,14 +194,6 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 		return labels, err
 	}
 	return labels, nil
-}
-
-func (d *DockerImage) TagLocalImage(localImage string) error {
-	err := cmdExec(DockerCmd, nil, nil, "tag", localImage, d.imageName)
-	if err != nil {
-		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
-	}
-	return nil
 }
 
 // Exec executes a docker command

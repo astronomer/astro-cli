@@ -24,8 +24,8 @@ type ContainerHandler interface {
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
-	Pytest(pytestFile, projectImageName string) (string, error)
-	Parse(buildImage string) error
+	Pytest(imageName, pytestFile, projectImageName string) (string, error)
+	Parse(imageName, buildImage string) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -35,11 +35,10 @@ type RegistryHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(config types.ImageBuildConfig) error
+	Build(localImage string, config types.ImageBuildConfig) error
 	Push(registry, username, token, remoteImage string) error
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
-	TagLocalImage(localImage string) error
 }
 
 type DockerComposeAPI interface {

@@ -156,18 +156,18 @@ func (d *DockerCompose) Start(imageName string, noCache bool) error {
 	}
 
 	// Build this project image
-	if imageName == "" {
-		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
-		if err != nil {
-			return err
-		}
-	} else {
-		// skip build if an imageName is passed
-		err := d.imageHandler.TagLocalImage(imageName)
-		if err != nil {
-			return err
-		}
+	// if imageName == "" {
+	err = d.imageHandler.Build(imageName, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+	if err != nil {
+		return err
 	}
+	// } else {
+	// 	// skip build if an imageName is passed
+	// 	err := d.imageHandler.TagLocalImage(imageName)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
@@ -332,7 +332,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, error) {
+func (d *DockerCompose) Pytest(imageName, pytestFile, projectImageName string) (string, error) {
 	// projectImageName may be provided to the function if it is being used in the deploy command
 	if projectImageName == "" {
 		var err error
@@ -345,7 +345,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 
 		projectImageName = ImageName(projectImageName, "latest")
 		// build image
-		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+		err = d.imageHandler.Build(imageName, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 		if err != nil {
 			return "", err
 		}
@@ -436,7 +436,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 	return buf.String(), errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) Parse(buildImage string) error {
+func (d *DockerCompose) Parse(imageName, buildImage string) error {
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath
 
@@ -453,7 +453,7 @@ func (d *DockerCompose) Parse(buildImage string) error {
 	fmt.Println("\nChecking your DAGs for errors,\nthis might take a minute if you haven't run this command before…")
 
 	pytestFile := DefaultTestPath
-	exitCode, err := d.Pytest(pytestFile, buildImage)
+	exitCode, err := d.Pytest(imageName, pytestFile, buildImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("errors detected in your local DAGs are listed above")

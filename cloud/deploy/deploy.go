@@ -187,7 +187,7 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 	if pytest == parse && dagParseVersionCheck {
 		if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
 			fmt.Println("Testing image...")
-			err := containerHandler.Parse(deployImage)
+			err := containerHandler.Parse("", deployImage)
 			if err != nil {
 				fmt.Println(err)
 				return errDagsParseFailed
@@ -212,7 +212,7 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 		pytestFile = pytest
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestFile, deployImage)
+	exitCode, err := containerHandler.Pytest("", pytestFile, deployImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
@@ -260,18 +260,18 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 
 	imageHandler := airflowImageHandler(deployImage)
 
-	if imageName == "" {
-		err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true})
-		if err != nil {
-			return "", err
-		}
-	} else {
-		// skip build if an imageName is passed
-		err := imageHandler.TagLocalImage(imageName)
-		if err != nil {
-			return "", err
-		}
+	// if imageName == "" {
+	err := imageHandler.Build(imageName, types.ImageBuildConfig{Path: path, Output: true})
+	if err != nil {
+		return "", err
 	}
+	// } else {
+	// 	// skip build if an imageName is passed
+	// 	err := imageHandler.TagLocalImage(imageName)
+	// 	if err != nil {
+	// 		return "", err
+	// 	}
+	// }
 
 	// parse dockerfile
 	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
