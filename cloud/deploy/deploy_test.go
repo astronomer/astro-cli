@@ -156,7 +156,7 @@ func TestDeployFailure(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", true, mockClient)
+	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", true, false, mockClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
 	mockClient.AssertExpectations(t)

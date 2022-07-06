@@ -94,13 +94,12 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 
 		// Check the dags directory
 		dagsPath := path + "/dags"
-		// _, err := fileutil.Exists(dagsPath, nil);
-		// if err != nil {
-		// 	return errors.Wrapf(err, "failed to find dags '%s'", dagsPath)
-		// }
 
 		// Generate the dags tar
-		fileutil.Tar(dagsPath, "/tmp")
+		err = fileutil.Tar(dagsPath, "/tmp")
+		if err != nil {
+			return err
+		}
 
 		sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagURL)
 		if err != nil {
@@ -111,13 +110,13 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 		if err != nil {
 			return err
 		}
-		versionId, err := sasDagClient.Upload(dagFile)
+		versionID, err := sasDagClient.Upload(dagFile)
 		if err != nil {
 			return err
 		}
 
 		var status string
-		if versionId != "" {
+		if versionID != "" {
 			status = "SUCCEEDED"
 		} else {
 			status = "FAILED"
@@ -125,7 +124,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 
 		message := "Dags uploaded successfully"
 		action := "UPLOAD"
-		_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionId, status, message, client)
+		_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionID, status, message, client)
 		if err != nil {
 			return err
 		}
