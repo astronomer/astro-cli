@@ -4,13 +4,13 @@ jobs:
   lint:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:20.10.14-1
+      - image: quay.io/astronomer/ap-dind-golang:20.10.17
     steps:
       - lint
   test:
     working_directory: /go/src/github.com/astronomer/astro-cli
     docker:
-      - image: quay.io/astronomer/ap-dind-golang:20.10.14-1
+      - image: quay.io/astronomer/ap-dind-golang:20.10.17
     steps:
       - test
   new-tag:
