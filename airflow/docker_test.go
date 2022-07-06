@@ -579,12 +579,13 @@ func TestDockerComposePytest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Twice()
+		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
+		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Twice()
+		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Twice()
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Twice()
 
 		mockResponse := "0"
 		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
@@ -598,6 +599,11 @@ func TestDockerComposePytest(t *testing.T) {
 		resp, err := mockDockerCompose.Pytest("", "test", "")
 		assert.NoError(t, err)
 		assert.Equal(t, "", resp)
+
+		resp, err = mockDockerCompose.Pytest("custom-image", "test", "")
+		assert.NoError(t, err)
+		assert.Equal(t, "", resp)
+
 		composeMock.AssertExpectations(t)
 		imageHandler.AssertExpectations(t)
 	})
