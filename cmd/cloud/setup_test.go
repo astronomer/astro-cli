@@ -94,7 +94,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain string, client astro.Client, out io.Writer, loginLink bool) error {
+		authLogin = func(domain string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return nil
 		}
 
@@ -120,7 +120,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain string, client astro.Client, out io.Writer, loginLink bool) error {
+		authLogin = func(domain string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return nil
 		}
 
