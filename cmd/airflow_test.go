@@ -892,6 +892,74 @@ func TestAirflowUpgradeCheck(t *testing.T) {
 	})
 }
 
+func TestAirflowBash(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		cmd.Flag("webserver").Value.Set("true")
+		cmd.Flag("scheduler").Value.Set("true")
+		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("postgres").Value.Set("true")
+
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Bash", "scheduler").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBash(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("without any component flag", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Bash", "scheduler").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBash(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		cmd.Flag("webserver").Value.Set("true")
+		cmd.Flag("scheduler").Value.Set("true")
+		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("postgres").Value.Set("true")
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Bash", "scheduler").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBash(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowBash(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+}
+
 func TestPrepareDefaultAirflowImageTag(t *testing.T) {
 	getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string) (string, error) {
 		return "", nil

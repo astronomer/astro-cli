@@ -102,7 +102,7 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowParseCmd(),
 		newAirflowRestartCmd(),
 		newAirflowUpgradeCheckCmd(),
-		newBashCmd(),
+		newAirflowBashCmd(),
 	)
 	return cmd
 }
@@ -306,7 +306,7 @@ func newAirflowUpgradeCheckCmd() *cobra.Command {
 	return cmd
 }
 
-func newBashCmd() *cobra.Command {
+func newAirflowBashCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bash",
 		Short: "Exec into a running an Airflow container",

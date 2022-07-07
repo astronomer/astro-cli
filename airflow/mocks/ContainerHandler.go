@@ -9,6 +9,20 @@ type ContainerHandler struct {
 	mock.Mock
 }
 
+// Bash provides a mock function with given fields: container
+func (_m *ContainerHandler) Bash(container string) error {
+	ret := _m.Called(container)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(container)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Kill provides a mock function with given fields:
 func (_m *ContainerHandler) Kill() error {
 	ret := _m.Called()
