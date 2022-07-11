@@ -120,3 +120,35 @@ func TestWriteStringToFile(t *testing.T) {
 		})
 	}
 }
+
+func TestTar(t *testing.T) {
+	os.Mkdir("./test", os.ModePerm)
+
+	type args struct {
+		source string
+		target string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "basic case",
+			args:    args{source: "./test", target: "/tmp"},
+			wantErr: false,
+		},
+	}
+	defer afero.NewOsFs().Remove("./test")
+	defer afero.NewOsFs().Remove("/tmp/test.tar")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := Tar(tt.args.source, tt.args.target); (err != nil) != tt.wantErr {
+				t.Errorf("Tar() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if _, err := os.Open(tt.args.source); err != nil {
+				t.Errorf("Error opening file %s", tt.args.source)
+			}
+		})
+	}
+}
