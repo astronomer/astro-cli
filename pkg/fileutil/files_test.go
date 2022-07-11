@@ -146,6 +146,13 @@ func TestTar(t *testing.T) {
 			if err := Tar(tt.args.source, tt.args.target); (err != nil) != tt.wantErr {
 				t.Errorf("Tar() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			filePath := "/tmp/test.tar"
+			if _, err := os.Create(filePath); err != nil {
+				t.Errorf("Error creating file %s", filePath)
+			}
+			if _, err := os.Stat(tt.args.source); err != nil {
+				t.Errorf("Error getting file stats %s", tt.args.source)
+			}
 			if _, err := os.Open(tt.args.source); err != nil {
 				t.Errorf("Error opening file %s", tt.args.source)
 			}
