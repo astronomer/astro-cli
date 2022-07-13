@@ -855,6 +855,59 @@ func TestDockerComposeParse(t *testing.T) {
 	})
 }
 
+func TestDockerComposeBash(t *testing.T) {
+	testUtils.InitTestConfig(testUtils.LocalPlatform)
+	mockDockerCompose := DockerCompose{projectName: "test"}
+	container := "scheduler"
+	t.Run("success", func(t *testing.T) {
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		mockDockerCompose.composeService = composeMock
+
+		err := mockDockerCompose.Bash(container)
+		assert.NoError(t, err)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("Bash error", func(t *testing.T) {
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
+		mockDockerCompose.composeService = composeMock
+
+		err := mockDockerCompose.Bash(container)
+		assert.Contains(t, err.Error(), errMock.Error())
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("compose ps failure", func(t *testing.T) {
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
+
+		mockDockerCompose.composeService = composeMock
+
+		err := mockDockerCompose.Bash(container)
+		assert.ErrorIs(t, err, errMockDocker)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("project not running", func(t *testing.T) {
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+
+		err := mockDockerCompose.Bash(container)
+		assert.Contains(t, err.Error(), "cannot exec into container, project not running")
+		composeMock.AssertExpectations(t)
+	})
+}
+
 func TestCheckWebserverHealth(t *testing.T) {
 	testUtils.InitTestConfig(testUtils.LocalPlatform)
 	t.Run("success", func(t *testing.T) {

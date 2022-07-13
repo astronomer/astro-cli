@@ -15,6 +15,7 @@ const (
 	WebserverDockerContainerName = "webserver"
 	SchedulerDockerContainerName = "scheduler"
 	TriggererDockerContainerName = "triggerer"
+	PostgresDockerContainerName  = "postgres"
 )
 
 var (

@@ -472,6 +472,37 @@ func (d *DockerCompose) Parse(imageName, buildImage string) error {
 	return err
 }
 
+func (d *DockerCompose) Bash(container string) error {
+	// exec into schedueler by default
+	if container == "" {
+		container = SchedulerDockerContainerName
+	}
+
+	// query for container names
+	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeStatusCheckErrMsg)
+	}
+	if len(psInfo) == 0 {
+		return errors.New("cannot exec into container, project not running")
+	}
+	// find container name of specified container
+	var containerName string
+	for i := range psInfo {
+		if strings.Contains(psInfo[i].Name, container) {
+			containerName = psInfo[i].Name
+		}
+	}
+	// exec into container
+	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // getWebServerContainerId return webserver container id
 func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
