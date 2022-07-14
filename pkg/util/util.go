@@ -4,6 +4,8 @@ import (
 	b64 "encoding/base64"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -75,4 +77,25 @@ func CheckEnvBool(envBool string) bool {
 		return true
 	}
 	return false
+}
+
+var runCmd = func(name string, arg ...string) error {
+	cmd := exec.Command(name, arg...)
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func ClearTerminal() error {
+	switch runtime.GOOS {
+	case "windows":
+		return runCmd("cmd", "/c", "cls")
+	case "darwin", "linux":
+		return runCmd("clear")
+	default:
+		return runCmd("clear")
+	}
 }

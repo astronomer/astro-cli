@@ -12,7 +12,10 @@ import (
 var (
 	workspaceUserWsRole      string
 	workspaceUserCreateEmail string
+	paginated                bool
 )
+
+const paginationPageSize = 100
 
 func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -85,6 +88,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 			return workspaceUserList(cmd, out)
 		},
 	}
+	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated user list")
 	return cmd
 }
 
@@ -139,6 +143,9 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
+	}
+	if paginated {
+		return workspace.PaginatedListRoles(ws, "", paginationPageSize, true, houstonClient, out)
 	}
 	return workspace.ListRoles(ws, houstonClient, out)
 }

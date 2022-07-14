@@ -47,6 +47,7 @@ type ResponseData struct {
 	WorkspaceUpdateUserRole        string                      `json:"workspaceUpdateUserRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings   `json:"workspaceUser,omitempty"`
 	WorkspaceGetUsers              []WorkspaceUserRoleBindings `json:"workspaceUsers,omitempty"`
+	WorkspacePaginatedGetUsers     []WorkspaceUserRoleBindings `json:"paginatedWorkspaceUsers,omitempty"`
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
 	RuntimeReleases                RuntimeReleases             `json:"runtimeReleases,omitempty"`

@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"errors"
+	"os"
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -190,6 +191,99 @@ func TestListRolesError(t *testing.T) {
 	err := ListRoles(wsID, api, buf)
 	assert.EqualError(t, err, errMock.Error())
 	api.AssertExpectations(t)
+}
+
+func TestPaginatedListRoles(t *testing.T) {
+	wsID := "ck1qg6whg001r08691y117hub"
+	var paginationPageSize float64 = 100
+
+	mockResponse := []houston.WorkspaceUserRoleBindings{
+		{
+			ID:       "ckbv7zpkh00og0760ki4mhl6r",
+			Username: "test@test.com",
+			FullName: "test",
+			Emails:   []houston.Email{{Address: "test@test.com"}},
+			RoleBindings: []houston.RoleBindingWorkspace{
+				{
+					Role: houston.WorkspaceAdminRole,
+					Workspace: struct {
+						ID string `json:"id"`
+					}{
+						ID: wsID,
+					},
+				},
+			},
+		},
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+
+	// mock os.Stdin for when prompted by PromptPaginatedOption
+	input := []byte("q")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	buf := new(bytes.Buffer)
+	err = PaginatedListRoles(wsID, "", paginationPageSize, true, api, buf)
+	assert.NoError(t, err)
+	expected := ` USERNAME          ID                            ROLE                
+ test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
+`
+	assert.Equal(t, expected, buf.String())
+	api.AssertExpectations(t)
+}
+
+func TestPaginatedListRolesError(t *testing.T) {
+	testUtil.InitTestConfig("software")
+
+	wsID := "ck1qg6whg001r08691y117hub"
+	var paginationPageSize float64 = 100
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(nil, errMock)
+
+	buf := new(bytes.Buffer)
+	err := PaginatedListRoles(wsID, "", paginationPageSize, true, api, buf)
+	assert.EqualError(t, err, errMock.Error())
+	api.AssertExpectations(t)
+}
+
+func TestShowListRolesPaginatedOption(t *testing.T) {
+	wsID := "ck1qg6whg001r08691y117hub"
+	var paginationPageSize float64 = 100
+
+	t.Run("total record less then page size", func(t *testing.T) {
+		// mock os.Stdin for when prompted by PromptPaginatedOption
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		value := PromptPaginatedOption(wsID, wsID, paginationPageSize, 10)
+		assert.Equal(t, value.quit, true)
+	})
 }
 
 func TestUpdateRole(t *testing.T) {
