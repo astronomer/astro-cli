@@ -706,3 +706,58 @@ func TestListPublicRuntimeReleases(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestCreateUserInvite(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testInput := CreateUserInviteInput{
+		InviteeEmail:   "test@email.com",
+		Role:           "ORGANIZATION_MEMBER",
+		OrganizationID: "test-org-id",
+	}
+	testInputWithInvalidEmail := CreateUserInviteInput{
+		InviteeEmail:   "invalid-email",
+		Role:           "ORGANIZATION_MEMBER",
+		OrganizationID: "test-org-id",
+	}
+	mockResponse := &Response{
+		Data: ResponseData{
+			CreateUserInvite: UserInvite{
+				UserID:         "test-user-id",
+				OrganizationID: "test-org-id",
+				OauthInviteID:  "test-oauth-invite-id",
+				ExpiresAt:      "now+10mins",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.CreateUserInvite(testInput)
+		assert.NoError(t, err)
+		assert.Equal(t, resp, mockResponse.Data.CreateUserInvite)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.CreateUserInvite(testInputWithInvalidEmail)
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}

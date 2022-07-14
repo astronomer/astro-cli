@@ -14,6 +14,7 @@ type ResponseData struct {
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
+	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
 	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
@@ -23,6 +24,7 @@ type ResponseData struct {
 	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
 	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
+	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 }
 
 type Self struct {
@@ -263,4 +265,19 @@ type EnvironmentVariable struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 	IsSecret bool   `json:"isSecret"`
+}
+
+// Input for creating a user invite
+type CreateUserInviteInput struct {
+	InviteeEmail   string `json:"inviteeEmail"`
+	Role           string `json:"role"`
+	OrganizationID string `json:"organizationId"`
+}
+
+// Output returned when a user invite is created
+type UserInvite struct {
+	UserID         string `json:"userId"`
+	OrganizationID string `json:"organizationId"`
+	OauthInviteID  string `json:"oauthInviteId"`
+	ExpiresAt      string `json:"expiresAt"`
 }
