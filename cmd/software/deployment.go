@@ -35,7 +35,8 @@ var (
 	releaseName             string
 	nfsLocation             string
 	dagDeploymentType       string
-	triggererReplicas       int
+	createTriggererReplicas int
+	updateTriggererReplicas int
 	gitRevision             string
 	gitRepoURL              string
 	gitBranchName           string
@@ -141,7 +142,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 1, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
 	if runtimeEnabled {
@@ -228,7 +229,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&updateTriggererReplicas, "triggerer-replicas", "", -1, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
 	//noline:dupl
@@ -388,7 +389,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		SSHKey:            sshKey,
 		KnownHosts:        knowHosts,
 		GitSyncInterval:   gitSyncInterval,
-		TriggererReplicas: triggererReplicas,
+		TriggererReplicas: createTriggererReplicas,
 	}
 	return deployment.Create(req, houstonClient, out)
 }
@@ -459,7 +460,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, triggererReplicas, houstonClient, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
