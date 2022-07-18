@@ -33,6 +33,7 @@ import (
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/errors"
+	"github.com/pkg/browser"
 )
 
 const (
@@ -67,6 +68,8 @@ var (
 
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
+
+	openURL = browser.OpenURL
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -610,10 +613,16 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 
 				fmt.Println("\nProject is running! All components are now available.")
 				parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
-				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold("http://localhost:"+parts[len(parts)-1]))
+				webserverURL := "http://localhost:"+parts[len(parts)-1]
+				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
 				fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 				fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
 				fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
+
+				err = openURL(webserverURL)
+				if err != nil {
+					fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+				}
 				return errComposeProjectRunning
 			}
 			return nil
