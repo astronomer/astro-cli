@@ -32,8 +32,8 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
-	"github.com/pkg/errors"
 	"github.com/pkg/browser"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -613,7 +613,7 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 
 				fmt.Println("\nProject is running! All components are now available.")
 				parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
-				webserverURL := "http://localhost:"+parts[len(parts)-1]
+				webserverURL := "http://localhost:" + parts[len(parts)-1]
 				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
 				fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 				fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
