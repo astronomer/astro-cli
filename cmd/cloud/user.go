@@ -52,8 +52,8 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = input.Text("enter email address to invite a user: ")
 	}
 
-	createdInvite, err := user.CreateInvite(email, role, astroClient)
-	outMsg = fmt.Sprintf("invite for %s with role %s created \n\n %v", email, role, createdInvite)
+	_, err := user.CreateInvite(email, role, astroClient)
+	outMsg = fmt.Sprintf("invite for %s with role %s created", email, role)
 	if err != nil {
 		outMsg = fmt.Sprintf("invite failed to create: %s", err.Error())
 	}
