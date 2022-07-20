@@ -72,9 +72,9 @@ var (
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
 
-	openURL = browser.OpenURL
-	timeoutSeconds = time.Duration(60)
-	tickMS = time.Duration(500)
+	openURL    = browser.OpenURL
+	timeoutNum = 60
+	tickNum    = 500
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -705,15 +705,15 @@ func startDocker() error {
 }
 
 func waitForDocker(buf io.Writer) error {
-	timeout := time.After(timeoutSeconds * time.Second)
-	ticker := time.Tick(tickMS * time.Millisecond)
+	timeout := time.After(time.Duration(timeoutNum) * time.Second)
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
 	for {
 		select {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
 			return errors.New("timed out waiting for docker")
 		// Got a tick, we should check on checkSomething()
-		case <-ticker:
+		case <-ticker.C:
 			err := cmdExec(DockerCmd, buf, buf, "ps")
 			if err != nil {
 				continue
