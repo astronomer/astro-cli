@@ -33,7 +33,6 @@ func (_m *Client) CreateDeployment(input *astro.DeploymentCreateInput) (astro.De
 	return r0, r1
 }
 
-// TODO: why did this get generated?
 // CreateImage provides a mock function with given fields: input
 func (_m *Client) CreateImage(input astro.ImageCreateInput) (*astro.Image, error) {
 	ret := _m.Called(input)
@@ -366,8 +365,6 @@ func (_m *Client) UpdateDeployment(input *astro.DeploymentUpdateInput) (astro.De
 
 	return r0, r1
 }
-
-// TODO: why did this get generated?
 
 type mockConstructorTestingTNewClient interface {
 	mock.TestingT

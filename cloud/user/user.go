@@ -3,21 +3,21 @@ package user
 import (
 	"fmt"
 
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
+
 	"github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/software/workspace"
 	"github.com/pkg/errors"
 )
 
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
 func CreateInvite(email, role string, client astro.Client) (astro.UserInvite, error) {
 	var userInviteInput astro.CreateUserInviteInput
-	userInviteInput.InviteeEmail = email
-	userInviteInput.Role = role
 	derivedOrganizationID, err := getOrganizationID(client)
 	if err != nil {
 		return astro.UserInvite{}, err
 	}
-	userInviteInput.OrganizationID = derivedOrganizationID
+	userInviteInput = astro.CreateUserInviteInput{InviteeEmail: email, Role: role, OrganizationID: derivedOrganizationID}
 	return client.CreateUserInvite(userInviteInput)
 }
 
@@ -28,17 +28,18 @@ func getOrganizationID(client astro.Client) (string, error) {
 		currentWorkspaceID string
 		invitorWorkspace   astro.Workspace
 		err                error
+		ctx                config.Context
 	)
 
 	// get invitor's current workspace ID
-	currentWorkspaceID, err = workspace.GetCurrentWorkspace()
+	ctx, err = context.GetCurrentContext()
 	if err != nil {
-		return "", errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return "", err
 	}
 
 	// get the invitor's workspace
 
-	invitorWorkspace, err = client.GetWorkspace(currentWorkspaceID)
+	invitorWorkspace, err = client.GetWorkspace(ctx.Workspace)
 	errMsg := fmt.Sprintf("could not get workspace: %s", currentWorkspaceID)
 	if err != nil {
 		return "", errors.Wrap(err, errMsg)

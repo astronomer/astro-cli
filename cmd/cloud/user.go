@@ -16,8 +16,8 @@ func newUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
 		Aliases: []string{"us"},
-		Short:   "Invite Users to your Astro Organization",
-		Long:    "Invite Users to your Astro Organization.",
+		Short:   "Invite a user to your Astro Organization",
+		Long:    "Invite a user to your Astro Organization.",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
@@ -31,12 +31,14 @@ func newUserInviteCmd(out io.Writer) *cobra.Command {
 		Use:     "invite [email]",
 		Aliases: []string{"inv"},
 		Short:   "Invite a user to your Astro Organization",
-		Long:    "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userInvite(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The invited user's role. It can be one of ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN or ORGANIZATION_OWNER ")
+	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
+		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	return cmd
 }
 
@@ -55,7 +57,7 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	_, err := user.CreateInvite(email, role, astroClient)
 	outMsg = fmt.Sprintf("invite for %s with role %s created", email, role)
 	if err != nil {
-		outMsg = fmt.Sprintf("invite failed to create: %s", err.Error())
+		outMsg = fmt.Sprintf("failed to create invite: %s", err.Error())
 	}
 	_, err = out.Write([]byte(outMsg))
 	if err != nil {

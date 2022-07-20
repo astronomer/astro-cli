@@ -761,3 +761,45 @@ func TestCreateUserInvite(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestGetWorkspace(t *testing.T) {
+	expectedWorkspace := Response{
+		Data: ResponseData{
+			GetWorkspace: Workspace{
+				ID:             "",
+				Label:          "",
+				OrganizationID: "",
+			},
+		},
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	jsonResponse, err := json.Marshal(expectedWorkspace)
+	assert.NoError(t, err)
+
+	t.Run("happy path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		workspace, err := astroClient.GetWorkspace("test-workspace")
+		assert.NoError(t, err)
+		assert.Equal(t, workspace, expectedWorkspace.Data.GetWorkspace)
+	})
+	t.Run("error path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+		_, err := astroClient.GetWorkspace("test-workspace")
+		assert.Error(t, err, "API error")
+	})
+}

@@ -103,12 +103,12 @@ var (
   `
 	CreateUserInvite = `
 	mutation createUserInvite($input: CreateUserInviteInput!) {
-	  createUserInvite(input: $input) {
-		  userId
-		  organizationId
-		  oauthInviteId
-		  expiresAt
-	  }
+		createUserInvite(input: $input) {
+			userId
+			organizationId
+			oauthInviteId
+			expiresAt
+		}
 	}
-  `
+	`
 )
