@@ -33,7 +33,7 @@ require (
 require (
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
-	github.com/opencontainers/image-spec v1.0.1
+	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 )
