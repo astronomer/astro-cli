@@ -26,6 +26,7 @@ import (
 const (
 	DockerCmd          = "docker"
 	EchoCmd            = "echo"
+	OpenCmd            = "open"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
 )
 
