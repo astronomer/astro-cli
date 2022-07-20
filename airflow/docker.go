@@ -72,9 +72,9 @@ var (
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
 
-	openURL = browser.OpenURL
+	openURL        = browser.OpenURL
 	timeoutSeconds = time.Duration(60)
-	tickMS = time.Duration(500)
+	tickMS         = time.Duration(500)
 )
 
 // ComposeConfig is input data to docker compose yaml template
