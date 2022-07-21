@@ -1007,6 +1007,6 @@ func TestStartDocker(t *testing.T) {
 		}
 
 		err := startDocker()
-		assert.ErrorIs(t, err, errors.New("timed out waiting for docker"))
+		assert.Contains(t, err.Error(), "timed out waiting for docker")
 	})
 }
