@@ -75,6 +75,9 @@ var (
 	openURL    = browser.OpenURL
 	timeoutNum = 60
 	tickNum    = 500
+
+	cmdPsExec = cmdExec
+	cmdOpenExec = cmdExec
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -683,11 +686,7 @@ func startDocker() error {
 	if err != nil {
 		// open docker
 		fmt.Println("\nIt looks like the docker engine is not running")
-		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", "docker")
-		if err != nil {
-			return err
-		}
-		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", "docker")
+		err = cmdOpenExec(OpenCmd, buf, os.Stderr, "-a", "docker")
 		if err != nil {
 			return err
 		}
@@ -714,7 +713,7 @@ func waitForDocker(buf io.Writer) error {
 			return errors.New("timed out waiting for docker")
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
-			err := cmdExec(DockerCmd, buf, buf, "ps")
+			err := cmdPsExec(DockerCmd, buf, buf, "ps")
 			if err != nil {
 				continue
 			} else {

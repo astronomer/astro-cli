@@ -978,15 +978,11 @@ func TestStartDocker(t *testing.T) {
 			return errExecMock
 		}
 
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdOpenExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return errExecMock
-		}
-
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdPsExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 
