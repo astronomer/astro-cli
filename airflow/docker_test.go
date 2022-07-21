@@ -989,4 +989,24 @@ func TestStartDocker(t *testing.T) {
 		err := startDocker()
 		assert.NoError(t, err)
 	})
+
+
+	t.Run("start docker fail", func(t *testing.T) {
+		timeoutNum = 5
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errExecMock
+		}
+
+		cmdOpenExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		cmdPsExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errExecMock
+		}
+
+		err := startDocker()
+		assert.ErrorIs(t, err, errors.New("timed out waiting for docker"))
+	})
 }
