@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/software/teams"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -61,5 +62,38 @@ func TestNewGetTeamUsersCmd(t *testing.T) {
 	output, err := execTeamCmd("get", "-u", "test-id")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "USERNAME            ID          \n email@email.com     test-id")
+	api.AssertExpectations(t)
+}
+
+func TestNewTeamListCmd(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	team := houston.Team{
+		Name: "Everyone",
+		ID:   "blah-id",
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("ListTeams", "", teams.ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{team}}, nil)
+	houstonClient = api
+
+	output, err := execTeamCmd("list")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Everyone")
+	assert.Contains(t, output, "blah-id")
+	api.AssertExpectations(t)
+}
+
+func TestNewTeamUpdateCmd(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	api := new(mocks.ClientInterface)
+	api.On("CreateTeamSystemRoleBinding", "team-id", houston.SystemAdminRole).Return(houston.SystemAdminRole, nil)
+	houstonClient = api
+
+	output, err := execTeamCmd("update", "team-id", "--role", houston.SystemAdminRole)
+	assert.NoError(t, err)
+	assert.Contains(t, output, "team-id")
+	assert.Contains(t, output, houston.SystemAdminRole)
 	api.AssertExpectations(t)
 }

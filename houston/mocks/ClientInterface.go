@@ -173,6 +173,27 @@ func (_m *ClientInterface) CreateDeploymentServiceAccount(variables *houston.Cre
 	return r0, r1
 }
 
+// CreateTeamSystemRoleBinding provides a mock function with given fields: teamID, role
+func (_m *ClientInterface) CreateTeamSystemRoleBinding(teamID string, role string) (string, error) {
+	ret := _m.Called(teamID, role)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(teamID, role)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(teamID, role)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateUser provides a mock function with given fields: email, password
 func (_m *ClientInterface) CreateUser(email string, password string) (*houston.AuthUser, error) {
 	ret := _m.Called(email, password)
@@ -304,6 +325,27 @@ func (_m *ClientInterface) DeleteDeploymentUser(deploymentID string, email strin
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = rf(deploymentID, email)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteTeamSystemRoleBinding provides a mock function with given fields: teamID, role
+func (_m *ClientInterface) DeleteTeamSystemRoleBinding(teamID string, role string) (string, error) {
+	ret := _m.Called(teamID, role)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(teamID, role)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(teamID, role)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -739,6 +781,27 @@ func (_m *ClientInterface) ListDeployments(filters houston.ListDeploymentsReques
 	var r1 error
 	if rf, ok := ret.Get(1).(func(houston.ListDeploymentsRequest) error); ok {
 		r1 = rf(filters)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListTeams provides a mock function with given fields: cursor, take
+func (_m *ClientInterface) ListTeams(cursor string, take int) (houston.ListTeamsResp, error) {
+	ret := _m.Called(cursor, take)
+
+	var r0 houston.ListTeamsResp
+	if rf, ok := ret.Get(0).(func(string, int) houston.ListTeamsResp); ok {
+		r0 = rf(cursor, take)
+	} else {
+		r0 = ret.Get(0).(houston.ListTeamsResp)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, int) error); ok {
+		r1 = rf(cursor, take)
 	} else {
 		r1 = ret.Error(1)
 	}
