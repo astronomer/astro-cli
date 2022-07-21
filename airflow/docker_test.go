@@ -990,7 +990,6 @@ func TestStartDocker(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-
 	t.Run("start docker fail", func(t *testing.T) {
 		timeoutNum = 5
 
