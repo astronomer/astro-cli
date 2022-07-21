@@ -969,3 +969,28 @@ func TestCheckWebserverHealth(t *testing.T) {
 		assert.ErrorIs(t, err, errMockDocker)
 	})
 }
+
+var errExecMock = errors.New("docker is not running")
+
+func TestStartDocker(t *testing.T) {
+	t.Run("start docker success", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errExecMock
+		}
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errExecMock
+		}
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		err := startDocker()
+		assert.NoError(t, err)
+	})
+}
