@@ -76,7 +76,7 @@ var (
 	timeoutNum = 60
 	tickNum    = 500
 
-	cmdPsExec = cmdExec
+	cmdPsExec   = cmdExec
 	cmdOpenExec = cmdExec
 )
 
