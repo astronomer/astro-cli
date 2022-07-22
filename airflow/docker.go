@@ -151,7 +151,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 
 // Start starts a local airflow development cluster
 func (d *DockerCompose) Start(imageName string, noCache bool) error {
-	// check of docker is up for mac
+	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
 		if err != nil {
@@ -703,7 +703,8 @@ func startDocker() error {
 	return nil
 }
 
-func waitForDocker(buf io.Writer) error {
+func waitForDocker() error {
+    buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
 	for {
@@ -713,6 +714,7 @@ func waitForDocker(buf io.Writer) error {
 			return errors.New("timed out waiting for docker")
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
+                        buf.Reset()
 			err := cmdPsExec(DockerCmd, buf, buf, "ps")
 			if err != nil {
 				continue
