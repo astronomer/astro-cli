@@ -2,6 +2,7 @@ package user
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -10,15 +11,35 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	ErrInvalidRole  = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrInvalidEmail = errors.New("no email provided for the invite. Retry with a valid email address")
+)
+
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
-func CreateInvite(email, role string, client astro.Client) (astro.UserInvite, error) {
-	var userInviteInput astro.CreateUserInviteInput
+func CreateInvite(email, role string, out io.Writer, client astro.Client) error {
+	var (
+		userInviteInput astro.CreateUserInviteInput
+		err             error
+	)
+	if email == "" {
+		return ErrInvalidEmail
+	}
+	err = IsRoleValid(role)
+	if err != nil {
+		return err
+	}
 	derivedOrganizationID, err := getOrganizationID(client)
 	if err != nil {
-		return astro.UserInvite{}, err
+		return err
 	}
 	userInviteInput = astro.CreateUserInviteInput{InviteeEmail: email, Role: role, OrganizationID: derivedOrganizationID}
-	return client.CreateUserInvite(userInviteInput)
+	_, err = client.CreateUserInvite(userInviteInput)
+	if err != nil {
+		return fmt.Errorf("failed to create invite: %s", err.Error()) //nolint
+	}
+	fmt.Fprintf(out, "invite for %s with role %s created\n", email, role)
+	return nil
 }
 
 // getOrganizationID derives the organizationID of the user creating an invite
@@ -38,13 +59,25 @@ func getOrganizationID(client astro.Client) (string, error) {
 	}
 
 	// get the invitor's workspace
-
-	invitorWorkspace, err = client.GetWorkspace(ctx.Workspace)
-	errMsg := fmt.Sprintf("could not get workspace: %s", currentWorkspaceID)
+	currentWorkspaceID = ctx.Workspace
+	invitorWorkspace, err = client.GetWorkspace(currentWorkspaceID)
 	if err != nil {
-		return "", errors.Wrap(err, errMsg)
+		return "", err
 	}
 
 	// return the invitor's organizationID
 	return invitorWorkspace.OrganizationID, nil
+}
+
+// IsRoleValid checks if the requested role is valid
+// If the role is valid, it returns nil
+// error errInvalidRole is returned if the role is not valid
+func IsRoleValid(role string) error {
+	validRoles := []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
+	for _, validRole := range validRoles {
+		if role == validRole {
+			return nil
+		}
+	}
+	return ErrInvalidRole
 }

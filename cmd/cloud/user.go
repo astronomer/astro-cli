@@ -1,7 +1,6 @@
 package cloud
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -43,8 +42,7 @@ func newUserInviteCmd(out io.Writer) *cobra.Command {
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
-	var email, outMsg string
-	cmd.SilenceUsage = false
+	var email string
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
@@ -54,14 +52,6 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = input.Text("enter email address to invite a user: ")
 	}
 
-	_, err := user.CreateInvite(email, role, astroClient)
-	outMsg = fmt.Sprintf("invite for %s with role %s created", email, role)
-	if err != nil {
-		outMsg = fmt.Sprintf("failed to create invite: %s", err.Error())
-	}
-	_, err = out.Write([]byte(outMsg))
-	if err != nil {
-		return err
-	}
-	return nil
+	cmd.SilenceUsage = true
+	return user.CreateInvite(email, role, out, astroClient)
 }

@@ -133,7 +133,6 @@ var (
 	  }
 	}
   `
-	// TODO confirm if this query will work
 	GetWorkspace = `
 	query GetWorkspace($workspaceId: Id!) {
 		workspace(id:$workspaceId) {
