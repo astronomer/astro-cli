@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Initiates a Dag Deployment Request
 func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeployment, error) {
 	// create initiate dag deployment input
 	initiateDagDeploymentInput := astro.InitiateDagDeploymentInput{
@@ -20,6 +21,7 @@ func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeploy
 	return dagDeployment, nil
 }
 
+// Report upload dags status back to astro
 func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
 	// create report dag deployment status input
 	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{

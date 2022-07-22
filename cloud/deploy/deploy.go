@@ -39,6 +39,9 @@ const (
 
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nPlease use one of the following supported tags: %s"
+
+	message = "Dags uploaded successfully"
+	action  = "UPLOAD"
 )
 
 var (
@@ -60,6 +63,58 @@ type deploymentInfo struct {
 	currentVersion string
 	organizationID string
 	webserverURL   string
+}
+
+func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Client) error {
+	fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
+	dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
+	if err != nil {
+		return err
+	}
+
+	// Check the dags directory
+	dagsPath := path + "/dags"
+
+	// Generate the dags tar
+	err = fileutil.Tar(dagsPath, "/tmp")
+	if err != nil {
+		return err
+	}
+
+	sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dagFile, err := os.Open("/tmp/dags.tar")
+	if err != nil {
+		return err
+	}
+	versionID, err := sasDagClient.Upload(dagFile)
+	if err != nil {
+		return err
+	}
+
+	var status string
+	if versionID != "" {
+		status = "SUCCEEDED"
+	} else {
+		status = "FAILED"
+	}
+
+	_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionID, status, message, client)
+	if err != nil {
+		return err
+	}
+
+	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+
+	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Astronomer UI to confirm that your deploy was successful." +
+		"\n\nDeployment can be accessed at the following URLs: \n" +
+		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
+
+	return nil
 }
 
 // Deploy pushes a new docker image
@@ -86,55 +141,10 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 	}
 
 	if dags {
-		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-		dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
+		err = deployDags(path, domain, &deployInfo, client)
 		if err != nil {
 			return err
 		}
-
-		// Check the dags directory
-		dagsPath := path + "/dags"
-
-		// Generate the dags tar
-		err = fileutil.Tar(dagsPath, "/tmp")
-		if err != nil {
-			return err
-		}
-
-		sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagURL)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		dagFile, err := os.Open("/tmp/dags.tar")
-		if err != nil {
-			return err
-		}
-		versionID, err := sasDagClient.Upload(dagFile)
-		if err != nil {
-			return err
-		}
-
-		var status string
-		if versionID != "" {
-			status = "SUCCEEDED"
-		} else {
-			status = "FAILED"
-		}
-
-		message := "Dags uploaded successfully"
-		action := "UPLOAD"
-		_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionID, status, message, client)
-		if err != nil {
-			return err
-		}
-
-		deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
-
-		fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Astronomer UI to confirm that your deploy was successful." +
-			"\n\nDeployment can be accessed at the following URLs: \n" +
-			fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		// Build our image
 		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
