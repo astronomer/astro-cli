@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"runtime"
@@ -695,7 +694,7 @@ func startDocker() error {
 		fmt.Println("If you don't have Docker Desktop installed, install it (https://www.docker.com/products/docker-desktop/) and try again.")
 		fmt.Println("If you are using Colima or another Docker alternative, start the engine manually.")
 		// poll for docker
-		err = waitForDocker(buf)
+		err = waitForDocker()
 		if err != nil {
 			return err
 		}
@@ -704,7 +703,7 @@ func startDocker() error {
 }
 
 func waitForDocker() error {
-    buf := new(bytes.Buffer)
+	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
 	for {
@@ -714,7 +713,7 @@ func waitForDocker() error {
 			return errors.New("timed out waiting for docker")
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
-                        buf.Reset()
+			buf.Reset()
 			err := cmdPsExec(DockerCmd, buf, buf, "ps")
 			if err != nil {
 				continue
