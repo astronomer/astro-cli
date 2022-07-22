@@ -46,7 +46,7 @@ const (
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
-	OpenCmd            = "open"
+	OpenCmd                        = "open"
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
