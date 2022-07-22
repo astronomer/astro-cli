@@ -9,6 +9,20 @@ type ContainerHandler struct {
 	mock.Mock
 }
 
+// Bash provides a mock function with given fields: container
+func (_m *ContainerHandler) Bash(container string) error {
+	ret := _m.Called(container)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(container)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Kill provides a mock function with given fields:
 func (_m *ContainerHandler) Kill() error {
 	ret := _m.Called()
@@ -58,13 +72,13 @@ func (_m *ContainerHandler) PS() error {
 	return r0
 }
 
-// Parse provides a mock function with given fields: buildImage
-func (_m *ContainerHandler) Parse(buildImage string) error {
-	ret := _m.Called(buildImage)
+// Parse provides a mock function with given fields: imageName, buildImage
+func (_m *ContainerHandler) Parse(imageName string, buildImage string) error {
+	ret := _m.Called(imageName, buildImage)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(buildImage)
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(imageName, buildImage)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -72,20 +86,20 @@ func (_m *ContainerHandler) Parse(buildImage string) error {
 	return r0
 }
 
-// Pytest provides a mock function with given fields: pytestFile, projectImageName
-func (_m *ContainerHandler) Pytest(pytestFile string, projectImageName string) (string, error) {
-	ret := _m.Called(pytestFile, projectImageName)
+// Pytest provides a mock function with given fields: imageName, pytestFile, projectImageName
+func (_m *ContainerHandler) Pytest(imageName string, pytestFile string, projectImageName string) (string, error) {
+	ret := _m.Called(imageName, pytestFile, projectImageName)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(string, string) string); ok {
-		r0 = rf(pytestFile, projectImageName)
+	if rf, ok := ret.Get(0).(func(string, string, string) string); ok {
+		r0 = rf(imageName, pytestFile, projectImageName)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(pytestFile, projectImageName)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(imageName, pytestFile, projectImageName)
 	} else {
 		r1 = ret.Error(1)
 	}

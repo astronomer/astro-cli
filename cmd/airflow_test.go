@@ -13,6 +13,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var errMock = errors.New("mock error")
@@ -706,7 +707,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", mock.Anything, "test-pytest-file", "").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -722,7 +723,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("exit code 1", errMock).Once()
+			mockContainerHandler.On("Pytest", mock.Anything, "test-pytest-file", "").Return("exit code 1", errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -738,7 +739,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("0", nil).Once()
+			mockContainerHandler.On("Pytest", mock.Anything, "test-pytest-file", "").Return("0", nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -754,7 +755,7 @@ func TestAirflowPytest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Pytest", "test-pytest-file", "").Return("0", errMock).Once()
+			mockContainerHandler.On("Pytest", mock.Anything, "test-pytest-file", "").Return("0", errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -797,7 +798,7 @@ func TestAirflowParse(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Parse", "").Return(nil).Once()
+			mockContainerHandler.On("Parse", mock.Anything, "").Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -812,7 +813,7 @@ func TestAirflowParse(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Parse", "").Return(errMock).Once()
+			mockContainerHandler.On("Parse", mock.Anything, "").Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -887,6 +888,74 @@ func TestAirflowUpgradeCheck(t *testing.T) {
 		}
 
 		err := airflowUpgradeCheck(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+}
+
+func TestAirflowBash(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		cmd.Flag("webserver").Value.Set("true")
+		cmd.Flag("scheduler").Value.Set("true")
+		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("postgres").Value.Set("true")
+
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Bash", "scheduler").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBash(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("without any component flag", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Bash", "scheduler").Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBash(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		cmd.Flag("webserver").Value.Set("true")
+		cmd.Flag("scheduler").Value.Set("true")
+		cmd.Flag("triggerer").Value.Set("true")
+		cmd.Flag("postgres").Value.Set("true")
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("Bash", "scheduler").Return(errMock).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowBash(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
+	t.Run("containerHandlerInit failure", func(t *testing.T) {
+		cmd := newAirflowBashCmd()
+		args := []string{}
+
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+			return nil, errMock
+		}
+
+		err := airflowBash(cmd, args)
 		assert.ErrorIs(t, err, errMock)
 	})
 }

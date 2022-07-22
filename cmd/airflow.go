@@ -27,12 +27,16 @@ var (
 	airflowVersion         string
 	envFile                string
 	pytestFile             string
-	imageName              string
+	customImageName        string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
 	triggererLogs          bool
 	noCache                bool
+	schedulerExec          bool
+	postgresExec           bool
+	webserverExec          bool
+	triggererExec          bool
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
@@ -98,6 +102,7 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowParseCmd(),
 		newAirflowRestartCmd(),
 		newAirflowUpgradeCheckCmd(),
+		newAirflowBashCmd(),
 	)
 	return cmd
 }
@@ -147,7 +152,7 @@ func newAirflowStartCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
 	return cmd
 }
 
@@ -245,7 +250,7 @@ func newAirflowRestartCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
 	return cmd
 }
 
@@ -263,6 +268,7 @@ func newAirflowPytestCmd() *cobra.Command {
 		RunE:    airflowPytest,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run pytest with")
 	return cmd
 }
 
@@ -280,6 +286,7 @@ func newAirflowParseCmd() *cobra.Command {
 		RunE:    airflowParse,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run parse with")
 	return cmd
 }
 
@@ -296,6 +303,26 @@ func newAirflowUpgradeCheckCmd() *cobra.Command {
 		RunE:               airflowUpgradeCheck,
 		DisableFlagParsing: true,
 	}
+	return cmd
+}
+
+func newAirflowBashCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "bash",
+		Short: "Exec into a running an Airflow container",
+		Long:  "Use this command to Exec into either the Webserver, Sechduler, Postgres, or Triggerer Container to run bash commands",
+		Args:  cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE: utils.EnsureProjectDir,
+		RunE:    airflowBash,
+	}
+	cmd.Flags().BoolVarP(&schedulerExec, "scheduler", "s", false, "Exec into the scheduler container")
+	cmd.Flags().BoolVarP(&webserverExec, "webserver", "w", false, "Exec into the webserver container")
+	cmd.Flags().BoolVarP(&postgresExec, "postgres", "p", false, "Exec into the postgres container")
+	cmd.Flags().BoolVarP(&triggererExec, "triggerer", "t", false, "Exec into the triggerer container")
 	return cmd
 }
 
@@ -399,7 +426,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(imageName, noCache)
+	return containerHandler.Start(customImageName, noCache)
 }
 
 // airflowRun
@@ -507,7 +534,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	return containerHandler.Start(imageName, noCache)
+	return containerHandler.Start(customImageName, noCache)
 }
 
 // run pytest on an airflow project
@@ -542,7 +569,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestFile, "")
+	exitCode, err := containerHandler.Pytest(customImageName, pytestFile, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
@@ -568,7 +595,7 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Parse("")
+	return containerHandler.Parse(customImageName, "")
 }
 
 // airflowUpgradeCheck
@@ -585,6 +612,40 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	}
 
 	return containerHandler.Run(args, "root")
+}
+
+// Exec into an airflow container
+func airflowBash(cmd *cobra.Command, args []string) error {
+	// figure out what container to exec into
+	container := ""
+
+	if triggererExec {
+		container = airflow.TriggererDockerContainerName
+	}
+	if postgresExec {
+		container = airflow.PostgresDockerContainerName
+	}
+	if webserverExec {
+		container = airflow.WebserverDockerContainerName
+	}
+	if schedulerExec {
+		container = airflow.SchedulerDockerContainerName
+	}
+	// exec into secheduler by default
+	if container == "" {
+		container = airflow.SchedulerDockerContainerName
+	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Execing into the %s container\n\n", container)
+	return containerHandler.Bash(container)
 }
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client) string {

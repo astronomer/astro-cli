@@ -32,6 +32,7 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
+	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 )
 
@@ -67,6 +68,8 @@ var (
 
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
+
+	openURL = browser.OpenURL
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -332,7 +335,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, error) {
+func (d *DockerCompose) Pytest(imageName, pytestFile, projectImageName string) (string, error) {
 	// projectImageName may be provided to the function if it is being used in the deploy command
 	if projectImageName == "" {
 		var err error
@@ -345,9 +348,17 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 
 		projectImageName = ImageName(projectImageName, "latest")
 		// build image
-		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
-		if err != nil {
-			return "", err
+		if imageName == "" {
+			err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+			if err != nil {
+				return "", err
+			}
+		} else {
+			// skip build if an imageName is passed
+			err := d.imageHandler.TagLocalImage(imageName)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
@@ -436,7 +447,7 @@ func (d *DockerCompose) Pytest(pytestFile, projectImageName string) (string, err
 	return buf.String(), errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) Parse(buildImage string) error {
+func (d *DockerCompose) Parse(imageName, buildImage string) error {
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath
 
@@ -453,7 +464,7 @@ func (d *DockerCompose) Parse(buildImage string) error {
 	fmt.Println("\nChecking your DAGs for errors,\nthis might take a minute if you haven't run this command before…")
 
 	pytestFile := DefaultTestPath
-	exitCode, err := d.Pytest(pytestFile, buildImage)
+	exitCode, err := d.Pytest(imageName, pytestFile, buildImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("errors detected in your local DAGs are listed above")
@@ -462,6 +473,37 @@ func (d *DockerCompose) Parse(buildImage string) error {
 	}
 	fmt.Println("\nno errors detected in your local DAGs")
 	return err
+}
+
+func (d *DockerCompose) Bash(container string) error {
+	// exec into schedueler by default
+	if container == "" {
+		container = SchedulerDockerContainerName
+	}
+
+	// query for container names
+	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeStatusCheckErrMsg)
+	}
+	if len(psInfo) == 0 {
+		return errors.New("cannot exec into container, project not running")
+	}
+	// find container name of specified container
+	var containerName string
+	for i := range psInfo {
+		if strings.Contains(psInfo[i].Name, container) {
+			containerName = psInfo[i].Name
+		}
+	}
+	// exec into container
+	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // getWebServerContainerId return webserver container id
@@ -571,10 +613,16 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 
 				fmt.Println("\nProject is running! All components are now available.")
 				parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
-				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold("http://localhost:"+parts[len(parts)-1]))
+				webserverURL := "http://localhost:" + parts[len(parts)-1]
+				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
 				fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 				fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
 				fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
+
+				err = openURL(webserverURL)
+				if err != nil {
+					fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+				}
 				return errComposeProjectRunning
 			}
 			return nil

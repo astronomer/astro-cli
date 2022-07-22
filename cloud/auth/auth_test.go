@@ -440,12 +440,23 @@ func TestLogin(t *testing.T) {
 		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
 		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 
-		err := Login("astronomer.io", mockClient, os.Stdout, false)
+		err := Login("astronomer.io", mockClient, os.Stdout, false, false)
+		assert.NoError(t, err)
+	})
+
+	t.Run("oauth token success", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
+		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+
+		defer testUtil.MockUserInput(t, "OAuth Token")()
+
+		err := Login("astronomer.io", mockClient, os.Stdout, false, true)
 		assert.NoError(t, err)
 	})
 
 	t.Run("invalid domain", func(t *testing.T) {
-		err := Login("fail.astronomer.io", nil, os.Stdout, false)
+		err := Login("fail.astronomer.io", nil, os.Stdout, false, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Invalid domain.")
 	})
@@ -458,7 +469,7 @@ func TestLogin(t *testing.T) {
 			return "", errMock
 		}
 		authenticator = Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
-		err := Login("cloud.astronomer.io", nil, os.Stdout, false)
+		err := Login("cloud.astronomer.io", nil, os.Stdout, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -481,7 +492,7 @@ func TestLogin(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{}, errMock).Once()
 
-		err := Login("", mockClient, os.Stdout, false)
+		err := Login("", mockClient, os.Stdout, false, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -510,7 +521,7 @@ func TestLogin(t *testing.T) {
 		// initialize stdin with user email input
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
 		// do the test
-		err = Login("astronomer.io", mockClient, os.Stdout, true)
+		err = Login("astronomer.io", mockClient, os.Stdout, true, false)
 		assert.NoError(t, err)
 	})
 
@@ -538,7 +549,7 @@ func TestLogin(t *testing.T) {
 		}
 		// initialize user input with email
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
-		err := Login("astronomer.io", mockClient, os.Stdout, true)
+		err := Login("astronomer.io", mockClient, os.Stdout, true, false)
 		assert.NoError(t, err)
 		// assert that everything got set in the right spot
 		domainContext, err := context.GetContext("astronomer.io")

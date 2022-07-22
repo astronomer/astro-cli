@@ -35,6 +35,8 @@ var (
 	errDeploymentAlreadyOnRuntime = errors.New("deployment is already using runtime image")
 	errRuntimeUpdateFailed        = errors.New("failed to update the deployment runtime version")
 	errInvalidAirflowVersion      = errors.New("invalid Airflow version to migrate the deployment to Runtime, please upgrade the deployment to 2.2.4 Airflow version before trying to migrate to Runtime image")
+
+	triggererAllowedAirflowVersion = semver.MustParse("2.2.0")
 )
 
 const (
@@ -138,6 +140,19 @@ func CheckTriggererEnabled(client houston.ClientInterface) bool {
 	return config.Flags.TriggererEnabled
 }
 
+func addTriggererReplicasArg(vars map[string]interface{}, client houston.ClientInterface, airflowVersion string, triggererReplicas int) {
+	// reset triggerer count to zero in case airflowVersion < 2.2.0
+	if airflowVersion != "" {
+		if version := semver.MustParse(airflowVersion); version != nil && version.LessThan(triggererAllowedAirflowVersion) {
+			triggererReplicas = 0
+		}
+	}
+
+	if CheckTriggererEnabled(client) {
+		vars["triggererReplicas"] = triggererReplicas
+	}
+}
+
 // Create airflow deployment
 func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer) error {
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
@@ -173,9 +188,8 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		return err
 	}
 
-	if CheckTriggererEnabled(client) {
-		vars["triggererReplicas"] = req.TriggererReplicas
-	}
+	addTriggererReplicasArg(vars, client, req.AirflowVersion, req.TriggererReplicas)
+
 	d, err := client.CreateDeployment(vars)
 	if err != nil {
 		return err
@@ -338,7 +352,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		return err
 	}
 
-	if CheckTriggererEnabled(client) {
+	if CheckTriggererEnabled(client) && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
 	}
 
