@@ -46,6 +46,7 @@ const (
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
+	OpenCmd            = "open"
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -685,15 +686,14 @@ func startDocker() error {
 	err := cmdExec(DockerCmd, buf, buf, "ps")
 	if err != nil {
 		// open docker
-		fmt.Println("\nIt looks like the docker engine is not running")
+		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
 		err = cmdOpenExec(OpenCmd, buf, os.Stderr, "-a", "docker")
 		if err != nil {
 			return err
 		}
-		fmt.Println("\nIf you don't see docker desktop starting exit this command and start it manually")
-		fmt.Println("If you don't have docker desktop installed install it here: https://www.docker.com/products/docker-desktop/")
-		fmt.Println("If you are using colima or another docker alternative you will have to start the engine manually")
-		fmt.Println("\nStarting up the docker engine…")
+		fmt.Println("\nIf you don't see Docker Desktop starting, exit this command and start it manually.")
+		fmt.Println("If you don't have Docker Desktop installed, install it (https://www.docker.com/products/docker-desktop/) and try again.")
+		fmt.Println("If you are using Colima or another Docker alternative, start the engine manually.")
 		// poll for docker
 		err = waitForDocker(buf)
 		if err != nil {
