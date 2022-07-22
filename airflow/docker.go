@@ -704,7 +704,7 @@ func startDocker() error {
 }
 
 func waitForDocker() error {
-    buf := new(bytes.Buffer)
+	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
 	for {
@@ -714,7 +714,7 @@ func waitForDocker() error {
 			return errors.New("timed out waiting for docker")
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
-                        buf.Reset()
+			buf.Reset()
 			err := cmdPsExec(DockerCmd, buf, buf, "ps")
 			if err != nil {
 				continue
