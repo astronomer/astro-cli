@@ -43,6 +43,8 @@ var (
 	pytestFile string
 	dockerfile = "Dockerfile"
 
+	deployImagePlatformSupport = []string{"linux/amd64"}
+
 	// Monkey patched to write unit tests
 	airflowImageHandler  = airflow.ImageHandlerInit
 	containerHandlerInit = airflow.ContainerHandlerInit
@@ -261,7 +263,7 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {
-		err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true})
+		err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 		if err != nil {
 			return "", err
 		}

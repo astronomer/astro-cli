@@ -55,6 +55,10 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	if config.NoCache {
 		args = append(args, "--no-cache")
 	}
+
+	if len(config.TargetPlatforms) > 0 {
+		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(config.TargetPlatforms, ",")))
+	}
 	// Build image
 	var stdout, stderr io.Writer
 	if config.Output {
