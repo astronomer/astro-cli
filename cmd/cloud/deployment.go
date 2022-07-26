@@ -41,15 +41,15 @@ var (
 		`
 	deploymentVariableCreateExample = `
 		# Create a deployment variable
-		$ astro deployment variable create --deployment-id <deployment-id> --key FOO --value BAR --secret
+		$ astro deployment variable create FOO=BAR FOO2=BAR2 --deployment-id <deployment-id> --secret
 		# Create a deployment variables from a file
-		$ astro deployment variable create  --deployment-id <deployment-id> --load --env .env.my-deployment
+		$ astro deployment variable create --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 	deploymentVariableUpdateExample = `
 		# Update a deployment variable
-		$ astro deployment variable update --deployment-id <deployment-id> --key KEY --value NEWVALUE --secret
+		$ astro deployment variable update FOO=NEWBAR FOO2=NEWBAR2 --deployment-id <deployment-id> --secret
 		# Update a deployment variables from a file
-		$ astro deployment variable update  --deployment-id <deployment-id> --load --env .env.my-deployment
+		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 
 	httpClient = httputil.NewHTTPClient()
@@ -204,6 +204,8 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Create environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set the new environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables from")
+	_ = cmd.Flags().MarkHidden("key")
+	_ = cmd.Flags().MarkHidden("value")
 
 	return cmd
 }
@@ -225,6 +227,9 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Update environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set updated environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables to update from")
+	_ = cmd.Flags().MarkHidden("key")
+	_ = cmd.Flags().MarkHidden("value")
+
 
 	return cmd
 }
