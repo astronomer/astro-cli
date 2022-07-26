@@ -230,7 +230,6 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	_ = cmd.Flags().MarkHidden("key")
 	_ = cmd.Flags().MarkHidden("value")
 
-
 	return cmd
 }
 
