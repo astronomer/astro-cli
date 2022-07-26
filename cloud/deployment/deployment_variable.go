@@ -59,7 +59,7 @@ func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool
 
 // this function modifies a deployment's environment variable object
 // it is used to create and update deployment's environment variables
-func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
+func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string, variableList []string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -99,7 +99,10 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 	if variableValue != "" && variableKey == "" {
 		fmt.Fprintf(out, "Variable with value %s not created or updated with flags\nYou must provide a variable key", variableValue)
 	}
-
+	// add new variables from list of variables provided through args
+	if len(variableList) > 0 {
+		newEnvironmentVariables = addVariablesFromArgs(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableList, updateVars, makeSecret)
+	}
 	// add new variables from file
 	if useEnvFile {
 		newEnvironmentVariables = addVariablesFromFile(envFile, oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, updateVars, makeSecret)
@@ -193,7 +196,7 @@ func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.En
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
 	case exist && !updateVars: // don't update variable
-		fmt.Printf("key %s already exists, skipping creation. Use the update command to update existing variables", variableKey)
+		fmt.Printf("key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
 	case exist && updateVars: // update variable
 		fmt.Printf("updating variable %s \n", variableKey)
 		secret := makeSecret
@@ -214,6 +217,54 @@ func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.En
 		}
 		newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
 		fmt.Printf("adding variable %s\n", variableKey)
+	}
+	return newEnvironmentVariables
+}
+
+func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableList []string, updateVars, makeSecret bool) []astro.EnvironmentVariable {
+	var key string
+	var val string
+	// valisdate each key value pair and add to new variables list
+	for i := range variableList {
+		// split pair
+		pair := strings.Split(variableList[i], "=")
+		if len(pair) > 1 {
+			key = pair[0]
+			val = pair[1]
+			if key == "" || val == "" {
+				fmt.Printf("Input %s has blank key or value\n", variableList[i])
+				continue
+			}
+		} else {
+			fmt.Printf("Input %s is not a valid key value pair\n", variableList[i])
+			continue
+		}
+		var newEnvironmentVariable astro.EnvironmentVariable
+		exist, num := contains(oldKeyList, key)
+		switch {
+		case exist && !updateVars: // don't update variable
+			fmt.Printf("key %s already exists, skipping creation. Use the update command to update existing variables", key)
+		case exist && updateVars: // update variable
+			fmt.Printf("updating variable %s \n", key)
+			secret := makeSecret
+			if !makeSecret { // you can only make variables secret a user can't make them not secret
+				secret = oldEnvironmentVariables[num].IsSecret
+			}
+			newEnvironmentVariable = astro.EnvironmentVariable{
+				IsSecret: secret,
+				Key:      oldEnvironmentVariables[num].Key,
+				Value:    val,
+			}
+			newEnvironmentVariables[num] = newEnvironmentVariable
+		default:
+			newFileEnvironmentVariable := astro.EnvironmentVariable{
+				IsSecret: makeSecret,
+				Key:      key,
+				Value:    val,
+			}
+			newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
+			fmt.Printf("adding variable %s\n", key)
+		}
 	}
 	return newEnvironmentVariables
 }

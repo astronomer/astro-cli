@@ -189,10 +189,10 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 // nolint:dupl
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create",
-		Short:   "Create Deployment-level environment variables",
-		Long:    "Create Deployment-level environment variables by supplying either a key and value or an environment file with a list of keys and values",
-		Args:    cobra.NoArgs,
+		Use:   "create [key1=val1 key2=val2]",
+		Short: "Create Deployment-level environment variables",
+		Long:  "Create Deployment-level environment variables by supplying either a key and value or an environment file with a list of keys and values",
+		// Args:    cobra.NoArgs,
 		Example: deploymentVariableCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableCreate(cmd, args, out)
@@ -211,10 +211,9 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 // nolint:dupl
 func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update",
+		Use:     "update [key1=update_val1 key2=update_val2]",
 		Short:   "Update Deployment-level environment variables",
 		Long:    "Update Deployment-level environment variables by supplying either a key and value or an environment file with a list of keys and values, variables that don't already exist will be created",
-		Args:    cobra.NoArgs,
 		Example: deploymentVariableUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableUpdate(cmd, args, out)
@@ -330,26 +329,30 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	return deployment.VariableList(deploymentID, variableKey, ws, envFile, useEnvFile, astroClient, out)
 }
 
-func deploymentVariableCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
+func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
+	variableList := args
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, useEnvFile, makeSecret, false, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, variableList, useEnvFile, makeSecret, false, astroClient, out)
 }
 
-func deploymentVariableUpdate(cmd *cobra.Command, _ []string, out io.Writer) error {
+func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
+	variableList := args
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, useEnvFile, makeSecret, true, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, variableList, useEnvFile, makeSecret, true, astroClient, out)
 }
