@@ -210,23 +210,23 @@ func TestVariableModify(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("missing var key or value from arg list", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
-		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
+	// t.Run("missing var key or value from arg list", func(t *testing.T) {
+	// 	mockClient := new(astro_mocks.Client)
+	// 	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+	// 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
 
-		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-2="}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Input test-key-2= has blank key or value")
-		mockClient.AssertExpectations(t)
+	// 	buf := new(bytes.Buffer)
+	// 	err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-2="}, false, false, false, mockClient, buf)
+	// 	assert.NoError(t, err)
+	// 	assert.Contains(t, buf.String(), "Input test-key-2= has blank key or value")
+	// 	mockClient.AssertExpectations(t)
 
-		buf = new(bytes.Buffer)
-		err = VariableModify("test-id-1", "", "", ws, "", []string{"test-key-2"}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Input test-key-2 is not a valid key value pair")
-		mockClient.AssertExpectations(t)
-	})
+	// 	buf = new(bytes.Buffer)
+	// 	err = VariableModify("test-id-1", "", "", ws, "", []string{"test-key-2"}, false, false, false, mockClient, buf)
+	// 	assert.NoError(t, err)
+	// 	assert.Contains(t, buf.String(), "Input test-key-2 is not a valid key value pair")
+	// 	mockClient.AssertExpectations(t)
+	// })
 
 	t.Run("create env var failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
