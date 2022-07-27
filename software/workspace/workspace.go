@@ -20,10 +20,10 @@ type PaginationOptions struct {
 }
 
 var (
-	defaultWorkspacePaginationOptions         = "f. first p. previous n. next q. quit\n> "
-	WorkspacePaginationWithoutNextOptions     = "f. first p. previous q. quit\n> "
-	WorkspacePaginationWithoutPreviousOptions = "n. next q. quit\n> "
-	WorkspacePaginationWithQuitOptions        = "q. quit\n> "
+	defaultWorkspacePaginationOptions     = "f. first p. previous n. next q. quit\n> "
+	WorkspacePaginationWithoutNextOptions = "f. first p. previous q. quit\n> "
+	WorkspacePaginationWithNexQuitOptions = "n. next q. quit\n> "
+	WorkspacePaginationWithQuitOptions    = "q. quit\n> "
 )
 
 var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
@@ -128,14 +128,15 @@ func WorkspacesPromptPaginatedOption(pageSize, pageNumber, totalRecord int) Pagi
 	if totalRecord < pageSize {
 		delete(gotoOptions, "n")
 		gotoOptionMessage = WorkspacePaginationWithoutNextOptions
-	} else if pageNumber == 0 {
+	}
+
+	if pageNumber == 0 {
+		delete(gotoOptions, "p")
 		delete(gotoOptions, "f")
-		gotoOptionMessage = WorkspacePaginationWithoutPreviousOptions
+		gotoOptionMessage = WorkspacePaginationWithNexQuitOptions
 	}
 
 	if pageNumber == 0 && totalRecord < pageSize {
-		delete(gotoOptions, "p")
-		delete(gotoOptions, "f")
 		gotoOptionMessage = WorkspacePaginationWithQuitOptions
 	}
 
