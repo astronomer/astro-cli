@@ -476,6 +476,23 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	}`
 
+	WorkspacesPaginatedGetRequest = `
+	query paginatedWorkspaces(
+		$pageSize: Int
+		$pageNumber: Int
+	  ) {
+		  paginatedWorkspaces(
+				take: $pageSize
+				pageNumber: $pageNumber
+		  ) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
 	WorkspaceCreateRequest = `
 	mutation CreateWorkspace($label: String!, $description: String = "N/A") {
 		createWorkspace(label: $label, description: $description) {

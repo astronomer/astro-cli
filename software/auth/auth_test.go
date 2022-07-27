@@ -239,7 +239,7 @@ func TestLoginSuccess(t *testing.T) {
 	houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
 
 	out := &bytes.Buffer{}
-	if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
+	if err := Login("localhost", false, "test", "test", false, 100, houstonMock, out); (err != nil) != false {
 		t.Errorf("Login() error = %v, wantErr %v", err, false)
 		return
 	}
@@ -249,7 +249,7 @@ func TestLoginSuccess(t *testing.T) {
 
 	houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
 	out = &bytes.Buffer{}
-	if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
+	if err := Login("localhost", false, "test", "test", false, 100, houstonMock, out); (err != nil) != false {
 		t.Errorf("Login() error = %v, wantErr %v", err, false)
 		return
 	}
@@ -271,7 +271,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(nil, errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", houstonMock, out); !errors.Is(err, errMockRegistry) {
+		if err := Login("localhost", false, "test", "test", false, 100, houstonMock, out); !errors.Is(err, errMockRegistry) {
 			t.Errorf("Login() error = %v, wantErr %v", err, errMockRegistry)
 			return
 		}
@@ -287,7 +287,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return("", errMockRegistry)
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", houstonMock, out); !errors.Is(err, errMockRegistry) {
+		if err := Login("localhost", false, "test", "test", false, 100, houstonMock, out); !errors.Is(err, errMockRegistry) {
 			t.Errorf("Login() error = %v, wantErr %v", err, errMockRegistry)
 			return
 		}
@@ -304,7 +304,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{}, errMockRegistry).Once()
 
 		out := &bytes.Buffer{}
-		if err := Login("localhost", false, "test", "test", houstonMock, out); !errors.Is(err, errMockRegistry) {
+		if err := Login("localhost", false, "test", "test", false, 100, houstonMock, out); !errors.Is(err, errMockRegistry) {
 			t.Errorf("Login() error = %v, wantErr %v", err, errMockRegistry)
 			return
 		}
@@ -322,7 +322,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		out := &bytes.Buffer{}
-		if err := Login("dev.astro.io", false, "test", "test", houstonMock, out); !errors.Is(err, nil) {
+		if err := Login("dev.astro.io", false, "test", "test", false, 100, houstonMock, out); !errors.Is(err, nil) {
 			t.Errorf("Login() error = %v, wantErr %v", err, nil)
 			return
 		}
@@ -346,7 +346,7 @@ func TestLoginFailure(t *testing.T) {
 		}
 
 		out := &bytes.Buffer{}
-		if err := Login("test.astro.io", false, "test", "test", houstonMock, out); !errors.Is(err, nil) {
+		if err := Login("test.astro.io", false, "test", "test", false, 100, houstonMock, out); !errors.Is(err, nil) {
 			t.Errorf("Login() error = %v, wantErr %v", err, nil)
 			return
 		}

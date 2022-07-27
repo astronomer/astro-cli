@@ -12,6 +12,20 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+type PaginationOptions struct {
+	pageSize      int
+	pageNumber    int
+	quit          bool
+	userSelection int
+}
+
+var (
+	defaultWorkspacePaginationOptions         = "f. first p. previous n. next q. quit\n> "
+	WorkspacePaginationWithoutNextOptions     = "f. first p. previous q. quit\n> "
+	WorkspacePaginationWithoutPreviousOptions = "n. next q. quit\n> "
+	WorkspacePaginationWithQuitOptions        = "q. quit\n> "
+)
+
 var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
 func newTableOut() *printutil.Table {
@@ -102,11 +116,55 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-func getWorkspaceSelection(client houston.ClientInterface, out io.Writer) (string, error) {
+// WorkspacesPromptPaginatedOption Show pagination option based on page size and total record
+func WorkspacesPromptPaginatedOption(pageSize, pageNumber, totalRecord int) PaginationOptions {
+	gotoOptionMessage := defaultWorkspacePaginationOptions
+	gotoOptions := make(map[string]PaginationOptions)
+	gotoOptions["f"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
+	gotoOptions["p"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
+	gotoOptions["n"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
+	gotoOptions["q"] = PaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
+
+	if totalRecord < pageSize {
+		delete(gotoOptions, "n")
+		gotoOptionMessage = WorkspacePaginationWithoutNextOptions
+	} else if pageNumber == 0 {
+		delete(gotoOptions, "f")
+		gotoOptionMessage = WorkspacePaginationWithoutPreviousOptions
+	}
+
+	if pageNumber == 0 && totalRecord < pageSize {
+		delete(gotoOptions, "p")
+		delete(gotoOptions, "f")
+		gotoOptionMessage = WorkspacePaginationWithQuitOptions
+	}
+
+	in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
+	value, found := gotoOptions[in]
+	i, err := strconv.ParseInt(in, 10, 8) //nolint:gomnd
+
+	if found {
+		return value
+	} else if err == nil && int(i) > pageSize*pageNumber {
+		userSelection := gotoOptions["q"]
+		userSelection.userSelection = int(i) - pageSize*pageNumber
+		return userSelection
+	}
+	fmt.Print("\nInvalid option")
+	return WorkspacesPromptPaginatedOption(pageSize, pageNumber, totalRecord)
+}
+
+func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterface, out io.Writer) (string, error) {
 	tab := newTableOut()
 	tab.GetUserInput = true
+	var ws []houston.Workspace
+	var err error
 
-	ws, err := client.ListWorkspaces()
+	if pageSize > 0 {
+		ws, err = client.PaginatedListWorkspaces(pageSize, pageNumber)
+	} else {
+		ws, err = client.ListWorkspaces()
+	}
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +189,19 @@ func getWorkspaceSelection(client houston.ClientInterface, out io.Writer) (strin
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.Print(out)
+	tab.PrintWithPageNumber(pageNumber*pageSize, out)
+	totalRecords := len(ws)
+
+	if pageSize > 0 {
+		selectedOption := WorkspacesPromptPaginatedOption(pageSize, pageNumber, totalRecords)
+		if selectedOption.quit {
+			if selectedOption.userSelection == 0 {
+				return "", nil
+			}
+			return ws[selectedOption.userSelection-1].ID, nil
+		}
+		return getWorkspaceSelection(selectedOption.pageSize, selectedOption.pageNumber, client, out)
+	}
 
 	in := input.Text("\n> ")
 	i, err := strconv.ParseInt(in, 10, 64) //nolint:gomnd
@@ -143,9 +213,9 @@ func getWorkspaceSelection(client houston.ClientInterface, out io.Writer) (strin
 }
 
 // Switch switches workspaces
-func Switch(id string, client houston.ClientInterface, out io.Writer) error {
+func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writer) error {
 	if id == "" {
-		_id, err := getWorkspaceSelection(client, out)
+		_id, err := getWorkspaceSelection(pageSize, 0, client, out)
 		if err != nil {
 			return err
 		}

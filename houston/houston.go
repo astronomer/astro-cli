@@ -27,6 +27,7 @@ type ClientInterface interface {
 	// workspace
 	CreateWorkspace(label, description string) (*Workspace, error)
 	ListWorkspaces() ([]Workspace, error)
+	PaginatedListWorkspaces(pageSize int, pageNumber int) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)

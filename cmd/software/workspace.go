@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/software/workspace"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +19,8 @@ var (
 	workspaceCreateLabel       string
 	workspaceUpdateLabel       string
 	workspaceUpdateDescription string
+	workspacePaginated         bool
+	workspacePageSize          int
 	workspaceDeleteExample     = `
   $ astro workspace delete <workspace-id>
 `
@@ -99,6 +102,8 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 			return workspaceSwitch(cmd, out, args)
 		},
 	}
+	cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated user list")
+	cmd.Flags().IntVarP(&workspacePageSize, "pageSize", "s", 0, "Page size")
 	return cmd
 }
 
@@ -176,6 +181,15 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 1 {
 		id = args[0]
 	}
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
 
-	return workspace.Switch(id, houstonClient, out)
+	if ctx.Interactive || workspacePaginated {
+		if workspacePageSize == 0 {
+			workspacePageSize = ctx.PageSize
+		}
+	}
+	return workspace.Switch(id, workspacePageSize, houstonClient, out)
 }
