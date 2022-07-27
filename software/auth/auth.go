@@ -54,7 +54,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	return client.AuthenticateWithBasicAuth(username, password, ctx)
 }
 
-func switchToLastUsedWorkspace(c *config.Context, workspaces []houston.Workspace) bool {
+var switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
 	if c.LastUsedWorkspace == "" {
 		return false
 	}
@@ -205,7 +205,7 @@ func Login(domain string, oAuthOnly bool, username, password string, interactive
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + cliChooseWorkspace)
 			pageSize := 0
-			if ctx.Interactive {
+			if interactive {
 				pageSize = ctx.PageSize
 			}
 			err := workspace.Switch("", pageSize, client, out)

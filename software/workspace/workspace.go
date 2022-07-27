@@ -117,42 +117,43 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 // WorkspacesPromptPaginatedOption Show pagination option based on page size and total record
-func WorkspacesPromptPaginatedOption(pageSize, pageNumber, totalRecord int) PaginationOptions {
-	gotoOptionMessage := defaultWorkspacePaginationOptions
-	gotoOptions := make(map[string]PaginationOptions)
-	gotoOptions["f"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
-	gotoOptions["p"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
-	gotoOptions["n"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
-	gotoOptions["q"] = PaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
+var WorkspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) PaginationOptions {
+	for {
+		gotoOptionMessage := defaultWorkspacePaginationOptions
+		gotoOptions := make(map[string]PaginationOptions)
+		gotoOptions["f"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
+		gotoOptions["p"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
+		gotoOptions["n"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
+		gotoOptions["q"] = PaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
 
-	if totalRecord < pageSize {
-		delete(gotoOptions, "n")
-		gotoOptionMessage = WorkspacePaginationWithoutNextOptions
+		if totalRecord < pageSize {
+			delete(gotoOptions, "n")
+			gotoOptionMessage = WorkspacePaginationWithoutNextOptions
+		}
+
+		if pageNumber == 0 {
+			delete(gotoOptions, "p")
+			delete(gotoOptions, "f")
+			gotoOptionMessage = WorkspacePaginationWithNexQuitOptions
+		}
+
+		if pageNumber == 0 && totalRecord < pageSize {
+			gotoOptionMessage = WorkspacePaginationWithQuitOptions
+		}
+
+		in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
+		value, found := gotoOptions[in]
+		i, err := strconv.ParseInt(in, 10, 8) //nolint:gomnd
+
+		if found {
+			return value
+		} else if err == nil && int(i) > pageSize*pageNumber {
+			userSelection := gotoOptions["q"]
+			userSelection.userSelection = int(i) - pageSize*pageNumber
+			return userSelection
+		}
+		fmt.Print("\nInvalid option")
 	}
-
-	if pageNumber == 0 {
-		delete(gotoOptions, "p")
-		delete(gotoOptions, "f")
-		gotoOptionMessage = WorkspacePaginationWithNexQuitOptions
-	}
-
-	if pageNumber == 0 && totalRecord < pageSize {
-		gotoOptionMessage = WorkspacePaginationWithQuitOptions
-	}
-
-	in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
-	value, found := gotoOptions[in]
-	i, err := strconv.ParseInt(in, 10, 8) //nolint:gomnd
-
-	if found {
-		return value
-	} else if err == nil && int(i) > pageSize*pageNumber {
-		userSelection := gotoOptions["q"]
-		userSelection.userSelection = int(i) - pageSize*pageNumber
-		return userSelection
-	}
-	fmt.Print("\nInvalid option")
-	return WorkspacesPromptPaginatedOption(pageSize, pageNumber, totalRecord)
 }
 
 func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterface, out io.Writer) (string, error) {
