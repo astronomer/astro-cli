@@ -58,6 +58,9 @@ type ResponseData struct {
 	WorkspaceUpdateTeamRole        string                      `json:"workspaceUpdateTeamRole,omitempty"`
 	WorkspaceGetTeams              []Team                      `json:"workspaceTeams,omitempty"`
 	UpdateDeploymentImage          UpdateDeploymentImageResp   `json:"updateDeploymentImage,omitempty"`
+	ListTeams                      ListTeamsResp               `json:"paginatedTeams,omitempty"`
+	CreateTeamSystemRoleBinding    RoleBinding                 `json:"createTeamSystemRoleBinding"`
+	DeleteTeamSystemRoleBinding    RoleBinding                 `json:"deleteTeamSystemRoleBinding"`
 }
 
 type Namespace struct {
@@ -227,6 +230,11 @@ type Team struct {
 	CreatedAt    string        `json:"createdAt"`
 	UpdatedAt    string        `json:"updatedAt"`
 	RoleBindings []RoleBinding `json:"roleBindings"`
+}
+
+type ListTeamsResp struct {
+	Count int    `json:"count"`
+	Teams []Team `json:"teams"`
 }
 
 type RoleBindingWorkspace struct {

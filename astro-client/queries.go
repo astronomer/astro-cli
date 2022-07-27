@@ -133,4 +133,12 @@ var (
 	  }
 	}
   `
+	GetWorkspace = `
+	query GetWorkspace($workspaceId: Id!) {
+		workspace(id:$workspaceId) {
+			id
+			label
+			organizationId
+		}
+	}`
 )

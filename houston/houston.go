@@ -72,6 +72,9 @@ type ClientInterface interface {
 	// teams
 	GetTeam(teamID string) (*Team, error)
 	GetTeamUsers(teamID string) ([]User, error)
+	ListTeams(cursor string, take int) (ListTeamsResp, error)
+	CreateTeamSystemRoleBinding(teamID, role string) (string, error)
+	DeleteTeamSystemRoleBinding(teamID, role string) (string, error)
 	// workspace teams and roles
 	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
 	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
