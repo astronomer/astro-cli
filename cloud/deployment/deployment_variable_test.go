@@ -212,19 +212,19 @@ func TestVariableModify(t *testing.T) {
 
 	// t.Run("missing var key or value from arg list", func(t *testing.T) {
 	// 	mockClient := new(astro_mocks.Client)
-	// 	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
-	// 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
+	// 	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
+	// 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Twice()
+
+	// 	// buf := new(bytes.Buffer)
+	// 	// err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-3="}, false, false, false, mockClient, buf)
+	// 	// assert.NoError(t, err)
+	// 	// assert.Contains(t, buf.String(), "test-key-2")
+	// 	// mockClient.AssertExpectations(t)
 
 	// 	buf := new(bytes.Buffer)
-	// 	err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-2="}, false, false, false, mockClient, buf)
+	// 	err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-3"}, false, false, false, mockClient, buf)
 	// 	assert.NoError(t, err)
-	// 	assert.Contains(t, buf.String(), "Input test-key-2= has blank key or value")
-	// 	mockClient.AssertExpectations(t)
-
-	// 	buf = new(bytes.Buffer)
-	// 	err = VariableModify("test-id-1", "", "", ws, "", []string{"test-key-2"}, false, false, false, mockClient, buf)
-	// 	assert.NoError(t, err)
-	// 	assert.Contains(t, buf.String(), "Input test-key-2 is not a valid key value pair")
+	// 	assert.Contains(t, buf.String(), "test-key-2")
 	// 	mockClient.AssertExpectations(t)
 	// })
 
@@ -329,4 +329,11 @@ func TestAddVariablesFromArgs(t *testing.T) {
 		[]string{"test-key-1=test-value-3"}, false, false,
 	)
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}}, resp)
+
+	resp = addVariablesFromArgs([]string{"test-key-1"},
+		[]astro.EnvironmentVariablesObject{},
+		[]astro.EnvironmentVariable{},
+		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false,
+	)
+	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-2", Value: "test-value-3"}}, resp)
 }
