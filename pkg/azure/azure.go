@@ -11,6 +11,16 @@ type DagClient struct {
 	blobClient *azblob.BlockBlobClient
 }
 
+type Azure interface {
+	Upload(dagFileReader io.Reader) (string, error)
+	CreateSASDagClient(sasLink string) (DagClient, error)
+}
+
+type AzureClientAPI interface {
+	NewBlockBlobClientWithNoCredential(blobURL string, options *azblob.ClientOptions) (*azblob.BlockBlobClient, error)
+	UploadStream(ctx context.Context, body io.Reader, o *azblob.UploadStreamOptions) (*azblob.BlockBlobCommitBlockListResponse, error)
+}
+
 func upload(blobClient *azblob.BlockBlobClient, uploadFileReader io.Reader) (string, error) {
 	uploadRes, err := blobClient.UploadStream(context.TODO(), uploadFileReader, azblob.UploadStreamOptions{})
 	if err != nil {

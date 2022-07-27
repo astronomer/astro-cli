@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"os"
+	// "io"
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -17,9 +21,23 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	// "github.com/astronomer/astro-cli/pkg/azure"
+	azure_mocks "github.com/astronomer/astro-cli/pkg/azure/mocks"
+	"github.com/spf13/afero"
 )
 
 var errMock = errors.New("mock error")
+
+// var mockBlobClient *azblob.BlockBlobClient
+
+// // This helps in assigning mock at the runtime instead of compile time
+// var azureUploadMock func(dagFile io.Reader) (string, error)
+
+// type azureClientMock struct{}
+
+// func (a azureClientMock) azureUpload(dagFile io.Reader) (string, error) {
+// 	return azureUploadMock(dagFile)
+// }
 
 func TestDeploySuccess(t *testing.T) {
 	mockDeplyResp := []astro.Deployment{
@@ -162,6 +180,141 @@ func TestDeployFailure(t *testing.T) {
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
+}
+
+func TestDeployDagsSuccess(t *testing.T) {
+	mockDeplyResp := []astro.Deployment{
+		{
+			ID:             "test-id",
+			ReleaseName:    "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:             "test-id-2",
+			ReleaseName:    "test-name-2",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+	}
+
+	mockInitiateDagDeploymentResponse := astro.InitiateDagDeployment{
+		ID:     "test-dag-deployment-id",
+		DagURL: "http://test-dag-url",
+	}
+
+	mockDagDeploymentStatusResponse := astro.DagDeploymentStatus{
+		ID:            "test-dag-deployment-status-id",
+		DeploymentID:  "test-id",
+		Action:        "UPLOAD",
+		VersionID:     "version-id",
+		Status:        "SUCCESS",
+		Message:       "some-message",
+		CreatedAt:     "created-date",
+		InitiatorID:   "initiator-id",
+		InitiatorType: "user",
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+	// mockBlobClient = new(azblob.BlockBlobClient)
+	mockAzure := new(azure_mocks.Azure)
+	mockAzureClientAPI := new(azure_mocks.AzureClientAPI)
+	// mockDagClient, err := mockAzureClient.CreateSASDagClient("http://test-dag-url")
+	// if err != nil {
+	//     t.Fatal(err)
+	// }
+	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Once()
+	mockClient.On("InitiateDagDeployment", mock.Anything).Return(mockInitiateDagDeploymentResponse, nil).Once()
+	// var dagFile io.Reader
+	filePath := "test.yaml"
+	fs := afero.NewMemMapFs()
+	_ = afero.WriteFile(fs, filePath, []byte(`test`), 0o777)
+	tempFile, _ := os.CreateTemp("", "test.yaml")
+	// defer os.Remove(tempFile.Name())
+	// dagClient := azure.DagClient{
+	// 	"UploadStream": func() (*azblob.BlobContentInfo, error) {
+	// 		return &map[string]string{"VersionID": "version-id"}, nil
+	// 	},
+	// }
+	// dagClient := azure.DagClient{
+	// 	"UploadStream": func() (*azblob.BlockBlobCommitBlockListResponse, error) {
+	// 		return &azblob.BlockBlobCommitBlockListResponse{map[string]interface{}{VersionID: "version-id"}}, nil
+	// 	},
+	// }
+	// dagClient := &azblob.BlockBlobClient{
+	// 	"UploadStream": func() (*azblob.BlockBlobCommitBlockListResponse, error) {
+	// 		return &azblob.BlockBlobCommitBlockListResponse{map[string]interface{}{"VersionID": "version-id"}}, nil
+	// 	},
+	// }
+	// fmt.Println(*mockAzureClient)
+	// mockAzureClient.On("getBlockBlobClientFromSAS", "http://test-dag-url").Return(dagClient, nil).Once()
+	// dagClient := &azblob.BlockBlobClient{}
+	cli, err := azblob.NewBlockBlobClientWithNoCredential(mockInitiateDagDeploymentResponse.DagURL, nil)
+	fmt.Println(cli)
+	fmt.Println(err)
+	res, err := cli.UploadStream(context.TODO(), tempFile, azblob.UploadStreamOptions{})
+	fmt.Println(res)
+	fmt.Println(err)
+	// {
+	// 	NewBlockBlobClientWithNoCredential: func(url string) (*azblob.BlockBlobClient, error) {
+	// 		return azblob.BlockBlobClient{}, nil
+	// 	},
+	// }
+	// mockAzureClientAPI.On("NewBlockBlobClientWithNoCredential", mockInitiateDagDeploymentResponse.DagURL, nil).Return(dagClient, nil).Once()
+	// mockAzureClientAPI.On("UploadStream", context.TODO(), dagFile, azblob.UploadStreamOptions{}).Return(map[string]string{"VersionID": "version-id"}, nil).Once()
+	// mockAzure.On("getBlockBlobClientFromSAS", mockInitiateDagDeploymentResponse.DagURL).Return(dagClient, nil).Once()
+	// mockAzure.On("CreateSASDagClient", mockInitiateDagDeploymentResponse.DagURL).Return(dagClient, nil).Once()
+	// mockAzure.On("Upload", mock.Anything).Return("version-id", nil).Once()
+	// azureClient = azureClientMock{}
+	// azureUploadMock = func(dagFile io.Reader) (string, error) {
+	// 	return "version-id", nil
+	// }
+	// _, err = mockDagClient.Upload(dagFile)
+	// assert.NoError(t, err)
+	// uploadRes, err := mockBlobClient.UploadStream(context.TODO(), tempFile, azblob.UploadStreamOptions{})
+	// fmt.Println(uploadRes);
+	// assert.NoError(t, err)
+	// assert.Equal(t, *uploadRes.VersionID, "version-id")
+
+	mockClient.On("ReportDagDeploymentStatus", mock.Anything).Return(mockDagDeploymentStatusResponse, nil).Once()
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+	ctx.Token = "test testing"
+	err = ctx.SetContext()
+	assert.NoError(t, err)
+
+	// mock os.Stdin
+	input := []byte("1")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	err = Deploy("./testfiles/", "", "test-ws-id", "", "", "", true, true, mockClient)
+	fmt.Println(err)
+	assert.NoError(t, err)
+
+	mockAzureClientAPI.AssertExpectations(t)
+
+	mockAzure.AssertExpectations(t)
+	mockClient.AssertExpectations(t)
 }
 
 func TestBuildImageFailure(t *testing.T) {
