@@ -91,7 +91,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 
 	// add new variable from flag
 	if variableKey != "" && variableValue != "" {
-		newEnvironmentVariables = addVariableFromFlag(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret)
+		newEnvironmentVariables = addVariableFromFlag(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret, out)
 	}
 	if variableValue == "" && variableKey != "" {
 		fmt.Fprintf(out, "Variable with key %s not created or updated\nYou must provide a variable value", variableKey)
@@ -191,14 +191,14 @@ func writeVarToFile(environmentVariablesObjects []astro.EnvironmentVariablesObje
 }
 
 // Add variables from flag
-func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool) []astro.EnvironmentVariable {
+func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
 	var newEnvironmentVariable astro.EnvironmentVariable
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
 	case exist && !updateVars: // don't update variable
-		fmt.Printf("key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
+		fmt.Fprintln(out, "key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
 	case exist && updateVars: // update variable
-		fmt.Printf("updating variable %s \n", variableKey)
+		fmt.Fprintln(out, "updating variable %s \n", variableKey)
 		secret := makeSecret
 		if !makeSecret { // you can only make variables secret a user can't make them not secret
 			secret = oldEnvironmentVariables[num].IsSecret
