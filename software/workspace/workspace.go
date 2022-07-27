@@ -189,7 +189,10 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.PrintWithPageNumber(pageNumber*pageSize, out)
+	tabPrintErr := tab.PrintWithPageNumber(pageNumber*pageSize, out)
+	if tabPrintErr != nil {
+		return "", fmt.Errorf("unable to print with page number: %w", tabPrintErr)
+	}
 	totalRecords := len(ws)
 
 	if pageSize > 0 {
