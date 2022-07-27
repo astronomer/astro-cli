@@ -196,9 +196,9 @@ func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.En
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
 	case exist && !updateVars: // don't update variable
-		fmt.Fprintln(out, "key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
+		fmt.Fprintf(out, "key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
 	case exist && updateVars: // update variable
-		fmt.Fprintln(out, "updating variable %s \n", variableKey)
+		fmt.Fprintf(out, "updating variable %s \n", variableKey)
 		secret := makeSecret
 		if !makeSecret { // you can only make variables secret a user can't make them not secret
 			secret = oldEnvironmentVariables[num].IsSecret
