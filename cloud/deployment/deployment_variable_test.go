@@ -210,24 +210,6 @@ func TestVariableModify(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-	// t.Run("missing var key or value from arg list", func(t *testing.T) {
-	// 	mockClient := new(astro_mocks.Client)
-	// 	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
-	// 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Twice()
-
-	// 	// buf := new(bytes.Buffer)
-	// 	// err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-3="}, false, false, false, mockClient, buf)
-	// 	// assert.NoError(t, err)
-	// 	// assert.Contains(t, buf.String(), "test-key-2")
-	// 	// mockClient.AssertExpectations(t)
-
-	// 	buf := new(bytes.Buffer)
-	// 	err := VariableModify("test-id-1", "", "", ws, "", []string{"test-key-3"}, false, false, false, mockClient, buf)
-	// 	assert.NoError(t, err)
-	// 	assert.Contains(t, buf.String(), "test-key-2")
-	// 	mockClient.AssertExpectations(t)
-	// })
-
 	t.Run("create env var failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
