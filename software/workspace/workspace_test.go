@@ -371,7 +371,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 func TestWorkspacesPromptPaginatedOption(t *testing.T) {
 	t.Run("quit selection when total record less then page size and page first", func(t *testing.T) {
 		defer testUtil.MockUserInput(t, "q")()
-		resp := WorkspacesPromptPaginatedOption(3, 0, 3)
+		resp := workspacesPromptPaginatedOption(3, 0, 3)
 		expected := PaginationOptions{pageSize: 3, pageNumber: 0, quit: true, userSelection: 0}
 
 		assert.Equal(t, expected, resp)

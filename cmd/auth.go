@@ -39,8 +39,8 @@ func newLoginCommand(astroClient astro.Client, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
 	cmd.Flags().BoolVarP(&shouldLoginWithToken, "token-login", "t", false, "Login with a token for browserless cloud CLI login")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Prompt for interactive cli")
-	cmd.Flags().IntVarP(&pageSize, "page-size", "s", defaultPageSize, "Pagination page size")
+	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Prompt for interactive cli for software login")
+	cmd.Flags().IntVarP(&pageSize, "page-size", "s", defaultPageSize, "Pagination page size for software workspace selection")
 	return cmd
 }
 

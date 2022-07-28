@@ -102,7 +102,7 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 			return workspaceSwitch(cmd, out, args)
 		},
 	}
-	cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated user list")
+	cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated workspace list")
 	cmd.Flags().IntVarP(&workspacePageSize, "pageSize", "s", 0, "Page size")
 	return cmd
 }
