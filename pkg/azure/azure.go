@@ -8,7 +8,7 @@ import (
 )
 
 type DagClient struct {
-	blobClient *azblob.BlockBlobClient
+	BlobClient *azblob.BlockBlobClient
 }
 
 type Azure interface {
@@ -43,9 +43,9 @@ func CreateSASDagClient(sasLink string) (DagClient, error) {
 	if err != nil {
 		return DagClient{}, err
 	}
-	return DagClient{blobClient: blobClient}, nil
+	return DagClient{BlobClient: blobClient}, nil
 }
 
 func (ac DagClient) Upload(dagFileReader io.Reader) (string, error) {
-	return upload(ac.blobClient, dagFileReader)
+	return upload(ac.BlobClient, dagFileReader)
 }
