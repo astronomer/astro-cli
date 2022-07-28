@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/software/workspace"
 	"github.com/spf13/cobra"
@@ -13,9 +14,10 @@ var (
 	workspaceUserWsRole      string
 	workspaceUserCreateEmail string
 	paginated                bool
+	pageSize                 int
 )
 
-const paginationPageSize = 100
+const defaultWorkspaceUserPageSize = 100
 
 func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -89,6 +91,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated user list")
+	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Pagination page size")
 	return cmd
 }
 
@@ -144,8 +147,18 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
-	if paginated {
-		return workspace.PaginatedListRoles(ws, "", paginationPageSize, true, houstonClient, out)
+	configPageSize := config.CFG.PageSize.GetInt()
+
+	if config.CFG.Interactive.GetBool() || paginated {
+		if pageSize < 0 && configPageSize > 0 {
+			pageSize = configPageSize
+		}
+
+		if !(pageSize > 0 && pageSize <= defaultWorkspaceUserPageSize) {
+			pageSize = defaultWorkspaceUserPageSize
+		}
+
+		return workspace.PaginatedListRoles(ws, "", float64(pageSize), 0, houstonClient, out)
 	}
 	return workspace.ListRoles(ws, houstonClient, out)
 }

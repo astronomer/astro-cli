@@ -16,16 +16,16 @@ import (
 var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
 
 var (
-	defaultPaginationOptions         = "f. first p. previous n. next q. quit\n"
-	paginationWithoutNextOptions     = "f. first p. previous q. quit\n"
-	paginationWithoutPreviousOptions = "f. first n. next q. quit\n"
+	defaultPaginationOptions      = "f. first p. previous n. next q. quit\n> "
+	paginationWithoutNextOptions  = "f. first p. previous q. quit\n> "
+	paginationWithNextQuitOptions = "n. next q. quit\n> "
 )
 
 type PaginationOptions struct {
-	cursorID string
-	pageSize float64
-	quit     bool
-	init     bool
+	cursorID   string
+	pageSize   float64
+	quit       bool
+	pageNumber int
 }
 
 // Add a user to a workspace with specified role
@@ -89,7 +89,7 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 }
 
 // PaginatedListRoles print users and roles from a workspace
-func PaginatedListRoles(workspaceID string, cursorID string, take float64, init bool, client houston.ClientInterface, out io.Writer) error {
+func PaginatedListRoles(workspaceID, cursorID string, take float64, pageNumber int, client houston.ClientInterface, out io.Writer) error {
 	err := util.ClearTerminal()
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func PaginatedListRoles(workspaceID string, cursorID string, take float64, init 
 	tab.Print(out)
 
 	totalUsers := len(users)
-	if init && totalUsers < int(take) {
+	if pageNumber == 0 && totalUsers < int(take) {
 		return nil
 	}
 
@@ -131,39 +131,43 @@ func PaginatedListRoles(workspaceID string, cursorID string, take float64, init 
 		previousCursorID = ""
 	}
 
-	selectedOption := PromptPaginatedOption(previousCursorID, nextCursorID, take, totalUsers)
+	selectedOption := PromptPaginatedOption(previousCursorID, nextCursorID, take, totalUsers, pageNumber)
 	if selectedOption.quit {
 		return nil
 	}
 
-	return PaginatedListRoles(workspaceID, selectedOption.cursorID, selectedOption.pageSize, selectedOption.init, client, out)
+	return PaginatedListRoles(workspaceID, selectedOption.cursorID, selectedOption.pageSize, selectedOption.pageNumber, client, out)
 }
 
 // PromptPaginatedOption Show pagination option based on page size and total record
-func PromptPaginatedOption(previousCursorID string, nextCursorID string, take float64, totalRecord int) PaginationOptions {
-	pageSize := math.Abs(take)
-	gotoOptionMessage := defaultPaginationOptions
-	gotoOptions := make(map[string]PaginationOptions)
-	gotoOptions["f"] = PaginationOptions{cursorID: "", pageSize: pageSize, quit: false, init: false}
-	gotoOptions["p"] = PaginationOptions{cursorID: previousCursorID, pageSize: -pageSize, quit: false, init: false}
-	gotoOptions["n"] = PaginationOptions{cursorID: nextCursorID, pageSize: pageSize, quit: false, init: false}
-	gotoOptions["q"] = PaginationOptions{cursorID: "", pageSize: 0, quit: true, init: false}
+var PromptPaginatedOption = func(previousCursorID string, nextCursorID string, take float64, totalRecord int, pageNumber int) PaginationOptions {
+	for {
+		pageSize := math.Abs(take)
+		gotoOptionMessage := defaultPaginationOptions
+		gotoOptions := make(map[string]PaginationOptions)
+		gotoOptions["f"] = PaginationOptions{cursorID: "", pageSize: pageSize, quit: false, pageNumber: 0}
+		gotoOptions["p"] = PaginationOptions{cursorID: previousCursorID, pageSize: -pageSize, quit: false, pageNumber: pageNumber - 1}
+		gotoOptions["n"] = PaginationOptions{cursorID: nextCursorID, pageSize: pageSize, quit: false, pageNumber: pageNumber + 1}
+		gotoOptions["q"] = PaginationOptions{cursorID: "", pageSize: 0, quit: true, pageNumber: 0}
 
-	if totalRecord < int(take) {
-		delete(gotoOptions, "n")
-		gotoOptionMessage = paginationWithoutNextOptions
-	} else if int(take) < 0 && int(pageSize) > totalRecord {
-		delete(gotoOptions, "p")
-		gotoOptionMessage = paginationWithoutPreviousOptions
-	}
+		if totalRecord < int(pageSize) {
+			delete(gotoOptions, "n")
+			gotoOptionMessage = paginationWithoutNextOptions
+		}
 
-	in := input.Text("\n\nSelect below options to goto\n" + gotoOptionMessage)
-	value, found := gotoOptions[in]
-	if found {
-		return value
+		if pageNumber == 0 {
+			delete(gotoOptions, "p")
+			delete(gotoOptions, "f")
+			gotoOptionMessage = paginationWithNextQuitOptions
+		}
+
+		in := input.Text("\n\nPlease select one of the following options\n" + gotoOptionMessage)
+		value, found := gotoOptions[in]
+		if found {
+			return value
+		}
+		fmt.Print("\nInvalid option")
 	}
-	fmt.Print("\nInvalid option")
-	return PromptPaginatedOption(previousCursorID, nextCursorID, take, totalRecord)
 }
 
 // Update workspace user role

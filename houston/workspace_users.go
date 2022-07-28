@@ -46,7 +46,7 @@ func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) ([]W
 }
 
 // ListWorkspacePaginatedUserAndRoles - list users and roles from a workspace
-func (h ClientImplementation) ListWorkspacePaginatedUserAndRoles(workspaceID string, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error) {
+func (h ClientImplementation) ListWorkspacePaginatedUserAndRoles(workspaceID, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error) {
 	req := Request{
 		Query:     WorkspacePaginatedGetUsersRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "cursorUuid": cursorID, "take": take},

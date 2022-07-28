@@ -236,7 +236,7 @@ func TestPaginatedListRoles(t *testing.T) {
 	os.Stdin = r
 
 	buf := new(bytes.Buffer)
-	err = PaginatedListRoles(wsID, "", paginationPageSize, true, api, buf)
+	err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
 	assert.NoError(t, err)
 	expected := ` USERNAME          ID                            ROLE                
  test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
@@ -255,7 +255,7 @@ func TestPaginatedListRolesError(t *testing.T) {
 	api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
-	err := PaginatedListRoles(wsID, "", paginationPageSize, true, api, buf)
+	err := PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
 	assert.EqualError(t, err, errMock.Error())
 	api.AssertExpectations(t)
 }
@@ -281,7 +281,7 @@ func TestShowListRolesPaginatedOption(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		value := PromptPaginatedOption(wsID, wsID, paginationPageSize, 10)
+		value := PromptPaginatedOption(wsID, wsID, paginationPageSize, 10, 0)
 		assert.Equal(t, value.quit, true)
 	})
 }
