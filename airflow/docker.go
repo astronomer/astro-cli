@@ -75,9 +75,6 @@ var (
 	openURL    = browser.OpenURL
 	timeoutNum = 60
 	tickNum    = 500
-
-	cmdPsExec   = cmdExec
-	cmdOpenExec = cmdExec
 )
 
 // ComposeConfig is input data to docker compose yaml template
