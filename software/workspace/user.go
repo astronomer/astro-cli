@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
@@ -90,11 +89,6 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 
 // PaginatedListRoles print users and roles from a workspace
 func PaginatedListRoles(workspaceID, cursorID string, take float64, pageNumber int, client houston.ClientInterface, out io.Writer) error {
-	err := util.ClearTerminal()
-	if err != nil {
-		return err
-	}
-
 	users, err := client.ListWorkspacePaginatedUserAndRoles(workspaceID, cursorID, take)
 	if err != nil {
 		return err

@@ -3,8 +3,6 @@ package util
 import (
 	"errors"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("command error")
@@ -218,21 +216,4 @@ func TestCheckEnvBool(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestClearTerminal(t *testing.T) {
-	t.Run("ClearTerminal success", func(t *testing.T) {
-		runCmd = func(name string, arg ...string) error {
-			return nil
-		}
-		err := ClearTerminal()
-		assert.NoError(t, err)
-	})
-	t.Run("ClearTerminal error", func(t *testing.T) {
-		runCmd = func(name string, arg ...string) error {
-			return errMock
-		}
-		err := ClearTerminal()
-		assert.Contains(t, err.Error(), errMock.Error())
-	})
 }
