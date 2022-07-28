@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -36,6 +35,7 @@ const (
 	houstonDomain        = "houston"
 	localSoftwareDomain  = "localhost.me"
 	registryDomainPrefix = "registry."
+	defaultPageSize      = 100
 )
 
 var (
@@ -128,9 +128,14 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, interactive bool, pageSize int, client houston.ClientInterface, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
+	interactive := config.CFG.Interactive.GetBool()
+	pageSize := config.CFG.PageSize.GetInt()
+	if !(pageSize > 0 && pageSize < defaultPageSize) {
+		pageSize = defaultPageSize
+	}
 
 	ctx := &config.Context{Domain: domain}
 	err = ctx.PrintSoftwareContext(out)
@@ -168,16 +173,6 @@ func Login(domain string, oAuthOnly bool, username, password string, interactive
 		return err
 	}
 
-	err = c.SetContextKey("interactive", strconv.FormatBool(interactive))
-	if err != nil {
-		return err
-	}
-
-	err = c.SetContextKey("pageSize", strconv.FormatInt(int64(pageSize), 10))
-	if err != nil {
-		return err
-	}
-
 	workspaces, err := client.ListWorkspaces()
 	if err != nil {
 		return err
@@ -204,9 +199,9 @@ func Login(domain string, oAuthOnly bool, username, password string, interactive
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + cliChooseWorkspace)
-			pageSize := 0
-			if interactive {
-				pageSize = ctx.PageSize
+
+			if !interactive {
+				pageSize = 0
 			}
 			err := workspace.Switch("", pageSize, client, out)
 			if err != nil {

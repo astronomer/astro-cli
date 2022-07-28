@@ -44,8 +44,6 @@ type Context struct {
 	Token             string `mapstructure:"token"`
 	RefreshToken      string `mapstructure:"refreshtoken"`
 	UserEmail         string `mapstructure:"user_email"`
-	Interactive       bool   `mapstructure:"interactive"`
-	PageSize          int    `mapstructure:"pageSize"`
 }
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
@@ -133,8 +131,6 @@ func (c *Context) SetContext() error {
 		"last_used_workspace": c.Workspace,
 		"refreshtoken":        c.RefreshToken,
 		"user_email":          c.UserEmail,
-		"interactive":         c.Interactive,
-		"pageSize":            c.PageSize,
 	}
 
 	viperHome.Set("contexts"+"."+key, context)

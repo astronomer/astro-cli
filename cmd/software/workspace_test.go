@@ -141,10 +141,30 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonMock.AssertExpectations(t)
 	})
 
-	t.Run("With pagination", func(t *testing.T) {
+	t.Run("With pagination default pageSize", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		wsID := "test-id"
+		buf := new(bytes.Buffer)
+		workspacePaginated = true
+
+		houstonMock := new(mocks.ClientInterface)
+		currentClient := houstonClient
+		houstonClient = houstonMock
+		defer func() { houstonClient = currentClient }()
+
+		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+
+		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), wsID)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("With pagination, invalid/negative pageSize", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		wsID := "test-id"
 		workspacePaginated = true
+		workspacePageSize = -10
 		buf := new(bytes.Buffer)
 
 		houstonMock := new(mocks.ClientInterface)

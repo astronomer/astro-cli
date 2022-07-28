@@ -15,16 +15,12 @@ var (
 	shouldDisplayLoginLink bool
 	shouldLoginWithToken   bool
 	oAuth                  bool
-	interactive            bool
-	pageSize               int
 
 	cloudLogin     = cloudAuth.Login
 	cloudLogout    = cloudAuth.Logout
 	softwareLogin  = softwareAuth.Login
 	softwareLogout = softwareAuth.Logout
 )
-
-const defaultPageSize = 100
 
 func newLoginCommand(astroClient astro.Client, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -39,8 +35,6 @@ func newLoginCommand(astroClient astro.Client, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
 	cmd.Flags().BoolVarP(&shouldLoginWithToken, "token-login", "t", false, "Login with a token for browserless cloud CLI login")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Prompt for interactive cli for software login")
-	cmd.Flags().IntVarP(&pageSize, "page-size", "s", defaultPageSize, "Pagination page size for software workspace selection")
 	return cmd
 }
 
@@ -60,13 +54,10 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	if !(pageSize > 0 && pageSize < defaultPageSize) {
-		pageSize = defaultPageSize
-	}
 
 	if len(args) == 1 {
 		if !context.IsCloudDomain(args[0]) {
-			return softwareLogin(args[0], oAuth, "", "", interactive, pageSize, houstonClient, out)
+			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)
 		}
 		return cloudLogin(args[0], astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
 	}
@@ -78,7 +69,7 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.W
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
 	}
-	return softwareLogin(ctx.Domain, oAuth, "", "", interactive, pageSize, houstonClient, out)
+	return softwareLogin(ctx.Domain, oAuth, "", "", houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {

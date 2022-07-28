@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/software/workspace"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +25,8 @@ var (
   $ astro workspace delete <workspace-id>
 `
 )
+
+const defaultPageSize = 100
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -181,15 +183,18 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 1 {
 		id = args[0]
 	}
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
 
-	if ctx.Interactive || workspacePaginated {
-		if workspacePageSize == 0 {
-			workspacePageSize = ctx.PageSize
+	pageSize := config.CFG.PageSize.GetInt()
+
+	if config.CFG.Interactive.GetBool() || workspacePaginated {
+		if workspacePageSize < 0 && pageSize > 0 {
+			workspacePageSize = pageSize
+		}
+
+		if !(workspacePageSize > 0 && workspacePageSize <= defaultPageSize) {
+			workspacePageSize = defaultPageSize
 		}
 	}
+
 	return workspace.Switch(id, workspacePageSize, houstonClient, out)
 }
