@@ -686,7 +686,7 @@ func startDocker() error {
 	if err != nil {
 		// open docker
 		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
-		err = cmdOpenExec(OpenCmd, buf, os.Stderr, "-a", "docker")
+		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", "docker")
 		if err != nil {
 			return err
 		}
@@ -714,7 +714,7 @@ func waitForDocker() error {
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
 			buf.Reset()
-			err := cmdPsExec(DockerCmd, buf, buf, "ps")
+			err := cmdExec(DockerCmd, buf, buf, "ps")
 			if err != nil {
 				continue
 			} else {
