@@ -1,11 +1,8 @@
 package util
 
 import (
-	"errors"
 	"testing"
 )
-
-var errMock = errors.New("command error")
 
 func TestCoerce(t *testing.T) {
 	type args struct {
