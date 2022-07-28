@@ -194,55 +194,174 @@ func TestListRolesError(t *testing.T) {
 }
 
 func TestPaginatedListRoles(t *testing.T) {
-	wsID := "ck1qg6whg001r08691y117hub"
-	var paginationPageSize float64 = 100
+	t.Run("user should not be prompted for pagination options if api returns less then page size", func(t *testing.T) {
+		wsID := "ck1qg6whg001r08691y117hub"
+		var paginationPageSize float64 = 100
 
-	mockResponse := []houston.WorkspaceUserRoleBindings{
-		{
-			ID:       "ckbv7zpkh00og0760ki4mhl6r",
-			Username: "test@test.com",
-			FullName: "test",
-			Emails:   []houston.Email{{Address: "test@test.com"}},
-			RoleBindings: []houston.RoleBindingWorkspace{
-				{
-					Role: houston.WorkspaceAdminRole,
-					Workspace: struct {
-						ID string `json:"id"`
-					}{
-						ID: wsID,
+		mockResponse := []houston.WorkspaceUserRoleBindings{
+			{
+				ID:       "ckbv7zpkh00og0760ki4mhl6r",
+				Username: "test@test.com",
+				FullName: "test",
+				Emails:   []houston.Email{{Address: "test@test.com"}},
+				RoleBindings: []houston.RoleBindingWorkspace{
+					{
+						Role: houston.WorkspaceAdminRole,
+						Workspace: struct {
+							ID string `json:"id"`
+						}{
+							ID: wsID,
+						},
 					},
 				},
 			},
-		},
-	}
+		}
 
-	api := new(mocks.ClientInterface)
-	api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
 
-	// mock os.Stdin for when prompted by PromptPaginatedOption
-	input := []byte("q")
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
-	w.Close()
-	stdin := os.Stdin
-	// Restore stdin right after the test.
-	defer func() { os.Stdin = stdin }()
-	os.Stdin = r
+		// mock os.Stdin for when prompted by PromptPaginatedOption
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
 
-	buf := new(bytes.Buffer)
-	err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-	assert.NoError(t, err)
-	expected := ` USERNAME          ID                            ROLE                
+		buf := new(bytes.Buffer)
+		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
+		assert.NoError(t, err)
+		expected := ` USERNAME          ID                            ROLE                
  test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+		assert.Equal(t, expected, buf.String())
+		api.AssertExpectations(t)
+	})
+	t.Run("user should be prompted for pagination options if return record is same as page size", func(t *testing.T) {
+		wsID := "ck1qg6whg001r08691y117hub"
+		var paginationPageSize float64 = 1
+
+		mockResponse := []houston.WorkspaceUserRoleBindings{
+			{
+				ID:       "ckbv7zpkh00og0760ki4mhl6r",
+				Username: "test@test.com",
+				FullName: "test",
+				Emails:   []houston.Email{{Address: "test@test.com"}},
+				RoleBindings: []houston.RoleBindingWorkspace{
+					{
+						Role: houston.WorkspaceAdminRole,
+						Workspace: struct {
+							ID string `json:"id"`
+						}{
+							ID: wsID,
+						},
+					},
+				},
+			},
+		}
+
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+
+		// mock os.Stdin for when prompted by PromptPaginatedOption
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		buf := new(bytes.Buffer)
+		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
+		assert.NoError(t, err)
+		expected := ` USERNAME          ID                            ROLE                
+ test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
+`
+		assert.Equal(t, expected, buf.String())
+		api.AssertExpectations(t)
+	})
+	t.Run("user should not see previous option if no record return if last action was next", func(t *testing.T) {
+		wsID := "ck1qg6whg001r08691y117hub"
+		var paginationPageSize float64 = 10
+
+		mockResponse := []houston.WorkspaceUserRoleBindings{}
+
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+
+		// mock os.Stdin for when prompted by PromptPaginatedOption
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		buf := new(bytes.Buffer)
+		err = PaginatedListRoles(wsID, "", paginationPageSize, 10, api, buf)
+		assert.NoError(t, err)
+		expected := ` USERNAME     ID     ROLE     
+`
+		assert.Equal(t, expected, buf.String())
+		api.AssertExpectations(t)
+	})
+	t.Run("user should not see next option if no record return if last action was previous", func(t *testing.T) {
+		wsID := "ck1qg6whg001r08691y117hub"
+		var paginationPageSize float64 = -10
+
+		mockResponse := []houston.WorkspaceUserRoleBindings{}
+
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+
+		// mock os.Stdin for when prompted by PromptPaginatedOption
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		buf := new(bytes.Buffer)
+		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
+		assert.NoError(t, err)
+		expected := ` USERNAME     ID     ROLE     
+`
+		assert.Equal(t, expected, buf.String())
+		api.AssertExpectations(t)
+	})
 }
 
 func TestPaginatedListRolesError(t *testing.T) {
