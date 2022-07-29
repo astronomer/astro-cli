@@ -708,7 +708,7 @@ func waitForDocker() error {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
 			return errors.New("timed out waiting for docker")
-		// Got a tick, we should check on checkSomething()
+		// Got a tick, we should check if docker is up & running
 		case <-ticker.C:
 			buf.Reset()
 			err := cmdExec(DockerCmd, buf, buf, "ps")
