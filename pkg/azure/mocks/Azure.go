@@ -36,20 +36,20 @@ func (_m *Azure) CreateSASDagClient(sasLink string) (azure.DagClient, error) {
 	return r0, r1
 }
 
-// Upload provides a mock function with given fields: dagFileReader
-func (_m *Azure) Upload(dagFileReader io.Reader) (string, error) {
-	ret := _m.Called(dagFileReader)
+// Upload provides a mock function with given fields: ac, dagFileReader
+func (_m *Azure) Upload(ac azure.DagClient, dagFileReader io.Reader) (string, error) {
+	ret := _m.Called(ac, dagFileReader)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(io.Reader) string); ok {
-		r0 = rf(dagFileReader)
+	if rf, ok := ret.Get(0).(func(azure.DagClient, io.Reader) string); ok {
+		r0 = rf(ac, dagFileReader)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(io.Reader) error); ok {
-		r1 = rf(dagFileReader)
+	if rf, ok := ret.Get(1).(func(azure.DagClient, io.Reader) error); ok {
+		r1 = rf(ac, dagFileReader)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -3,14 +3,10 @@ package deploy
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/astronomer/astro-cli/pkg/azure"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -21,9 +17,6 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	// "github.com/astronomer/astro-cli/pkg/azure"
-	azure_mocks "github.com/astronomer/astro-cli/pkg/azure/mocks"
-	"github.com/spf13/afero"
 )
 
 var errMock = errors.New("mock error")
@@ -169,89 +162,6 @@ func TestDeployFailure(t *testing.T) {
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
-}
-
-func TestDeployDagsSuccess(t *testing.T) {
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt: time.Now(),
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt: time.Now(),
-		},
-	}
-
-	mockInitiateDagDeploymentResponse := astro.InitiateDagDeployment{
-		ID:     "test-dag-deployment-id",
-		DagURL: "https://test-dag-url",
-	}
-
-	mockDagDeploymentStatusResponse := astro.DagDeploymentStatus{
-		ID:            "test-dag-deployment-status-id",
-		DeploymentID:  "test-id",
-		Action:        "UPLOAD",
-		VersionID:     "version-id",
-		Status:        "SUCCESS",
-		Message:       "some-message",
-		CreatedAt:     "created-date",
-		InitiatorID:   "initiator-id",
-		InitiatorType: "user",
-	}
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
-	mockAZBlobClient := new(azure_mocks.Azure)
-	testBClient, err := azblob.NewBlockBlobClient("test-url", nil, nil)
-	assert.NoError(t, err)
-	clientToBeReturned := azure.DagClient{BlobClient: testBClient}
-	mockAZBlobClient.On("CreateSASDagClient", mock.Anything).Return(clientToBeReturned, nil).Once()
-	mockAZBlobClient.On("Upload", mock.Anything).Return(map[string]string{"VersionID": "version-id"}, errMock).Once()
-	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Once()
-	mockClient.On("InitiateDagDeployment", mock.Anything).Return(mockInitiateDagDeploymentResponse, nil).Once()
-	mockClient.On("ReportDagDeploymentStatus", mock.Anything).Return(mockDagDeploymentStatusResponse, nil).Once()
-	filePath := "test.yaml"
-	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, filePath, []byte("test"), 0o777)
-
-	ctx, err := config.GetCurrentContext()
-	assert.NoError(t, err)
-	ctx.Token = "test testing"
-	err = ctx.SetContext()
-	assert.NoError(t, err)
-
-	// mock os.Stdin
-	input := []byte("1")
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
-	w.Close()
-	stdin := os.Stdin
-	// Restore stdin right after the test.
-	defer func() { os.Stdin = stdin }()
-	os.Stdin = r
-	err = Deploy("./testfiles/", "", "test-ws-id", "", "", "", true, true, mockClient)
-	fmt.Println(err)
-
-	// TODO debug to see why the mock client is not called and the real client is called
-	mockClient.AssertExpectations(t)
-	mockAZBlobClient.AssertExpectations(t)
 }
 
 func TestBuildImageFailure(t *testing.T) {

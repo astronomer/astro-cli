@@ -90,7 +90,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 	if err != nil {
 		return err
 	}
-	versionID, err := sasDagClient.Upload(dagFile)
+	versionID, err := azure.Upload(sasDagClient, dagFile)
 	if err != nil {
 		return err
 	}

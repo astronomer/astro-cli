@@ -12,40 +12,30 @@ type DagClient struct {
 }
 
 type Azure interface {
-	Upload(dagFileReader io.Reader) (string, error)
+	Upload(ac DagClient, dagFileReader io.Reader) (string, error)
 	CreateSASDagClient(sasLink string) (DagClient, error)
 }
 
-type AzureClientAPI interface {
+type ClientAPI interface {
 	NewBlockBlobClientWithNoCredential(blobURL string, options *azblob.ClientOptions) (*azblob.BlockBlobClient, error)
 	UploadStream(ctx context.Context, body io.Reader, o *azblob.UploadStreamOptions) (*azblob.BlockBlobCommitBlockListResponse, error)
 }
 
-func upload(blobClient *azblob.BlockBlobClient, uploadFileReader io.Reader) (string, error) {
-	uploadRes, err := blobClient.UploadStream(context.TODO(), uploadFileReader, azblob.UploadStreamOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return *uploadRes.VersionID, nil
-}
-
-func getBlockBlobClientFromSAS(blobURL string) (*azblob.BlockBlobClient, error) {
-	blobClient, err := azblob.NewBlockBlobClientWithNoCredential(blobURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	return blobClient, nil
-}
-
 func CreateSASDagClient(sasLink string) (DagClient, error) {
-	blobClient, err := getBlockBlobClientFromSAS(sasLink)
+	blobClient, err := azblob.NewBlockBlobClientWithNoCredential(sasLink, nil)
 	if err != nil {
 		return DagClient{}, err
 	}
+
 	return DagClient{BlobClient: blobClient}, nil
 }
 
-func (ac DagClient) Upload(dagFileReader io.Reader) (string, error) {
-	return upload(ac.BlobClient, dagFileReader)
+func Upload(ac DagClient, dagFileReader io.Reader) (string, error) {
+	uploadRes, err := ac.BlobClient.UploadStream(context.TODO(), dagFileReader, azblob.UploadStreamOptions{})
+	if err != nil {
+		return "", err
+	}
+	versionID := *uploadRes.VersionID
+
+	return versionID, nil
 }
