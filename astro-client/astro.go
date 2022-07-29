@@ -10,6 +10,7 @@ type Client interface {
 	ListUserRoleBindings() ([]RoleBinding, error)
 	// Workspace
 	ListWorkspaces() ([]Workspace, error)
+	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
 	CreateDeployment(input *DeploymentCreateInput) (Deployment, error)
 	UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error)
@@ -28,6 +29,8 @@ type Client interface {
 	// RuntimeRelease
 	ListInternalRuntimeReleases() ([]RuntimeRelease, error)
 	ListPublicRuntimeReleases() ([]RuntimeRelease, error)
+	// UserInvite
+	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 }
 
 func (c *HTTPClient) ListUserRoleBindings() ([]RoleBinding, error) {
@@ -239,4 +242,32 @@ func (c *HTTPClient) ListPublicRuntimeReleases() ([]RuntimeRelease, error) {
 		return []RuntimeRelease{}, err
 	}
 	return resp.Data.RuntimeReleases, nil
+}
+
+// CreateUserInvite create a user invite request
+func (c *HTTPClient) CreateUserInvite(input CreateUserInviteInput) (UserInvite, error) {
+	req := Request{
+		Query:     CreateUserInvite,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return UserInvite{}, err
+	}
+	return resp.Data.CreateUserInvite, nil
+}
+
+// GetWorkspace returns information about the workspace
+func (c *HTTPClient) GetWorkspace(workspaceID string) (Workspace, error) {
+	wsReq := Request{
+		Query:     GetWorkspace,
+		Variables: map[string]interface{}{"workspaceId": workspaceID},
+	}
+
+	wsResp, err := wsReq.DoWithPublicClient(c)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return wsResp.Data.GetWorkspace, nil
 }

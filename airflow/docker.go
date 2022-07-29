@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/astronomer/astro-cli/airflow/include"
@@ -43,6 +45,7 @@ const (
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
+	OpenCmd                        = "open"
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -69,7 +72,9 @@ var (
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
 
-	openURL = browser.OpenURL
+	openURL    = browser.OpenURL
+	timeoutNum = 60
+	tickNum    = 500
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -142,6 +147,14 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 
 // Start starts a local airflow development cluster
 func (d *DockerCompose) Start(imageName string, noCache bool) error {
+	// check if docker is up for macOS
+	if runtime.GOOS == "darwin" {
+		err := startDocker()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -662,4 +675,48 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 func checkServiceState(serviceState, expectedState string) bool {
 	scrubbedState := strings.Split(serviceState, " ")[0]
 	return scrubbedState == expectedState
+}
+
+func startDocker() error {
+	buf := new(bytes.Buffer)
+	err := cmdExec(DockerCmd, buf, buf, "ps")
+	if err != nil {
+		// open docker
+		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
+		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", "docker")
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nIf you don't see Docker Desktop starting, exit this command and start it manually.")
+		fmt.Println("If you don't have Docker Desktop installed, install it (https://www.docker.com/products/docker-desktop/) and try again.")
+		fmt.Println("If you are using Colima or another Docker alternative, start the engine manually.")
+		// poll for docker
+		err = waitForDocker()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func waitForDocker() error {
+	buf := new(bytes.Buffer)
+	timeout := time.After(time.Duration(timeoutNum) * time.Second)
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeout:
+			return errors.New("timed out waiting for docker")
+		// Got a tick, we should check if docker is up & running
+		case <-ticker.C:
+			buf.Reset()
+			err := cmdExec(DockerCmd, buf, buf, "ps")
+			if err != nil {
+				continue
+			} else {
+				return nil
+			}
+		}
+	}
 }

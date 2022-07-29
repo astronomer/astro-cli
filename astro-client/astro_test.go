@@ -799,3 +799,100 @@ func TestListPublicRuntimeReleases(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestCreateUserInvite(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testInput := CreateUserInviteInput{
+		InviteeEmail:   "test@email.com",
+		Role:           "ORGANIZATION_MEMBER",
+		OrganizationID: "test-org-id",
+	}
+	testInputWithInvalidEmail := CreateUserInviteInput{
+		InviteeEmail:   "invalid-email",
+		Role:           "ORGANIZATION_MEMBER",
+		OrganizationID: "test-org-id",
+	}
+	mockResponse := &Response{
+		Data: ResponseData{
+			CreateUserInvite: UserInvite{
+				UserID:         "test-user-id",
+				OrganizationID: "test-org-id",
+				OauthInviteID:  "test-oauth-invite-id",
+				ExpiresAt:      "now+10mins",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.CreateUserInvite(testInput)
+		assert.NoError(t, err)
+		assert.Equal(t, resp, mockResponse.Data.CreateUserInvite)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.CreateUserInvite(testInputWithInvalidEmail)
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestGetWorkspace(t *testing.T) {
+	expectedWorkspace := Response{
+		Data: ResponseData{
+			GetWorkspace: Workspace{
+				ID:             "",
+				Label:          "",
+				OrganizationID: "",
+			},
+		},
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	jsonResponse, err := json.Marshal(expectedWorkspace)
+	assert.NoError(t, err)
+
+	t.Run("happy path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		workspace, err := astroClient.GetWorkspace("test-workspace")
+		assert.NoError(t, err)
+		assert.Equal(t, workspace, expectedWorkspace.Data.GetWorkspace)
+	})
+	t.Run("error path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+		_, err := astroClient.GetWorkspace("test-workspace")
+		assert.Error(t, err, "API error")
+	})
+}
