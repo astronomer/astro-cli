@@ -36,7 +36,7 @@ func (c *HTTPClient) ListUserRoleBindings() ([]RoleBinding, error) {
 		Query: SelfQuery,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []RoleBinding{}, err
 	}
@@ -54,7 +54,7 @@ func (c *HTTPClient) ListWorkspaces() ([]Workspace, error) {
 		Query: WorkspacesGetRequest,
 	}
 
-	wsResp, err := wsReq.DoWithClient(c)
+	wsResp, err := wsReq.DoWithPublicClient(c)
 	if err != nil {
 		return []Workspace{}, err
 	}
@@ -67,7 +67,7 @@ func (c *HTTPClient) CreateDeployment(input *DeploymentCreateInput) (Deployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
@@ -80,7 +80,7 @@ func (c *HTTPClient) UpdateDeployment(input *DeploymentUpdateInput) (Deployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
@@ -93,7 +93,7 @@ func (c *HTTPClient) ListDeployments(input DeploymentsInput) ([]Deployment, erro
 		Variables: map[string]interface{}{"deploymentsInput": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []Deployment{}, err
 	}
@@ -106,7 +106,7 @@ func (c *HTTPClient) DeleteDeployment(input DeploymentDeleteInput) (Deployment, 
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
@@ -119,7 +119,7 @@ func (c *HTTPClient) GetDeploymentHistory(vars map[string]interface{}) (Deployme
 		Variables: vars,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return DeploymentHistory{}, err
 	}
@@ -131,7 +131,7 @@ func (c *HTTPClient) GetDeploymentConfig() (DeploymentConfig, error) {
 		Query: GetDeploymentConfigOptions,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return DeploymentConfig{}, err
 	}
@@ -144,7 +144,7 @@ func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) (
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []EnvironmentVariablesObject{}, err
 	}
@@ -157,7 +157,7 @@ func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
 		Variables: map[string]interface{}{"imageCreateInput": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
 		Variables: map[string]interface{}{"imageDeployInput": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
 		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []Cluster{}, err
 	}
@@ -196,7 +196,7 @@ func (c *HTTPClient) ListInternalRuntimeReleases() ([]RuntimeRelease, error) {
 		Variables: map[string]interface{}{"channel": ""},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []RuntimeRelease{}, err
 	}
