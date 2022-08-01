@@ -3,7 +3,6 @@ package deploy
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,6 +47,7 @@ var (
 	splitNum   = 2
 	pytestFile string
 	dockerfile = "Dockerfile"
+	dagsFile   = "/tmp/dags.tar"
 
 	// Monkey patched to write unit tests
 	airflowImageHandler  = airflow.ImageHandlerInit
@@ -83,14 +83,20 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 
 	sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagURL)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	dagFile, err := os.Open("/tmp/dags.tar")
+	dagFile, err := os.Open(dagsFile)
 	if err != nil {
 		return err
 	}
 	versionID, err := azure.Upload(sasDagClient, dagFile)
+	if err != nil {
+		return err
+	}
+
+	// Delete the temporary tar file
+	err = os.Remove(dagsFile)
 	if err != nil {
 		return err
 	}
@@ -109,7 +115,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 
 	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
 
-	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Astronomer UI to confirm that your deploy was successful." +
+	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Cloud UI to confirm that your deploy was successful." +
 		"\n\nDeployment can be accessed at the following URLs: \n" +
 		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
