@@ -224,7 +224,7 @@ func addVariable(oldKeyList []string, oldEnvironmentVariables []astro.Environmen
 func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableList []string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
 	var key string
 	var val string
-	// valisdate each key value pair and add to new variables list
+	// validate each key-value pair and add it to the new variables list
 	for i := range variableList {
 		// split pair
 		pair := strings.Split(variableList[i], "=")
@@ -236,7 +236,7 @@ func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.E
 				continue
 			}
 		} else {
-			fmt.Printf("Input %s is not a valid key value pair\n", variableList[i])
+			fmt.Printf("Input %s is not a valid key value pair, should be of the form key=value\n", variableList[i])
 			continue
 		}
 		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, key, val, updateVars, makeSecret, out)
