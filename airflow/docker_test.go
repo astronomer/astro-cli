@@ -875,6 +875,10 @@ func TestCheckWebserverHealth(t *testing.T) {
 			mockEventsCall.ReturnArguments = mock.Arguments{err}
 		}
 
+		openURL = func(url string) error {
+			return nil
+		}
+
 		orgInitSetting := initSettings
 		initSettings = func(id string, version uint64) error {
 			return nil
@@ -910,6 +914,10 @@ func TestCheckWebserverHealth(t *testing.T) {
 			err = consumer(api.Event{Status: "health_status: healthy"})
 			assert.ErrorIs(t, err, errMockDocker)
 			mockEventsCall.ReturnArguments = mock.Arguments{err}
+		}
+
+		openURL = func(url string) error {
+			return nil
 		}
 
 		err := checkWebserverHealth(&types.Project{Name: "test"}, composeMock, 2)
