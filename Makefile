@@ -20,7 +20,7 @@ test:
 	go test -count=1 -cover ./...
 	go test -coverprofile=coverage.txt -covermode=atomic ./...
 
-mock: mock_airflow mock_houston mock_astro
+mock: mock_airflow mock_houston mock_astro mock_pkg
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
