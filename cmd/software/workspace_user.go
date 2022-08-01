@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/software/workspace"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -90,8 +91,8 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 			return workspaceUserList(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated user list")
-	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Pagination page size")
+	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
+	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
 	return cmd
 }
 
@@ -155,6 +156,7 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 		}
 
 		if !(pageSize > 0 && pageSize <= defaultWorkspaceUserPageSize) {
+			logrus.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultWorkspaceUserPageSize, defaultWorkspaceUserPageSize)
 			pageSize = defaultWorkspaceUserPageSize
 		}
 

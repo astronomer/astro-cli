@@ -14,7 +14,7 @@ import (
 
 var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
 
-var (
+const (
 	defaultPaginationOptions      = "f. first p. previous n. next q. quit\n> "
 	paginationWithoutNextOptions  = "f. first p. previous q. quit\n> "
 	paginationWithNextQuitOptions = "n. next q. quit\n> "
