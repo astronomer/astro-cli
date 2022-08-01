@@ -36,6 +36,7 @@ var (
 	pytestFile string
 	envFile    string
 	imageName  string
+	deploymentName string
 )
 
 const (
@@ -62,6 +63,7 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
 	_ = cmd.Flags().MarkHidden("dags")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	return cmd
 }
 
@@ -106,5 +108,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, imageName, forcePrompt, dags, astroClient)
+	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, imageName, deploymentName, forcePrompt, dags, astroClient)
 }

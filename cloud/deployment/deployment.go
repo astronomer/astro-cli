@@ -78,7 +78,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	return tab.Print(out)
 }
 
-func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount int, client astro.Client) error {
+func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs bool, logCount int, client astro.Client) error {
 	logLevels := []string{}
 
 	// log level
@@ -96,7 +96,7 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 	}
 
 	// get deployment
-	deployment, err := GetDeployment(ws, deploymentID, client)
+	deployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -170,6 +170,16 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		label = input.Text(ansi.Bold("\nDeployment name: "))
 		if label == "" {
 			return errors.New("you must give your Deployment a name")
+		}
+		deployments, err := getDeployments(workspaceID, client)
+		if err != nil {
+			return errors.Wrap(err, errInvalidDeployment.Error())
+		}
+
+		for i := range deployments {
+			if deployments[i].Label == label {
+				return errors.New("A Deployment with that name already exists")
+			}
 		}
 	}
 
@@ -328,9 +338,9 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	return clusterID, nil
 }
 
-func Update(deploymentID, label, ws, description string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -425,9 +435,9 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 	return nil
 }
 
-func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) error {
+func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client astro.Client) error {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -522,17 +532,37 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployment, error) {
+func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client) (astro.Deployment, error) {
 	deployments, err := getDeployments(ws, client)
 	if err != nil {
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
+	}
+
+	if deploymentID != "" && deploymentName != "" {
+		fmt.Printf("Both a Deployment ID and Deployment Name have been supplied. The Deploymnet ID %s will be used\n", deploymentID)
+	}
+
+	if deploymentID == "" && deploymentName != "" {
+		var stageDeployments []astro.Deployment
+		for i := range deployments {
+			if deployments[i].Label == deploymentName {
+				stageDeployments = append(stageDeployments, deployments[i])
+			}
+		}
+		if len(stageDeployments) > 1 {
+			fmt.Printf("More than one Deployment with the name %s was found\n")
+		} else if len(stageDeployments) == 1 {
+			return stageDeployments[0], nil
+		} else if len(stageDeployments) < 1 {
+			fmt.Printf("No Deployment with the name %s was found\n")
+		}
 	}
 
 	var currentDeployment astro.Deployment
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
+		currentDeployment, err = selectDeployment(deployments, "Select a Deployment")
 		if err != nil {
 			return astro.Deployment{}, err
 		}
