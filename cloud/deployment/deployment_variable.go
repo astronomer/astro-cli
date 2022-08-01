@@ -91,7 +91,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 
 	// add new variable from flag
 	if variableKey != "" && variableValue != "" {
-		newEnvironmentVariables = addVariableFromFlag(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret, out)
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret, out)
 	}
 	if variableValue == "" && variableKey != "" {
 		fmt.Fprintf(out, "Variable with key %s not created or updated\nYou must provide a variable value", variableKey)
@@ -101,7 +101,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 	}
 	// add new variables from list of variables provided through args
 	if len(variableList) > 0 {
-		newEnvironmentVariables = addVariablesFromArgs(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableList, updateVars, makeSecret)
+		newEnvironmentVariables = addVariablesFromArgs(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableList, updateVars, makeSecret, out)
 	}
 	// add new variables from file
 	if useEnvFile {
@@ -190,8 +190,8 @@ func writeVarToFile(environmentVariablesObjects []astro.EnvironmentVariablesObje
 	return nil
 }
 
-// Add variables from flag
-func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
+// Add variables
+func addVariable(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
 	var newEnvironmentVariable astro.EnvironmentVariable
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
@@ -221,7 +221,7 @@ func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.En
 	return newEnvironmentVariables
 }
 
-func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableList []string, updateVars, makeSecret bool) []astro.EnvironmentVariable {
+func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableList []string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
 	var key string
 	var val string
 	// valisdate each key value pair and add to new variables list
@@ -239,32 +239,7 @@ func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.E
 			fmt.Printf("Input %s is not a valid key value pair\n", variableList[i])
 			continue
 		}
-		var newEnvironmentVariable astro.EnvironmentVariable
-		exist, num := contains(oldKeyList, key)
-		switch {
-		case exist && !updateVars: // don't update variable
-			fmt.Printf("key %s already exists, skipping creation. Use the update command to update existing variables", key)
-		case exist && updateVars: // update variable
-			fmt.Printf("updating variable %s \n", key)
-			secret := makeSecret
-			if !makeSecret { // you can only make variables secret a user can't make them not secret
-				secret = oldEnvironmentVariables[num].IsSecret
-			}
-			newEnvironmentVariable = astro.EnvironmentVariable{
-				IsSecret: secret,
-				Key:      oldEnvironmentVariables[num].Key,
-				Value:    val,
-			}
-			newEnvironmentVariables[num] = newEnvironmentVariable
-		default:
-			newFileEnvironmentVariable := astro.EnvironmentVariable{
-				IsSecret: makeSecret,
-				Key:      key,
-				Value:    val,
-			}
-			newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
-			fmt.Printf("adding variable %s\n", key)
-		}
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, key, val, updateVars, makeSecret, out)
 	}
 	return newEnvironmentVariables
 }

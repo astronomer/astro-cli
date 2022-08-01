@@ -279,9 +279,9 @@ func TestWriteVarToFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAddVariableFromFlag(t *testing.T) {
+func TestAddVariable(t *testing.T) {
 	buf := new(bytes.Buffer)
-	resp := addVariableFromFlag([]string{"test-key-1"},
+	resp := addVariable([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
 		"test-key-1", "test-value-3", true, false, buf,
@@ -289,7 +289,7 @@ func TestAddVariableFromFlag(t *testing.T) {
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
 
 	buf = new(bytes.Buffer)
-	resp = addVariableFromFlag([]string{"test-key-1"},
+	resp = addVariable([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
 		"test-key-1", "test-value-3", false, false, buf,
@@ -298,24 +298,25 @@ func TestAddVariableFromFlag(t *testing.T) {
 }
 
 func TestAddVariablesFromArgs(t *testing.T) {
+	buf := new(bytes.Buffer)
 	resp := addVariablesFromArgs([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
-		[]string{"test-key-1=test-value-3"}, true, false,
+		[]string{"test-key-1=test-value-3"}, true, false, buf,
 	)
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
 
 	resp = addVariablesFromArgs([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
-		[]string{"test-key-1=test-value-3"}, false, false,
+		[]string{"test-key-1=test-value-3"}, false, false, buf,
 	)
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}}, resp)
 
 	resp = addVariablesFromArgs([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{},
 		[]astro.EnvironmentVariable{},
-		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false,
+		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false, buf,
 	)
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-2", Value: "test-value-3"}}, resp)
 }
