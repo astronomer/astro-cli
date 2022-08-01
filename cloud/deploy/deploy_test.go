@@ -171,6 +171,15 @@ func TestBuildImageFailure(t *testing.T) {
 	ctx.SetSystemAdmin(true)
 
 	mockImageHandler := new(mocks.ImageHandler)
+
+	// image build failure
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything).Return(errMock).Once()
+		return mockImageHandler
+	}
+	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	assert.ErrorIs(t, err, errMock)
+
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("4.2.5", nil)
