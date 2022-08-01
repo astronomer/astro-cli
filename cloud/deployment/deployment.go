@@ -550,6 +550,31 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 			}
 		}
 		if len(stageDeployments) > 1 {
+			fmt.Printf("More than one Deployment with the name %s was found\n")
+		} else if len(stageDeployments) == 1 {
+			return stageDeployments[0], nil
+		} else if len(stageDeployments) < 1 {
+			fmt.Printf("No Deployment with the name %s was found\n")
+		}
+	}
+
+	var currentDeployment astro.Deployment
+
+	// select deployment if deploymentID is empty
+	if deploymentID == "" {
+		currentDeployment, err = selectDeployment(deployments, "Select a Deployment")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+		if currentDeployment.ID == "" {
+			// get latest runtime veresion
+			airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+			runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+			if err != nil {
+				return astro.Deployment{}, err
+			}
+		}
+		if len(stageDeployments) > 1 {
 			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
 		}
 		if len(stageDeployments) == 1 {
