@@ -124,7 +124,7 @@ func (c *Context) SetContext() error {
 		return err
 	}
 
-	context := map[string]interface{}{
+	context := map[string]string{
 		"token":               c.Token,
 		"domain":              c.Domain,
 		"workspace":           c.Workspace,
