@@ -6,6 +6,8 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"time"
+	"bytes"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -38,6 +40,8 @@ var (
 	schedulerAuMax       = 30
 	workerAuMax          = 175
 	schedulerReplicasMax = 4
+	tickNum              = 620
+	timeoutNum           = 300
 )
 
 func newTableOut() *printutil.Table {
@@ -210,6 +214,14 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
+	// if waitForStatus {
+	// 	waitForStatus(d.ID)
+	// }
+	err = waitForStatus(d.ID, workspaceID, client)
+	if err != nil {
+		return err
+	}
+
 	tab := newTableOut()
 
 	currentTag := d.DeploymentSpec.Image.Tag
@@ -326,6 +338,46 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		return "", errors.New("unable to find specified Cluster")
 	}
 	return clusterID, nil
+}
+
+func waitForStatus(ws, deploymentID string, client astro.Client) error {
+	fmt.Printf("Waiting for deployment to become healthy...\n\nThis may take a few minutes\n")
+	buf := new(bytes.Buffer)
+	timeout := time.After(time.Duration(timeoutNum) * time.Second)
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
+	fmt.Println("deployment id: " + deploymentID )
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeout:
+			return errors.New("timed out waiting for the deployment to become healthy")
+		// Got a tick, we should check if docker is up & running
+		case <-ticker.C:
+			buf.Reset()
+			deployments, err := getDeployments(ws, client)
+			if err != nil {
+				return err
+			}
+
+			var currentDeployment astro.Deployment
+
+			for i := range deployments {
+				fmt.Println(deployments[i].ID)
+				if deployments[i].ID == deploymentID {
+
+					currentDeployment = deployments[i]
+					fmt.Println("found deployment!")
+				}
+			}
+			fmt.Println(currentDeployment.Status)
+			if currentDeployment.Status == "HEALTHY" {
+				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
+				return nil
+			} else {
+				continue
+			}
+		}
+	}
 }
 
 func Update(deploymentID, label, ws, description string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
