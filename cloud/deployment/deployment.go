@@ -40,8 +40,8 @@ var (
 	schedulerAuMax       = 30
 	workerAuMax          = 175
 	schedulerReplicasMax = 4
-	tickNum              = 620
-	timeoutNum           = 300
+	tickNum              = 2
+	timeoutNum           = 420
 )
 
 func newTableOut() *printutil.Table {
@@ -132,7 +132,7 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	// validate resources requests
@@ -214,13 +214,12 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
-	// if waitForStatus {
-	// 	waitForStatus(d.ID)
-	// }
-	err = waitForStatus(d.ID, workspaceID, client)
-	if err != nil {
-		return err
-	}
+	if waitForStatus {
+		err = healthPoll(d.ID, workspaceID, client)
+		if err != nil {
+			return err
+		}
+	}	
 
 	tab := newTableOut()
 
@@ -340,12 +339,11 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	return clusterID, nil
 }
 
-func waitForStatus(ws, deploymentID string, client astro.Client) error {
-	fmt.Printf("Waiting for deployment to become healthy...\n\nThis may take a few minutes\n")
+func healthPoll(deploymentID, ws string, client astro.Client) error {
+	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
-	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
-	fmt.Println("deployment id: " + deploymentID )
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
 	for {
 		select {
 		// Got a timeout! fail with a timeout error
@@ -362,14 +360,11 @@ func waitForStatus(ws, deploymentID string, client astro.Client) error {
 			var currentDeployment astro.Deployment
 
 			for i := range deployments {
-				fmt.Println(deployments[i].ID)
 				if deployments[i].ID == deploymentID {
 
 					currentDeployment = deployments[i]
-					fmt.Println("found deployment!")
 				}
 			}
-			fmt.Println(currentDeployment.Status)
 			if currentDeployment.Status == "HEALTHY" {
 				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
 				return nil
@@ -597,7 +592,7 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 			}
 
 			// walk user through creating a deployment
-			err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+			err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client, false)
 			if err != nil {
 				return astro.Deployment{}, err
 			}
