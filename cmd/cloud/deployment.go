@@ -3,6 +3,8 @@ package cloud
 import (
 	"io"
 
+	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
+
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -52,6 +54,10 @@ var (
 		# Update a deployment variables from a file
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
+	wQueueConcurrency int
+	wQueueMin         int
+	wQueueMax         int
+	wQueueWorkerType  string
 
 	httpClient = httputil.NewHTTPClient()
 )
@@ -71,6 +77,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentLogsCmd(),
 		newDeploymentUpdateCmd(),
 		newDeploymentVariableRootCmd(out),
+		newDeploymentWorkerQueueRootCmd(out),
 	)
 	return cmd
 }
@@ -367,4 +374,55 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	cmd.SilenceUsage = true
 
 	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroClient, out)
+}
+
+func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "worker-queue ",
+		Aliases: []string{"wq"},
+		Short:   "Manage deployment worker queues",
+		Long:    "Manage worker queues for an Astro Deployment.",
+	}
+	cmd.AddCommand(
+		newDeploymentWorkerQueueCreateCmd(out),
+	)
+	return cmd
+}
+
+func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create a Deployment's worker queue",
+		Long:    "Create a worker queue for an Astro Deployment",
+		Example: "", // TODO should we add some examples for default and custom worker-queue commands?
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentWorkerQueueCreate(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created")
+	// TODO confirm the allowed input range and default value
+	cmd.Flags().IntVarP(&wQueueMin, "min-count", "", 1, "The min worker count of the worker queue. Possible values are between 1 and 10.")
+	// TODO confirm the allowed input range and default value
+	cmd.Flags().IntVarP(&wQueueMax, "max-count", "", 1, "The max worker count of the worker queue. Possible values are between 11 and 20.")
+	// TODO confirm the allowed input range and default value
+	cmd.Flags().IntVarP(&wQueueConcurrency, "concurrency", "", 1, "The concurrency(number of slots) of the worker queue. Possible values are between 21 and 30.")
+	cmd.Flags().StringVarP(&wQueueWorkerType, "worker-type", "t", "", "The worker type of the default worker queue")
+
+	return cmd
+}
+
+func deploymentWorkerQueueCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return err
+	}
+
+	if deploymentID == "" {
+		return errors.New("deployment id is required")
+	}
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	return workerqueue.Create(ws, astroClient, out)
 }

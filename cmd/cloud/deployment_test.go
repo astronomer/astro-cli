@@ -274,3 +274,53 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 	assert.Contains(t, resp, "test-value-2-update")
 	mockClient.AssertExpectations(t)
 }
+
+func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
+	expectedHelp := "Manage worker queues for an Astro Deployment."
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	buf := new(bytes.Buffer)
+
+	t.Run("worker-queue command runs", func(t *testing.T) {
+		wQueueCmd := newDeploymentWorkerQueueRootCmd(os.Stdout)
+		wQueueCmd.SetOut(buf)
+		_, err := wQueueCmd.ExecuteC()
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "worker-queue")
+	})
+
+	t.Run("-h prints worker-queue help", func(t *testing.T) {
+		cmdArgs := []string{"worker-queue", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+}
+
+func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
+	expectedHelp := "Create a worker queue for an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints worker-queue help", func(t *testing.T) {
+		cmdArgs := []string{"worker-queue", "create", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	// TODO validation tests for each optional user input being in a valid range
+
+	t.Run("happy path worker queue create", func(t *testing.T) {
+		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	// TODO discuss if we want to print both usage and the error?
+	t.Run("returns an error when no deployment-id is passed", func(t *testing.T) {
+		expectedOut := "Usage:\n"
+		cmdArgs := []string{"worker-queue", "create"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+	// TODO more error cases
+}
