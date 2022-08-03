@@ -49,7 +49,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		_, err := GetDeployment(ws, deploymentID, mockClient)
+		_, err := GetDeployment(ws, deploymentID, "", mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -59,7 +59,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		deployment, err := GetDeployment(ws, deploymentID, mockClient)
+		deployment, err := GetDeployment(ws, deploymentID, "", mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -69,7 +69,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		deployment, err := GetDeployment(ws, "", mockClient)
+		deployment, err := GetDeployment(ws, "", "", mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -99,7 +99,7 @@ func TestGetDeployment(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		deployment, err := GetDeployment(ws, "", mockClient)
+		deployment, err := GetDeployment(ws, "", "", mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -123,7 +123,7 @@ func TestLogs(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 
-		err := Logs(deploymentID, ws, true, true, true, logCount, mockClient)
+		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockClient)
 		assert.NoError(t, err)
 
 		mockClient.AssertExpectations(t)
@@ -150,7 +150,7 @@ func TestLogs(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Logs("", ws, false, false, false, logCount, mockClient)
+		err = Logs("", ws, "", false, false, false, logCount, mockClient)
 		assert.NoError(t, err)
 
 		mockClient.AssertExpectations(t)
@@ -161,7 +161,7 @@ func TestLogs(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{}, errMock).Once()
 
-		err := Logs(deploymentID, ws, true, true, true, logCount, mockClient)
+		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -179,6 +179,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("test-name")
@@ -363,7 +364,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", 0, 0, 0, false, mockClient)
+		err = Update("test-id", "", ws, "", "", 0, 0, 0, false, mockClient)
 		assert.NoError(t, err)
 
 		// mock os.Stdin
@@ -382,7 +383,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -391,7 +392,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err := Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -416,10 +417,10 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 
-		err = Update("test-invalid-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("test-invalid-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -444,7 +445,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -454,7 +455,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "", ws, "", 0, 0, 0, true, mockClient)
+		err := Update("test-id", "", ws, "", "", 0, 0, 0, true, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -491,7 +492,7 @@ func TestDelete(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Delete("test-id", ws, false, mockClient)
+		err = Delete("test-id", ws, "", false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -500,7 +501,7 @@ func TestDelete(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		err := Delete("test-id", ws, false, mockClient)
+		err := Delete("test-id", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -525,10 +526,10 @@ func TestDelete(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Delete("", ws, false, mockClient)
+		err = Delete("", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 
-		err = Delete("test-invalid-id", ws, false, mockClient)
+		err = Delete("test-invalid-id", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -553,7 +554,7 @@ func TestDelete(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Delete("test-id", ws, false, mockClient)
+		err = Delete("test-id", ws, "", false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -563,7 +564,7 @@ func TestDelete(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("DeleteDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
-		err := Delete("test-id", ws, true, mockClient)
+		err := Delete("test-id", ws, "", true, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
