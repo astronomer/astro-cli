@@ -1,13 +1,13 @@
 package deployment
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strconv"
 	"time"
-	"bytes"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -220,7 +220,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		if err != nil {
 			return err
 		}
-	}	
+	}
 
 	tab := newTableOut()
 
