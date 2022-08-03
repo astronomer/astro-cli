@@ -96,10 +96,12 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 	}
 
 	// Delete the temporary tar file
-	err = os.Remove(dagsFile)
-	if err != nil {
-		return err
-	}
+	defer func() {
+		err = os.Remove(dagsFile)
+		if err != nil {
+			fmt.Println("Failed to delete temporary tar file: ", err.Error())
+		}
+	}()
 
 	var status string
 	if versionID != "" {
