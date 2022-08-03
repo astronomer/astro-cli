@@ -85,7 +85,6 @@ func TestGetDeployment(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-
 	t.Run("test automatic deployment selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
