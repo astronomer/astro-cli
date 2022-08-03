@@ -72,7 +72,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 	}
 
 	return tab.Print(out)
@@ -197,7 +197,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 
 	createInput := &astro.DeploymentCreateInput{
 		WorkspaceID:           workspaceID,
-		OrchestratorID:        clusterID,
+		ClusterID:             clusterID,
 		Label:                 label,
 		Description:           description,
 		RuntimeReleaseVersion: runtimeVersion,
@@ -218,7 +218,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	}
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -380,7 +380,7 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 
 	deploymentUpdate := &astro.DeploymentUpdateInput{
 		ID:             currentDeployment.ID,
-		OrchestratorID: currentDeployment.Orchestrator.ID,
+		ClusterID:      currentDeployment.Cluster.ID,
 		DeploymentSpec: spec,
 	}
 	if label != "" {
@@ -419,7 +419,7 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 	tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 	tabDeployment.Print(os.Stdout)
 	return nil

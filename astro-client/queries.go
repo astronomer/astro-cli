@@ -19,7 +19,7 @@ var (
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			createdAt

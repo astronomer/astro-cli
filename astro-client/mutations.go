@@ -43,7 +43,7 @@ var (
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {
@@ -72,7 +72,7 @@ var (
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {

@@ -58,7 +58,7 @@ type Deployment struct {
 	Status          string         `json:"status"`
 	ReleaseName     string         `json:"releaseName"`
 	Version         string         `json:"version"`
-	Orchestrator    Orchestrator   `json:"orchestrator"`
+	Cluster         Cluster        `json:"cluster"`
 	Workspace       Workspace      `json:"workspace"`
 	RuntimeRelease  RuntimeRelease `json:"runtimeRelease"`
 	DeploymentSpec  DeploymentSpec `json:"deploymentSpec"`
@@ -68,12 +68,6 @@ type Deployment struct {
 
 // Cluster contains all components of an Astronomer Cluster
 type Cluster struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	CloudProvider string `json:"cloudProvider"`
-}
-
-type Orchestrator struct {
 	ID            string `json:"id"`
 	Name          string `json:"name"`
 	CloudProvider string `json:"cloudProvider"`
@@ -230,7 +224,7 @@ type ImageDeployInput struct {
 
 type DeploymentCreateInput struct {
 	WorkspaceID           string               `json:"workspaceId"`
-	OrchestratorID        string               `json:"orchestratorId"`
+	ClusterID             string               `json:"clusterId"`
 	Label                 string               `json:"label"`
 	Description           string               `json:"description"`
 	AirflowTag            string               `json:"airflowTag"`
@@ -246,7 +240,7 @@ type DeploymentCreateSpec struct {
 
 type DeploymentUpdateInput struct {
 	ID             string               `json:"id"`
-	OrchestratorID string               `json:"orchestratorId"`
+	ClusterID      string               `json:"clusterId"`
 	Label          string               `json:"label"`
 	Description    string               `json:"description"`
 	DeploymentSpec DeploymentCreateSpec `json:"deploymentSpec"`
