@@ -551,9 +551,11 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 		}
 		if len(stageDeployments) > 1 {
 			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
-		} else if len(stageDeployments) == 1 {
+		}
+		if len(stageDeployments) == 1 {
 			return stageDeployments[0], nil
-		} else if len(stageDeployments) < 1 {
+		}
+		if len(stageDeployments) < 1 {
 			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
 		}
 	}
@@ -562,35 +564,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = selectDeployment(deployments, "Select a Deployment")
-		if err != nil {
-			return astro.Deployment{}, err
-		}
-		if currentDeployment.ID == "" {
-			// get latest runtime veresion
-			airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-			runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-
-			// walk user through creating a deployment
-			err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-
-			// get a new deployment list
-			deployments, err = getDeployments(ws, client)
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-			currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-		}
-		return currentDeployment, nil
+		return deploymentSelectionProcess(ws, deployments, client)
 	}
 	for i := range deployments {
 		if deployments[i].ID == deploymentID {
@@ -600,6 +574,38 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 	fmt.Println(currentDeployment.ID)
 	if currentDeployment.ID == "" {
 		return astro.Deployment{}, errInvalidDeployment
+	}
+	return currentDeployment, nil
+}
+
+func deploymentSelectionProcess(ws string, deployments []astro.Deployment, client astro.Client) (astro.Deployment, error) {
+	currentDeployment, err := selectDeployment(deployments, "Select a Deployment")
+	if err != nil {
+		return astro.Deployment{}, err
+	}
+	if currentDeployment.ID == "" {
+		// get latest runtime veresion
+		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		// walk user through creating a deployment
+		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		// get a new deployment list
+		deployments, err = getDeployments(ws, client)
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
 	}
 	return currentDeployment, nil
 }

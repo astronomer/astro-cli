@@ -33,9 +33,9 @@ Menu will be presented if you do not specify a deployment ID:
 )
 
 var (
-	pytestFile string
-	envFile    string
-	imageName  string
+	pytestFile     string
+	envFile        string
+	imageName      string
 	deploymentName string
 )
 
