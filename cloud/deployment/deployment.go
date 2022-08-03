@@ -40,8 +40,9 @@ var (
 	schedulerAuMax       = 30
 	workerAuMax          = 175
 	schedulerReplicasMax = 4
-	tickNum              = 2
-	timeoutNum           = 420
+	sleepTime            = 180
+	tickNum              = 10
+	timeoutNum           = 180
 )
 
 func newTableOut() *printutil.Table {
@@ -341,6 +342,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 
 func healthPoll(deploymentID, ws string, client astro.Client) error {
 	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
