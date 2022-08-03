@@ -360,19 +360,16 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 			}
 
 			var currentDeployment astro.Deployment
-
 			for i := range deployments {
 				if deployments[i].ID == deploymentID {
-
 					currentDeployment = deployments[i]
 				}
 			}
 			if currentDeployment.Status == "HEALTHY" {
 				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
 				return nil
-			} else {
-				continue
 			}
+			continue
 		}
 	}
 }
