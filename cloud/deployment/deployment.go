@@ -541,7 +541,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 	if deploymentID != "" && deploymentName != "" {
 		fmt.Printf("Both a Deployment ID and Deployment Name have been supplied. The Deploymnet ID %s will be used\n", deploymentID)
 	}
-
+	// find deployment by name
 	if deploymentID == "" && deploymentName != "" {
 		var stageDeployments []astro.Deployment
 		for i := range deployments {
@@ -593,6 +593,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 	if deploymentID == "" {
 		return deploymentSelectionProcess(ws, deployments, client)
 	}
+	// find deployment by ID
 	for i := range deployments {
 		if deployments[i].ID == deploymentID {
 			currentDeployment = deployments[i]

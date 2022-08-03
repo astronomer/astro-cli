@@ -53,8 +53,18 @@ func TestGetDeployment(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
-
+	deploymentName := "test-wrong"
 	deploymentID = "test-id"
+	t.Run("auto select after invalid deployment Name", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
+
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentID, deployment.ID)
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("correct deployment ID", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -64,12 +74,33 @@ func TestGetDeployment(t *testing.T) {
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
 	})
+	deploymentName = "test"
+	t.Run("correct deployment Name", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{Label: "test"}}, nil).Once()
+
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentName, deployment.Label)
+		mockClient.AssertExpectations(t)
+	})
+
 
 	t.Run("test automatic deployment selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, "", "", mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentID, deployment.ID)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("both id and label used", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+
+		deployment, err := GetDeployment(ws, deploymentID, deploymentName, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
