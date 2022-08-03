@@ -299,6 +299,24 @@ func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	expectedHelp := "Create a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(astro_mocks.Client)
+	astroClient = mockClient
+	deploymentRespNoQueues := []astro.Deployment{
+		{
+			ID:             "test-deployment-id",
+			Label:          "test-deployment-label",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{},
+			WorkerQueues:   []astro.WorkerQueue{},
+		},
+		{
+			ID:             "test-deployment-id-1",
+			Label:          "test-deployment-label-1",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{},
+			WorkerQueues:   []astro.WorkerQueue{},
+		},
+	}
 
 	t.Run("-h prints worker-queue help", func(t *testing.T) {
 		cmdArgs := []string{"worker-queue", "create", "-h"}
@@ -309,9 +327,12 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	// TODO validation tests for each optional user input being in a valid range
 
 	t.Run("happy path worker queue create", func(t *testing.T) {
+		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
+		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespNoQueues, nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 
 	// TODO discuss if we want to print both usage and the error?

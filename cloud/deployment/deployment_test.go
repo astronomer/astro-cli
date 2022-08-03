@@ -491,7 +491,7 @@ func TestSelectCluster(t *testing.T) {
 		os.Stdin = r
 
 		_, err = selectCluster("", orgID, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 	})
 
 	t.Run("not able to find cluster", func(t *testing.T) {
@@ -589,7 +589,7 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 
 		err = Update("test-invalid-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
@@ -698,7 +698,7 @@ func TestDelete(t *testing.T) {
 		os.Stdin = r
 
 		err = Delete("", ws, "", false, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 
 		err = Delete("test-invalid-id", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)

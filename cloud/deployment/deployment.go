@@ -22,7 +22,7 @@ import (
 
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 	// Monkey patched to write unit tests
@@ -134,6 +134,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
+// TODO add default worker queue to deployment create
 func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
@@ -351,7 +352,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		choice := input.Text("\n> ")
 		selected, ok := clusterMap[choice]
 		if !ok {
-			return "", errInvalidDeploymentKey
+			return "", ErrInvalidDeploymentKey
 		}
 
 		clusterID = selected.ID
@@ -593,7 +594,7 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
-		return astro.Deployment{}, errInvalidDeploymentKey
+		return astro.Deployment{}, ErrInvalidDeploymentKey
 	}
 	return selected, nil
 }

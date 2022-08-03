@@ -65,6 +65,7 @@ type Deployment struct {
 	Workspace       Workspace      `json:"workspace"`
 	RuntimeRelease  RuntimeRelease `json:"runtimeRelease"`
 	DeploymentSpec  DeploymentSpec `json:"deploymentSpec"`
+	WorkerQueues    []WorkerQueue  `json:"workerQueues"`
 	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt       string         `json:"updatedAt"`
 }
@@ -276,6 +277,7 @@ type DeploymentUpdateInput struct {
 	Label          string               `json:"label"`
 	Description    string               `json:"description"`
 	DeploymentSpec DeploymentCreateSpec `json:"deploymentSpec"`
+	WorkerQueues   []WorkerQueue        `json:"workerQueues"`
 }
 
 type DeploymentDeleteInput struct {
@@ -306,4 +308,13 @@ type UserInvite struct {
 	OrganizationID string `json:"organizationId"`
 	OauthInviteID  string `json:"oauthInviteId"`
 	ExpiresAt      string `json:"expiresAt"`
+}
+
+type WorkerQueue struct {
+	Name              string `json:"name"`
+	IsDefault         bool   `json:"isDefault"`
+	MaxWorkerCount    int    `json:"maxWorkerCount"`
+	MinWorkerCount    int    `json:"minWorkerCount"`
+	WorkerConcurrency int    `json:"workerConcurrency"`
+	NodePoolID        string `json:"nodePoolId"`
 }
