@@ -550,11 +550,11 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 			}
 		}
 		if len(stageDeployments) > 1 {
-			fmt.Printf("More than one Deployment with the name %s was found\n")
+			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
 		} else if len(stageDeployments) == 1 {
 			return stageDeployments[0], nil
 		} else if len(stageDeployments) < 1 {
-			fmt.Printf("No Deployment with the name %s was found\n")
+			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
 		}
 	}
 
