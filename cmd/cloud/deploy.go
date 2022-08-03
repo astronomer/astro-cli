@@ -34,6 +34,7 @@ Menu will be presented if you do not specify a deployment ID:
 
 var (
 <<<<<<< HEAD
+<<<<<<< HEAD
 	pytestFile     string
 	envFile        string
 	imageName      string
@@ -42,6 +43,11 @@ var (
 	envFile    string
 	imageName  string
 >>>>>>> add deployment name flag
+=======
+	pytestFile     string
+	envFile        string
+	imageName      string
+>>>>>>> fix tests
 	deploymentName string
 )
 
