@@ -471,6 +471,99 @@ func TestModifyDeploymentVariable(t *testing.T) {
 	})
 }
 
+func TestInitiateDagDeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockResponse := &Response{
+		Data: ResponseData{
+			InitiateDagDeployment: InitiateDagDeployment{
+				ID:     "test-id",
+				DagURL: "test-url",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		envVars, err := astroClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
+		assert.NoError(t, err)
+		assert.Equal(t, envVars, mockResponse.Data.InitiateDagDeployment)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestReportDagDeploymentStatus(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockResponse := &Response{
+		Data: ResponseData{
+			ReportDagDeploymentStatus: DagDeploymentStatus{
+				ID:            "test-id",
+				DeploymentID:  "test-deployment-id",
+				Action:        "test-action",
+				VersionID:     "test-version-id",
+				Status:        "test-status",
+				Message:       "test-message",
+				CreatedAt:     "test-created-at",
+				InitiatorID:   "test-initiator-id",
+				InitiatorType: "test-initiator-type",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		image, err := astroClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
+		assert.NoError(t, err)
+		assert.Equal(t, image, mockResponse.Data.ReportDagDeploymentStatus)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
 func TestCreateImage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
