@@ -47,7 +47,6 @@ var (
 	splitNum   = 2
 	pytestFile string
 	dockerfile = "Dockerfile"
-	dagsFile   = "/tmp/dags.tar"
 
 	// Monkey patched to write unit tests
 	airflowImageHandler  = airflow.ImageHandlerInit
@@ -76,7 +75,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 	dagsPath := path + "/dags"
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, "/tmp")
+	err = fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return err
 	}
@@ -86,22 +85,17 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		return err
 	}
 
-	dagFile, err := os.Open(dagsFile)
+	dagsFilePath := path + "/dags.tar"
+	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
 		return err
 	}
+	defer dagFile.Close()
+
 	versionID, err := azure.Upload(sasDagClient, dagFile)
 	if err != nil {
 		return err
 	}
-
-	// Delete the temporary tar file
-	defer func() {
-		err = os.Remove(dagsFile)
-		if err != nil {
-			fmt.Println("Failed to delete temporary tar file: ", err.Error())
-		}
-	}()
 
 	var status string
 	if versionID != "" {
@@ -121,6 +115,16 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		"\n\nDeployment can be accessed at the following URLs: \n" +
 		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
+
+	// Delete the tar file
+	defer func() {
+		dagFile.Close()
+		err = os.Remove(dagFile.Name())
+		if err != nil {
+			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
+			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
+		}
+	}()
 
 	return nil
 }
