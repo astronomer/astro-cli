@@ -111,7 +111,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 
 	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
 
-	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Cloud UI to confirm that your deploy was successful." +
+	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 		"\n\nDeployment can be accessed at the following URLs: \n" +
 		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
