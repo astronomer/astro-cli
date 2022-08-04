@@ -159,8 +159,8 @@ func IsCloudContext() bool {
 // IsCloudDomain returns whether the given domain is related to cloud platform or not
 func IsCloudDomain(domain string) bool {
 	if domain == DevCloudDomain ||
-		domain == StageCloudDomain ||
 		domain == PerfCloudDomain ||
+		domain == StageCloudDomain ||
 		CloudDomainRegex.MatchString(domain) {
 		return true
 	}

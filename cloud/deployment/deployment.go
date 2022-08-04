@@ -486,7 +486,7 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 	}
 
 	if len(deployments) == 1 {
-		fmt.Println("Only one deployment was found. Using the following Deployment by default: \n" +
+		fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
 			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
 

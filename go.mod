@@ -23,23 +23,26 @@ require (
 	github.com/spf13/afero v1.6.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
-	github.com/stretchr/testify v1.7.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
-	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
-	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c
+	github.com/stretchr/testify v1.7.1
+	golang.org/x/crypto v0.0.0-20220511200225-c6db032c6c88 // indirect
+	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 	golang.org/x/text v0.3.7 // indirect
 )
 
 require (
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
-	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 )
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.2.3 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.1.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.4.17 // indirect
 	github.com/Microsoft/hcsshim v0.8.18 // indirect
