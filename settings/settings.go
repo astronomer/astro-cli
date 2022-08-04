@@ -140,6 +140,9 @@ func AddConnections(id string, version uint64) {
 		if !objectValidator(0, conn.ConnID) {
 			continue
 		}
+		fmt.Println("conn:")
+		fmt.Println(conn)
+
 		quotedConnID := "'" + conn.ConnID + "'"
 
 		if strings.Contains(out, quotedConnID) {
