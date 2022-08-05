@@ -143,4 +143,25 @@ var (
 			organizationId
 		}
 	}`
+
+	GetWorkerQueueOptions = `
+	query workerQueueOptions {
+		workerQueueOptions {
+			minWorkerCount {
+			  floor
+			  ceiling
+			  default
+			}
+			maxWorkerCount {
+			  floor
+			  ceiling
+			  default
+			}
+			workerConcurrency {
+			  floor
+			  ceiling
+			  default
+			}
+		}
+	}`
 )

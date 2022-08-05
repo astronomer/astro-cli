@@ -27,6 +27,7 @@ type ResponseData struct {
 	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
+	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
 }
 
 type Self struct {
@@ -317,4 +318,16 @@ type WorkerQueue struct {
 	MinWorkerCount    int    `json:"minWorkerCount"`
 	WorkerConcurrency int    `json:"workerConcurrency"`
 	NodePoolID        string `json:"nodePoolId"`
+}
+
+type WorkerQueueDefaultOptions struct {
+	MinWorkerCount    WorkerQueueOption `json:"minWorkerCount"`
+	MaxWorkerCount    WorkerQueueOption `json:"maxWorkerCount"`
+	WorkerConcurrency WorkerQueueOption `json:"workerConcurrency"`
+}
+
+type WorkerQueueOption struct {
+	Floor   int `json:"floor"`
+	Ceiling int `json:"ceiling"`
+	Default int `json:"default"`
 }

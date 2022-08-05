@@ -317,6 +317,23 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 			WorkerQueues:   []astro.WorkerQueue{},
 		},
 	}
+	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
+		MinWorkerCount: astro.WorkerQueueOption{
+			Floor:   1,
+			Ceiling: 20,
+			Default: 5,
+		},
+		MaxWorkerCount: astro.WorkerQueueOption{
+			Floor:   21,
+			Ceiling: 200,
+			Default: 125,
+		},
+		WorkerConcurrency: astro.WorkerQueueOption{
+			Floor:   175,
+			Ceiling: 275,
+			Default: 180,
+		},
+	}
 
 	t.Run("-h prints worker-queue help", func(t *testing.T) {
 		cmdArgs := []string{"worker-queue", "create", "-h"}
@@ -327,6 +344,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	// TODO validation tests for each optional user input being in a valid range
 
 	t.Run("happy path worker queue create", func(t *testing.T) {
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
 		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespNoQueues, nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id"}
