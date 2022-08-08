@@ -60,6 +60,10 @@ type ResponseData struct {
 	ListTeams                      ListTeamsResp               `json:"paginatedTeams,omitempty"`
 	CreateTeamSystemRoleBinding    RoleBinding                 `json:"createTeamSystemRoleBinding"`
 	DeleteTeamSystemRoleBinding    RoleBinding                 `json:"deleteTeamSystemRoleBinding"`
+	AddDeploymentTeam              *RoleBinding                `json:"deploymentAddTeamRole,omitempty"`
+	RemoveDeploymentTeam           *RoleBinding                `json:"deploymentRemoveTeamRole,omitempty"`
+	UpdateDeploymentTeam           *RoleBinding                `json:"deploymentUpdateTeamRole,omitempty"`
+	DeploymentGetTeams             []Team                      `json:"deploymentTeams,omitempty"`
 }
 
 type Namespace struct {
@@ -122,6 +126,12 @@ type DeploymentURL struct {
 type DeploymentInfo struct {
 	NextCli string `json:"NextCli"`
 	Current string `json:"current"`
+}
+
+// DeploymentTeam defines a structure of RBAC deployment teams
+type DeploymentTeam struct {
+	ID           string        `json:"id"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // Email contains various pieces of a users email
