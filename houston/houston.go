@@ -74,6 +74,11 @@ type ClientInterface interface {
 	ListTeams(cursor string, take int) (ListTeamsResp, error)
 	CreateTeamSystemRoleBinding(teamID, role string) (string, error)
 	DeleteTeamSystemRoleBinding(teamID, role string) (string, error)
+	// deployment teams
+	AddDeploymentTeam(deploymentID string, teamID string, role string) (*RoleBinding, error)
+	RemoveDeploymentTeam(deploymentID string, teamID string) (*RoleBinding, error)
+	ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error)
+	UpdateDeploymentTeamRole(deploymentID string, teamID string, role string) (*RoleBinding, error)
 	// workspace teams and roles
 	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
 	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
