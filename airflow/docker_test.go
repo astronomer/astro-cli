@@ -928,6 +928,10 @@ func TestCheckWebserverHealth(t *testing.T) {
 			mockEventsCall.ReturnArguments = mock.Arguments{err}
 		}
 
+		openURL = func(url string) error {
+			return nil
+		}
+
 		orgInitSetting := initSettings
 		initSettings = func(id string, version uint64) error {
 			return nil
@@ -965,7 +969,53 @@ func TestCheckWebserverHealth(t *testing.T) {
 			mockEventsCall.ReturnArguments = mock.Arguments{err}
 		}
 
+		openURL = func(url string) error {
+			return nil
+		}
+
 		err := checkWebserverHealth(&types.Project{Name: "test"}, composeMock, 2)
 		assert.ErrorIs(t, err, errMockDocker)
+	})
+}
+
+var errExecMock = errors.New("docker is not running")
+
+func TestStartDocker(t *testing.T) {
+	t.Run("start docker success", func(t *testing.T) {
+		counter := 0
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch cmd {
+			case "open":
+				return nil
+			case "docker":
+				if counter == 0 {
+					counter++
+					return errExecMock
+				}
+				return nil
+			default:
+				return errExecMock
+			}
+		}
+
+		err := startDocker()
+		assert.NoError(t, err)
+	})
+
+	t.Run("start docker fail", func(t *testing.T) {
+		timeoutNum = 5
+
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch cmd {
+			case "open":
+				return nil
+			case "docker":
+				return errExecMock
+			default:
+				return errExecMock
+			}
+		}
+		err := startDocker()
+		assert.Contains(t, err.Error(), "timed out waiting for docker")
 	})
 }

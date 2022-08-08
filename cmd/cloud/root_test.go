@@ -13,7 +13,7 @@ func TestAddCmds(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(astroMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace"}, cmds[cmdIdx].Use)
+		assert.Contains(t, []string{"deployment", "deploy DEPLOYMENT-ID", "workspace", "user"}, cmds[cmdIdx].Use)
 	}
 	astroMock.AssertExpectations(t)
 }

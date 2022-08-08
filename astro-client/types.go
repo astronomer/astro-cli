@@ -14,6 +14,7 @@ type ResponseData struct {
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
+	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
 	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
@@ -23,6 +24,9 @@ type ResponseData struct {
 	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
 	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
+	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
+	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
+	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
 }
 
 type Self struct {
@@ -92,6 +96,36 @@ type DeploymentSpec struct {
 	Workers                     Workers                      `json:"workers"`
 	Scheduler                   Scheduler                    `json:"scheduler"`
 	EnvironmentVariablesObjects []EnvironmentVariablesObject `json:"environmentVariablesObjects"`
+}
+
+type InitiateDagDeployment struct {
+	ID     string `json:"id"`
+	DagURL string `json:"dagUrl"`
+}
+
+type InitiateDagDeploymentInput struct {
+	DeploymentID string `json:"deploymentId"`
+}
+
+type DagDeploymentStatus struct {
+	ID            string `json:"id"`
+	DeploymentID  string `json:"deploymentId"`
+	Action        string `json:"action"`
+	VersionID     string `json:"versionId"`
+	Status        string `json:"status"`
+	Message       string `json:"message"`
+	CreatedAt     string `json:"createdAt"`
+	InitiatorID   string `json:"initiatorId"`
+	InitiatorType string `json:"initiatorType"`
+}
+
+type ReportDagDeploymentStatusInput struct {
+	InitiatedDagDeploymentID string `json:"initiatedDagDeploymentId"`
+	DeploymentID             string `json:"deploymentId"`
+	Action                   string `json:"action"`
+	VersionID                string `json:"versionId"`
+	Status                   string `json:"status"`
+	Message                  string `json:"message"`
 }
 
 type EnvironmentVariablesObject struct {
@@ -263,4 +297,19 @@ type EnvironmentVariable struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 	IsSecret bool   `json:"isSecret"`
+}
+
+// Input for creating a user invite
+type CreateUserInviteInput struct {
+	InviteeEmail   string `json:"inviteeEmail"`
+	Role           string `json:"role"`
+	OrganizationID string `json:"organizationId"`
+}
+
+// Output returned when a user invite is created
+type UserInvite struct {
+	UserID         string `json:"userId"`
+	OrganizationID string `json:"organizationId"`
+	OauthInviteID  string `json:"oauthInviteId"`
+	ExpiresAt      string `json:"expiresAt"`
 }

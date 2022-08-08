@@ -169,7 +169,7 @@ func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
 		if decode.Errors[0].Message == permissionsErrMsg {
 			return nil, fmt.Errorf("Your token has expired. Please log in again: %w", err) //nolint
 		}
-		return nil, err
+		return nil, fmt.Errorf(decode.Errors[0].Message) //nolint
 	}
 
 	return &decode, nil

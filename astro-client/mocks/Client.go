@@ -56,6 +56,27 @@ func (_m *Client) CreateImage(input astro.ImageCreateInput) (*astro.Image, error
 	return r0, r1
 }
 
+// CreateUserInvite provides a mock function with given fields: input
+func (_m *Client) CreateUserInvite(input astro.CreateUserInviteInput) (astro.UserInvite, error) {
+	ret := _m.Called(input)
+
+	var r0 astro.UserInvite
+	if rf, ok := ret.Get(0).(func(astro.CreateUserInviteInput) astro.UserInvite); ok {
+		r0 = rf(input)
+	} else {
+		r0 = ret.Get(0).(astro.UserInvite)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(astro.CreateUserInviteInput) error); ok {
+		r1 = rf(input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteDeployment provides a mock function with given fields: input
 func (_m *Client) DeleteDeployment(input astro.DeploymentDeleteInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
@@ -135,6 +156,48 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	var r1 error
 	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
 		r1 = rf(vars)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetWorkspace provides a mock function with given fields: workspaceID
+func (_m *Client) GetWorkspace(workspaceID string) (astro.Workspace, error) {
+	ret := _m.Called(workspaceID)
+
+	var r0 astro.Workspace
+	if rf, ok := ret.Get(0).(func(string) astro.Workspace); ok {
+		r0 = rf(workspaceID)
+	} else {
+		r0 = ret.Get(0).(astro.Workspace)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(workspaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// InitiateDagDeployment provides a mock function with given fields: input
+func (_m *Client) InitiateDagDeployment(input astro.InitiateDagDeploymentInput) (astro.InitiateDagDeployment, error) {
+	ret := _m.Called(input)
+
+	var r0 astro.InitiateDagDeployment
+	if rf, ok := ret.Get(0).(func(astro.InitiateDagDeploymentInput) astro.InitiateDagDeployment); ok {
+		r0 = rf(input)
+	} else {
+		r0 = ret.Get(0).(astro.InitiateDagDeployment)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(astro.InitiateDagDeploymentInput) error); ok {
+		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -295,6 +358,27 @@ func (_m *Client) ModifyDeploymentVariable(input astro.EnvironmentVariablesInput
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(astro.EnvironmentVariablesInput) error); ok {
+		r1 = rf(input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReportDagDeploymentStatus provides a mock function with given fields: input
+func (_m *Client) ReportDagDeploymentStatus(input *astro.ReportDagDeploymentStatusInput) (astro.DagDeploymentStatus, error) {
+	ret := _m.Called(input)
+
+	var r0 astro.DagDeploymentStatus
+	if rf, ok := ret.Get(0).(func(*astro.ReportDagDeploymentStatusInput) astro.DagDeploymentStatus); ok {
+		r0 = rf(input)
+	} else {
+		r0 = ret.Get(0).(astro.DagDeploymentStatus)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*astro.ReportDagDeploymentStatusInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

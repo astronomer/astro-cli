@@ -10,6 +10,7 @@ type Client interface {
 	ListUserRoleBindings() ([]RoleBinding, error)
 	// Workspace
 	ListWorkspaces() ([]Workspace, error)
+	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
 	CreateDeployment(input *DeploymentCreateInput) (Deployment, error)
 	UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error)
@@ -18,6 +19,8 @@ type Client interface {
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
+	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
+	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
@@ -26,6 +29,8 @@ type Client interface {
 	// RuntimeRelease
 	ListInternalRuntimeReleases() ([]RuntimeRelease, error)
 	ListPublicRuntimeReleases() ([]RuntimeRelease, error)
+	// UserInvite
+	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 }
 
 func (c *HTTPClient) ListUserRoleBindings() ([]RoleBinding, error) {
@@ -148,6 +153,32 @@ func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) (
 	return resp.Data.DeploymentVariablesUpdate, nil
 }
 
+func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error) {
+	req := Request{
+		Query:     DagDeploymentInitiate,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return InitiateDagDeployment{}, err
+	}
+	return resp.Data.InitiateDagDeployment, nil
+}
+
+func (c *HTTPClient) ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error) {
+	req := Request{
+		Query:     ReportDagDeploymentStatus,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return DagDeploymentStatus{}, err
+	}
+	return resp.Data.ReportDagDeploymentStatus, nil
+}
+
 func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
 	req := Request{
 		Query:     ImageCreate,
@@ -211,4 +242,32 @@ func (c *HTTPClient) ListPublicRuntimeReleases() ([]RuntimeRelease, error) {
 		return []RuntimeRelease{}, err
 	}
 	return resp.Data.RuntimeReleases, nil
+}
+
+// CreateUserInvite create a user invite request
+func (c *HTTPClient) CreateUserInvite(input CreateUserInviteInput) (UserInvite, error) {
+	req := Request{
+		Query:     CreateUserInvite,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return UserInvite{}, err
+	}
+	return resp.Data.CreateUserInvite, nil
+}
+
+// GetWorkspace returns information about the workspace
+func (c *HTTPClient) GetWorkspace(workspaceID string) (Workspace, error) {
+	wsReq := Request{
+		Query:     GetWorkspace,
+		Variables: map[string]interface{}{"workspaceId": workspaceID},
+	}
+
+	wsResp, err := wsReq.DoWithPublicClient(c)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return wsResp.Data.GetWorkspace, nil
 }

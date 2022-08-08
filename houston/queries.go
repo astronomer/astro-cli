@@ -854,4 +854,65 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	}
 	`
+
+	DeploymentTeamAddRequest = `
+	mutation deploymentAddTeamRole(
+		$teamUuid: Uuid!
+		$deploymentUuid: Uuid!
+		$role: Role! = WORKSPACE_VIEWER
+	) {
+		deploymentAddTeamRole(
+			teamUuid: $teamUuid
+			deploymentUuid: $deploymentUuid
+			role: $role
+		) {
+			id
+			role
+		}
+	}`
+
+	DeploymentTeamRemoveRequest = `
+	mutation deploymentRemoveTeamRole($deploymentUuid: Uuid!, $teamUuid: Uuid!) {
+		deploymentRemoveTeamRole(
+			deploymentUuid: $deploymentUuid
+			teamUuid: $teamUuid
+		) {
+			id
+		}
+	}`
+
+	DeploymentTeamUpdateRequest = `
+	mutation deploymentUpdateTeamRole(
+		$deploymentUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role!
+	) {
+		deploymentUpdateTeamRole(
+			deploymentUuid: $deploymentUuid
+			teamUuid: $teamUuid
+			role: $role
+		) {
+			id
+			role
+		}
+	}`
+
+	DeploymentGetTeamsRequest = `
+	query deploymentTeams($deploymentUuid: Uuid!) {
+		deploymentTeams(deploymentUuid: $deploymentUuid) {
+			id
+			name
+			roleBindings {
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+				}
+			}
+		}
+	}`
 )
