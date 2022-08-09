@@ -103,6 +103,9 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowRestartCmd(),
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
+		newAirflowSettingsCmd(),
+		newAirflowSettingsEnvExportCmd(),
+		newAirflowSettingsExportCmd(),
 	)
 	return cmd
 }
@@ -323,6 +326,54 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&webserverExec, "webserver", "w", false, "Exec into the webserver container")
 	cmd.Flags().BoolVarP(&postgresExec, "postgres", "p", false, "Exec into the postgres container")
 	cmd.Flags().BoolVarP(&triggererExec, "triggerer", "t", false, "Exec into the triggerer container")
+	return cmd
+}
+
+func newAirflowSettingsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "settings-import",
+		Short: "Create or Update objects from an Aiflow Settings locally",
+		Long:  "This command will create all objects in an Airflow Settings file locally. Airflow must be running locally for this command to work",
+		Args:  cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE: utils.EnsureProjectDir,
+		RunE:    airflowSettingsImport,
+	}
+	return cmd
+}
+
+func newAirflowSettingsEnvExportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "settings-env-export",
+		Short: "Export all Airflow objects to an env file",
+		Long:  "This command will export all Airflow objects to a env file. Airflow must be running locally for this command to work",
+		Args:  cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE: utils.EnsureProjectDir,
+		RunE:    airflowSettingsEnvExport,
+	}
+	return cmd
+}
+
+func newAirflowSettingsExportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "settings-export",
+		Short: "Export all Airflow objects to an airflow settings file. Does not overwrite objects that already exists in the file",
+		Long:  "This command will export all Airflow objects to an airflow settings file. Objects already in the file will not be over written. Airflow must be running locally for this command to work",
+		Args:  cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE: utils.EnsureProjectDir,
+		RunE:    airflowSettingsExport,
+	}
 	return cmd
 }
 
@@ -646,6 +697,42 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Execing into the %s container\n\n", container)
 	return containerHandler.Bash(container)
+}
+
+func airflowSettingsImport(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	if err != nil {
+		return err
+	}
+	
+	return containerHandler.SettingsFileImport()
+}
+
+func airflowSettingsEnvExport(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	if err != nil {
+		return err
+	}
+	
+	return containerHandler.SettingsFileEnvExport()
+}
+
+func airflowSettingsExport(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	if err != nil {
+		return err
+	}
+	
+	return containerHandler.SettingsFileExport()
 }
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client) string {

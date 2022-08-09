@@ -27,6 +27,9 @@ type ContainerHandler interface {
 	Pytest(imageName, pytestFile, projectImageName string) (string, error)
 	Parse(imageName, buildImage string) error
 	Bash(container string) error
+	SettingsFileImport() error
+	SettingsFileEnvExport() error
+	SettingsFileExport() error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry

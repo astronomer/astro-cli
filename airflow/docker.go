@@ -519,6 +519,135 @@ func (d *DockerCompose) Bash(container string) error {
 	return nil
 }
 
+func (d *DockerCompose) SettingsFileImport() error {
+	// Get project containers
+	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeCreateErrMsg)
+	}
+
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return err
+	}
+
+	airflowDockerVersion := defaultAirflowVersion
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if version := semver.MustParse(airflowVersion); version != nil {
+			airflowDockerVersion = version.Major()
+		}
+	}
+
+	fileState, err := fileutil.Exists(airflowSettingsFile, nil)
+
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+
+	if fileState {
+		for i := range psInfo {
+			if strings.Contains(psInfo[i].Name, d.projectName) &&
+				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+				err = initSettings(psInfo[i].ID, airflowDockerVersion)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	fmt.Println("\nAirflow Objects from settings file created")
+	return nil
+}
+
+func (d *DockerCompose) SettingsFileEnvExport() error {
+	// Get project containers
+	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeCreateErrMsg)
+	}
+
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return err
+	}
+
+	airflowDockerVersion := defaultAirflowVersion
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if version := semver.MustParse(airflowVersion); version != nil {
+			airflowDockerVersion = version.Major()
+		}
+	}
+
+	fileState, err := fileutil.Exists(airflowSettingsFile, nil)
+
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+
+	if fileState {
+		for i := range psInfo {
+			if strings.Contains(psInfo[i].Name, d.projectName) &&
+				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+				err = settings.SettingsEnvExport(psInfo[i].ID, airflowDockerVersion)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	fmt.Println("\nAirflow Objects from settings file created")
+	return nil
+}
+
+func (d *DockerCompose) SettingsFileExport() error {
+	// Get project containers
+	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeCreateErrMsg)
+	}
+
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return err
+	}
+
+	airflowDockerVersion := defaultAirflowVersion
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if version := semver.MustParse(airflowVersion); version != nil {
+			airflowDockerVersion = version.Major()
+		}
+	}
+
+	fileState, err := fileutil.Exists(airflowSettingsFile, nil)
+
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+
+	if fileState {
+		for i := range psInfo {
+			if strings.Contains(psInfo[i].Name, d.projectName) &&
+				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+				err = settings.SettingsExport(psInfo[i].ID, airflowDockerVersion)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	fmt.Println("\nAirflow Objects sucessfully exported to the Settings file")
+	return nil
+}
+
 // getWebServerContainerId return webserver container id
 func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
