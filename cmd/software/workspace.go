@@ -188,7 +188,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	pageSize := config.CFG.PageSize.GetInt()
 
 	if config.CFG.Interactive.GetBool() || workspacePaginated {
-		if workspacePageSize < 0 && pageSize > 0 {
+		if workspacePageSize <= 0 && pageSize > 0 {
 			workspacePageSize = pageSize
 		}
 
