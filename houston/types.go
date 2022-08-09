@@ -44,7 +44,7 @@ type ResponseData struct {
 	CancelUpdateDeploymentRuntime  *Deployment                 `json:"cancelRuntimeUpdate,omitempty"`
 	UpdateWorkspace                *Workspace                  `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog             `json:"logs,omitempty"`
-	WorkspaceUpdateUserRole        string                      `json:"workspaceUpdateUserRole,omitempty"`
+	WorkspaceUpdateUserRole        string                      `json:"workspaceUpsertUserRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings   `json:"workspaceUser,omitempty"`
 	WorkspaceGetUsers              []WorkspaceUserRoleBindings `json:"workspaceUsers,omitempty"`
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
