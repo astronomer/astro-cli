@@ -151,7 +151,7 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 	configPageSize := config.CFG.PageSize.GetInt()
 
 	if config.CFG.Interactive.GetBool() || paginated {
-		if pageSize < 0 && configPageSize > 0 {
+		if pageSize <= 0 && configPageSize > 0 {
 			pageSize = configPageSize
 		}
 
