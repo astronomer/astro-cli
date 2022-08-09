@@ -181,7 +181,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			WorkspaceUpdateUserRole: DeploymentAdminRole,
+			WorkspaceUpsertUserRole: DeploymentAdminRole,
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
@@ -199,7 +199,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 
 		response, err := api.UpdateWorkspaceUserRole("workspace-id", "email", DeploymentAdminRole)
 		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspaceUpdateUserRole)
+		assert.Equal(t, response, mockResponse.Data.WorkspaceUpsertUserRole)
 	})
 
 	t.Run("error", func(t *testing.T) {

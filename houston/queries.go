@@ -543,8 +543,8 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}`
 
 	WorkspaceUserUpdateRequest = `
-	mutation workspaceUpdateUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
-		workspaceUpdateUserRole(
+	mutation workspaceUpsertUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
+		workspaceUpsertUserRole(
         	workspaceUuid: $workspaceUuid
             email: $email
             role: $role
