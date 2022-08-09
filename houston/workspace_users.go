@@ -57,7 +57,7 @@ func (h ClientImplementation) UpdateWorkspaceUserRole(workspaceID, email, role s
 		return "", handleAPIErr(err)
 	}
 
-	return r.Data.WorkspaceUpdateUserRole, nil
+	return r.Data.WorkspaceUpsertUserRole, nil
 }
 
 // GetUserRoleInWorkspace - get a user role in a workspace
