@@ -855,6 +855,29 @@ func (_m *ClientInterface) ListTeams(cursor string, take int) (houston.ListTeams
 	return r0, r1
 }
 
+// ListWorkspacePaginatedUserAndRoles provides a mock function with given fields: workspaceID, cursorID, take
+func (_m *ClientInterface) ListWorkspacePaginatedUserAndRoles(workspaceID string, cursorID string, take float64) ([]houston.WorkspaceUserRoleBindings, error) {
+	ret := _m.Called(workspaceID, cursorID, take)
+
+	var r0 []houston.WorkspaceUserRoleBindings
+	if rf, ok := ret.Get(0).(func(string, string, float64) []houston.WorkspaceUserRoleBindings); ok {
+		r0 = rf(workspaceID, cursorID, take)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.WorkspaceUserRoleBindings)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, float64) error); ok {
+		r1 = rf(workspaceID, cursorID, take)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListWorkspaceServiceAccounts provides a mock function with given fields: workspaceID
 func (_m *ClientInterface) ListWorkspaceServiceAccounts(workspaceID string) ([]houston.ServiceAccount, error) {
 	ret := _m.Called(workspaceID)

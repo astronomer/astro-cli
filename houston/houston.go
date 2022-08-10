@@ -35,6 +35,7 @@ type ClientInterface interface {
 	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)
 	DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error)
 	ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error)
+	ListWorkspacePaginatedUserAndRoles(workspaceID string, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error)
 	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
 	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
 	// auth

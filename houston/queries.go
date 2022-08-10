@@ -588,6 +588,32 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}
 	}`
 
+	WorkspacePaginatedGetUsersRequest = `
+	query paginatedWorkspaceUsers(
+	  $workspaceUuid: Uuid!,
+	  $cursorUuid: Uuid,
+	  $take: Int
+	) {
+		paginatedWorkspaceUsers(
+        	workspaceUuid: $workspaceUuid
+        	cursor: $cursorUuid
+        	take: $take
+        ) {
+		id
+		username
+		fullName
+		emails {
+			address
+		}
+		roleBindings {
+		  workspace{
+			id
+		  }
+		  role
+		}
+	}
+	}`
+
 	WorkspaceUserRemoveRequest = `
 	mutation RemoveWorkspaceUser(
 		$workspaceId: Uuid!
