@@ -72,6 +72,8 @@ var (
 		HoustonDialTimeout:   newCfg("houston.dial_timeout", "10"),
 		HoustonSkipVerifyTLS: newCfg("houston.skip_verify_tls", "false"),
 		SkipParse:            newCfg("skip_parse", "false"),
+		Interactive:          newCfg("interactive", "false"),
+		PageSize:             newCfg("page_size", "20"),
 	}
 
 	// viperHome is the viper object in the users home directory

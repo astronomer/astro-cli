@@ -45,6 +45,21 @@ func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) ([]W
 	return r.Data.WorkspaceGetUsers, nil
 }
 
+// ListWorkspacePaginatedUserAndRoles - list users and roles from a workspace
+func (h ClientImplementation) ListWorkspacePaginatedUserAndRoles(workspaceID, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error) {
+	req := Request{
+		Query:     WorkspacePaginatedGetUsersRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID, "cursorUuid": cursorID, "take": take},
+	}
+
+	r, err := req.DoWithClient(h.client)
+	if err != nil {
+		return []WorkspaceUserRoleBindings{}, handleAPIErr(err)
+	}
+
+	return r.Data.WorkspacePaginatedGetUsers, nil
+}
+
 // UpdateUserRoleInWorkspace - update a user role in a workspace
 func (h ClientImplementation) UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error) {
 	req := Request{
@@ -57,7 +72,7 @@ func (h ClientImplementation) UpdateWorkspaceUserRole(workspaceID, email, role s
 		return "", handleAPIErr(err)
 	}
 
-	return r.Data.WorkspaceUpdateUserRole, nil
+	return r.Data.WorkspaceUpsertUserRole, nil
 }
 
 // GetUserRoleInWorkspace - get a user role in a workspace

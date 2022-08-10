@@ -27,6 +27,7 @@ type ClientInterface interface {
 	// workspace
 	CreateWorkspace(label, description string) (*Workspace, error)
 	ListWorkspaces() ([]Workspace, error)
+	PaginatedListWorkspaces(pageSize int, pageNumber int) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)
@@ -34,6 +35,7 @@ type ClientInterface interface {
 	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)
 	DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error)
 	ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error)
+	ListWorkspacePaginatedUserAndRoles(workspaceID string, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error)
 	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
 	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
 	// auth
@@ -74,6 +76,11 @@ type ClientInterface interface {
 	ListTeams(cursor string, take int) (ListTeamsResp, error)
 	CreateTeamSystemRoleBinding(teamID, role string) (string, error)
 	DeleteTeamSystemRoleBinding(teamID, role string) (string, error)
+	// deployment teams
+	AddDeploymentTeam(deploymentID string, teamID string, role string) (*RoleBinding, error)
+	RemoveDeploymentTeam(deploymentID string, teamID string) (*RoleBinding, error)
+	ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error)
+	UpdateDeploymentTeamRole(deploymentID string, teamID string, role string) (*RoleBinding, error)
 	// workspace teams and roles
 	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
 	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
