@@ -17,28 +17,38 @@ var (
 func Create(ws, deploymentID, name string, isDefaultWQueue bool, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
 	var (
 		requestedDeployment       astro.Deployment
-		deloymentToUpdateInput    *astro.DeploymentUpdateInput
 		err                       error
-		workerQueueToCreate       astro.WorkerQueue
+		workerQueueToCreate       *astro.WorkerQueue
 		wQueueListToCreate        []astro.WorkerQueue
 		workerQueueDefaultOptions astro.WorkerQueueDefaultOptions
+		pool                      astro.NodePool
+		nodePoolIDForWorkerQueue  string
 	)
-	// get defaults for min-count, max-count and concurrency from API
-	workerQueueDefaultOptions, err = GetWorkerQueueDefaultOptions(client)
-	if err != nil {
-		return err
-	}
-
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, client)
 	if err != nil {
 		return err
 	}
 
-	workerQueueToCreate = astro.WorkerQueue{
+	// get defaults for min-count, max-count and concurrency from API
+	workerQueueDefaultOptions, err = GetWorkerQueueDefaultOptions(client)
+	if err != nil {
+		return err
+	}
+
+	// Get the default nodepool ID to use
+	for _, pool = range requestedDeployment.Cluster.NodePools {
+		if pool.IsDefault {
+			nodePoolIDForWorkerQueue = pool.ID
+		}
+	}
+
+	// TODO user selects nodePoolID for creating a queue on non-default nodepools
+
+	workerQueueToCreate = &astro.WorkerQueue{
 		Name:       name,
 		IsDefault:  isDefaultWQueue,
-		NodePoolID: "", // TODO query clusters to get the nodepoolID
+		NodePoolID: nodePoolIDForWorkerQueue,
 	}
 	workerQueueToCreate = setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, workerQueueToCreate, workerQueueDefaultOptions)
 
@@ -49,33 +59,28 @@ func Create(ws, deploymentID, name string, isDefaultWQueue bool, wQueueMin, wQue
 
 	if len(requestedDeployment.WorkerQueues) > 0 {
 		// worker-queues exist so we add a new one to the existing list
-		wQueueListToCreate = append(requestedDeployment.WorkerQueues, workerQueueToCreate) //nolint
+		wQueueListToCreate = append(requestedDeployment.WorkerQueues, *workerQueueToCreate) //nolint
 		// TODO if worker-queue exists, update it with requested values
 		// TODO should workerqueue.Create() do this?
+		// TODO should we validate if user is going to re-create the default queue?
+	} else {
+		// TODO is this a valid case since every deployment should already have a default queue
+		// no worker-queues exist so create a new list of one worker queue
+		wQueueListToCreate = []astro.WorkerQueue{*workerQueueToCreate}
 	}
 
-	// no worker-queues exist so create a new list of one worker queue
-	wQueueListToCreate = []astro.WorkerQueue{workerQueueToCreate}
-	deloymentToUpdateInput = &astro.DeploymentUpdateInput{
-		ID:             deploymentID,
-		OrchestratorID: requestedDeployment.Orchestrator.ID, // TODO do we need to provide this?
-		Label:          requestedDeployment.Label,           // TODO do we need to provide this?
-		Description:    requestedDeployment.Description,     // TODO do we need to provide this?
-		DeploymentSpec: astro.DeploymentCreateSpec{},        // TODO do we need to provide this?
-		WorkerQueues:   wQueueListToCreate,
-	}
-	_, err = client.UpdateDeployment(deloymentToUpdateInput)
+	err = deployment.Update(requestedDeployment.ID, "", ws, "", 0, 0, 0, wQueueListToCreate, true, client)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "worker-queue %s for %s in %s workspace created\n", workerQueueToCreate.Name, deploymentID, ws)
+	fmt.Fprintf(out, "worker-queue %s for %s in %s workspace created\n", workerQueueToCreate.Name, requestedDeployment.ID, ws)
 	return nil
 }
 
 // setWorkerQueueValues sets values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency
 // Default values are used if the user did not request any
 
-func setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) astro.WorkerQueue {
+func setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
 	if wQueueMin != 0 {
 		// use the value from the user input
 		workerQueueToCreate.MinWorkerCount = wQueueMin
@@ -120,7 +125,7 @@ func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefault
 // if it adheres to them, it returns nil
 // ErrInvalidWorkerQueueOption is returned if min, max or concurrency are out of range
 
-func IsWorkerQueueInputValid(requestedWorkerQueue astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
+func IsWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
 		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {

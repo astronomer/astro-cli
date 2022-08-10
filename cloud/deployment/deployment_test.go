@@ -535,7 +535,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", "", 0, 0, 0, false, mockClient)
+		err = Update("test-id", "", ws, "", "", 0, 0, 0, []astro.WorkerQueue{}, false, mockClient)
 		assert.NoError(t, err)
 
 		// mock os.Stdin
@@ -554,7 +554,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, []astro.WorkerQueue{}, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -563,7 +563,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
+		err := Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, []astro.WorkerQueue{}, false, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -588,10 +588,10 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
+		err = Update("", "test-label", ws, "test description", "", 5, 3, 10, []astro.WorkerQueue{}, false, mockClient)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 
-		err = Update("test-invalid-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
+		err = Update("test-invalid-id", "test-label", ws, "test description", "", 5, 3, 10, []astro.WorkerQueue{}, false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -616,7 +616,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, []astro.WorkerQueue{}, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -626,7 +626,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "", ws, "", "", 0, 0, 0, true, mockClient)
+		err := Update("test-id", "", ws, "", "", 0, 0, 0, []astro.WorkerQueue{}, true, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})

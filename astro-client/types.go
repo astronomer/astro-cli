@@ -73,9 +73,10 @@ type Deployment struct {
 
 // Cluster contains all components of an Astronomer Cluster
 type Cluster struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	CloudProvider string `json:"cloudProvider"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	CloudProvider string     `json:"cloudProvider"`
+	NodePools     []NodePool `json:"nodePools"`
 }
 
 type RuntimeRelease struct {
@@ -312,6 +313,7 @@ type UserInvite struct {
 }
 
 type WorkerQueue struct {
+	ID                string `json:"id,omitempty"` // Empty when creating new WorkerQueues
 	Name              string `json:"name"`
 	IsDefault         bool   `json:"isDefault"`
 	MaxWorkerCount    int    `json:"maxWorkerCount"`
@@ -330,4 +332,10 @@ type WorkerQueueOption struct {
 	Floor   int `json:"floor"`
 	Ceiling int `json:"ceiling"`
 	Default int `json:"default"`
+}
+
+type NodePool struct {
+	ID               string `json:"id"`
+	IsDefault        bool   `json:"isDefault"`
+	NodeInstanceType string `json:"nodeInstanceType"`
 }

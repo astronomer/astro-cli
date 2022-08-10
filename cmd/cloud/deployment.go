@@ -3,6 +3,8 @@ package cloud
 import (
 	"io"
 
+	"github.com/astronomer/astro-cli/astro-client"
+
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -318,7 +320,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, updateWorkerAU, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, updateWorkerAU, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -380,7 +382,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 
 func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "worker-queue ",
+		Use:     "worker-queue",
 		Aliases: []string{"wq"},
 		Short:   "Manage deployment worker queues",
 		Long:    "Manage worker queues for an Astro Deployment.",
@@ -405,11 +407,8 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&wQueueName, "name", "n", "", "The name of the worker queue. If the name contains a space, specify the entire name within quotes \"\" .")
 	cmd.Flags().BoolVarP(&isDefaultWQueue, "isDefault", "", false, "Make this the default worker queue by passing in a t | f.")
-	// TODO confirm the allowed input range and default value
 	cmd.Flags().IntVarP(&wQueueMin, "min-count", "", 0, "The min worker count of the worker queue. Possible values are between 1 and 10.")
-	// TODO confirm the allowed input range and default value
 	cmd.Flags().IntVarP(&wQueueMax, "max-count", "", 0, "The max worker count of the worker queue. Possible values are between 11 and 20.")
-	// TODO confirm the allowed input range and default value
 	cmd.Flags().IntVarP(&wQueueConcurrency, "concurrency", "", 0, "The concurrency(number of slots) of the worker queue. Possible values are between 21 and 30.")
 	cmd.Flags().StringVarP(&wQueueWorkerType, "worker-type", "t", "", "The worker type of the default worker queue.")
 
@@ -422,10 +421,6 @@ func deploymentWorkerQueueCreate(cmd *cobra.Command, _ []string, out io.Writer) 
 		return err
 	}
 
-	// TODO are wQueueName and isDefaultWQueue required?
-	if deploymentID == "" {
-		return errors.New("deployment id is required")
-	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 

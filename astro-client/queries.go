@@ -22,6 +22,27 @@ var (
 			cluster {
 				id
 			}
+			cluster {
+				id
+				name
+				cloudProvider
+				nodePools {
+					id
+					isDefault
+					nodeInstanceType
+				}
+			}
+			workerQueues {
+				id
+				name
+				isDefault
+				nodePoolId
+				podCpu
+				podRam
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
+			}
 			createdAt
 			status
 			runtimeRelease {

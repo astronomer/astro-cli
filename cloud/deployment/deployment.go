@@ -134,7 +134,6 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-// TODO add default worker queue to deployment create
 func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
@@ -281,6 +280,7 @@ func createOutput(organizationID, workspaceID string, d *astro.Deployment) error
 }
 
 func validateResources(workerAU, schedulerAU, schedulerReplicas int) bool {
+	// TODO will be deprecating this when removing the --worker-au flag
 	if workerAU > workerAuMax || workerAU < WorkerAuMin {
 		fmt.Printf("\nWorker AUs must be between a min of %d and a max of %d AUs", WorkerAuMin, workerAuMax)
 		return false
@@ -405,7 +405,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
@@ -471,6 +471,10 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 		deploymentUpdate.Description = currentDeployment.Description
 	}
 
+	// if we have worker queues add them to the input
+	if len(wQueueList) > 0 {
+		deploymentUpdate.WorkerQueues = wQueueList
+	}
 	// validate resources requests
 	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
 	if !resourcesValid {
@@ -652,7 +656,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		return astro.Deployment{}, err
 	}
 	if currentDeployment.ID == "" {
-		// get latest runtime veresion
+		// get latest runtime version
 		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
 		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
 		if err != nil {
