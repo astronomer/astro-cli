@@ -12,7 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-type PaginationOptions struct {
+type WorkspacePaginationOptions struct {
 	pageSize      int
 	pageNumber    int
 	quit          bool
@@ -117,14 +117,14 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 // workspacesPromptPaginatedOption Show pagination option based on page size and total record
-var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) PaginationOptions {
+var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) WorkspacePaginationOptions {
 	for {
 		gotoOptionMessage := defaultWorkspacePaginationOptions
-		gotoOptions := make(map[string]PaginationOptions)
-		gotoOptions["f"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
-		gotoOptions["p"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
-		gotoOptions["n"] = PaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
-		gotoOptions["q"] = PaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
+		gotoOptions := make(map[string]WorkspacePaginationOptions)
+		gotoOptions["f"] = WorkspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
+		gotoOptions["p"] = WorkspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
+		gotoOptions["n"] = WorkspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
+		gotoOptions["q"] = WorkspacePaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
 
 		if totalRecord < pageSize {
 			delete(gotoOptions, "n")
