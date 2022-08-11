@@ -64,7 +64,11 @@ func TestRemoveTeam(t *testing.T) {
 func TestListTeamRoles(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("ListWorkspaceTeamsAndRoles", "workspace-id").Return([]houston.Team{{ID: "test-id-1", Name: "test-name-1", RoleBindings: []houston.RoleBinding{{Role: "test-role-1"}}}, {ID: "test-id-2", Name: "test-name-2", RoleBindings: []houston.RoleBinding{{Role: "test-role-2"}}}}, nil)
+		mock.On("ListWorkspaceTeamsAndRoles", "workspace-id").Return(
+			[]houston.Team{
+				{ID: "test-id-1", Name: "test-name-1", RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceViewerRole, Workspace: houston.Workspace{ID: "workspace-id"}}}},
+				{ID: "test-id-2", Name: "test-name-2", RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "workspace-id"}}}},
+			}, nil)
 
 		buf := new(bytes.Buffer)
 		err := ListTeamRoles("workspace-id", mock, buf)
@@ -147,4 +151,35 @@ func TestUpdateTeamRole(t *testing.T) {
 		assert.ErrorIs(t, err, errMock)
 		mock.AssertExpectations(t)
 	})
+}
+
+func TestGetWorkspaceLevelRole(t *testing.T) {
+	tests := []struct {
+		roleBinding []houston.RoleBinding
+		workspaceID string
+		result      string
+	}{
+		{
+			roleBinding: []houston.RoleBinding{
+				{Role: houston.SystemAdminRole},
+				{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "test-id-1"}},
+				{Role: houston.WorkspaceEditorRole, Workspace: houston.Workspace{ID: "test-id-2"}},
+			},
+			workspaceID: "test-id-1",
+			result:      houston.WorkspaceAdminRole,
+		},
+		{
+			roleBinding: []houston.RoleBinding{
+				{Role: houston.SystemAdminRole},
+				{Role: houston.WorkspaceEditorRole, Workspace: houston.Workspace{ID: "test-id-2"}},
+			},
+			workspaceID: "test-id-1",
+			result:      houston.NoneTeamRole,
+		},
+	}
+
+	for _, tt := range tests {
+		resp := getWorkspaceLevelRole(tt.roleBinding, tt.workspaceID)
+		assert.Equal(t, tt.result, resp, "expected: %v, actual: %v", tt.result, resp)
+	}
 }

@@ -30,8 +30,9 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 
 	// Build rows
 	for i := range deploymentTeams {
-		for j := range deploymentTeams[i].RoleBindings {
-			tab.AddRow([]string{deploymentID, deploymentTeams[i].ID, deploymentTeams[i].Name, deploymentTeams[i].RoleBindings[j].Role}, false)
+		role := getDeploymentLevelRole(deploymentTeams[i].RoleBindings, deploymentID)
+		if role != houston.NoneTeamRole {
+			tab.AddRow([]string{deploymentID, deploymentTeams[i].ID, deploymentTeams[i].Name, role}, false)
 		}
 	}
 
@@ -99,4 +100,23 @@ func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out
 	tab.Print(out)
 
 	return nil
+}
+
+// isValidDeploymentLevelRole checks if the role is amongst valid workspace roles
+func isValidDeploymentLevelRole(role string) bool {
+	switch role {
+	case houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole, houston.NoneTeamRole:
+		return true
+	}
+	return false
+}
+
+// getDeploymentLevelRole returns the first system level role from a slice of roles
+func getDeploymentLevelRole(roles []houston.RoleBinding, deploymentID string) string {
+	for i := range roles {
+		if isValidDeploymentLevelRole(roles[i].Role) && roles[i].Deployment.ID == deploymentID {
+			return roles[i].Role
+		}
+	}
+	return houston.NoneTeamRole
 }
