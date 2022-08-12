@@ -263,7 +263,7 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 			fmt.Printf("%s is an improperly formated variable no variable created", vars[i])
 			continue
 		}
-		key := strings.SplitN(vars[i], "=", 2)[0] // nolint:gomnd
+		key := strings.SplitN(vars[i], "=", 2)[0]   // nolint:gomnd
 		value := strings.SplitN(vars[i], "=", 2)[1] // nolint:gomnd
 		if key == "" {
 			fmt.Printf("empty key! skipping creating variable with value: %s\n", value)
