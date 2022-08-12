@@ -406,7 +406,7 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created.")
 	cmd.Flags().StringVarP(&wQueueName, "name", "n", "", "The name of the worker queue. If the name contains a space, specify the entire name within quotes \"\" .")
-	cmd.Flags().BoolVarP(&isDefaultWQueue, "isDefault", "", false, "Make this the default worker queue by passing in a t | f.")
+	cmd.Flags().BoolVarP(&isDefaultWQueue, "isDefault", "", false, "Make this the default worker queue by setting this to true.")
 	cmd.Flags().IntVarP(&wQueueMin, "min-count", "", 0, "The min worker count of the worker queue. Possible values are between 1 and 10.")
 	cmd.Flags().IntVarP(&wQueueMax, "max-count", "", 0, "The max worker count of the worker queue. Possible values are between 11 and 20.")
 	cmd.Flags().IntVarP(&wQueueConcurrency, "concurrency", "", 0, "The concurrency(number of slots) of the worker queue. Possible values are between 21 and 30.")

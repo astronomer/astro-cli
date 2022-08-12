@@ -146,7 +146,7 @@ func TestCreate(t *testing.T) {
 			Default: 180,
 		},
 	}
-	t.Run("happy path creates a new worker queue for an existing deployment when no worker queues exist", func(t *testing.T) {
+	t.Run("happy path creates a new worker queue for a deployment when no worker queues exist", func(t *testing.T) {
 		expectedOutMessage := "worker-queue " + expectedWorkerQueue.Name + " for test-deployment-id in test-ws-id workspace created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
@@ -171,7 +171,7 @@ func TestCreate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("happy path creates a new worker queue for an existing deployment when worker queues exist", func(t *testing.T) {
+	t.Run("happy path creates a new worker queue for a deployment when worker queues exist", func(t *testing.T) {
 		expectedOutMessage := "worker-queue " + expectedWorkerQueue.Name + " for test-deployment-id in test-ws-id workspace created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
@@ -235,13 +235,23 @@ func TestCreate(t *testing.T) {
 		assert.ErrorIs(t, err, deployment.ErrInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("returns an error when requested worker queue is not valid", func(t *testing.T) {
+	t.Run("returns an error when requested worker queue input is not valid", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespNoQueues, nil).Once()
 		err := Create("test-ws-id", "test-deployment-id", "", false, 25, 0, 0, mockClient, out)
 		assert.ErrorIs(t, err, ErrInvalidWorkerQueueOption)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when requested worker queue would update an existing queue with the same name", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		err := Create("test-ws-id", "test-deployment-id", "test-default-queue-1", false, 0, 0, 0, mockClient, out)
+		assert.ErrorIs(t, err, ErrCannotUpdateExistingQueue)
+		assert.ErrorContains(t, err, "use worker-queue update test-default-queue-1 instead: worker-queue exists")
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when update deployment fails", func(t *testing.T) {
@@ -413,5 +423,45 @@ func TestIsWorkerQueueOptionValid(t *testing.T) {
 		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.ErrorIs(t, err, ErrInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker concurrency must be between 175 and 275: worker-queue option is invalid")
+	})
+}
+
+func TestQueueExists(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	existingQueues := []astro.WorkerQueue{
+		{
+			ID:                "test-wq-id",
+			Name:              "test-default-queue",
+			IsDefault:         true,
+			MaxWorkerCount:    130,
+			MinWorkerCount:    12,
+			WorkerConcurrency: 110,
+			NodePoolID:        "test-nodepool-id",
+		},
+		{
+			ID:                "test-wq-id-1",
+			Name:              "test-default-queue-1",
+			IsDefault:         false,
+			MaxWorkerCount:    175,
+			MinWorkerCount:    8,
+			WorkerConcurrency: 150,
+			NodePoolID:        "test-nodepool-id-1",
+		},
+	}
+	t.Run("returns true if queue with same name exists in list of queues", func(t *testing.T) {
+		actual := QueueExists(existingQueues, &astro.WorkerQueue{Name: "test-default-queue"})
+		assert.True(t, actual)
+	})
+	t.Run("returns true if queue with same id exists in list of queues", func(t *testing.T) {
+		actual := QueueExists(existingQueues, &astro.WorkerQueue{ID: "test-wq-id-1"})
+		assert.True(t, actual)
+	})
+	t.Run("returns false if queue with same name does not exist in list of queues", func(t *testing.T) {
+		actual := QueueExists(existingQueues, &astro.WorkerQueue{Name: "test-default-queues"})
+		assert.False(t, actual)
+	})
+	t.Run("returns true if queue with same id exists in list of queues", func(t *testing.T) {
+		actual := QueueExists(existingQueues, &astro.WorkerQueue{ID: "test-wq-id-10"})
+		assert.False(t, actual)
 	})
 }

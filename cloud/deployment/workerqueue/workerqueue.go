@@ -12,12 +12,14 @@ import (
 var (
 	ErrWorkerQueueDefaultOptions = errors.New("failed to get worker-queue default options")
 	ErrInvalidWorkerQueueOption  = errors.New("worker-queue option is invalid")
+	ErrCannotUpdateExistingQueue = errors.New("worker-queue exists")
 )
 
 func Create(ws, deploymentID, name string, isDefaultWQueue bool, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
 	var (
 		requestedDeployment       astro.Deployment
 		err                       error
+		errHelp                   string
 		workerQueueToCreate       *astro.WorkerQueue
 		wQueueListToCreate        []astro.WorkerQueue
 		workerQueueDefaultOptions astro.WorkerQueueDefaultOptions
@@ -30,6 +32,7 @@ func Create(ws, deploymentID, name string, isDefaultWQueue bool, wQueueMin, wQue
 		return err
 	}
 
+	// TODO should we only get defaults once via init()
 	// get defaults for min-count, max-count and concurrency from API
 	workerQueueDefaultOptions, err = GetWorkerQueueDefaultOptions(client)
 	if err != nil {
@@ -57,18 +60,16 @@ func Create(ws, deploymentID, name string, isDefaultWQueue bool, wQueueMin, wQue
 		return err
 	}
 
-	if len(requestedDeployment.WorkerQueues) > 0 {
-		// worker-queues exist so we add a new one to the existing list
-		wQueueListToCreate = append(requestedDeployment.WorkerQueues, *workerQueueToCreate) //nolint
-		// TODO if worker-queue exists, update it with requested values
-		// TODO should workerqueue.Create() do this?
-		// TODO should we validate if user is going to re-create the default queue?
-	} else {
-		// TODO is this a valid case since every deployment should already have a default queue
-		// no worker-queues exist so create a new list of one worker queue
-		wQueueListToCreate = []astro.WorkerQueue{*workerQueueToCreate}
+	if QueueExists(requestedDeployment.WorkerQueues, workerQueueToCreate) {
+		// create does not allow updating existing queues
+		errHelp = fmt.Sprintf("use worker-queue update %s instead", workerQueueToCreate.Name)
+		return errors.Wrap(ErrCannotUpdateExistingQueue, errHelp)
 	}
 
+	// workerQueueToCreate does not exist so we add it
+	wQueueListToCreate = append(requestedDeployment.WorkerQueues, *workerQueueToCreate) //nolint
+
+	// update the deployment with the new list of worker-queues
 	err = deployment.Update(requestedDeployment.ID, "", ws, "", 0, 0, 0, wQueueListToCreate, true, client)
 	if err != nil {
 		return err
@@ -143,4 +144,22 @@ func IsWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOpt
 		return errors.Wrap(ErrInvalidWorkerQueueOption, errorMessage)
 	}
 	return nil
+}
+
+// QueueExists takes a []existingQueues and a queueToCreate as arguments
+// It returns true if queueToCreate exists in []existingQueues
+// It returns false if queueToCreate does not exist in []existingQueues
+
+func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.WorkerQueue) bool {
+	for _, queue := range existingQueues {
+		if queue.ID == queueToCreate.ID {
+			// queueToCreate exists
+			return true
+		}
+		if queue.Name == queueToCreate.Name {
+			// queueToCreate exists
+			return true
+		}
+	}
+	return false
 }

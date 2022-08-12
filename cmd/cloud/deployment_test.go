@@ -417,10 +417,8 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	// TODO When updating existing queues, pass in ID of the existing queues
 	// TODO When updating existing queues, is changing the name of the existing queue/s allowed?
 	// TODO no short-hand for min-count, max-count, concurrency or isDefault
-	// TODO what if no worker-queue name was provided
-	// TODO how does a user create a non-default worker-queue
-	// TODO what if the user wants to create a worker queue on a non-default nodepool?
-	// TODO what if no deployments exist?
-	// TODO what if no clusters exist in chosen deployment?
+	// TODO what if no worker-queue name was provided --> (prompt user for the name)
+	// TODO what if the user wants to create a worker queue on a non-default nodepool? --> (use the worker-type to map to nodepool)
+	// TODO what if no deployments exist? --> (manually test)
 	// TODO more error cases
 }
