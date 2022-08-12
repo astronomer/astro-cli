@@ -127,7 +127,7 @@ func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	user, err := houstonClient.GetWorkspaceUserRole(ws, args[0])
+	user, err := houston.Call(houstonClient.GetWorkspaceUserRole, houston.GetWorkspaceUserRoleRequest{WorkspaceID: ws, Email: args[0]})
 	if err != nil {
 		return err
 	}

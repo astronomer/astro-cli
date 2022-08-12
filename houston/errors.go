@@ -1,8 +1,13 @@
 package houston
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+)
+
+var (
+	ErrMethodNotImplemented = errors.New("method not implemented for the given Houston version")
 )
 
 type ErrFieldsNotAvailable struct {

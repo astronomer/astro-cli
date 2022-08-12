@@ -16,11 +16,18 @@ type ListDeploymentLogsRequest struct {
 	Timestamp    time.Time `json:"timestamp"`
 }
 
+// UpdateDeploymentImageRequest - properties to update a deployment image
 type UpdateDeploymentImageRequest struct {
 	ReleaseName    string `json:"releaseName"`
 	Image          string `json:"image"`
 	AirflowVersion string `json:"airflowVersion"`
 	RuntimeVersion string `json:"runtimeVersion"`
+}
+
+// DeleteDeploymentRequest - properties to delete a deployment
+type DeleteDeploymentRequest struct {
+	DeploymentID string `json:"deploymentId"`
+	HardDelete   bool   `json:"delpoymentHardDelete"`
 }
 
 // CreateDeployment - create a deployment
@@ -39,10 +46,10 @@ func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*De
 }
 
 // DeleteDeployment - delete a deployment
-func (h ClientImplementation) DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error) {
+func (h ClientImplementation) DeleteDeployment(request DeleteDeploymentRequest) (*Deployment, error) {
 	req := Request{
 		Query:     DeploymentDeleteRequest,
-		Variables: map[string]interface{}{"deploymentId": deploymentID, "deploymentHardDelete": doHardDelete},
+		Variables: request,
 	}
 
 	res, err := req.DoWithClient(h.client)
@@ -125,7 +132,7 @@ func (h ClientImplementation) UpdateDeploymentAirflow(variables map[string]inter
 }
 
 // GetDeploymentConfig - get a deployment configuration
-func (h ClientImplementation) GetDeploymentConfig() (*DeploymentConfig, error) {
+func (h ClientImplementation) GetDeploymentConfig(_ interface{}) (*DeploymentConfig, error) {
 	dReq := Request{
 		Query: DeploymentInfoRequest,
 	}
@@ -153,7 +160,7 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 	return r.Data.DeploymentLog, nil
 }
 
-func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) error {
+func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) (interface{}, error) {
 	req := Request{
 		Query:     DeploymentImageUpdateRequest,
 		Variables: updateReq,
@@ -161,10 +168,10 @@ func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentIm
 
 	_, err := req.DoWithClient(h.client)
 	if err != nil {
-		return handleAPIErr(err)
+		return nil, handleAPIErr(err)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (h ClientImplementation) UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error) {

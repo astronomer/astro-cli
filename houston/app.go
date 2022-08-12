@@ -6,7 +6,7 @@ var (
 )
 
 // GetAppConfig - get application configuration
-func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
+func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 	// If application config has already been requested, we do not want to request it again
 	// since this is a CLI program that gets executed and exits at the end of execution, we don't want to send multiple
 	// times the same call to get the app config, since it probably won't change in a few milliseconds.
@@ -30,7 +30,7 @@ func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
 }
 
 // GetAvailableNamespace - get namespaces to create deployments
-func (h ClientImplementation) GetAvailableNamespaces() ([]Namespace, error) {
+func (h ClientImplementation) GetAvailableNamespaces(_ interface{}) ([]Namespace, error) {
 	req := Request{
 		Query: AvailableNamespacesGetRequest,
 	}

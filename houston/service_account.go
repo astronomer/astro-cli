@@ -9,6 +9,13 @@ type CreateServiceAccountRequest struct {
 	Role         string `json:"role"`
 }
 
+// DeleteServiceAccountRequest - properties to delete a service account
+type DeleteServiceAccountRequest struct {
+	WorkspaceID      string `json:"workspaceUuid"`
+	DeploymentID     string `json:"deploymentUuid"`
+	ServiceAccountID string `json:"serviceAccountUuid"`
+}
+
 // CreateServiceAccountInDeployment - create a service account in a deployment
 func (h ClientImplementation) CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error) {
 	req := Request{
@@ -38,10 +45,10 @@ func (h ClientImplementation) CreateWorkspaceServiceAccount(variables *CreateSer
 }
 
 // DeleteServiceAccountFromDeployment - delete a service account from a workspace
-func (h ClientImplementation) DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error) {
+func (h ClientImplementation) DeleteDeploymentServiceAccount(request DeleteServiceAccountRequest) (*ServiceAccount, error) {
 	req := Request{
 		Query:     DeploymentServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "deploymentUuid": deploymentID},
+		Variables: request,
 	}
 
 	resp, err := req.DoWithClient(h.client)
@@ -53,10 +60,10 @@ func (h ClientImplementation) DeleteDeploymentServiceAccount(deploymentID, servi
 }
 
 // DeleteServiceAccountFromWorkspace - delete a service account from a workspace
-func (h ClientImplementation) DeleteWorkspaceServiceAccount(workspaceID, serviceAccountID string) (*ServiceAccount, error) {
+func (h ClientImplementation) DeleteWorkspaceServiceAccount(request DeleteServiceAccountRequest) (*ServiceAccount, error) {
 	req := Request{
 		Query:     WorkspaceServiceAccountDeleteRequest,
-		Variables: map[string]interface{}{"serviceAccountUuid": serviceAccountID, "workspaceUuid": workspaceID},
+		Variables: request,
 	}
 
 	resp, err := req.DoWithClient(h.client)

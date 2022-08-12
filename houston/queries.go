@@ -800,7 +800,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}
 	`
 
-	ListTeamsRequest = `
+	PaginatedTeamsRequest = `
 	query paginatedTeams (
 		$take: Int
 		$cursor: Uuid
@@ -816,7 +816,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}
 	`
 
-	CreateTeamSystemRoleBindingRequest = `
+	CreateTeamSystemRoleBindingMutation = `
 	mutation createTeamSystemRoleBinding (
 		$teamUuid: Uuid!
 		$role: Role!
@@ -827,13 +827,20 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}
 	`
 
-	DeleteTeamSystemRoleBindingRequest = `
+	DeleteTeamSystemRoleBindingMutation = `
 	mutation deleteTeamSystemRoleBinding (
 		$teamUuid: Uuid!
 		$role: Role!
 	) {
 		deleteTeamSystemRoleBinding(teamUuid:$teamUuid, role:$role) {
 			role
+		}
+	}
+	`
+	HoustonVersionQuery = `
+	query AppConfig {
+		appConfig {
+			version
 		}
 	}
 	`

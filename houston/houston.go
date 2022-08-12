@@ -15,6 +15,8 @@ import (
 )
 
 var (
+	HoustonClient ClientInterface
+
 	errInaptPermissionsMsg       = "You do not have the appropriate permissions for that"
 	errAuthTokenRefreshFailedMsg = "AUTH_TOKEN_REFRESH_FAILED" //nolint:gosec
 	ErrVerboseInaptPermissions   = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
@@ -23,63 +25,63 @@ var (
 // ClientInterface - Interface that defines methods exposed by the Houston API
 type ClientInterface interface {
 	// user
-	CreateUser(email, password string) (*AuthUser, error)
+	CreateUser(req CreateUserRequest) (*AuthUser, error)
 	// workspace
-	CreateWorkspace(label, description string) (*Workspace, error)
-	ListWorkspaces() ([]Workspace, error)
+	CreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
+	ListWorkspaces(_ interface{}) ([]Workspace, error) // Extra argument added to be inline with function signature
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
-	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)
+	UpdateWorkspace(req UpdateWorkspaceRequest) (*Workspace, error)
 	// workspace users and roles
-	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)
-	DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error)
+	AddWorkspaceUser(req AddWorkspaceUserRequest) (*Workspace, error)
+	DeleteWorkspaceUser(req DeleteWorkspaceUserRequest) (*Workspace, error)
 	ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error)
-	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
-	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
+	UpdateWorkspaceUserRole(req UpdateWorkspaceUserRoleRequest) (string, error)
+	GetWorkspaceUserRole(req GetWorkspaceUserRoleRequest) (WorkspaceUserRoleBindings, error)
 	// auth
-	AuthenticateWithBasicAuth(username, password string, ctx *config.Context) (string, error)
+	AuthenticateWithBasicAuth(req BasicAuthRequest) (string, error)
 	GetAuthConfig(ctx *config.Context) (*AuthConfig, error)
 	// deployment
 	CreateDeployment(vars map[string]interface{}) (*Deployment, error)
-	DeleteDeployment(deploymentID string, doHardDelete bool) (*Deployment, error)
+	DeleteDeployment(req DeleteDeploymentRequest) (*Deployment, error)
 	ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error)
 	UpdateDeployment(variables map[string]interface{}) (*Deployment, error)
 	GetDeployment(deploymentID string) (*Deployment, error)
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
-	GetDeploymentConfig() (*DeploymentConfig, error)
+	GetDeploymentConfig(_ interface{}) (*DeploymentConfig, error) // Extra argument added to be inline with function signature
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
-	UpdateDeploymentImage(req UpdateDeploymentImageRequest) error
+	UpdateDeploymentImage(req UpdateDeploymentImageRequest) (interface{}, error) // Extra return argument added to be inline with function signature
 	// deployment users
 	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
 	UpdateDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
-	DeleteDeploymentUser(deploymentID, email string) (*RoleBinding, error)
+	DeleteDeploymentUser(req DeleteDeploymentUserRequest) (*RoleBinding, error)
 	// service account
 	CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error)
-	DeleteDeploymentServiceAccount(deploymentID, serviceAccountID string) (*ServiceAccount, error)
+	DeleteDeploymentServiceAccount(req DeleteServiceAccountRequest) (*ServiceAccount, error)
 	ListDeploymentServiceAccounts(deploymentID string) ([]ServiceAccount, error)
 	CreateWorkspaceServiceAccount(variables *CreateServiceAccountRequest) (*WorkspaceServiceAccount, error)
-	DeleteWorkspaceServiceAccount(workspaceID, serviceAccountID string) (*ServiceAccount, error)
+	DeleteWorkspaceServiceAccount(req DeleteServiceAccountRequest) (*ServiceAccount, error)
 	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
-	GetAppConfig() (*AppConfig, error)
-	GetAvailableNamespaces() ([]Namespace, error)
+	GetAppConfig(_ interface{}) (*AppConfig, error)            // Extra argument added to be inline with function signature
+	GetAvailableNamespaces(_ interface{}) ([]Namespace, error) // Extra argument added to be inline with function signature
 	// runtime
 	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
 	// teams
 	GetTeam(teamID string) (*Team, error)
 	GetTeamUsers(teamID string) ([]User, error)
-	ListTeams(cursor string, take int) (ListTeamsResp, error)
-	CreateTeamSystemRoleBinding(teamID, role string) (string, error)
-	DeleteTeamSystemRoleBinding(teamID, role string) (string, error)
+	ListTeams(req ListTeamsRequest) (ListTeamsResp, error)
+	CreateTeamSystemRoleBinding(req SystemRoleBindingRequest) (string, error)
+	DeleteTeamSystemRoleBinding(req SystemRoleBindingRequest) (string, error)
 	// workspace teams and roles
-	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
-	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
+	AddWorkspaceTeam(req AddWorkspaceTeamRequest) (*Workspace, error)
+	DeleteWorkspaceTeam(req DeleteWorkspaceTeamRequest) (*Workspace, error)
 	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
-	UpdateWorkspaceTeamRole(workspaceID, teamID, role string) (string, error)
-	GetWorkspaceTeamRole(workspaceID, teamID string) (*Team, error)
+	UpdateWorkspaceTeamRole(req UpdateWorkspaceTeamRoleRequest) (string, error)
+	GetWorkspaceTeamRole(req GetWorkspaceTeamRoleRequest) (*Team, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

@@ -1,10 +1,22 @@
 package houston
 
+// CreateWorkspaceRequest - properties to create a workspace
+type CreateWorkspaceRequest struct {
+	Label       string `json:"label"`
+	Description string `json:"description"`
+}
+
+// UpdateWorkspaceRequest - properties to update in a workspace
+type UpdateWorkspaceRequest struct {
+	WorkspaceID string            `json:"workspaceId"`
+	Args        map[string]string `json:"payload"`
+}
+
 // CreateWorkspace - create a workspace
-func (h ClientImplementation) CreateWorkspace(label, description string) (*Workspace, error) {
+func (h ClientImplementation) CreateWorkspace(request CreateWorkspaceRequest) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceCreateRequest,
-		Variables: map[string]interface{}{"label": label, "description": description},
+		Variables: request,
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -16,7 +28,7 @@ func (h ClientImplementation) CreateWorkspace(label, description string) (*Works
 }
 
 // ListWorkspaces - list workspaces
-func (h ClientImplementation) ListWorkspaces() ([]Workspace, error) {
+func (h ClientImplementation) ListWorkspaces(_ interface{}) ([]Workspace, error) {
 	req := Request{
 		Query: WorkspacesGetRequest,
 	}
@@ -65,10 +77,10 @@ func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, erro
 }
 
 // UpdateWorkspace - update a workspace
-func (h ClientImplementation) UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error) {
+func (h ClientImplementation) UpdateWorkspace(request UpdateWorkspaceRequest) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceUpdateRequest,
-		Variables: map[string]interface{}{"workspaceId": workspaceID, "payload": args},
+		Variables: request,
 	}
 
 	r, err := req.DoWithClient(h.client)

@@ -23,7 +23,7 @@ func Log(deploymentID, component, search string, since time.Duration, client hou
 		Timestamp:    timestamp,
 	}
 
-	logs, err := client.ListDeploymentLogs(request)
+	logs, err := houston.Call(client.ListDeploymentLogs, request)
 	if err != nil {
 		return err
 	}

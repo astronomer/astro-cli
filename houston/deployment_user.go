@@ -15,6 +15,11 @@ type UpdateDeploymentUserRequest struct {
 	DeploymentID string `json:"deploymentId"`
 }
 
+type DeleteDeploymentUserRequest struct {
+	DeploymentID string `json:"deploymentId"`
+	Email        string `json:"email"`
+}
+
 // ListUsersInDeployment - list users with deployment access
 func (h ClientImplementation) ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error) {
 	user := map[string]interface{}{
@@ -70,13 +75,10 @@ func (h ClientImplementation) UpdateDeploymentUser(variables UpdateDeploymentUse
 }
 
 // DeleteUserFromDeployment - remove a user from a deployment
-func (h ClientImplementation) DeleteDeploymentUser(deploymentID, email string) (*RoleBinding, error) {
+func (h ClientImplementation) DeleteDeploymentUser(request DeleteDeploymentUserRequest) (*RoleBinding, error) {
 	req := Request{
-		Query: DeploymentUserDeleteRequest,
-		Variables: map[string]interface{}{
-			"email":        email,
-			"deploymentId": deploymentID,
-		},
+		Query:     DeploymentUserDeleteRequest,
+		Variables: request,
 	}
 
 	r, err := req.DoWithClient(h.client)

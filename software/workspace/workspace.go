@@ -25,7 +25,7 @@ func newTableOut() *printutil.Table {
 
 // Create a workspace
 func Create(label, desc string, client houston.ClientInterface, out io.Writer) error {
-	w, err := client.CreateWorkspace(label, desc)
+	w, err := houston.Call(client.CreateWorkspace, houston.CreateWorkspaceRequest{Label: label, Description: desc})
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func Create(label, desc string, client houston.ClientInterface, out io.Writer) e
 
 // List all workspaces
 func List(client houston.ClientInterface, out io.Writer) error {
-	ws, err := client.ListWorkspaces()
+	ws, err := houston.Call(client.ListWorkspaces, nil)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func List(client houston.ClientInterface, out io.Writer) error {
 
 // Delete a workspace by id
 func Delete(id string, client houston.ClientInterface, out io.Writer) error {
-	_, err := client.DeleteWorkspace(id)
+	_, err := houston.Call(client.DeleteWorkspace, id)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func getWorkspaceSelection(client houston.ClientInterface, out io.Writer) (strin
 	tab := newTableOut()
 	tab.GetUserInput = true
 
-	ws, err := client.ListWorkspaces()
+	ws, err := houston.Call(client.ListWorkspaces, nil)
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +153,7 @@ func Switch(id string, client houston.ClientInterface, out io.Writer) error {
 		id = _id
 	}
 	// validate workspace
-	_, err := client.GetWorkspace(id)
+	_, err := houston.Call(client.GetWorkspace, id)
 	if err != nil {
 		return fmt.Errorf("workspace id is not valid: %w", err)
 	}
@@ -176,7 +176,7 @@ func Switch(id string, client houston.ClientInterface, out io.Writer) error {
 // Update an astronomer workspace
 func Update(id string, client houston.ClientInterface, out io.Writer, args map[string]string) error {
 	// validate workspace
-	w, err := client.UpdateWorkspace(id, args)
+	w, err := houston.Call(client.UpdateWorkspace, houston.UpdateWorkspaceRequest{WorkspaceID: id, Args: args})
 	if err != nil {
 		return err
 	}

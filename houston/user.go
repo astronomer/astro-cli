@@ -1,10 +1,16 @@
 package houston
 
+// CreateUserRequest - properties to create a user
+type CreateUserRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // CreateUser - Send a request to create a user in the Houston API
-func (h ClientImplementation) CreateUser(email, password string) (*AuthUser, error) {
+func (h ClientImplementation) CreateUser(request CreateUserRequest) (*AuthUser, error) {
 	req := Request{
 		Query:     UserCreateRequest,
-		Variables: map[string]interface{}{"email": email, "password": password},
+		Variables: request,
 	}
 
 	resp, err := req.DoWithClient(h.client)
