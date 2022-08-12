@@ -259,8 +259,8 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		if vars[i] == "" {
 			continue
 		}
-		if len(strings.SplitN(vars[i], "=", 2)) == 1{
-			fmt.Printf("%s is an improperly formated varaible no varaible created",vars[i])
+		if len(strings.SplitN(vars[i], "=", 2)) == 1 {
+			fmt.Printf("%s is an improperly formated varaible no varaible created", vars[i])
 			continue
 		}
 		key := strings.SplitN(vars[i], "=", 2)[0]
