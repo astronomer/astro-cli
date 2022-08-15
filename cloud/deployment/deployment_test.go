@@ -148,7 +148,6 @@ func TestGetDeployment(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-
 	// t.Run("select deployment error", func(t *testing.T) {
 	// 	mockClient := new(astro_mocks.Client)
 	// 	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, nil).Once()
@@ -211,8 +210,6 @@ func TestGetDeployment(t *testing.T) {
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
 	})
-
-
 }
 
 func TestLogs(t *testing.T) {
