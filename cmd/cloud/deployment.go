@@ -208,11 +208,8 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Create environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set the new environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables from")
-<<<<<<< HEAD
 	_ = cmd.Flags().MarkHidden("key")
 	_ = cmd.Flags().MarkHidden("value")
-=======
->>>>>>> add deployment name flag
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to create variables from")
 
 	return cmd
@@ -235,11 +232,8 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Update environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set updated environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables to update from")
-<<<<<<< HEAD
 	_ = cmd.Flags().MarkHidden("key")
 	_ = cmd.Flags().MarkHidden("value")
-=======
->>>>>>> add deployment name flag
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to update varibles from")
 
 	return cmd

@@ -33,21 +33,9 @@ Menu will be presented if you do not specify a deployment ID:
 )
 
 var (
-<<<<<<< HEAD
-<<<<<<< HEAD
 	pytestFile     string
 	envFile        string
 	imageName      string
-=======
-	pytestFile string
-	envFile    string
-	imageName  string
->>>>>>> add deployment name flag
-=======
-	pytestFile     string
-	envFile        string
-	imageName      string
->>>>>>> fix tests
 	deploymentName string
 )
 
@@ -73,11 +61,8 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
-<<<<<<< HEAD
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
 	_ = cmd.Flags().MarkHidden("dags")
-=======
->>>>>>> add deployment name flag
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	return cmd
 }
