@@ -210,10 +210,6 @@ func TestGetDeployment(t *testing.T) {
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
 	})
-<<<<<<< HEAD
-=======
-
->>>>>>> 1c11e8153a5f05289958f1a11a3b9546aa91ed51
 }
 
 func TestLogs(t *testing.T) {
