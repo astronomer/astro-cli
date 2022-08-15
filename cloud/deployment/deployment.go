@@ -539,7 +539,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 	}
 
 	if deploymentID != "" && deploymentName != "" {
-		fmt.Printf("Both a Deployment ID and Deployment Name have been supplied. The Deploymnet ID %s will be used\n", deploymentID)
+		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used\n", deploymentID)
 	}
 	// find deployment by name
 	if deploymentID == "" && deploymentName != "" {

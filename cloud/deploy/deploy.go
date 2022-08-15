@@ -229,7 +229,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 	}
 
 	if deploymentID != "" && deploymentName != "" {
-		fmt.Printf("Both a Deployment ID and Deployment Name have been supplied. The Deploymnet ID %s will be used for the Deploy\n", deploymentID)
+		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used for the Deploy\n", deploymentID)
 	}
 
 	// check if deploymentID or if force prompt was requested was given by user
