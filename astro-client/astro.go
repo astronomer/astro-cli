@@ -6,10 +6,9 @@ import (
 )
 
 type Client interface {
-	// UserRoleBinding
-	ListUserRoleBindings() ([]RoleBinding, error)
+	SelfUser() (*Self, error)
 	// Workspace
-	ListWorkspaces() ([]Workspace, error)
+	ListWorkspaces(organizationID string) ([]Workspace, error)
 	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
 	CreateDeployment(input *DeploymentCreateInput) (Deployment, error)
@@ -33,27 +32,28 @@ type Client interface {
 	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 }
 
-func (c *HTTPClient) ListUserRoleBindings() ([]RoleBinding, error) {
+func (c *HTTPClient) SelfUser() (*Self, error) {
 	req := Request{
 		Query: SelfQuery,
 	}
 
 	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
-		return []RoleBinding{}, err
+		return nil, err
 	}
 
 	if resp.Data.SelfQuery == nil {
 		fmt.Printf("Something went wrong! Try again or contact Astronomer Support")
-		return []RoleBinding{}, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
+		return nil, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
 	}
 
-	return resp.Data.SelfQuery.User.RoleBindings, nil
+	return resp.Data.SelfQuery, nil
 }
 
-func (c *HTTPClient) ListWorkspaces() ([]Workspace, error) {
+func (c *HTTPClient) ListWorkspaces(organizationID string) ([]Workspace, error) {
 	wsReq := Request{
-		Query: WorkspacesGetRequest,
+		Query:     WorkspacesGetRequest,
+		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
 	wsResp, err := wsReq.DoWithPublicClient(c)

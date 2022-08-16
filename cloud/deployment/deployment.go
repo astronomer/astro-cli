@@ -131,6 +131,12 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
 	// validate resources requests
 	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
 	if !resourcesValid {
@@ -147,7 +153,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	}
 
 	// validate workspace
-	ws, err := client.ListWorkspaces()
+	ws, err := client.ListWorkspaces(c.Organization)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -219,11 +225,6 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
-
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
 
 	deploymentURL := "cloud." + c.Domain + "/" + organizationID + "/deployments/" + d.ID
 

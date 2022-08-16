@@ -39,6 +39,7 @@ type Contexts struct {
 // Context represents a single context
 type Context struct {
 	Domain            string `mapstructure:"domain"`
+	Organization      string `mapstructure:"organization"`
 	Workspace         string `mapstructure:"workspace"`
 	LastUsedWorkspace string `mapstructure:"last_used_workspace"`
 	Token             string `mapstructure:"token"`

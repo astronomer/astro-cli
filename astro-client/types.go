@@ -30,7 +30,8 @@ type ResponseData struct {
 }
 
 type Self struct {
-	User User `json:"user"`
+	User                        User   `json:"user"`
+	AuthenticatedOrganizationID string `json:"authenticatedOrganizationId"`
 }
 
 type AuthProvider struct {

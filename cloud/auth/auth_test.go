@@ -22,7 +22,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var errMock = errors.New("mock-error")
+var (
+	errMock      = errors.New("mock-error")
+	mockSelfResp = &astro.Self{
+		AuthenticatedOrganizationID: "test-organization-id",
+		User: astro.User{
+			RoleBindings: []astro.RoleBinding{
+				{
+					Role: "SYSTEM_ADMIN",
+				},
+			},
+		},
+	}
+)
 
 func Test_validateDomain(t *testing.T) {
 	domain := "astronomer.io"
@@ -343,8 +355,8 @@ func TestCheckToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
@@ -352,9 +364,9 @@ func TestCheckToken(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("list user role bindings failure", func(t *testing.T) {
+	t.Run("self user failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{}, errMock).Once()
+		mockClient.On("SelfUser").Return(nil, errMock).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
@@ -364,7 +376,7 @@ func TestCheckToken(t *testing.T) {
 
 	t.Run("set context failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
 		ctx := config.Context{}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
@@ -374,8 +386,8 @@ func TestCheckToken(t *testing.T) {
 
 	t.Run("list workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{}, errMock).Once()
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{}, errMock).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
@@ -385,8 +397,8 @@ func TestCheckToken(t *testing.T) {
 
 	t.Run("success with more than one workspace", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
 		ctx := config.Context{Domain: "test-domain", LastUsedWorkspace: "test-id-1"}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
@@ -396,9 +408,9 @@ func TestCheckToken(t *testing.T) {
 
 	t.Run("success with workspace switch", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
-		ctx := config.Context{Domain: "test-domain"}
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+		ctx := config.Context{Domain: "test-domain", LastUsedWorkspace: "test-id-1", Organization: "test-organization-id"}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
 		assert.NoError(t, err)
@@ -407,10 +419,10 @@ func TestCheckToken(t *testing.T) {
 
 	t.Run("success but with workspace switch failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{}, errMock).Once()
-		ctx := config.Context{Domain: "test-domain"}
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{}, errMock).Once()
+		ctx := config.Context{Domain: "test-domain", LastUsedWorkspace: "test-id-1", Organization: "test-organization-id"}
 		buf := new(bytes.Buffer)
 		err := checkToken(&ctx, mockClient, buf)
 		assert.NoError(t, err)
@@ -437,8 +449,8 @@ func TestLogin(t *testing.T) {
 		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
 
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 
 		err := Login("astronomer.io", mockClient, os.Stdout, false, false)
 		assert.NoError(t, err)
@@ -446,8 +458,8 @@ func TestLogin(t *testing.T) {
 
 	t.Run("oauth token success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{{Role: "SYSTEM_ADMIN"}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 
 		defer testUtil.MockUserInput(t, "OAuth Token")()
 
@@ -490,7 +502,7 @@ func TestLogin(t *testing.T) {
 		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
 
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{}, errMock).Once()
+		mockClient.On("SelfUser").Return(nil, errMock).Once()
 
 		err := Login("", mockClient, os.Stdout, false, false)
 		assert.ErrorIs(t, err, errMock)
@@ -501,8 +513,8 @@ func TestLogin(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		// initialize the mock client
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{
 			ID:    "test-workspace",
 			Label: "something-label",
 		}}, nil).Once()
@@ -530,8 +542,8 @@ func TestLogin(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		// initialize the mock client
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListUserRoleBindings").Return([]astro.RoleBinding{}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{
+		mockClient.On("SelfUser").Return(mockSelfResp, nil).Once()
+		mockClient.On("ListWorkspaces", "test-organization-id").Return([]astro.Workspace{{
 			ID:    "test-workspace",
 			Label: "something-label",
 		}}, nil).Once()

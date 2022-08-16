@@ -40,14 +40,14 @@ func GetCurrentWorkspace() (string, error) {
 
 // List all workspaces
 func List(client astro.Client, out io.Writer) error {
-	ws, err := client.ListWorkspaces()
-	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
-
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
+	}
+
+	ws, err := client.ListWorkspaces(c.Organization)
+	if err != nil {
+		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
 	tab := newTableOut()
@@ -78,13 +78,13 @@ func getWorkspaceSelection(client astro.Client, out io.Writer) (string, error) {
 		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
 	}
 
-	ws, err := client.ListWorkspaces()
+	var c config.Context
+	c, err := config.GetCurrentContext()
 	if err != nil {
 		return "", err
 	}
 
-	var c config.Context
-	c, err = config.GetCurrentContext()
+	ws, err := client.ListWorkspaces(c.Organization)
 	if err != nil {
 		return "", err
 	}
@@ -118,15 +118,16 @@ func Switch(id string, client astro.Client, out io.Writer) error {
 
 		id = _id
 	}
-	// validate workspace
-	_, err := client.ListWorkspaces()
-	if err != nil {
-		return errors.Wrap(err, "workspace id is not valid")
-	}
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
+	}
+
+	// validate workspace
+	_, err = client.ListWorkspaces(c.Organization)
+	if err != nil {
+		return errors.Wrap(err, "workspace id is not valid")
 	}
 
 	err = c.SetContextKey("workspace", id)
