@@ -33,11 +33,11 @@ var (
 	}
 	`
 
-	DeploymentCreate = `
-	mutation deploymentCreate(
-		$input: DeploymentCreateInput
+	CreateDeployment = `
+	mutation createDeployment(
+		$input: CreateDeploymentInput!
 	  ) {
-		deploymentCreate (
+		createDeployment (
 		  input: $input
 		){
 			id

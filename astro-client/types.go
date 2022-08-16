@@ -18,7 +18,7 @@ type ResponseData struct {
 	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
-	DeploymentCreate          Deployment                   `json:"DeploymentCreate,omitempty"`
+	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
 	GetDeploymentHistory      DeploymentHistory            `json:"deploymentHistory,omitempty"`
 	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
@@ -255,12 +255,11 @@ type ImageDeployInput struct {
 	Repository string `json:"repository"`
 }
 
-type DeploymentCreateInput struct {
+type CreateDeploymentInput struct {
 	WorkspaceID           string               `json:"workspaceId"`
 	ClusterID             string               `json:"clusterId"`
 	Label                 string               `json:"label"`
 	Description           string               `json:"description"`
-	AirflowTag            string               `json:"airflowTag"`
 	RuntimeReleaseVersion string               `json:"runtimeReleaseVersion"`
 	DeploymentSpec        DeploymentCreateSpec `json:"deploymentSpec"`
 }

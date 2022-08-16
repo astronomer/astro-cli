@@ -11,7 +11,7 @@ type Client interface {
 	ListWorkspaces(organizationID string) ([]Workspace, error)
 	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
-	CreateDeployment(input *DeploymentCreateInput) (Deployment, error)
+	CreateDeployment(input *CreateDeploymentInput) (Deployment, error)
 	UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error)
 	ListDeployments(input DeploymentsInput) ([]Deployment, error)
 	DeleteDeployment(input DeploymentDeleteInput) (Deployment, error)
@@ -63,9 +63,9 @@ func (c *HTTPClient) ListWorkspaces(organizationID string) ([]Workspace, error) 
 	return wsResp.Data.GetWorkspaces, nil
 }
 
-func (c *HTTPClient) CreateDeployment(input *DeploymentCreateInput) (Deployment, error) {
+func (c *HTTPClient) CreateDeployment(input *CreateDeploymentInput) (Deployment, error) {
 	req := Request{
-		Query:     DeploymentCreate,
+		Query:     CreateDeployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
@@ -73,7 +73,7 @@ func (c *HTTPClient) CreateDeployment(input *DeploymentCreateInput) (Deployment,
 	if err != nil {
 		return Deployment{}, err
 	}
-	return resp.Data.DeploymentCreate, nil
+	return resp.Data.CreateDeployment, nil
 }
 
 func (c *HTTPClient) UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error) {

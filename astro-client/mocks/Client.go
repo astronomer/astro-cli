@@ -13,18 +13,18 @@ type Client struct {
 }
 
 // CreateDeployment provides a mock function with given fields: input
-func (_m *Client) CreateDeployment(input *astro.DeploymentCreateInput) (astro.Deployment, error) {
+func (_m *Client) CreateDeployment(input *astro.CreateDeploymentInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
 
 	var r0 astro.Deployment
-	if rf, ok := ret.Get(0).(func(*astro.DeploymentCreateInput) astro.Deployment); ok {
+	if rf, ok := ret.Get(0).(func(*astro.CreateDeploymentInput) astro.Deployment); ok {
 		r0 = rf(input)
 	} else {
 		r0 = ret.Get(0).(astro.Deployment)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*astro.DeploymentCreateInput) error); ok {
+	if rf, ok := ret.Get(1).(func(*astro.CreateDeploymentInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

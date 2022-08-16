@@ -201,7 +201,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		Scheduler: scheduler,
 	}
 
-	createInput := &astro.DeploymentCreateInput{
+	createInput := &astro.CreateDeploymentInput{
 		WorkspaceID:           workspaceID,
 		ClusterID:             clusterID,
 		Label:                 label,

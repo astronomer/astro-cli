@@ -110,7 +110,7 @@ var (
 	`
 
 	GetClusters = `
-	query clusters($organizationId: Id) {
+	query clusters($organizationId: Id!) {
 		clusters(organizationId: $organizationId) {
 			id
 			name

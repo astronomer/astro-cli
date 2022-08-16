@@ -143,7 +143,7 @@ func TestCreateDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentCreate: Deployment{
+			CreateDeployment: Deployment{
 				ID:             "test-deployment-id",
 				Label:          "test-deployment-label",
 				ReleaseName:    "test-release-name",
@@ -165,9 +165,9 @@ func TestCreateDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployment, err := astroClient.CreateDeployment(&DeploymentCreateInput{})
+		deployment, err := astroClient.CreateDeployment(&CreateDeploymentInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.DeploymentCreate)
+		assert.Equal(t, deployment, mockResponse.Data.CreateDeployment)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -180,7 +180,7 @@ func TestCreateDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.CreateDeployment(&DeploymentCreateInput{})
+		_, err := astroClient.CreateDeployment(&CreateDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
