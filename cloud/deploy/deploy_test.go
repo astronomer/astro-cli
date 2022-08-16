@@ -45,10 +45,10 @@ func TestDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Times(3)
-	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Times(3)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(3)
+	mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Times(4)
+	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Times(4)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -96,6 +96,11 @@ func TestDeploySuccess(t *testing.T) {
 
 	// test custom image
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "", false, false, mockClient)
+	assert.NoError(t, err)
+
+	config.CFG.ProjectDeployment.SetProjectString("test-id")
+	// test both deploymentID and name used
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "test-name", false, false, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
