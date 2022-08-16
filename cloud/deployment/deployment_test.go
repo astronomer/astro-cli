@@ -85,6 +85,32 @@ func TestGetDeployment(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("two deployments with the same name", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{Label: "test", ID: "test-id"}, {Label: "test", ID: "test-id2"}}, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentName, deployment.Label)
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("deployment name and deployment id", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -99,7 +125,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		_, err := GetDeployment(ws, deploymentID, deploymentName, mockClient)
+		_, err := GetDeployment(ws, deploymentID, "", mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -113,7 +139,7 @@ func TestGetDeployment(t *testing.T) {
 			return errMock
 		}
 
-		_, err := GetDeployment(ws, deploymentID, deploymentName, mockClient)
+		_, err := GetDeployment(ws, "", "", mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
