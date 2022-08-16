@@ -33,7 +33,7 @@ func TestSelfQuery(t *testing.T) {
 						},
 					},
 				},
-				AuthenticatedOrganizationID: "test-organization-id",
+				AuthenticatedOrganizationID: "test-org-id",
 			},
 		},
 	}
