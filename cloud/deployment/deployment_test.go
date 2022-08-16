@@ -203,7 +203,7 @@ func TestCreate(t *testing.T) {
 
 	t.Run("success and wait for status", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Twice()
 		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
@@ -226,11 +226,16 @@ func TestCreate(t *testing.T) {
 
 		// setup wait for test 
 		sleepTime = 1
-		tickNum = 1
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
+		tickNum = 2
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Twice()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", Status: "HEALTHY"}}, nil).Once()
 		err = Create("", ws, "test-desc", csID, "4.2.5", 10, 3, 15, mockClient, true)
 		assert.NoError(t, err)
+
+		// timeout
+		timeoutNum = 1
+		err = Create("", ws, "test-desc", csID, "4.2.5", 10, 3, 15, mockClient, true)
+		assert.ErrorIs(t, err, errors.New("timed out waiting for the deployment to become healthy"))
 		mockClient.AssertExpectations(t)
 	})
 
