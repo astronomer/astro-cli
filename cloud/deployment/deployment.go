@@ -23,6 +23,7 @@ import (
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 	// Monkey patched to write unit tests
 	createDeployment = Create
@@ -350,7 +351,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		select {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
-			return errors.New("timed out waiting for the deployment to become healthy")
+			return errTimedOut
 		// Got a tick, we should check if docker is up & running
 		case <-ticker.C:
 			buf.Reset()
