@@ -64,7 +64,11 @@ func TestRemoveTeam(t *testing.T) {
 func TestListTeamRoles(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("ListDeploymentTeamsAndRoles", "deployment-id").Return([]houston.Team{{ID: "test-id-1", Name: "test-name-1", RoleBindings: []houston.RoleBinding{{Role: "test-role-1"}}}, {ID: "test-id-2", Name: "test-name-2", RoleBindings: []houston.RoleBinding{{Role: "test-role-2"}}}}, nil)
+		mock.On("ListDeploymentTeamsAndRoles", "deployment-id").Return(
+			[]houston.Team{
+				{ID: "test-id-1", Name: "test-name-1", RoleBindings: []houston.RoleBinding{{Role: houston.DeploymentViewerRole, Deployment: houston.Deployment{ID: "deployment-id"}}}},
+				{ID: "test-id-2", Name: "test-name-2", RoleBindings: []houston.RoleBinding{{Role: houston.DeploymentAdminRole, Deployment: houston.Deployment{ID: "deployment-id"}}}},
+			}, nil)
 
 		buf := new(bytes.Buffer)
 		err := ListTeamRoles("deployment-id", mock, buf)
@@ -112,4 +116,35 @@ func TestUpdateTeamRole(t *testing.T) {
 		assert.ErrorIs(t, err, errMock)
 		mock.AssertExpectations(t)
 	})
+}
+
+func TestGetDeploymentLevelRole(t *testing.T) {
+	tests := []struct {
+		roleBinding  []houston.RoleBinding
+		deploymentID string
+		result       string
+	}{
+		{
+			roleBinding: []houston.RoleBinding{
+				{Role: houston.SystemAdminRole},
+				{Role: houston.DeploymentAdminRole, Deployment: houston.Deployment{ID: "test-id-1"}},
+				{Role: houston.DeploymentEditorRole, Deployment: houston.Deployment{ID: "test-id-2"}},
+			},
+			deploymentID: "test-id-1",
+			result:       houston.DeploymentAdminRole,
+		},
+		{
+			roleBinding: []houston.RoleBinding{
+				{Role: houston.SystemAdminRole},
+				{Role: houston.DeploymentEditorRole, Deployment: houston.Deployment{ID: "test-id-2"}},
+			},
+			deploymentID: "test-id-1",
+			result:       houston.NoneTeamRole,
+		},
+	}
+
+	for _, tt := range tests {
+		resp := getDeploymentLevelRole(tt.roleBinding, tt.deploymentID)
+		assert.Equal(t, tt.result, resp, "expected: %v, actual: %v", tt.result, resp)
+	}
 }
