@@ -139,8 +139,24 @@ func TestGetDeployment(t *testing.T) {
 			return errMock
 		}
 
-		_, err := GetDeployment(ws, "", "", mockClient)
-		assert.ErrorIs(t, err, errInvalidDeployment)
+		// mock os.Stdin
+		input := []byte("y")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		_, err = GetDeployment(ws, "", "", mockClient)
+		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
