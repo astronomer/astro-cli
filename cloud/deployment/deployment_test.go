@@ -201,6 +201,39 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("success and wait for status", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
+		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("test-name")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		// setup wait for test 
+		sleepTime = 1
+		tickNum = 1
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id", Status: "HEALTHY"}}, nil).Once()
+		err = Create("", ws, "test-desc", csID, "4.2.5", 10, 3, 15, mockClient, true)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("failed to validate resources", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
