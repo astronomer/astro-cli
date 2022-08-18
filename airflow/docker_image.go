@@ -10,8 +10,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -44,6 +46,26 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	err := os.Chdir(config.Path)
 	if err != nil {
 		return err
+	}
+
+	fullpath := filepath.Join(config.Path, ".dockerignore")
+
+	lines, err := fileutil.Read(fullpath)
+	if err != nil {
+		return err
+	}
+	contains, _ := fileutil.Contains(lines, "dags/")
+	if !contains {
+		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+
+		if _, err := f.Write([]byte("\ndags/")); err != nil {
+			return err
+		}
 	}
 
 	args := []string{

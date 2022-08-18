@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"archive/tar"
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -119,4 +120,29 @@ func Tar(source, target string) error {
 			_, err = io.Copy(tarball, file)
 			return err
 		})
+}
+
+// readLines reads a whole file into memory and returns a slice of its lines.
+func Read(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
+func Contains(elems []string, v string) (exist bool, num int) {
+	for i, s := range elems {
+		if v == s {
+			return true, i
+		}
+	}
+	return false, 0
 }
