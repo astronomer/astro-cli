@@ -77,9 +77,10 @@ func ConfigSettings(id, settingsFile string, version uint64, connections, variab
 func InitSettings(settingsFile string) error {
 	// Set up viper object for project config
 	viperSettings = viper.New()
-	viperSettings.SetConfigName(settingsFile)
+	ConfigFileName := strings.Split(settingsFile, ".")[0]
+	viperSettings.SetConfigName(ConfigFileName)
 	viperSettings.SetConfigType(ConfigFileType)
-	workingConfigFile := filepath.Join(WorkingPath, fmt.Sprintf("%s.%s", settingsFile, ConfigFileType))
+	workingConfigFile := filepath.Join(WorkingPath, fmt.Sprintf("%s.%s", ConfigFileName, ConfigFileType))
 	// Add the path we discovered
 	viperSettings.SetConfigFile(workingConfigFile)
 
@@ -91,9 +92,12 @@ func InitSettings(settingsFile string) error {
 	}
 
 	err := viperSettings.Unmarshal(&settings)
+	// Try and use old settings file if error
 	if err != nil {
 		err := viperSettings.Unmarshal(&oldSettings)
-		return errors.Wrap(err, "unable to decode into struct")
+		if err != nil { 
+			return errors.Wrap(err, "unable to decode into struct")
+		}
 		old = true
 	}
 	return nil

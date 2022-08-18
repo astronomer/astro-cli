@@ -121,13 +121,27 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	return r0
 }
 
-// Start provides a mock function with given fields: imageName, noCache
-func (_m *ContainerHandler) Start(imageName string, noCache bool) error {
-	ret := _m.Called(imageName, noCache)
+// Settings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, export, envExport
+func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connections bool, variables bool, pools bool, export bool, envExport bool) error {
+	ret := _m.Called(settingsFile, envFile, connections, variables, pools, export, envExport)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, bool) error); ok {
-		r0 = rf(imageName, noCache)
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool, bool) error); ok {
+		r0 = rf(settingsFile, envFile, connections, variables, pools, export, envExport)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: imageName, settingsFile, noCache
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, noCache bool) error {
+	ret := _m.Called(imageName, settingsFile, noCache)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, bool) error); ok {
+		r0 = rf(imageName, settingsFile, noCache)
 	} else {
 		r0 = ret.Error(0)
 	}
