@@ -228,36 +228,81 @@ func TestRegistryAuthFailure(t *testing.T) {
 }
 
 func TestLoginSuccess(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+	t.Run("default without workspace pagination switch", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		configYaml := testUtil.NewTestConfig("localhost")
+		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+		config.InitConfig(fs)
 
-	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
-	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
-	houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		houstonMock := new(houstonMocks.ClientInterface)
+		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
+		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
+		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
 
-	out := &bytes.Buffer{}
-	if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
-		t.Errorf("Login() error = %v, wantErr %v", err, false)
-		return
-	}
-	if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
-		t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
-	}
+		out := &bytes.Buffer{}
+		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
+			t.Errorf("Login() error = %v, wantErr %v", err, false)
+			return
+		}
+		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
+			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
+		}
 
-	houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
-	out = &bytes.Buffer{}
-	if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
-		t.Errorf("Login() error = %v, wantErr %v", err, false)
-		return
-	}
-	if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
-		t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
-	}
+		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
+		out = &bytes.Buffer{}
+		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
+			t.Errorf("Login() error = %v, wantErr %v", err, false)
+			return
+		}
+		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
+			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
+		}
 
-	houstonMock.AssertExpectations(t)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("with workspace pagination switch", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		configYaml := testUtil.NewTestConfig("localhost")
+		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+		config.InitConfig(fs)
+		config.CFG.Interactive.SetHomeString("true")
+		config.CFG.PageSize.SetHomeString("100")
+
+		defer testUtil.MockUserInput(t, "1")()
+
+		houstonMock := new(houstonMocks.ClientInterface)
+		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
+		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
+		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+			return false
+		}
+
+		out := &bytes.Buffer{}
+		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
+			t.Errorf("Login() error = %v, wantErr %v", err, false)
+			return
+		}
+		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost"}, gotOut) {
+			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
+		}
+
+		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("PaginatedListWorkspaces", 100, 0).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("GetWorkspace", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
+
+		out = &bytes.Buffer{}
+		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
+			t.Errorf("Login() error = %v, wantErr %v", err, false)
+			return
+		}
+		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-id"}, gotOut) {
+			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost", "test-workspace-id"})
+		}
+
+		houstonMock.AssertExpectations(t)
+	})
 }
 
 func TestLoginFailure(t *testing.T) {

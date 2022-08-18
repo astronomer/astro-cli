@@ -94,6 +94,68 @@ func TestTablePrint(t *testing.T) {
 	}
 }
 
+func TestTablePrintWithIndex(t *testing.T) {
+	type fields struct {
+		Padding         []int
+		RenderedPadding string
+		Header          []string
+		RenderedHeader  string
+		Truncate        bool
+		Rows            []Row
+		GetUserInput    bool
+		SuccessMsg      string
+		NoResultsMsg    string
+		ColorRowCode    [2]string
+		altPadding      []int
+		DynamicPadding  bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantOut string
+		wantErr bool
+	}{
+		{
+			name:    "empty table case",
+			fields:  fields{NoResultsMsg: "no rows present"},
+			wantOut: "no rows present",
+			wantErr: false,
+		},
+		{
+			name:    "basic case",
+			fields:  fields{SuccessMsg: "printed all rows", Rows: []Row{{Raw: []string{"testing"}}}},
+			wantOut: "printed all rows",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := &Table{
+				Padding:         tt.fields.Padding,
+				RenderedPadding: tt.fields.RenderedPadding,
+				Header:          tt.fields.Header,
+				RenderedHeader:  tt.fields.RenderedHeader,
+				Truncate:        tt.fields.Truncate,
+				Rows:            tt.fields.Rows,
+				GetUserInput:    tt.fields.GetUserInput,
+				SuccessMsg:      tt.fields.SuccessMsg,
+				NoResultsMsg:    tt.fields.NoResultsMsg,
+				ColorRowCode:    tt.fields.ColorRowCode,
+				altPadding:      tt.fields.altPadding,
+				DynamicPadding:  tt.fields.DynamicPadding,
+			}
+			out := &bytes.Buffer{}
+			if err := tr.PrintWithPageNumber(10, out); (err != nil) != tt.wantErr {
+				t.Errorf("Table.PrintWithPageNumber() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
+				t.Errorf("Table.PrintWithPageNumber() = %v, want %v", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
 func TestTablePrintHeader(t *testing.T) {
 	type fields struct {
 		Padding         []int
@@ -188,7 +250,7 @@ func TestTablePrintRows(t *testing.T) {
 				DynamicPadding:  tt.fields.DynamicPadding,
 			}
 			out := &bytes.Buffer{}
-			tr.PrintRows(out)
+			tr.PrintRows(out, 0)
 			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
 				t.Errorf("Table.PrintRows() = %v, want %v", gotOut, tt.wantOut)
 			}

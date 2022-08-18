@@ -29,6 +29,7 @@ type ClientInterface interface {
 	// workspace
 	CreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
 	ListWorkspaces(_ interface{}) ([]Workspace, error) // Extra argument added to be inline with function signature
+	PaginatedListWorkspaces(pageSize int, pageNumber int) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(req UpdateWorkspaceRequest) (*Workspace, error)
@@ -36,6 +37,7 @@ type ClientInterface interface {
 	AddWorkspaceUser(req AddWorkspaceUserRequest) (*Workspace, error)
 	DeleteWorkspaceUser(req DeleteWorkspaceUserRequest) (*Workspace, error)
 	ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error)
+	ListWorkspacePaginatedUserAndRoles(workspaceID string, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error)
 	UpdateWorkspaceUserRole(req UpdateWorkspaceUserRoleRequest) (string, error)
 	GetWorkspaceUserRole(req GetWorkspaceUserRoleRequest) (WorkspaceUserRoleBindings, error)
 	// auth
@@ -76,6 +78,11 @@ type ClientInterface interface {
 	ListTeams(req ListTeamsRequest) (ListTeamsResp, error)
 	CreateTeamSystemRoleBinding(req SystemRoleBindingRequest) (string, error)
 	DeleteTeamSystemRoleBinding(req SystemRoleBindingRequest) (string, error)
+	// deployment teams
+	AddDeploymentTeam(deploymentID string, teamID string, role string) (*RoleBinding, error)
+	RemoveDeploymentTeam(deploymentID string, teamID string) (*RoleBinding, error)
+	ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error)
+	UpdateDeploymentTeamRole(deploymentID string, teamID string, role string) (*RoleBinding, error)
 	// workspace teams and roles
 	AddWorkspaceTeam(req AddWorkspaceTeamRequest) (*Workspace, error)
 	DeleteWorkspaceTeam(req DeleteWorkspaceTeamRequest) (*Workspace, error)

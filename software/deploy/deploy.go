@@ -23,6 +23,8 @@ var (
 	imageHandlerInit = airflow.ImageHandlerInit
 
 	dockerfile = "Dockerfile"
+
+	deployImagePlatformSupport = []string{"linux/amd64"}
 )
 
 var (
@@ -216,8 +218,10 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 	imageHandler := imageHandlerInit(imageName)
 
 	buildConfig := types.ImageBuildConfig{
-		Path:    config.WorkingPath,
-		NoCache: ignoreCacheDeploy,
+		Path:            config.WorkingPath,
+		NoCache:         ignoreCacheDeploy,
+		TargetPlatforms: deployImagePlatformSupport,
+		Output:          true,
 	}
 	err = imageHandler.Build(buildConfig)
 	if err != nil {

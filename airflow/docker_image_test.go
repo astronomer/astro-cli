@@ -24,8 +24,9 @@ func TestDockerImageBuild(t *testing.T) {
 	assert.NoError(t, err)
 
 	options := airflowTypes.ImageBuildConfig{
-		Path:    cwd,
-		NoCache: false,
+		Path:            cwd,
+		TargetPlatforms: []string{"linux/amd64"},
+		NoCache:         false,
 	}
 
 	previousCmdExec := cmdExec

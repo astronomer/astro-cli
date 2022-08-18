@@ -476,6 +476,23 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	}`
 
+	WorkspacesPaginatedGetRequest = `
+	query paginatedWorkspaces(
+		$pageSize: Int
+		$pageNumber: Int
+	  ) {
+		  paginatedWorkspaces(
+				take: $pageSize
+				pageNumber: $pageNumber
+		  ) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
 	WorkspaceCreateRequest = `
 	mutation CreateWorkspace($label: String!, $description: String = "N/A") {
 		createWorkspace(label: $label, description: $description) {
@@ -526,8 +543,8 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}`
 
 	WorkspaceUserUpdateRequest = `
-	mutation workspaceUpdateUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
-		workspaceUpdateUserRole(
+	mutation workspaceUpsertUserRole($workspaceUuid: Uuid!, $email: String!, $role: Role!) {
+		workspaceUpsertUserRole(
         	workspaceUuid: $workspaceUuid
             email: $email
             role: $role
@@ -555,6 +572,32 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	query workspaceListUsers($workspaceUuid: Uuid!) {
 		workspaceUsers(
         	workspaceUuid: $workspaceUuid
+        ) {
+		id
+		username
+		fullName
+		emails {
+			address
+		}
+		roleBindings {
+		  workspace{
+			id
+		  }
+		  role
+		}
+	}
+	}`
+
+	WorkspacePaginatedGetUsersRequest = `
+	query paginatedWorkspaceUsers(
+	  $workspaceUuid: Uuid!,
+	  $cursorUuid: Uuid,
+	  $take: Int
+	) {
+		paginatedWorkspaceUsers(
+        	workspaceUuid: $workspaceUuid
+        	cursor: $cursorUuid
+        	take: $take
         ) {
 		id
 		username
@@ -844,4 +887,65 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 		}
 	}
 	`
+
+	DeploymentTeamAddRequest = `
+	mutation deploymentAddTeamRole(
+		$teamUuid: Uuid!
+		$deploymentUuid: Uuid!
+		$role: Role! = WORKSPACE_VIEWER
+	) {
+		deploymentAddTeamRole(
+			teamUuid: $teamUuid
+			deploymentUuid: $deploymentUuid
+			role: $role
+		) {
+			id
+			role
+		}
+	}`
+
+	DeploymentTeamRemoveRequest = `
+	mutation deploymentRemoveTeamRole($deploymentUuid: Uuid!, $teamUuid: Uuid!) {
+		deploymentRemoveTeamRole(
+			deploymentUuid: $deploymentUuid
+			teamUuid: $teamUuid
+		) {
+			id
+		}
+	}`
+
+	DeploymentTeamUpdateRequest = `
+	mutation deploymentUpdateTeamRole(
+		$deploymentUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role!
+	) {
+		deploymentUpdateTeamRole(
+			deploymentUuid: $deploymentUuid
+			teamUuid: $teamUuid
+			role: $role
+		) {
+			id
+			role
+		}
+	}`
+
+	DeploymentGetTeamsRequest = `
+	query deploymentTeams($deploymentUuid: Uuid!) {
+		deploymentTeams(deploymentUuid: $deploymentUuid) {
+			id
+			name
+			roleBindings {
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+				}
+			}
+		}
+	}`
 )
