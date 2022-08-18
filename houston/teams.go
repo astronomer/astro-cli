@@ -12,6 +12,84 @@ type SystemRoleBindingRequest struct {
 	Role   string `json:"role"`
 }
 
+var (
+	TeamGetRequest = `
+	query team($teamUuid: Uuid!, $workspaceUuid: Uuid) {
+		team(teamUuid: $teamUuid, workspaceUuid: $workspaceUuid) {
+			name
+			id
+			createdAt
+			roleBindings {
+				id
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+					releaseName
+				}
+			}
+		}
+	}
+	`
+
+	TeamGetUsersRequest = `
+	query GetTeamUsers(
+		$teamUuid: Uuid!
+	){
+		teamUsers(
+			teamUuid: $teamUuid
+		){
+			username
+			id
+			emails {
+				address
+				verified
+				primary
+			}
+			status
+		}
+	}`
+
+	PaginatedTeamsRequest = `
+	query paginatedTeams (
+		$take: Int
+		$cursor: Uuid
+		$workspaceUuid: Uuid
+	){
+		paginatedTeams(take:$take, cursor:$cursor, workspaceUuid:$workspaceUuid) {
+			count
+			teams {
+				id
+				name
+			}
+		}
+	}`
+
+	CreateTeamSystemRoleBindingMutation = `
+	mutation createTeamSystemRoleBinding (
+		$teamUuid: Uuid!
+		$role: Role!
+	){
+		createTeamSystemRoleBinding(teamUuid:$teamUuid, role:$role) {
+			role
+		}
+	}`
+
+	DeleteTeamSystemRoleBindingMutation = `
+	mutation deleteTeamSystemRoleBinding (
+		$teamUuid: Uuid!
+		$role: Role!
+	){
+		deleteTeamSystemRoleBinding(teamUuid:$teamUuid, role:$role) {
+			role
+		}
+	}`
+)
+
 // GetTeam - return a specific team
 func (h ClientImplementation) GetTeam(teamID string) (*Team, error) {
 	req := Request{

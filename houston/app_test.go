@@ -49,11 +49,11 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		config, err := api.GetAppConfig()
+		config, err := api.GetAppConfig(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, config, mockAppConfig)
 
-		config, err = api.GetAppConfig()
+		config, err = api.GetAppConfig(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, config, mockAppConfig)
 
@@ -76,11 +76,11 @@ func TestGetAppConfig(t *testing.T) {
 		appConfig = nil
 		appConfigErr = nil
 
-		config, err := api.GetAppConfig()
+		config, err := api.GetAppConfig(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 		assert.Nil(t, config)
 
-		config, err = api.GetAppConfig()
+		config, err = api.GetAppConfig(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 		assert.Nil(t, config)
 
@@ -102,7 +102,7 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAppConfig()
+		_, err := api.GetAppConfig(nil)
 		assert.EqualError(t, err, ErrFieldsNotAvailable{}.Error())
 	})
 }
@@ -131,7 +131,7 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		namespaces, err := api.GetAvailableNamespaces()
+		namespaces, err := api.GetAvailableNamespaces(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, namespaces, mockNamespaces.Data.GetDeploymentNamespaces)
 	})
@@ -146,7 +146,7 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAvailableNamespaces()
+		_, err := api.GetAvailableNamespaces(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

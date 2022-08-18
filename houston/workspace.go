@@ -12,6 +12,122 @@ type UpdateWorkspaceRequest struct {
 	Args        map[string]string `json:"payload"`
 }
 
+// UpdateWorkspaceRequest - inputs to list in workspaces
+type PaginatedListWorkspaceRequest struct {
+	PageSize   int `json:"pageSize"`
+	PageNumber int `json:"pageNumber"`
+}
+
+var (
+	WorkspaceCreateRequest = `
+	mutation CreateWorkspace(
+		$label: String!,
+		$description: String = "N/A"
+	) {
+		createWorkspace(
+			label: $label,
+			description: $description
+		) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspaceDeleteRequest = `
+	mutation DeleteWorkspace($workspaceId: Uuid!) {
+		deleteWorkspace(workspaceUuid: $workspaceId) {
+			id
+			label
+			description
+		}
+	}`
+
+	WorkspaceUpdateRequest = `
+	mutation UpdateWorkspace(
+		$workspaceId: Uuid!,
+		$payload: JSON!
+	) {
+		updateWorkspace(
+			workspaceUuid: $workspaceId,
+			payload: $payload
+		) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspacesGetRequest = `
+	query GetWorkspaces {
+		workspaces {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+			roleBindings {
+				role
+				user {
+					id
+					username
+				}
+				serviceAccount {
+					id
+					label
+				}
+			}
+		}
+	}`
+
+	WorkspacesPaginatedGetRequest = `
+	query paginatedWorkspaces(
+		$pageSize: Int
+		$pageNumber: Int
+	){
+		paginatedWorkspaces(
+			take: $pageSize
+			pageNumber: $pageNumber
+		){
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspaceGetRequest = `
+	query GetWorkspace(
+		$workspaceUuid: Uuid!
+	){
+		workspace(
+			workspaceUuid: $workspaceUuid
+		){
+			id
+			label
+			description
+			createdAt
+			updatedAt
+			roleBindings {
+				role
+				user {
+					id
+					username
+				}
+				serviceAccount {
+					id
+					label
+				}
+			}
+		}
+	}`
+)
+
 // CreateWorkspace - create a workspace
 func (h ClientImplementation) CreateWorkspace(request CreateWorkspaceRequest) (*Workspace, error) {
 	req := Request{
@@ -39,6 +155,21 @@ func (h ClientImplementation) ListWorkspaces(_ interface{}) ([]Workspace, error)
 	}
 
 	return r.Data.GetWorkspaces, nil
+}
+
+// PaginatedListWorkspaces - list workspaces
+func (h ClientImplementation) PaginatedListWorkspaces(request PaginatedListWorkspaceRequest) ([]Workspace, error) {
+	req := Request{
+		Query:     WorkspacesPaginatedGetRequest,
+		Variables: request,
+	}
+
+	r, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return r.Data.GetPaginatedWorkspaces, nil
 }
 
 // DeleteWorkspace - delete a workspace

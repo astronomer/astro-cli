@@ -29,6 +29,7 @@ import (
 
 const (
 	Domain          = "astronomer.io"
+	localDomain     = "localhost"
 	inputOAuthToken = "OAuth Token: " // nolint:gosec // false positive
 
 	cliChooseWorkspace     = "Please choose a workspace:"
@@ -65,11 +66,16 @@ func orgLookup(domain string) (string, error) {
 		splitDomain := strings.SplitN(domain, ".", splitNum)
 		domain = splitDomain[1]
 	}
-	addr := fmt.Sprintf(
-		"%s://api.%s/hub/organization-lookup",
-		config.CFG.CloudAPIProtocol.GetString(),
-		domain,
-	)
+	var addr string
+	if domain == localDomain {
+		addr = "http://localhost:8871/organization-lookup"
+	} else {
+		addr = fmt.Sprintf(
+			"%s://api.%s/hub/organization-lookup",
+			config.CFG.CloudAPIProtocol.GetString(),
+			domain,
+		)
+	}
 	ctx := http_context.Background()
 	reqData, err := json.Marshal(orgLookupRequest{Email: userEmail})
 	if err != nil {

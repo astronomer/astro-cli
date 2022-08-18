@@ -98,6 +98,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentSaRootCmd(out),
 		newDeploymentUserRootCmd(out),
 		newDeploymentAirflowRootCmd(out),
+		newDeploymentTeamRootCmd(out),
 	)
 
 	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
@@ -371,7 +372,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 			return err
 		}
 	}
-
+	fmt.Println("test", runtimeVersion)
 	req := &deployment.CreateDeploymentRequest{
 		Label:             deploymentCreateLabel,
 		WS:                ws,

@@ -35,6 +35,7 @@ const (
 	houstonDomain        = "houston"
 	localSoftwareDomain  = "localhost.me"
 	registryDomainPrefix = "registry."
+	defaultPageSize      = 100
 )
 
 var (
@@ -53,7 +54,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	return houston.Call(client.AuthenticateWithBasicAuth, houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
 }
 
-func switchToLastUsedWorkspace(c *config.Context, workspaces []houston.Workspace) bool {
+var switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
 	if c.LastUsedWorkspace == "" {
 		return false
 	}
@@ -130,6 +131,11 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
+	interactive := config.CFG.Interactive.GetBool()
+	pageSize := config.CFG.PageSize.GetInt()
+	if !(pageSize > 0 && pageSize < defaultPageSize) {
+		pageSize = defaultPageSize
+	}
 
 	ctx := &config.Context{Domain: domain}
 	err = ctx.PrintSoftwareContext(out)
@@ -193,7 +199,11 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Println("\n" + cliChooseWorkspace)
-			err := workspace.Switch("", client, out)
+
+			if !interactive {
+				pageSize = 0
+			}
+			err := workspace.Switch("", pageSize, client, out)
 			if err != nil {
 				fmt.Fprint(out, cliSetWorkspaceExample)
 			}

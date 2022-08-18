@@ -28,7 +28,8 @@ type ClientInterface interface {
 	CreateUser(req CreateUserRequest) (*AuthUser, error)
 	// workspace
 	CreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
-	ListWorkspaces(_ interface{}) ([]Workspace, error) // Extra argument added to be inline with function signature
+	ListWorkspaces(req interface{}) ([]Workspace, error) // Extra argument added to be inline with function signature
+	PaginatedListWorkspaces(req PaginatedListWorkspaceRequest) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(req UpdateWorkspaceRequest) (*Workspace, error)
@@ -36,6 +37,7 @@ type ClientInterface interface {
 	AddWorkspaceUser(req AddWorkspaceUserRequest) (*Workspace, error)
 	DeleteWorkspaceUser(req DeleteWorkspaceUserRequest) (*Workspace, error)
 	ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error)
+	ListWorkspacePaginatedUserAndRoles(req PaginatedWorkspaceUserRolesRequest) ([]WorkspaceUserRoleBindings, error)
 	UpdateWorkspaceUserRole(req UpdateWorkspaceUserRoleRequest) (string, error)
 	GetWorkspaceUserRole(req GetWorkspaceUserRoleRequest) (WorkspaceUserRoleBindings, error)
 	// auth
@@ -50,7 +52,7 @@ type ClientInterface interface {
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
-	GetDeploymentConfig(_ interface{}) (*DeploymentConfig, error) // Extra argument added to be inline with function signature
+	GetDeploymentConfig(req interface{}) (*DeploymentConfig, error) // Extra argument added to be inline with function signature
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
 	UpdateDeploymentImage(req UpdateDeploymentImageRequest) (interface{}, error) // Extra return argument added to be inline with function signature
 	// deployment users
@@ -66,8 +68,8 @@ type ClientInterface interface {
 	DeleteWorkspaceServiceAccount(req DeleteServiceAccountRequest) (*ServiceAccount, error)
 	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
-	GetAppConfig(_ interface{}) (*AppConfig, error)            // Extra argument added to be inline with function signature
-	GetAvailableNamespaces(_ interface{}) ([]Namespace, error) // Extra argument added to be inline with function signature
+	GetAppConfig(req interface{}) (*AppConfig, error)            // Extra argument added to be inline with function signature
+	GetAvailableNamespaces(req interface{}) ([]Namespace, error) // Extra argument added to be inline with function signature
 	// runtime
 	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
 	// teams
@@ -76,6 +78,11 @@ type ClientInterface interface {
 	ListTeams(req ListTeamsRequest) (ListTeamsResp, error)
 	CreateTeamSystemRoleBinding(req SystemRoleBindingRequest) (string, error)
 	DeleteTeamSystemRoleBinding(req SystemRoleBindingRequest) (string, error)
+	// deployment teams
+	AddDeploymentTeam(req AddDeploymentTeamRequest) (*RoleBinding, error)
+	RemoveDeploymentTeam(req RemoveDeploymentTeamRequest) (*RoleBinding, error)
+	ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error)
+	UpdateDeploymentTeamRole(req UpdateDeploymentTeamRequest) (*RoleBinding, error)
 	// workspace teams and roles
 	AddWorkspaceTeam(req AddWorkspaceTeamRequest) (*Workspace, error)
 	DeleteWorkspaceTeam(req DeleteWorkspaceTeamRequest) (*Workspace, error)
@@ -108,11 +115,6 @@ func newInternalClient(c *httputil.HTTPClient) *Client {
 	return &Client{
 		HTTPClient: c,
 	}
-}
-
-// GraphQLQuery wraps a graphql query string
-type GraphQLQuery struct {
-	Query string `json:"query"`
 }
 
 type Request struct {

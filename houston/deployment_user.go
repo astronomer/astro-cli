@@ -20,6 +20,96 @@ type DeleteDeploymentUserRequest struct {
 	Email        string `json:"email"`
 }
 
+var (
+	// DeploymentUserListRequest return the users for a specific deployment by ID
+	DeploymentUserListRequest = `
+	query deploymentUsers(
+		$deploymentId: Id!
+		$user: UserSearch
+	){
+		deploymentUsers(
+				deploymentId: $deploymentId
+				user: $user
+		){
+			id
+			fullName
+			username
+				roleBindings {
+				role
+				}
+		}
+	}`
+
+	// DeploymentUserAddRequest Mutation for AddDeploymentUser
+	DeploymentUserAddRequest = `
+	mutation AddDeploymentUser(
+		$userId: Id
+		$email: String!
+		$deploymentId: Id!
+		$role: Role!
+	){
+		deploymentAddUserRole(
+			userId: $userId
+			email: $email
+			deploymentId: $deploymentId
+			role: $role
+		){
+			id
+			user {
+				username
+			}
+			role
+			deployment {
+				id
+				releaseName
+			}
+		}
+	}`
+
+	// DeploymentUserDeleteRequest Mutation for AddDeploymentUser
+	DeploymentUserDeleteRequest = `
+	mutation DeleteDeploymentUser(
+		$userId: Id
+		$email: String!
+		$deploymentId: Id!
+	){
+		deploymentRemoveUserRole(
+			userId: $userId
+			email: $email
+			deploymentId: $deploymentId
+		){
+			id
+			role
+		}
+	}`
+
+	// DeploymentUserUpdateRequest Mutation for UpdateDeploymentUser
+	DeploymentUserUpdateRequest = `
+	mutation UpdateDeploymentUser(
+		$userId: Id
+		$email: String!
+		$deploymentId: Id!
+		$role: Role!
+	){
+		deploymentUpdateUserRole(
+			userId: $userId
+			email: $email
+			deploymentId: $deploymentId
+			role: $role
+		){
+			id
+			user {
+				username
+			}
+			role
+			deployment {
+				id
+				releaseName
+			}
+		}
+	}`
+)
+
 // ListUsersInDeployment - list users with deployment access
 func (h ClientImplementation) ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error) {
 	user := map[string]interface{}{

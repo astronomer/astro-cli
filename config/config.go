@@ -54,7 +54,7 @@ var (
 		CloudAPIToken:        newCfg("cloud.api.token", ""),
 		Context:              newCfg("context", ""),
 		Contexts:             newCfg("contexts", ""),
-		LocalAstro:           newCfg("local.astrohub", ""),
+		LocalAstro:           newCfg("local.astrohub", "http://localhost:8871/v1"),
 		LocalPublicAstro:     newCfg("local.public_astrohub", "http://localhost:8871/graphql"),
 		LocalRegistry:        newCfg("local.registry", "localhost:5555"),
 		LocalHouston:         newCfg("local.houston", ""),
@@ -72,6 +72,8 @@ var (
 		HoustonDialTimeout:   newCfg("houston.dial_timeout", "10"),
 		HoustonSkipVerifyTLS: newCfg("houston.skip_verify_tls", "false"),
 		SkipParse:            newCfg("skip_parse", "false"),
+		Interactive:          newCfg("interactive", "false"),
+		PageSize:             newCfg("page_size", "20"),
 	}
 
 	// viperHome is the viper object in the users home directory

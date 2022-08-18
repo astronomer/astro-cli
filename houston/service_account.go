@@ -16,6 +16,144 @@ type DeleteServiceAccountRequest struct {
 	ServiceAccountID string `json:"serviceAccountUuid"`
 }
 
+var (
+	CreateDeploymentServiceAccountRequest = `
+	mutation createDeploymentServiceAccount(
+		$label: String!,
+		$category: String,
+		$deploymentUuid: Uuid!,
+		$role: Role!
+  	){
+		createDeploymentServiceAccount(
+		  label: $label,
+		  category: $category,
+		  deploymentUuid: $deploymentUuid,
+		  role: $role
+    	){
+		    id
+		    label
+		    apiKey
+		    entityType
+		    deploymentUuid
+		    category
+		    active
+		    lastUsedAt
+		    createdAt
+		    updatedAt
+    	}
+  	}`
+
+	CreateWorkspaceServiceAccountRequest = `
+	mutation createWorkspaceServiceAccount(
+		$label: String!,
+		$category: String,
+		$workspaceUuid: Uuid!,
+		$role: Role!
+	){
+		createWorkspaceServiceAccount(
+		  label: $label,
+		  category: $category,
+		  workspaceUuid: $workspaceUuid,
+		  role: $role
+		){
+			id
+			label
+			apiKey
+			entityType
+			workspaceUuid
+			category
+			active
+			lastUsedAt
+			createdAt
+			updatedAt
+		}
+    }`
+
+	DeploymentServiceAccountDeleteRequest = `
+	mutation deleteDeploymentServiceAccount(
+         $serviceAccountUuid: Uuid!
+         $deploymentUuid: Uuid!
+    ){
+		deleteDeploymentServiceAccount(
+          serviceAccountUuid: $serviceAccountUuid
+          deploymentUuid: $deploymentUuid
+        ){
+			id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
+		}
+	}`
+
+	WorkspaceServiceAccountDeleteRequest = `
+	mutation deleteWorkspaceServiceAccount(
+          $serviceAccountUuid: Uuid!
+          $workspaceUuid: Uuid!
+    ){
+        deleteWorkspaceServiceAccount(
+          serviceAccountUuid: $serviceAccountUuid
+          workspaceUuid: $workspaceUuid
+        ){
+            id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
+         }
+    }`
+
+	DeploymentServiceAccountsGetRequest = `
+	query GetDeploymentServiceAccounts(
+		$deploymentUuid: Uuid!
+  	){
+		deploymentServiceAccounts(
+			deploymentUuid: $deploymentUuid
+		){
+			id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
+		}
+  	}`
+
+	WorkspaceServiceAccountsGetRequest = `
+	query GetWorkspaceServiceAccounts(
+		$workspaceUuid: Uuid!
+	){
+		workspaceServiceAccounts(
+			workspaceUuid: $workspaceUuid
+		){
+			id
+			apiKey
+			label
+			category
+			entityType
+			entityUuid
+			active
+			createdAt
+			updatedAt
+			lastUsedAt
+		}
+	}`
+)
+
 // CreateServiceAccountInDeployment - create a service account in a deployment
 func (h ClientImplementation) CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error) {
 	req := Request{

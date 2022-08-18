@@ -26,6 +26,74 @@ type GetWorkspaceTeamRoleRequest struct {
 	TeamID      string `json:"teamUuid"`
 }
 
+var (
+	WorkspaceTeamAddRequest = `
+	mutation AddWorkspaceTeam(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role! = WORKSPACE_VIEWER
+		$deploymentRoles: [DeploymentRoles!] = []
+	){
+		workspaceAddTeam(
+			workspaceUuid: $workspaceUuid
+			teamUuid: $teamUuid
+			role: $role
+			deploymentRoles: $deploymentRoles) {
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}`
+
+	WorkspaceTeamUpdateRequest = `
+	mutation workspaceUpdateTeamRole(
+		$workspaceUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role!
+	){
+		workspaceUpdateTeamRole(
+      		workspaceUuid: $workspaceUuid
+      		teamUuid: $teamUuid
+      		role: $role
+    	)
+	}`
+
+	WorkspaceTeamRemoveRequest = `
+	mutation workspaceRemoveTeam(
+		$workspaceUuid: Uuid!,
+		$teamUuid: Uuid!
+	){
+		workspaceRemoveTeam(workspaceUuid: $workspaceUuid, teamUuid: $teamUuid) {
+			id
+			label
+		}
+	}
+	`
+
+	WorkspaceGetTeamsRequest = `
+	query workspaceGetTeams($workspaceUuid: Uuid!) {
+		workspaceTeams(
+			workspaceUuid: $workspaceUuid
+		){
+			id
+      		name
+			roleBindings {
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+				}
+			}
+		}
+	}`
+)
+
 // AddTeamToWorkspace - add a team to a workspace
 func (h ClientImplementation) AddWorkspaceTeam(request AddWorkspaceTeamRequest) (*Workspace, error) {
 	req := Request{

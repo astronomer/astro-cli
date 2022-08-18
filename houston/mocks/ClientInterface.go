@@ -14,6 +14,29 @@ type ClientInterface struct {
 	mock.Mock
 }
 
+// AddDeploymentTeam provides a mock function with given fields: req
+func (_m *ClientInterface) AddDeploymentTeam(req houston.AddDeploymentTeamRequest) (*houston.RoleBinding, error) {
+	ret := _m.Called(req)
+
+	var r0 *houston.RoleBinding
+	if rf, ok := ret.Get(0).(func(houston.AddDeploymentTeamRequest) *houston.RoleBinding); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.RoleBinding)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(houston.AddDeploymentTeamRequest) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AddDeploymentUser provides a mock function with given fields: variables
 func (_m *ClientInterface) AddDeploymentUser(variables houston.UpdateDeploymentUserRequest) (*houston.RoleBinding, error) {
 	ret := _m.Called(variables)
@@ -445,13 +468,13 @@ func (_m *ClientInterface) DeleteWorkspaceUser(req houston.DeleteWorkspaceUserRe
 	return r0, r1
 }
 
-// GetAppConfig provides a mock function with given fields: _
-func (_m *ClientInterface) GetAppConfig(_ interface{}) (*houston.AppConfig, error) {
-	ret := _m.Called(_)
+// GetAppConfig provides a mock function with given fields: req
+func (_m *ClientInterface) GetAppConfig(req interface{}) (*houston.AppConfig, error) {
+	ret := _m.Called(req)
 
 	var r0 *houston.AppConfig
 	if rf, ok := ret.Get(0).(func(interface{}) *houston.AppConfig); ok {
-		r0 = rf(_)
+		r0 = rf(req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*houston.AppConfig)
@@ -460,7 +483,7 @@ func (_m *ClientInterface) GetAppConfig(_ interface{}) (*houston.AppConfig, erro
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_)
+		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -491,13 +514,13 @@ func (_m *ClientInterface) GetAuthConfig(ctx *config.Context) (*houston.AuthConf
 	return r0, r1
 }
 
-// GetAvailableNamespaces provides a mock function with given fields: _
-func (_m *ClientInterface) GetAvailableNamespaces(_ interface{}) ([]houston.Namespace, error) {
-	ret := _m.Called(_)
+// GetAvailableNamespaces provides a mock function with given fields: req
+func (_m *ClientInterface) GetAvailableNamespaces(req interface{}) ([]houston.Namespace, error) {
+	ret := _m.Called(req)
 
 	var r0 []houston.Namespace
 	if rf, ok := ret.Get(0).(func(interface{}) []houston.Namespace); ok {
-		r0 = rf(_)
+		r0 = rf(req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.Namespace)
@@ -506,7 +529,7 @@ func (_m *ClientInterface) GetAvailableNamespaces(_ interface{}) ([]houston.Name
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_)
+		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -537,13 +560,13 @@ func (_m *ClientInterface) GetDeployment(deploymentID string) (*houston.Deployme
 	return r0, r1
 }
 
-// GetDeploymentConfig provides a mock function with given fields: _
-func (_m *ClientInterface) GetDeploymentConfig(_ interface{}) (*houston.DeploymentConfig, error) {
-	ret := _m.Called(_)
+// GetDeploymentConfig provides a mock function with given fields: req
+func (_m *ClientInterface) GetDeploymentConfig(req interface{}) (*houston.DeploymentConfig, error) {
+	ret := _m.Called(req)
 
 	var r0 *houston.DeploymentConfig
 	if rf, ok := ret.Get(0).(func(interface{}) *houston.DeploymentConfig); ok {
-		r0 = rf(_)
+		r0 = rf(req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*houston.DeploymentConfig)
@@ -552,7 +575,7 @@ func (_m *ClientInterface) GetDeploymentConfig(_ interface{}) (*houston.Deployme
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_)
+		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -742,6 +765,29 @@ func (_m *ClientInterface) ListDeploymentServiceAccounts(deploymentID string) ([
 	return r0, r1
 }
 
+// ListDeploymentTeamsAndRoles provides a mock function with given fields: deploymentID
+func (_m *ClientInterface) ListDeploymentTeamsAndRoles(deploymentID string) ([]houston.Team, error) {
+	ret := _m.Called(deploymentID)
+
+	var r0 []houston.Team
+	if rf, ok := ret.Get(0).(func(string) []houston.Team); ok {
+		r0 = rf(deploymentID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.Team)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(deploymentID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListDeploymentUsers provides a mock function with given fields: filters
 func (_m *ClientInterface) ListDeploymentUsers(filters houston.ListDeploymentUsersRequest) ([]houston.DeploymentUser, error) {
 	ret := _m.Called(filters)
@@ -801,6 +847,29 @@ func (_m *ClientInterface) ListTeams(req houston.ListTeamsRequest) (houston.List
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(houston.ListTeamsRequest) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListWorkspacePaginatedUserAndRoles provides a mock function with given fields: req
+func (_m *ClientInterface) ListWorkspacePaginatedUserAndRoles(req houston.PaginatedWorkspaceUserRolesRequest) ([]houston.WorkspaceUserRoleBindings, error) {
+	ret := _m.Called(req)
+
+	var r0 []houston.WorkspaceUserRoleBindings
+	if rf, ok := ret.Get(0).(func(houston.PaginatedWorkspaceUserRolesRequest) []houston.WorkspaceUserRoleBindings); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.WorkspaceUserRoleBindings)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(houston.PaginatedWorkspaceUserRolesRequest) error); ok {
 		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
@@ -878,13 +947,13 @@ func (_m *ClientInterface) ListWorkspaceUserAndRoles(workspaceID string) ([]hous
 	return r0, r1
 }
 
-// ListWorkspaces provides a mock function with given fields: _
-func (_m *ClientInterface) ListWorkspaces(_ interface{}) ([]houston.Workspace, error) {
-	ret := _m.Called(_)
+// ListWorkspaces provides a mock function with given fields: req
+func (_m *ClientInterface) ListWorkspaces(req interface{}) ([]houston.Workspace, error) {
+	ret := _m.Called(req)
 
 	var r0 []houston.Workspace
 	if rf, ok := ret.Get(0).(func(interface{}) []houston.Workspace); ok {
-		r0 = rf(_)
+		r0 = rf(req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.Workspace)
@@ -893,7 +962,53 @@ func (_m *ClientInterface) ListWorkspaces(_ interface{}) ([]houston.Workspace, e
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(_)
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// PaginatedListWorkspaces provides a mock function with given fields: req
+func (_m *ClientInterface) PaginatedListWorkspaces(req houston.PaginatedListWorkspaceRequest) ([]houston.Workspace, error) {
+	ret := _m.Called(req)
+
+	var r0 []houston.Workspace
+	if rf, ok := ret.Get(0).(func(houston.PaginatedListWorkspaceRequest) []houston.Workspace); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]houston.Workspace)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(houston.PaginatedListWorkspaceRequest) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RemoveDeploymentTeam provides a mock function with given fields: req
+func (_m *ClientInterface) RemoveDeploymentTeam(req houston.RemoveDeploymentTeamRequest) (*houston.RoleBinding, error) {
+	ret := _m.Called(req)
+
+	var r0 *houston.RoleBinding
+	if rf, ok := ret.Get(0).(func(houston.RemoveDeploymentTeamRequest) *houston.RoleBinding); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.RoleBinding)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(houston.RemoveDeploymentTeamRequest) error); ok {
+		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -986,6 +1101,29 @@ func (_m *ClientInterface) UpdateDeploymentRuntime(variables map[string]interfac
 	var r1 error
 	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
 		r1 = rf(variables)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateDeploymentTeamRole provides a mock function with given fields: req
+func (_m *ClientInterface) UpdateDeploymentTeamRole(req houston.UpdateDeploymentTeamRequest) (*houston.RoleBinding, error) {
+	ret := _m.Called(req)
+
+	var r0 *houston.RoleBinding
+	if rf, ok := ret.Get(0).(func(houston.UpdateDeploymentTeamRequest) *houston.RoleBinding); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.RoleBinding)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(houston.UpdateDeploymentTeamRequest) error); ok {
+		r1 = rf(req)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -44,7 +44,7 @@ func TestCreateUser(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.CreateUser("email", "password")
+		response, err := api.CreateUser(CreateUserRequest{"email", "password"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.CreateUser)
 	})
@@ -59,7 +59,7 @@ func TestCreateUser(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.CreateUser("email", "password")
+		_, err := api.CreateUser(CreateUserRequest{"email", "password"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

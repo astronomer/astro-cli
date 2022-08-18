@@ -14,6 +14,39 @@ type BasicAuthRequest struct {
 	Ctx      *config.Context `json:"-"`
 }
 
+var (
+	AuthConfigGetRequest = `
+	query GetAuthConfig($redirect: String) {
+		authConfig(redirect: $redirect) {
+			localEnabled
+			publicSignup
+			initialSignup
+			providers {
+				name
+        		displayName
+				url
+      		}
+		}
+	}`
+
+	TokenBasicCreateRequest = `
+	mutation createBasicToken($identity: String, $password: String!) {
+		createToken(identity: $identity, password: $password) {
+			user {
+				id
+				fullName
+				username
+				status
+				createdAt
+				updatedAt
+			}
+			token {
+				value
+			}
+		}
+	}`
+)
+
 // AuthenticateWithBasicAuth - authentiate to Houston using basic auth
 func (h ClientImplementation) AuthenticateWithBasicAuth(request BasicAuthRequest) (string, error) {
 	req := Request{

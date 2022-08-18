@@ -6,6 +6,34 @@ type CreateUserRequest struct {
 	Password string `json:"password"`
 }
 
+var (
+	UserCreateRequest = `
+	mutation CreateUser(
+		$email: String!
+		$password: String!
+		$username: String
+		$inviteToken: String
+	){
+		createUser(
+			email: $email
+			password: $password
+			username: $username
+			inviteToken: $inviteToken
+		){
+			user {
+				id
+				username
+				status
+				createdAt
+				updatedAt
+			}
+			token {
+				value
+			}
+		}
+	}`
+)
+
 // CreateUser - Send a request to create a user in the Houston API
 func (h ClientImplementation) CreateUser(request CreateUserRequest) (*AuthUser, error) {
 	req := Request{

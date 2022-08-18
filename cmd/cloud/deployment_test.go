@@ -208,6 +208,10 @@ func TestDeploymentVariableModify(t *testing.T) {
 			Key:   "test-key-2",
 			Value: "test-value-2",
 		},
+		{
+			Key:   "test-key-3",
+			Value: "test-value-3",
+		},
 	}
 
 	mockClient := new(astro_mocks.Client)
@@ -215,13 +219,15 @@ func TestDeploymentVariableModify(t *testing.T) {
 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
 	astroClient = mockClient
 
-	cmdArgs := []string{"variable", "create", "--deployment-id", "test-id-1", "--key", "test-key-2", "--value", "test-value-2"}
+	cmdArgs := []string{"variable", "create", "test-key-3=test-value-3", "--deployment-id", "test-id-1", "--key", "test-key-2", "--value", "test-value-2"}
 	resp, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	assert.Contains(t, resp, "test-key-1")
 	assert.Contains(t, resp, "test-value-1")
 	assert.Contains(t, resp, "test-key-2")
 	assert.Contains(t, resp, "test-value-2")
+	assert.Contains(t, resp, "test-key-3")
+	assert.Contains(t, resp, "test-value-3")
 	mockClient.AssertExpectations(t)
 }
 
@@ -248,6 +254,10 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 			Key:   "test-key-1",
 			Value: "test-value-update",
 		},
+		{
+			Key:   "test-key-2",
+			Value: "test-value-2-update",
+		},
 	}
 
 	mockClient := new(astro_mocks.Client)
@@ -255,10 +265,12 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockUpdateResponse, nil).Once()
 	astroClient = mockClient
 
-	cmdArgs := []string{"variable", "update", "--deployment-id", "test-id-1", "--key", "test-key-1", "--value", "test-value-update"}
+	cmdArgs := []string{"variable", "update", "test-key-2=test-value-2-update", "--deployment-id", "test-id-1", "--key", "test-key-1", "--value", "test-value-update"}
 	resp, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	assert.Contains(t, resp, "test-key-1")
 	assert.Contains(t, resp, "test-value-update")
+	assert.Contains(t, resp, "test-key-2")
+	assert.Contains(t, resp, "test-value-2-update")
 	mockClient.AssertExpectations(t)
 }

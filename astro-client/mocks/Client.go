@@ -184,6 +184,27 @@ func (_m *Client) GetWorkspace(workspaceID string) (astro.Workspace, error) {
 	return r0, r1
 }
 
+// InitiateDagDeployment provides a mock function with given fields: input
+func (_m *Client) InitiateDagDeployment(input astro.InitiateDagDeploymentInput) (astro.InitiateDagDeployment, error) {
+	ret := _m.Called(input)
+
+	var r0 astro.InitiateDagDeployment
+	if rf, ok := ret.Get(0).(func(astro.InitiateDagDeploymentInput) astro.InitiateDagDeployment); ok {
+		r0 = rf(input)
+	} else {
+		r0 = ret.Get(0).(astro.InitiateDagDeployment)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(astro.InitiateDagDeploymentInput) error); ok {
+		r1 = rf(input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListClusters provides a mock function with given fields: organizationID
 func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
 	ret := _m.Called(organizationID)
@@ -337,6 +358,27 @@ func (_m *Client) ModifyDeploymentVariable(input astro.EnvironmentVariablesInput
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(astro.EnvironmentVariablesInput) error); ok {
+		r1 = rf(input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReportDagDeploymentStatus provides a mock function with given fields: input
+func (_m *Client) ReportDagDeploymentStatus(input *astro.ReportDagDeploymentStatusInput) (astro.DagDeploymentStatus, error) {
+	ret := _m.Called(input)
+
+	var r0 astro.DagDeploymentStatus
+	if rf, ok := ret.Get(0).(func(*astro.ReportDagDeploymentStatusInput) astro.DagDeploymentStatus); ok {
+		r0 = rf(input)
+	} else {
+		r0 = ret.Get(0).(astro.DagDeploymentStatus)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*astro.ReportDagDeploymentStatusInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

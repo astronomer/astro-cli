@@ -5,6 +5,71 @@ var (
 	appConfigErr error
 )
 
+var (
+	AppConfigRequest = queryList{
+		{
+			version: "0.29.2",
+			query: `
+			query AppConfig {
+				appConfig {
+					version
+					baseDomain
+					byoUpdateRegistryHost
+					smtpConfigured
+					manualReleaseNames
+					configureDagDeployment
+					nfsMountDagDeployment
+					manualNamespaceNames
+					hardDeleteDeployment
+					triggererEnabled
+					featureFlags
+				}
+			}`,
+		},
+		{
+			version: "0.28.0",
+			query: `
+			query AppConfig {
+				appConfig {
+					version
+					baseDomain
+					smtpConfigured
+					manualReleaseNames
+					configureDagDeployment
+					nfsMountDagDeployment
+					manualNamespaceNames
+					hardDeleteDeployment
+					triggererEnabled
+					featureFlags
+				}
+			}`,
+		},
+		{
+			version: "0.25.0",
+			query: `
+			query AppConfig {
+				appConfig {
+					version
+					baseDomain
+					smtpConfigured
+					manualReleaseNames
+					configureDagDeployment
+					nfsMountDagDeployment
+					manualNamespaceNames
+					hardDeleteDeployment
+				}
+			}`,
+		},
+	}
+
+	AvailableNamespacesGetRequest = `
+	query availableNamespaces {
+		availableNamespaces{
+			name
+		}
+	}`
+)
+
 // GetAppConfig - get application configuration
 func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 	// If application config has already been requested, we do not want to request it again
@@ -14,8 +79,10 @@ func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 		return appConfig, appConfigErr
 	}
 
+	reqQuery := AppConfigRequest.GreatestLowerBound(Version)
+
 	req := Request{
-		Query: AppConfigRequest,
+		Query: reqQuery,
 	}
 
 	var r *Response

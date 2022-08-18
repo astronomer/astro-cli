@@ -48,7 +48,7 @@ func TestCreateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.CreateWorkspace("label", "description")
+		response, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.CreateWorkspace)
 	})
@@ -63,7 +63,7 @@ func TestCreateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.CreateWorkspace("label", "description")
+		_, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -124,7 +124,7 @@ func TestListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.ListWorkspaces()
+		response, err := api.ListWorkspaces(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.GetWorkspaces)
 	})
@@ -139,7 +139,83 @@ func TestListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.ListWorkspaces()
+		_, err := api.ListWorkspaces(nil)
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestPaginatedListWorkspaces(t *testing.T) {
+	testUtil.InitTestConfig("software")
+
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetPaginatedWorkspaces: []Workspace{
+				{
+					ID:          "workspace-id",
+					Label:       "label",
+					Description: "test description",
+					Users: []User{
+						{
+							ID:       "id",
+							Username: "test",
+							Emails: []Email{
+								{Address: "test@astronomer.com"},
+							},
+							Status: "active",
+						},
+					},
+					CreatedAt: "2020-06-25T22:10:42.385Z",
+					UpdatedAt: "2020-06-25T22:10:42.385Z",
+				},
+				{
+					ID:          "workspace-id2",
+					Label:       "label2",
+					Description: "test description2",
+					Users: []User{
+						{
+							ID:       "id",
+							Username: "test",
+							Emails: []Email{
+								{Address: "test@astronomer.com"},
+							},
+							Status: "active",
+						},
+					},
+					CreatedAt: "2020-06-25T22:10:42.385Z",
+					UpdatedAt: "2020-06-25T22:10:42.385Z",
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		response, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
+		assert.NoError(t, err)
+		assert.Equal(t, response, mockResponse.Data.GetPaginatedWorkspaces)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -295,7 +371,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.UpdateWorkspace("workspace-id", map[string]string{})
+		response, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.UpdateWorkspace)
 	})
@@ -310,7 +386,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateWorkspace("workspace-id", map[string]string{})
+		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

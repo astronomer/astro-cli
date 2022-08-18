@@ -15,8 +15,9 @@ var (
 	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
 	initDebugLogs = []string{}
 
-	houstonClient houston.ClientInterface
-	appConfig     *houston.AppConfig
+	houstonClient  houston.ClientInterface
+	houstonVersion string
+	appConfig      *houston.AppConfig
 
 	workspaceID string
 	teamID      string
@@ -31,6 +32,8 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	}
+	houstonVersion = appConfig.Version
+	houston.Version = houstonVersion // updating version in houston package to avoid extra houston call
 
 	return []*cobra.Command{
 		newDeploymentRootCmd(out),
