@@ -298,7 +298,7 @@ func TestAirflowFailure(t *testing.T) {
 
 	// Invalid deployment name case
 	err = Airflow(houstonMock, "", "test-deployment-id", "test-workspace-id", "", false, false, false)
-	assert.ErrorIs(t, err, errInvalidDeploymentName)
+	assert.ErrorIs(t, err, errInvalidDeploymentID)
 
 	// No deployment in the current workspace case
 	err = Airflow(houstonMock, "", "", "test-workspace-id", "", false, false, false)
