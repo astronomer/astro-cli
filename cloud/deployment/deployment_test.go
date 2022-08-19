@@ -348,6 +348,8 @@ func TestCreate(t *testing.T) {
 		err = Create("", ws, "test-desc", csID, "4.2.5", 10, 3, 15, mockClient, true)
 		assert.NoError(t, err)
 
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{}}, nil).Once()
+
 		// mock os.Stdin
 		input = []byte("test-name")
 		r, w, err = os.Pipe()
