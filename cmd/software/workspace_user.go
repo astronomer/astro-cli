@@ -160,7 +160,7 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 			pageSize = defaultWorkspaceUserPageSize
 		}
 
-		return workspace.PaginatedListRoles(ws, "", float64(pageSize), 0, houstonClient, out)
+		return workspace.PaginatedListRoles(ws, "", pageSize, 0, houstonClient, out)
 	}
 	return workspace.ListRoles(ws, houstonClient, out)
 }
