@@ -71,6 +71,8 @@ var (
 
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
+	exportSettings   = settings.SettingsExport
+	envExportSettings = settings.SettingsEnvExport
 
 	openURL    = browser.OpenURL
 	timeoutNum = 60
@@ -559,14 +561,14 @@ func (d *DockerCompose) Settings(settingsFile, envFile string, connections, vari
 			if strings.Contains(psInfo[i].Name, d.projectName) &&
 				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
 				if export && !envExport {
-					err = settings.SettingsExport(psInfo[i].ID, settingsFile, airflowDockerVersion, connections, variables, pools)
+					err = exportSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, connections, variables, pools)
 					if err != nil {
 						return err
 					}
 					fmt.Println("\nAirflow Objects exported to settings file")
 				}
 				if envExport && export {
-					err = settings.SettingsEnvExport(psInfo[i].ID, envFile, airflowDockerVersion, connections, variables)
+					err = envExportSettings(psInfo[i].ID, envFile, airflowDockerVersion, connections, variables)
 					if err != nil {
 						return err
 					}
