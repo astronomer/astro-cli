@@ -33,6 +33,8 @@ type cfgs struct {
 	HoustonDialTimeout   cfg
 	HoustonSkipVerifyTLS cfg
 	SkipParse            cfg
+	Interactive          cfg
+	PageSize             cfg
 }
 
 // Creates a new cfg struct

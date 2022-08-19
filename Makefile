@@ -6,7 +6,7 @@ ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
 OUTPUT ?= astro
 # golangci-lint version
-GOLANGCI_LINT_VERSION ?=v1.45.0
+GOLANGCI_LINT_VERSION ?=v1.46.2
 
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
@@ -20,7 +20,7 @@ test:
 	go test -count=1 -cover ./...
 	go test -coverprofile=coverage.txt -covermode=atomic ./...
 
-mock: mock_airflow mock_houston mock_astro
+mock: mock_airflow mock_houston mock_astro mock_pkg
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
@@ -35,6 +35,10 @@ mock_airflow:
 
 mock_astro:
 	mockery --filename=Client.go --output=astro-client/mocks --dir=astro-client --outpkg=astro_mocks --name Client
+
+mock_pkg:
+	mockery --filename=Azure.go --output=pkg/azure/mocks --dir=pkg/azure --outpkg=azure_mocks --name Azure
+	mockery --filename=ClientAPI.go --output=pkg/azure/mocks --dir=pkg/azure --outpkg=azure_mocks --name ClientAPI
 
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)

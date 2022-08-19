@@ -84,7 +84,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	return tab.Print(out)
 }
 
-func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount int, client astro.Client) error {
+func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs bool, logCount int, client astro.Client) error {
 	logLevels := []string{}
 
 	// log level
@@ -102,7 +102,7 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 	}
 
 	// get deployment
-	deployment, err := GetDeployment(ws, deploymentID, client)
+	deployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -176,6 +176,16 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		label = input.Text(ansi.Bold("\nDeployment name: "))
 		if label == "" {
 			return errors.New("you must give your Deployment a name")
+		}
+		deployments, err := getDeployments(workspaceID, client)
+		if err != nil {
+			return errors.Wrap(err, errInvalidDeployment.Error())
+		}
+
+		for i := range deployments {
+			if deployments[i].Label == label {
+				return errors.New("A Deployment with that name already exists")
+			}
 		}
 	}
 
@@ -375,9 +385,9 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -472,9 +482,9 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 	return nil
 }
 
-func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) error {
+func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client astro.Client) error {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -533,7 +543,7 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 	}
 
 	if len(deployments) == 1 {
-		fmt.Println("Only one deployment was found. Using the following Deployment by default: \n" +
+		fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
 			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
 
@@ -569,46 +579,41 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployment, error) {
+func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client) (astro.Deployment, error) {
 	deployments, err := getDeployments(ws, client)
 	if err != nil {
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
+	}
+
+	if deploymentID != "" && deploymentName != "" {
+		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used\n", deploymentID)
+	}
+	// find deployment by name
+	if deploymentID == "" && deploymentName != "" {
+		var stageDeployments []astro.Deployment
+		for i := range deployments {
+			if deployments[i].Label == deploymentName {
+				stageDeployments = append(stageDeployments, deployments[i])
+			}
+		}
+		if len(stageDeployments) > 1 {
+			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
+		}
+		if len(stageDeployments) == 1 {
+			return stageDeployments[0], nil
+		}
+		if len(stageDeployments) < 1 {
+			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
+		}
 	}
 
 	var currentDeployment astro.Deployment
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
-		if err != nil {
-			return astro.Deployment{}, err
-		}
-		if currentDeployment.ID == "" {
-			// get latest runtime veresion
-			airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
-			runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-
-			// walk user through creating a deployment
-			err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client, false)
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-
-			// get a new deployment list
-			deployments, err = getDeployments(ws, client)
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-			currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
-			if err != nil {
-				return astro.Deployment{}, err
-			}
-		}
-		return currentDeployment, nil
+		return deploymentSelectionProcess(ws, deployments, client)
 	}
+	// find deployment by ID
 	for i := range deployments {
 		if deployments[i].ID == deploymentID {
 			currentDeployment = deployments[i]
@@ -617,6 +622,38 @@ func GetDeployment(ws, deploymentID string, client astro.Client) (astro.Deployme
 	fmt.Println(currentDeployment.ID)
 	if currentDeployment.ID == "" {
 		return astro.Deployment{}, errInvalidDeployment
+	}
+	return currentDeployment, nil
+}
+
+func deploymentSelectionProcess(ws string, deployments []astro.Deployment, client astro.Client) (astro.Deployment, error) {
+	currentDeployment, err := selectDeployment(deployments, "Select a Deployment")
+	if err != nil {
+		return astro.Deployment{}, err
+	}
+	if currentDeployment.ID == "" {
+		// get latest runtime veresion
+		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		// walk user through creating a deployment
+		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client, false)
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		// get a new deployment list
+		deployments, err = getDeployments(ws, client)
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
 	}
 	return currentDeployment, nil
 }

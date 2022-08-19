@@ -77,8 +77,8 @@ func TestInit(t *testing.T) {
 		"requirements.txt",
 		".env",
 		"airflow_settings.yaml",
-		"dags/example-dag-basic.py",
-		"dags/example-dag-advanced.py",
+		"dags/example_dag_basic.py",
+		"dags/example_dag_advanced.py",
 		"README.md",
 	}
 	for _, file := range expectedFiles {

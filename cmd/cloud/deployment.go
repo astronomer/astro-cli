@@ -42,15 +42,15 @@ var (
 		`
 	deploymentVariableCreateExample = `
 		# Create a deployment variable
-		$ astro deployment variable create --deployment-id <deployment-id> --key FOO --value BAR --secret
+		$ astro deployment variable create FOO=BAR FOO2=BAR2 --deployment-id <deployment-id> --secret
 		# Create a deployment variables from a file
-		$ astro deployment variable create  --deployment-id <deployment-id> --load --env .env.my-deployment
+		$ astro deployment variable create --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 	deploymentVariableUpdateExample = `
 		# Update a deployment variable
-		$ astro deployment variable update --deployment-id <deployment-id> --key KEY --value NEWVALUE --secret
+		$ astro deployment variable update FOO=NEWBAR FOO2=NEWBAR2 --deployment-id <deployment-id> --secret
 		# Update a deployment variables from a file
-		$ astro deployment variable update  --deployment-id <deployment-id> --load --env .env.my-deployment
+		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 
 	httpClient = httputil.NewHTTPClient()
@@ -101,6 +101,7 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&errorLogs, "error", "e", false, "Show logs with a log level of 'error'")
 	cmd.Flags().BoolVarP(&infoLogs, "info", "i", false, "Show logs with a log level of 'info'")
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to show logs of")
 	return cmd
 }
 
@@ -132,13 +133,14 @@ func newDeploymentUpdateCmd() *cobra.Command {
 		Long:    "Update the configuration for an Astro Deployment. All flags are optional",
 		RunE:    deploymentUpdate,
 	}
-	cmd.Flags().StringVarP(&label, "name", "n", "", "The Deployment's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&label, "name", "n", "", "Update the Deployment's name. If the new name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace the Deployment is located in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().IntVarP(&updateWorkerAU, "worker-au", "a", 0, "The Deployment's Worker resources in AUs")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
 	return cmd
 }
 
@@ -151,6 +153,7 @@ func newDeploymentDeleteCmd() *cobra.Command {
 		RunE:    deploymentDelete,
 	}
 	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Force delete. Don't prompt a user before Deployment deletion")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to delete")
 	return cmd
 }
 
@@ -184,6 +187,7 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&variableKey, "key", "k", "", "Specify a key to find a specifc variable")
 	cmd.Flags().BoolVarP(&useEnvFile, "save", "s", false, "Save deployment variables to an environment file")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of the file to save environment variables to")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to list variables from")
 
 	return cmd
 }
@@ -191,10 +195,10 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 // nolint:dupl
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "create",
-		Short:   "Create Deployment-level environment variables",
-		Long:    "Create Deployment-level environment variables by supplying either a key and value or an environment file with a list of keys and values",
-		Args:    cobra.NoArgs,
+		Use:   "create [key1=val1 key2=val2]",
+		Short: "Create Deployment-level environment variables",
+		Long:  "Create Deployment-level environment variables by supplying either a key and value or an environment file with a list of keys and values",
+		// Args:    cobra.NoArgs,
 		Example: deploymentVariableCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableCreate(cmd, args, out)
@@ -206,6 +210,9 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Create environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set the new environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables from")
+	_ = cmd.Flags().MarkHidden("key")
+	_ = cmd.Flags().MarkHidden("value")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to create variables from")
 
 	return cmd
 }
@@ -213,10 +220,9 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 // nolint:dupl
 func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update",
+		Use:     "update [key1=update_val1 key2=update_val2]",
 		Short:   "Update Deployment-level environment variables",
 		Long:    "Update Deployment-level environment variables by supplying either a key and value or an environment file with a list of keys and values, variables that don't already exist will be created",
-		Args:    cobra.NoArgs,
 		Example: deploymentVariableUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableUpdate(cmd, args, out)
@@ -228,6 +234,9 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Update environment variables loaded from an environment file")
 	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set updated environment variables as secrets")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables to update from")
+	_ = cmd.Flags().MarkHidden("key")
+	_ = cmd.Flags().MarkHidden("value")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to update varibles from")
 
 	return cmd
 }
@@ -260,7 +269,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
-	return deployment.Logs(deploymentID, ws, warnLogs, errorLogs, infoLogs, logCount, astroClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, astroClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
@@ -300,7 +309,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, updateSchedulerAU, updateSchedulerReplicas, updateWorkerAU, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, updateWorkerAU, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -317,7 +326,7 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Delete(deploymentID, ws, forceDelete, astroClient)
+	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroClient)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -329,29 +338,33 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableList(deploymentID, variableKey, ws, envFile, useEnvFile, astroClient, out)
+	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroClient, out)
 }
 
-func deploymentVariableCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
+func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
+	variableList := args
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, useEnvFile, makeSecret, false, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroClient, out)
 }
 
-func deploymentVariableUpdate(cmd *cobra.Command, _ []string, out io.Writer) error {
+func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
+	variableList := args
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, useEnvFile, makeSecret, true, astroClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroClient, out)
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool, client astro.Client, out io.Writer) error {
+func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -21,7 +21,7 @@ func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool
 
 // this function modifies a deployment's environment variable object
 // it is used to create and update deployment's environment variables
-func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
+func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName string, variableList []string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -67,7 +67,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 
 	// add new variable from flag
 	if variableKey != "" && variableValue != "" {
-		newEnvironmentVariables = addVariableFromFlag(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret)
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableKey, variableValue, updateVars, makeSecret, out)
 	}
 	if variableValue == "" && variableKey != "" {
 		fmt.Fprintf(out, "Variable with key %s not created or updated\nYou must provide a variable value", variableKey)
@@ -99,7 +99,10 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 	if variableValue != "" && variableKey == "" {
 		fmt.Fprintf(out, "Variable with value %s not created or updated with flags\nYou must provide a variable key", variableValue)
 	}
-
+	// add new variables from list of variables provided through args
+	if len(variableList) > 0 {
+		newEnvironmentVariables = addVariablesFromArgs(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, variableList, updateVars, makeSecret, out)
+	}
 	// add new variables from file
 	if useEnvFile {
 		newEnvironmentVariables = addVariablesFromFile(envFile, oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, updateVars, makeSecret)
@@ -187,15 +190,15 @@ func writeVarToFile(environmentVariablesObjects []astro.EnvironmentVariablesObje
 	return nil
 }
 
-// Add variables from flag
-func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool) []astro.EnvironmentVariable {
+// Add variables
+func addVariable(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableKey, variableValue string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
 	var newEnvironmentVariable astro.EnvironmentVariable
 	exist, num := contains(oldKeyList, variableKey)
 	switch {
 	case exist && !updateVars: // don't update variable
-		fmt.Printf("key %s already exists, skipping creation. Use the update command to update existing variables", variableKey)
+		fmt.Fprintf(out, "key %s already exists, skipping creation. Use the update command to update existing variables\n", variableKey)
 	case exist && updateVars: // update variable
-		fmt.Printf("updating variable %s \n", variableKey)
+		fmt.Fprintf(out, "updating variable %s \n", variableKey)
 		secret := makeSecret
 		if !makeSecret { // you can only make variables secret a user can't make them not secret
 			secret = oldEnvironmentVariables[num].IsSecret
@@ -214,6 +217,29 @@ func addVariableFromFlag(oldKeyList []string, oldEnvironmentVariables []astro.En
 		}
 		newEnvironmentVariables = append(newEnvironmentVariables, newFileEnvironmentVariable)
 		fmt.Printf("adding variable %s\n", variableKey)
+	}
+	return newEnvironmentVariables
+}
+
+func addVariablesFromArgs(oldKeyList []string, oldEnvironmentVariables []astro.EnvironmentVariablesObject, newEnvironmentVariables []astro.EnvironmentVariable, variableList []string, updateVars, makeSecret bool, out io.Writer) []astro.EnvironmentVariable {
+	var key string
+	var val string
+	// validate each key-value pair and add it to the new variables list
+	for i := range variableList {
+		// split pair
+		pair := strings.Split(variableList[i], "=")
+		if len(pair) > 1 {
+			key = pair[0]
+			val = pair[1]
+			if key == "" || val == "" {
+				fmt.Printf("Input %s has blank key or value\n", variableList[i])
+				continue
+			}
+		} else {
+			fmt.Printf("Input %s is not a valid key value pair, should be of the form key=value\n", variableList[i])
+			continue
+		}
+		newEnvironmentVariables = addVariable(oldKeyList, oldEnvironmentVariables, newEnvironmentVariables, key, val, updateVars, makeSecret, out)
 	}
 	return newEnvironmentVariables
 }

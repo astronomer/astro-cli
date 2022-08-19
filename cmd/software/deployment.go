@@ -98,6 +98,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentSaRootCmd(out),
 		newDeploymentUserRootCmd(out),
 		newDeploymentAirflowRootCmd(out),
+		newDeploymentTeamRootCmd(out),
 	)
 
 	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
