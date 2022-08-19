@@ -229,10 +229,23 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	if waitForStatus {
 		err = healthPoll(d.ID, workspaceID, client)
 		if err != nil {
+			err = createOutput(organizationID, workspaceID, d)
+			if err != nil {
+				return err
+			}
 			return err
 		}
 	}
 
+	err = createOutput(organizationID, workspaceID, d)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createOutput(organizationID, workspaceID string, d astro.Deployment) error {
 	tab := newTableOut()
 
 	currentTag := d.DeploymentSpec.Image.Tag
