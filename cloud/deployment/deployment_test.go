@@ -49,29 +49,144 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		_, err := GetDeployment(ws, deploymentID, mockClient)
+		_, err := GetDeployment(ws, deploymentID, "", mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
-
+	deploymentName := "test-wrong"
 	deploymentID = "test-id"
+	t.Run("auto select after invalid deployment Name", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
+
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentID, deployment.ID)
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("correct deployment ID", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		deployment, err := GetDeployment(ws, deploymentID, mockClient)
+		deployment, err := GetDeployment(ws, deploymentID, "", mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentID, deployment.ID)
+		mockClient.AssertExpectations(t)
+	})
+	deploymentName = "test"
+	t.Run("correct deployment Name", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{Label: "test"}}, nil).Once()
+
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentName, deployment.Label)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("two deployments with the same name", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{Label: "test", ID: "test-id"}, {Label: "test", ID: "test-id2"}}, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, deploymentName, deployment.Label)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("deployment name and deployment id", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+
+		deployment, err := GetDeployment(ws, deploymentID, deploymentName, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("test automatic deployment selection", func(t *testing.T) {
+	t.Run("bad deployment call", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		deployment, err := GetDeployment(ws, "", mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentID, deployment.ID)
+		_, err := GetDeployment(ws, deploymentID, "", mockClient)
+		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("create deployment error", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, nil).Once()
+
+		// mock createDeployment
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client) error {
+			return errMock
+		}
+
+		// mock os.Stdin
+		input := []byte("y")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		_, err = GetDeployment(ws, "", "", mockClient)
+		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("get deployments after creation error", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, nil).Once()
+
+		// mock createDeployment
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client) error {
+			return nil
+		}
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, errMock).Once()
+		// mock os.Stdin
+		input := []byte("y")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		_, err = GetDeployment(ws, "", "", mockClient)
+		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -99,7 +214,7 @@ func TestGetDeployment(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		deployment, err := GetDeployment(ws, "", mockClient)
+		deployment, err := GetDeployment(ws, "", "", mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -123,7 +238,7 @@ func TestLogs(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 
-		err := Logs(deploymentID, ws, true, true, true, logCount, mockClient)
+		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockClient)
 		assert.NoError(t, err)
 
 		mockClient.AssertExpectations(t)
@@ -150,7 +265,7 @@ func TestLogs(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Logs("", ws, false, false, false, logCount, mockClient)
+		err = Logs("", ws, "", false, false, false, logCount, mockClient)
 		assert.NoError(t, err)
 
 		mockClient.AssertExpectations(t)
@@ -161,7 +276,7 @@ func TestLogs(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{}, errMock).Once()
 
-		err := Logs(deploymentID, ws, true, true, true, logCount, mockClient)
+		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -179,6 +294,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("test-name")
@@ -363,7 +479,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", 0, 0, 0, false, mockClient)
+		err = Update("test-id", "", ws, "", "", 0, 0, 0, false, mockClient)
 		assert.NoError(t, err)
 
 		// mock os.Stdin
@@ -382,7 +498,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -391,7 +507,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err := Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -416,10 +532,10 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 
-		err = Update("test-invalid-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("test-invalid-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -444,7 +560,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", 5, 3, 10, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", 5, 3, 10, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -454,7 +570,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "", ws, "", 0, 0, 0, true, mockClient)
+		err := Update("test-id", "", ws, "", "", 0, 0, 0, true, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -491,7 +607,7 @@ func TestDelete(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Delete("test-id", ws, false, mockClient)
+		err = Delete("test-id", ws, "", false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -500,7 +616,7 @@ func TestDelete(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
-		err := Delete("test-id", ws, false, mockClient)
+		err := Delete("test-id", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -525,10 +641,10 @@ func TestDelete(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Delete("", ws, false, mockClient)
+		err = Delete("", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 
-		err = Delete("test-invalid-id", ws, false, mockClient)
+		err = Delete("test-invalid-id", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -553,7 +669,7 @@ func TestDelete(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Delete("test-id", ws, false, mockClient)
+		err = Delete("test-id", ws, "", false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -563,7 +679,7 @@ func TestDelete(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("DeleteDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
-		err := Delete("test-id", ws, true, mockClient)
+		err := Delete("test-id", ws, "", true, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
