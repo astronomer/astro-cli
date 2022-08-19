@@ -352,7 +352,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
 			return errTimedOut
-		// Got a tick, we should check if docker is up & running
+		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
 			deployments, err := getDeployments(ws, client)
