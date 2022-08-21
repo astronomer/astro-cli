@@ -28,6 +28,7 @@ var (
 	warnLogs                      bool
 	errorLogs                     bool
 	infoLogs                      bool
+	waitForStatus                 bool
 	logCount                      = 500
 	variableKey                   string
 	variableValue                 string
@@ -120,6 +121,7 @@ func newDeploymentCreateCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().IntVarP(&workerAU, "worker-au", "a", deployment.WorkerAuMin, "The Deployment's Worker resources in AUs")
+	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	return cmd
 }
 
@@ -289,7 +291,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, schedulerAU, schedulerReplicas, workerAU, astroClient)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, schedulerAU, schedulerReplicas, workerAU, astroClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {

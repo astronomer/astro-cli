@@ -1,11 +1,13 @@
 package deployment
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strconv"
+	"time"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -21,6 +23,7 @@ import (
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 	// Monkey patched to write unit tests
 	createDeployment = Create
@@ -38,6 +41,9 @@ var (
 	schedulerAuMax       = 30
 	workerAuMax          = 175
 	schedulerReplicasMax = 4
+	sleepTime            = 180
+	tickNum              = 10
+	timeoutNum           = 180
 )
 
 func newTableOut() *printutil.Table {
@@ -128,7 +134,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	// validate resources requests
@@ -220,6 +226,26 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
+	if waitForStatus {
+		err = healthPoll(d.ID, workspaceID, client)
+		if err != nil {
+			errOutput := createOutput(organizationID, workspaceID, &d)
+			if errOutput != nil {
+				return errOutput
+			}
+			return err
+		}
+	}
+
+	err = createOutput(organizationID, workspaceID, &d)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createOutput(organizationID, workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	currentTag := d.DeploymentSpec.Image.Tag
@@ -336,6 +362,40 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		return "", errors.New("unable to find specified Cluster")
 	}
 	return clusterID, nil
+}
+
+func healthPoll(deploymentID, ws string, client astro.Client) error {
+	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+	time.Sleep(time.Duration(sleepTime) * time.Second)
+	buf := new(bytes.Buffer)
+	timeout := time.After(time.Duration(timeoutNum) * time.Second)
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeout:
+			return errTimedOut
+		// Got a tick, we should check if deployment is healthy
+		case <-ticker.C:
+			buf.Reset()
+			deployments, err := getDeployments(ws, client)
+			if err != nil {
+				return err
+			}
+
+			var currentDeployment astro.Deployment
+			for i := range deployments {
+				if deployments[i].ID == deploymentID {
+					currentDeployment = deployments[i]
+				}
+			}
+			if currentDeployment.Status == "HEALTHY" {
+				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
+				return nil
+			}
+			continue
+		}
+	}
 }
 
 func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
@@ -593,7 +653,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client)
+		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
