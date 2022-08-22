@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	houstonClient houston.ClientInterface
 	verboseLevel  string
+	houstonClient houston.ClientInterface
 )
 
 const (
