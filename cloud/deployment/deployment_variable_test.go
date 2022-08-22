@@ -36,12 +36,12 @@ func TestVariableList(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "", false, mockClient, buf)
+		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-value-1")
 
-		err = VariableList("test-id-1", "", ws, "", false, mockClient, buf)
+		err = VariableList("test-id-1", "", ws, "", "", false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-value-1")
@@ -53,7 +53,7 @@ func TestVariableList(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-invalid-id", "test-key-1", ws, "", false, mockClient, buf)
+		err := VariableList("test-invalid-id", "test-key-1", ws, "", "", false, mockClient, buf)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		// mock os.Stdin
@@ -72,7 +72,7 @@ func TestVariableList(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = VariableList("", "test-key-1", ws, "", false, mockClient, buf)
+		err = VariableList("", "test-key-1", ws, "", "", false, mockClient, buf)
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
@@ -82,7 +82,7 @@ func TestVariableList(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-invalid-key", ws, "", false, mockClient, buf)
+		err := VariableList("test-id-1", "test-invalid-key", ws, "", "", false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "No variables found")
 		mockClient.AssertExpectations(t)
@@ -93,7 +93,7 @@ func TestVariableList(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "", false, mockClient, buf)
+		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -103,7 +103,7 @@ func TestVariableList(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "\000x", true, mockClient, buf)
+		err := VariableList("test-id-1", "test-key-1", ws, "\000x", "", true, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "unable to write environment variables to file")
 	})
@@ -145,7 +145,7 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", []string{}, true, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, true, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-key-2")
@@ -159,7 +159,7 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", []string{}, false, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -169,7 +169,7 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", []string{}, false, false, false, mockClient, buf)
+		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		// mock os.Stdin
@@ -188,7 +188,7 @@ func TestVariableModify(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = VariableModify("", "test-key-2", "test-value-2", ws, "", []string{}, false, false, false, mockClient, buf)
+		err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.ErrorIs(t, err, errInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
@@ -199,12 +199,12 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "", "test-value-2", ws, "", []string{}, false, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable key")
 
 		buf = new(bytes.Buffer)
-		err = VariableModify("test-id-1", "test-key-2", "", ws, "", []string{}, false, false, false, mockClient, buf)
+		err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable value")
 		mockClient.AssertExpectations(t)
@@ -216,7 +216,7 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", []string{}, false, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -227,7 +227,7 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-2", "", "", ws, "", []string{}, false, false, false, mockClient, buf)
+		err := VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "No variables for this Deployment")
 	})

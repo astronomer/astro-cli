@@ -132,7 +132,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt, dags bool, client astro.Client) error {
+func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error {
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -149,7 +149,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 		domain = splitDomain[1]
 	}
 
-	deployInfo, err := getDeploymentInfo(deploymentID, wsID, prompt, domain, client)
+	deployInfo, err := getDeploymentInfo(deploymentID, wsID, deploymentName, prompt, domain, client)
 	if err != nil {
 		return err
 	}
@@ -219,15 +219,22 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 	return nil
 }
 
-func getDeploymentInfo(deploymentID, wsID string, prompt bool, cloudDomain string, client astro.Client) (deploymentInfo, error) {
+func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, cloudDomain string, client astro.Client) (deploymentInfo, error) {
 	// Use config deployment if provided
 	if deploymentID == "" {
 		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
+		if deploymentID != "" {
+			fmt.Printf("Deployment ID found in the config file. This Deployment ID will be used for the deploy\n")
+		}
+	}
+
+	if deploymentID != "" && deploymentName != "" {
+		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used for the Deploy\n", deploymentID)
 	}
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, client)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
 		if err != nil {
 			return deploymentInfo{}, err
 		}

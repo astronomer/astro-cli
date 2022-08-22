@@ -23,6 +23,7 @@ var (
 				id
 			}
 			createdAt
+			status
 			runtimeRelease {
 				version
 				airflowVersion
