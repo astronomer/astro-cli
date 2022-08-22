@@ -82,7 +82,7 @@ func (c *HTTPClient) UpdateDeployment(input *DeploymentUpdateInput) (Deployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
@@ -95,7 +95,7 @@ func (c *HTTPClient) ListDeployments(input DeploymentsInput) ([]Deployment, erro
 		Variables: map[string]interface{}{"deploymentsInput": input},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return []Deployment{}, err
 	}
@@ -108,7 +108,7 @@ func (c *HTTPClient) DeleteDeployment(input DeploymentDeleteInput) (Deployment, 
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
@@ -121,7 +121,7 @@ func (c *HTTPClient) GetDeploymentHistory(vars map[string]interface{}) (Deployme
 		Variables: vars,
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return DeploymentHistory{}, err
 	}
@@ -133,7 +133,7 @@ func (c *HTTPClient) GetDeploymentConfig() (DeploymentConfig, error) {
 		Query: GetDeploymentConfigOptions,
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return DeploymentConfig{}, err
 	}
@@ -146,7 +146,7 @@ func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) (
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return []EnvironmentVariablesObject{}, err
 	}
@@ -185,7 +185,7 @@ func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
 		Variables: map[string]interface{}{"imageCreateInput": input},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
 		Variables: map[string]interface{}{"imageDeployInput": input},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *HTTPClient) ListInternalRuntimeReleases() ([]RuntimeRelease, error) {
 		Variables: map[string]interface{}{"channel": ""},
 	}
 
-	resp, err := req.DoWithPublicClient(c)
+	resp, err := req.DoWithClient(c)
 	if err != nil {
 		return []RuntimeRelease{}, err
 	}
