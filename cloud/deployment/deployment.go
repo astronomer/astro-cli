@@ -262,6 +262,11 @@ func createOutput(organizationID, workspaceID string, d *astro.Deployment) error
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
 	deploymentURL := "cloud." + c.Domain + "/" + organizationID + "/deployments/" + d.ID
 
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully created Deployment: %s", ansi.Bold(d.Label)) +
