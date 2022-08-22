@@ -124,7 +124,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -151,7 +151,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 
 	t.Run("list workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{}, errMock).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
 		_, err := getWorkspaceSelection(mockClient, buf)
@@ -161,7 +161,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 
 	t.Run("invalid selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -187,8 +187,6 @@ func TestGetWorkspaceSelection(t *testing.T) {
 
 	t.Run("get current context failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Once()
-
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
@@ -211,7 +209,7 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := Switch("test-id-1", mockClient, buf)
@@ -222,7 +220,7 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("list workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{}, errMock).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
 		err := Switch("test-id-1", mockClient, buf)
@@ -232,7 +230,7 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("success with selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Twice()
+		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Twice()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -259,7 +257,7 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("failure with invalid selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return(mockResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -285,7 +283,6 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("failure to get current context", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces").Return(mockResponse, nil).Once()
 
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)

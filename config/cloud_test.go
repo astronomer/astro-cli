@@ -15,11 +15,13 @@ context: test_com
 contexts:
   example_com:
     domain: example.com
+    organization: test-org-id
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
   test_com:
     domain: test.com
+    organization: test-org-id
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v

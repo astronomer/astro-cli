@@ -78,7 +78,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 	}
 
 	return tab.Print(out)
@@ -137,6 +137,12 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
 	// validate resources requests
 	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
 	if !resourcesValid {
@@ -153,7 +159,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	}
 
 	// validate workspace
-	ws, err := client.ListWorkspaces()
+	ws, err := client.ListWorkspaces(c.Organization)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -211,9 +217,9 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		Scheduler: scheduler,
 	}
 
-	createInput := &astro.DeploymentCreateInput{
+	createInput := &astro.CreateDeploymentInput{
 		WorkspaceID:           workspaceID,
-		OrchestratorID:        clusterID,
+		ClusterID:             clusterID,
 		Label:                 label,
 		Description:           description,
 		RuntimeReleaseVersion: runtimeVersion,
@@ -254,7 +260,7 @@ func createOutput(organizationID, workspaceID string, d *astro.Deployment) error
 	}
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -450,7 +456,7 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 
 	deploymentUpdate := &astro.DeploymentUpdateInput{
 		ID:             currentDeployment.ID,
-		OrchestratorID: currentDeployment.Orchestrator.ID,
+		ClusterID:      currentDeployment.Cluster.ID,
 		DeploymentSpec: spec,
 	}
 	if label != "" {
@@ -489,7 +495,7 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 	tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 	tabDeployment.Print(os.Stdout)
 	return nil

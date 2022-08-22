@@ -59,6 +59,7 @@ contexts:
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
+    organization: test-org-id
 `
 	switch platform {
 	case CloudPlatform:

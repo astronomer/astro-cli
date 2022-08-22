@@ -291,7 +291,7 @@ func TestCreate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -320,7 +320,7 @@ func TestCreate(t *testing.T) {
 	t.Run("success and wait for status", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Twice()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Twice()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Twice()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Twice()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 
@@ -390,7 +390,7 @@ func TestCreate(t *testing.T) {
 	t.Run("list workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{}, errMock).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", 10, 3, 15, mockClient, false)
 		assert.ErrorIs(t, err, errMock)
@@ -400,7 +400,7 @@ func TestCreate(t *testing.T) {
 	t.Run("invalid workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
-		mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 
 		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", 10, 3, 15, mockClient, false)
 		assert.Error(t, err)
