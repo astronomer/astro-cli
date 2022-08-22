@@ -66,9 +66,12 @@ type deploymentInfo struct {
 	webserverURL   string
 }
 
-func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Client) error {
-	fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-	dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
+func deployDags(path, domain, airflowID string, deployInfo *deploymentInfo, client astro.Client) error {
+	if airflowID == "" {
+		airflowID = deployInfo.deploymentID
+	}
+	fmt.Println("Initiating DAG Deployment for: " + airflowID)
+	dagDeployment, err := deployment.Initiate(airflowID, client)
 	if err != nil {
 		return err
 	}
@@ -106,17 +109,19 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		status = "FAILED"
 	}
 
-	_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionID, status, message, client)
+	_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, airflowID, action, versionID, status, message, client)
 	if err != nil {
 		return err
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+	fmt.Println("Successfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.");
 
-	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
-		"\n\nDeployment can be accessed at the following URLs: \n" +
-		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
+	// deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+
+	// fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+	// 	"\n\nDeployment can be accessed at the following URLs: \n" +
+	// 	fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+	// 	fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 
 	// Delete the tar file
 	defer func() {
@@ -132,7 +137,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt, dags bool, client astro.Client) error {
+func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt, dags bool, vrID string, client astro.Client) error {
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -149,13 +154,16 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName string, prompt,
 		domain = splitDomain[1]
 	}
 
-	deployInfo, err := getDeploymentInfo(deploymentID, wsID, prompt, domain, client)
-	if err != nil {
-		return err
+	var deployInfo deploymentInfo
+	if vrID == "" {
+		deployInfo, err = getDeploymentInfo(deploymentID, wsID, prompt, domain, client)
+		if err != nil {
+			return err
+		}		
 	}
 
 	if dags {
-		err = deployDags(path, domain, &deployInfo, client)
+		err = deployDags(path, domain, vrID, &deployInfo, client)
 		if err != nil {
 			return err
 		}
