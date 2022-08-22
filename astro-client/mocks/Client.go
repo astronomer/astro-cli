@@ -364,8 +364,8 @@ func (_m *Client) ReportDagDeploymentStatus(input *astro.ReportDagDeploymentStat
 	return r0, r1
 }
 
-// SelfUser provides a mock function with given fields:
-func (_m *Client) SelfUser() (*astro.Self, error) {
+// GetUserInfo provides a mock function with given fields:
+func (_m *Client) GetUserInfo() (*astro.Self, error) {
 	ret := _m.Called()
 
 	var r0 *astro.Self

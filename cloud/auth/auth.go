@@ -299,7 +299,7 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 // checkToken requests a users rolebindings and sets the workspace to make sure that token works
 // TODO check orgID is in the token
 func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
-	self, err := client.SelfUser()
+	self, err := client.GetUserInfo()
 	if err != nil {
 		return err
 	}

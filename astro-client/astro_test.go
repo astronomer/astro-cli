@@ -59,7 +59,7 @@ func TestSelfQuery(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		roleBindings, err := astroClient.SelfUser()
+		roleBindings, err := astroClient.GetUserInfo()
 		assert.NoError(t, err)
 		assert.Equal(t, roleBindings, mockResponse.Data.SelfQuery)
 	})
@@ -74,7 +74,7 @@ func TestSelfQuery(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.SelfUser()
+		_, err := astroClient.GetUserInfo()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 
@@ -87,7 +87,7 @@ func TestSelfQuery(t *testing.T) {
 			}
 		})
 		astroClient := NewAstroClient(client)
-		_, err := astroClient.SelfUser()
+		_, err := astroClient.GetUserInfo()
 		assert.Contains(t, err.Error(), "something went wrong! Try again or contact Astronomer Support")
 	})
 }
