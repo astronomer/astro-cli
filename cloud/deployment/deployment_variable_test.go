@@ -266,6 +266,13 @@ func TestAddVariableFromFile(t *testing.T) {
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, false, false)
 
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
+
+	resp = addVariablesFromFile(
+		"./testfiles/test-env-file-wrong", []string{"test-key-1"},
+		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-2"}},
+		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, false, false)
+
+	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
 }
 
 func TestWriteVarToFile(t *testing.T) {
