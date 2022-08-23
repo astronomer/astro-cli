@@ -1,10 +1,14 @@
 package houston
 
 import (
+	"errors"
 	"sort"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 )
+
+var errGraphQLQueryNotDefined = errors.New("GraphQL query not defined for the given Platform version")
 
 type queryByVersion struct {
 	version string
@@ -31,22 +35,14 @@ func (s queryList) GreatestLowerBound(v string) string {
 	if !sort.IsSorted(s) {
 		sort.Sort(s)
 	}
-
 	v = sanitiseVersionString(v)
-	var prevQuery string
-	for idx := range s {
+	for idx := len(s) - 1; idx >= 0; idx-- {
 		idxVersion := sanitiseVersionString(s[idx].version)
 		cmp := semver.Compare(v, idxVersion)
-		if cmp == 0 {
+		if cmp >= 0 {
 			return s[idx].query
-		} else if cmp > 0 {
-			if prevQuery != "" {
-				return prevQuery
-			} else {
-				return s[idx].query
-			}
 		}
-		prevQuery = s[idx].query
 	}
+	logrus.Debugf("GraphQL query not defined for the given Platform version: %s, fallbacking to latest query", v)
 	return s[len(s)-1].query
 }

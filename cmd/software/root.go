@@ -32,8 +32,10 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	}
-	houstonVersion = appConfig.Version
-	houston.Version = houstonVersion // updating version in houston package to avoid extra houston call
+	if appConfig != nil {
+		houstonVersion = appConfig.Version
+		houston.SetVersion(houstonVersion) // updating version in houston package to avoid extra houston call
+	}
 
 	return []*cobra.Command{
 		newDeploymentRootCmd(out),

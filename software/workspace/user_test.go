@@ -44,7 +44,7 @@ func TestAdd(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("AddWorkspaceUser", id, email, role).Return(mockWsUserResponse, nil)
+	api.On("AddWorkspaceUser", houston.AddWorkspaceUserRequest{WorkspaceID: id, Email: email, Role: role}).Return(mockWsUserResponse, nil)
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
@@ -65,7 +65,7 @@ func TestAddError(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("AddWorkspaceUser", id, email, role).Return(nil, errMock)
+	api.On("AddWorkspaceUser", houston.AddWorkspaceUserRequest{WorkspaceID: id, Email: email, Role: role}).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
@@ -80,7 +80,7 @@ func TestRemove(t *testing.T) {
 	userID := "ckc0eir8e01gj07608ajmvia1"
 
 	api := new(mocks.ClientInterface)
-	api.On("DeleteWorkspaceUser", id, mockWsUserResponse.ID).Return(mockWsUserResponse, nil)
+	api.On("DeleteWorkspaceUser", houston.DeleteWorkspaceUserRequest{WorkspaceID: id, UserID: mockWsUserResponse.ID}).Return(mockWsUserResponse, nil)
 
 	buf := new(bytes.Buffer)
 	err := Remove(id, userID, api, buf)
@@ -100,7 +100,7 @@ func TestRemoveError(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("DeleteWorkspaceUser", id, email).Return(nil, errMock)
+	api.On("DeleteWorkspaceUser", houston.DeleteWorkspaceUserRequest{WorkspaceID: id, UserID: email}).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := Remove(id, email, api, buf)
@@ -218,7 +218,7 @@ func TestPaginatedListRoles(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: paginationPageSize}).Return(mockResponse, nil)
 
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
@@ -269,7 +269,7 @@ func TestPaginatedListRoles(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: paginationPageSize}).Return(mockResponse, nil)
 
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
@@ -303,7 +303,7 @@ func TestPaginatedListRoles(t *testing.T) {
 		mockResponse := []houston.WorkspaceUserRoleBindings{}
 
 		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: paginationPageSize}).Return(mockResponse, nil)
 
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
@@ -336,7 +336,7 @@ func TestPaginatedListRoles(t *testing.T) {
 		mockResponse := []houston.WorkspaceUserRoleBindings{}
 
 		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(mockResponse, nil)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: paginationPageSize}).Return(mockResponse, nil)
 
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
@@ -371,7 +371,7 @@ func TestPaginatedListRolesError(t *testing.T) {
 	var paginationPageSize float64 = 100
 
 	api := new(mocks.ClientInterface)
-	api.On("ListWorkspacePaginatedUserAndRoles", wsID, "", paginationPageSize).Return(nil, errMock)
+	api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: paginationPageSize}).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
@@ -413,8 +413,8 @@ func TestUpdateRole(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
-	api.On("UpdateWorkspaceUserRole", id, email, role).Return(role, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
+	api.On("UpdateWorkspaceUserRole", houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: role}).Return(role, nil)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
@@ -432,7 +432,7 @@ func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
@@ -448,7 +448,7 @@ func TestUpdateRoleErrorGetRoles(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", id, email).Return(houston.WorkspaceUserRoleBindings{}, errMock)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(houston.WorkspaceUserRoleBindings{}, errMock)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
@@ -464,8 +464,8 @@ func TestUpdateRoleError(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
-	api.On("UpdateWorkspaceUserRole", id, email, role).Return("", errMock)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
+	api.On("UpdateWorkspaceUserRole", houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: role}).Return("", errMock)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
@@ -483,7 +483,7 @@ func TestUpdateRoleNoAccess(t *testing.T) {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", id, email).Return(mockRoles, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)

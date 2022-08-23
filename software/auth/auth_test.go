@@ -237,7 +237,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
 
 		out := &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
@@ -248,7 +248,7 @@ func TestLoginSuccess(t *testing.T) {
 			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
 		}
 
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
 		out = &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
 			t.Errorf("Login() error = %v, wantErr %v", err, false)
@@ -274,7 +274,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
 		switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
 			return false
 		}
@@ -288,8 +288,8 @@ func TestLoginSuccess(t *testing.T) {
 			t.Errorf("Login() = %v, want %v", gotOut, []string{"localhost"})
 		}
 
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
-		houstonMock.On("PaginatedListWorkspaces", 100, 0).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 100, PageNumber: 0}).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Once()
 		houstonMock.On("GetWorkspace", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
 
 		out = &bytes.Buffer{}
@@ -329,7 +329,7 @@ func TestLoginFailure(t *testing.T) {
 	t.Run("AuthenticateWithBasicAuth failure", func(t *testing.T) {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
-		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return("", errMockRegistry)
+		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 		out := &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); !errors.Is(err, errMockRegistry) {
@@ -346,7 +346,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{}, errMockRegistry).Once()
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{}, errMockRegistry).Once()
 
 		out := &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); !errors.Is(err, errMockRegistry) {
@@ -362,8 +362,8 @@ func TestLoginFailure(t *testing.T) {
 	t.Run("no workspace failure", func(t *testing.T) {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
-		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil)
+		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return(mockToken, nil)
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil)
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		out := &bytes.Buffer{}
@@ -381,7 +381,7 @@ func TestLoginFailure(t *testing.T) {
 		houstonMock := new(houstonMocks.ClientInterface)
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
-		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		mockRegistryHandler := new(mocks.RegistryHandler)
@@ -472,7 +472,7 @@ func TestGetAuthTokenSuccess(t *testing.T) {
 	config.InitConfig(fs)
 
 	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
+	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return(mockToken, nil)
 
 	type args struct {
 		username   string
@@ -529,7 +529,7 @@ func TestGetAuthTokenFailure(t *testing.T) {
 	assert.Equal(t, got, "")
 
 	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return("", errMockRegistry)
+	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return("", errMockRegistry)
 
 	_, err = getAuthToken("test", "test", &houston.AuthConfig{LocalEnabled: true}, &config.Context{Domain: "localhost"}, houstonMock)
 	if !errors.Is(err, errMockRegistry) {

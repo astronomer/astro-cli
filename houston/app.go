@@ -79,8 +79,7 @@ func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 		return appConfig, appConfigErr
 	}
 
-	reqQuery := AppConfigRequest.GreatestLowerBound(Version)
-
+	reqQuery := AppConfigRequest.GreatestLowerBound(version)
 	req := Request{
 		Query: reqQuery,
 	}

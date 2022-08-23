@@ -15,7 +15,7 @@ var errMockHouston = errors.New("some houston error")
 
 func TestCreateSuccess(t *testing.T) {
 	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("CreateUser", mock.Anything, mock.Anything).Return(&houston.AuthUser{}, nil)
+	houstonMock.On("CreateUser", mock.Anything).Return(&houston.AuthUser{}, nil)
 
 	type args struct {
 		email    string
@@ -57,7 +57,7 @@ func TestCreateSuccess(t *testing.T) {
 
 func TestCreateFailure(t *testing.T) {
 	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("CreateUser", mock.Anything, mock.Anything).Return(nil, errMockHouston)
+	houstonMock.On("CreateUser", mock.Anything).Return(nil, errMockHouston)
 
 	out := &bytes.Buffer{}
 	if err := Create("test@test.com", "test", houstonMock, out); !errors.Is(err, errUserCreationDisabled) {
@@ -70,7 +70,7 @@ func TestCreateFailure(t *testing.T) {
 
 func TestCreatePending(t *testing.T) {
 	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("CreateUser", mock.Anything, mock.Anything).Return(&houston.AuthUser{User: houston.User{Status: "pending"}}, nil)
+	houstonMock.On("CreateUser", mock.Anything).Return(&houston.AuthUser{User: houston.User{Status: "pending"}}, nil)
 
 	out := &bytes.Buffer{}
 	if err := Create("test@test.com", "test", houstonMock, out); err != nil {

@@ -46,7 +46,7 @@ func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, clien
 		Category:    category,
 		Role:        role,
 	}
-	sa, err := houston.Call(client.CreateDeploymentServiceAccount, request)
+	sa, err := houston.Call(client.CreateWorkspaceServiceAccount, request)
 	if err != nil {
 		return err
 	}

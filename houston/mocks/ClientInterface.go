@@ -1016,52 +1016,6 @@ func (_m *ClientInterface) RemoveDeploymentTeam(req houston.RemoveDeploymentTeam
 	return r0, r1
 }
 
-// PaginatedListWorkspaces provides a mock function with given fields: pageSize, pageNumber
-func (_m *ClientInterface) PaginatedListWorkspaces(pageSize int, pageNumber int) ([]houston.Workspace, error) {
-	ret := _m.Called(pageSize, pageNumber)
-
-	var r0 []houston.Workspace
-	if rf, ok := ret.Get(0).(func(int, int) []houston.Workspace); ok {
-		r0 = rf(pageSize, pageNumber)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]houston.Workspace)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(int, int) error); ok {
-		r1 = rf(pageSize, pageNumber)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// RemoveDeploymentTeam provides a mock function with given fields: deploymentID, teamID
-func (_m *ClientInterface) RemoveDeploymentTeam(deploymentID string, teamID string) (*houston.RoleBinding, error) {
-	ret := _m.Called(deploymentID, teamID)
-
-	var r0 *houston.RoleBinding
-	if rf, ok := ret.Get(0).(func(string, string) *houston.RoleBinding); ok {
-		r0 = rf(deploymentID, teamID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*houston.RoleBinding)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(deploymentID, teamID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // UpdateDeployment provides a mock function with given fields: variables
 func (_m *ClientInterface) UpdateDeployment(variables map[string]interface{}) (*houston.Deployment, error) {
 	ret := _m.Called(variables)

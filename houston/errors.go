@@ -1,14 +1,17 @@
 package houston
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
 
-var (
-	ErrMethodNotImplemented = errors.New("method not implemented for the given Houston version")
-)
+type ErrMethodNotImplemented struct {
+	MethodName string
+}
+
+func (e ErrMethodNotImplemented) Error() string {
+	return fmt.Sprintf("%s method not implemented for the given Houston version", e.MethodName)
+}
 
 type ErrFieldsNotAvailable struct {
 	BaseError error

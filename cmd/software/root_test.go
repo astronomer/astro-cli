@@ -21,7 +21,7 @@ func TestAddCmds(t *testing.T) {
 		},
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig").Return(appConfig, nil)
+	houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
@@ -32,7 +32,7 @@ func TestAddCmds(t *testing.T) {
 
 func TestAppConfigFailure(t *testing.T) {
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig").Return(nil, errMock)
+	houstonMock.On("GetAppConfig", nil).Return(nil, errMock)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {

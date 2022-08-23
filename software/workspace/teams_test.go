@@ -12,7 +12,7 @@ import (
 func TestAddTeam(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("AddWorkspaceTeam", "workspace-id", "team-id", "role").Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
+		mock.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role"}).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("workspace-id", "team-id", "role", mock, buf)
@@ -25,7 +25,7 @@ func TestAddTeam(t *testing.T) {
 
 	t.Run("houston failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("AddWorkspaceTeam", "workspace-id", "team-id", "role").Return(nil, errMock)
+		mock.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("workspace-id", "team-id", "role", mock, buf)
@@ -38,7 +38,7 @@ func TestAddTeam(t *testing.T) {
 func TestRemoveTeam(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("DeleteWorkspaceTeam", "workspace-id", "team-id").Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
+		mock.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("workspace-id", "team-id", mock, buf)
@@ -51,7 +51,7 @@ func TestRemoveTeam(t *testing.T) {
 
 	t.Run("houston failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("DeleteWorkspaceTeam", "workspace-id", "team-id").Return(nil, errMock)
+		mock.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("workspace-id", "team-id", mock, buf)
@@ -95,8 +95,8 @@ func TestListTeamRoles(t *testing.T) {
 func TestUpdateTeamRole(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", "workspace-id", "team-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
-		mock.On("UpdateWorkspaceTeamRole", "workspace-id", "team-id", "role-id").Return("role-id", nil)
+		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
+		mock.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role-id"}).Return("role-id", nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
@@ -109,7 +109,7 @@ func TestUpdateTeamRole(t *testing.T) {
 
 	t.Run("teams not in workspace", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", "workspace-id", "team-id").Return(nil, nil)
+		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
@@ -120,7 +120,7 @@ func TestUpdateTeamRole(t *testing.T) {
 
 	t.Run("GetWorkspaceTeamRole failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", "workspace-id", "team-id").Return(nil, errMock)
+		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
@@ -131,7 +131,7 @@ func TestUpdateTeamRole(t *testing.T) {
 
 	t.Run("rolebinding not present", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", "workspace-id", "team-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{}}, nil)
+		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{}}, nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
@@ -142,8 +142,8 @@ func TestUpdateTeamRole(t *testing.T) {
 
 	t.Run("UpdateWorkspaceTeamRole failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", "workspace-id", "team-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
-		mock.On("UpdateWorkspaceTeamRole", "workspace-id", "team-id", "role-id").Return("", errMock)
+		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
+		mock.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role-id"}).Return("", errMock)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)

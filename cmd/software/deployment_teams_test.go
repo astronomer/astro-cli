@@ -41,8 +41,8 @@ Successfully added team cl0evnxfl0120dxxu1s4nbnk7 to deployment cknz133ra49758zr
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("AddDeploymentTeam", mockDeployment.ID, mockDeploymentTeamRole.Team.ID, mockDeploymentTeamRole.Role).Return(mockDeploymentTeamRole, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("AddDeploymentTeam", houston.AddDeploymentTeamRequest{DeploymentID: mockDeployment.ID, TeamID: mockDeploymentTeamRole.Team.ID, Role: mockDeploymentTeamRole.Role}).Return(mockDeploymentTeamRole, nil)
 	houstonClient = api
 
 	output, err := execDeploymentCmd(
@@ -65,8 +65,8 @@ func TestDeploymentTeamRm(t *testing.T) {
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("RemoveDeploymentTeam", mockDeployment.ID, mockDeploymentTeamRole.Team.ID).Return(mockDeploymentTeamRole, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("RemoveDeploymentTeam", houston.RemoveDeploymentTeamRequest{DeploymentID: mockDeployment.ID, TeamID: mockDeploymentTeamRole.Team.ID}).Return(mockDeploymentTeamRole, nil)
 	houstonClient = api
 
 	output, err := execDeploymentCmd(
@@ -84,9 +84,8 @@ func TestDeploymentTeamUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("GetDeploymentTeamRole", mockDeployment.ID, mockDeploymentTeamRole.Team.ID).Return(mockDeploymentTeam, nil)
-	api.On("UpdateDeploymentTeamRole", mockDeployment.ID, mockDeploymentTeamRole.Team.ID, mockDeploymentTeamRole.Role).Return(mockDeploymentTeamRole, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("UpdateDeploymentTeamRole", houston.UpdateDeploymentTeamRequest{DeploymentID: mockDeployment.ID, TeamID: mockDeploymentTeamRole.Team.ID, Role: mockDeploymentTeamRole.Role}).Return(mockDeploymentTeamRole, nil)
 	houstonClient = api
 
 	_, err := execDeploymentCmd(

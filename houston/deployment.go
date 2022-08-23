@@ -464,7 +464,7 @@ var (
 
 // CreateDeployment - create a deployment
 func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
-	reqQuery := DeploymentCreateRequest.GreatestLowerBound(Version)
+	reqQuery := DeploymentCreateRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
 		Variables: vars,
@@ -503,7 +503,7 @@ func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([
 		variables["releaseName"] = filters.ReleaseName
 	}
 
-	reqQuery := DeploymentsGetRequest.GreatestLowerBound(Version)
+	reqQuery := DeploymentsGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query: reqQuery,
 	}
@@ -522,7 +522,7 @@ func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([
 
 // UpdateDeployment - update a deployment
 func (h ClientImplementation) UpdateDeployment(variables map[string]interface{}) (*Deployment, error) {
-	reqQuery := DeploymentUpdateRequest.GreatestLowerBound(Version)
+	reqQuery := DeploymentUpdateRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
 		Variables: variables,
@@ -538,7 +538,7 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 
 // GetDeployment - get a deployment
 func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
-	reqQuery := DeploymentGetRequest.GreatestLowerBound(Version)
+	reqQuery := DeploymentGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
 		Variables: map[string]interface{}{"id": deploymentID},

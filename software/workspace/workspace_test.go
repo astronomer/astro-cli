@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 	description := "description"
 
 	api := new(mocks.ClientInterface)
-	api.On("CreateWorkspace", label, description).Return(mockWorkspace, nil)
+	api.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: label, Description: description}).Return(mockWorkspace, nil)
 
 	buf := new(bytes.Buffer)
 	err := Create(label, description, api, buf)
@@ -83,7 +83,7 @@ func TestCreateError(t *testing.T) {
 	description := "description"
 
 	api := new(mocks.ClientInterface)
-	api.On("CreateWorkspace", label, description).Return(nil, errMock)
+	api.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: label, Description: description}).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := Create(label, description, api, buf)
@@ -95,7 +95,7 @@ func TestList(t *testing.T) {
 	testUtil.InitTestConfig("software")
 
 	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaces").Return(mockWorkspaceList, nil)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
@@ -116,7 +116,7 @@ func TestListActiveWorkspace(t *testing.T) {
 	mockWorkspaceList[0].ID = "ck05r3bor07h40d02y2hw4n4v"
 
 	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaces").Return(mockWorkspaceList, nil)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
@@ -130,7 +130,7 @@ func TestListError(t *testing.T) {
 	testUtil.InitTestConfig("software")
 
 	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaces").Return(nil, errMock)
+	api.On("ListWorkspaces", nil).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := List(api, buf)
@@ -212,7 +212,7 @@ func TestGetWorkspaceSelectionError(t *testing.T) {
 	testUtil.InitTestConfig("software")
 
 	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaces").Return(nil, errMock)
+	api.On("ListWorkspaces", nil).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	_, err := getWorkspaceSelection(0, 0, api, buf)
@@ -241,7 +241,7 @@ contexts:
 
 	api := new(mocks.ClientInterface)
 	api.On("GetWorkspace", mockWorkspace.ID).Return(mockWorkspace, nil)
-	api.On("ListWorkspaces").Return(mockWorkspaceList, nil)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
 
 	defer testUtil.MockUserInput(t, "3")()
 
@@ -289,7 +289,7 @@ func TestUpdate(t *testing.T) {
 	args := map[string]string{"1": "2"}
 
 	api := new(mocks.ClientInterface)
-	api.On("UpdateWorkspace", id, args).Return(mockWorkspace, nil)
+	api.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: id, Args: args}).Return(mockWorkspace, nil)
 
 	buf := new(bytes.Buffer)
 	err := Update(id, api, buf, args)
@@ -307,7 +307,7 @@ func TestUpdateError(t *testing.T) {
 	args := map[string]string{"1": "2"}
 
 	api := new(mocks.ClientInterface)
-	api.On("UpdateWorkspace", id, args).Return(nil, errMock)
+	api.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: id, Args: args}).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := Update(id, api, buf, args)
@@ -317,8 +317,8 @@ func TestUpdateError(t *testing.T) {
 
 func TestGetWorkspaceSelection(t *testing.T) {
 	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaces").Return(mockWorkspaceList, nil)
-	api.On("PaginatedListWorkspaces", 10, 0).Return(mockWorkspaceList, nil)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
 
 	t.Run("no context set", func(t *testing.T) {
 		err := config.ResetCurrentContext()

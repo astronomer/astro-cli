@@ -54,7 +54,7 @@ func TestList(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil)
 
 		err := List(mockClient, buf)
 		assert.NoError(t, err)
@@ -66,7 +66,7 @@ func TestList(t *testing.T) {
 	t.Run("listTeams error", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", ListTeamLimit).Return(houston.ListTeamsResp{}, errMockHouston)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, errMockHouston)
 
 		err := List(mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)
@@ -78,7 +78,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("CreateTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return(houston.SystemAdminRole, nil).Once()
+		mockClient.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
 		err := Update("test-id", houston.SystemAdminRole, mockClient, buf)
 		assert.NoError(t, err)
@@ -91,7 +91,7 @@ func TestUpdate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
-		mockClient.On("DeleteTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return(houston.SystemAdminRole, nil).Once()
+		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
 		err := Update("test-id", houston.NoneTeamRole, mockClient, buf)
 		assert.NoError(t, err)
@@ -110,7 +110,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("CreateTeamSystemRoleBinding error", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("CreateTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return("", errMockHouston).Once()
+		mockClient.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
 		err := Update("test-id", houston.SystemAdminRole, mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)
@@ -142,7 +142,7 @@ func TestUpdate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
-		mockClient.On("DeleteTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return("", errMockHouston).Once()
+		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
 		err := Update("test-id", houston.NoneTeamRole, mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)

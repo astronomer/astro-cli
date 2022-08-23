@@ -91,8 +91,10 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 			return workspaceUserList(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
-	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
+		cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
+	}
 	return cmd
 }
 
