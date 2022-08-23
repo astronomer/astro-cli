@@ -29,6 +29,7 @@ import (
 
 const (
 	Domain          = "astronomer.io"
+	localDomain     = "localhost"
 	inputOAuthToken = "OAuth Token: " // nolint:gosec // false positive
 
 	cliChooseWorkspace     = "Please choose a workspace:"
@@ -65,11 +66,16 @@ func orgLookup(domain string) (string, error) {
 		splitDomain := strings.SplitN(domain, ".", splitNum)
 		domain = splitDomain[1]
 	}
-	addr := fmt.Sprintf(
-		"%s://api.%s/hub/organization-lookup",
-		config.CFG.CloudAPIProtocol.GetString(),
-		domain,
-	)
+	var addr string
+	if domain == localDomain {
+		addr = "http://localhost:8871/organization-lookup"
+	} else {
+		addr = fmt.Sprintf(
+			"%s://api.%s/hub/organization-lookup",
+			config.CFG.CloudAPIProtocol.GetString(),
+			domain,
+		)
+	}
 	ctx := http_context.Background()
 	reqData, err := json.Marshal(orgLookupRequest{Email: userEmail})
 	if err != nil {
@@ -293,10 +299,12 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 // checkToken requests a users rolebindings and sets the workspace to make sure that token works
 // TODO check orgID is in the token
 func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
-	roleBindings, err := client.ListUserRoleBindings()
+	self, err := client.GetUserInfo()
 	if err != nil {
 		return err
 	}
+	organizationID := self.AuthenticatedOrganizationID
+	roleBindings := self.User.RoleBindings
 
 	err = c.SetSystemAdmin(false)
 	if err != nil {
@@ -313,7 +321,14 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 		}
 	}
 
-	workspaces, err := client.ListWorkspaces()
+	if organizationID != "" {
+		err = c.SetContextKey("organization", organizationID)
+		if err != nil {
+			return err
+		}
+	}
+
+	workspaces, err := client.ListWorkspaces(organizationID)
 	if err != nil {
 		return errors.Wrap(err, "Invalid authentication token. Try to log in again with a new token or check your internet connection.\n\nDetails")
 	}
@@ -331,7 +346,6 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 		}
 		fmt.Printf(configSetDefaultWorkspace, w.Label)
 	}
-
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in context
 		w, isSwitched, err := switchToLastUsedWorkspace(c, workspaces)

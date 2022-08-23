@@ -37,6 +37,7 @@ type ResponseData struct {
 	GetWorkspaceServiceAccounts    []ServiceAccount            `json:"workspaceServiceAccounts,omitempty"`
 	GetUsers                       []User                      `json:"users,omitempty"`
 	GetWorkspaces                  []Workspace                 `json:"workspaces,omitempty"`
+	GetPaginatedWorkspaces         []Workspace                 `json:"paginatedWorkspaces,omitempty"`
 	GetWorkspace                   *Workspace                  `json:"workspace,omitempty"`
 	UpdateDeployment               *Deployment                 `json:"updateDeployment,omitempty"`
 	UpdateDeploymentAirflow        *Deployment                 `json:"updateDeploymentAirflow,omitempty"`
@@ -44,9 +45,10 @@ type ResponseData struct {
 	CancelUpdateDeploymentRuntime  *Deployment                 `json:"cancelRuntimeUpdate,omitempty"`
 	UpdateWorkspace                *Workspace                  `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog             `json:"logs,omitempty"`
-	WorkspaceUpdateUserRole        string                      `json:"workspaceUpdateUserRole,omitempty"`
+	WorkspaceUpsertUserRole        string                      `json:"workspaceUpsertUserRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings   `json:"workspaceUser,omitempty"`
 	WorkspaceGetUsers              []WorkspaceUserRoleBindings `json:"workspaceUsers,omitempty"`
+	WorkspacePaginatedGetUsers     []WorkspaceUserRoleBindings `json:"paginatedWorkspaceUsers,omitempty"`
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
 	RuntimeReleases                RuntimeReleases             `json:"runtimeReleases,omitempty"`
@@ -60,6 +62,10 @@ type ResponseData struct {
 	ListTeams                      ListTeamsResp               `json:"paginatedTeams,omitempty"`
 	CreateTeamSystemRoleBinding    RoleBinding                 `json:"createTeamSystemRoleBinding"`
 	DeleteTeamSystemRoleBinding    RoleBinding                 `json:"deleteTeamSystemRoleBinding"`
+	AddDeploymentTeam              *RoleBinding                `json:"deploymentAddTeamRole,omitempty"`
+	RemoveDeploymentTeam           *RoleBinding                `json:"deploymentRemoveTeamRole,omitempty"`
+	UpdateDeploymentTeam           *RoleBinding                `json:"deploymentUpdateTeamRole,omitempty"`
+	DeploymentGetTeams             []Team                      `json:"deploymentTeams,omitempty"`
 }
 
 type Namespace struct {
@@ -122,6 +128,12 @@ type DeploymentURL struct {
 type DeploymentInfo struct {
 	NextCli string `json:"NextCli"`
 	Current string `json:"current"`
+}
+
+// DeploymentTeam defines a structure of RBAC deployment teams
+type DeploymentTeam struct {
+	ID           string        `json:"id"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // Email contains various pieces of a users email
@@ -236,23 +248,12 @@ type ListTeamsResp struct {
 	Teams []Team `json:"teams"`
 }
 
-type RoleBindingWorkspace struct {
-	Role      string `json:"role"`
-	Workspace struct {
-		ID string `json:"id"`
-	} `json:"workspace"`
-}
-
 type WorkspaceUserRoleBindings struct {
-	ID           string                 `json:"id"`
-	Username     string                 `json:"username"`
-	FullName     string                 `json:"fullName"`
-	Emails       []Email                `json:"emails"`
-	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
-}
-
-type WorkspaceTeamRoleBindings struct {
-	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
+	ID           string        `json:"id"`
+	Username     string        `json:"username"`
+	FullName     string        `json:"fullName"`
+	Emails       []Email       `json:"emails"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 type RoleBinding struct {

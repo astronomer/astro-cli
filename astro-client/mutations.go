@@ -33,17 +33,17 @@ var (
 	}
 	`
 
-	DeploymentCreate = `
-	mutation deploymentCreate(
-		$input: DeploymentCreateInput
+	CreateDeployment = `
+	mutation createDeployment(
+		$input: CreateDeploymentInput!
 	  ) {
-		deploymentCreate (
+		createDeployment (
 		  input: $input
 		){
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {
@@ -72,7 +72,7 @@ var (
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {
@@ -102,13 +102,36 @@ var (
 	}
   `
 	CreateUserInvite = `
-	mutation createUserInvite($input: CreateUserInviteInput!) {
-		createUserInvite(input: $input) {
+  	mutation createUserInvite($input: CreateUserInviteInput!) {
+	  createUserInvite(input: $input) {
 			userId
 			organizationId
 			oauthInviteId
 			expiresAt
+	  }
+  	}
+  `
+	DagDeploymentInitiate = `
+	mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
+		initiateDagDeployment(input: $input) {
+			id
+			dagUrl
 		}
 	}
-	`
+  `
+	ReportDagDeploymentStatus = `
+	mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
+		reportDagDeploymentStatus(input: $input) {
+			id
+			deploymentId
+			action
+			versionId
+			status
+			message
+			createdAt
+			initiatorId
+			initiatorType
+		}
+	}
+  `
 )

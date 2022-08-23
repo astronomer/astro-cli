@@ -54,6 +54,7 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+
 	if len(args) == 1 {
 		if !context.IsCloudDomain(args[0]) {
 			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)

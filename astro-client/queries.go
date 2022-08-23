@@ -3,8 +3,8 @@ package astro
 // TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
 	WorkspacesGetRequest = `
-	query GetWorkspaces {
-		workspaces {
+	query GetWorkspaces($organizationId: Id!) {
+		workspaces(organizationId: $organizationId) {
 			id
 			label
 			organizationId
@@ -19,10 +19,11 @@ var (
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			createdAt
+			status
 			runtimeRelease {
 				version
 				airflowVersion
@@ -64,6 +65,7 @@ var (
 			role
 			}
 		}
+		authenticatedOrganizationId
 		}
 	}
 	`
@@ -109,7 +111,7 @@ var (
 	`
 
 	GetClusters = `
-	query clusters($organizationId: Id) {
+	query clusters($organizationId: Id!) {
 		clusters(organizationId: $organizationId) {
 			id
 			name

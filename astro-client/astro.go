@@ -6,19 +6,20 @@ import (
 )
 
 type Client interface {
-	// UserRoleBinding
-	ListUserRoleBindings() ([]RoleBinding, error)
+	GetUserInfo() (*Self, error)
 	// Workspace
-	ListWorkspaces() ([]Workspace, error)
+	ListWorkspaces(organizationID string) ([]Workspace, error)
 	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
-	CreateDeployment(input *DeploymentCreateInput) (Deployment, error)
+	CreateDeployment(input *CreateDeploymentInput) (Deployment, error)
 	UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error)
 	ListDeployments(input DeploymentsInput) ([]Deployment, error)
 	DeleteDeployment(input DeploymentDeleteInput) (Deployment, error)
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
+	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
+	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
 	CreateImage(input ImageCreateInput) (*Image, error)
 	DeployImage(input ImageDeployInput) (*Image, error)
@@ -31,47 +32,48 @@ type Client interface {
 	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 }
 
-func (c *HTTPClient) ListUserRoleBindings() ([]RoleBinding, error) {
+func (c *HTTPClient) GetUserInfo() (*Self, error) {
 	req := Request{
 		Query: SelfQuery,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
-		return []RoleBinding{}, err
+		return nil, err
 	}
 
 	if resp.Data.SelfQuery == nil {
 		fmt.Printf("Something went wrong! Try again or contact Astronomer Support")
-		return []RoleBinding{}, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
+		return nil, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
 	}
 
-	return resp.Data.SelfQuery.User.RoleBindings, nil
+	return resp.Data.SelfQuery, nil
 }
 
-func (c *HTTPClient) ListWorkspaces() ([]Workspace, error) {
+func (c *HTTPClient) ListWorkspaces(organizationID string) ([]Workspace, error) {
 	wsReq := Request{
-		Query: WorkspacesGetRequest,
+		Query:     WorkspacesGetRequest,
+		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
-	wsResp, err := wsReq.DoWithClient(c)
+	wsResp, err := wsReq.DoWithPublicClient(c)
 	if err != nil {
 		return []Workspace{}, err
 	}
 	return wsResp.Data.GetWorkspaces, nil
 }
 
-func (c *HTTPClient) CreateDeployment(input *DeploymentCreateInput) (Deployment, error) {
+func (c *HTTPClient) CreateDeployment(input *CreateDeploymentInput) (Deployment, error) {
 	req := Request{
-		Query:     DeploymentCreate,
+		Query:     CreateDeployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
-	return resp.Data.DeploymentCreate, nil
+	return resp.Data.CreateDeployment, nil
 }
 
 func (c *HTTPClient) UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error) {
@@ -151,6 +153,32 @@ func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) (
 	return resp.Data.DeploymentVariablesUpdate, nil
 }
 
+func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error) {
+	req := Request{
+		Query:     DagDeploymentInitiate,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return InitiateDagDeployment{}, err
+	}
+	return resp.Data.InitiateDagDeployment, nil
+}
+
+func (c *HTTPClient) ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error) {
+	req := Request{
+		Query:     ReportDagDeploymentStatus,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return DagDeploymentStatus{}, err
+	}
+	return resp.Data.ReportDagDeploymentStatus, nil
+}
+
 func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
 	req := Request{
 		Query:     ImageCreate,
@@ -183,7 +211,7 @@ func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
 		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []Cluster{}, err
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -25,7 +26,7 @@ func TestWorkspaceUserRemove(t *testing.T) {
 		Username: "test@astronomer.io",
 		Emails:   []houston.Email{{Address: "test@astronomer.io"}},
 		FullName: "test",
-		RoleBindings: []houston.RoleBindingWorkspace{
+		RoleBindings: []houston.RoleBinding{
 			{
 				Role: houston.WorkspaceAdminRole,
 			},
@@ -98,12 +99,10 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockEmail := "test-email"
 	mockRoles := houston.WorkspaceUserRoleBindings{
-		RoleBindings: []houston.RoleBindingWorkspace{
+		RoleBindings: []houston.RoleBinding{
 			{
-				Role: houston.WorkspaceViewerRole,
-				Workspace: struct {
-					ID string `json:"id"`
-				}{ID: "ck05r3bor07h40d02y2hw4n4v"},
+				Role:      houston.WorkspaceViewerRole,
+				Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"},
 			},
 		},
 	}
@@ -136,16 +135,18 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 
 func TestWorkspaceUserList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+	ws, err := coalesceWorkspace()
+	assert.NoError(t, err)
 	mockResponse := []houston.WorkspaceUserRoleBindings{
 		{
 			ID:       "test-id-username",
 			Username: "test@astronomer.io",
 			FullName: "testusername",
 			Emails:   []houston.Email{{Address: "test@astronomer.io"}},
-			RoleBindings: []houston.RoleBindingWorkspace{
+			RoleBindings: []houston.RoleBinding{
 				{
-					Role: houston.WorkspaceViewerRole,
+					Role:      houston.WorkspaceViewerRole,
+					Workspace: houston.Workspace{ID: ws},
 				},
 			},
 		},
@@ -159,11 +160,120 @@ func TestWorkspaceUserList(t *testing.T) {
 	defer func() { houstonClient = currentClient }()
 
 	buf := new(bytes.Buffer)
-	err := workspaceUserList(&cobra.Command{}, buf)
+	err = workspaceUserList(&cobra.Command{}, buf)
 	assert.NoError(t, err)
 	content := buf.String()
 	assert.Contains(t, content, mockResponse[0].Username)
 	assert.Contains(t, content, mockResponse[0].ID)
 	assert.Contains(t, content, houston.WorkspaceViewerRole)
 	houstonMock.AssertExpectations(t)
+}
+
+func TestWorkspaceUserListPaginated(t *testing.T) {
+	t.Run("with default page size", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
+		mockResponse := []houston.WorkspaceUserRoleBindings{
+			{
+				ID:       "test-id-username",
+				Username: "test@astronomer.io",
+				FullName: "testusername",
+				Emails:   []houston.Email{{Address: "test@astronomer.io"}},
+				RoleBindings: []houston.RoleBinding{
+					{
+						Role:      houston.WorkspaceViewerRole,
+						Workspace: houston.Workspace{ID: ws},
+					},
+				},
+			},
+		}
+
+		houstonMock := new(mocks.ClientInterface)
+		houstonMock.On("ListWorkspacePaginatedUserAndRoles", mock.Anything, mock.Anything, mock.Anything).Return(mockResponse, nil)
+
+		currentClient := houstonClient
+		houstonClient = houstonMock
+		defer func() { houstonClient = currentClient }()
+
+		buf := new(bytes.Buffer)
+		// mock os.Stdin
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		paginated = true
+		err = workspaceUserList(&cobra.Command{}, buf)
+		assert.NoError(t, err)
+		content := buf.String()
+		assert.Contains(t, content, mockResponse[0].Username)
+		assert.Contains(t, content, mockResponse[0].ID)
+		assert.Contains(t, content, houston.WorkspaceViewerRole)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("with invalid/negative page size", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
+		mockResponse := []houston.WorkspaceUserRoleBindings{
+			{
+				ID:       "test-id-username",
+				Username: "test@astronomer.io",
+				FullName: "testusername",
+				Emails:   []houston.Email{{Address: "test@astronomer.io"}},
+				RoleBindings: []houston.RoleBinding{
+					{
+						Role:      houston.WorkspaceViewerRole,
+						Workspace: houston.Workspace{ID: ws},
+					},
+				},
+			},
+		}
+
+		houstonMock := new(mocks.ClientInterface)
+		houstonMock.On("ListWorkspacePaginatedUserAndRoles", mock.Anything, mock.Anything, mock.Anything).Return(mockResponse, nil)
+
+		currentClient := houstonClient
+		houstonClient = houstonMock
+		defer func() { houstonClient = currentClient }()
+
+		buf := new(bytes.Buffer)
+		// mock os.Stdin
+		input := []byte("q")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		paginated = true
+		pageSize = -10
+		err = workspaceUserList(&cobra.Command{}, buf)
+		assert.NoError(t, err)
+		content := buf.String()
+		assert.Contains(t, content, mockResponse[0].Username)
+		assert.Contains(t, content, mockResponse[0].ID)
+		assert.Contains(t, content, houston.WorkspaceViewerRole)
+		houstonMock.AssertExpectations(t)
+	})
 }
