@@ -921,7 +921,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
@@ -937,7 +937,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return errMock
 		}
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
@@ -953,7 +953,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		exportSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, false)
@@ -969,7 +969,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		exportSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return errMock
 		}
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, false)
@@ -985,7 +985,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		envExportSettings = func(id, settingsFile string, version uint64, connections, variables bool) error {
 			return nil
 		}
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, true)
@@ -1001,7 +1001,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		envExportSettings = func(id, settingsFile string, version uint64, connections, variables bool) error {
 			return errMock
 		}
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, true)
@@ -1014,7 +1014,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{}, errMock).Once()
-		
+
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)

@@ -69,9 +69,9 @@ var (
 
 	airflowSettingsFile = "airflow_settings.yaml"
 
-	inspectContainer = inspect.Inspect
-	initSettings     = settings.ConfigSettings
-	exportSettings   = settings.SettingsExport
+	inspectContainer  = inspect.Inspect
+	initSettings      = settings.ConfigSettings
+	exportSettings    = settings.SettingsExport
 	envExportSettings = settings.SettingsEnvExport
 
 	openURL    = browser.OpenURL
