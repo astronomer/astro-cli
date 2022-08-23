@@ -268,7 +268,7 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	}
 
 	// get workspace ID
-	deployments, err := astroClient.ListDeployments(astro.DeploymentsInput{})
+	deployments, err := astroClient.ListDeployments(c.Organization, "")
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}

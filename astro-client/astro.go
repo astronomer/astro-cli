@@ -13,7 +13,8 @@ type Client interface {
 	// Deployment
 	CreateDeployment(input *CreateDeploymentInput) (Deployment, error)
 	UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error)
-	ListDeployments(input DeploymentsInput) ([]Deployment, error)
+	ListDeployments(organizationID, workspaceID string) ([]Deployment, error)
+	GetDeployment(deploymentID string) (Deployment, error)
 	DeleteDeployment(input DeploymentDeleteInput) (Deployment, error)
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
@@ -89,10 +90,10 @@ func (c *HTTPClient) UpdateDeployment(input *DeploymentUpdateInput) (Deployment,
 	return resp.Data.DeploymentUpdate, nil
 }
 
-func (c *HTTPClient) ListDeployments(input DeploymentsInput) ([]Deployment, error) {
+func (c *HTTPClient) ListDeployments(organizationID, workspaceID string) ([]Deployment, error) {
 	req := Request{
 		Query:     WorkspaceDeploymentsGetRequest,
-		Variables: map[string]interface{}{"deploymentsInput": input},
+		Variables: map[string]interface{}{"organizationId": organizationID, "workspaceId": workspaceID},
 	}
 
 	resp, err := req.DoWithPublicClient(c)
@@ -100,6 +101,19 @@ func (c *HTTPClient) ListDeployments(input DeploymentsInput) ([]Deployment, erro
 		return []Deployment{}, err
 	}
 	return resp.Data.GetDeployments, nil
+}
+
+func (c *HTTPClient) GetDeployment(deploymentID string) (Deployment, error) {
+	req := Request{
+		Query:     GetDeployment,
+		Variables: map[string]interface{}{"id": deploymentID},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return Deployment{}, err
+	}
+	return resp.Data.GetDeployment, nil
 }
 
 func (c *HTTPClient) DeleteDeployment(input DeploymentDeleteInput) (Deployment, error) {

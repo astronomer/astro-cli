@@ -233,6 +233,7 @@ func TestUpdateDeployment(t *testing.T) {
 
 func TestListDeployments(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	org := "test-org-id"
 	mockResponse := &Response{
 		Data: ResponseData{
 			GetDeployments: []Deployment{
@@ -259,7 +260,7 @@ func TestListDeployments(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployments, err := astroClient.ListDeployments(DeploymentsInput{})
+		deployments, err := astroClient.ListDeployments(org, "")
 		assert.NoError(t, err)
 		assert.Equal(t, deployments, mockResponse.Data.GetDeployments)
 	})
@@ -274,7 +275,7 @@ func TestListDeployments(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.ListDeployments(DeploymentsInput{})
+		_, err := astroClient.ListDeployments(org, "")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

@@ -121,6 +121,27 @@ func (_m *Client) DeployImage(input astro.ImageDeployInput) (*astro.Image, error
 	return r0, r1
 }
 
+// GetDeployment provides a mock function with given fields: deploymentID
+func (_m *Client) GetDeployment(deploymentID string) (astro.Deployment, error) {
+	ret := _m.Called(deploymentID)
+
+	var r0 astro.Deployment
+	if rf, ok := ret.Get(0).(func(string) astro.Deployment); ok {
+		r0 = rf(deploymentID)
+	} else {
+		r0 = ret.Get(0).(astro.Deployment)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(deploymentID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDeploymentConfig provides a mock function with given fields:
 func (_m *Client) GetDeploymentConfig() (astro.DeploymentConfig, error) {
 	ret := _m.Called()
@@ -251,13 +272,13 @@ func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
 	return r0, r1
 }
 
-// ListDeployments provides a mock function with given fields: input
-func (_m *Client) ListDeployments(input astro.DeploymentsInput) ([]astro.Deployment, error) {
-	ret := _m.Called(input)
+// ListDeployments provides a mock function with given fields: organizationID, workspaceID
+func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]astro.Deployment, error) {
+	ret := _m.Called(organizationID, workspaceID)
 
 	var r0 []astro.Deployment
-	if rf, ok := ret.Get(0).(func(astro.DeploymentsInput) []astro.Deployment); ok {
-		r0 = rf(input)
+	if rf, ok := ret.Get(0).(func(string, string) []astro.Deployment); ok {
+		r0 = rf(organizationID, workspaceID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]astro.Deployment)
@@ -265,8 +286,8 @@ func (_m *Client) ListDeployments(input astro.DeploymentsInput) ([]astro.Deploym
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(astro.DeploymentsInput) error); ok {
-		r1 = rf(input)
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(organizationID, workspaceID)
 	} else {
 		r1 = ret.Error(1)
 	}

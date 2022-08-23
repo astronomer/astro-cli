@@ -56,11 +56,15 @@ func newTableOut() *printutil.Table {
 
 // List all airflow deployments
 func List(ws string, all bool, client astro.Client, out io.Writer) error {
-	deploymentsInput := astro.DeploymentsInput{}
-	if !all {
-		deploymentsInput.WorkspaceID = ws
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
 	}
-	deployments, err := client.ListDeployments(deploymentsInput)
+
+	if all {
+		ws = ""
+	}
+	deployments, err := client.ListDeployments(c.Organization, ws)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -538,11 +542,12 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 }
 
 func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) {
-	deploymentsInput := astro.DeploymentsInput{
-		WorkspaceID: ws,
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return []astro.Deployment{}, err
 	}
 
-	deployments, err := client.ListDeployments(deploymentsInput)
+	deployments, err := client.ListDeployments(c.Organization, ws)
 	if err != nil {
 		return deployments, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}

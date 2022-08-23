@@ -111,7 +111,7 @@ func TestSetup(t *testing.T) {
 		}
 
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", mock.Anything).Return(mockDeplyResp, nil).Once()
+		mockClient.On("ListDeployments", mock.Anything, "").Return(mockDeplyResp, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
 		cmd, err := cmd.ExecuteC()
