@@ -78,18 +78,18 @@ func (_m *Client) CreateUserInvite(input astro.CreateUserInviteInput) (astro.Use
 }
 
 // DeleteDeployment provides a mock function with given fields: input
-func (_m *Client) DeleteDeployment(input astro.DeploymentDeleteInput) (astro.Deployment, error) {
+func (_m *Client) DeleteDeployment(input astro.DeleteDeploymentInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
 
 	var r0 astro.Deployment
-	if rf, ok := ret.Get(0).(func(astro.DeploymentDeleteInput) astro.Deployment); ok {
+	if rf, ok := ret.Get(0).(func(astro.DeleteDeploymentInput) astro.Deployment); ok {
 		r0 = rf(input)
 	} else {
 		r0 = ret.Get(0).(astro.Deployment)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(astro.DeploymentDeleteInput) error); ok {
+	if rf, ok := ret.Get(1).(func(astro.DeleteDeploymentInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

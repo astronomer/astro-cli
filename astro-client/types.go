@@ -21,7 +21,7 @@ type ResponseData struct {
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
 	GetDeploymentHistory      DeploymentHistory            `json:"deploymentHistory,omitempty"`
-	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
+	DeleteDeployment          Deployment                   `json:"DeleteDeployment,omitempty"`
 	UpdateDeployment          Deployment                   `json:"UpdateDeployment,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
 	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
@@ -278,7 +278,7 @@ type UpdateDeploymentInput struct {
 	DeploymentSpec DeploymentCreateSpec `json:"deploymentSpec"`
 }
 
-type DeploymentDeleteInput struct {
+type DeleteDeploymentInput struct {
 	ID string `json:"id"`
 }
 

@@ -21,11 +21,11 @@ var (
 	}
 	`
 
-	DeploymentDelete = `
-	mutation deploymentDelete(
-		$input: DeploymentDeleteInput!
+	DeleteDeployment = `
+	mutation deleteDeployment(
+		$input: DeleteDeploymentInput!
 	  ) {
-		deploymentDelete(
+		deleteDeployment(
 			input: $input
 		) {
 		  id

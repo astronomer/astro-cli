@@ -15,7 +15,7 @@ type Client interface {
 	UpdateDeployment(input *UpdateDeploymentInput) (Deployment, error)
 	ListDeployments(organizationID, workspaceID string) ([]Deployment, error)
 	GetDeployment(deploymentID string) (Deployment, error)
-	DeleteDeployment(input DeploymentDeleteInput) (Deployment, error)
+	DeleteDeployment(input DeleteDeploymentInput) (Deployment, error)
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
@@ -116,9 +116,9 @@ func (c *HTTPClient) GetDeployment(deploymentID string) (Deployment, error) {
 	return resp.Data.GetDeployment, nil
 }
 
-func (c *HTTPClient) DeleteDeployment(input DeploymentDeleteInput) (Deployment, error) {
+func (c *HTTPClient) DeleteDeployment(input DeleteDeploymentInput) (Deployment, error) {
 	req := Request{
-		Query:     DeploymentDelete,
+		Query:     DeleteDeployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
@@ -126,7 +126,7 @@ func (c *HTTPClient) DeleteDeployment(input DeploymentDeleteInput) (Deployment, 
 	if err != nil {
 		return Deployment{}, err
 	}
-	return resp.Data.DeploymentDelete, nil
+	return resp.Data.DeleteDeployment, nil
 }
 
 func (c *HTTPClient) GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error) {

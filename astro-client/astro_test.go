@@ -284,7 +284,7 @@ func TestDeleteDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentDelete: Deployment{
+			DeleteDeployment: Deployment{
 				ID:             "test-deployment-id",
 				Label:          "test-deployment-label",
 				ReleaseName:    "test-release-name",
@@ -306,9 +306,9 @@ func TestDeleteDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployment, err := astroClient.DeleteDeployment(DeploymentDeleteInput{})
+		deployment, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.DeploymentDelete)
+		assert.Equal(t, deployment, mockResponse.Data.DeleteDeployment)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -321,7 +321,7 @@ func TestDeleteDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.DeleteDeployment(DeploymentDeleteInput{})
+		_, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

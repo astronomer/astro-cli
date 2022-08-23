@@ -524,7 +524,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 	}
 
 	// delete deployment
-	deploymentInput := astro.DeploymentDeleteInput{
+	deploymentInput := astro.DeleteDeploymentInput{
 		ID: currentDeployment.ID,
 	}
 	deploymentDeleteResp, err := client.DeleteDeployment(deploymentInput)
