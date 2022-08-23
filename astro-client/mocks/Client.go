@@ -163,6 +163,29 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	return r0, r1
 }
 
+// GetUserInfo provides a mock function with given fields:
+func (_m *Client) GetUserInfo() (*astro.Self, error) {
+	ret := _m.Called()
+
+	var r0 *astro.Self
+	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astro.Self)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetWorkspace provides a mock function with given fields: workspaceID
 func (_m *Client) GetWorkspace(workspaceID string) (astro.Workspace, error) {
 	ret := _m.Called(workspaceID)
@@ -357,29 +380,6 @@ func (_m *Client) ReportDagDeploymentStatus(input *astro.ReportDagDeploymentStat
 	var r1 error
 	if rf, ok := ret.Get(1).(func(*astro.ReportDagDeploymentStatusInput) error); ok {
 		r1 = rf(input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// SelfUser provides a mock function with given fields:
-func (_m *Client) SelfUser() (*astro.Self, error) {
-	ret := _m.Called()
-
-	var r0 *astro.Self
-	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*astro.Self)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

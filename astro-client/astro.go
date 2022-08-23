@@ -6,7 +6,7 @@ import (
 )
 
 type Client interface {
-	SelfUser() (*Self, error)
+	GetUserInfo() (*Self, error)
 	// Workspace
 	ListWorkspaces(organizationID string) ([]Workspace, error)
 	GetWorkspace(workspaceID string) (Workspace, error)
@@ -32,7 +32,7 @@ type Client interface {
 	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 }
 
-func (c *HTTPClient) SelfUser() (*Self, error) {
+func (c *HTTPClient) GetUserInfo() (*Self, error) {
 	req := Request{
 		Query: SelfQuery,
 	}

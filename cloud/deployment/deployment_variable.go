@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool, client astro.Client, out io.Writer) error {
+func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -21,7 +21,7 @@ func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func VariableList(deploymentID, variableKey, ws, envFile string, useEnvFile bool
 
 // this function modifies a deployment's environment variable object
 // it is used to create and update deployment's environment variables
-func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string, variableList []string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
+func VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName string, variableList []string, useEnvFile, makeSecret, updateVars bool, client astro.Client, out io.Writer) error {
 	varTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
@@ -67,7 +67,7 @@ func VariableModify(deploymentID, variableKey, variableValue, ws, envFile string
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -259,8 +259,12 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 		if vars[i] == "" {
 			continue
 		}
-		key := strings.Split(vars[i], "=")[0]
-		value := strings.Split(vars[i], "=")[1]
+		if len(strings.SplitN(vars[i], "=", 2)) == 1 { // nolint:gomnd
+			fmt.Printf("%s is an improperly formatted variable, no variable created\n", vars[i])
+			continue
+		}
+		key := strings.SplitN(vars[i], "=", 2)[0]   // nolint:gomnd
+		value := strings.SplitN(vars[i], "=", 2)[1] // nolint:gomnd
 		if key == "" {
 			fmt.Printf("empty key! skipping creating variable with value: %s\n", value)
 			continue

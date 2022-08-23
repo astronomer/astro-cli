@@ -26,7 +26,7 @@ func TestWorkspaceUserRemove(t *testing.T) {
 		Username: "test@astronomer.io",
 		Emails:   []houston.Email{{Address: "test@astronomer.io"}},
 		FullName: "test",
-		RoleBindings: []houston.RoleBindingWorkspace{
+		RoleBindings: []houston.RoleBinding{
 			{
 				Role: houston.WorkspaceAdminRole,
 			},
@@ -99,12 +99,10 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockEmail := "test-email"
 	mockRoles := houston.WorkspaceUserRoleBindings{
-		RoleBindings: []houston.RoleBindingWorkspace{
+		RoleBindings: []houston.RoleBinding{
 			{
-				Role: houston.WorkspaceViewerRole,
-				Workspace: struct {
-					ID string `json:"id"`
-				}{ID: "ck05r3bor07h40d02y2hw4n4v"},
+				Role:      houston.WorkspaceViewerRole,
+				Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"},
 			},
 		},
 	}
@@ -137,16 +135,18 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 
 func TestWorkspaceUserList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+	ws, err := coalesceWorkspace()
+	assert.NoError(t, err)
 	mockResponse := []houston.WorkspaceUserRoleBindings{
 		{
 			ID:       "test-id-username",
 			Username: "test@astronomer.io",
 			FullName: "testusername",
 			Emails:   []houston.Email{{Address: "test@astronomer.io"}},
-			RoleBindings: []houston.RoleBindingWorkspace{
+			RoleBindings: []houston.RoleBinding{
 				{
-					Role: houston.WorkspaceViewerRole,
+					Role:      houston.WorkspaceViewerRole,
+					Workspace: houston.Workspace{ID: ws},
 				},
 			},
 		},
@@ -160,7 +160,7 @@ func TestWorkspaceUserList(t *testing.T) {
 	defer func() { houstonClient = currentClient }()
 
 	buf := new(bytes.Buffer)
-	err := workspaceUserList(&cobra.Command{}, buf)
+	err = workspaceUserList(&cobra.Command{}, buf)
 	assert.NoError(t, err)
 	content := buf.String()
 	assert.Contains(t, content, mockResponse[0].Username)
@@ -172,16 +172,18 @@ func TestWorkspaceUserList(t *testing.T) {
 func TestWorkspaceUserListPaginated(t *testing.T) {
 	t.Run("with default page size", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
 		mockResponse := []houston.WorkspaceUserRoleBindings{
 			{
 				ID:       "test-id-username",
 				Username: "test@astronomer.io",
 				FullName: "testusername",
 				Emails:   []houston.Email{{Address: "test@astronomer.io"}},
-				RoleBindings: []houston.RoleBindingWorkspace{
+				RoleBindings: []houston.RoleBinding{
 					{
-						Role: houston.WorkspaceViewerRole,
+						Role:      houston.WorkspaceViewerRole,
+						Workspace: houston.Workspace{ID: ws},
 					},
 				},
 			},
@@ -223,16 +225,18 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 
 	t.Run("with invalid/negative page size", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
+		ws, err := coalesceWorkspace()
+		assert.NoError(t, err)
 		mockResponse := []houston.WorkspaceUserRoleBindings{
 			{
 				ID:       "test-id-username",
 				Username: "test@astronomer.io",
 				FullName: "testusername",
 				Emails:   []houston.Email{{Address: "test@astronomer.io"}},
-				RoleBindings: []houston.RoleBindingWorkspace{
+				RoleBindings: []houston.RoleBinding{
 					{
-						Role: houston.WorkspaceViewerRole,
+						Role:      houston.WorkspaceViewerRole,
+						Workspace: houston.Workspace{ID: ws},
 					},
 				},
 			},

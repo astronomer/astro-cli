@@ -121,8 +121,8 @@ This will generate a skeleton project directory:
 ```
 .
 ├── dags
-│   ├── example-dag-advanced.py
-│   ├── example-dag-basic.py
+│   ├── example_dag_advanced.py
+│   ├── example_dag_basic.py
 ├── tests
 │   ├── dags
 │       ├── test_dag_integrity.py

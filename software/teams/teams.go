@@ -7,15 +7,23 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/software/deployment"
+	"github.com/astronomer/astro-cli/software/utils"
+	"github.com/astronomer/astro-cli/software/workspace"
 	"github.com/sirupsen/logrus"
 )
 
-const ListTeamLimit = 25
+const ListTeamLimit = 20
 
-var errMissingTeamID = errors.New("missing team ID")
+var (
+	errMissingTeamID = errors.New("missing team ID")
+
+	// monkey patched to write tests
+	promptPaginatedOption = utils.PromptPaginatedOption
+)
 
 // retrieves a team and all of its users if passed optional param
-func Get(teamID string, usersEnabled bool, client houston.ClientInterface, out io.Writer) error {
+func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client houston.ClientInterface, out io.Writer) error {
 	if teamID == "" {
 		return errMissingTeamID
 	}
@@ -23,12 +31,47 @@ func Get(teamID string, usersEnabled bool, client houston.ClientInterface, out i
 	if err != nil {
 		return err
 	}
+	role := getSystemLevelRole(team.RoleBindings)
 
-	fmt.Fprintf(out, "\nTeam Name: %s\nTeam ID: %s \n\n", team.Name, team.ID)
+	fmt.Fprintf(out, "\nTeam Name: %s\nTeam ID: %s \nSystem Role: %s\n", team.Name, team.ID, role)
 
-	if usersEnabled {
+	if getRoleInfo || allFilters {
+		workspaceRolesTable := printutil.Table{
+			Padding:        []int{44, 50},
+			DynamicPadding: true,
+			Header:         []string{"WORKSPACE ID", "WORKSPACE NAME", "ROLE"},
+			ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+		}
+
+		deploymentRolesTable := printutil.Table{
+			Padding:        []int{44, 50},
+			DynamicPadding: true,
+			Header:         []string{"DEPLOYMENT ID", "DEPLOYMENT NAME", "ROLE"},
+			ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+		}
+
+		for i := range team.RoleBindings {
+			if workspace.IsValidWorkspaceLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneTeamRole {
+				workspaceRolesTable.AddRow([]string{team.RoleBindings[i].Workspace.ID, team.RoleBindings[i].Workspace.Label, team.RoleBindings[i].Role}, false)
+			}
+			if deployment.IsValidDeploymentLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneTeamRole {
+				deploymentRolesTable.AddRow([]string{team.RoleBindings[i].Deployment.ID, team.RoleBindings[i].Deployment.Label, team.RoleBindings[i].Role}, false)
+			}
+		}
+		if len(workspaceRolesTable.Rows) > 0 {
+			fmt.Fprintln(out, "\nWorkspace Level Roles:")
+			workspaceRolesTable.Print(out)
+		}
+
+		if len(deploymentRolesTable.Rows) > 0 {
+			fmt.Fprintln(out, "\nDeployment Level Roles:")
+			deploymentRolesTable.Print(out)
+		}
+	}
+
+	if getUserInfo || allFilters {
 		logrus.Debug("retrieving users part of team")
-		fmt.Fprintln(out, "Users part of Team:")
+		fmt.Fprintln(out, "\nUsers part of Team:")
 		users, err := client.GetTeamUsers(teamID)
 		if err != nil {
 			return err
@@ -68,18 +111,64 @@ func List(client houston.ClientInterface, out io.Writer) error {
 	teamsTable := printutil.Table{
 		Padding:        []int{50, 50},
 		DynamicPadding: true,
-		Header:         []string{"TEAM ID", "TEAM NAME"},
+		Header:         []string{"TEAM ID", "TEAM NAME", "ROLE"},
 		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
 	}
 	for i := range teams {
-		teamsTable.AddRow([]string{teams[i].ID, teams[i].Name}, false)
+		role := getSystemLevelRole(teams[i].RoleBindings)
+		teamsTable.AddRow([]string{teams[i].ID, teams[i].Name, role}, false)
 	}
 	return teamsTable.Print(out)
 }
 
+func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, pageNumber int, cursorID string) error {
+	resp, err := client.ListTeams(cursorID, pageSize)
+	if err != nil {
+		return err
+	}
+	teamsTable := printutil.Table{
+		Padding:        []int{50, 50},
+		DynamicPadding: true,
+		Header:         []string{"TEAM ID", "TEAM NAME", "ROLE"},
+		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	}
+	for i := range resp.Teams {
+		role := getSystemLevelRole(resp.Teams[i].RoleBindings)
+		teamsTable.AddRow([]string{resp.Teams[i].ID, resp.Teams[i].Name, role}, false)
+	}
+	if err := teamsTable.Print(out); err != nil {
+		return err
+	}
+
+	totalTeams := len(resp.Teams)
+	var (
+		previousCursor string
+		nextCursor     string
+	)
+	if totalTeams > 0 {
+		previousCursor = resp.Teams[0].ID
+		nextCursor = resp.Teams[len(resp.Teams)-1].ID
+	}
+	if totalTeams == 0 && pageSize < 0 {
+		nextCursor = ""
+	} else if totalTeams == 0 && pageSize > 0 {
+		previousCursor = ""
+	}
+	lastPage := false
+	if resp.Count <= pageNumber*pageSize+totalTeams {
+		lastPage = true
+	}
+
+	selectedOption := promptPaginatedOption(previousCursor, nextCursor, pageSize, totalTeams, pageNumber, lastPage)
+	if selectedOption.Quit {
+		return nil
+	}
+	return PaginatedList(client, out, selectedOption.PageSize, selectedOption.PageNumber, selectedOption.CursorID)
+}
+
 // Update will update the system role associated with the team
 func Update(teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	if !isValidSystemAdminRole(role) {
+	if !isValidSystemLevelRole(role) {
 		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneTeamRole) //nolint:goerr113
 	}
 
@@ -91,7 +180,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 		}
 
 		for idx := range team.RoleBindings {
-			if isValidSystemAdminRole(team.RoleBindings[idx].Role) {
+			if isValidSystemLevelRole(team.RoleBindings[idx].Role) {
 				role = team.RoleBindings[idx].Role
 				break
 			}
@@ -119,11 +208,21 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 	return nil
 }
 
-// isValidSystemAdminRole checks if the role is amongst valid system adming role
-func isValidSystemAdminRole(role string) bool {
+// isValidSystemLevelRole checks if the role is amongst valid system adming role
+func isValidSystemLevelRole(role string) bool {
 	switch role {
 	case houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneTeamRole:
 		return true
 	}
 	return false
+}
+
+// getSystemLevelRole returns the first system level role from a slice of roles
+func getSystemLevelRole(roles []houston.RoleBinding) string {
+	for i := range roles {
+		if isValidSystemLevelRole(roles[i].Role) {
+			return roles[i].Role
+		}
+	}
+	return houston.NoneTeamRole
 }

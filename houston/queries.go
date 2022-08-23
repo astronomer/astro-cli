@@ -854,6 +854,9 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 			teams {
 				id
 				name
+				roleBindings {
+					role
+				}
 			}
 		}
 	}

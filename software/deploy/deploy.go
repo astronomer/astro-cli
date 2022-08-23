@@ -30,7 +30,7 @@ var (
 var (
 	errNoWorkspaceID             = errors.New("no workspace id provided")
 	errNoDomainSet               = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentName     = errors.New("please specify a valid deployment name")
+	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
 	errDeploymentNotFound        = errors.New("no airflow deployments found")
 	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n") //nolint
 )
@@ -93,7 +93,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	}
 
 	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {
-		return errInvalidDeploymentName
+		return errInvalidDeploymentID
 	}
 
 	// Prompt user for deployment if no deployment passed in

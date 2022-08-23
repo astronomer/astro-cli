@@ -3,7 +3,9 @@ package software
 import (
 	"io"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/software/teams"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +24,7 @@ func newTeamCmd(out io.Writer) *cobra.Command {
 }
 
 func newTeamGetCmd(out io.Writer) *cobra.Command {
-	var usersEnabled bool
+	var usersEnabled, rolesEnabled, all bool
 	cmd := &cobra.Command{
 		Use:     "get [TEAM ID]",
 		Aliases: []string{"g"},
@@ -31,14 +33,18 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return teams.Get(args[0], usersEnabled, houstonClient, out)
+			return teams.Get(args[0], usersEnabled, rolesEnabled, all, houstonClient, out)
 		},
 	}
 	cmd.Flags().BoolVarP(&usersEnabled, "users", "u", false, "Get user details of the team")
+	cmd.Flags().BoolVarP(&rolesEnabled, "roles", "r", false, "Get role details of the team")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Use all of the filters")
 	return cmd
 }
 
 func newTeamListCmd(out io.Writer) *cobra.Command {
+	var paginated bool
+	var pageSize int
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"l"},
@@ -46,9 +52,11 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all teams in the Astronomer Platform",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return teams.List(houstonClient, out)
+			return listTeam(cmd, out, paginated, pageSize)
 		},
 	}
+	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated team list")
+	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the team list if paginated is set to true")
 	return cmd
 }
 
@@ -68,4 +76,21 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&teamRole, "role", "r", "", "Role assigned to the team, one of: SYSTEM_VIEWER, SYSTEM_EDITOR, SYSTEM_ADMIN, NONE")
 	_ = cmd.MarkFlagRequired("role")
 	return cmd
+}
+
+func listTeam(_ *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
+	if config.CFG.Interactive.GetBool() || paginated {
+		configPageSize := config.CFG.PageSize.GetInt()
+		if pageSize <= 0 && teams.ListTeamLimit > 0 {
+			pageSize = configPageSize
+		}
+
+		if !(pageSize > 0 && pageSize <= teams.ListTeamLimit) {
+			logrus.Warnf("Page size cannot be more than %d, reducing the page size to %d", teams.ListTeamLimit, teams.ListTeamLimit)
+			pageSize = teams.ListTeamLimit
+		}
+
+		return teams.PaginatedList(houstonClient, out, pageSize, 0, "")
+	}
+	return teams.List(houstonClient, out)
 }
