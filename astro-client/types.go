@@ -22,7 +22,7 @@ type ResponseData struct {
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
 	GetDeploymentHistory      DeploymentHistory            `json:"deploymentHistory,omitempty"`
 	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
-	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
+	UpdateDeployment          Deployment                   `json:"UpdateDeployment,omitempty"`
 	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
 	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
@@ -270,7 +270,7 @@ type DeploymentCreateSpec struct {
 	Scheduler Scheduler `json:"scheduler"`
 }
 
-type DeploymentUpdateInput struct {
+type UpdateDeploymentInput struct {
 	ID             string               `json:"id"`
 	ClusterID      string               `json:"clusterId"`
 	Label          string               `json:"label"`

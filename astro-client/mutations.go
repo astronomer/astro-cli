@@ -62,11 +62,11 @@ var (
 	}
 	`
 
-	DeploymentUpdate = `
-	mutation deploymentUpdate(
-		$input: DeploymentUpdateInput
+	UpdateDeployment = `
+	mutation updateDeployment(
+		$input: UpdateDeploymentInput!
 	  ) {
-		deploymentUpdate(
+		updateDeployment(
 			input: $input
 		) {
 			id

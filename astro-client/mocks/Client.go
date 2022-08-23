@@ -409,18 +409,18 @@ func (_m *Client) ReportDagDeploymentStatus(input *astro.ReportDagDeploymentStat
 }
 
 // UpdateDeployment provides a mock function with given fields: input
-func (_m *Client) UpdateDeployment(input *astro.DeploymentUpdateInput) (astro.Deployment, error) {
+func (_m *Client) UpdateDeployment(input *astro.UpdateDeploymentInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
 
 	var r0 astro.Deployment
-	if rf, ok := ret.Get(0).(func(*astro.DeploymentUpdateInput) astro.Deployment); ok {
+	if rf, ok := ret.Get(0).(func(*astro.UpdateDeploymentInput) astro.Deployment); ok {
 		r0 = rf(input)
 	} else {
 		r0 = ret.Get(0).(astro.Deployment)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*astro.DeploymentUpdateInput) error); ok {
+	if rf, ok := ret.Get(1).(func(*astro.UpdateDeploymentInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

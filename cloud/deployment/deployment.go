@@ -458,7 +458,7 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 		Executor:  "CeleryExecutor",
 	}
 
-	deploymentUpdate := &astro.DeploymentUpdateInput{
+	deploymentUpdate := &astro.UpdateDeploymentInput{
 		ID:             currentDeployment.ID,
 		ClusterID:      currentDeployment.Cluster.ID,
 		DeploymentSpec: spec,

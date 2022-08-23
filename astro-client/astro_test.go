@@ -189,7 +189,7 @@ func TestUpdateDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentUpdate: Deployment{
+			UpdateDeployment: Deployment{
 				ID:             "test-deployment-id",
 				Label:          "test-deployment-label",
 				ReleaseName:    "test-release-name",
@@ -211,9 +211,9 @@ func TestUpdateDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployment, err := astroClient.UpdateDeployment(&DeploymentUpdateInput{})
+		deployment, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.DeploymentUpdate)
+		assert.Equal(t, deployment, mockResponse.Data.UpdateDeployment)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -226,7 +226,7 @@ func TestUpdateDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.UpdateDeployment(&DeploymentUpdateInput{})
+		_, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
