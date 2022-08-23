@@ -355,7 +355,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow-settings.yaml", false).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -370,7 +370,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow-settings.yaml", false).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -643,7 +643,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow-settings.yaml", true).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -676,7 +676,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow-settings.yaml", true).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -962,7 +962,7 @@ func TestAirflowBash(t *testing.T) {
 
 func TestAirflowObjectImport(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectImportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
 		cmd.Flag("variables").Value.Set("true")
@@ -971,7 +971,7 @@ func TestAirflowObjectImport(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow-settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
+			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -981,12 +981,12 @@ func TestAirflowObjectImport(t *testing.T) {
 	})
 
 	t.Run("without any object flag", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectImportCmd()
 		args := []string{}
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow-settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
+			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -996,7 +996,7 @@ func TestAirflowObjectImport(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectImportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
 		cmd.Flag("variables").Value.Set("true")
@@ -1004,7 +1004,7 @@ func TestAirflowObjectImport(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow-settings.yaml", ".env", connections, variables, pools, export, envExport).Return(errMock).Once()
+			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1014,7 +1014,7 @@ func TestAirflowObjectImport(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectImportCmd()
 		args := []string{}
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
@@ -1028,16 +1028,18 @@ func TestAirflowObjectImport(t *testing.T) {
 
 func TestAirflowObjectExport(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectExportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
 		cmd.Flag("variables").Value.Set("true")
 
 		args := []string{}
 
+		export = true
+
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow-settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
+			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1047,12 +1049,14 @@ func TestAirflowObjectExport(t *testing.T) {
 	})
 
 	t.Run("without any object flag", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectExportCmd()
 		args := []string{}
+
+		export = true
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow-settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
+			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1062,15 +1066,17 @@ func TestAirflowObjectExport(t *testing.T) {
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectExportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
 		cmd.Flag("variables").Value.Set("true")
 		args := []string{}
 
+		export = true
+
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow-settings.yaml", ".env", connections, variables, pools, export, envExport).Return(errMock).Once()
+			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1080,8 +1086,10 @@ func TestAirflowObjectExport(t *testing.T) {
 	})
 
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
-		cmd := newAirflowBashCmd()
+		cmd := newObjectExportCmd()
 		args := []string{}
+
+		export = true
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			return nil, errMock

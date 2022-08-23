@@ -160,7 +160,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow-settings.yaml", "Settings or env file to import airflow objects from")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 	return cmd
 }
 
@@ -259,7 +259,7 @@ func newAirflowRestartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow-settings.yaml", "Settings or env file to import airflow objects from")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 
 	return cmd
 }
@@ -365,7 +365,7 @@ func newObjectImportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from an Airflow Settings File")
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from an Airflow Settings File")
 	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from an Airflow Settings File")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow-settings.yaml", "Settings or env file export objects too")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
 	return cmd
 }
 
@@ -385,7 +385,7 @@ func newObjectExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to an Airflow Settings File")
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to an Airflow Settings File")
 	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to an Airflow Settings File")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow-settings.yaml", "Settings or env file export objects too")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
 	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "This exports the objects in the form of Airflow environment variables to an env file")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to export objects as environment variables too")
 	return cmd
