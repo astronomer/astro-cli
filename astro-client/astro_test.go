@@ -431,7 +431,7 @@ func TestModifyDeploymentVariable(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentVariablesUpdate: []EnvironmentVariablesObject{
+			UpdateDeploymentVariables: []EnvironmentVariablesObject{
 				{
 					Key:      "test-env-key",
 					Value:    "test-env-value",
@@ -455,7 +455,7 @@ func TestModifyDeploymentVariable(t *testing.T) {
 
 		envVars, err := astroClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, envVars, mockResponse.Data.DeploymentVariablesUpdate)
+		assert.Equal(t, envVars, mockResponse.Data.UpdateDeploymentVariables)
 	})
 
 	t.Run("error", func(t *testing.T) {

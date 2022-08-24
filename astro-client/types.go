@@ -23,7 +23,7 @@ type ResponseData struct {
 	GetDeploymentHistory      DeploymentHistory            `json:"deploymentHistory,omitempty"`
 	DeleteDeployment          Deployment                   `json:"DeleteDeployment,omitempty"`
 	UpdateDeployment          Deployment                   `json:"UpdateDeployment,omitempty"`
-	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
+	UpdateDeploymentVariables []EnvironmentVariablesObject `json:"UpdateDeploymentVariables,omitempty"`
 	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`

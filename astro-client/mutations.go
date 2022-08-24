@@ -87,11 +87,11 @@ var (
 	  	}
 	}
 	`
-	DeploymentVariablesCreate = `
-	mutation deploymentVariablesUpdate(
+	CreateDeploymentVariables = `
+	mutation updateDeploymentVariables(
 	  $input: EnvironmentVariablesInput!
 	) {
-	  deploymentVariablesUpdate(
+		updateDeploymentVariables(
 		input: $input
 	  ) {
 		key

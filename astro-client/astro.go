@@ -156,7 +156,7 @@ func (c *HTTPClient) GetDeploymentConfig() (DeploymentConfig, error) {
 
 func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error) {
 	req := Request{
-		Query:     DeploymentVariablesCreate,
+		Query:     CreateDeploymentVariables,
 		Variables: map[string]interface{}{"input": input},
 	}
 
@@ -164,7 +164,7 @@ func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) (
 	if err != nil {
 		return []EnvironmentVariablesObject{}, err
 	}
-	return resp.Data.DeploymentVariablesUpdate, nil
+	return resp.Data.UpdateDeploymentVariables, nil
 }
 
 func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error) {
