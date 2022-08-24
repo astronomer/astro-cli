@@ -3,13 +3,12 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -315,6 +314,7 @@ func EnvExportVariables(id, envFile string) error {
 		defer f.Close()
 
 		for k, v := range m {
+
 			_, err := f.WriteString("\nAIRFLOW_VAR_" + strings.ToUpper(k) + "=" + v)
 			if err != nil {
 				fmt.Println(err)

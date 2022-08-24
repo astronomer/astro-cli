@@ -97,7 +97,7 @@ func AddConnectionsOld(id string, version uint64) {
 		if objectValidator(0, conn.ConnURI) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
 		}
-		if objectValidator(0, conn.ConnExtra){
+		if objectValidator(0, conn.ConnExtra) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, conn.ConnExtra)
 		}
 		if objectValidator(0, conn.ConnHost) {
