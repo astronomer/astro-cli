@@ -28,7 +28,7 @@ type ClientInterface interface {
 	CreateUser(req CreateUserRequest) (*AuthUser, error)
 	// workspace
 	CreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
-	ListWorkspaces(req interface{}) ([]Workspace, error) // Extra argument added to be inline with function signature
+	ListWorkspaces() ([]Workspace, error)
 	PaginatedListWorkspaces(req PaginatedListWorkspaceRequest) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
@@ -52,9 +52,9 @@ type ClientInterface interface {
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
-	GetDeploymentConfig(req interface{}) (*DeploymentConfig, error) // Extra argument added to be inline with function signature
+	GetDeploymentConfig() (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
-	UpdateDeploymentImage(req UpdateDeploymentImageRequest) (interface{}, error) // Extra return argument added to be inline with function signature
+	UpdateDeploymentImage(req UpdateDeploymentImageRequest) error
 	// deployment users
 	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
@@ -68,8 +68,9 @@ type ClientInterface interface {
 	DeleteWorkspaceServiceAccount(req DeleteServiceAccountRequest) (*ServiceAccount, error)
 	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
-	GetAppConfig(req interface{}) (*AppConfig, error)            // Extra argument added to be inline with function signature
-	GetAvailableNamespaces(req interface{}) ([]Namespace, error) // Extra argument added to be inline with function signature
+	GetAppConfig() (*AppConfig, error)
+	GetAvailableNamespaces() ([]Namespace, error)
+	GetPlatformVersion() (string, error)
 	// runtime
 	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
 	// teams

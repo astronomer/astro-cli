@@ -468,13 +468,13 @@ func (_m *ClientInterface) DeleteWorkspaceUser(req houston.DeleteWorkspaceUserRe
 	return r0, r1
 }
 
-// GetAppConfig provides a mock function with given fields: req
-func (_m *ClientInterface) GetAppConfig(req interface{}) (*houston.AppConfig, error) {
-	ret := _m.Called(req)
+// GetAppConfig provides a mock function with given fields:
+func (_m *ClientInterface) GetAppConfig() (*houston.AppConfig, error) {
+	ret := _m.Called()
 
 	var r0 *houston.AppConfig
-	if rf, ok := ret.Get(0).(func(interface{}) *houston.AppConfig); ok {
-		r0 = rf(req)
+	if rf, ok := ret.Get(0).(func() *houston.AppConfig); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*houston.AppConfig)
@@ -482,8 +482,8 @@ func (_m *ClientInterface) GetAppConfig(req interface{}) (*houston.AppConfig, er
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(req)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -514,13 +514,13 @@ func (_m *ClientInterface) GetAuthConfig(ctx *config.Context) (*houston.AuthConf
 	return r0, r1
 }
 
-// GetAvailableNamespaces provides a mock function with given fields: req
-func (_m *ClientInterface) GetAvailableNamespaces(req interface{}) ([]houston.Namespace, error) {
-	ret := _m.Called(req)
+// GetAvailableNamespaces provides a mock function with given fields:
+func (_m *ClientInterface) GetAvailableNamespaces() ([]houston.Namespace, error) {
+	ret := _m.Called()
 
 	var r0 []houston.Namespace
-	if rf, ok := ret.Get(0).(func(interface{}) []houston.Namespace); ok {
-		r0 = rf(req)
+	if rf, ok := ret.Get(0).(func() []houston.Namespace); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.Namespace)
@@ -528,8 +528,8 @@ func (_m *ClientInterface) GetAvailableNamespaces(req interface{}) ([]houston.Na
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(req)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -560,13 +560,13 @@ func (_m *ClientInterface) GetDeployment(deploymentID string) (*houston.Deployme
 	return r0, r1
 }
 
-// GetDeploymentConfig provides a mock function with given fields: req
-func (_m *ClientInterface) GetDeploymentConfig(req interface{}) (*houston.DeploymentConfig, error) {
-	ret := _m.Called(req)
+// GetDeploymentConfig provides a mock function with given fields:
+func (_m *ClientInterface) GetDeploymentConfig() (*houston.DeploymentConfig, error) {
+	ret := _m.Called()
 
 	var r0 *houston.DeploymentConfig
-	if rf, ok := ret.Get(0).(func(interface{}) *houston.DeploymentConfig); ok {
-		r0 = rf(req)
+	if rf, ok := ret.Get(0).(func() *houston.DeploymentConfig); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*houston.DeploymentConfig)
@@ -574,8 +574,29 @@ func (_m *ClientInterface) GetDeploymentConfig(req interface{}) (*houston.Deploy
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(req)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPlatformVersion provides a mock function with given fields:
+func (_m *ClientInterface) GetPlatformVersion() (string, error) {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -947,13 +968,13 @@ func (_m *ClientInterface) ListWorkspaceUserAndRoles(workspaceID string) ([]hous
 	return r0, r1
 }
 
-// ListWorkspaces provides a mock function with given fields: req
-func (_m *ClientInterface) ListWorkspaces(req interface{}) ([]houston.Workspace, error) {
-	ret := _m.Called(req)
+// ListWorkspaces provides a mock function with given fields:
+func (_m *ClientInterface) ListWorkspaces() ([]houston.Workspace, error) {
+	ret := _m.Called()
 
 	var r0 []houston.Workspace
-	if rf, ok := ret.Get(0).(func(interface{}) []houston.Workspace); ok {
-		r0 = rf(req)
+	if rf, ok := ret.Get(0).(func() []houston.Workspace); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]houston.Workspace)
@@ -961,8 +982,8 @@ func (_m *ClientInterface) ListWorkspaces(req interface{}) ([]houston.Workspace,
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(interface{}) error); ok {
-		r1 = rf(req)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1063,26 +1084,17 @@ func (_m *ClientInterface) UpdateDeploymentAirflow(variables map[string]interfac
 }
 
 // UpdateDeploymentImage provides a mock function with given fields: req
-func (_m *ClientInterface) UpdateDeploymentImage(req houston.UpdateDeploymentImageRequest) (interface{}, error) {
+func (_m *ClientInterface) UpdateDeploymentImage(req houston.UpdateDeploymentImageRequest) error {
 	ret := _m.Called(req)
 
-	var r0 interface{}
-	if rf, ok := ret.Get(0).(func(houston.UpdateDeploymentImageRequest) interface{}); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(houston.UpdateDeploymentImageRequest) error); ok {
 		r0 = rf(req)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
-		}
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(houston.UpdateDeploymentImageRequest) error); ok {
-		r1 = rf(req)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // UpdateDeploymentRuntime provides a mock function with given fields: variables

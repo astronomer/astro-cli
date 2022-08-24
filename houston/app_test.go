@@ -49,11 +49,11 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		config, err := api.GetAppConfig(nil)
+		config, err := api.GetAppConfig()
 		assert.NoError(t, err)
 		assert.Equal(t, config, mockAppConfig)
 
-		config, err = api.GetAppConfig(nil)
+		config, err = api.GetAppConfig()
 		assert.NoError(t, err)
 		assert.Equal(t, config, mockAppConfig)
 
@@ -76,11 +76,11 @@ func TestGetAppConfig(t *testing.T) {
 		appConfig = nil
 		appConfigErr = nil
 
-		config, err := api.GetAppConfig(nil)
+		config, err := api.GetAppConfig()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 		assert.Nil(t, config)
 
-		config, err = api.GetAppConfig(nil)
+		config, err = api.GetAppConfig()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 		assert.Nil(t, config)
 
@@ -102,7 +102,7 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAppConfig(nil)
+		_, err := api.GetAppConfig()
 		assert.EqualError(t, err, ErrFieldsNotAvailable{}.Error())
 	})
 }
@@ -131,7 +131,7 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		namespaces, err := api.GetAvailableNamespaces(nil)
+		namespaces, err := api.GetAvailableNamespaces()
 		assert.NoError(t, err)
 		assert.Equal(t, namespaces, mockNamespaces.Data.GetDeploymentNamespaces)
 	})
@@ -146,7 +146,48 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAvailableNamespaces(nil)
+		_, err := api.GetAvailableNamespaces()
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestGetPlatformVersion(t *testing.T) {
+	testUtil.InitTestConfig("software")
+
+	mockNamespaces := &Response{
+		Data: ResponseData{
+			GetAppConfig: &AppConfig{Version: "0.30.0"},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockNamespaces)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+		version = ""
+		platformVersion, err := api.GetPlatformVersion()
+		assert.NoError(t, err)
+		assert.Equal(t, platformVersion, mockNamespaces.Data.GetAppConfig.Version)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+		version = ""
+		_, err := api.GetAvailableNamespaces()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

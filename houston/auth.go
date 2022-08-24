@@ -29,6 +29,7 @@ var (
 		}
 	}`
 
+	// nolint:gosec
 	TokenBasicCreateRequest = `
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {
@@ -49,6 +50,10 @@ var (
 
 // AuthenticateWithBasicAuth - authentiate to Houston using basic auth
 func (h ClientImplementation) AuthenticateWithBasicAuth(request BasicAuthRequest) (string, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return "", err
+	}
+
 	req := Request{
 		Query:     TokenBasicCreateRequest,
 		Variables: request,
@@ -75,6 +80,10 @@ func (h ClientImplementation) AuthenticateWithBasicAuth(request BasicAuthRequest
 
 // GetAuthConfig - get authentication configuration
 func (h ClientImplementation) GetAuthConfig(ctx *config.Context) (*AuthConfig, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	acReq := Request{
 		Query: AuthConfigGetRequest,
 	}

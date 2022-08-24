@@ -15,7 +15,7 @@ var errTeamNotInWorkspace = errors.New("the team you are trying to change is not
 // Add a team to a workspace with specified role
 // nolint: dupl
 func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	w, err := houston.Call(client.AddWorkspaceTeam, houston.AddWorkspaceTeamRequest{WorkspaceID: workspaceID, TeamID: teamID, Role: role})
+	w, err := client.AddWorkspaceTeam(houston.AddWorkspaceTeamRequest{WorkspaceID: workspaceID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface, o
 
 // Remove a team from a workspace
 func RemoveTeam(workspaceID, teamID string, client houston.ClientInterface, out io.Writer) error {
-	w, err := houston.Call(client.DeleteWorkspaceTeam, houston.DeleteWorkspaceTeamRequest{WorkspaceID: workspaceID, TeamID: teamID})
+	w, err := client.DeleteWorkspaceTeam(houston.DeleteWorkspaceTeamRequest{WorkspaceID: workspaceID, TeamID: teamID})
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func RemoveTeam(workspaceID, teamID string, client houston.ClientInterface, out 
 
 // ListRoles print teams and roles from a workspace
 func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Writer) error {
-	workspaceTeams, err := houston.Call(client.ListWorkspaceTeamsAndRoles, workspaceID)
+	workspaceTeams, err := client.ListWorkspaceTeamsAndRoles(workspaceID)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 // nolint: dupl
 func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	// get team you are updating to show role from before change
-	teams, err := houston.Call(client.GetWorkspaceTeamRole, houston.GetWorkspaceTeamRoleRequest{WorkspaceID: workspaceID, TeamID: teamID})
+	teams, err := client.GetWorkspaceTeamRole(houston.GetWorkspaceTeamRoleRequest{WorkspaceID: workspaceID, TeamID: teamID})
 
 	if teams == nil || err != nil {
 		return errTeamNotInWorkspace
@@ -96,7 +96,7 @@ func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInter
 		return errTeamNotInWorkspace
 	}
 
-	newRole, err := houston.Call(client.UpdateWorkspaceTeamRole, houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: workspaceID, TeamID: teamID, Role: role})
+	newRole, err := client.UpdateWorkspaceTeamRole(houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: workspaceID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
 	}

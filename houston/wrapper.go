@@ -1,29 +1,16 @@
 package houston
 
 import (
-	"crypto/tls"
-	"net"
-	"net/http"
-	"reflect"
 	"runtime"
 	"strings"
-	"time"
 
-	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 )
 
-var (
-	version                string
-	ApplyDecoratorForTests bool
-)
+var ApplyDecoratorForTests bool
 
-const houstonVersionQuery = `query AppConfig {
-								appConfig {
-									version
-								}
-							}`
+const DesiredMethodDepth = 2 // 2 because getCallerFunctionName will be called from ValidateAvailability which is called from the function which we are interested in
 
 type VersionRestrictions struct {
 	GTE string
@@ -49,24 +36,27 @@ var houstonMethodAvailabilityByVersion = map[string]VersionRestrictions{
 	"GetRuntimeReleases":      {GTE: "0.29.0"},
 }
 
-func Call[fReq any, fResp any, fType func(any) (any, error)](houstonFunc func(fReq) (fResp, error), req fReq) (fResp, error) {
-	if !ApplyDecoratorForTests && isCalledFromUnitTestFile() { //bypassing this decorator for unit tests
-		return houstonFunc(req)
+func (h ClientImplementation) ValidateAvailability() error {
+	if !ApplyDecoratorForTests && isCalledFromUnitTestFile() { // bypassing this wrapper for unit tests
+		return nil
 	}
-	if version == "" { //fallback in case version is not set
-		version = getHoustonVersion()
+
+	platformVersion, err := h.GetPlatformVersion()
+	if err != nil {
+		logrus.Debugf("Error retrieving houston version: %s", err.Error())
+		return nil
 	}
+
 	// get functionName from houstonFunc
-	funcName := getFunctionName(houstonFunc)
+	funcName := getCallerFunctionName()
 	funcRestriction, ok := houstonMethodAvailabilityByVersion[funcName]
 	if !ok {
-		return houstonFunc(req)
+		return nil
 	}
-	if VerifyVersionMatch(version, funcRestriction) {
-		return houstonFunc(req)
+	if VerifyVersionMatch(platformVersion, funcRestriction) {
+		return nil
 	}
-	var res fResp
-	return res, ErrMethodNotImplemented{MethodName: funcName}
+	return ErrMethodNotImplemented{MethodName: funcName}
 }
 
 func VerifyVersionMatch(version string, funcRestriction VersionRestrictions) bool {
@@ -104,10 +94,14 @@ func VerifyVersionMatch(version string, funcRestriction VersionRestrictions) boo
 	return true
 }
 
-func getFunctionName(i interface{}) string {
-	runtimeFuncName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name() // naming convention: github.com/astronomer/astro-cli/houston.ClientInterface.GetTeam-fm
+func getCallerFunctionName() string {
+	pc, _, _, ok := runtime.Caller(DesiredMethodDepth)
+	if !ok {
+		return ""
+	}
+	runtimeFuncName := runtime.FuncForPC(pc).Name()                           // naming convention: github.com/astronomer/astro-cli/houston.ClientInterface.GetTeam-fm
 	methodName := runtimeFuncName[strings.LastIndex(runtimeFuncName, ".")+1:] // split by . and get the last part of it
-	methodName, _, _ = strings.Cut(methodName, "-")                           //get the string before the first instance of hyphen
+	methodName, _, _ = strings.Cut(methodName, "-")                           // get the string before the first instance of hyphen
 	return methodName
 }
 
@@ -121,33 +115,6 @@ func sanitiseVersionString(v string) string {
 		v = strings.TrimSuffix(v, preRelease)
 	}
 	return v
-}
-
-func getHoustonVersion() string {
-	httpClient := httputil.NewHTTPClient()
-	// configure http transport
-	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
-	// #nosec
-	httpClient.HTTPClient.Transport = &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout: time.Duration(dialTimeout) * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
-	}
-	client := newInternalClient(httpClient)
-
-	req := Request{
-		Query: houstonVersionQuery,
-	}
-
-	var r *Response
-	r, appConfigErr = req.DoWithClient(client)
-	if appConfigErr != nil {
-		appConfigErr = handleAPIErr(appConfigErr)
-		return ""
-	}
-	return r.Data.GetAppConfig.Version
 }
 
 func SetVersion(v string) {

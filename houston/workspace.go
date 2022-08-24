@@ -130,6 +130,10 @@ var (
 
 // CreateWorkspace - create a workspace
 func (h ClientImplementation) CreateWorkspace(request CreateWorkspaceRequest) (*Workspace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	req := Request{
 		Query:     WorkspaceCreateRequest,
 		Variables: request,
@@ -144,7 +148,11 @@ func (h ClientImplementation) CreateWorkspace(request CreateWorkspaceRequest) (*
 }
 
 // ListWorkspaces - list workspaces
-func (h ClientImplementation) ListWorkspaces(_ interface{}) ([]Workspace, error) {
+func (h ClientImplementation) ListWorkspaces() ([]Workspace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return []Workspace{}, err
+	}
+
 	req := Request{
 		Query: WorkspacesGetRequest,
 	}
@@ -159,6 +167,10 @@ func (h ClientImplementation) ListWorkspaces(_ interface{}) ([]Workspace, error)
 
 // PaginatedListWorkspaces - list workspaces
 func (h ClientImplementation) PaginatedListWorkspaces(request PaginatedListWorkspaceRequest) ([]Workspace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return []Workspace{}, err
+	}
+
 	req := Request{
 		Query:     WorkspacesPaginatedGetRequest,
 		Variables: request,
@@ -174,6 +186,10 @@ func (h ClientImplementation) PaginatedListWorkspaces(request PaginatedListWorks
 
 // DeleteWorkspace - delete a workspace
 func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	req := Request{
 		Query:     WorkspaceDeleteRequest,
 		Variables: map[string]interface{}{"workspaceId": workspaceID},
@@ -189,6 +205,10 @@ func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, e
 
 // GetWorkspace - get a workspace
 func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	req := Request{
 		Query:     WorkspaceGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
@@ -209,6 +229,10 @@ func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, erro
 
 // UpdateWorkspace - update a workspace
 func (h ClientImplementation) UpdateWorkspace(request UpdateWorkspaceRequest) (*Workspace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	req := Request{
 		Query:     WorkspaceUpdateRequest,
 		Variables: request,

@@ -30,7 +30,7 @@ type PaginationOptions struct {
 // Add a user to a workspace with specified role
 // nolint: dupl
 func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
-	w, err := houston.Call(client.AddWorkspaceUser, houston.AddWorkspaceUserRequest{WorkspaceID: workspaceID, Email: email, Role: role})
+	w, err := client.AddWorkspaceUser(houston.AddWorkspaceUserRequest{WorkspaceID: workspaceID, Email: email, Role: role})
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func Add(workspaceID, email, role string, client houston.ClientInterface, out io
 // Remove a user from a workspace
 // nolint: dupl
 func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error {
-	w, err := houston.Call(client.DeleteWorkspaceUser, houston.DeleteWorkspaceUserRequest{WorkspaceID: workspaceID, UserID: userID})
+	w, err := client.DeleteWorkspaceUser(houston.DeleteWorkspaceUserRequest{WorkspaceID: workspaceID, UserID: userID})
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func Remove(workspaceID, userID string, client houston.ClientInterface, out io.W
 
 // ListRoles print users and roles from a workspace
 func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer) error {
-	users, err := houston.Call(client.ListWorkspaceUserAndRoles, workspaceID)
+	users, err := client.ListWorkspaceUserAndRoles(workspaceID)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 
 // PaginatedListRoles print users and roles from a workspace
 func PaginatedListRoles(workspaceID, cursorID string, take float64, pageNumber int, client houston.ClientInterface, out io.Writer) error {
-	users, err := houston.Call(client.ListWorkspacePaginatedUserAndRoles, houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: workspaceID, CursorID: cursorID, Take: take})
+	users, err := client.ListWorkspacePaginatedUserAndRoles(houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: workspaceID, CursorID: cursorID, Take: take})
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ var PromptPaginatedOption = func(previousCursorID string, nextCursorID string, t
 // Update workspace user role
 func UpdateRole(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	// get user you are updating to show role from before change
-	roles, err := houston.Call(client.GetWorkspaceUserRole, houston.GetWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email})
+	roles, err := client.GetWorkspaceUserRole(houston.GetWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email})
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func UpdateRole(workspaceID, email, role string, client houston.ClientInterface,
 		return errUserNotInWorkspace
 	}
 
-	newRole, err := houston.Call(client.UpdateWorkspaceUserRole, houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email, Role: role})
+	newRole, err := client.UpdateWorkspaceUserRole(houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email, Role: role})
 	if err != nil {
 		return err
 	}

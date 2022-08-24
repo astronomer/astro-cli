@@ -400,7 +400,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		deploymentConfig, err := api.GetDeploymentConfig(nil)
+		deploymentConfig, err := api.GetDeploymentConfig()
 		assert.NoError(t, err)
 		assert.Equal(t, *deploymentConfig, mockDeploymentConfig.Data.DeploymentConfig)
 	})
@@ -415,7 +415,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetDeploymentConfig(nil)
+		_, err := api.GetDeploymentConfig()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -601,7 +601,7 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		assert.NoError(t, err)
 	})
 
@@ -615,7 +615,7 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

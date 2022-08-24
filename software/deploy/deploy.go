@@ -63,7 +63,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	}
 
 	// Validate workspace
-	currentWorkspace, err := houston.Call(houstonClient.GetWorkspace, wsID)
+	currentWorkspace, err := houstonClient.GetWorkspace(wsID)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 	request := houston.ListDeploymentsRequest{
 		WorkspaceID: currentWorkspace.ID,
 	}
-	deployments, err := houston.Call(houstonClient.ListDeployments, request)
+	deployments, err := houstonClient.ListDeployments(request)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID, by
 		nextTag = "deploy-" + time.Now().UTC().Format("2006-01-02T15-04") // updating nextTag logic for private registry, since houston won't maintain next tag in case of BYO registry
 	}
 
-	deploymentInfo, err := houston.Call(houstonClient.GetDeployment, deploymentID)
+	deploymentInfo, err := houstonClient.GetDeployment(deploymentID)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
@@ -186,12 +186,12 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		}
 	}
 	// Get valid image tags for platform using Deployment Info request
-	deploymentConfig, err := houston.Call(houstonClient.GetDeploymentConfig, nil)
+	deploymentConfig, err := houstonClient.GetDeploymentConfig()
 	if err != nil {
 		return err
 	}
 	// ignoring the error as user can be connected to platform where runtime is not enabled
-	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases, "")
+	runtimeReleases, _ := houstonClient.GetRuntimeReleases("")
 	var validTags string
 	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
 		validTags = strings.Join(deploymentConfig.GetValidTags(tag), ", ")
@@ -247,8 +247,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		runtimeVersion, _ := imageHandler.GetLabel(runtimeImageLabel)
 		airflowVersion, _ := imageHandler.GetLabel(airflowImageLabel)
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
-		_, err = houston.Call(houstonClient.UpdateDeploymentImage, req)
-		return err
+		return houstonClient.UpdateDeploymentImage(req)
 	}
 
 	return nil

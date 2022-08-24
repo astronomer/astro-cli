@@ -8,13 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type cmdFlag struct {
-	cmd  string
-	flag string
-}
-
 var cmdAvailabilityByVersion = map[string]houston.VersionRestrictions{
-	"astro team":            {GTE: "0.29.1"},
+	"astro team":            {GTE: "0.30.0"},
 	"astro deployment team": {GTE: "0.30.0"},
 	"astro workspace team":  {GTE: "0.30.0"},
 

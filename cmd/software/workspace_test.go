@@ -48,8 +48,8 @@ func TestWorkspaceList(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(&houston.AppConfig{}, nil)
-	api.On("ListWorkspaces", nil).Return(mockWorkspaces, nil)
+	api.On("GetAppConfig").Return(&houston.AppConfig{}, nil)
+	api.On("ListWorkspaces").Return(mockWorkspaces, nil)
 
 	houstonClient = api
 

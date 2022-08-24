@@ -28,7 +28,7 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	houstonClient = client
 
 	var err error
-	appConfig, err = houston.Call(client.GetAppConfig, nil)
+	appConfig, err = client.GetAppConfig()
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	}

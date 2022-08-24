@@ -1,8 +1,15 @@
 package houston
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"runtime"
+	"strings"
 	"testing"
 
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,13 +74,13 @@ func TestSanitiseVersionString(t *testing.T) {
 	}
 }
 
-func funcToTest(_ interface{}) (interface{}, error) { return nil, nil }
-
-func TestGetFunctionName(t *testing.T) {
-	if got := getFunctionName(funcToTest); got != "funcToTest" {
-		t.Errorf("GetFunctionName() = %v, want %v", got, "funcToTest")
+func TestGetCallerFunctionName(t *testing.T) {
+	var res string
+	testFunc := func() {
+		res = getCallerFunctionName()
 	}
-
+	testFunc()
+	assert.Equal(t, res, "TestGetCallerFunctionName")
 }
 
 func TestVerifyVersionMatch(t *testing.T) {
@@ -141,39 +148,58 @@ func TestVerifyVersionMatch(t *testing.T) {
 	}
 }
 
-func TestCall(t *testing.T) {
+func TestValidateAvailability(t *testing.T) {
+	testUtil.InitTestConfig("software")
+
+	mockResponse := Response{
+		Data: ResponseData{
+			GetAppConfig: &AppConfig{Version: "0.30.0"},
+		},
+	}
+	jsonResponse, jsonErr := json.Marshal(mockResponse)
+	assert.NoError(t, jsonErr)
+
+	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+			Header:     make(http.Header),
+		}
+	})
+	api := ClientImplementation{client: newInternalClient(client)}
+
 	t.Run("basic case", func(t *testing.T) {
-		resp, err := Call(funcToTest, nil)
+		err := api.ValidateAvailability()
 		assert.NoError(t, err)
-		assert.Nil(t, resp)
 	})
 
 	t.Run("basic case bypassing test file check", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.29.0"
-		resp, err := Call(funcToTest, nil)
+		err := api.ValidateAvailability()
 		assert.NoError(t, err)
-		assert.Nil(t, resp)
 	})
 
 	t.Run("basic case with method restriction", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.29.0"
-		houstonMethodAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.29.0"}
-		resp, err := Call(funcToTest, nil)
+		houstonMethodAvailabilityByVersion["TestValidateAvailability"] = VersionRestrictions{GTE: "0.29.0"}
+		err := api.ValidateAvailability()
 		assert.NoError(t, err)
-		assert.Nil(t, resp)
 	})
 
 	t.Run("negative case with method restriction", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.29.0"}
-		resp, err := Call(funcToTest, nil)
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{MethodName: "funcToTest"})
-		assert.Nil(t, resp)
+
+		pc, _, _, _ := runtime.Caller(0)
+		fName := runtime.FuncForPC(pc).Name()
+		methodName := fName[strings.LastIndex(fName, ".")+1:] // split by . and get the last part of it
+		methodName, _, _ = strings.Cut(methodName, "-")
+
+		houstonMethodAvailabilityByVersion[methodName] = VersionRestrictions{GTE: "0.29.0"}
+		err := api.ValidateAvailability()
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{MethodName: methodName})
 	})
 }

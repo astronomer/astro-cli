@@ -10,7 +10,6 @@ import (
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
-	"github.com/astronomer/astro-cli/cmd/software"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -92,7 +91,7 @@ func NewRootCmd() *cobra.Command {
 		rootCmd.AddCommand(
 			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
-		software.VersionMatchCmds(rootCmd, []string{"astro"})
+		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
 	return rootCmd

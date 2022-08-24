@@ -40,8 +40,7 @@ type WSResponse struct {
 	} `json:"payload"`
 }
 
-var (
-	DeploymentLogsSubscribeRequest = `
+var DeploymentLogsSubscribeRequest = `
     subscription log(
 		$deploymentId: Uuid!
 		$component: String
@@ -59,7 +58,6 @@ var (
         	log: message
     	}
     }`
-)
 
 func BuildDeploymentLogsSubscribeRequest(deploymentID, component, search string, timestamp time.Time) (string, error) {
 	payload := Request{

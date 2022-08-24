@@ -92,6 +92,10 @@ var (
 
 // GetTeam - return a specific team
 func (h ClientImplementation) GetTeam(teamID string) (*Team, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	req := Request{
 		Query:     TeamGetRequest,
 		Variables: map[string]interface{}{"teamUuid": teamID},
@@ -106,6 +110,10 @@ func (h ClientImplementation) GetTeam(teamID string) (*Team, error) {
 
 // GetTeamUsers - return a specific teams Users
 func (h ClientImplementation) GetTeamUsers(teamID string) ([]User, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return []User{}, err
+	}
+
 	req := Request{
 		Query:     TeamGetUsersRequest,
 		Variables: map[string]interface{}{"teamUuid": teamID},
@@ -120,6 +128,10 @@ func (h ClientImplementation) GetTeamUsers(teamID string) ([]User, error) {
 
 // ListTeams - return list of available teams
 func (h ClientImplementation) ListTeams(request ListTeamsRequest) (ListTeamsResp, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return ListTeamsResp{}, err
+	}
+
 	req := Request{
 		Query:     PaginatedTeamsRequest,
 		Variables: request,
@@ -134,6 +146,10 @@ func (h ClientImplementation) ListTeams(request ListTeamsRequest) (ListTeamsResp
 
 // CreateTeamSystemRoleBinding - create system role binding for a team
 func (h ClientImplementation) CreateTeamSystemRoleBinding(request SystemRoleBindingRequest) (string, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return "", err
+	}
+
 	req := Request{
 		Query:     CreateTeamSystemRoleBindingMutation,
 		Variables: request,
@@ -149,6 +165,10 @@ func (h ClientImplementation) CreateTeamSystemRoleBinding(request SystemRoleBind
 
 // DeleteTeamSystemRoleBinding - delete system role binding for a team
 func (h ClientImplementation) DeleteTeamSystemRoleBinding(request SystemRoleBindingRequest) (string, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return "", err
+	}
+
 	req := Request{
 		Query:     DeleteTeamSystemRoleBindingMutation,
 		Variables: request,

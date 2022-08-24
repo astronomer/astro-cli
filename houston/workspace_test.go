@@ -124,7 +124,7 @@ func TestListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.ListWorkspaces(nil)
+		response, err := api.ListWorkspaces()
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.GetWorkspaces)
 	})
@@ -139,7 +139,7 @@ func TestListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.ListWorkspaces(nil)
+		_, err := api.ListWorkspaces()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

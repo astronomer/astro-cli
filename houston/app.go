@@ -3,6 +3,7 @@ package houston
 var (
 	appConfig    *AppConfig
 	appConfigErr error
+	version      string
 )
 
 var (
@@ -68,10 +69,21 @@ var (
 			name
 		}
 	}`
+
+	HoustonVersionQuery = `
+	query AppConfig {
+		appConfig {
+			version
+		}
+	}`
 )
 
 // GetAppConfig - get application configuration
-func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
+func (h ClientImplementation) GetAppConfig() (*AppConfig, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return nil, err
+	}
+
 	// If application config has already been requested, we do not want to request it again
 	// since this is a CLI program that gets executed and exits at the end of execution, we don't want to send multiple
 	// times the same call to get the app config, since it probably won't change in a few milliseconds.
@@ -96,7 +108,11 @@ func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 }
 
 // GetAvailableNamespace - get namespaces to create deployments
-func (h ClientImplementation) GetAvailableNamespaces(_ interface{}) ([]Namespace, error) {
+func (h ClientImplementation) GetAvailableNamespaces() ([]Namespace, error) {
+	if err := h.ValidateAvailability(); err != nil {
+		return []Namespace{}, err
+	}
+
 	req := Request{
 		Query: AvailableNamespacesGetRequest,
 	}
@@ -107,4 +123,23 @@ func (h ClientImplementation) GetAvailableNamespaces(_ interface{}) ([]Namespace
 	}
 
 	return r.Data.GetDeploymentNamespaces, nil
+}
+
+// GetPlatformVersion would fetch the current platform version
+// This method bypass method availability check as this is to be called by that logic itself
+func (h ClientImplementation) GetPlatformVersion() (string, error) {
+	if version != "" {
+		return version, nil
+	}
+
+	req := Request{
+		Query: HoustonVersionQuery,
+	}
+
+	r, err := req.DoWithClient(h.client)
+	if err != nil {
+		return "", err
+	}
+	version = r.Data.GetAppConfig.Version
+	return version, nil
 }

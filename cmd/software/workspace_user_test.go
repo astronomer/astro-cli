@@ -34,7 +34,7 @@ func TestWorkspaceUserRemove(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetAppConfig").Return(mockAppConfig, nil)
 	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: mockWorkspace.ID, Email: mockUser.Username}).Return(mockUser, nil)
 	api.On("DeleteWorkspaceUser", houston.DeleteWorkspaceUserRequest{WorkspaceID: mockWorkspace.ID, UserID: mockUser.ID}).Return(mockWorkspace, nil)
 	houstonClient = api

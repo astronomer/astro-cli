@@ -1,14 +1,11 @@
 package houston
 
 import (
-	"errors"
 	"sort"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 )
-
-var errGraphQLQueryNotDefined = errors.New("GraphQL query not defined for the given Platform version")
 
 type queryByVersion struct {
 	version string
