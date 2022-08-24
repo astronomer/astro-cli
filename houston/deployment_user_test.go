@@ -62,6 +62,25 @@ func TestListDeploymentUsers(t *testing.T) {
 		_, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["ListDeploymentUsers"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListDeploymentUsers"})
+	})
 }
 
 func TestAddDeploymentUser(t *testing.T) {
@@ -115,6 +134,25 @@ func TestAddDeploymentUser(t *testing.T) {
 
 		_, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["AddDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AddDeploymentUser"})
 	})
 }
 
@@ -170,6 +208,25 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		_, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["UpdateDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeploymentUser"})
+	})
 }
 
 func TestDeleteDeploymentUser(t *testing.T) {
@@ -223,5 +280,24 @@ func TestDeleteDeploymentUser(t *testing.T) {
 
 		_, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["DeleteDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteDeploymentUser"})
 	})
 }

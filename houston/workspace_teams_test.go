@@ -56,6 +56,25 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		_, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["AddWorkspaceTeam"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AddWorkspaceTeam"})
+	})
 }
 
 func TestDeleteWorkspaceTeam(t *testing.T) {
@@ -102,6 +121,25 @@ func TestDeleteWorkspaceTeam(t *testing.T) {
 
 		_, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["DeleteWorkspaceTeam"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteWorkspaceTeam"})
 	})
 }
 
@@ -150,6 +188,25 @@ func TestListWorkspaceTeamsAndRoles(t *testing.T) {
 		_, err := api.ListWorkspaceTeamsAndRoles("workspace-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["ListWorkspaceTeamsAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.ListWorkspaceTeamsAndRoles("workspace-id")
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspaceTeamsAndRoles"})
+	})
 }
 
 func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
@@ -191,6 +248,25 @@ func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
 		_, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["UpdateWorkspaceTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", "role"})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateWorkspaceTeamRole"})
+	})
 }
 
 func TestGetWorkspaceTeamRole(t *testing.T) {
@@ -227,5 +303,24 @@ func TestGetWorkspaceTeamRole(t *testing.T) {
 
 		_, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["GetWorkspaceTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetWorkspaceTeamRole"})
 	})
 }

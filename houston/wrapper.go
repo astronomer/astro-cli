@@ -41,18 +41,19 @@ func (h ClientImplementation) ValidateAvailability() error {
 		return nil
 	}
 
-	platformVersion, err := h.GetPlatformVersion()
-	if err != nil {
-		logrus.Debugf("Error retrieving houston version: %s", err.Error())
-		return nil
-	}
-
 	// get functionName from houstonFunc
 	funcName := getCallerFunctionName()
 	funcRestriction, ok := houstonMethodAvailabilityByVersion[funcName]
 	if !ok {
 		return nil
 	}
+
+	platformVersion, err := h.GetPlatformVersion()
+	if err != nil {
+		logrus.Debugf("Error retrieving houston version: %s", err.Error())
+		return nil
+	}
+
 	if VerifyVersionMatch(platformVersion, funcRestriction) {
 		return nil
 	}

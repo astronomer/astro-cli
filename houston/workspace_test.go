@@ -66,6 +66,25 @@ func TestCreateWorkspace(t *testing.T) {
 		_, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["CreateWorkspace"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CreateWorkspace"})
+	})
 }
 
 func TestListWorkspaces(t *testing.T) {
@@ -141,6 +160,25 @@ func TestListWorkspaces(t *testing.T) {
 
 		_, err := api.ListWorkspaces()
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["ListWorkspaces"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.ListWorkspaces()
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspaces"})
 	})
 }
 
@@ -218,6 +256,25 @@ func TestPaginatedListWorkspaces(t *testing.T) {
 		_, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["PaginatedListWorkspaces"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"PaginatedListWorkspaces"})
+	})
 }
 
 func TestDeleteWorkspace(t *testing.T) {
@@ -274,6 +331,25 @@ func TestDeleteWorkspace(t *testing.T) {
 
 		_, err := api.DeleteWorkspace("workspace-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["DeleteWorkspace"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.DeleteWorkspace("workspace-id")
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteWorkspace"})
 	})
 }
 
@@ -332,6 +408,25 @@ func TestGetWorkspace(t *testing.T) {
 		_, err := api.GetWorkspace("workspace-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["GetWorkspace"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.GetWorkspace("workspace-id")
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetWorkspace"})
+	})
 }
 
 func TestUpdateWorkspace(t *testing.T) {
@@ -388,5 +483,24 @@ func TestUpdateWorkspace(t *testing.T) {
 
 		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["UpdateWorkspace"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateWorkspace"})
 	})
 }

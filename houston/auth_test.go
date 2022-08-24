@@ -58,6 +58,25 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		_, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["AuthenticateWithBasicAuth"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AuthenticateWithBasicAuth"})
+	})
 }
 
 func TestGetAuthConfig(t *testing.T) {
@@ -104,5 +123,24 @@ func TestGetAuthConfig(t *testing.T) {
 
 		_, err := api.GetAuthConfig(&ctx)
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("method not available", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "0.28.0"
+		houstonMethodAvailabilityByVersion["GetAuthConfig"] = VersionRestrictions{GTE: "0.29.0"}
+
+		_, err := api.GetAuthConfig(&ctx)
+		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetAuthConfig"})
 	})
 }
