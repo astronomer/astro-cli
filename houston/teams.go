@@ -65,6 +65,9 @@ var (
 			teams {
 				id
 				name
+				roleBindings {
+					role
+				}
 			}
 		}
 	}`

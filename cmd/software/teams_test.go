@@ -97,3 +97,42 @@ func TestNewTeamUpdateCmd(t *testing.T) {
 	assert.Contains(t, output, houston.SystemAdminRole)
 	api.AssertExpectations(t)
 }
+
+func TestListTeam(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	t.Run("success with page size more than the threshold", func(t *testing.T) {
+		api := new(mocks.ClientInterface)
+		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		houstonClient = api
+		defer testUtil.MockUserInput(t, "q")()
+
+		output, err := execTeamCmd("list", "-p", "-s=30")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "test-id")
+		api.AssertExpectations(t)
+	})
+
+	t.Run("success with negative page size", func(t *testing.T) {
+		api := new(mocks.ClientInterface)
+		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		houstonClient = api
+		defer testUtil.MockUserInput(t, "q")()
+
+		output, err := execTeamCmd("list", "-p", "-s=-2")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "test-id")
+		api.AssertExpectations(t)
+	})
+
+	t.Run("success without pagination", func(t *testing.T) {
+		api := new(mocks.ClientInterface)
+		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		houstonClient = api
+
+		output, err := execTeamCmd("list")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "test-id")
+		api.AssertExpectations(t)
+	})
+}

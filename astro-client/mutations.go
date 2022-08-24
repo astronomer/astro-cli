@@ -33,17 +33,17 @@ var (
 	}
 	`
 
-	DeploymentCreate = `
-	mutation deploymentCreate(
-		$input: DeploymentCreateInput
+	CreateDeployment = `
+	mutation createDeployment(
+		$input: CreateDeploymentInput!
 	  ) {
-		deploymentCreate (
+		createDeployment (
 		  input: $input
 		){
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {
@@ -72,7 +72,7 @@ var (
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {

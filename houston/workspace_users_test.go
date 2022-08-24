@@ -134,7 +134,7 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 					Username: "test@astronomer.com",
 					FullName: "test",
 					Emails:   []Email{{Address: "test@astronomer.com"}},
-					RoleBindings: []RoleBindingWorkspace{
+					RoleBindings: []RoleBinding{
 						{
 							Role: WorkspaceViewerRole,
 						},
@@ -187,7 +187,7 @@ func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
 					Username: "test@astronomer.com",
 					FullName: "test",
 					Emails:   []Email{{Address: "test@astronomer.com"}},
-					RoleBindings: []RoleBindingWorkspace{
+					RoleBindings: []RoleBinding{
 						{
 							Role: WorkspaceViewerRole,
 						},
@@ -240,7 +240,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 					Username: "test@astronomer.com",
 					FullName: "test",
 					Emails:   []Email{{Address: "test@astronomer.com"}},
-					RoleBindings: []RoleBindingWorkspace{
+					RoleBindings: []RoleBinding{
 						{
 							Role: WorkspaceViewerRole,
 						},
@@ -288,7 +288,7 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 	mockResponse := &Response{
 		Data: ResponseData{
 			WorkspaceGetUser: WorkspaceUserRoleBindings{
-				RoleBindings: []RoleBindingWorkspace{
+				RoleBindings: []RoleBinding{
 					{
 						Role: DeploymentAdminRole,
 					},

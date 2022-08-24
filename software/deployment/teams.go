@@ -103,7 +103,7 @@ func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out
 }
 
 // isValidDeploymentLevelRole checks if the role is amongst valid workspace roles
-func isValidDeploymentLevelRole(role string) bool {
+func IsValidDeploymentLevelRole(role string) bool {
 	switch role {
 	case houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole, houston.NoneTeamRole:
 		return true
@@ -114,7 +114,7 @@ func isValidDeploymentLevelRole(role string) bool {
 // getDeploymentLevelRole returns the first system level role from a slice of roles
 func getDeploymentLevelRole(roles []houston.RoleBinding, deploymentID string) string {
 	for i := range roles {
-		if isValidDeploymentLevelRole(roles[i].Role) && roles[i].Deployment.ID == deploymentID {
+		if IsValidDeploymentLevelRole(roles[i].Role) && roles[i].Deployment.ID == deploymentID {
 			return roles[i].Role
 		}
 	}

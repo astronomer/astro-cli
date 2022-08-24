@@ -248,23 +248,12 @@ type ListTeamsResp struct {
 	Teams []Team `json:"teams"`
 }
 
-type RoleBindingWorkspace struct {
-	Role      string `json:"role"`
-	Workspace struct {
-		ID string `json:"id"`
-	} `json:"workspace"`
-}
-
 type WorkspaceUserRoleBindings struct {
-	ID           string                 `json:"id"`
-	Username     string                 `json:"username"`
-	FullName     string                 `json:"fullName"`
-	Emails       []Email                `json:"emails"`
-	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
-}
-
-type WorkspaceTeamRoleBindings struct {
-	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
+	ID           string        `json:"id"`
+	Username     string        `json:"username"`
+	FullName     string        `json:"fullName"`
+	Emails       []Email       `json:"emails"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 type RoleBinding struct {

@@ -34,7 +34,7 @@ func TestWorkspaceList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Once()
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Once()
 	astroClient = mockClient
 
 	cmdArgs := []string{"list"}
@@ -49,7 +49,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListWorkspaces").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Twice()
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Twice()
 	astroClient = mockClient
 
 	// mock os.Stdin
