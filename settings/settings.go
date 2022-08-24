@@ -1,14 +1,15 @@
 package settings
 
 import (
-	"fmt"
-	"path/filepath"
-	"strings"
 	"encoding/json"
-	"gopkg.in/yaml.v2"
+	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
-	"os"
+	"strings"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -21,13 +22,14 @@ var (
 	// ConfigFileName = "airflow_settings"
 	// ConfigFileType is the config file extension
 	ConfigFileType = "yaml"
+	tmpFile        = "tmp.json"
 	// WorkingPath is the path to the working directory
 	WorkingPath, _ = fileutil.GetWorkingDir()
 
 	// viperSettings is the viper object in a project directory
 	viperSettings *viper.Viper
 
-	settings Config
+	settings    Config
 	oldSettings OldConfig
 
 	// AirflowVersionTwo 2.0.0
@@ -36,12 +38,15 @@ var (
 	// Monkey patched as of now to write unit tests
 	// TODO: do replace this with interface based mocking once changes are in place in `airflow` package
 	execAirflowCommand = docker.AirflowCommand
-	old bool
+	old                bool
 )
 
-const configReadErrorMsg = "Error reading config in home dir: %s\n"
-const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
-var re = regexp.MustCompile(ansi)
+const (
+	configReadErrorMsg = "Error reading config in home dir: %s\n"
+	noColorString      = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+)
+
+var re = regexp.MustCompile(noColorString)
 
 // ConfigSettings is the main builder of the settings package
 func ConfigSettings(id, settingsFile string, version uint64, connections, variables, pools bool) error {
@@ -95,7 +100,7 @@ func InitSettings(settingsFile string) error {
 	// Try and use old settings file if error
 	if err != nil {
 		err := viperSettings.Unmarshal(&oldSettings)
-		if err != nil { 
+		if err != nil {
 			return errors.Wrap(err, "unable to decode into struct")
 		}
 		old = true
@@ -173,24 +178,11 @@ func AddConnections(id string, version uint64) {
 		if !objectValidator(0, conn.Conn_ID) {
 			continue
 		}
-	
-		var extra_string string
-		i = 0
-		for k, v := range conn.Conn_Extra {
-			if i == 0 {
-				extra_string = extra_string + "\"" + k + "\": \"" + v + "\""
-			} else {
-				extra_string = extra_string + ", \"" + k + "\": \"" + v + "\""
-			}
-			i++
-		}
-		if extra_string != "" {
-			extra_string = "{" + extra_string + "}"
-		}
 
+		extra_string := jsonString(conn.Conn_Extra)
 		quotedConnID := "'" + conn.Conn_ID + "'"
 
-		if strings.Contains(out, quotedConnID) || strings.Contains(out, conn.Conn_ID)  {
+		if strings.Contains(out, quotedConnID) || strings.Contains(out, conn.Conn_ID) {
 			fmt.Printf("Found Connection: %q...replacing...\n", conn.Conn_ID)
 			airflowCommand = fmt.Sprintf("%s %s %q", baseRmCmd, connIDArg, conn.Conn_ID)
 			execAirflowCommand(id, airflowCommand)
@@ -276,19 +268,19 @@ func objectValidator(bound int, args ...string) bool {
 	return count <= bound
 }
 
-func SettingsEnvExport(id, envFile string, version uint64, connections, variables bool) error {
+func EnvExport(id, envFile string, version uint64, connections, variables bool) error {
 	if version >= AirflowVersionTwo {
-		// env export variables if varaibles is true
+		// env export variables if variables is true
 		if variables {
 			err := EnvExportVariables(id, envFile)
-			if err != nil { 
+			if err != nil {
 				fmt.Println(err)
 			}
 		}
 		// env export connections if connections is true
 		if connections {
 			err := EnvExportConnections(id, envFile)
-			if err != nil { 
+			if err != nil {
 				fmt.Println(err)
 			}
 		}
@@ -299,46 +291,47 @@ func SettingsEnvExport(id, envFile string, version uint64, connections, variable
 }
 
 func EnvExportVariables(id, envFile string) error {
-	// setup files
-	tmpFile := "tmp.json"
 	// setup airflow command to export variables
 	airflowCommand := "airflow variables export " + tmpFile
 	out := execAirflowCommand(id, airflowCommand)
 
 	if strings.Contains(out, "successfully") {
-		// get varaibles from file created by airflow command
+		// get variables from file created by airflow command
 		fileCmd := "cat " + tmpFile
 		out = execAirflowCommand(id, fileCmd)
 
 		m := map[string]string{}
 		err := json.Unmarshal([]byte(out), &m)
 		if err != nil {
-			fmt.Println("variable json decode unsucessful")
+			fmt.Println(err)
+			fmt.Println("variable json decode unsuccessful")
 		}
 		// add variables to the env file
 		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
 		if err != nil {
-			fmt.Println("Writing variables to file unsuccessful")
+			return errors.Wrap(err, "Writing variables to file unsuccessful")
 		}
 
 		defer f.Close()
 
-		for k, v := range m { 
-			f.WriteString("\nAIRFLOW_VAR_" + strings.ToUpper(k) + "=" + v )
+		for k, v := range m {
+			_, err := f.WriteString("\nAIRFLOW_VAR_" + strings.ToUpper(k) + "=" + v)
+			if err != nil {
+				fmt.Println(err)
+				fmt.Printf("error adding variable %s to file\n", k)
+			}
 		}
 		fmt.Println("Aiflow variables successfully export to the file " + envFile)
-		rmCmd := "rm " + tmpFile 
+		rmCmd := "rm " + tmpFile
 		_ = execAirflowCommand(id, rmCmd)
 		return nil
 	}
-	return errors.New("variable export unsucessful")
+	return errors.New("variable export unsuccessful")
 }
 
 func EnvExportConnections(id, envFile string) error {
-	// setup files
-	tmpFile := "tmp.env"
 	// Airflow command to export connections to env uris
-	airflowCommand := "airflow connections export " + tmpFile +  " --file-format env"
+	airflowCommand := "airflow connections export " + tmpFile + " --file-format env"
 	out := execAirflowCommand(id, airflowCommand)
 
 	if strings.Contains(out, "successfully") {
@@ -350,26 +343,30 @@ func EnvExportConnections(id, envFile string) error {
 		// add connections to the env file
 		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
 		if err != nil {
-			fmt.Println("Writing connections to file unsuccessful")
+			return errors.Wrap(err, "Writing connections to file unsuccessful")
 		}
 
 		defer f.Close()
 
-		for i := range vars { 
+		for i := range vars {
 			varSplit := strings.SplitN(vars[i], "=", 2)
 			if len(varSplit) > 1 {
-				f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1] )
+				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
+				if err != nil {
+					fmt.Println(err)
+					fmt.Printf("error adding connection %s to file\n", varSplit[0])
+				}
 			}
 		}
 		fmt.Println("Aiflow connections successfully export to the file " + envFile)
-		rmCmd := "rm " + tmpFile 
+		rmCmd := "rm " + tmpFile
 		_ = execAirflowCommand(id, rmCmd)
 		return nil
 	}
-	return errors.New("connection export unsucessful")
+	return errors.New("connection export unsuccessful")
 }
 
-func SettingsExport(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+func Export(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 	// init settings file
 	err := InitSettings(settingsFile)
 	if err != nil {
@@ -379,19 +376,19 @@ func SettingsExport(id, settingsFile string, version uint64, connections, variab
 	if version >= AirflowVersionTwo {
 		if pools {
 			err = ExportPools(id)
-			if err != nil { 
+			if err != nil {
 				fmt.Println(err)
 			}
 		}
 		if variables {
 			err = ExportVariables(id)
-			if err != nil { 
+			if err != nil {
 				fmt.Println(err)
 			}
 		}
 		if connections {
 			err := ExportConnections(id)
-			if err != nil { 
+			if err != nil {
 				fmt.Println(err)
 			}
 		}
@@ -405,7 +402,7 @@ func ExportConnections(id string) error {
 	// Setup airflow command to export connections
 	airflowCommand := "airflow connections list -o yaml"
 	out := execAirflowCommand(id, airflowCommand)
-	// remove all color from output of the airflow command 
+	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
 	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1]
@@ -418,37 +415,38 @@ func ExportConnections(id string) error {
 	}
 	// add connections to settings file
 	for i := range connections {
-
-		port, err :=  strconv.Atoi(connections[i].ConnPort)
+		port, err := strconv.Atoi(connections[i].ConnPort)
 		if err != nil {
 			fmt.Println("Issue with parsing port number: ")
 			fmt.Println(err)
 		}
 
 		newConnection := Connection{
-			Conn_ID: connections[i].ConnID,
-			Conn_Type: connections[i].ConnType,
-			Conn_Host: connections[i].ConnHost,
-			Conn_Schema: connections[i].ConnSchema,
-			Conn_Login: connections[i].ConnLogin,
+			Conn_ID:       connections[i].ConnID,
+			Conn_Type:     connections[i].ConnType,
+			Conn_Host:     connections[i].ConnHost,
+			Conn_Schema:   connections[i].ConnSchema,
+			Conn_Login:    connections[i].ConnLogin,
 			Conn_Password: connections[i].ConnPassword,
-			Conn_Port: port,
-			Conn_URI: connections[i].ConnURI,
-			Conn_Extra: connections[i].ConnExtra,
+			Conn_Port:     port,
+			Conn_URI:      connections[i].ConnURI,
+			Conn_Extra:    connections[i].ConnExtra,
 		}
 
 		settings.Airflow.Connections = append(settings.Airflow.Connections, newConnection)
 	}
 	// write to settings file
 	viperSettings.Set("airflow", settings.Airflow)
-	viperSettings.WriteConfig()
+	err = viperSettings.WriteConfig()
+	if err != nil {
+		return err
+	}
 	fmt.Println("successfully exported Connections")
 	return nil
 }
 
 func ExportVariables(id string) error {
 	// setup files
-	tmpFile := "tmp.json"
 	airflowCommand := "airflow variables export " + tmpFile
 	out := execAirflowCommand(id, airflowCommand)
 
@@ -460,31 +458,30 @@ func ExportVariables(id string) error {
 		m := map[string]string{}
 		err := json.Unmarshal([]byte(out), &m)
 		if err != nil {
-			fmt.Println("variable json decode unsucessful")
+			fmt.Println("variable json decode unsuccessful")
 		}
 		// add the variables to settings object
 		for k, v := range m {
-
 			newVariables := Variables{{k, v}}
-
-			for _, variable := range newVariables {
-				settings.Airflow.Variables = append(settings.Airflow.Variables, variable)
-			}
+			settings.Airflow.Variables = append(settings.Airflow.Variables, newVariables...)
 		}
 		// write variables to settings file
 		viperSettings.Set("airflow", settings.Airflow)
-		viperSettings.WriteConfig()
+		err = viperSettings.WriteConfig()
+		if err != nil {
+			return err
+		}
 		fmt.Println("successfully exported variables")
 		return nil
 	}
-	return errors.New("variable export unsucessful")
+	return errors.New("variable export unsuccessful")
 }
 
 func ExportPools(id string) error {
 	// Setup airflow command to export pools
 	airflowCommand := "airflow pools list -o yaml"
 	out := execAirflowCommand(id, airflowCommand)
-	// remove all color from output of the airflow command 
+	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 
 	var pools ListPools
@@ -497,24 +494,40 @@ func ExportPools(id string) error {
 	}
 	// add pools to the settings object
 	for i := range pools {
-
 		if pools[i].PoolName != "default_pool" {
-			slot, err :=  strconv.Atoi(pools[i].PoolSlot)
+			slot, err := strconv.Atoi(pools[i].PoolSlot)
 			if err != nil {
 				fmt.Println("Issue with parsing pool slot number: ")
 				fmt.Println(err)
 			}
 
 			newPools := Pools{{pools[i].PoolName, slot, pools[i].PoolDescription}}
-
-			for _, pool := range newPools {
-				settings.Airflow.Pools = append(settings.Airflow.Pools, pool)
-			}
+			settings.Airflow.Pools = append(settings.Airflow.Pools, newPools...)
 		}
 	}
-	// write pools to the airlfow settings file
+	// write pools to the airflow settings file
 	viperSettings.Set("airflow", settings.Airflow)
-	viperSettings.WriteConfig()
+	err = viperSettings.WriteConfig()
+	if err != nil {
+		return err
+	}
 	fmt.Println("successfully exported pools")
 	return nil
+}
+
+func jsonString(connExtra map[string]string) string {
+	var extra_string string
+	i := 0
+	for k, v := range connExtra {
+		if i == 0 {
+			extra_string = extra_string + "\"" + k + "\": \"" + v + "\""
+		} else {
+			extra_string = extra_string + ", \"" + k + "\": \"" + v + "\""
+		}
+		i++
+	}
+	if extra_string != "" {
+		extra_string = "{" + extra_string + "}"
+	}
+	return extra_string
 }

@@ -71,8 +71,8 @@ var (
 
 	inspectContainer = inspect.Inspect
 	initSettings     = settings.ConfigSettings
-	exportSettings   = settings.SettingsExport
-	envExportSettings = settings.SettingsEnvExport
+	exportSettings   = settings.Export
+	envExportSettings = settings.EnvExport
 
 	openURL    = browser.OpenURL
 	timeoutNum = 60

@@ -341,7 +341,7 @@ func newAirflowObjectRootCmd() *cobra.Command {
 		Use:     "object",
 		Aliases: []string{"obj"},
 		Short:   "Manage local Airflow Connections, Variables, and Pools",
-		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Ariflow environemnt to an Airflow settings file",
+		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environemnt to an Airflow settings file",
 	}
 	cmd.AddCommand(
 		newObjectImportCmd(),
