@@ -146,7 +146,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(imageName string, noCache bool, nobrowser bool) error {
+func (d *DockerCompose) Start(imageName string, noCache, nobrowser bool) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
