@@ -23,8 +23,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var errMockDocker = errors.New("mock docker compose error")
-var errMockSettings = errors.New("mock Settings error")
+var (
+	errMockDocker   = errors.New("mock docker compose error")
+	errMockSettings = errors.New("mock Settings error")
+)
 
 var airflowVersionLabel = "2.2.5"
 

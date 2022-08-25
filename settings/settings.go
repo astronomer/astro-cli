@@ -45,10 +45,14 @@ const (
 	noColorString      = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
 )
 
+var errNoID = errors.New("container ID is not found, the webserver may not be running")
 var re = regexp.MustCompile(noColorString)
 
 // ConfigSettings is the main builder of the settings package
 func ConfigSettings(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+	if id == "" {
+		return errNoID
+	}
 	err := InitSettings(settingsFile)
 	if err != nil {
 		return err
@@ -268,6 +272,9 @@ func objectValidator(bound int, args ...string) bool {
 }
 
 func EnvExport(id, envFile string, version uint64, connections, variables bool) error {
+	if id == "" {
+		return errNoID
+	}
 	if version >= AirflowVersionTwo {
 		// env export variables if variables is true
 		if variables {
@@ -290,6 +297,9 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 }
 
 func EnvExportVariables(id, envFile string) error {
+	if id == "" {
+		return errNoID
+	}
 	// setup airflow command to export variables
 	airflowCommand := "airflow variables export " + tmpFile
 	out := execAirflowCommand(id, airflowCommand)

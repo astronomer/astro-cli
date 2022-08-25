@@ -557,34 +557,33 @@ func (d *DockerCompose) Settings(settingsFile, envFile string, connections, vari
 	if !fileState {
 		return errors.New("file specified does not exist")
 	}
-
-	if fileState {
-		for i := range psInfo {
-			if strings.Contains(psInfo[i].Name, d.projectName) &&
-				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-				if export && !envExport {
-					err = exportSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, connections, variables, pools)
-					if err != nil {
-						return err
-					}
-					fmt.Println("\nAirflow Objects exported to settings file")
-				}
-				if envExport && export {
-					err = envExportSettings(psInfo[i].ID, envFile, airflowDockerVersion, connections, variables)
-					if err != nil {
-						return err
-					}
-					fmt.Println("\nAirflow Objects exported to env file")
-				}
-				if !envExport && !export {
-					err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, connections, variables, pools)
-					if err != nil {
-						return err
-					}
-					fmt.Println("\nAirflow Objects created from settings file")
-				}
-			}
+	var containerID string
+	for i := range psInfo {
+		if strings.Contains(psInfo[i].Name, d.projectName) &&
+			strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+			containerID = psInfo[i].ID
 		}
+	}
+	if export && !envExport {
+		err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nAirflow objects exported to settings file")
+	}
+	if envExport && export {
+		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nAirflow objects exported to env file")
+	}
+	if !envExport && !export {
+		err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nAirflow objects created from settings file")
 	}
 	return nil
 }
