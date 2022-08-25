@@ -721,7 +721,6 @@ func airflowSettingsImport(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
 	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport)
 }
 

@@ -925,7 +925,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
+		err := mockDockerCompose.Settings("airflow/testfiles/airflow_settings.yaml", ".env", true, true, true, false, false)
 		assert.NoError(t, err)
 		composeMock.AssertExpectations(t)
 	})
@@ -942,7 +942,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, false, false)
 		assert.ErrorIs(t, err, errMock)
 		composeMock.AssertExpectations(t)
 	})
@@ -959,7 +959,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, false)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, true, false)
 		assert.NoError(t, err)
 		composeMock.AssertExpectations(t)
 	})
@@ -976,7 +976,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, false)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, true, false)
 		assert.ErrorIs(t, err, errMock)
 		composeMock.AssertExpectations(t)
 	})
@@ -993,7 +993,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, true)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, true, true)
 		assert.NoError(t, err)
 		composeMock.AssertExpectations(t)
 	})
@@ -1010,7 +1010,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, true, true)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, true, true)
 		assert.ErrorIs(t, err, errMock)
 		composeMock.AssertExpectations(t)
 	})
@@ -1024,7 +1024,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, false, false)
 		assert.Contains(t, err.Error(), errMock.Error())
 		composeMock.AssertExpectations(t)
 	})
@@ -1034,7 +1034,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
 
 		mockDockerCompose.composeService = composeMock
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, false, false)
 		assert.ErrorIs(t, err, errMockDocker)
 		composeMock.AssertExpectations(t)
 	})
@@ -1045,8 +1045,22 @@ func TestDockerComposeSettings(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, false, false)
 		assert.Contains(t, err.Error(), "project not running, run docker dev start to start project")
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("file does not exist", func(t *testing.T) {
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.Settings("./testfiles/airflow_settings.yaml", ".env", true, true, true, false, false)
+		assert.Contains(t, err.Error(), "file specified does not exist")
 		composeMock.AssertExpectations(t)
 	})
 }
