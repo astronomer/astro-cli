@@ -105,7 +105,9 @@ func List(client houston.ClientInterface, out io.Writer) error {
 		}
 		count = resp.Count
 		teams = append(teams, resp.Teams...)
-		cursor = teams[len(teams)-1].ID
+		if count > 0 {
+			cursor = teams[len(teams)-1].ID
+		}
 	}
 
 	teamsTable := printutil.Table{

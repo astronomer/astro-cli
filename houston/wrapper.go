@@ -18,6 +18,7 @@ type VersionRestrictions struct {
 	EQ  []string
 }
 
+// APIs availability based on the version they were added/removed in Houston
 var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
 	"GetTeam":                     {GTE: "0.30.0"},
 	"GetTeamUsers":                {GTE: "0.30.0"},
@@ -41,19 +42,22 @@ func (h ClientImplementation) ValidateAvailability() error {
 		return nil
 	}
 
-	// get functionName from houstonFunc
+	// get the name of the function which called ValidateAvailability
 	apiName := getCallerFunctionName()
+	// check if any restrictions are defined on that API, else return
 	apiRestriction, ok := houstonAPIAvailabilityByVersion[apiName]
 	if !ok {
 		return nil
 	}
 
+	// get the current version of the connected platform
 	platformVersion, err := h.GetPlatformVersion()
 	if err != nil {
 		logrus.Debugf("Error retrieving houston version: %s", err.Error())
 		return nil
 	}
 
+	// validate if the platform version fits within API restrictions
 	if VerifyVersionMatch(platformVersion, apiRestriction) {
 		return nil
 	}

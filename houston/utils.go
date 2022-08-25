@@ -7,6 +7,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+// queryByVersion - defines properties needed to maintain differences in a query overtime introduced by Houston API
 type queryByVersion struct {
 	version string
 	query   string

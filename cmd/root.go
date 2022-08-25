@@ -71,8 +71,6 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonClient, ctx))
-
 	rootCmd.AddCommand(
 		newLoginCommand(astroClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
@@ -94,16 +92,20 @@ func NewRootCmd() *cobra.Command {
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
+
+	version, _ := houstonClient.GetPlatformVersion()
+	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(version, ctx))
+
 	return rootCmd
 }
 
-func getResourcesHelpTemplate(houstonClient houston.ClientInterface, ctx string) string {
-	version, _ := houstonClient.GetPlatformVersion()
+func getResourcesHelpTemplate(version, ctx string) string {
+
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
 Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
-Astronomer Software Version: %s{{end}}
+Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx), ctx, version, version)
+`, ansi.Bold(ctx), ctx, version, ansi.Bold(version))
 }
