@@ -37,6 +37,7 @@ var (
 	postgresExec           bool
 	webserverExec          bool
 	triggererExec          bool
+	noBrowser              bool
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
@@ -153,6 +154,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
+	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	return cmd
 }
 
@@ -426,7 +428,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(customImageName, noCache)
+	return containerHandler.Start(customImageName, noCache, noBrowser)
 }
 
 // airflowRun
@@ -533,8 +535,10 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		envFile = args[0]
 	}
+	// don't startup browser on restart
+	noBrowser = true
 
-	return containerHandler.Start(customImageName, noCache)
+	return containerHandler.Start(customImageName, noCache, noBrowser)
 }
 
 // run pytest on an airflow project
