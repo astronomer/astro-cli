@@ -5,12 +5,12 @@ import (
 	"strings"
 )
 
-type ErrMethodNotImplemented struct {
-	MethodName string
+type ErrAPINotImplemented struct {
+	APIName string
 }
 
-func (e ErrMethodNotImplemented) Error() string {
-	return fmt.Sprintf("%s method not implemented for the given Houston version", e.MethodName)
+func (e ErrAPINotImplemented) Error() string {
+	return fmt.Sprintf("%s GraphQL API not implemented for the given Houston version", e.APIName)
 }
 
 type ErrFieldsNotAvailable struct {

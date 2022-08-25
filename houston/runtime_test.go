@@ -81,9 +81,9 @@ func TestGetRuntimeReleases(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetRuntimeReleases"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetRuntimeReleases"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetRuntimeReleases("")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetRuntimeReleases"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetRuntimeReleases"})
 	})
 }

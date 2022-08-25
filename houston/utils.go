@@ -40,6 +40,6 @@ func (s queryList) GreatestLowerBound(v string) string {
 			return s[idx].query
 		}
 	}
-	logrus.Debugf("GraphQL query not defined for the given Platform version: %s, fallbacking to latest query", v)
+	logrus.Debugf("GraphQL query not defined for the given Platform version: %s, falling back to latest query", v)
 	return s[len(s)-1].query
 }

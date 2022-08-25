@@ -16,8 +16,8 @@ var (
 	initDebugLogs = []string{}
 
 	houstonClient  houston.ClientInterface
-	houstonVersion string
 	appConfig      *houston.AppConfig
+	houstonVersion string
 
 	workspaceID string
 	teamID      string

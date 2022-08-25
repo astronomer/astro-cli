@@ -79,10 +79,10 @@ func TestAddWorkspaceUser(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["AddWorkspaceUser"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["AddWorkspaceUser"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.AddWorkspaceUser(AddWorkspaceUserRequest{"workspace-id", "email", "role"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AddWorkspaceUser"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"AddWorkspaceUser"})
 	})
 }
 
@@ -154,10 +154,10 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteWorkspaceUser"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteWorkspaceUser"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteWorkspaceUser(DeleteWorkspaceUserRequest{"workspace-id", "user-id"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteWorkspaceUser"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteWorkspaceUser"})
 	})
 }
 
@@ -226,10 +226,10 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListWorkspaceUserAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListWorkspaceUserAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListWorkspaceUserAndRoles("workspace-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspaceUserAndRoles"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListWorkspaceUserAndRoles"})
 	})
 }
 
@@ -298,10 +298,10 @@ func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListWorkspacePaginatedUserAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListWorkspacePaginatedUserAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspacePaginatedUserAndRoles"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListWorkspacePaginatedUserAndRoles"})
 	})
 }
 
@@ -370,10 +370,10 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListWorkspacePaginatedUserAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListWorkspacePaginatedUserAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspacePaginatedUserAndRoles"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListWorkspacePaginatedUserAndRoles"})
 	})
 }
 
@@ -439,9 +439,9 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetWorkspaceUserRole"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetWorkspaceUserRole"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetWorkspaceUserRole(GetWorkspaceUserRoleRequest{"workspace-id", "email"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetWorkspaceUserRole"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetWorkspaceUserRole"})
 	})
 }

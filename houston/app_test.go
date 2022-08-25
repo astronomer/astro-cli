@@ -119,10 +119,10 @@ func TestGetAppConfig(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetAppConfig"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetAppConfig"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetAppConfig()
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetAppConfig"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetAppConfig"})
 	})
 }
 
@@ -182,10 +182,10 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetAvailableNamespaces"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetAvailableNamespaces"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetAvailableNamespaces()
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetAvailableNamespaces"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetAvailableNamespaces"})
 	})
 }
 

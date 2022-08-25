@@ -75,10 +75,10 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["CreateDeploymentServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["CreateDeploymentServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.CreateDeploymentServiceAccount(&CreateServiceAccountRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CreateDeploymentServiceAccount"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"CreateDeploymentServiceAccount"})
 	})
 }
 
@@ -146,10 +146,10 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["CreateWorkspaceServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["CreateWorkspaceServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.CreateWorkspaceServiceAccount(&CreateServiceAccountRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CreateWorkspaceServiceAccount"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"CreateWorkspaceServiceAccount"})
 	})
 }
 
@@ -215,10 +215,10 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteDeploymentServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteDeploymentServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteDeploymentServiceAccount(DeleteServiceAccountRequest{"", "deployment-id", "sa-id"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteDeploymentServiceAccount"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteDeploymentServiceAccount"})
 	})
 }
 
@@ -284,10 +284,10 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteWorkspaceServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteWorkspaceServiceAccount"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteWorkspaceServiceAccount(DeleteServiceAccountRequest{"workspace-id", "", "sa-id"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteWorkspaceServiceAccount"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteWorkspaceServiceAccount"})
 	})
 }
 
@@ -365,10 +365,10 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListDeploymentServiceAccounts"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListDeploymentServiceAccounts"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListDeploymentServiceAccounts("deployment-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListDeploymentServiceAccounts"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeploymentServiceAccounts"})
 	})
 }
 
@@ -446,9 +446,9 @@ func TestListWorkspaceServiceAccounts(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListWorkspaceServiceAccounts"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListWorkspaceServiceAccounts"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListWorkspaceServiceAccounts("workspace-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspaceServiceAccounts"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListWorkspaceServiceAccounts"})
 	})
 }

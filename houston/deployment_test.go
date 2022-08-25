@@ -82,10 +82,10 @@ func TestCreateDeployment(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["CreateDeployment"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["CreateDeployment"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.CreateDeployment(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CreateDeployment"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"CreateDeployment"})
 	})
 }
 
@@ -160,10 +160,10 @@ func TestDeleteDeployment(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteDeployment"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteDeployment"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteDeployment"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteDeployment"})
 	})
 }
 
@@ -240,10 +240,10 @@ func TestListDeployments(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListDeployments"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListDeployments"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListDeployments(ListDeploymentsRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListDeployments"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeployments"})
 	})
 }
 
@@ -318,10 +318,10 @@ func TestUpdateDeployment(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateDeployment"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateDeployment"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.UpdateDeployment(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeployment"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeployment"})
 	})
 }
 
@@ -396,10 +396,10 @@ func TestGetDeployment(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetDeployment"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetDeployment"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetDeployment("deployment-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetDeployment"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetDeployment"})
 	})
 }
 
@@ -474,10 +474,10 @@ func TestUpdateDeploymentAirflow(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateDeploymentAirflow"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateDeploymentAirflow"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.UpdateDeploymentAirflow(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeploymentAirflow"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentAirflow"})
 	})
 }
 
@@ -546,10 +546,10 @@ func TestGetDeploymentConfig(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetDeploymentConfig"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetDeploymentConfig"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetDeploymentConfig()
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetDeploymentConfig"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetDeploymentConfig"})
 	})
 }
 
@@ -610,10 +610,10 @@ func TestListDeploymentLogs(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListDeploymentLogs"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListDeploymentLogs"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListDeploymentLogs(ListDeploymentLogsRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListDeploymentLogs"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeploymentLogs"})
 	})
 }
 
@@ -691,10 +691,10 @@ func TestUpdateDeploymentRuntime(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateDeploymentRuntime"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateDeploymentRuntime"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeploymentRuntime"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentRuntime"})
 	})
 }
 
@@ -759,10 +759,10 @@ func TestCancelUpdateDeploymentRuntime(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["CancelUpdateDeploymentRuntime"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["CancelUpdateDeploymentRuntime"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CancelUpdateDeploymentRuntime"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"CancelUpdateDeploymentRuntime"})
 	})
 }
 
@@ -822,9 +822,9 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateDeploymentImage"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateDeploymentImage"] = VersionRestrictions{GTE: "0.29.0"}
 
 		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeploymentImage"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentImage"})
 	})
 }

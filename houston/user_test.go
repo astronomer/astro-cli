@@ -76,9 +76,9 @@ func TestCreateUser(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["CreateUser"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["CreateUser"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.CreateUser(CreateUserRequest{"email", "password"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CreateUser"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"CreateUser"})
 	})
 }

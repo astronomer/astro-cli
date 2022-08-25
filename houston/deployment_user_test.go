@@ -76,10 +76,10 @@ func TestListDeploymentUsers(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListDeploymentUsers"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListDeploymentUsers"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListDeploymentUsers(ListDeploymentUsersRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListDeploymentUsers"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeploymentUsers"})
 	})
 }
 
@@ -149,10 +149,10 @@ func TestAddDeploymentUser(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["AddDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["AddDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.AddDeploymentUser(UpdateDeploymentUserRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AddDeploymentUser"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"AddDeploymentUser"})
 	})
 }
 
@@ -222,10 +222,10 @@ func TestUpdateDeploymentUser(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.UpdateDeploymentUser(UpdateDeploymentUserRequest{})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeploymentUser"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentUser"})
 	})
 }
 
@@ -295,9 +295,9 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteDeploymentUser"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteDeploymentUser"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteDeploymentUser"})
 	})
 }

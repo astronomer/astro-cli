@@ -183,7 +183,7 @@ func TestValidateAvailability(t *testing.T) {
 	t.Run("basic case with method restriction", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
-		houstonMethodAvailabilityByVersion["TestValidateAvailability"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["TestValidateAvailability"] = VersionRestrictions{GTE: "0.29.0"}
 		err := api.ValidateAvailability()
 		assert.NoError(t, err)
 	})
@@ -198,8 +198,8 @@ func TestValidateAvailability(t *testing.T) {
 		methodName := fName[strings.LastIndex(fName, ".")+1:] // split by . and get the last part of it
 		methodName, _, _ = strings.Cut(methodName, "-")
 
-		houstonMethodAvailabilityByVersion[methodName] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion[methodName] = VersionRestrictions{GTE: "0.29.0"}
 		err := api.ValidateAvailability()
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{MethodName: methodName})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{APIName: methodName})
 	})
 }

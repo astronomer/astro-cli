@@ -73,10 +73,10 @@ func TestAddDeploymentTeam(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["AddDeploymentTeam"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["AddDeploymentTeam"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AddDeploymentTeam"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"AddDeploymentTeam"})
 	})
 }
 
@@ -142,10 +142,10 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["RemoveDeploymentTeam"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["RemoveDeploymentTeam"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"RemoveDeploymentTeam"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"RemoveDeploymentTeam"})
 	})
 }
 
@@ -208,10 +208,10 @@ func TestListDeploymentTeamsAndRoles(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListDeploymentTeamsAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListDeploymentTeamsAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListDeploymentTeamsAndRoles("deployment-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListDeploymentTeamsAndRoles"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeploymentTeamsAndRoles"})
 	})
 }
 
@@ -277,9 +277,9 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateDeploymentTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateDeploymentTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", DeploymentAdminRole})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateDeploymentTeamRole"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentTeamRole"})
 	})
 }

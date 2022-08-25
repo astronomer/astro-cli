@@ -18,7 +18,7 @@ type VersionRestrictions struct {
 	EQ  []string
 }
 
-var houstonMethodAvailabilityByVersion = map[string]VersionRestrictions{
+var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
 	"GetTeam":                     {GTE: "0.30.0"},
 	"GetTeamUsers":                {GTE: "0.30.0"},
 	"ListTeams":                   {GTE: "0.30.0"},
@@ -42,8 +42,8 @@ func (h ClientImplementation) ValidateAvailability() error {
 	}
 
 	// get functionName from houstonFunc
-	funcName := getCallerFunctionName()
-	funcRestriction, ok := houstonMethodAvailabilityByVersion[funcName]
+	apiName := getCallerFunctionName()
+	apiRestriction, ok := houstonAPIAvailabilityByVersion[apiName]
 	if !ok {
 		return nil
 	}
@@ -54,10 +54,10 @@ func (h ClientImplementation) ValidateAvailability() error {
 		return nil
 	}
 
-	if VerifyVersionMatch(platformVersion, funcRestriction) {
+	if VerifyVersionMatch(platformVersion, apiRestriction) {
 		return nil
 	}
-	return ErrMethodNotImplemented{MethodName: funcName}
+	return ErrAPINotImplemented{APIName: apiName}
 }
 
 func VerifyVersionMatch(version string, funcRestriction VersionRestrictions) bool {
@@ -120,6 +120,10 @@ func sanitiseVersionString(v string) string {
 
 func SetVersion(v string) {
 	version = v
+}
+
+func GetVersion() string {
+	return version
 }
 
 func isCalledFromUnitTestFile() bool {

@@ -66,10 +66,10 @@ func TestGetTeam(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetTeam"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetTeam"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetTeam("team-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetTeam"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetTeam"})
 	})
 }
 
@@ -130,10 +130,10 @@ func TestGetTeamUsers(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetTeamUsers"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetTeamUsers"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetTeamUsers("team-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetTeamUsers"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetTeamUsers"})
 	})
 }
 
@@ -197,10 +197,10 @@ func TestListTeams(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListTeams"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListTeams"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListTeams(ListTeamsRequest{"", 1})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListTeams"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListTeams"})
 	})
 }
 
@@ -258,10 +258,10 @@ func TestCreateTeamSystemRoleBinding(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["CreateTeamSystemRoleBinding"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["CreateTeamSystemRoleBinding"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"CreateTeamSystemRoleBinding"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"CreateTeamSystemRoleBinding"})
 	})
 }
 
@@ -319,9 +319,9 @@ func TestDeleteTeamSystemRoleBinding(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteTeamSystemRoleBinding"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteTeamSystemRoleBinding"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteTeamSystemRoleBinding"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteTeamSystemRoleBinding"})
 	})
 }

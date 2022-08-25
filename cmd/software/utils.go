@@ -31,7 +31,7 @@ func VersionMatchCmds(rootCmd *cobra.Command, parent []string) {
 func removeCmd(c *cobra.Command) {
 	c.Hidden = true                                   // hide the command in help output
 	c.Run = func(cmd *cobra.Command, args []string) { // define the error response when the command is executed
-		fmt.Printf("Error: unknown command \"%s\" for \"astro\" \nRun 'astro --help' for usage.\n", c.Name())
+		fmt.Printf("Error: unknown command \"%s\" for \"astro\" \nRun 'astro --help' for usage.\nMake sure you are connected to correct Astronomer Software platform version to use this command.\n", c.Name())
 	}
 	c.ResetCommands()           // remove all the subcommands
 	c.DisableFlagParsing = true // to disable help flag

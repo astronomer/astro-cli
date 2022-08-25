@@ -72,10 +72,10 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["AuthenticateWithBasicAuth"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["AuthenticateWithBasicAuth"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AuthenticateWithBasicAuth"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"AuthenticateWithBasicAuth"})
 	})
 }
 
@@ -138,9 +138,9 @@ func TestGetAuthConfig(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetAuthConfig"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetAuthConfig"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetAuthConfig(&ctx)
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetAuthConfig"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetAuthConfig"})
 	})
 }

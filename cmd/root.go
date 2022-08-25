@@ -71,7 +71,7 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 
-	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(ctx))
+	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonClient, ctx))
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroClient, os.Stdout),
@@ -97,11 +97,13 @@ func NewRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func getResourcesHelpTemplate(ctx string) string {
+func getResourcesHelpTemplate(houstonClient houston.ClientInterface, ctx string) string {
+	version, _ := houstonClient.GetPlatformVersion()
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
-Current Context: %s
+Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
+Astronomer Software Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx))
+`, ansi.Bold(ctx), ctx, version, version)
 }

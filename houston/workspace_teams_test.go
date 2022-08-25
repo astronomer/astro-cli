@@ -70,10 +70,10 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["AddWorkspaceTeam"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["AddWorkspaceTeam"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"AddWorkspaceTeam"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"AddWorkspaceTeam"})
 	})
 }
 
@@ -136,10 +136,10 @@ func TestDeleteWorkspaceTeam(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["DeleteWorkspaceTeam"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["DeleteWorkspaceTeam"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"DeleteWorkspaceTeam"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteWorkspaceTeam"})
 	})
 }
 
@@ -202,10 +202,10 @@ func TestListWorkspaceTeamsAndRoles(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["ListWorkspaceTeamsAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["ListWorkspaceTeamsAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.ListWorkspaceTeamsAndRoles("workspace-id")
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"ListWorkspaceTeamsAndRoles"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListWorkspaceTeamsAndRoles"})
 	})
 }
 
@@ -262,10 +262,10 @@ func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["UpdateWorkspaceTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["UpdateWorkspaceTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", "role"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"UpdateWorkspaceTeamRole"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateWorkspaceTeamRole"})
 	})
 }
 
@@ -318,9 +318,9 @@ func TestGetWorkspaceTeamRole(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
 		version = "0.28.0"
-		houstonMethodAvailabilityByVersion["GetWorkspaceTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
+		houstonAPIAvailabilityByVersion["GetWorkspaceTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
 
 		_, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
-		assert.ErrorIs(t, err, ErrMethodNotImplemented{"GetWorkspaceTeamRole"})
+		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetWorkspaceTeamRole"})
 	})
 }
