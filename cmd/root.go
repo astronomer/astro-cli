@@ -100,7 +100,6 @@ func NewRootCmd() *cobra.Command {
 }
 
 func getResourcesHelpTemplate(version, ctx string) string {
-
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
 Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
