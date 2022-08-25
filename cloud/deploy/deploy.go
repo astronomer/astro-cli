@@ -375,17 +375,19 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 	}
 
 	// Allows System Admins to test with internal runtime releases
-	admin, _ := c.GetSystemAdmin()
-	var runtimeReleases []astro.RuntimeRelease
-	if admin {
-		runtimeReleases, err = client.ListInternalRuntimeReleases()
-	} else {
-		runtimeReleases, err = client.ListPublicRuntimeReleases()
-	}
-
+	// admin, _ := c.GetSystemAdmin()
+	// var runtimeReleases []astro.RuntimeRelease
+	ConfigOptions, err := client.GetDeploymentConfig()
 	if err != nil {
 		return "", err
 	}
+	runtimeReleases := ConfigOptions.RuntimeReleases
+	fmt.Println(runtimeReleases)
+	// if admin {
+	// 	runtimeReleases, err = client.ListInternalRuntimeReleases()
+	// } else {
+	// 	runtimeReleases, err = client.ListPublicRuntimeReleases()
+	// }
 
 	runtimeVersions := []string{}
 

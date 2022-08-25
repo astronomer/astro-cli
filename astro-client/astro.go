@@ -106,7 +106,7 @@ func (c *HTTPClient) ListDeployments(organizationID, workspaceID string) ([]Depl
 func (c *HTTPClient) GetDeployment(deploymentID string) (Deployment, error) {
 	req := Request{
 		Query:     GetDeployment,
-		Variables: map[string]interface{}{"id": deploymentID},
+		Variables: map[string]interface{}{"deploymentId": deploymentID},
 	}
 
 	resp, err := req.DoWithPublicClient(c)

@@ -173,6 +173,7 @@ var (
 		}
 		executors
 		runtimeReleases {
+			channel
 			version
 		}
 	  }
