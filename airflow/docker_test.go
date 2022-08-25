@@ -921,7 +921,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -938,7 +938,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return errMock
 		}
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -955,7 +955,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		exportSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return nil
 		}
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -972,7 +972,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		exportSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 			return errMock
 		}
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -989,7 +989,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		envExportSettings = func(id, settingsFile string, version uint64, connections, variables bool) error {
 			return nil
 		}
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -1006,7 +1006,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		envExportSettings = func(id, settingsFile string, version uint64, connections, variables bool) error {
 			return errMock
 		}
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -1020,7 +1020,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{}, errMock).Once()
-
+		
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
@@ -1034,7 +1034,6 @@ func TestDockerComposeSettings(t *testing.T) {
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
 
 		mockDockerCompose.composeService = composeMock
-
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
 		assert.ErrorIs(t, err, errMockDocker)
 		composeMock.AssertExpectations(t)
@@ -1047,7 +1046,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.Settings("airflow_settings.yaml", ".env", true, true, true, false, false)
-		assert.Contains(t, err.Error(), "cannot exec into container, project not running")
+		assert.Contains(t, err.Error(), "project not running, run docker dev start to start project")
 		composeMock.AssertExpectations(t)
 	})
 }

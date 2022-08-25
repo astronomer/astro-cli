@@ -536,6 +536,9 @@ func (d *DockerCompose) Settings(settingsFile, envFile string, connections, vari
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
+	if len(psInfo) == 0 {
+		return errors.New("project not running, run docker dev start to start project")
+	}
 
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
