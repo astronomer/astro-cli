@@ -1068,7 +1068,7 @@ func TestDockerComposeSettings(t *testing.T) {
 func TestCheckWebserverHealth(t *testing.T) {
 	testUtils.InitTestConfig(testUtils.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
-		airflowSettingsFile = "docker_test.go" // any file which exists
+		settingsFile = "docker_test.go" // any file which exists
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "running"}}, nil).Once()
 		mockEventsCall := composeMock.On("Events", context.Background(), "test", mock.Anything)
@@ -1109,7 +1109,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 	})
 
 	t.Run("compose ps failure", func(t *testing.T) {
-		airflowSettingsFile = "./testfiles/test_dag_inegrity_file.py" // any file which exists
+		settingsFile = "./testfiles/test_dag_inegrity_file.py" // any file which exists
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
 		mockEventsCall := composeMock.On("Events", context.Background(), "test", mock.Anything)
