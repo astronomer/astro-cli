@@ -105,8 +105,8 @@ func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInter
 	return nil
 }
 
-// isValidWorkspaceLevelRole checks if the role is amongst valid workspace roles
-func isValidWorkspaceLevelRole(role string) bool {
+// IsValidWorkspaceLevelRole checks if the role is amongst valid workspace roles
+func IsValidWorkspaceLevelRole(role string) bool {
 	switch role {
 	case houston.WorkspaceAdminRole, houston.WorkspaceEditorRole, houston.WorkspaceViewerRole, houston.NoneTeamRole:
 		return true
@@ -117,7 +117,7 @@ func isValidWorkspaceLevelRole(role string) bool {
 // getWorkspaceLevelRole returns the first system level role from a slice of roles
 func getWorkspaceLevelRole(roles []houston.RoleBinding, workspaceID string) string {
 	for i := range roles {
-		if isValidWorkspaceLevelRole(roles[i].Role) && roles[i].Workspace.ID == workspaceID {
+		if IsValidWorkspaceLevelRole(roles[i].Role) && roles[i].Workspace.ID == workspaceID {
 			return roles[i].Role
 		}
 	}
