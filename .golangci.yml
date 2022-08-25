@@ -5,6 +5,7 @@ run:
   skip-files:
     - settings/old_settings.go
     - settings/settings.go
+    - settings/types.go
 linters-settings:
   depguard:
     list-type: blacklist
