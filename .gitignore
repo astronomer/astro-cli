@@ -4,6 +4,7 @@
 .idea/
 .vscode/
 airflow/pod-config.yml
+airflow_settings_dev.yaml
 astro
 astro-cli
 cover.out
@@ -14,4 +15,3 @@ packages.txt
 requirements.txt
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile
-airflow_settings_dev.yaml
