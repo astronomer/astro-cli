@@ -28,7 +28,7 @@ var (
 	// viperSettings is the viper object in a project directory
 	viperSettings *viper.Viper
 
-	settings    Config
+	settings Config
 
 	// AirflowVersionTwo 2.0.0
 	AirflowVersionTwo uint64 = 2
@@ -168,7 +168,7 @@ func AddConnections(id string, version uint64) {
 		// extra_string := jsonString(conn.Conn_Extra)
 
 		var extra_string string
-		v, ok := conn.Conn_Extra.(map[interface {}]interface {})
+		v, ok := conn.Conn_Extra.(map[interface{}]interface{})
 		fmt.Println(ok)
 		fmt.Println(v)
 		if !ok {
