@@ -457,7 +457,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 		return err
 	}
 
-	if deployment.RuntimeVersion == "" || deployment.AirflowVersion != "" {
+	if deployment.RuntimeVersion == "" && deployment.AirflowVersion != "" {
 		return errDeploymentNotOnRuntime
 	}
 
