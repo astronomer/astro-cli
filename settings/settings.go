@@ -301,16 +301,13 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 }
 
 func EnvExportVariables(id, envFile string) error {
-	if id == "" {
-		return errNoID
-	}
 	// setup airflow command to export variables
-	airflowCommand := "airflow variables export " + tmpFile
+	airflowCommand := "airflow variables export tmp.var"
 	out := execAirflowCommand(id, airflowCommand)
 
 	if strings.Contains(out, "successfully") {
 		// get variables from file created by airflow command
-		fileCmd := "cat " + tmpFile
+		fileCmd := "cat tmp.var"
 		out = execAirflowCommand(id, fileCmd)
 
 		m := map[string]string{}
@@ -336,7 +333,7 @@ func EnvExportVariables(id, envFile string) error {
 			}
 		}
 		fmt.Println("Aiflow variables successfully export to the file " + envFile)
-		rmCmd := "rm " + tmpFile
+		rmCmd := "rm tmp.var"
 		_ = execAirflowCommand(id, rmCmd)
 		return nil
 	}
@@ -345,12 +342,12 @@ func EnvExportVariables(id, envFile string) error {
 
 func EnvExportConnections(id, envFile string) error {
 	// Airflow command to export connections to env uris
-	airflowCommand := "airflow connections export " + tmpFile + " --file-format env"
+	airflowCommand := "airflow connections export tmp.connections --file-format env"
 	out := execAirflowCommand(id, airflowCommand)
 
 	if strings.Contains(out, "successfully") {
 		// get connections from file craeted by airflow command
-		fileCmd := "cat " + tmpFile
+		fileCmd := "cat tmp.connections"
 		out = execAirflowCommand(id, fileCmd)
 
 		vars := strings.Split(out, "\n")
@@ -373,7 +370,7 @@ func EnvExportConnections(id, envFile string) error {
 			}
 		}
 		fmt.Println("Aiflow connections successfully export to the file " + envFile)
-		rmCmd := "rm " + tmpFile
+		rmCmd := "rm tmp.connection"
 		_ = execAirflowCommand(id, rmCmd)
 		return nil
 	}
@@ -381,6 +378,9 @@ func EnvExportConnections(id, envFile string) error {
 }
 
 func Export(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+	if id == "" {
+		return errNoID
+	}
 	// init settings file
 	err := InitSettings(settingsFile)
 	if err != nil {
@@ -461,12 +461,12 @@ func ExportConnections(id string) error {
 
 func ExportVariables(id string) error {
 	// setup files
-	airflowCommand := "airflow variables export " + tmpFile
+	airflowCommand := "airflow variables export tmp.var"
 	out := execAirflowCommand(id, airflowCommand)
 
 	if strings.Contains(out, "successfully") {
 		// get variables created by the airflow command
-		fileCmd := "cat " + tmpFile
+		fileCmd := "cat tmp.var"
 		out = execAirflowCommand(id, fileCmd)
 
 		m := map[string]string{}
@@ -485,6 +485,8 @@ func ExportVariables(id string) error {
 		if err != nil {
 			return err
 		}
+		rmCmd := "rm tmp.var"
+		_ = execAirflowCommand(id, rmCmd)
 		fmt.Println("successfully exported variables")
 		return nil
 	}

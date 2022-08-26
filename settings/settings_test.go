@@ -4,7 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/pkg/errors"
 )
+
+var errMock = errors.New("settings file error")
 
 func TestAddConnectionsAirflowOne(t *testing.T) {
 	var testExtra map[string]string
@@ -48,6 +51,25 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 	settings.Airflow.Connections = []Connection{testConn}
 
 	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
+	expectedDelCmd := "airflow connections delete   \"test-id\""
+	expectedListCmd := "airflow connections list -o plain"
+	execAirflowCommand = func(id, airflowCommand string) string {
+		assert.Contains(t, []string{expectedAddCmd, expectedListCmd, expectedDelCmd}, airflowCommand)
+		if airflowCommand == expectedListCmd {
+			return "'test-id' 'test-type' 'test-host' 'test-uri'"
+		}
+		return ""
+	}
+	AddConnections("test-conn-id", 2)
+}
+
+func TestAddConnectionsAirflowTwoURI(t *testing.T) {
+	testConn := Connection{
+		Conn_URI:      "test-uri",
+	}
+	settings.Airflow.Connections = []Connection{testConn}
+
+	expectedAddCmd := "airflow connections add   'test-id' --conn-uri 'test-uri'"
 	expectedDelCmd := "airflow connections delete   \"test-id\""
 	expectedListCmd := "airflow connections list -o plain"
 	execAirflowCommand = func(id, airflowCommand string) string {
@@ -139,4 +161,115 @@ func TestInitSettingsFailure(t *testing.T) {
 	err := InitSettings(ConfigFileName)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to decode file")
+}
+
+func TestEnvExport(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		execAirflowCommand = func(id, airflowCommand string) string {
+			switch airflowCommand {
+			case "airflow variables export tmp.var":
+				return "1 variables successfully exported to tmp.var"
+			case "cat tmp.var":
+				return `{
+					"myvar": "myval"
+				}`
+			case "airflow connections export tmp.connections --file-format env":
+				return "Connections successfully exported to tmp.json"
+			case "cat tmp.connections":
+				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema"		
+			default:
+				return ""
+			}
+		}
+
+		err := EnvExport("id", "testfiles/test.env", 2, true, true)
+		assert.NoError(t, err)
+	})
+	t.Run("missing id", func(t *testing.T) {
+		err := EnvExport("", "", 2, true, true)
+		assert.ErrorIs(t, err, errNoID)
+	})
+
+	// t.Run("variable failure", func(t *testing.T) {
+	// 	execAirflowCommand = func(id, airflowCommand string) string {
+	// 		return ""
+	// 	}
+		
+	// 	err := EnvExport("id", "testfiles/test.env", 2, false, true)
+	// 	assert.Contains(t, err.Error(), "variable export unsuccessful")
+	// })
+
+	// t.Run("connection failure", func(t *testing.T) {
+	// 	execAirflowCommand = func(id, airflowCommand string) string {
+	// 		return ""
+	// 	}
+		
+	// 	err := EnvExport("id", "testfiles/test.env", 2, true, false)
+	// 	assert.Contains(t, err.Error(), "connection export unsuccessful")
+	// })
+
+	t.Run("not airflow 2", func(t *testing.T) {
+		err := EnvExport("id", "", 1, true, true)
+		assert.Contains(t, err.Error(), "Command must be used with Airflow 2.X")
+	})
+}
+
+func TestExport(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		execAirflowCommand = func(id, airflowCommand string) string {
+			switch airflowCommand {
+			case "airflow connections list -o yaml":
+				return `- conn_id: local_postgres
+				conn_type: postgres
+				description: null
+				extra_dejson:
+				get_uri: postgres://username:password@example.db.example.com:5432/schema
+				host: example.db.example.com
+				id: '11'
+				is_encrypted: 'True'
+				is_extra_encrypted: 'True'
+				login: username
+				password: password
+				port: '5432'
+				schema: schema`
+			case "airflow variables export tmp.var":
+				return "1 variables successfully exported to tmp.var"
+			case "cat tmp.var":
+				return `{
+					"myvar": "myval"
+				}`
+			case "airflow pools list -o yaml":
+				return `- description: Default pool
+				pool: default_pool
+				slots: '128'
+			  - description: ''
+				pool: subdag_limit
+				slots: '3'`
+			default:
+				return ""
+			}
+		}
+
+		err := Export("id", "testfiles/airflow_settings_export.yaml", 2, true, true, true)
+		assert.NoError(t, err)
+	})
+
+	// t.Run("variable failure", func(t *testing.T) {
+	// 	execAirflowCommand = func(id, airflowCommand string) string {
+	// 		return ""
+	// 	}
+		
+	// 	err := Export("id", "testfiles/airflow_settings_export.yaml", 2, false, true, false)
+	// 	assert.Contains(t, err.Error(), "variable export unsuccessful")
+	// })
+
+	t.Run("missing id", func(t *testing.T) {
+		err := Export("", "", 2, true, true, true)
+		assert.ErrorIs(t, err, errNoID)
+	})
+
+	t.Run("not airflow 2", func(t *testing.T) {
+		err := Export("id", "", 1, true, true, true)
+		assert.Contains(t, err.Error(), "Command must be used with Airflow 2.X")
+	})
 }
