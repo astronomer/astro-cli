@@ -355,7 +355,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -370,7 +370,7 @@ func TestAirflowStart(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -643,7 +643,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true).Return(nil).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true, true).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -676,7 +676,7 @@ func TestAirflowRestart(t *testing.T) {
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			mockContainerHandler.On("Stop").Return(nil).Once()
-			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true).Return(errMock).Once()
+			mockContainerHandler.On("Start", "", "airflow_settings.yaml", true, true).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
