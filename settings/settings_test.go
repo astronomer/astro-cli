@@ -3,11 +3,9 @@ package settings
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 )
-
-var errMock = errors.New("settings file error")
 
 func TestAddConnectionsAirflowOne(t *testing.T) {
 	var testExtra map[string]string
@@ -65,7 +63,7 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 
 func TestAddConnectionsAirflowTwoURI(t *testing.T) {
 	testConn := Connection{
-		Conn_URI:      "test-uri",
+		Conn_URI: "test-uri",
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
@@ -176,7 +174,7 @@ func TestEnvExport(t *testing.T) {
 			case "airflow connections export tmp.connections --file-format env":
 				return "Connections successfully exported to tmp.json"
 			case "cat tmp.connections":
-				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema"		
+				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema"
 			default:
 				return ""
 			}
@@ -192,18 +190,28 @@ func TestEnvExport(t *testing.T) {
 
 	// t.Run("variable failure", func(t *testing.T) {
 	// 	execAirflowCommand = func(id, airflowCommand string) string {
-	// 		return ""
+	// 		switch airflowCommand {
+	// 		case "airflow variables export tmp.var":
+	// 			return ""
+	// 		default:
+	// 			return ""
+	// 		}
 	// 	}
-		
+
 	// 	err := EnvExport("id", "testfiles/test.env", 2, false, true)
 	// 	assert.Contains(t, err.Error(), "variable export unsuccessful")
 	// })
 
 	// t.Run("connection failure", func(t *testing.T) {
 	// 	execAirflowCommand = func(id, airflowCommand string) string {
-	// 		return ""
+	// 		switch airflowCommand {
+	// 		case "airflow connections export tmp.connections --file-format env":
+	// 			return ""
+	// 		default:
+	// 			return ""
+	// 		}
 	// 	}
-		
+
 	// 	err := EnvExport("id", "testfiles/test.env", 2, true, false)
 	// 	assert.Contains(t, err.Error(), "connection export unsuccessful")
 	// })
@@ -256,9 +264,14 @@ func TestExport(t *testing.T) {
 
 	// t.Run("variable failure", func(t *testing.T) {
 	// 	execAirflowCommand = func(id, airflowCommand string) string {
-	// 		return ""
+	// 		switch airflowCommand {
+	// 		case "airflow variables export tmp.var":
+	// 			return ""
+	// 		default:
+	// 			return ""
+	// 		}
 	// 	}
-		
+
 	// 	err := Export("id", "testfiles/airflow_settings_export.yaml", 2, false, true, false)
 	// 	assert.Contains(t, err.Error(), "variable export unsuccessful")
 	// })
