@@ -279,12 +279,14 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 	if id == "" {
 		return errNoID
 	}
+	var parseErr bool
 	if version >= AirflowVersionTwo {
 		// env export variables if variables is true
 		if variables {
 			err := EnvExportVariables(id, envFile)
 			if err != nil {
 				fmt.Println(err)
+				parseErr = true
 			}
 		}
 		// env export connections if connections is true
@@ -292,7 +294,11 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 			err := EnvExportConnections(id, envFile)
 			if err != nil {
 				fmt.Println(err)
+				parseErr = true
 			}
+		}
+		if parseErr {
+			return errors.New("there was an error during env export")
 		}
 		return nil
 	}
@@ -386,25 +392,32 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	if err != nil {
 		return err
 	}
+	var parseErr bool
 	// export Airflow Objects
 	if version >= AirflowVersionTwo {
 		if pools {
 			err = ExportPools(id)
 			if err != nil {
 				fmt.Println(err)
+				parseErr = true
 			}
 		}
 		if variables {
 			err = ExportVariables(id)
 			if err != nil {
 				fmt.Println(err)
+				parseErr = true
 			}
 		}
 		if connections {
 			err := ExportConnections(id)
 			if err != nil {
 				fmt.Println(err)
+				parseErr = true
 			}
+		}
+		if parseErr {
+			return errors.New("there was an error during export")
 		}
 		return nil
 	}
