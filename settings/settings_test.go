@@ -22,7 +22,7 @@ func TestAddConnectionsAirflowOne(t *testing.T) {
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
-	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_uri 'test-uri' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
+	expectedAddCmd := "airflow connections -a  --conn_id 'test-id' --conn_type 'test-type' --conn_host 'test-host' --conn_login 'test-login' --conn_password 'test-password' --conn_schema 'test-schema' --conn_port 1"
 	expectedListCmd := "airflow connections -l "
 	execAirflowCommand = func(id, airflowCommand string) string {
 		assert.Contains(t, []string{expectedAddCmd, expectedListCmd}, airflowCommand)
@@ -47,7 +47,7 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
-	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-uri 'test-uri' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
+	expectedAddCmd := "airflow connections add   'test-id' --conn-type 'test-type' --conn-host 'test-host' --conn-login 'test-login' --conn-password 'test-password' --conn-schema 'test-schema' --conn-port 1"
 	expectedDelCmd := "airflow connections delete   \"test-id\""
 	expectedListCmd := "airflow connections list -o plain"
 	execAirflowCommand = func(id, airflowCommand string) string {
@@ -138,5 +138,5 @@ func TestInitSettingsFailure(t *testing.T) {
 	ConfigFileName := "airflow_settings_invalid"
 	err := InitSettings(ConfigFileName)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to decode into struct")
+	assert.Contains(t, err.Error(), "unable to decode file")
 }

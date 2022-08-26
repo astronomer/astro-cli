@@ -41,34 +41,6 @@ type Config struct {
 	Airflow `mapstructure:"airflow"`
 }
 
-// NewConnections is an array of airflow connection
-type OldConnections []OldConnection
-
-// NewConnection contains structure of airflow connection
-type OldConnection struct {
-	ConnID       string `mapstructure:"conn_id"`
-	ConnType     string `mapstructure:"conn_type"`
-	ConnHost     string `mapstructure:"conn_host"`
-	ConnSchema   string `mapstructure:"conn_schema"`
-	ConnLogin    string `mapstructure:"conn_login"`
-	ConnPassword string `mapstructure:"conn_password"`
-	ConnPort     int    `mapstructure:"conn_port"`
-	ConnURI      string `mapstructure:"conn_uri"`
-	ConnExtra    string `mapstructure:"conn_extra"`
-}
-
-// Airflow contains structure of airflow settings
-type OldAirflow struct {
-	OldConnections `mapstructure:"connections"`
-	Pools          `mapstructure:"pools"`
-	Variables      `mapstructure:"variables"`
-}
-
-// NewConfig is input data to generate connections, pools, and variables
-type OldConfig struct {
-	OldAirflow `mapstructure:"airflow"`
-}
-
 type ListConnections []ListConnection
 
 type ListConnection struct {

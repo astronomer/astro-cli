@@ -136,8 +136,8 @@ func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connec
 }
 
 // Start provides a mock function with given fields: imageName, settingsFile, noCache, noBrowser
-func (_m *ContainerHandler) Start(imageName, settingsFile string, noCache bool, noBrowser bool) error {
-	ret := _m.Called(imageName, noCache, noBrowser)
+func (_m *ContainerHandler) Start(imageName, settingsFile string, noCache, noBrowser bool) error {
+	ret := _m.Called(imageName, settingsFile, noCache, noBrowser)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, bool, bool) error); ok {
