@@ -29,7 +29,6 @@ var (
 	viperSettings *viper.Viper
 
 	settings    Config
-	oldSettings OldConfig
 
 	// AirflowVersionTwo 2.0.0
 	AirflowVersionTwo uint64 = 2
@@ -37,7 +36,6 @@ var (
 	// Monkey patched as of now to write unit tests
 	// TODO: do replace this with interface based mocking once changes are in place in `airflow` package
 	execAirflowCommand = docker.AirflowCommand
-	old                bool
 )
 
 const (
@@ -56,18 +54,6 @@ func ConfigSettings(id, settingsFile string, version uint64, connections, variab
 	err := InitSettings(settingsFile)
 	if err != nil {
 		return err
-	}
-	if old {
-		if pools {
-			AddPoolsOld(id, version)
-		}
-		if variables {
-			AddVariablesOld(id, version)
-		}
-		if connections {
-			AddConnectionsOld(id, version)
-		}
-		return nil
 	}
 	if pools {
 		AddPools(id, version)
@@ -102,11 +88,7 @@ func InitSettings(settingsFile string) error {
 	err := viperSettings.Unmarshal(&settings)
 	// Try and use old settings file if error
 	if err != nil {
-		err := viperSettings.Unmarshal(&oldSettings)
-		if err != nil {
-			return errors.Wrap(err, "unable to decode into struct")
-		}
-		old = true
+		return errors.Wrap(err, "unable to decode file")
 	}
 	return nil
 }
@@ -177,12 +159,27 @@ func AddConnections(id string, version uint64) {
 	out := execAirflowCommand(id, airflowCommand)
 
 	for i := range connections {
+		var j int
 		conn := connections[i]
 		if !objectValidator(0, conn.Conn_ID) {
 			continue
 		}
 
-		extra_string := jsonString(conn.Conn_Extra)
+		// extra_string := jsonString(conn.Conn_Extra)
+
+		var extra_string string
+		v, ok := conn.Conn_Extra.(map[interface {}]interface {})
+		fmt.Println(ok)
+		fmt.Println(v)
+		if !ok {
+			t, ok := conn.Conn_Extra.(string)
+			if ok {
+				extra_string = t
+			}
+		} else {
+			extra_string = jsonString(v)
+		}
+
 		quotedConnID := "'" + conn.Conn_ID + "'"
 
 		if strings.Contains(out, quotedConnID) || strings.Contains(out, conn.Conn_ID) {
@@ -199,28 +196,35 @@ func AddConnections(id string, version uint64) {
 		airflowCommand = fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.Conn_ID)
 		if objectValidator(0, conn.Conn_Type) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.Conn_Type)
-		}
-		if objectValidator(0, conn.Conn_URI) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.Conn_URI)
+			j++
 		}
 		if extra_string != "" {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, extra_string)
 		}
 		if objectValidator(0, conn.Conn_Host) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.Conn_Host)
+			j++
 		}
 		if objectValidator(0, conn.Conn_Login) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.Conn_Login)
+			j++
 		}
 		if objectValidator(0, conn.Conn_Password) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.Conn_Password)
+			j++
 		}
 		if objectValidator(0, conn.Conn_Schema) {
 			airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.Conn_Schema)
+			j++
 		}
 		if conn.Conn_Port != 0 {
 			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.Conn_Port)
+			j++
 		}
+		if objectValidator(0, conn.Conn_URI) && j == 0 {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.Conn_URI)
+		}
+
 		out := execAirflowCommand(id, airflowCommand)
 		fmt.Println("Adding connection logs:\n" + out)
 		fmt.Printf("Added Connection: %s\n", conn.Conn_ID)
@@ -525,16 +529,20 @@ func ExportPools(id string) error {
 	return nil
 }
 
-func jsonString(connExtra map[string]string) string {
+func jsonString(connExtra map[interface{}]interface{}) string {
 	var extra_string string
 	i := 0
 	for k, v := range connExtra {
-		if i == 0 {
-			extra_string = extra_string + "\"" + k + "\": \"" + v + "\""
-		} else {
-			extra_string = extra_string + ", \"" + k + "\": \"" + v + "\""
+		key, ok := k.(string)
+		value, ok := v.(string)
+		if ok {
+			if i == 0 {
+				extra_string = extra_string + "\"" + key + "\": \"" + value + "\""
+			} else {
+				extra_string = extra_string + ", \"" + key + "\": \"" + value + "\""
+			}
+			i++
 		}
-		i++
 	}
 	if extra_string != "" {
 		extra_string = "{" + extra_string + "}"

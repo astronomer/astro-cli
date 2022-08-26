@@ -13,7 +13,7 @@ type Connection struct {
 	Conn_Password string            `mapstructure:"conn_password"`
 	Conn_Port     int               `mapstructure:"conn_port"`
 	Conn_URI      string            `mapstructure:"conn_uri"`
-	Conn_Extra    map[string]string `mapstructure:"conn_extra"`
+	Conn_Extra    interface{} `mapstructure:"conn_extra"`
 }
 
 // Pools contains structure of airflow pools

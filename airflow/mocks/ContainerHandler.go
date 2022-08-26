@@ -121,7 +121,6 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	return r0
 }
 
-<<<<<<< HEAD
 // Settings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, export, envExport
 func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connections bool, variables bool, pools bool, export bool, envExport bool) error {
 	ret := _m.Called(settingsFile, envFile, connections, variables, pools, export, envExport)
