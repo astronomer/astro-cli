@@ -238,15 +238,15 @@ var (
 			version: "0.25.0",
 			query: `
 			mutation UpdateDeployment(
-				$deploymentId: Uuid!, 
-				$payload: JSON!, 
-				$cloudRole: String, 
+				$deploymentId: Uuid!,
+				$payload: JSON!,
+				$cloudRole: String,
 				$dagDeployment: DagDeployment
 			){
 				updateDeployment(
-					deploymentUuid: $deploymentId, 
-					payload: $payload, 
-					cloudRole: $cloudRole, 
+					deploymentUuid: $deploymentId,
+					payload: $payload,
+					cloudRole: $cloudRole,
 					dagDeployment: $dagDeployment
 				){
 					id
@@ -271,19 +271,19 @@ var (
 			version: "0.28.0",
 			query: `
 			mutation UpdateDeployment(
-				$deploymentId: Uuid!, 
-				$payload: JSON!, 
-				$executor: ExecutorType, 
-				$cloudRole: String, 
-				$dagDeployment: DagDeployment, 
+				$deploymentId: Uuid!,
+				$payload: JSON!,
+				$executor: ExecutorType,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
 				$triggererReplicas: Int
 			){
 				updateDeployment(
-					deploymentUuid: $deploymentId, 
-					payload: $payload, 
-					executor: $executor, 
-					cloudRole: $cloudRole, 
-					dagDeployment: $dagDeployment, 
+					deploymentUuid: $deploymentId,
+					payload: $payload,
+					executor: $executor,
+					cloudRole: $cloudRole,
+					dagDeployment: $dagDeployment,
 					triggerer:{ replicas: $triggererReplicas }
 				){
 					id
