@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,11 +40,27 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
-	deploymentRespNoQueues := []astro.Deployment{
+	deploymentRespDefaultQueue := []astro.Deployment{
 		{
 			ID:             "test-deployment-id",
 			Label:          "test-deployment-label",
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			RuntimeRelease: astro.RuntimeRelease{Version: "5.0.8"},
+			Cluster: astro.Cluster{
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-instance-type",
+						CreatedAt:        time.Now(),
+					},
+					{
+						ID:               "test-pool-id-1",
+						IsDefault:        true,
+						NodeInstanceType: "test-instance-type-1",
+						CreatedAt:        time.Now(),
+					},
+				},
+			},
 			DeploymentSpec: astro.DeploymentSpec{
 				Workers: astro.Workers{
 					AU: 10,
@@ -53,7 +70,26 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 					Replicas: 3,
 				},
 			},
-			WorkerQueues: []astro.WorkerQueue{},
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					ID:                "test-wq-id",
+					Name:              "test-default-queue",
+					IsDefault:         true,
+					MaxWorkerCount:    130,
+					MinWorkerCount:    12,
+					WorkerConcurrency: 110,
+					NodePoolID:        "test-pool-id",
+				},
+				{
+					ID:                "test-wq-id-1",
+					Name:              "test-default-queue-1",
+					IsDefault:         false,
+					MaxWorkerCount:    175,
+					MinWorkerCount:    8,
+					WorkerConcurrency: 150,
+					NodePoolID:        "test-pool-id-1",
+				},
+			},
 		},
 		{
 			ID:             "test-deployment-id-1",
@@ -110,17 +146,17 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespNoQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
-		cmdArgs := []string{"worker-queue", "create"}
+		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
+		cmdArgs := []string{"worker-queue", "create", "-t", "test-instance-type"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("create worker queue for existing deployments when deployment id was provided", func(t *testing.T) {
-		expectedoutput := "worker queue  for test-deployment-id-1 in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		expectedoutput := "worker queue  for test-deployment-id in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -133,30 +169,26 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespNoQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
-		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id-1"}
+		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
+		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
 		mockClient.AssertExpectations(t)
 	})
-
-	// TODO discuss if we want to print both usage and the error?
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"worker-queue", "create"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
-		assert.Contains(t, resp, expectedOut)
+		assert.NotContains(t, resp, expectedOut)
 	})
 	// TODO When updating existing queues, pass in ID of the existing queues
 	// TODO When updating existing queues, is changing the name of the existing queue/s allowed?
-	// TODO no short-hand for min-count, max-count, concurrency or isDefault
 	// TODO what if no worker-queue name was provided --> (prompt user for the name)
-	// TODO what if the user wants to create a worker queue on a non-default nodepool? --> (use the worker-type to map to nodepool)
 	// TODO what if no deployments exist? --> (manually test)
 	// TODO more error cases
 }

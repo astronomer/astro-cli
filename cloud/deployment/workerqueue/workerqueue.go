@@ -4,18 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
+	"strconv"
 
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
 	ErrWorkerQueueDefaultOptions = errors.New("failed to get worker queue default options")
 	ErrInvalidWorkerQueueOption  = errors.New("worker queue option is invalid")
 	ErrCannotUpdateExistingQueue = errors.New("worker queue already exists")
+	ErrInvalidNodePool           = errors.New("node pool selection failed")
 )
 
-func Create(ws, deploymentID, deploymentName, name string, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
+func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
 	var (
 		requestedDeployment astro.Deployment
 		err                 error
@@ -23,7 +28,6 @@ func Create(ws, deploymentID, deploymentName, name string, wQueueMin, wQueueMax,
 		queueToCreate       *astro.WorkerQueue
 		listToCreate        []astro.WorkerQueue
 		defaultOptions      astro.WorkerQueueDefaultOptions
-		pool                astro.NodePool
 		nodePoolID          string
 	)
 	// get or select the deployment
@@ -38,15 +42,11 @@ func Create(ws, deploymentID, deploymentName, name string, wQueueMin, wQueueMax,
 		return fmt.Errorf("%w: %s", ErrWorkerQueueDefaultOptions, err.Error())
 	}
 
-	// Get the default nodepool ID to use
-	for _, pool = range requestedDeployment.Cluster.NodePools {
-		if pool.IsDefault {
-			nodePoolID = pool.ID
-			break
-		}
+	// Get the nodepoolID to use
+	nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
+	if err != nil {
+		return err
 	}
-
-	// TODO user selects nodePoolID for creating a queue on non-default nodepools
 
 	queueToCreate = &astro.WorkerQueue{
 		Name:       name,
@@ -158,4 +158,61 @@ func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.Worker
 		}
 	}
 	return false
+}
+
+// selectNodePool takes workerType and []NodePool as arguments
+// If user requested a workerType, then the matching nodePoolID is returned
+// If user did not request a workerType, then it prompts the user to pick one
+// An ErrInvalidNodePool is returned if a user chooses an option not on the list
+func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer) (string, error) {
+	var (
+		nodePoolID, message string
+		pool                astro.NodePool
+		errToReturn         error
+	)
+
+	message = "No worker-type was specified.  Select the node pool to use"
+	switch workerType {
+	case "":
+		tab := printutil.Table{
+			Padding:        []int{5, 30, 20, 50},
+			DynamicPadding: true,
+			Header:         []string{"#", "NODE INSTANCE TYPE", "ISDEFAULT", "NODEPOOL ID"},
+		}
+
+		fmt.Println(message)
+
+		sort.Slice(nodePools, func(i, j int) bool {
+			return nodePools[i].CreatedAt.Before(nodePools[j].CreatedAt)
+		})
+
+		nodePoolMap := map[string]astro.NodePool{}
+		for i := range nodePools {
+			index := i + 1
+			tab.AddRow([]string{strconv.Itoa(index), nodePools[i].NodeInstanceType, strconv.FormatBool(nodePools[i].IsDefault), nodePools[i].ID}, false)
+
+			nodePoolMap[strconv.Itoa(index)] = nodePools[i]
+		}
+
+		tab.Print(out)
+		choice := input.Text("\n> ")
+		selectedPool, ok := nodePoolMap[choice]
+		if !ok {
+			// returning empty nodePoolID
+			errToReturn = fmt.Errorf("%w: invalid node pool: %s selected", ErrInvalidNodePool, choice)
+			return nodePoolID, errToReturn
+		}
+		return selectedPool.ID, nil
+	default:
+		// Get the nodePoolID for pool that matches workerType
+		for _, pool = range nodePools {
+			if pool.NodeInstanceType == workerType {
+				nodePoolID = pool.ID
+				return nodePoolID, errToReturn
+			}
+		}
+		// did not find a matching workerType in any node pool
+		errToReturn = fmt.Errorf("%w: workerType %s did not match any node pool", ErrInvalidNodePool, workerType)
+		return nodePoolID, errToReturn
+	}
 }

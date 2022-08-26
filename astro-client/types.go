@@ -335,7 +335,8 @@ type WorkerQueueOption struct {
 }
 
 type NodePool struct {
-	ID               string `json:"id"`
-	IsDefault        bool   `json:"isDefault"`
-	NodeInstanceType string `json:"nodeInstanceType"`
+	ID               string    `json:"id"`
+	IsDefault        bool      `json:"isDefault"`
+	NodeInstanceType string    `json:"nodeInstanceType"`
+	CreatedAt        time.Time `json:"createdAt"`
 }

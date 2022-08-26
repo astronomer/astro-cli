@@ -30,6 +30,7 @@ var (
 					id
 					isDefault
 					nodeInstanceType
+					createdAt
 				}
 			}
 			workerQueues {

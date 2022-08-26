@@ -3,8 +3,9 @@ package cloud
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 )
 
 func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
@@ -43,13 +44,12 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentWorkerQueueCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
+	cmd.SilenceUsage = true
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	return workerqueue.Create(ws, deploymentID, deploymentName, wQueueName, wQueueMinWorkerCount, wQueueMaxWorkerCount, wQueueConcurrency, astroClient, out)
+	return workerqueue.Create(ws, deploymentID, deploymentName, wQueueName, wQueueWorkerType, wQueueMinWorkerCount, wQueueMaxWorkerCount, wQueueConcurrency, astroClient, out)
 }
