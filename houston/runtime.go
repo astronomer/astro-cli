@@ -10,10 +10,6 @@ var GetRuntimeReleases = `
 	}`
 
 func (h ClientImplementation) GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return RuntimeReleases{}, err
-	}
-
 	vars := make(map[string]interface{})
 	if airflowVersion != "" {
 		vars["airflowVersion"] = airflowVersion

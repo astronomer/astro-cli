@@ -163,10 +163,6 @@ var (
 
 // AddUserToWorkspace - add a user to a workspace
 func (h ClientImplementation) AddWorkspaceUser(request AddWorkspaceUserRequest) (*Workspace, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     WorkspaceUserAddRequest,
 		Variables: request,
@@ -182,10 +178,6 @@ func (h ClientImplementation) AddWorkspaceUser(request AddWorkspaceUserRequest) 
 
 // RemoveUserFromWorkspace - remove a user from a workspace
 func (h ClientImplementation) DeleteWorkspaceUser(request DeleteWorkspaceUserRequest) (*Workspace, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     WorkspaceUserRemoveRequest,
 		Variables: request,
@@ -201,10 +193,6 @@ func (h ClientImplementation) DeleteWorkspaceUser(request DeleteWorkspaceUserReq
 
 // ListUserAndRolesFromWorkspace - list users and roles from a workspace
 func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []WorkspaceUserRoleBindings{}, err
-	}
-
 	req := Request{
 		Query:     WorkspaceGetUsersRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
@@ -220,10 +208,6 @@ func (h ClientImplementation) ListWorkspaceUserAndRoles(workspaceID string) ([]W
 
 // ListWorkspacePaginatedUserAndRoles - list users and roles from a workspace
 func (h ClientImplementation) ListWorkspacePaginatedUserAndRoles(request PaginatedWorkspaceUserRolesRequest) ([]WorkspaceUserRoleBindings, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []WorkspaceUserRoleBindings{}, err
-	}
-
 	req := Request{
 		Query:     WorkspacePaginatedGetUsersRequest,
 		Variables: request,
@@ -239,10 +223,6 @@ func (h ClientImplementation) ListWorkspacePaginatedUserAndRoles(request Paginat
 
 // UpdateUserRoleInWorkspace - update a user role in a workspace
 func (h ClientImplementation) UpdateWorkspaceUserRole(request UpdateWorkspaceUserRoleRequest) (string, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return "", err
-	}
-
 	req := Request{
 		Query:     WorkspaceUserUpdateRequest,
 		Variables: request,
@@ -258,10 +238,6 @@ func (h ClientImplementation) UpdateWorkspaceUserRole(request UpdateWorkspaceUse
 
 // GetUserRoleInWorkspace - get a user role in a workspace
 func (h ClientImplementation) GetWorkspaceUserRole(request GetWorkspaceUserRoleRequest) (WorkspaceUserRoleBindings, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return WorkspaceUserRoleBindings{}, err
-	}
-
 	req := Request{
 		Query:     WorkspaceGetUserRequest,
 		Variables: request,

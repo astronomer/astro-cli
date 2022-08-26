@@ -156,10 +156,6 @@ var (
 
 // CreateServiceAccountInDeployment - create a service account in a deployment
 func (h ClientImplementation) CreateDeploymentServiceAccount(variables *CreateServiceAccountRequest) (*DeploymentServiceAccount, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     CreateDeploymentServiceAccountRequest,
 		Variables: variables,
@@ -174,10 +170,6 @@ func (h ClientImplementation) CreateDeploymentServiceAccount(variables *CreateSe
 
 // CreateServiceAccountInWorkspace - create a service account into a workspace
 func (h ClientImplementation) CreateWorkspaceServiceAccount(variables *CreateServiceAccountRequest) (*WorkspaceServiceAccount, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     CreateWorkspaceServiceAccountRequest,
 		Variables: variables,
@@ -192,10 +184,6 @@ func (h ClientImplementation) CreateWorkspaceServiceAccount(variables *CreateSer
 
 // DeleteServiceAccountFromDeployment - delete a service account from a workspace
 func (h ClientImplementation) DeleteDeploymentServiceAccount(request DeleteServiceAccountRequest) (*ServiceAccount, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentServiceAccountDeleteRequest,
 		Variables: request,
@@ -211,10 +199,6 @@ func (h ClientImplementation) DeleteDeploymentServiceAccount(request DeleteServi
 
 // DeleteServiceAccountFromWorkspace - delete a service account from a workspace
 func (h ClientImplementation) DeleteWorkspaceServiceAccount(request DeleteServiceAccountRequest) (*ServiceAccount, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     WorkspaceServiceAccountDeleteRequest,
 		Variables: request,
@@ -230,10 +214,6 @@ func (h ClientImplementation) DeleteWorkspaceServiceAccount(request DeleteServic
 
 // ListServiceAccountsInDeployment - list service accounts in a deployment
 func (h ClientImplementation) ListDeploymentServiceAccounts(deploymentID string) ([]ServiceAccount, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []ServiceAccount{}, err
-	}
-
 	req := Request{
 		Query:     DeploymentServiceAccountsGetRequest,
 		Variables: map[string]interface{}{"deploymentUuid": deploymentID},
@@ -249,10 +229,6 @@ func (h ClientImplementation) ListDeploymentServiceAccounts(deploymentID string)
 
 // ListServiceAccountsInWorkspace - list service accounts in a workspace
 func (h ClientImplementation) ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []ServiceAccount{}, err
-	}
-
 	req := Request{
 		Query:     WorkspaceServiceAccountsGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},

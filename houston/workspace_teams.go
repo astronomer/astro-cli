@@ -96,10 +96,6 @@ var (
 
 // AddTeamToWorkspace - add a team to a workspace
 func (h ClientImplementation) AddWorkspaceTeam(request AddWorkspaceTeamRequest) (*Workspace, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     WorkspaceTeamAddRequest,
 		Variables: request,
@@ -115,10 +111,6 @@ func (h ClientImplementation) AddWorkspaceTeam(request AddWorkspaceTeamRequest) 
 
 // RemoveTeamFromWorkspace - remove a team from a workspace
 func (h ClientImplementation) DeleteWorkspaceTeam(request DeleteWorkspaceTeamRequest) (*Workspace, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     WorkspaceTeamRemoveRequest,
 		Variables: request,
@@ -134,10 +126,6 @@ func (h ClientImplementation) DeleteWorkspaceTeam(request DeleteWorkspaceTeamReq
 
 // ListTeamAndRolesFromWorkspace - list teams and roles from a workspace
 func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []Team{}, err
-	}
-
 	req := Request{
 		Query:     WorkspaceGetTeamsRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
@@ -153,10 +141,6 @@ func (h ClientImplementation) ListWorkspaceTeamsAndRoles(workspaceID string) ([]
 
 // UpdateTeamRoleInWorkspace - update a team role in a workspace
 func (h ClientImplementation) UpdateWorkspaceTeamRole(request UpdateWorkspaceTeamRoleRequest) (string, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return "", err
-	}
-
 	req := Request{
 		Query:     WorkspaceTeamUpdateRequest,
 		Variables: request,
@@ -172,10 +156,6 @@ func (h ClientImplementation) UpdateWorkspaceTeamRole(request UpdateWorkspaceTea
 
 // GetTeamRoleInWorkspace - get a team role in a workspace
 func (h ClientImplementation) GetWorkspaceTeamRole(request GetWorkspaceTeamRoleRequest) (*Team, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     TeamGetRequest,
 		Variables: request,

@@ -13,7 +13,7 @@ var errHoustonInvalidDeploymentTeams = errors.New("no teams were found for this 
 
 // TeamsList returns a list of teams with deployment access
 func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.Writer) error {
-	deploymentTeams, err := client.ListDeploymentTeamsAndRoles(deploymentID)
+	deploymentTeams, err := houston.Call(client.ListDeploymentTeamsAndRoles)(deploymentID)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 // nolint:dupl
 // AddTeam adds a team to a deployment with specified role
 func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	_, err := client.AddDeploymentTeam(houston.AddDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
+	_, err := houston.Call(client.AddDeploymentTeam)(houston.AddDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, 
 // nolint:dupl
 // UpdateTeam updates a team's deployment role
 func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	_, err := client.UpdateDeploymentTeamRole(houston.UpdateDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
+	_, err := houston.Call(client.UpdateDeploymentTeamRole)(houston.UpdateDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInte
 
 // RemoveTeam removes team access for a deployment
 func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out io.Writer) error {
-	_, err := client.RemoveDeploymentTeam(houston.RemoveDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID})
+	_, err := houston.Call(client.RemoveDeploymentTeam)(houston.RemoveDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID})
 	if err != nil {
 		return err
 	}

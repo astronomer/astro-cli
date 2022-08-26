@@ -112,10 +112,6 @@ var (
 
 // ListUsersInDeployment - list users with deployment access
 func (h ClientImplementation) ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []DeploymentUser{}, err
-	}
-
 	user := map[string]interface{}{
 		"userId":   filters.UserID,
 		"email":    filters.Email,
@@ -140,10 +136,6 @@ func (h ClientImplementation) ListDeploymentUsers(filters ListDeploymentUsersReq
 
 // AddUserToDeployment - Add a user to a deployment with specified role
 func (h ClientImplementation) AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentUserAddRequest,
 		Variables: variables,
@@ -159,10 +151,6 @@ func (h ClientImplementation) AddDeploymentUser(variables UpdateDeploymentUserRe
 
 // UpdateUserInDeployment - update a user's role inside a deployment
 func (h ClientImplementation) UpdateDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentUserUpdateRequest,
 		Variables: variables,
@@ -178,10 +166,6 @@ func (h ClientImplementation) UpdateDeploymentUser(variables UpdateDeploymentUse
 
 // DeleteUserFromDeployment - remove a user from a deployment
 func (h ClientImplementation) DeleteDeploymentUser(request DeleteDeploymentUserRequest) (*RoleBinding, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentUserDeleteRequest,
 		Variables: request,

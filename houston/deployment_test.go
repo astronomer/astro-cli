@@ -68,25 +68,6 @@ func TestCreateDeployment(t *testing.T) {
 		_, err := api.CreateDeployment(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["CreateDeployment"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.CreateDeployment(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"CreateDeployment"})
-	})
 }
 
 func TestDeleteDeployment(t *testing.T) {
@@ -145,25 +126,6 @@ func TestDeleteDeployment(t *testing.T) {
 
 		_, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["DeleteDeployment"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"DeleteDeployment"})
 	})
 }
 
@@ -226,25 +188,6 @@ func TestListDeployments(t *testing.T) {
 		_, err := api.ListDeployments(ListDeploymentsRequest{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["ListDeployments"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.ListDeployments(ListDeploymentsRequest{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeployments"})
-	})
 }
 
 func TestUpdateDeployment(t *testing.T) {
@@ -303,25 +246,6 @@ func TestUpdateDeployment(t *testing.T) {
 
 		_, err := api.UpdateDeployment(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["UpdateDeployment"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.UpdateDeployment(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeployment"})
 	})
 }
 
@@ -382,25 +306,6 @@ func TestGetDeployment(t *testing.T) {
 		_, err := api.GetDeployment("deployment-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["GetDeployment"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.GetDeployment("deployment-id")
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetDeployment"})
-	})
 }
 
 func TestUpdateDeploymentAirflow(t *testing.T) {
@@ -460,25 +365,6 @@ func TestUpdateDeploymentAirflow(t *testing.T) {
 		_, err := api.UpdateDeploymentAirflow(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["UpdateDeploymentAirflow"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.UpdateDeploymentAirflow(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentAirflow"})
-	})
 }
 
 func TestGetDeploymentConfig(t *testing.T) {
@@ -514,7 +400,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		deploymentConfig, err := api.GetDeploymentConfig()
+		deploymentConfig, err := api.GetDeploymentConfig(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, *deploymentConfig, mockDeploymentConfig.Data.DeploymentConfig)
 	})
@@ -529,27 +415,8 @@ func TestGetDeploymentConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetDeploymentConfig()
+		_, err := api.GetDeploymentConfig(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["GetDeploymentConfig"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.GetDeploymentConfig()
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetDeploymentConfig"})
 	})
 }
 
@@ -595,25 +462,6 @@ func TestListDeploymentLogs(t *testing.T) {
 
 		_, err := api.ListDeploymentLogs(ListDeploymentLogsRequest{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["ListDeploymentLogs"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.ListDeploymentLogs(ListDeploymentLogsRequest{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeploymentLogs"})
 	})
 }
 
@@ -677,25 +525,6 @@ func TestUpdateDeploymentRuntime(t *testing.T) {
 		_, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["UpdateDeploymentRuntime"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.UpdateDeploymentRuntime(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentRuntime"})
-	})
 }
 
 func TestCancelUpdateDeploymentRuntime(t *testing.T) {
@@ -745,25 +574,6 @@ func TestCancelUpdateDeploymentRuntime(t *testing.T) {
 		_, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["CancelUpdateDeploymentRuntime"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.CancelUpdateDeploymentRuntime(map[string]interface{}{})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"CancelUpdateDeploymentRuntime"})
-	})
 }
 
 func TestUpdateDeploymentImage(t *testing.T) {
@@ -791,7 +601,7 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		assert.NoError(t, err)
 	})
 
@@ -805,26 +615,7 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["UpdateDeploymentImage"] = VersionRestrictions{GTE: "0.29.0"}
-
-		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentImage"})
 	})
 }

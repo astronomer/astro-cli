@@ -49,11 +49,11 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		config, err := api.GetAppConfig()
+		config, err := api.GetAppConfig(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, config, mockAppConfig)
 
-		config, err = api.GetAppConfig()
+		config, err = api.GetAppConfig(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, config, mockAppConfig)
 
@@ -76,11 +76,11 @@ func TestGetAppConfig(t *testing.T) {
 		appConfig = nil
 		appConfigErr = nil
 
-		config, err := api.GetAppConfig()
+		config, err := api.GetAppConfig(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 		assert.Nil(t, config)
 
-		config, err = api.GetAppConfig()
+		config, err = api.GetAppConfig(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 		assert.Nil(t, config)
 
@@ -102,27 +102,8 @@ func TestGetAppConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAppConfig()
+		_, err := api.GetAppConfig(nil)
 		assert.EqualError(t, err, ErrFieldsNotAvailable{}.Error())
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["GetAppConfig"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.GetAppConfig()
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetAppConfig"})
 	})
 }
 
@@ -150,7 +131,7 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		namespaces, err := api.GetAvailableNamespaces()
+		namespaces, err := api.GetAvailableNamespaces(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, namespaces, mockNamespaces.Data.GetDeploymentNamespaces)
 	})
@@ -165,27 +146,8 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetAvailableNamespaces()
+		_, err := api.GetAvailableNamespaces(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["GetAvailableNamespaces"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.GetAvailableNamespaces()
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"GetAvailableNamespaces"})
 	})
 }
 
@@ -200,6 +162,38 @@ func TestGetPlatformVersion(t *testing.T) {
 	jsonResponse, err := json.Marshal(mockNamespaces)
 	assert.NoError(t, err)
 
+	t.Run("non empty version", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+		version = "0.30.0"
+		versionErr = nil
+		resp, err := api.GetPlatformVersion(nil)
+		assert.NoError(t, err)
+		assert.Equal(t, version, resp)
+	})
+
+	t.Run("non empty version error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+		version = ""
+		versionErr = errMockHouston
+		resp, err := api.GetPlatformVersion(nil)
+		assert.ErrorIs(t, err, errMockHouston)
+		assert.Equal(t, version, resp)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
@@ -210,7 +204,8 @@ func TestGetPlatformVersion(t *testing.T) {
 		})
 		api := NewClient(client)
 		version = ""
-		platformVersion, err := api.GetPlatformVersion()
+		versionErr = nil
+		platformVersion, err := api.GetPlatformVersion(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, platformVersion, mockNamespaces.Data.GetAppConfig.Version)
 	})
@@ -225,7 +220,8 @@ func TestGetPlatformVersion(t *testing.T) {
 		})
 		api := NewClient(client)
 		version = ""
-		_, err := api.GetAvailableNamespaces()
+		versionErr = nil
+		_, err := api.GetPlatformVersion(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

@@ -27,7 +27,7 @@ func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client housto
 	if teamID == "" {
 		return errMissingTeamID
 	}
-	team, err := client.GetTeam(teamID)
+	team, err := houston.Call(client.GetTeam)(teamID)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client housto
 	if getUserInfo || allFilters {
 		logrus.Debug("retrieving users part of team")
 		fmt.Fprintln(out, "\nUsers part of Team:")
-		users, err := client.GetTeamUsers(teamID)
+		users, err := houston.Call(client.GetTeamUsers)(teamID)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func List(client houston.ClientInterface, out io.Writer) error {
 	count := -1
 
 	for len(teams) < count || count == -1 {
-		resp, err := client.ListTeams(houston.ListTeamsRequest{Take: ListTeamLimit, Cursor: cursor})
+		resp, err := houston.Call(client.ListTeams)(houston.ListTeamsRequest{Take: ListTeamLimit, Cursor: cursor})
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func List(client houston.ClientInterface, out io.Writer) error {
 }
 
 func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, pageNumber int, cursorID string) error {
-	resp, err := client.ListTeams(houston.ListTeamsRequest{Cursor: cursorID, Take: pageSize})
+	resp, err := houston.Call(client.ListTeams)(houston.ListTeamsRequest{Cursor: cursorID, Take: pageSize})
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 
 	if role == houston.NoneTeamRole {
 		// Get current role for the team
-		team, err := client.GetTeam(teamID)
+		team, err := houston.Call(client.GetTeam)(teamID)
 		if err != nil {
 			return err
 		}
@@ -193,7 +193,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 			return nil
 		}
 
-		_, err = client.DeleteTeamSystemRoleBinding(houston.SystemRoleBindingRequest{TeamID: teamID, Role: role})
+		_, err = houston.Call(client.DeleteTeamSystemRoleBinding)(houston.SystemRoleBindingRequest{TeamID: teamID, Role: role})
 		if err != nil {
 			return err
 		}
@@ -201,7 +201,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 		return nil
 	}
 
-	newRole, err := client.CreateTeamSystemRoleBinding(houston.SystemRoleBindingRequest{TeamID: teamID, Role: role})
+	newRole, err := houston.Call(client.CreateTeamSystemRoleBinding)(houston.SystemRoleBindingRequest{TeamID: teamID, Role: role})
 	if err != nil {
 		return err
 	}

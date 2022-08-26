@@ -28,13 +28,13 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	houstonClient = client
 
 	var err error
-	appConfig, err = client.GetAppConfig()
+	appConfig, err = houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	}
-	if appConfig != nil {
-		houstonVersion = appConfig.Version
-		houston.SetVersion(houstonVersion) // updating version in houston package to avoid extra houston call
+	houstonVersion, err = client.GetPlatformVersion(nil)
+	if err != nil {
+		logrus.Debugf("Unable to get Houston version: %s", err.Error())
 	}
 
 	return []*cobra.Command{

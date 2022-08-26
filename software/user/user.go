@@ -28,7 +28,7 @@ func Create(email, password string, client houston.ClientInterface, out io.Write
 		password = inputPassword
 	}
 
-	authUser, err := client.CreateUser(houston.CreateUserRequest{Email: email, Password: password})
+	authUser, err := houston.Call(client.CreateUser)(houston.CreateUserRequest{Email: email, Password: password})
 	if err != nil {
 		return errUserCreationDisabled
 	}

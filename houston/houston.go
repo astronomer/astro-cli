@@ -1,11 +1,15 @@
 package houston
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -28,7 +32,7 @@ type ClientInterface interface {
 	CreateUser(req CreateUserRequest) (*AuthUser, error)
 	// workspace
 	CreateWorkspace(req CreateWorkspaceRequest) (*Workspace, error)
-	ListWorkspaces() ([]Workspace, error)
+	ListWorkspaces(interface{}) ([]Workspace, error)
 	PaginatedListWorkspaces(req PaginatedListWorkspaceRequest) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
@@ -52,9 +56,9 @@ type ClientInterface interface {
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
-	GetDeploymentConfig() (*DeploymentConfig, error)
+	GetDeploymentConfig(interface{}) (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
-	UpdateDeploymentImage(req UpdateDeploymentImageRequest) error
+	UpdateDeploymentImage(req UpdateDeploymentImageRequest) (interface{}, error)
 	// deployment users
 	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
@@ -68,9 +72,9 @@ type ClientInterface interface {
 	DeleteWorkspaceServiceAccount(req DeleteServiceAccountRequest) (*ServiceAccount, error)
 	ListWorkspaceServiceAccounts(workspaceID string) ([]ServiceAccount, error)
 	// app
-	GetAppConfig() (*AppConfig, error)
-	GetAvailableNamespaces() ([]Namespace, error)
-	GetPlatformVersion() (string, error)
+	GetAppConfig(interface{}) (*AppConfig, error)
+	GetAvailableNamespaces(interface{}) ([]Namespace, error)
+	GetPlatformVersion(interface{}) (string, error)
 	// runtime
 	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
 	// teams
@@ -109,6 +113,21 @@ var NewClient = func(c *httputil.HTTPClient) ClientInterface {
 // Client containers the logger and HTTPClient used to communicate with the HoustonAPI
 type Client struct {
 	HTTPClient *httputil.HTTPClient
+}
+
+func NewHTTPClient() *httputil.HTTPClient {
+	httpClient := httputil.NewHTTPClient()
+	// configure http transport
+	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
+	// #nosec
+	httpClient.HTTPClient.Transport = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: time.Duration(dialTimeout) * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
+	}
+	return httpClient
 }
 
 // newInternalClient returns a new Client with the logger and HTTP Client setup.

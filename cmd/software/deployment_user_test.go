@@ -23,7 +23,7 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("AddDeploymentUser", expectedAddUserRequest).Return(mockDeploymentUserRole, nil)
 
 	houstonClient = api
@@ -46,7 +46,7 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("DeleteDeploymentUser", houston.DeleteDeploymentUserRequest{DeploymentID: mockDeploymentUserRole.Deployment.ID, Email: mockDeploymentUserRole.User.Username}).
 		Return(mockDeploymentUserRole, nil)
 
@@ -88,7 +88,7 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("UpdateDeploymentUser", expectedUpdateUserRequest).Return(&mockResponseUserRole, nil)
 
 	houstonClient = api

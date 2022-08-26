@@ -1,16 +1,23 @@
 package houston
 
 import (
+	"reflect"
 	"runtime"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 )
 
-var ApplyDecoratorForTests bool
+var (
+	ApplyDecoratorForTests bool
 
-const DesiredMethodDepth = 2 // 2 because getCallerFunctionName will be called from ValidateAvailability which is called from the function which we are interested in
+	version    string
+	versionErr error
+)
+
+const (
+	DesiredMethodDepth = 2 // 2 because getCallerFunctionName will be called from ValidateAvailability which is called from the function which we are interested in
+)
 
 type VersionRestrictions struct {
 	GTE string
@@ -37,36 +44,39 @@ var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
 	"GetRuntimeReleases":      {GTE: "0.29.0"},
 }
 
-func (h ClientImplementation) ValidateAvailability() error {
-	if !ApplyDecoratorForTests && isCalledFromUnitTestFile() { // bypassing this wrapper for unit tests
-		return nil
-	}
+func Call[fReq any, fResp any, fType func(any) (any, error)](houstonFunc func(fReq) (fResp, error)) func(fReq) (fResp, error) {
+	return func(r fReq) (fResp, error) {
+		if !ApplyDecoratorForTests && isCalledFromUnitTestFile() { // bypassing this decorator for unit tests
+			return houstonFunc(r)
+		}
 
-	// get the name of the function which called ValidateAvailability
-	apiName := getCallerFunctionName()
-	// check if any restrictions are defined on that API, else return
-	apiRestriction, ok := houstonAPIAvailabilityByVersion[apiName]
-	if !ok {
-		return nil
-	}
+		// get function name of houstonFunc
+		funcName := getFunctionName(houstonFunc)
+		// check if any restrictions are defined on that API, else return
+		funcRestriction, ok := houstonAPIAvailabilityByVersion[funcName]
+		if !ok {
+			return houstonFunc(r)
+		}
 
-	// get the current version of the connected platform
-	platformVersion, err := h.GetPlatformVersion()
-	if err != nil {
-		logrus.Debugf("Error retrieving houston version: %s", err.Error())
-		return nil
-	}
+		// get the current version of the connected platform
+		houstonVersion := getVersion()
 
-	// validate if the platform version fits within API restrictions
-	if VerifyVersionMatch(platformVersion, apiRestriction) {
-		return nil
+		// validate if the platform version fits within API restrictions
+		if VerifyVersionMatch(houstonVersion, funcRestriction) {
+			return houstonFunc(r)
+		}
+		var res fResp
+		return res, ErrAPINotImplemented{APIName: funcName}
 	}
-	return ErrAPINotImplemented{APIName: apiName}
 }
 
 func VerifyVersionMatch(version string, funcRestriction VersionRestrictions) bool {
 	orgVersion := version
 	version = sanitiseVersionString(version)
+
+	if !semver.IsValid(version) {
+		return true
+	}
 
 	if len(funcRestriction.EQ) > 0 {
 		for _, versionAvailable := range funcRestriction.EQ {
@@ -99,12 +109,8 @@ func VerifyVersionMatch(version string, funcRestriction VersionRestrictions) boo
 	return true
 }
 
-func getCallerFunctionName() string {
-	pc, _, _, ok := runtime.Caller(DesiredMethodDepth)
-	if !ok {
-		return ""
-	}
-	runtimeFuncName := runtime.FuncForPC(pc).Name()                           // naming convention: github.com/astronomer/astro-cli/houston.ClientInterface.GetTeam-fm
+func getFunctionName(i interface{}) string {
+	runtimeFuncName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name() // naming convention: github.com/astronomer/astro-cli/houston.ClientInterface.GetTeam-fm
 	methodName := runtimeFuncName[strings.LastIndex(runtimeFuncName, ".")+1:] // split by . and get the last part of it
 	methodName, _, _ = strings.Cut(methodName, "-")                           // get the string before the first instance of hyphen
 	return methodName
@@ -122,14 +128,6 @@ func sanitiseVersionString(v string) string {
 	return v
 }
 
-func SetVersion(v string) {
-	version = v
-}
-
-func GetVersion() string {
-	return version
-}
-
 func isCalledFromUnitTestFile() bool {
 	// depth is usually 4 because unit test method will call the actual testing method
 	// which will internally call the decorator function and then `isCalledFromUnitTestFile` will be called
@@ -140,4 +138,17 @@ func isCalledFromUnitTestFile() bool {
 		}
 	}
 	return false
+}
+
+func getVersion() string {
+	if version != "" || versionErr != nil {
+		return version
+	}
+
+	// fallback case in which somehow we reach here without getting houston version
+	httpClient := NewHTTPClient()
+	client := NewClient(httpClient)
+
+	version, versionErr = client.GetPlatformVersion(nil)
+	return version
 }

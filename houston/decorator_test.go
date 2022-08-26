@@ -1,42 +1,17 @@
 package houston
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"net/http"
-	"runtime"
-	"strings"
+	"errors"
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
+
+var errMockHouston = errors.New("mock houston error")
 
 func Test_isCalledFromUnitTestFile(t *testing.T) {
 	if got := isCalledFromUnitTestFile(); got != true {
 		t.Errorf("isCalledFromUnitTestFile() = %v, want %v", got, true)
-	}
-}
-
-func TestSetVersion(t *testing.T) {
-	type args struct {
-		v string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "set version",
-			args: args{v: "0.29.0"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			SetVersion(tt.args.v)
-			assert.Equal(t, version, tt.args.v)
-		})
 	}
 }
 
@@ -74,13 +49,12 @@ func TestSanitiseVersionString(t *testing.T) {
 	}
 }
 
-func TestGetCallerFunctionName(t *testing.T) {
-	var res string
-	testFunc := func() {
-		res = getCallerFunctionName()
+func funcToTest(_ interface{}) (interface{}, error) { return nil, nil }
+
+func TestGetFunctionName(t *testing.T) {
+	if got := getFunctionName(funcToTest); got != "funcToTest" {
+		t.Errorf("GetFunctionName() = %v, want %v", got, "funcToTest")
 	}
-	testFunc()
-	assert.Equal(t, res, "TestGetCallerFunctionName")
 }
 
 func TestVerifyVersionMatch(t *testing.T) {
@@ -138,6 +112,16 @@ func TestVerifyVersionMatch(t *testing.T) {
 			args: args{version: "0.30.0", funcRestriction: VersionRestrictions{}},
 			want: true,
 		},
+		{
+			name: "empty version",
+			args: args{version: "", funcRestriction: VersionRestrictions{GTE: "0.31.0"}},
+			want: true,
+		},
+		{
+			name: "invalid version",
+			args: args{version: "invalid", funcRestriction: VersionRestrictions{GTE: "0.31.0"}},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -148,58 +132,64 @@ func TestVerifyVersionMatch(t *testing.T) {
 	}
 }
 
-func TestValidateAvailability(t *testing.T) {
-	testUtil.InitTestConfig("software")
-
-	mockResponse := Response{
-		Data: ResponseData{
-			GetAppConfig: &AppConfig{Version: "0.30.0"},
-		},
-	}
-	jsonResponse, jsonErr := json.Marshal(mockResponse)
-	assert.NoError(t, jsonErr)
-
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	api := ClientImplementation{client: newInternalClient(client)}
-
+func TestCall(t *testing.T) {
 	t.Run("basic case", func(t *testing.T) {
-		err := api.ValidateAvailability()
+		resp, err := Call(funcToTest)(nil)
 		assert.NoError(t, err)
+		assert.Nil(t, resp)
 	})
 
 	t.Run("basic case bypassing test file check", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
-		err := api.ValidateAvailability()
+		resp, err := Call(funcToTest)(nil)
 		assert.NoError(t, err)
+		assert.Nil(t, resp)
 	})
 
 	t.Run("basic case with method restriction", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
-		houstonAPIAvailabilityByVersion["TestValidateAvailability"] = VersionRestrictions{GTE: "0.29.0"}
-		err := api.ValidateAvailability()
+		version = "0.30.0"
+		houstonAPIAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.30.0"}
+		resp, err := Call(funcToTest)(nil)
 		assert.NoError(t, err)
+		assert.Nil(t, resp)
+	})
+
+	t.Run("case when version is empty string", func(t *testing.T) {
+		ApplyDecoratorForTests = true
+		defer func() { ApplyDecoratorForTests = false }()
+		version = "invalid"
+		versionErr = errMockHouston
+		houstonAPIAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.30.0"}
+		resp, err := Call(funcToTest)(nil)
+		assert.NoError(t, err)
+		assert.Nil(t, resp)
 	})
 
 	t.Run("negative case with method restriction", func(t *testing.T) {
 		ApplyDecoratorForTests = true
 		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
+		version = "0.29.0"
+		houstonAPIAvailabilityByVersion["funcToTest"] = VersionRestrictions{GTE: "0.30.0"}
+		resp, err := Call(funcToTest)(nil)
+		assert.ErrorIs(t, err, ErrAPINotImplemented{APIName: "funcToTest"})
+		assert.Nil(t, resp)
+	})
+}
 
-		pc, _, _, _ := runtime.Caller(0)
-		fName := runtime.FuncForPC(pc).Name()
-		methodName := fName[strings.LastIndex(fName, ".")+1:] // split by . and get the last part of it
-		methodName, _, _ = strings.Cut(methodName, "-")
+func TestGetVersion(t *testing.T) {
+	t.Run("when version is already present", func(t *testing.T) {
+		version = "0.30.0"
+		resp := getVersion()
+		assert.Equal(t, version, resp)
+	})
 
-		houstonAPIAvailabilityByVersion[methodName] = VersionRestrictions{GTE: "0.29.0"}
-		err := api.ValidateAvailability()
-		assert.ErrorIs(t, err, ErrAPINotImplemented{APIName: methodName})
+	t.Run("when version error is already present", func(t *testing.T) {
+		versionErr = errMockHouston
+		version = ""
+		resp := getVersion()
+		assert.Equal(t, version, resp)
 	})
 }

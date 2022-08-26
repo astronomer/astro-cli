@@ -51,7 +51,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 		password, _ = input.Password(inputPassword)
 	}
 
-	return client.AuthenticateWithBasicAuth(houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
+	return houston.Call(client.AuthenticateWithBasicAuth)(houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
 }
 
 var switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
@@ -88,7 +88,7 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 		return nil
 	}
 
-	appConfig, err := client.GetAppConfig()
+	appConfig, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		return err
 	}
 
-	authConfig, err := client.GetAuthConfig(ctx)
+	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		return err
 	}
 
-	workspaces, err := client.ListWorkspaces()
+	workspaces, err := houston.Call(client.ListWorkspaces)(nil)
 	if err != nil {
 		return err
 	}

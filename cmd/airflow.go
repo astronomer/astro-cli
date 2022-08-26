@@ -18,7 +18,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/iancoleman/strcase"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -83,8 +82,6 @@ astro dev init --airflow-version 2.2.3
 	pytestDir = "/tests"
 
 	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
-
-	houstonVersion string
 )
 
 func newDevRootCmd() *cobra.Command {
@@ -128,10 +125,6 @@ func newAirflowInitCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
 	var err error
 	var avoidACFlag bool
-	houstonVersion, err = houstonClient.GetPlatformVersion()
-	if err != nil {
-		logrus.Debugf("Error retreiving Astronomer Software platform version: %s", err.Error())
-	}
 
 	// In case user is connected to Astronomer Platform and is connected to older version of platform
 	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
@@ -669,7 +662,7 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 	defaultImageTag, _ := getDefaultImageTag(httpClient, airflowVersion)
 
 	if defaultImageTag == "" {
-		if useAstronomerCertified || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
+		if useAstronomerCertified {
 			fmt.Println("WARNING! There was a network issue getting the latest Astronomer Certified image. Your Dockerfile may not contain the latest version")
 			defaultImageTag = airflowversions.DefaultAirflowVersion
 		} else {

@@ -33,7 +33,7 @@ func TestWorkspaceSAListCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("ListWorkspaceServiceAccounts", mockWorkspace.ID).Return([]houston.ServiceAccount{mockSA}, nil)
 	houstonClient = api
 

@@ -51,3 +51,9 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 		assert.Nil(t, resp)
 	})
 }
+
+func TestNewHTTPClient(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	client := NewHTTPClient()
+	assert.NotNil(t, client)
+}

@@ -1,17 +1,12 @@
 package cmd
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
-	"time"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -21,8 +16,9 @@ import (
 )
 
 var (
-	verboseLevel  string
-	houstonClient houston.ClientInterface
+	verboseLevel   string
+	houstonClient  houston.ClientInterface
+	houstonVersion string
 )
 
 const (
@@ -32,18 +28,12 @@ const (
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
-	httpClient := httputil.NewHTTPClient()
-	// configure http transport
-	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
-	// #nosec
-	httpClient.HTTPClient.Transport = &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout: time.Duration(dialTimeout) * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
-	}
+	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient)
+	houstonVersion, err := houstonClient.GetPlatformVersion(nil)
+	if err != nil {
+		logrus.Debugf("Unable to get Houston version: %s", err.Error())
+	}
 
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 
@@ -93,8 +83,7 @@ func NewRootCmd() *cobra.Command {
 		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
 
-	version, _ := houstonClient.GetPlatformVersion()
-	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(version, ctx))
+	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 
 	return rootCmd
 }

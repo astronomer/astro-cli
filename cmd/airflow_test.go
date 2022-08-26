@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -157,9 +156,6 @@ func mockUserInput(t *testing.T, i string) (r, stdin *os.File) {
 
 func TestAirflowInit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockHoustonClient := new(houston_mocks.ClientInterface)
-	mockHoustonClient.On("GetPlatformVersion").Return("", errMock)
-	houstonClient = mockHoustonClient
 	t.Run("success", func(t *testing.T) {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")

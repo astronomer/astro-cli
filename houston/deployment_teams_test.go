@@ -59,25 +59,6 @@ func TestAddDeploymentTeam(t *testing.T) {
 		_, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["AddDeploymentTeam"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"AddDeploymentTeam"})
-	})
 }
 
 func TestDeleteDeploymentTeam(t *testing.T) {
@@ -128,25 +109,6 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		_, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["RemoveDeploymentTeam"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"RemoveDeploymentTeam"})
-	})
 }
 
 func TestListDeploymentTeamsAndRoles(t *testing.T) {
@@ -193,25 +155,6 @@ func TestListDeploymentTeamsAndRoles(t *testing.T) {
 
 		_, err := api.ListDeploymentTeamsAndRoles("deploymeny-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["ListDeploymentTeamsAndRoles"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.ListDeploymentTeamsAndRoles("deployment-id")
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"ListDeploymentTeamsAndRoles"})
 	})
 }
 
@@ -262,24 +205,5 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 
 		_, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-
-	t.Run("method not available", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		api := NewClient(client)
-
-		ApplyDecoratorForTests = true
-		defer func() { ApplyDecoratorForTests = false }()
-		version = "0.28.0"
-		houstonAPIAvailabilityByVersion["UpdateDeploymentTeamRole"] = VersionRestrictions{GTE: "0.29.0"}
-
-		_, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", DeploymentAdminRole})
-		assert.ErrorIs(t, err, ErrAPINotImplemented{"UpdateDeploymentTeamRole"})
 	})
 }

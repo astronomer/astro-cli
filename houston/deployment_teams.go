@@ -85,10 +85,6 @@ var (
 
 // ListTeamsInDeployment - list teams with deployment access
 func (h ClientImplementation) ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []Team{}, err
-	}
-
 	req := Request{
 		Query: DeploymentGetTeamsRequest,
 		Variables: map[string]interface{}{
@@ -106,10 +102,6 @@ func (h ClientImplementation) ListDeploymentTeamsAndRoles(deploymentID string) (
 
 // AddTeamToDeployment - Add a team to a deployment with specified role
 func (h ClientImplementation) AddDeploymentTeam(request AddDeploymentTeamRequest) (*RoleBinding, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentTeamAddRequest,
 		Variables: request,
@@ -125,10 +117,6 @@ func (h ClientImplementation) AddDeploymentTeam(request AddDeploymentTeamRequest
 
 // UpdateTeamInDeployment - update a team's role inside a deployment
 func (h ClientImplementation) UpdateDeploymentTeamRole(request UpdateDeploymentTeamRequest) (*RoleBinding, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentTeamUpdateRequest,
 		Variables: request,
@@ -144,10 +132,6 @@ func (h ClientImplementation) UpdateDeploymentTeamRole(request UpdateDeploymentT
 
 // RemoveDeploymentTeam - remove a team from a deployment
 func (h ClientImplementation) RemoveDeploymentTeam(request RemoveDeploymentTeamRequest) (*RoleBinding, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentTeamRemoveRequest,
 		Variables: request,

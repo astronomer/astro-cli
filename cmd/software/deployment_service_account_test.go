@@ -30,7 +30,7 @@ func TestDeploymentSAListCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("ListDeploymentServiceAccounts", mockDeployment.ID).Return([]houston.ServiceAccount{mockSA}, nil)
 
 	houstonClient = api
@@ -59,7 +59,7 @@ func TestDeploymentSaDeleteRootCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "1234", ServiceAccountID: mockDeploymentSA.ID}).Return(mockDeploymentSA, nil)
 	houstonClient = api
 	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234")
@@ -95,7 +95,7 @@ func TestDeploymentSaCreateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("CreateDeploymentServiceAccount", expectedSARequest).Return(mockSA, nil)
 
 	houstonClient = api

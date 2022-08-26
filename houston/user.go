@@ -34,10 +34,6 @@ var UserCreateRequest = `
 
 // CreateUser - Send a request to create a user in the Houston API
 func (h ClientImplementation) CreateUser(request CreateUserRequest) (*AuthUser, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     UserCreateRequest,
 		Variables: request,

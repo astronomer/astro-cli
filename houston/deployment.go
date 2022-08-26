@@ -464,10 +464,6 @@ var (
 
 // CreateDeployment - create a deployment
 func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	reqQuery := DeploymentCreateRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
@@ -484,10 +480,6 @@ func (h ClientImplementation) CreateDeployment(vars map[string]interface{}) (*De
 
 // DeleteDeployment - delete a deployment
 func (h ClientImplementation) DeleteDeployment(request DeleteDeploymentRequest) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     DeploymentDeleteRequest,
 		Variables: request,
@@ -503,10 +495,6 @@ func (h ClientImplementation) DeleteDeployment(request DeleteDeploymentRequest) 
 
 // ListDeployments - List deployments from the API
 func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([]Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []Deployment{}, err
-	}
-
 	variables := map[string]interface{}{}
 	if filters.WorkspaceID != "" {
 		variables["workspaceId"] = filters.WorkspaceID
@@ -534,10 +522,6 @@ func (h ClientImplementation) ListDeployments(filters ListDeploymentsRequest) ([
 
 // UpdateDeployment - update a deployment
 func (h ClientImplementation) UpdateDeployment(variables map[string]interface{}) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	reqQuery := DeploymentUpdateRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
@@ -554,10 +538,6 @@ func (h ClientImplementation) UpdateDeployment(variables map[string]interface{})
 
 // GetDeployment - get a deployment
 func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	reqQuery := DeploymentGetRequest.GreatestLowerBound(version)
 	req := Request{
 		Query:     reqQuery,
@@ -574,10 +554,6 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 
 // UpdateDeploymentAirflow - update airflow on a deployment
 func (h ClientImplementation) UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     UpdateDeploymentAirflowRequest,
 		Variables: variables,
@@ -592,11 +568,7 @@ func (h ClientImplementation) UpdateDeploymentAirflow(variables map[string]inter
 }
 
 // GetDeploymentConfig - get a deployment configuration
-func (h ClientImplementation) GetDeploymentConfig() (*DeploymentConfig, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
+func (h ClientImplementation) GetDeploymentConfig(_ interface{}) (*DeploymentConfig, error) {
 	dReq := Request{
 		Query: DeploymentInfoRequest,
 	}
@@ -611,10 +583,6 @@ func (h ClientImplementation) GetDeploymentConfig() (*DeploymentConfig, error) {
 
 // ListDeploymentLogs - list logs from a deployment
 func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return []DeploymentLog{}, err
-	}
-
 	req := Request{
 		Query:     DeploymentLogsGetRequest,
 		Variables: filters,
@@ -628,11 +596,7 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 	return r.Data.DeploymentLog, nil
 }
 
-func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) error {
-	if err := h.ValidateAvailability(); err != nil {
-		return err
-	}
-
+func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) (interface{}, error) {
 	req := Request{
 		Query:     DeploymentImageUpdateRequest,
 		Variables: updateReq,
@@ -640,17 +604,13 @@ func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentIm
 
 	_, err := req.DoWithClient(h.client)
 	if err != nil {
-		return handleAPIErr(err)
+		return nil, handleAPIErr(err)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (h ClientImplementation) UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     UpdateDeploymentRuntimeRequest,
 		Variables: variables,
@@ -665,10 +625,6 @@ func (h ClientImplementation) UpdateDeploymentRuntime(variables map[string]inter
 }
 
 func (h ClientImplementation) CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error) {
-	if err := h.ValidateAvailability(); err != nil {
-		return nil, err
-	}
-
 	req := Request{
 		Query:     CancelUpdateDeploymentRuntimeRequest,
 		Variables: variables,
