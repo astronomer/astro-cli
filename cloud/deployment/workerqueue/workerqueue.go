@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	ErrWorkerQueueDefaultOptions = errors.New("failed to get worker queue default options")
-	ErrInvalidWorkerQueueOption  = errors.New("worker queue option is invalid")
-	ErrCannotUpdateExistingQueue = errors.New("worker queue already exists")
-	ErrInvalidNodePool           = errors.New("node pool selection failed")
+	errWorkerQueueDefaultOptions = errors.New("failed to get worker queue default options")
+	errInvalidWorkerQueueOption  = errors.New("worker queue option is invalid")
+	errCannotUpdateExistingQueue = errors.New("worker queue already exists")
+	errInvalidNodePool           = errors.New("node pool selection failed")
 )
 
 func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
@@ -39,13 +39,18 @@ func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin
 	// get defaults for min-count, max-count and concurrency from API
 	defaultOptions, err = GetWorkerQueueDefaultOptions(client)
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrWorkerQueueDefaultOptions, err.Error())
+		return fmt.Errorf("%w: %s", errWorkerQueueDefaultOptions, err.Error())
 	}
 
-	// Get the nodepoolID to use
+	// get the node poolID to use
 	nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
 	if err != nil {
 		return err
+	}
+
+	// prompt for name if one was not provided
+	if name == "" {
+		name = input.Text("Enter a name for the worker queue\n> ")
 	}
 
 	queueToCreate = &astro.WorkerQueue{
@@ -63,7 +68,7 @@ func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin
 	if QueueExists(requestedDeployment.WorkerQueues, queueToCreate) {
 		// create does not allow updating existing queues
 		errHelp = fmt.Sprintf("use worker queue update %s instead", queueToCreate.Name)
-		return fmt.Errorf("%w: %s", ErrCannotUpdateExistingQueue, errHelp)
+		return fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
 	}
 
 	// queueToCreate does not exist so we add it
@@ -74,7 +79,7 @@ func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "worker queue %s for %s in %s workspace created\n", queueToCreate.Name, requestedDeployment.ID, ws)
+	fmt.Fprintf(out, "worker queue %s for %s in %s workspace created\n", queueToCreate.Name, requestedDeployment.Label, ws)
 	return nil
 }
 
@@ -122,23 +127,23 @@ func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefault
 
 // IsWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions
 // if it adheres to them, it returns nil
-// ErrInvalidWorkerQueueOption is returned if min, max or concurrency are out of range
+// errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range
 func IsWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
 		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
 		errorMessage = fmt.Sprintf("min worker count must be between %d and %d", defaultOptions.MinWorkerCount.Floor, defaultOptions.MinWorkerCount.Ceiling)
-		return fmt.Errorf("%w: %s", ErrInvalidWorkerQueueOption, errorMessage)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if !(requestedWorkerQueue.MaxWorkerCount >= defaultOptions.MaxWorkerCount.Floor) ||
 		!(requestedWorkerQueue.MaxWorkerCount <= defaultOptions.MaxWorkerCount.Ceiling) {
 		errorMessage = fmt.Sprintf("max worker count must be between %d and %d", defaultOptions.MaxWorkerCount.Floor, defaultOptions.MaxWorkerCount.Ceiling)
-		return fmt.Errorf("%w: %s", ErrInvalidWorkerQueueOption, errorMessage)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	if !(requestedWorkerQueue.WorkerConcurrency >= defaultOptions.WorkerConcurrency.Floor) ||
 		!(requestedWorkerQueue.WorkerConcurrency <= defaultOptions.WorkerConcurrency.Ceiling) {
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", defaultOptions.WorkerConcurrency.Floor, defaultOptions.WorkerConcurrency.Ceiling)
-		return fmt.Errorf("%w: %s", ErrInvalidWorkerQueueOption, errorMessage)
+		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
 	return nil
 }
@@ -163,7 +168,7 @@ func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.Worker
 // selectNodePool takes workerType and []NodePool as arguments
 // If user requested a workerType, then the matching nodePoolID is returned
 // If user did not request a workerType, then it prompts the user to pick one
-// An ErrInvalidNodePool is returned if a user chooses an option not on the list
+// An errInvalidNodePool is returned if a user chooses an option not on the list
 func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer) (string, error) {
 	var (
 		nodePoolID, message string
@@ -171,13 +176,13 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 		errToReturn         error
 	)
 
-	message = "No worker-type was specified.  Select the node pool to use"
+	message = "No worker type was specified. Select the worker type to use"
 	switch workerType {
 	case "":
 		tab := printutil.Table{
 			Padding:        []int{5, 30, 20, 50},
 			DynamicPadding: true,
-			Header:         []string{"#", "NODE INSTANCE TYPE", "ISDEFAULT", "NODEPOOL ID"},
+			Header:         []string{"#", "WORKER TYPE", "ISDEFAULT", "ID"},
 		}
 
 		fmt.Println(message)
@@ -198,8 +203,8 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 		choice := input.Text("\n> ")
 		selectedPool, ok := nodePoolMap[choice]
 		if !ok {
-			// returning empty nodePoolID
-			errToReturn = fmt.Errorf("%w: invalid node pool: %s selected", ErrInvalidNodePool, choice)
+			// returning an error as choice was not in nodePoolMap
+			errToReturn = fmt.Errorf("%w: invalid worker type: %s selected", errInvalidNodePool, choice)
 			return nodePoolID, errToReturn
 		}
 		return selectedPool.ID, nil
@@ -212,7 +217,7 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 			}
 		}
 		// did not find a matching workerType in any node pool
-		errToReturn = fmt.Errorf("%w: workerType %s did not match any node pool", ErrInvalidNodePool, workerType)
+		errToReturn = fmt.Errorf("%w: workerType %s is not available for this deployment", errInvalidNodePool, workerType)
 		return nodePoolID, errToReturn
 	}
 }

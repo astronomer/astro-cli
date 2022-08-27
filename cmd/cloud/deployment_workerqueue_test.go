@@ -132,8 +132,8 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 
-	t.Run("create worker queue for existing deployments when no deployment id was provided", func(t *testing.T) {
-		expectedoutput := "worker queue  for test-deployment-id in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+	t.Run("create worker queue when no deployment id was provided", func(t *testing.T) {
+		expectedoutput := "worker queue  for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
@@ -155,10 +155,56 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		assert.Equal(t, expectedoutput, actualOut)
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("create worker queue for existing deployments when deployment id was provided", func(t *testing.T) {
-		expectedoutput := "worker queue  for test-deployment-id in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+	t.Run("create worker queue when deployment id was provided", func(t *testing.T) {
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
+		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type", "-n", "test-queue"}
+		actualOut, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedoutput, actualOut)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("create worker queue when deployment name was provided", func(t *testing.T) {
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
+		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test-deployment-label", "-t", "test-instance-type", "-n", "test-queue"}
+		actualOut, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedoutput, actualOut)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("create worker queue when no name was provided", func(t *testing.T) {
+		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
+		// mock os.Stdin
+		expectedInput := []byte("test-queue")
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
@@ -188,7 +234,5 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	})
 	// TODO When updating existing queues, pass in ID of the existing queues
 	// TODO When updating existing queues, is changing the name of the existing queue/s allowed?
-	// TODO what if no worker-queue name was provided --> (prompt user for the name)
-	// TODO what if no deployments exist? --> (manually test)
-	// TODO more error cases
+	// TODO any more error cases
 }

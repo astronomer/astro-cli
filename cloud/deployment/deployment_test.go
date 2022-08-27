@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
@@ -512,9 +513,34 @@ func TestUpdate(t *testing.T) {
 		ID:             "test-id",
 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 		DeploymentSpec: astro.DeploymentSpec{Workers: astro.Workers{AU: 10}, Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+		Cluster: astro.Cluster{
+			NodePools: []astro.NodePool{
+				{
+					ID:               "test-node-pool-id",
+					IsDefault:        true,
+					NodeInstanceType: "test-default-node-pool",
+					CreatedAt:        time.Time{},
+				},
+			},
+		},
+		WorkerQueues: []astro.WorkerQueue{
+			{
+				ID:         "test-queue-id",
+				Name:       "default",
+				IsDefault:  true,
+				NodePoolID: "test-default-node-pool",
+			},
+		},
 	}
 
 	t.Run("success", func(t *testing.T) {
+		expectedQueue := []astro.WorkerQueue{
+			{
+				Name:       "test-queue",
+				IsDefault:  false,
+				NodePoolID: "test-node-pool-id",
+			},
+		}
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Twice()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
@@ -535,7 +561,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", "", 0, 0, 0, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("test-id", "", ws, "", "", 0, 0, 0, expectedQueue, false, mockClient)
 		assert.NoError(t, err)
 
 		// mock os.Stdin

@@ -180,7 +180,7 @@ func TestCreate(t *testing.T) {
 		},
 	}
 	t.Run("happy path creates a new worker queue for a deployment when no worker queues exist", func(t *testing.T) {
-		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-id in test-ws-id workspace created\n"
+		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 
@@ -205,7 +205,7 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("happy path creates a new worker queue for a deployment when worker queues exist", func(t *testing.T) {
-		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-id in test-ws-id workspace created\n"
+		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 
@@ -242,9 +242,9 @@ func TestCreate(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
-		mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, ErrWorkerQueueDefaultOptions).Once()
+		mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, errWorkerQueueDefaultOptions).Once()
 		err := Create("test-ws-id", "test-deployment-id", "", "", "", 0, 200, 0, mockClient, out)
-		assert.ErrorIs(t, err, ErrWorkerQueueDefaultOptions)
+		assert.ErrorIs(t, err, errWorkerQueueDefaultOptions)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when selecting a node pool fails", func(t *testing.T) {
@@ -253,7 +253,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		err := Create("test-ws-id", "test-deployment-id", "", "", "non-existent", 0, 200, 0, mockClient, out)
-		assert.ErrorIs(t, err, ErrInvalidNodePool)
+		assert.ErrorIs(t, err, errInvalidNodePool)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when selecting a deployment fails", func(t *testing.T) {
@@ -283,7 +283,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
 		err := Create("test-ws-id", "test-deployment-id", "", "", "test-instance-type", 25, 0, 0, mockClient, out)
-		assert.ErrorIs(t, err, ErrInvalidWorkerQueueOption)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when requested worker queue would update an existing queue with the same name", func(t *testing.T) {
@@ -292,7 +292,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
 		err := Create("test-ws-id", "test-deployment-id", "", "test-default-queue-1", "test-instance-type-1", 0, 0, 0, mockClient, out)
-		assert.ErrorIs(t, err, ErrCannotUpdateExistingQueue)
+		assert.ErrorIs(t, err, errCannotUpdateExistingQueue)
 		assert.ErrorContains(t, err, "worker queue already exists: use worker queue update test-default-queue-1 instead")
 		mockClient.AssertExpectations(t)
 	})
@@ -350,9 +350,9 @@ func TestGetWorkerQueueDefaultOptions(t *testing.T) {
 	})
 	t.Run("returns an error when getting worker queue default options fails", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, ErrWorkerQueueDefaultOptions).Once()
+		mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, errWorkerQueueDefaultOptions).Once()
 		_, err := GetWorkerQueueDefaultOptions(mockClient)
-		assert.ErrorIs(t, err, ErrWorkerQueueDefaultOptions)
+		assert.ErrorIs(t, err, errWorkerQueueDefaultOptions)
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -448,14 +448,14 @@ func TestIsWorkerQueueInputValid(t *testing.T) {
 	t.Run("returns an error when min worker count is not between default floor and ceiling values", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 35
 		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
-		assert.ErrorIs(t, err, ErrInvalidWorkerQueueOption)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: min worker count must be between 1 and 20")
 	})
 	t.Run("returns an error when max worker count is not between default floor and ceiling values", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
 		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
-		assert.ErrorIs(t, err, ErrInvalidWorkerQueueOption)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
 	t.Run("returns an error when worker concurrency is not between default floor and ceiling values", func(t *testing.T) {
@@ -463,7 +463,7 @@ func TestIsWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 350
 		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
-		assert.ErrorIs(t, err, ErrInvalidWorkerQueueOption)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: worker concurrency must be between 175 and 275")
 	})
 }
@@ -575,7 +575,7 @@ func TestSelectNodePool(t *testing.T) {
 		os.Stdin = r
 
 		nodePoolID, err = selectNodePool(workerType, poolList, out)
-		assert.ErrorIs(t, err, ErrInvalidNodePool)
+		assert.ErrorIs(t, err, errInvalidNodePool)
 	})
 	t.Run("returns an error when user chooses a workerType that does not exist in any node pools", func(t *testing.T) {
 		workerType = "non-existent"
@@ -593,6 +593,6 @@ func TestSelectNodePool(t *testing.T) {
 		os.Stdin = r
 
 		nodePoolID, err = selectNodePool(workerType, poolList, out)
-		assert.ErrorIs(t, err, ErrInvalidNodePool)
+		assert.ErrorIs(t, err, errInvalidNodePool)
 	})
 }

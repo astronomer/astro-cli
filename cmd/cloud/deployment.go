@@ -54,12 +54,6 @@ var (
 		# Update a deployment variables from a file
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
-	wQueueConcurrency    int
-	wQueueMinWorkerCount int
-	wQueueMaxWorkerCount int
-	wQueueWorkerType     string
-	wQueueName           string
-
 	httpClient = httputil.NewHTTPClient()
 )
 
