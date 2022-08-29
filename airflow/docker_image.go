@@ -42,7 +42,7 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error { //nolint:gocognit
 	// Change to location of Dockerfile
 	err := os.Chdir(config.Path)
 	if err != nil {
@@ -67,7 +67,6 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		defer f.Close()
 
 		if _, err := f.WriteString("\ndags/"); err != nil {
-			dagsIgnoreSet = false
 			return err
 		}
 
@@ -124,7 +123,7 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		if err := scanner.Err(); err != nil {
 			return err
 		}
-		err = os.WriteFile(fullpath, buf.Bytes(), 0666)
+		err = os.WriteFile(fullpath, buf.Bytes(), 0o666) //nolint:gosec, gomnd
 		if err != nil {
 			return err
 		}

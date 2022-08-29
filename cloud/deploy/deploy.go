@@ -213,7 +213,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 			return err
 		}
 
-		//TODO: Change this message
+		// TODO: Change this message
 		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Deployment can be accessed at the following URLs: \n" +
 			fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
