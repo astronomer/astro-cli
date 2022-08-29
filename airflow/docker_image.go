@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -48,6 +49,8 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		return err
 	}
 
+	// flag to determine if we are setting the dags folder in the ignore path
+	dagsIgnoreSet := false
 	fullpath := filepath.Join(config.Path, ".dockerignore")
 
 	lines, err := fileutil.Read(fullpath)
@@ -63,9 +66,12 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 
 		defer f.Close()
 
-		if _, err := f.Write([]byte("\ndags/")); err != nil {
+		if _, err := f.WriteString("\ndags/"); err != nil {
+			dagsIgnoreSet = false
 			return err
 		}
+
+		dagsIgnoreSet = true
 	}
 
 	args := []string{
@@ -91,6 +97,38 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		stderr = nil
 	}
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
+	if dagsIgnoreSet {
+		f, err := os.Open(fullpath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		var bs []byte
+		buf := bytes.NewBuffer(bs)
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			if scanner.Text() != "dags/" {
+				_, err := buf.Write(scanner.Bytes())
+				if err != nil {
+					return err
+				}
+				_, err = buf.WriteString("\n")
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		err = os.WriteFile(fullpath, buf.Bytes(), 0666)
+		if err != nil {
+			return err
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}

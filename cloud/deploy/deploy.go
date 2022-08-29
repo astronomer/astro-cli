@@ -66,8 +66,7 @@ type deploymentInfo struct {
 	webserverURL   string
 }
 
-func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Client) error {
-	fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
+func deployDags(path string, deployInfo *deploymentInfo, client astro.Client) error {
 	dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
 	if err != nil {
 		return err
@@ -111,13 +110,6 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		return err
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
-
-	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
-		"\n\nDeployment can be accessed at the following URLs: \n" +
-		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
-
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
@@ -154,11 +146,19 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		return err
 	}
 
+	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+
 	if dags {
-		err = deployDags(path, domain, &deployInfo, client)
+		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
+		err = deployDags(path, &deployInfo, client)
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+			"\n\nDeployment can be accessed at the following URLs: \n" +
+			fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		// Build our image
 		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
@@ -208,8 +208,12 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 			return err
 		}
 
-		deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+		err = deployDags(path, &deployInfo, client)
+		if err != nil {
+			return err
+		}
 
+		//TODO: Change this message
 		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Deployment can be accessed at the following URLs: \n" +
 			fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
