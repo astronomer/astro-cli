@@ -146,7 +146,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(imageName string, noCache bool) error {
+func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
@@ -214,7 +214,7 @@ func (d *DockerCompose) Start(imageName string, noCache bool) error {
 		}
 	}
 
-	err = checkWebserverHealth(project, d.composeService, airflowDockerVersion)
+	err = checkWebserverHealth(project, d.composeService, airflowDockerVersion, noBrowser)
 	if err != nil {
 		return err
 	}
@@ -588,7 +588,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, pytestFile, bu
 	return project, err
 }
 
-var checkWebserverHealth = func(project *types.Project, composeService api.Service, airflowDockerVersion uint64) error {
+var checkWebserverHealth = func(project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	// check if webserver is healthy for user
 	err := composeService.Events(context.Background(), project.Name, api.EventsOptions{
 		Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
@@ -631,10 +631,11 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 				fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 				fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
 				fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
-
-				err = openURL(webserverURL)
-				if err != nil {
-					fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+				if !noBrowser || !util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER")) {
+					err = openURL(webserverURL)
+					if err != nil {
+						fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+					}
 				}
 				return errComposeProjectRunning
 			}
