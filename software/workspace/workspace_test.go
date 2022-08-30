@@ -252,6 +252,67 @@ contexts:
 	api.AssertExpectations(t)
 }
 
+func TestSwitchWithQuitSelection(t *testing.T) {
+	// prepare test config and init it
+	configRaw := []byte(`cloud:
+  api:
+    port: "443"
+    protocol: https
+    ws_protocol: wss
+context: localhost
+contexts:
+  localhost:
+    domain: localhost
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
+    workspace:
+`)
+	fs := afero.NewMemMapFs()
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	config.InitConfig(fs)
+
+	api := new(mocks.ClientInterface)
+	api.On("PaginatedListWorkspaces", 10, 0).Return(mockWorkspaceList, nil)
+
+	defer testUtil.MockUserInput(t, "q")()
+
+	buf := new(bytes.Buffer)
+	err := Switch("", 10, api, buf)
+	assert.NoError(t, err)
+	api.AssertExpectations(t)
+}
+
+func TestSwitchWithError(t *testing.T) {
+	// prepare test config and init it
+	configRaw := []byte(`cloud:
+  api:
+    port: "443"
+    protocol: https
+    ws_protocol: wss
+context: localhost
+contexts:
+  localhost:
+    domain: localhost
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
+    workspace:
+`)
+	fs := afero.NewMemMapFs()
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	config.InitConfig(fs)
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaces").Return(mockWorkspaceList, nil)
+
+	defer testUtil.MockUserInput(t, "y")()
+
+	buf := new(bytes.Buffer)
+	err := Switch("", 0, api, buf)
+	assert.Contains(t, err.Error(), "cannot parse y to int")
+	assert.Contains(t, buf.String(), mockWorkspace.ID)
+	api.AssertExpectations(t)
+}
+
 func TestSwitchHoustonError(t *testing.T) {
 	// prepare test config and init it
 	configRaw := []byte(`cloud:
