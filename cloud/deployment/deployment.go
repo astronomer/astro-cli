@@ -22,7 +22,7 @@ import (
 
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
-	errInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 	// Monkey patched to write unit tests
@@ -284,6 +284,7 @@ func createOutput(organizationID, workspaceID string, d *astro.Deployment) error
 }
 
 func validateResources(workerAU, schedulerAU, schedulerReplicas int) bool {
+	// TODO will be deprecating this when removing the --worker-au flag
 	if workerAU > workerAuMax || workerAU < WorkerAuMin {
 		fmt.Printf("\nWorker AUs must be between a min of %d and a max of %d AUs", WorkerAuMin, workerAuMax)
 		return false
@@ -355,7 +356,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		choice := input.Text("\n> ")
 		selected, ok := clusterMap[choice]
 		if !ok {
-			return "", errInvalidDeploymentKey
+			return "", ErrInvalidDeploymentKey
 		}
 
 		clusterID = selected.ID
@@ -408,7 +409,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
@@ -474,6 +475,10 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 		deploymentUpdate.Description = currentDeployment.Description
 	}
 
+	// if we have worker queues add them to the input
+	if len(wQueueList) > 0 {
+		deploymentUpdate.WorkerQueues = wQueueList
+	}
 	// validate resources requests
 	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
 	if !resourcesValid {
@@ -598,7 +603,7 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
-		return astro.Deployment{}, errInvalidDeploymentKey
+		return astro.Deployment{}, ErrInvalidDeploymentKey
 	}
 	return selected, nil
 }
@@ -656,7 +661,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		return astro.Deployment{}, err
 	}
 	if currentDeployment.ID == "" {
-		// get latest runtime veresion
+		// get latest runtime version
 		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
 		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
 		if err != nil {

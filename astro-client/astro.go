@@ -28,6 +28,8 @@ type Client interface {
 	ListClusters(organizationID string) ([]Cluster, error)
 	// UserInvite
 	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
+	// WorkerQueues
+	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -255,4 +257,17 @@ func (c *HTTPClient) GetWorkspace(workspaceID string) (Workspace, error) {
 		return Workspace{}, err
 	}
 	return wsResp.Data.GetWorkspace, nil
+}
+
+// GetWorkerQueueOptions gets the worker-queue default options
+func (c *HTTPClient) GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error) {
+	wqReq := Request{
+		Query: GetWorkerQueueOptions,
+	}
+
+	wqResp, err := wqReq.DoWithPublicClient(c)
+	if err != nil {
+		return WorkerQueueDefaultOptions{}, err
+	}
+	return wqResp.Data.GetWorkerQueueOptions, nil
 }

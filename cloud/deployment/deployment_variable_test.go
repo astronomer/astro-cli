@@ -75,7 +75,7 @@ func TestVariableList(t *testing.T) {
 		os.Stdin = r
 
 		err = VariableList("", "test-key-1", ws, "", "", false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -190,7 +190,7 @@ func TestVariableModify(t *testing.T) {
 		os.Stdin = r
 
 		err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
 
