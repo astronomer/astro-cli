@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestListUserRoleBindings(t *testing.T) {
+func TestGetUserInfo(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -276,6 +276,55 @@ func TestListDeployments(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ListDeployments(org, "")
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestGetDeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	deployment := "test-deployment-id"
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetDeployments: []Deployment{
+				{
+					ID:             "test-deployment-id",
+					Label:          "test-deployment-label",
+					ReleaseName:    "test-release-name",
+					RuntimeRelease: RuntimeRelease{Version: "4.2.5"},
+					Workspace:      Workspace{ID: "test-workspace-id"},
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		deployments, err := astroClient.GetDeployment(deployment)
+		assert.NoError(t, err)
+		assert.Equal(t, deployments, mockResponse.Data.GetDeployment)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetDeployment(deployment)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
