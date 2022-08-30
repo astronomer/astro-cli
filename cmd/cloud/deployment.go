@@ -3,6 +3,8 @@ package cloud
 import (
 	"io"
 
+	"github.com/astronomer/astro-cli/astro-client"
+
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -52,7 +54,6 @@ var (
 		# Update a deployment variables from a file
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
-
 	httpClient = httputil.NewHTTPClient()
 )
 
@@ -71,6 +72,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentLogsCmd(),
 		newDeploymentUpdateCmd(),
 		newDeploymentVariableRootCmd(out),
+		newDeploymentWorkerQueueRootCmd(out),
 	)
 	return cmd
 }
@@ -309,7 +311,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, updateWorkerAU, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, updateWorkerAU, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {

@@ -22,6 +22,28 @@ var (
 			cluster {
 				id
 			}
+			cluster {
+				id
+				name
+				cloudProvider
+				nodePools {
+					id
+					isDefault
+					nodeInstanceType
+					createdAt
+				}
+			}
+			workerQueues {
+				id
+				name
+				isDefault
+				nodePoolId
+				podCpu
+				podRam
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
+			}
 			createdAt
 			status
 			runtimeRelease {
@@ -141,6 +163,27 @@ var (
 			id
 			label
 			organizationId
+		}
+	}`
+
+	GetWorkerQueueOptions = `
+	query workerQueueOptions {
+		workerQueueOptions {
+			minWorkerCount {
+			  floor
+			  ceiling
+			  default
+			}
+			maxWorkerCount {
+			  floor
+			  ceiling
+			  default
+			}
+			workerConcurrency {
+			  floor
+			  ceiling
+			  default
+			}
 		}
 	}`
 )

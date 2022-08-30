@@ -27,6 +27,7 @@ type ResponseData struct {
 	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
+	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
 }
 
 type Self struct {
@@ -65,15 +66,17 @@ type Deployment struct {
 	Workspace       Workspace      `json:"workspace"`
 	RuntimeRelease  RuntimeRelease `json:"runtimeRelease"`
 	DeploymentSpec  DeploymentSpec `json:"deploymentSpec"`
+	WorkerQueues    []WorkerQueue  `json:"workerQueues"`
 	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt       string         `json:"updatedAt"`
 }
 
 // Cluster contains all components of an Astronomer Cluster
 type Cluster struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	CloudProvider string `json:"cloudProvider"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	CloudProvider string     `json:"cloudProvider"`
+	NodePools     []NodePool `json:"nodePools"`
 }
 
 type RuntimeRelease struct {
@@ -276,6 +279,7 @@ type DeploymentUpdateInput struct {
 	Label          string               `json:"label"`
 	Description    string               `json:"description"`
 	DeploymentSpec DeploymentCreateSpec `json:"deploymentSpec"`
+	WorkerQueues   []WorkerQueue        `json:"workerQueues"`
 }
 
 type DeploymentDeleteInput struct {
@@ -306,4 +310,33 @@ type UserInvite struct {
 	OrganizationID string `json:"organizationId"`
 	OauthInviteID  string `json:"oauthInviteId"`
 	ExpiresAt      string `json:"expiresAt"`
+}
+
+type WorkerQueue struct {
+	ID                string `json:"id,omitempty"` // Empty when creating new WorkerQueues
+	Name              string `json:"name"`
+	IsDefault         bool   `json:"isDefault"`
+	MaxWorkerCount    int    `json:"maxWorkerCount"`
+	MinWorkerCount    int    `json:"minWorkerCount"`
+	WorkerConcurrency int    `json:"workerConcurrency"`
+	NodePoolID        string `json:"nodePoolId"`
+}
+
+type WorkerQueueDefaultOptions struct {
+	MinWorkerCount    WorkerQueueOption `json:"minWorkerCount"`
+	MaxWorkerCount    WorkerQueueOption `json:"maxWorkerCount"`
+	WorkerConcurrency WorkerQueueOption `json:"workerConcurrency"`
+}
+
+type WorkerQueueOption struct {
+	Floor   int `json:"floor"`
+	Ceiling int `json:"ceiling"`
+	Default int `json:"default"`
+}
+
+type NodePool struct {
+	ID               string    `json:"id"`
+	IsDefault        bool      `json:"isDefault"`
+	NodeInstanceType string    `json:"nodeInstanceType"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
