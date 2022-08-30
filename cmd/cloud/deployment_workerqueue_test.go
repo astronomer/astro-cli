@@ -146,7 +146,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-t", "test-instance-type"}
@@ -169,7 +169,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type", "-n", "test-queue"}
@@ -192,7 +192,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test-deployment-label", "-t", "test-instance-type", "-n", "test-queue"}
@@ -215,7 +215,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type"}
