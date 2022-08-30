@@ -9,8 +9,8 @@ type Response struct {
 }
 
 type ResponseData struct {
-	CreateImage               *Image                       `json:"imageCreate,omitempty"`
-	DeployImage               *Image                       `json:"imageDeploy,omitempty"`
+	CreateImage               *Image                       `json:"createImage,omitempty"`
+	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
@@ -244,12 +244,12 @@ type DeploymentsInput struct {
 	DeploymentID string `json:"deploymentId"`
 }
 
-type ImageCreateInput struct {
+type CreateImageInput struct {
 	Tag          string `json:"tag"`
 	DeploymentID string `json:"deploymentId"`
 }
 
-type ImageDeployInput struct {
+type DeployImageInput struct {
 	ID         string `json:"id"`
 	Tag        string `json:"tag"`
 	Repository string `json:"repository"`

@@ -113,24 +113,6 @@ var (
 	}
 	`
 
-	InternalRuntimeReleases = `
-	query RuntimeReleasesQuery($channel: String) {
-		runtimeReleases(channel: $channel) {
-			version
-			channel
-		}
-	}
-	`
-
-	PublicRuntimeReleases = `
-	query RuntimeReleasesQuery {
-		runtimeReleases {
-			version
-			channel
-		}
-	}
-	`
-
 	DeploymentHistoryQuery = `
 	query deploymentHistory(
 		$deploymentId: Id!

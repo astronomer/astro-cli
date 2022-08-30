@@ -172,7 +172,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		}
 
 		// Create the image
-		imageCreateInput := astro.ImageCreateInput{
+		imageCreateInput := astro.CreateImageInput{
 			Tag:          version,
 			DeploymentID: deployInfo.deploymentID,
 		}
@@ -374,21 +374,11 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 		version = defaultRuntimeVersion
 	}
 
-	// Allows System Admins to test with internal runtime releases
-	// admin, _ := c.GetSystemAdmin()
-	// var runtimeReleases []astro.RuntimeRelease
 	ConfigOptions, err := client.GetDeploymentConfig()
 	if err != nil {
 		return "", err
 	}
 	runtimeReleases := ConfigOptions.RuntimeReleases
-	fmt.Println(runtimeReleases)
-	// if admin {
-	// 	runtimeReleases, err = client.ListInternalRuntimeReleases()
-	// } else {
-	// 	runtimeReleases, err = client.ListPublicRuntimeReleases()
-	// }
-
 	runtimeVersions := []string{}
 
 	for _, runtimeRelease := range runtimeReleases {
@@ -419,7 +409,7 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 
 // Deploy the image
 func imageDeploy(imageCreateResID, repository, nextTag string, client astro.Client) error {
-	imageDeployInput := astro.ImageDeployInput{
+	imageDeployInput := astro.DeployImageInput{
 		ID:         imageCreateResID,
 		Repository: repository,
 		Tag:        nextTag,

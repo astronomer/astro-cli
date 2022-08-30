@@ -593,7 +593,7 @@ func TestCreateImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		image, err := astroClient.CreateImage(ImageCreateInput{})
+		image, err := astroClient.CreateImage(CreateImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.CreateImage)
 	})
@@ -608,7 +608,7 @@ func TestCreateImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.CreateImage(ImageCreateInput{})
+		_, err := astroClient.CreateImage(CreateImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -640,7 +640,7 @@ func TestDeployImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		image, err := astroClient.DeployImage(ImageDeployInput{})
+		image, err := astroClient.DeployImage(DeployImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.DeployImage)
 	})
@@ -655,7 +655,7 @@ func TestDeployImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.DeployImage(ImageDeployInput{})
+		_, err := astroClient.DeployImage(DeployImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -702,102 +702,6 @@ func TestListClusters(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ListClusters("test-org-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-}
-
-func TestListInternalRuntimeReleases(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := &Response{
-		Data: ResponseData{
-			RuntimeReleases: []RuntimeRelease{
-				{
-					Version:                  "4.2.5",
-					AirflowVersion:           "2.2.5",
-					Channel:                  "stable",
-					ReleaseDate:              "2020-06-25",
-					AirflowDatabaseMigration: true,
-				},
-			},
-		},
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	t.Run("success", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		resp, err := astroClient.ListInternalRuntimeReleases()
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.RuntimeReleases)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		_, err := astroClient.ListInternalRuntimeReleases()
-		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-}
-
-func TestListPublicRuntimeReleases(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := &Response{
-		Data: ResponseData{
-			RuntimeReleases: []RuntimeRelease{
-				{
-					Version:                  "4.2.5",
-					AirflowVersion:           "2.2.5",
-					Channel:                  "stable",
-					ReleaseDate:              "2020-06-25",
-					AirflowDatabaseMigration: true,
-				},
-			},
-		},
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	t.Run("success", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		resp, err := astroClient.ListPublicRuntimeReleases()
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.RuntimeReleases)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		_, err := astroClient.ListPublicRuntimeReleases()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

@@ -40,7 +40,7 @@ func TestDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
-	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Times(4)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 
@@ -124,7 +124,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Once()
-	mockClient.On("ListPublicRuntimeReleases").Return([]astro.RuntimeRelease{{Version: "4.2.5", AirflowVersion: "2.2.5"}}, nil).Once()
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -194,7 +194,7 @@ func TestBuildImageFailure(t *testing.T) {
 	// failed to get runtime releases
 	dockerfile = "Dockerfile"
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListInternalRuntimeReleases").Return([]astro.RuntimeRelease{}, errMock).Once()
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
 	assert.ErrorIs(t, err, errMock)
 	mockClient.AssertExpectations(t)

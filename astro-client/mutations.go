@@ -1,9 +1,9 @@
 package astro
 
 var (
-	ImageCreate = `
-	mutation ImageCreate($imageCreateInput: ImageCreateInput!) {
-		imageCreate(input: $imageCreateInput) {
+	CreateImage = `
+	mutation CreateImage($imageCreateInput: CreateImageInput!) {
+		createImage(input: $imageCreateInput) {
 			id
 			deploymentId
 			tag
@@ -11,9 +11,9 @@ var (
 	}
 	`
 
-	ImageDeploy = `
-	mutation ImageDeploy($imageDeployInput: ImageDeployInput!) {
-		imageDeploy(input: $imageDeployInput) {
+	DeployImage = `
+	mutation DeployImage($imageDeployInput: DeployImageInput!) {
+		deployImage(input: $imageDeployInput) {
 			id
 			tag
 			repository

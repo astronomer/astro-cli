@@ -22,13 +22,10 @@ type Client interface {
 	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
 	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
-	CreateImage(input ImageCreateInput) (*Image, error)
-	DeployImage(input ImageDeployInput) (*Image, error)
+	CreateImage(input CreateImageInput) (*Image, error)
+	DeployImage(input DeployImageInput) (*Image, error)
 	// Cluster
 	ListClusters(organizationID string) ([]Cluster, error)
-	// RuntimeRelease
-	ListInternalRuntimeReleases() ([]RuntimeRelease, error)
-	ListPublicRuntimeReleases() ([]RuntimeRelease, error)
 	// UserInvite
 	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 }
@@ -193,9 +190,9 @@ func (c *HTTPClient) ReportDagDeploymentStatus(input *ReportDagDeploymentStatusI
 	return resp.Data.ReportDagDeploymentStatus, nil
 }
 
-func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
+func (c *HTTPClient) CreateImage(input CreateImageInput) (*Image, error) {
 	req := Request{
-		Query:     ImageCreate,
+		Query:     CreateImage,
 		Variables: map[string]interface{}{"imageCreateInput": input},
 	}
 
@@ -206,9 +203,9 @@ func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
 	return resp.Data.CreateImage, nil
 }
 
-func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
+func (c *HTTPClient) DeployImage(input DeployImageInput) (*Image, error) {
 	req := Request{
-		Query:     ImageDeploy,
+		Query:     DeployImage,
 		Variables: map[string]interface{}{"imageDeployInput": input},
 	}
 
@@ -230,32 +227,6 @@ func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
 		return []Cluster{}, err
 	}
 	return resp.Data.GetClusters, nil
-}
-
-func (c *HTTPClient) ListInternalRuntimeReleases() ([]RuntimeRelease, error) {
-	req := Request{
-		Query:     InternalRuntimeReleases,
-		Variables: map[string]interface{}{"channel": ""},
-	}
-
-	resp, err := req.DoWithPublicClient(c)
-	if err != nil {
-		return []RuntimeRelease{}, err
-	}
-	return resp.Data.RuntimeReleases, nil
-}
-
-func (c *HTTPClient) ListPublicRuntimeReleases() ([]RuntimeRelease, error) {
-	req := Request{
-		Query:     PublicRuntimeReleases,
-		Variables: map[string]interface{}{"channel": ""},
-	}
-
-	resp, err := req.DoWithPublicClient(c)
-	if err != nil {
-		return []RuntimeRelease{}, err
-	}
-	return resp.Data.RuntimeReleases, nil
 }
 
 // CreateUserInvite create a user invite request
