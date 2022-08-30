@@ -184,15 +184,17 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	return r0, r1
 }
 
-// GetWorkerQueueOptions provides a mock function with given fields:
-func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, error) {
+// GetUserInfo provides a mock function with given fields:
+func (_m *Client) GetUserInfo() (*astro.Self, error) {
 	ret := _m.Called()
 
-	var r0 astro.WorkerQueueDefaultOptions
-	if rf, ok := ret.Get(0).(func() astro.WorkerQueueDefaultOptions); ok {
+	var r0 *astro.Self
+	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(astro.WorkerQueueDefaultOptions)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astro.Self)
+		}
 	}
 
 	var r1 error
@@ -205,17 +207,15 @@ func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, erro
 	return r0, r1
 }
 
-// GetUserInfo provides a mock function with given fields:
-func (_m *Client) GetUserInfo() (*astro.Self, error) {
+// GetWorkerQueueOptions provides a mock function with given fields:
+func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, error) {
 	ret := _m.Called()
 
-	var r0 *astro.Self
-	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
+	var r0 astro.WorkerQueueDefaultOptions
+	if rf, ok := ret.Get(0).(func() astro.WorkerQueueDefaultOptions); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*astro.Self)
-		}
+		r0 = ret.Get(0).(astro.WorkerQueueDefaultOptions)
 	}
 
 	var r1 error
