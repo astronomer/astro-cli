@@ -156,7 +156,7 @@ var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int
 	}
 }
 
-func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterface, out io.Writer) (string, error) {
+func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterface, out io.Writer) (string, bool, error) {
 	tab := newTableOut()
 	tab.GetUserInput = true
 	var ws []houston.Workspace
@@ -168,12 +168,12 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		ws, err = client.ListWorkspaces()
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	for i := range ws {
@@ -193,7 +193,7 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 
 	tabPrintErr := tab.PrintWithPageNumber(pageNumber*pageSize, out)
 	if tabPrintErr != nil {
-		return "", fmt.Errorf("unable to print with page number: %w", tabPrintErr)
+		return "", false, fmt.Errorf("unable to print with page number: %w", tabPrintErr)
 	}
 	totalRecords := len(ws)
 
@@ -201,9 +201,9 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		selectedOption := workspacesPromptPaginatedOption(pageSize, pageNumber, totalRecords)
 		if selectedOption.quit {
 			if selectedOption.userSelection == 0 {
-				return "", nil
+				return "", true, nil
 			}
-			return ws[selectedOption.userSelection-1].ID, nil
+			return ws[selectedOption.userSelection-1].ID, false, nil
 		}
 		return getWorkspaceSelection(selectedOption.pageSize, selectedOption.pageNumber, client, out)
 	}
@@ -211,16 +211,20 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 	in := input.Text("\n> ")
 	i, err := strconv.ParseInt(in, 10, 64) //nolint:gomnd
 	if err != nil {
-		return "", fmt.Errorf("cannot parse %s to int: %w", in, err)
+		return "", false, fmt.Errorf("cannot parse %s to int: %w", in, err)
 	}
 
-	return ws[i-1].ID, nil
+	return ws[i-1].ID, false, nil
 }
 
 // Switch switches workspaces
 func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writer) error {
 	if id == "" {
-		_id, err := getWorkspaceSelection(pageSize, 0, client, out)
+		_id, _quit, err := getWorkspaceSelection(pageSize, 0, client, out)
+
+		if _quit {
+			return nil
+		}
 		if err != nil {
 			return err
 		}

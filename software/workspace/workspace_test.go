@@ -215,7 +215,7 @@ func TestGetWorkspaceSelectionError(t *testing.T) {
 	api.On("ListWorkspaces").Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
-	_, err := getWorkspaceSelection(0, 0, api, buf)
+	_, _, err := getWorkspaceSelection(0, 0, api, buf)
 	assert.EqualError(t, err, errMock.Error())
 	api.AssertExpectations(t)
 }
@@ -324,7 +324,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
-		resp, err := getWorkspaceSelection(0, 0, api, out)
+		resp, _, err := getWorkspaceSelection(0, 0, api, out)
 
 		assert.Contains(t, err.Error(), "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		assert.Equal(t, "", resp)
@@ -335,7 +335,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "1")()
-		resp, err := getWorkspaceSelection(0, 0, api, out)
+		resp, _, err := getWorkspaceSelection(0, 0, api, out)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", resp)
@@ -344,7 +344,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 	t.Run("success with pagination", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "1")()
-		resp, err := getWorkspaceSelection(10, 0, api, out)
+		resp, _, err := getWorkspaceSelection(10, 0, api, out)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", resp)
@@ -353,7 +353,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 	t.Run("invalid selection", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "y")()
-		resp, err := getWorkspaceSelection(0, 0, api, out)
+		resp, _, err := getWorkspaceSelection(0, 0, api, out)
 
 		assert.Contains(t, err.Error(), "cannot parse y to int")
 		assert.Equal(t, "", resp)
@@ -362,9 +362,10 @@ func TestGetWorkspaceSelection(t *testing.T) {
 	t.Run("quit selection when paginated", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "q")()
-		resp, err := getWorkspaceSelection(10, 0, api, out)
+		resp, quit, err := getWorkspaceSelection(10, 0, api, out)
 		assert.Nil(t, err)
 		assert.Equal(t, "", resp)
+		assert.Equal(t, true, quit)
 	})
 }
 
