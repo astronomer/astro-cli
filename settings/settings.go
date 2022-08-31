@@ -225,7 +225,7 @@ func AddConnections(id string, version uint64, logs bool) {
 
 		out := execAirflowCommand(id, airflowCommand)
 		if logs {
-			fmt.Println("Adding Connection logs:\n" + out)
+			fmt.Printf("Adding Connection logs:\n\n" + out)
 		}
 		fmt.Printf("Added Connection: %s\n", conn.Conn_ID)
 	}
@@ -313,7 +313,7 @@ func EnvExportVariables(id, envFile string, logs bool) error {
 	airflowCommand := "airflow variables export tmp.var"
 	out := execAirflowCommand(id, airflowCommand)
 	if logs {
-		fmt.Println("Env Export Variables logs:\n" + out)
+		fmt.Printf("Env Export Variables logs:\n\n" + out)
 	}
 
 	if strings.Contains(out, "successfully") {
@@ -481,7 +481,7 @@ func ExportConnections(id string, logs bool) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("successfully exported Connections\n")
+	fmt.Printf("successfully exported Connections\n\n")
 	return nil
 }
 
@@ -517,7 +517,7 @@ func ExportVariables(id string, logs bool) error {
 		}
 		rmCmd := "rm tmp.var"
 		_ = execAirflowCommand(id, rmCmd)
-		fmt.Println("successfully exported variables\n")
+		fmt.Printf("successfully exported variables\n\n")
 		return nil
 	}
 	return errors.New("variable export unsuccessful")
@@ -561,7 +561,7 @@ func ExportPools(id string, logs bool) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("successfully exported pools\n")
+	fmt.Printf("successfully exported pools\n\n")
 	return nil
 }
 
