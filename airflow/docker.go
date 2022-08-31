@@ -699,7 +699,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 				fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
 				fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
 				fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
-				if !noBrowser {
+				if !noBrowser || !util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER")) {
 					err = openURL(webserverURL)
 					if err != nil {
 						fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)

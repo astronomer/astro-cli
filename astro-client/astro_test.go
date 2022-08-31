@@ -897,3 +897,59 @@ func TestGetWorkspace(t *testing.T) {
 		assert.Error(t, err, "API error")
 	})
 }
+
+func TestWorkerQueueOptions(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockResponse := Response{
+		Data: ResponseData{
+			GetWorkerQueueOptions: WorkerQueueDefaultOptions{
+				MinWorkerCount: WorkerQueueOption{
+					Floor:   1,
+					Ceiling: 10,
+					Default: 2,
+				},
+				MaxWorkerCount: WorkerQueueOption{
+					Floor:   2,
+					Ceiling: 20,
+					Default: 5,
+				},
+				WorkerConcurrency: WorkerQueueOption{
+					Floor:   5,
+					Ceiling: 80,
+					Default: 25,
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("happy path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.GetWorkerQueueOptions()
+		assert.NoError(t, err)
+		assert.Equal(t, resp, mockResponse.Data.GetWorkerQueueOptions)
+	})
+
+	t.Run("error path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetWorkerQueueOptions()
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
