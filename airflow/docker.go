@@ -519,7 +519,7 @@ func (d *DockerCompose) Bash(container string) error {
 	return nil
 }
 
-func (d *DockerCompose) Settings(settingsFile, envFile string, connections, variables, pools, export, envExport bool) error {
+func (d *DockerCompose) Settings(settingsFile, envFile string, connections, variables, pools, export, envExport, logs bool) error {
 	// setup bools
 	if !connections && !variables && !pools {
 		connections = true
@@ -565,21 +565,21 @@ func (d *DockerCompose) Settings(settingsFile, envFile string, connections, vari
 		}
 	}
 	if export && !envExport {
-		err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+		err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
 		if err != nil {
 			return err
 		}
 		fmt.Println("\nAirflow objects exported to settings file")
 	}
 	if envExport && export {
-		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
+		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables, logs)
 		if err != nil {
 			return err
 		}
 		fmt.Println("\nAirflow objects exported to env file")
 	}
 	if !envExport && !export {
-		err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+		err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
 		if err != nil {
 			return err
 		}
@@ -684,7 +684,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 					for i := range psInfo {
 						if strings.Contains(psInfo[i].Name, project.Name) &&
 							strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
+							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true, true)
 							if err != nil {
 								return err
 							}

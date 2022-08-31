@@ -44,6 +44,7 @@ var (
 	envExport              bool
 	export                 bool
 	noBrowser              bool
+	logs                   bool
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
@@ -355,8 +356,8 @@ func newAirflowObjectRootCmd() *cobra.Command {
 func newObjectImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Create or Update objects from an Aiflow Settings locally",
-		Long:  "This command will create all objects in an Airflow Settings file locally. Airflow must be running locally for this command to work",
+		Short: "Create and update local Airflow objects from an Aiflow Settings file",
+		Long:  "This command will create all connections, variables, and pools in an Airflow Settings file locally. Airflow must be running locally for this command to work",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -368,14 +369,15 @@ func newObjectImportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from an Airflow Settings File")
 	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from an Airflow Settings File")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
+	cmd.Flags().BoolVarP(&logs, "logs", "l", false, "Show logs from airflow commands used to import objects")
 	return cmd
 }
 
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export all Airflow objects to an airflow settings file. Does not overwrite objects that already exists in the file",
-		Long:  "This command will export all Airflow objects to an airflow settings file. Objects already in the file will not be over written. Airflow must be running locally for this command to work",
+		Short: "Export all Airflow objects to an airflow settings or env file. Does not overwrite objects that already exist in the file",
+		Long:  "This command will export all Airflow objects to an airflow settings or env file(--env-export). Objects already in the file will not be over written. Airflow must be running locally for this command to work",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -390,6 +392,8 @@ func newObjectExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
 	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "This exports the objects in the form of Airflow environment variables to an env file")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to export objects as environment variables too")
+	cmd.Flags().BoolVarP(&logs, "logs", "l", false, "Show logs from airflow commands used to export objects")
+
 	return cmd
 }
 
@@ -725,7 +729,7 @@ func airflowSettingsImport(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport)
+	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
 }
 
 func airflowSettingsExport(cmd *cobra.Command, args []string) error {
@@ -739,7 +743,7 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	// export command was called
 	export = true
 
-	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport)
+	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
 }
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client) string {

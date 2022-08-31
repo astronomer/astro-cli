@@ -28,7 +28,7 @@ func TestAddConnectionsAirflowOne(t *testing.T) {
 		assert.Contains(t, []string{expectedAddCmd, expectedListCmd}, airflowCommand)
 		return ""
 	}
-	AddConnections("test-conn-id", 1)
+	AddConnections("test-conn-id", 1, true)
 }
 
 func TestAddConnectionsAirflowTwo(t *testing.T) {
@@ -57,7 +57,7 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 		}
 		return ""
 	}
-	AddConnections("test-conn-id", 2)
+	AddConnections("test-conn-id", 2, true)
 }
 
 func TestAddConnectionsAirflowTwoURI(t *testing.T) {
@@ -76,7 +76,7 @@ func TestAddConnectionsAirflowTwoURI(t *testing.T) {
 		}
 		return ""
 	}
-	AddConnections("test-conn-id", 2)
+	AddConnections("test-conn-id", 2, true)
 }
 
 func TestAddVariableAirflowOne(t *testing.T) {
@@ -92,7 +92,7 @@ func TestAddVariableAirflowOne(t *testing.T) {
 		assert.Equal(t, expectedAddCmd, airflowCommand)
 		return ""
 	}
-	AddVariables("test-conn-id", 1)
+	AddVariables("test-conn-id", 1, true)
 }
 
 func TestAddVariableAirflowTwo(t *testing.T) {
@@ -108,7 +108,7 @@ func TestAddVariableAirflowTwo(t *testing.T) {
 		assert.Equal(t, expectedAddCmd, airflowCommand)
 		return ""
 	}
-	AddVariables("test-conn-id", 2)
+	AddVariables("test-conn-id", 2, true)
 }
 
 func TestAddPoolsAirflowOne(t *testing.T) {
@@ -125,7 +125,7 @@ func TestAddPoolsAirflowOne(t *testing.T) {
 		assert.Equal(t, expectedAddCmd, airflowCommand)
 		return ""
 	}
-	AddPools("test-conn-id", 1)
+	AddPools("test-conn-id", 1, true)
 }
 
 func TestAddPoolsAirflowTwo(t *testing.T) {
@@ -142,7 +142,7 @@ func TestAddPoolsAirflowTwo(t *testing.T) {
 		assert.Equal(t, expectedAddCmd, airflowCommand)
 		return ""
 	}
-	AddPools("test-conn-id", 2)
+	AddPools("test-conn-id", 2, true)
 }
 
 func TestInitSettingsSuccess(t *testing.T) {
@@ -179,11 +179,11 @@ func TestEnvExport(t *testing.T) {
 			}
 		}
 
-		err := EnvExport("id", "testfiles/test.env", 2, true, true)
+		err := EnvExport("id", "testfiles/test.env", 2, true, true, true)
 		assert.NoError(t, err)
 	})
 	t.Run("missing id", func(t *testing.T) {
-		err := EnvExport("", "", 2, true, true)
+		err := EnvExport("", "", 2, true, true, true)
 		assert.ErrorIs(t, err, errNoID)
 	})
 
@@ -197,7 +197,7 @@ func TestEnvExport(t *testing.T) {
 			}
 		}
 
-		err := EnvExport("id", "testfiles/test.env", 2, false, true)
+		err := EnvExport("id", "testfiles/test.env", 2, false, true, true)
 		assert.Contains(t, err.Error(), "there was an error during env export")
 	})
 
@@ -211,12 +211,12 @@ func TestEnvExport(t *testing.T) {
 			}
 		}
 
-		err := EnvExport("id", "testfiles/test.env", 2, true, false)
+		err := EnvExport("id", "testfiles/test.env", 2, true, false, true)
 		assert.Contains(t, err.Error(), "there was an error during env export")
 	})
 
 	t.Run("not airflow 2", func(t *testing.T) {
-		err := EnvExport("id", "", 1, true, true)
+		err := EnvExport("id", "", 1, true, true, true)
 		assert.Contains(t, err.Error(), "Command must be used with Airflow 2.X")
 	})
 }
@@ -259,7 +259,7 @@ func TestExport(t *testing.T) {
 			}
 		}
 
-		err := Export("id", "airflow_settings_export.yaml", 2, true, true, true)
+		err := Export("id", "airflow_settings_export.yaml", 2, true, true, true, true)
 		assert.NoError(t, err)
 	})
 
@@ -273,17 +273,17 @@ func TestExport(t *testing.T) {
 			}
 		}
 
-		err := Export("id", "airflow_settings_export.yaml", 2, false, true, false)
+		err := Export("id", "airflow_settings_export.yaml", 2, false, true, false, true)
 		assert.Contains(t, err.Error(), "there was an error during export")
 	})
 
 	t.Run("missing id", func(t *testing.T) {
-		err := Export("", "", 2, true, true, true)
+		err := Export("", "", 2, true, true, true, true)
 		assert.ErrorIs(t, err, errNoID)
 	})
 
 	t.Run("not airflow 2", func(t *testing.T) {
-		err := Export("id", "", 1, true, true, true)
+		err := Export("id", "", 1, true, true, true, true)
 		assert.Contains(t, err.Error(), "Command must be used with Airflow 2.X")
 	})
 }

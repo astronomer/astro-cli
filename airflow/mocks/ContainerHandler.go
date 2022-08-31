@@ -121,13 +121,13 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	return r0
 }
 
-// Settings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, export, envExport
-func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connections bool, variables bool, pools bool, export bool, envExport bool) error {
-	ret := _m.Called(settingsFile, envFile, connections, variables, pools, export, envExport)
+// Settings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, export, envExport, logs
+func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connections bool, variables bool, pools bool, export bool, envExport bool, logs bool) error {
+	ret := _m.Called(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool, bool) error); ok {
-		r0 = rf(settingsFile, envFile, connections, variables, pools, export, envExport)
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool, bool, bool) error); ok {
+		r0 = rf(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -136,7 +136,7 @@ func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connec
 }
 
 // Start provides a mock function with given fields: imageName, settingsFile, noCache, noBrowser
-func (_m *ContainerHandler) Start(imageName, settingsFile string, noCache, noBrowser bool) error {
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, noCache bool, noBrowser bool) error {
 	ret := _m.Called(imageName, settingsFile, noCache, noBrowser)
 
 	var r0 error
