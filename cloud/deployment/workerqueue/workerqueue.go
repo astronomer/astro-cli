@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
+
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -18,6 +20,9 @@ var (
 	errInvalidWorkerQueueOption  = errors.New("worker queue option is invalid")
 	errCannotUpdateExistingQueue = errors.New("worker queue already exists")
 	errInvalidNodePool           = errors.New("node pool selection failed")
+	errQueueDoesNotExist         = errors.New("worker queue does not exist")
+	errInvalidQueue              = errors.New("worker queue selection failed")
+	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
 )
 
 func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
@@ -220,4 +225,109 @@ func selectNodePool(workerType string, nodePools []astro.NodePool, out io.Writer
 		errToReturn = fmt.Errorf("%w: workerType %s is not available for this deployment", errInvalidNodePool, workerType)
 		return nodePoolID, errToReturn
 	}
+}
+
+// Delete deletes the specified worker queue from the deployment
+// user gets prompted if no deployment was specified
+// user gets prompted if no name for the queue to delete was specified
+// An errQueueDoesNotExist is returned if queue to delete does not exist
+// An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
+func Delete(ws, deploymentID, deploymentName, name string, force bool, client astro.Client, out io.Writer) error {
+	var (
+		requestedDeployment astro.Deployment
+		err                 error
+		queueToDelete       *astro.WorkerQueue
+		listToDelete        []astro.WorkerQueue
+		queue               astro.WorkerQueue
+	)
+	// get or select the deployment
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, client)
+	if err != nil {
+		return err
+	}
+
+	// prompt for queue name if one was not provided
+	if name == "" {
+		name, err = selectQueue(requestedDeployment.WorkerQueues, out)
+		if err != nil {
+			return err
+		}
+	}
+	// check if default queue is being deleted
+	if name == "default" {
+		return errCannotDeleteDefaultQueue
+	}
+	queueToDelete = &astro.WorkerQueue{
+		Name:      name,
+		IsDefault: false, // cannot delete a default queue
+	}
+
+	if QueueExists(requestedDeployment.WorkerQueues, queueToDelete) {
+		if !force {
+			i, _ := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)))
+
+			if !i {
+				fmt.Fprintf(out, "Canceling worker queue deletion\n")
+				return nil
+			}
+		}
+
+		// create a new listToDelete without queueToDelete in it
+		for _, queue = range requestedDeployment.WorkerQueues {
+			if queue.Name != queueToDelete.Name {
+				listToDelete = append(listToDelete, queue)
+			}
+		}
+		// update the deployment with the new list
+		err = deployment.Update(requestedDeployment.ID, "", ws, "", "", 0, 0, 0, listToDelete, true, client)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Label, ws)
+		return nil
+	}
+	// can not delete a queue that does not exist
+	return fmt.Errorf("%w: %s", errQueueDoesNotExist, queueToDelete.Name)
+}
+
+// selectQueue takes []WorkerQueue and io.Writer as arguments
+// user can select a queue to delete from the list and the name of the selected queue is returned
+// An errInvalidQueue is returned if a user chooses a queue not on the list
+func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
+	var (
+		errToReturn        error
+		queueName, message string
+		queueToDelete      astro.WorkerQueue
+	)
+
+	tab := printutil.Table{
+		Padding:        []int{5, 30, 20, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "WORKER QUEUE", "ISDEFAULT", "ID"},
+	}
+
+	fmt.Println(message)
+
+	sort.Slice(queueList, func(i, j int) bool {
+		return queueList[i].Name < queueList[j].Name
+	})
+
+	queueMap := map[string]astro.WorkerQueue{}
+	for i := range queueList {
+		index := i + 1
+		tab.AddRow([]string{strconv.Itoa(index), queueList[i].Name, strconv.FormatBool(queueList[i].IsDefault), queueList[i].ID}, false)
+
+		queueMap[strconv.Itoa(index)] = queueList[i]
+	}
+
+	tab.Print(out)
+	choice := input.Text("\n> ")
+	queueToDelete, ok := queueMap[choice]
+	if !ok {
+		// returning an error as choice was not in queueMap
+		errToReturn = fmt.Errorf("%w: invalid worker queue: %s selected", errInvalidQueue, choice)
+		return queueName, errToReturn
+	}
+	return queueToDelete.Name, nil
 }
