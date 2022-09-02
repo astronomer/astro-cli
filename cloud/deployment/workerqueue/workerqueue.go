@@ -19,21 +19,21 @@ var (
 	errWorkerQueueDefaultOptions = errors.New("failed to get worker queue default options")
 	errInvalidWorkerQueueOption  = errors.New("worker queue option is invalid")
 	errCannotUpdateExistingQueue = errors.New("worker queue already exists")
+	errCannotCreateNewQueue      = errors.New("worker queue does not exist")
 	errInvalidNodePool           = errors.New("node pool selection failed")
 	errQueueDoesNotExist         = errors.New("worker queue does not exist")
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
 )
 
-func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, client astro.Client, out io.Writer) error {
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error {
 	var (
-		requestedDeployment astro.Deployment
-		err                 error
-		errHelp             string
-		queueToCreate       *astro.WorkerQueue
-		listToCreate        []astro.WorkerQueue
-		defaultOptions      astro.WorkerQueueDefaultOptions
-		nodePoolID          string
+		requestedDeployment                  astro.Deployment
+		err                                  error
+		errHelp, succeededAction, nodePoolID string
+		queueToCreateOrUpdate                *astro.WorkerQueue
+		listToCreate                         []astro.WorkerQueue
+		defaultOptions                       astro.WorkerQueueDefaultOptions
 	)
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, client)
@@ -53,38 +53,68 @@ func Create(ws, deploymentID, deploymentName, name, workerType string, wQueueMin
 		return err
 	}
 
-	// prompt for name if one was not provided
-	if name == "" {
-		name = input.Text("Enter a name for the worker queue\n> ")
-	}
-
-	queueToCreate = &astro.WorkerQueue{
+	queueToCreateOrUpdate = &astro.WorkerQueue{
 		Name:       name,
 		IsDefault:  false, // cannot create a default queue
 		NodePoolID: nodePoolID,
 	}
-	queueToCreate = setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreate, defaultOptions)
+	queueToCreateOrUpdate = setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
 
-	err = IsWorkerQueueInputValid(queueToCreate, defaultOptions)
+	err = IsWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
 	if err != nil {
 		return err
 	}
 
-	if QueueExists(requestedDeployment.WorkerQueues, queueToCreate) {
-		// create does not allow updating existing queues
-		errHelp = fmt.Sprintf("use worker queue update %s instead", queueToCreate.Name)
-		return fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
-	}
+	switch action {
+	case "create":
+		if name == "" {
+			// prompt for name if one was not provided
+			queueToCreateOrUpdate.Name = input.Text("Enter a name for the worker queue\n> ")
+		}
+		if QueueExists(requestedDeployment.WorkerQueues, queueToCreateOrUpdate) {
+			// create does not allow updating existing queues
+			errHelp = fmt.Sprintf("use worker queue update %s instead", queueToCreateOrUpdate.Name)
+			return fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
+		}
+		// queueToCreateOrUpdate does not exist
+		// user requested create, so we add queueToCreateOrUpdate to the list
+		listToCreate = append(requestedDeployment.WorkerQueues, *queueToCreateOrUpdate) //nolint
+	case "update":
+		if name == "" {
+			// user selects a queue as no name was provided
+			queueToCreateOrUpdate.Name, err = selectQueue(requestedDeployment.WorkerQueues, out)
+			if err != nil {
+				return err
+			}
+		}
+		if QueueExists(requestedDeployment.WorkerQueues, queueToCreateOrUpdate) {
+			if !force {
+				i, _ := input.Confirm(
+					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(queueToCreateOrUpdate.Name)))
 
-	// queueToCreate does not exist so we add it
-	listToCreate = append(requestedDeployment.WorkerQueues, *queueToCreate) //nolint
+				if !i {
+					fmt.Fprintf(out, "Canceling worker queue %s\n", action)
+					return nil
+				}
+			}
+			// user requested an update and queueToCreateOrUpdate exists
+			listToCreate = updateQueueList(requestedDeployment.WorkerQueues, queueToCreateOrUpdate)
+		} else {
+			// update does not allow creating new queues
+			errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
+			return fmt.Errorf("%w: %s", errCannotCreateNewQueue, errHelp)
+		}
+	}
 
 	// update the deployment with the new list of worker queues
 	err = deployment.Update(requestedDeployment.ID, "", ws, "", "", 0, 0, 0, listToCreate, true, client)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "worker queue %s for %s in %s workspace created\n", queueToCreate.Name, requestedDeployment.Label, ws)
+	// change action to past tense
+	succeededAction = fmt.Sprintf("%sd", action)
+
+	fmt.Fprintf(out, "worker queue %s for %s in %s workspace %s\n", queueToCreateOrUpdate.Name, requestedDeployment.Label, ws, succeededAction)
 	return nil
 }
 
@@ -330,4 +360,22 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 		return queueName, errToReturn
 	}
 	return queueToDelete.Name, nil
+}
+
+func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue) []astro.WorkerQueue {
+	for i, queue := range existingQueues {
+		if queue.Name != queueToUpdate.Name {
+			continue
+		}
+
+		queue.ID = existingQueues[i].ID               // we need IDs to update existing queues
+		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
+		queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
+		queue.MinWorkerCount = queueToUpdate.MinWorkerCount
+		queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+		queue.NodePoolID = queueToUpdate.NodePoolID
+		existingQueues[i] = queue
+		return existingQueues
+	}
+	return existingQueues
 }
