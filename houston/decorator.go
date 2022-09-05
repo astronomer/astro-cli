@@ -17,6 +17,7 @@ var (
 
 const (
 	DesiredMethodDepth = 2 // 2 because getCallerFunctionName will be called from ValidateAvailability which is called from the function which we are interested in
+	MaxHoustonVersion  = "1.0.0"
 )
 
 type VersionRestrictions struct {
@@ -73,9 +74,9 @@ func Call[fReq any, fResp any, fType func(any) (any, error)](houstonFunc func(fR
 func VerifyVersionMatch(version string, funcRestriction VersionRestrictions) bool {
 	orgVersion := version
 	version = sanitiseVersionString(version)
-
-	if !semver.IsValid(version) {
-		return true
+	if !semver.IsValid(version) { // fallback to the version higher than the latest
+		orgVersion = MaxHoustonVersion
+		version = sanitiseVersionString(MaxHoustonVersion)
 	}
 
 	if len(funcRestriction.EQ) > 0 {

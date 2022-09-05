@@ -28,11 +28,12 @@ const (
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
+	var err error
 	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient)
-	houstonVersion, err := houstonClient.GetPlatformVersion(nil)
+	houstonVersion, err = houstonClient.GetPlatformVersion(nil)
 	if err != nil {
-		logrus.Debugf("Unable to get Houston version: %s", err.Error())
+		softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
 	}
 
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())

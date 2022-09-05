@@ -13,7 +13,7 @@ import (
 
 var (
 	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
-	initDebugLogs = []string{}
+	InitDebugLogs = []string{}
 
 	houstonClient  houston.ClientInterface
 	appConfig      *houston.AppConfig
@@ -30,11 +30,11 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	var err error
 	appConfig, err = houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
+		InitDebugLogs = append(InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
 	}
 	houstonVersion, err = client.GetPlatformVersion(nil)
 	if err != nil {
-		logrus.Debugf("Unable to get Houston version: %s", err.Error())
+		InitDebugLogs = append(InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
 	}
 
 	return []*cobra.Command{
@@ -62,9 +62,9 @@ func SetUpLogs(out io.Writer, level string) error {
 }
 
 func PrintDebugLogs() {
-	for _, log := range initDebugLogs {
+	for _, log := range InitDebugLogs {
 		logrus.Debug(log)
 	}
 	// Free-up memory used by init logs
-	initDebugLogs = nil
+	InitDebugLogs = nil
 }

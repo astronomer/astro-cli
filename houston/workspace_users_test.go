@@ -234,19 +234,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			WorkspacePaginatedGetUsers: []WorkspaceUserRoleBindings{
-				{
-					ID:       "user-id",
-					Username: "test@astronomer.com",
-					FullName: "test",
-					Emails:   []Email{{Address: "test@astronomer.com"}},
-					RoleBindings: []RoleBinding{
-						{
-							Role: WorkspaceViewerRole,
-						},
-					},
-				},
-			},
+			WorkspaceUpsertUserRole: WorkspaceAdminRole,
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
@@ -262,9 +250,9 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
+		response, err := api.UpdateWorkspaceUserRole(UpdateWorkspaceUserRoleRequest{"workspace-id", "test@test.com", WorkspaceAdminRole})
 		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspacePaginatedGetUsers)
+		assert.Equal(t, response, mockResponse.Data.WorkspaceUpsertUserRole)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -277,7 +265,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
+		_, err := api.UpdateWorkspaceUserRole(UpdateWorkspaceUserRoleRequest{"workspace-id", "test@test.com", WorkspaceAdminRole})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

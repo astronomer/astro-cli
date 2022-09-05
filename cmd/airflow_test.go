@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -37,6 +38,52 @@ func TestDevInitCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro dev", output)
 	assert.Contains(t, output, "--use-astronomer-certified")
+}
+
+func TestDevInitCommandSoftware(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	t.Run("unknown software version", func(t *testing.T) {
+		houstonVersion = ""
+		cmd := newAirflowInitCmd()
+		buf := new(bytes.Buffer)
+		cmd.SetOut(buf)
+		cmd.SetArgs([]string{"dev", "init", "--help"})
+		_, err := cmd.ExecuteC()
+		output := buf.String()
+		assert.NoError(t, err)
+		assert.Contains(t, output, "astro dev", output)
+		assert.Contains(t, output, "--use-astronomer-certified")
+		assert.Contains(t, output, "--runtime-version string")
+	})
+
+	t.Run("0.28.0 software version", func(t *testing.T) {
+		houstonVersion = "0.28.0"
+		cmd := newAirflowInitCmd()
+		buf := new(bytes.Buffer)
+		cmd.SetOut(buf)
+		cmd.SetArgs([]string{"--help"})
+		_, err := cmd.ExecuteC()
+		output := buf.String()
+		assert.NoError(t, err)
+		assert.Contains(t, output, "astro dev", output)
+		assert.NotContains(t, output, "--use-astronomer-certified")
+		assert.NotContains(t, output, "--runtime-version string")
+	})
+
+	t.Run("0.29.0 software version", func(t *testing.T) {
+		houstonVersion = "0.29.0"
+		cmd := newAirflowInitCmd()
+		buf := new(bytes.Buffer)
+		cmd.SetOut(buf)
+		cmd.SetArgs([]string{"dev", "init", "--help"})
+		_, err := cmd.ExecuteC()
+		output := buf.String()
+		assert.NoError(t, err)
+		assert.Contains(t, output, "astro dev", output)
+		assert.Contains(t, output, "--use-astronomer-certified")
+		assert.Contains(t, output, "--runtime-version string")
+	})
 }
 
 func TestNewAirflowInitCmd(t *testing.T) {
