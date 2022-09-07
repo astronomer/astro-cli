@@ -236,3 +236,93 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	// TODO When updating existing queues, is changing the name of the existing queue/s allowed?
 	// TODO any more error cases
 }
+
+func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
+	expectedHelp := "Delete a worker queue from an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(astro_mocks.Client)
+	astroClient = mockClient
+
+	t.Run("-h prints worker-queue help", func(t *testing.T) {
+		cmdArgs := []string{"worker-queue", "delete", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("happy path delete worker queue", func(t *testing.T) {
+		deploymentRespWithQueues := []astro.Deployment{
+			{
+				ID:    "test-deployment-id",
+				Label: "test-deployment-label",
+				DeploymentSpec: astro.DeploymentSpec{
+					Executor: "CeleryExecutor",
+					Workers: astro.Workers{
+						AU: 12,
+					},
+					Scheduler: astro.Scheduler{
+						AU:       5,
+						Replicas: 3,
+					},
+					EnvironmentVariablesObjects: nil,
+				},
+				WorkerQueues: []astro.WorkerQueue{
+					{
+						ID:                "test-wq-id",
+						Name:              "test-worker-queue",
+						IsDefault:         true,
+						MaxWorkerCount:    130,
+						MinWorkerCount:    12,
+						WorkerConcurrency: 110,
+						NodePoolID:        "test-pool-id",
+					},
+					{
+						ID:                "test-wq-id-1",
+						Name:              "test-worker-queue-1",
+						IsDefault:         false,
+						MaxWorkerCount:    175,
+						MinWorkerCount:    8,
+						WorkerConcurrency: 150,
+						NodePoolID:        "test-pool-id-1",
+					},
+				},
+			},
+		}
+		listToDelete := []astro.WorkerQueue{
+			{
+				ID:                "test-wq-id",
+				Name:              "test-worker-queue",
+				IsDefault:         true,
+				MaxWorkerCount:    130,
+				MinWorkerCount:    12,
+				WorkerConcurrency: 110,
+				NodePoolID:        "test-pool-id",
+			},
+		}
+		deploymentUpdateInput := astro.DeploymentUpdateInput{
+			ID:    deploymentRespWithQueues[0].ID,
+			Label: deploymentRespWithQueues[0].Label,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
+				Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
+				Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
+			},
+			WorkerQueues: listToDelete,
+		}
+		expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace deleted\n"
+		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+
+		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-f"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOutMessage)
+	})
+	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOut := "Usage:\n"
+		cmdArgs := []string{"worker-queue", "delete"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+		assert.NotContains(t, resp, expectedOut)
+	})
+}
