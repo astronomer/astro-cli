@@ -73,7 +73,7 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 	for i := range users {
 		var color bool
 		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
-		if role != houston.NoneTeamRole {
+		if role != houston.NoneRole {
 			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
 		}
 	}
@@ -96,7 +96,7 @@ func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, clie
 	for i := range users {
 		var color bool
 		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
-		if role != houston.NoneTeamRole {
+		if role != houston.NoneRole {
 			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
 		}
 	}
