@@ -650,7 +650,7 @@ func TestDelete(t *testing.T) {
 			NodePoolID:        "test-pool-id",
 		},
 	}
-	deploymentUpdateInput := astro.DeploymentUpdateInput{
+	deploymentUpdateInput := astro.UpdateDeploymentInput{
 		ID:    deploymentRespWithQueues[0].ID,
 		Label: deploymentRespWithQueues[0].Label,
 		DeploymentSpec: astro.DeploymentCreateSpec{
@@ -664,7 +664,7 @@ func TestDelete(t *testing.T) {
 	t.Run("happy path worker queue gets deleted", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
 		assert.NoError(t, err)
@@ -686,7 +686,7 @@ func TestDelete(t *testing.T) {
 
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
 		err = Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
 		assert.NoError(t, err)
@@ -708,7 +708,7 @@ func TestDelete(t *testing.T) {
 
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
-			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+			mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
 			err = Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
 			assert.NoError(t, err)
@@ -719,7 +719,7 @@ func TestDelete(t *testing.T) {
 			expectedOutMessage = "Canceling worker queue deletion\n"
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
-			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+			mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Once()
 			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedOutMessage, out.String())
@@ -730,7 +730,7 @@ func TestDelete(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		out := new(bytes.Buffer)
 
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, errGetDeployment).Once()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(nil, errGetDeployment).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue", true, mockClient, out)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockClient.AssertExpectations(t)
@@ -750,7 +750,7 @@ func TestDelete(t *testing.T) {
 
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
 		err = Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
 		assert.ErrorIs(t, err, errInvalidQueue)
@@ -759,7 +759,7 @@ func TestDelete(t *testing.T) {
 	t.Run("returns an error if user chooses to delete default queue", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "default", true, mockClient, out)
 		assert.ErrorIs(t, err, errCannotDeleteDefaultQueue)
 		mockClient.AssertExpectations(t)
@@ -767,7 +767,7 @@ func TestDelete(t *testing.T) {
 	t.Run("returns an error if trying to delete a queue that does not exist", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-non-existent-queue", true, mockClient, out)
 		assert.ErrorIs(t, err, errQueueDoesNotExist)
 		mockClient.AssertExpectations(t)
@@ -775,7 +775,7 @@ func TestDelete(t *testing.T) {
 	t.Run("returns an error if deployment update fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
 		assert.ErrorIs(t, err, errUpdateDeployment)

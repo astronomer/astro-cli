@@ -298,7 +298,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 				NodePoolID:        "test-pool-id",
 			},
 		}
-		deploymentUpdateInput := astro.DeploymentUpdateInput{
+		deploymentUpdateInput := astro.UpdateDeploymentInput{
 			ID:    deploymentRespWithQueues[0].ID,
 			Label: deploymentRespWithQueues[0].Label,
 			DeploymentSpec: astro.DeploymentCreateSpec{
@@ -309,7 +309,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 			WorkerQueues: listToDelete,
 		}
 		expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace deleted\n"
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
 
 		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-f"}
