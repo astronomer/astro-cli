@@ -15,6 +15,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+const (
+	createAction = "create"
+	updateAction = "update"
+)
+
 var (
 	errWorkerQueueDefaultOptions = errors.New("failed to get worker queue default options")
 	errInvalidWorkerQueueOption  = errors.New("worker queue option is invalid")
@@ -66,7 +71,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	switch action {
-	case "create":
+	case createAction:
 		if name == "" {
 			// prompt for name if one was not provided
 			queueToCreateOrUpdate.Name = input.Text("Enter a name for the worker queue\n> ")
@@ -79,7 +84,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// queueToCreateOrUpdate does not exist
 		// user requested create, so we add queueToCreateOrUpdate to the list
 		listToCreate = append(requestedDeployment.WorkerQueues, *queueToCreateOrUpdate) //nolint
-	case "update":
+	case updateAction:
 		if name == "" {
 			// user selects a queue as no name was provided
 			queueToCreateOrUpdate.Name, err = selectQueue(requestedDeployment.WorkerQueues, out)
