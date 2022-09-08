@@ -96,11 +96,13 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error { //noli
 		stderr = nil
 	}
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
+
 	if dagsIgnoreSet {
 		f, err := os.Open(fullpath)
 		if err != nil {
 			return err
 		}
+
 		defer f.Close()
 
 		var bs []byte
@@ -108,12 +110,9 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error { //noli
 
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
-			if scanner.Text() != "dags/" {
-				_, err := buf.Write(scanner.Bytes())
-				if err != nil {
-					return err
-				}
-				_, err = buf.WriteString("\n")
+			text := scanner.Text()
+			if text != "dags/" {
+				_, err = buf.WriteString(text + "\n")
 				if err != nil {
 					return err
 				}
@@ -123,7 +122,7 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error { //noli
 		if err := scanner.Err(); err != nil {
 			return err
 		}
-		err = os.WriteFile(fullpath, buf.Bytes(), 0o666) //nolint:gosec, gomnd
+		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
 		if err != nil {
 			return err
 		}

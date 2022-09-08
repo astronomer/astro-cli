@@ -9,5 +9,4 @@ astro
 .env
 airflow_settings.yaml
 logs/
-dags/
 `)
