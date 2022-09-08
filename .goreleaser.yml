@@ -48,7 +48,7 @@ archives:
   - format: tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        format: exe
     name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:
       - licence*
