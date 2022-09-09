@@ -138,10 +138,10 @@ func Read(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func Contains(elems []string, v string) (exist bool, num int) {
-	for i, s := range elems {
-		if v == s {
-			return true, i
+func Contains(elems []string, param string) (exist bool, position int) {
+	for index, elem := range elems {
+		if param == elem {
+			return true, index
 		}
 	}
 	return false, 0
