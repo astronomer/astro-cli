@@ -393,6 +393,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 }
 
 func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+	var queueCreateUpdate bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
@@ -450,6 +451,7 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 
 	// if we have worker queues add them to the input
 	if len(wQueueList) > 0 {
+		queueCreateUpdate = true
 		deploymentUpdate.WorkerQueues = wQueueList
 	}
 	// validate resources requests
@@ -468,18 +470,21 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 		fmt.Printf("Something went wrong. Deployment %s was not updated", currentDeployment.Label)
 	}
 
-	tabDeployment := newTableOut()
+	// do not print table if worker queue create or update was used
+	if !queueCreateUpdate {
+		tabDeployment := newTableOut()
 
-	currentTag := d.DeploymentSpec.Image.Tag
-	if currentTag == "" {
-		currentTag = "?"
+		currentTag := d.DeploymentSpec.Image.Tag
+		if currentTag == "" {
+			currentTag = "?"
+		}
+
+		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
+
+		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
+		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
+		tabDeployment.Print(os.Stdout)
 	}
-
-	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
-
-	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
-	tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
-	tabDeployment.Print(os.Stdout)
 	return nil
 }
 
@@ -620,7 +625,6 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 			currentDeployment = deployments[i]
 		}
 	}
-	fmt.Println(currentDeployment.ID)
 	if currentDeployment.ID == "" {
 		return astro.Deployment{}, errInvalidDeployment
 	}
