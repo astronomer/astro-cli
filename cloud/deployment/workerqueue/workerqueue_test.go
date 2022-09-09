@@ -101,6 +101,7 @@ func TestCreate(t *testing.T) {
 			},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
+				Executor: "CeleryExecutor",
 				Workers: astro.Workers{
 					AU: 12,
 				},
@@ -112,7 +113,7 @@ func TestCreate(t *testing.T) {
 			WorkerQueues: []astro.WorkerQueue{
 				{
 					ID:                "test-wq-id",
-					Name:              "test-default-queue",
+					Name:              "test-queue",
 					IsDefault:         true,
 					MaxWorkerCount:    130,
 					MinWorkerCount:    12,
@@ -121,7 +122,7 @@ func TestCreate(t *testing.T) {
 				},
 				{
 					ID:                "test-wq-id-1",
-					Name:              "test-default-queue-1",
+					Name:              "test-queue-1",
 					IsDefault:         false,
 					MaxWorkerCount:    175,
 					MinWorkerCount:    8,
@@ -146,7 +147,7 @@ func TestCreate(t *testing.T) {
 			WorkerQueues: []astro.WorkerQueue{
 				{
 					ID:                "test-wq-id-2",
-					Name:              "test-default-queue-2",
+					Name:              "test-queue-2",
 					IsDefault:         false,
 					MaxWorkerCount:    130,
 					MinWorkerCount:    12,
@@ -155,13 +156,50 @@ func TestCreate(t *testing.T) {
 				},
 				{
 					ID:                "test-wq-id-3",
-					Name:              "test-default-queue-3",
+					Name:              "test-queue-3",
 					IsDefault:         true,
 					MaxWorkerCount:    175,
 					MinWorkerCount:    8,
 					WorkerConcurrency: 150,
 					NodePoolID:        "test-nodepool-id-3",
 				},
+			},
+		},
+	}
+	deploymentUpdateInput := astro.DeploymentUpdateInput{
+		ID:    deploymentRespWithQueues[0].ID,
+		Label: deploymentRespWithQueues[0].Label,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
+			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
+			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
+		},
+		WorkerQueues: []astro.WorkerQueue{
+			{
+				ID:                "test-wq-id",
+				Name:              "test-queue",
+				IsDefault:         true,
+				MaxWorkerCount:    130,
+				MinWorkerCount:    12,
+				WorkerConcurrency: 110,
+				NodePoolID:        "test-pool-id",
+			},
+			{
+				ID:                "test-wq-id-1",
+				Name:              "test-queue-1",
+				IsDefault:         false,
+				MaxWorkerCount:    175,
+				MinWorkerCount:    8,
+				WorkerConcurrency: 150,
+				NodePoolID:        "test-pool-id-1",
+			},
+			{
+				Name:              "test-worker-queue",
+				IsDefault:         false,
+				MaxWorkerCount:    125,
+				MinWorkerCount:    5,
+				WorkerConcurrency: 180,
+				NodePoolID:        "test-pool-id-1",
 			},
 		},
 	}
@@ -186,23 +224,11 @@ func TestCreate(t *testing.T) {
 		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-
-		// mock os.Stdin
-		expectedInput := []byte("y")
-		r, w, err := os.Pipe()
-		assert.NoError(t, err)
-		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
+		defer testUtil.MockUserInput(t, "y")()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespNoQueues, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
-		err = Create("test-ws-id", "test-deployment-id", "", "test-worker-queue", "test-instance-type-1", 0, 0, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "test-instance-type-1", 0, 0, 0, false, mockClient, out)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 		mockClient.AssertExpectations(t)
@@ -211,33 +237,33 @@ func TestCreate(t *testing.T) {
 		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-
-		// mock os.Stdin
-		expectedInput := []byte("2")
-		r, w, err := os.Pipe()
-		assert.NoError(t, err)
-		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
+		defer testUtil.MockUserInput(t, "2")()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
-		err = Create("test-ws-id", "test-deployment-id", "", "test-worker-queue", "", 0, 0, 0, mockClient, out)
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", 0, 0, 0, false, mockClient, out)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), expectedOutMessage)
 		mockClient.AssertExpectations(t)
+	})
+	t.Run("prompts user for queue name if one was not provided", func(t *testing.T) {
+		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
+		defer testUtil.MockUserInput(t, "test-worker-queue")()
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), expectedOutMessage)
 	})
 	t.Run("returns an error when listing deployments fails", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		out := new(bytes.Buffer)
 
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, errGetDeployment).Once()
-		err := Create("test-ws-id", "test-deployment-id", "", "", "", 0, 0, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 0, 0, false, mockClient, out)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -246,7 +272,7 @@ func TestCreate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, errWorkerQueueDefaultOptions).Once()
-		err := Create("test-ws-id", "test-deployment-id", "", "", "", 0, 200, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 200, 0, false, mockClient, out)
 		assert.ErrorIs(t, err, errWorkerQueueDefaultOptions)
 		mockClient.AssertExpectations(t)
 	})
@@ -255,28 +281,16 @@ func TestCreate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		err := Create("test-ws-id", "test-deployment-id", "", "", "non-existent", 0, 200, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "non-existent", 0, 200, 0, false, mockClient, out)
 		assert.ErrorIs(t, err, errInvalidNodePool)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when selecting a deployment fails", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		out := new(bytes.Buffer)
-
-		// mock os.Stdin
-		expectedInput := []byte("test-invalid-deployment-id")
-		r, w, err := os.Pipe()
-		assert.NoError(t, err)
-		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
+		defer testUtil.MockUserInput(t, "test-invalid-deployment-id")()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, deployment.ErrInvalidDeploymentKey).Once()
-		err = Create("test-ws-id", "", "", "", "", 0, 0, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockClient, out)
 		assert.ErrorIs(t, err, deployment.ErrInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
@@ -285,7 +299,7 @@ func TestCreate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
-		err := Create("test-ws-id", "test-deployment-id", "", "", "test-instance-type", 25, 0, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 25, 0, 0, false, mockClient, out)
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		mockClient.AssertExpectations(t)
 	})
@@ -294,17 +308,190 @@ func TestCreate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
-		err := Create("test-ws-id", "test-deployment-id", "", "test-default-queue-1", "test-instance-type-1", 0, 0, 0, mockClient, out)
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue-1", createAction, "test-instance-type-1", 0, 0, 0, false, mockClient, out)
 		assert.ErrorIs(t, err, errCannotUpdateExistingQueue)
-		assert.ErrorContains(t, err, "worker queue already exists: use worker queue update test-default-queue-1 instead")
+		assert.ErrorContains(t, err, "worker queue already exists: use worker queue update test-queue-1 instead")
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when update deployment fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
+		defer testUtil.MockUserInput(t, "y")()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 0, 0, false, mockClient, out)
+		assert.ErrorIs(t, err, errUpdateDeployment)
+		mockClient.AssertExpectations(t)
+	})
+}
 
+func TestUpdate(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	ws := "test-ws-id"
+	expectedWorkerQueue := astro.WorkerQueue{
+		Name:              "test-queue-1",
+		IsDefault:         false,
+		MaxWorkerCount:    0,
+		MinWorkerCount:    0,
+		WorkerConcurrency: 0,
+		NodePoolID:        "",
+	}
+	deploymentRespWithQueues := []astro.Deployment{
+		{
+			ID:    "test-deployment-id",
+			Label: "test-deployment-label",
+			Cluster: astro.Cluster{
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-instance-type",
+						CreatedAt:        time.Now(),
+					},
+					{
+						ID:               "test-pool-id-1",
+						IsDefault:        true,
+						NodeInstanceType: "test-instance-type-1",
+						CreatedAt:        time.Now(),
+					},
+				},
+			},
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Executor: "CeleryExecutor",
+				Workers: astro.Workers{
+					AU: 12,
+				},
+				Scheduler: astro.Scheduler{
+					AU:       5,
+					Replicas: 3,
+				},
+			},
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					ID:                "test-wq-id",
+					Name:              "test-default-queue",
+					IsDefault:         true,
+					MaxWorkerCount:    130,
+					MinWorkerCount:    12,
+					WorkerConcurrency: 110,
+					NodePoolID:        "test-pool-id",
+				},
+				{
+					ID:                "test-wq-id-1",
+					Name:              "test-queue-1",
+					IsDefault:         false,
+					MaxWorkerCount:    175,
+					MinWorkerCount:    8,
+					WorkerConcurrency: 150,
+					NodePoolID:        "test-pool-id-1",
+				},
+			},
+		},
+	}
+	listToUpdate := []astro.WorkerQueue{
+		{
+			ID:                "test-wq-id",
+			Name:              "test-default-queue",
+			IsDefault:         true,
+			MaxWorkerCount:    130,
+			MinWorkerCount:    12,
+			WorkerConcurrency: 110,
+			NodePoolID:        "test-pool-id",
+		},
+		{
+			ID:                "test-wq-id-1",
+			Name:              "test-queue-1",
+			IsDefault:         false,
+			MaxWorkerCount:    125,
+			MinWorkerCount:    5,
+			WorkerConcurrency: 180,
+			NodePoolID:        "test-pool-id-1",
+		},
+	}
+	deploymentUpdateInput := astro.DeploymentUpdateInput{
+		ID:    deploymentRespWithQueues[0].ID,
+		Label: deploymentRespWithQueues[0].Label,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
+			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
+			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
+		},
+		WorkerQueues: listToUpdate,
+	}
+	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
+		MinWorkerCount: astro.WorkerQueueOption{
+			Floor:   1,
+			Ceiling: 20,
+			Default: 5,
+		},
+		MaxWorkerCount: astro.WorkerQueueOption{
+			Floor:   20,
+			Ceiling: 200,
+			Default: 125,
+		},
+		WorkerConcurrency: astro.WorkerQueueOption{
+			Floor:   175,
+			Ceiling: 275,
+			Default: 180,
+		},
+	}
+	t.Run("happy path update existing worker queue for a deployment", func(t *testing.T) {
+		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace updated\n"
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), expectedOutMessage)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("prompts user for queue name if one was not provided", func(t *testing.T) {
+		expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace updated\n"
+		defer testUtil.MockUserInput(t, "2")()
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), expectedOutMessage)
+	})
+	t.Run("prompts user for confirmation if --force was not provided", func(t *testing.T) {
+		t.Run("updates the queue if user replies yes", func(t *testing.T) {
+			expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace updated\n"
+			defer testUtil.MockUserInput(t, "y")()
+			out := new(bytes.Buffer)
+			mockClient := new(astro_mocks.Client)
+			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+			mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", 0, 0, 0, false, mockClient, out)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOutMessage, out.String())
+			mockClient.AssertExpectations(t)
+		})
+		t.Run("cancels update if user does not confirm", func(t *testing.T) {
+			expectedOutMessage := "Canceling worker queue update\n"
+			out := new(bytes.Buffer)
+			mockClient := new(astro_mocks.Client)
+			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", 0, 0, 0, false, mockClient, out)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOutMessage, out.String())
+			mockClient.AssertExpectations(t)
+		})
+	})
+	t.Run("returns an error if user makes incorrect choice when selecting a queue to update", func(t *testing.T) {
+		expectedOutMessage := "invalid worker queue: 4 selected"
 		// mock os.Stdin
-		expectedInput := []byte("y")
+		expectedInput := []byte("4") // there is no queue with this index
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
@@ -315,11 +502,242 @@ func TestCreate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errGetDeployment).Once()
-		err = Create("test-ws-id", "test-deployment-id", "", "", "test-instance-type", 0, 0, 0, mockClient, out)
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err = CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errInvalidQueue)
+		assert.Contains(t, err.Error(), expectedOutMessage)
+	})
+	t.Run("returns an error when listing deployments fails", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		out := new(bytes.Buffer)
+
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, errGetDeployment).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 0, 0, true, mockClient, out)
 		assert.ErrorIs(t, err, errGetDeployment)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when getting worker queue default options fails", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, errWorkerQueueDefaultOptions).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 200, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errWorkerQueueDefaultOptions)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when selecting a node pool fails", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "non-existent", 0, 200, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errInvalidNodePool)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when selecting a deployment fails", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		out := new(bytes.Buffer)
+		defer testUtil.MockUserInput(t, "test-invalid-deployment-id")()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, deployment.ErrInvalidDeploymentKey).Once()
+		err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, deployment.ErrInvalidDeploymentKey)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when requested worker queue input is not valid", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 25, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when updating requested queue would create a new queue", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue-2", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errCannotCreateNewQueue)
+		assert.ErrorContains(t, err, "worker queue does not exist: use worker queue create test-queue-2 instead")
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error when update deployment fails", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		defer testUtil.MockUserInput(t, "y")()
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
+		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errUpdateDeployment)
+		mockClient.AssertExpectations(t)
+	})
+}
+
+func TestDelete(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	ws := "test-ws-id"
+	deploymentRespWithQueues := []astro.Deployment{
+		{
+			ID:    "test-deployment-id",
+			Label: "test-deployment-label",
+			DeploymentSpec: astro.DeploymentSpec{
+				Executor: "CeleryExecutor",
+				Workers: astro.Workers{
+					AU: 12,
+				},
+				Scheduler: astro.Scheduler{
+					AU:       5,
+					Replicas: 3,
+				},
+				EnvironmentVariablesObjects: nil,
+			},
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					ID:                "test-wq-id",
+					Name:              "default",
+					IsDefault:         true,
+					MaxWorkerCount:    130,
+					MinWorkerCount:    12,
+					WorkerConcurrency: 110,
+					NodePoolID:        "test-pool-id",
+				},
+				{
+					ID:                "test-wq-id-1",
+					Name:              "test-worker-queue-1",
+					IsDefault:         false,
+					MaxWorkerCount:    175,
+					MinWorkerCount:    8,
+					WorkerConcurrency: 150,
+					NodePoolID:        "test-pool-id-1",
+				},
+			},
+		},
+	}
+	listToDelete := []astro.WorkerQueue{
+		{
+			ID:                "test-wq-id",
+			Name:              "default",
+			IsDefault:         true,
+			MaxWorkerCount:    130,
+			MinWorkerCount:    12,
+			WorkerConcurrency: 110,
+			NodePoolID:        "test-pool-id",
+		},
+	}
+	deploymentUpdateInput := astro.DeploymentUpdateInput{
+		ID:    deploymentRespWithQueues[0].ID,
+		Label: deploymentRespWithQueues[0].Label,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
+			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
+			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
+		},
+		WorkerQueues: listToDelete,
+	}
+	expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in test-ws-id workspace deleted\n"
+	t.Run("happy path worker queue gets deleted", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("prompts user for queue name if one was not provided", func(t *testing.T) {
+		defer testUtil.MockUserInput(t, "2")()
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), expectedOutMessage)
+	})
+	t.Run("prompts user for confirmation if --force was not provided", func(t *testing.T) {
+		t.Run("deletes the queue if user replies yes", func(t *testing.T) {
+			defer testUtil.MockUserInput(t, "y")()
+			out := new(bytes.Buffer)
+			mockClient := new(astro_mocks.Client)
+			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+			mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOutMessage, out.String())
+			mockClient.AssertExpectations(t)
+		})
+		t.Run("cancels deletion if user does not confirm", func(t *testing.T) {
+			expectedOutMessage = "Canceling worker queue deletion\n"
+			out := new(bytes.Buffer)
+			mockClient := new(astro_mocks.Client)
+			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedOutMessage, out.String())
+			mockClient.AssertExpectations(t)
+		})
+	})
+	t.Run("returns an error when listing deployments fails", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		out := new(bytes.Buffer)
+
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, errGetDeployment).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue", true, mockClient, out)
+		assert.ErrorIs(t, err, errGetDeployment)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an errors if queue selection fails", func(t *testing.T) {
+		defer testUtil.MockUserInput(t, "3")()
+		// mock os.Stdin
+		expectedInput := []byte("3") // selecting a queue not in list
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err = Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
+		assert.ErrorIs(t, err, errInvalidQueue)
+		assert.NotContains(t, out.String(), expectedOutMessage)
+	})
+	t.Run("returns an error if user chooses to delete default queue", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "default", true, mockClient, out)
+		assert.ErrorIs(t, err, errCannotDeleteDefaultQueue)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if trying to delete a queue that does not exist", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "test-non-existent-queue", true, mockClient, out)
+		assert.ErrorIs(t, err, errQueueDoesNotExist)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if deployment update fails", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
+		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
+		assert.ErrorIs(t, err, errUpdateDeployment)
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -485,7 +903,7 @@ func TestQueueExists(t *testing.T) {
 		},
 		{
 			ID:                "test-wq-id-1",
-			Name:              "test-default-queue-1",
+			Name:              "test-queue-1",
 			IsDefault:         false,
 			MaxWorkerCount:    175,
 			MinWorkerCount:    8,
@@ -600,190 +1018,6 @@ func TestSelectNodePool(t *testing.T) {
 	})
 }
 
-func TestDelete(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	ws := "test-ws-id"
-	deploymentRespWithQueues := []astro.Deployment{
-		{
-			ID:    "test-deployment-id",
-			Label: "test-deployment-label",
-			DeploymentSpec: astro.DeploymentSpec{
-				Executor: "CeleryExecutor",
-				Workers: astro.Workers{
-					AU: 12,
-				},
-				Scheduler: astro.Scheduler{
-					AU:       5,
-					Replicas: 3,
-				},
-				EnvironmentVariablesObjects: nil,
-			},
-			WorkerQueues: []astro.WorkerQueue{
-				{
-					ID:                "test-wq-id",
-					Name:              "default",
-					IsDefault:         true,
-					MaxWorkerCount:    130,
-					MinWorkerCount:    12,
-					WorkerConcurrency: 110,
-					NodePoolID:        "test-pool-id",
-				},
-				{
-					ID:                "test-wq-id-1",
-					Name:              "test-worker-queue-1",
-					IsDefault:         false,
-					MaxWorkerCount:    175,
-					MinWorkerCount:    8,
-					WorkerConcurrency: 150,
-					NodePoolID:        "test-pool-id-1",
-				},
-			},
-		},
-	}
-	listToDelete := []astro.WorkerQueue{
-		{
-			ID:                "test-wq-id",
-			Name:              "default",
-			IsDefault:         true,
-			MaxWorkerCount:    130,
-			MinWorkerCount:    12,
-			WorkerConcurrency: 110,
-			NodePoolID:        "test-pool-id",
-		},
-	}
-	deploymentUpdateInput := astro.DeploymentUpdateInput{
-		ID:    deploymentRespWithQueues[0].ID,
-		Label: deploymentRespWithQueues[0].Label,
-		DeploymentSpec: astro.DeploymentCreateSpec{
-			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
-			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
-			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
-		},
-		WorkerQueues: listToDelete,
-	}
-	expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in test-ws-id workspace deleted\n"
-	t.Run("happy path worker queue gets deleted", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedOutMessage, out.String())
-		mockClient.AssertExpectations(t)
-	})
-	t.Run("prompts user for queue name if one was not provided", func(t *testing.T) {
-		// mock os.Stdin
-		expectedInput := []byte("2") // selecting queue with id: test-wq-id-1
-		r, w, err := os.Pipe()
-		assert.NoError(t, err)
-		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		out := new(bytes.Buffer)
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
-		err = Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
-		assert.NoError(t, err)
-		assert.Contains(t, out.String(), expectedOutMessage)
-	})
-	t.Run("prompts user for confirmation if --force was not provided", func(t *testing.T) {
-		t.Run("deletes the queue if user replies yes", func(t *testing.T) {
-			// mock os.Stdin
-			expectedInput := []byte("y") // replying yes to confirmation message
-			r, w, err := os.Pipe()
-			assert.NoError(t, err)
-			_, err = w.Write(expectedInput)
-			assert.NoError(t, err)
-			w.Close()
-			stdin := os.Stdin
-			// Restore stdin right after the test.
-			defer func() { os.Stdin = stdin }()
-			os.Stdin = r
-
-			out := new(bytes.Buffer)
-			mockClient := new(astro_mocks.Client)
-			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
-			mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
-			err = Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedOutMessage, out.String())
-			mockClient.AssertExpectations(t)
-		})
-		t.Run("cancels deletion if user does not confirm", func(t *testing.T) {
-			expectedOutMessage = "Canceling worker queue deletion\n"
-			out := new(bytes.Buffer)
-			mockClient := new(astro_mocks.Client)
-			mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
-			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedOutMessage, out.String())
-			mockClient.AssertExpectations(t)
-		})
-	})
-	t.Run("returns an error when listing deployments fails", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		out := new(bytes.Buffer)
-
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(nil, errGetDeployment).Once()
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue", true, mockClient, out)
-		assert.ErrorIs(t, err, errGetDeployment)
-		mockClient.AssertExpectations(t)
-	})
-	t.Run("returns an errors if queue selection fails", func(t *testing.T) {
-		// mock os.Stdin
-		expectedInput := []byte("3") // selecting a queue not in list
-		r, w, err := os.Pipe()
-		assert.NoError(t, err)
-		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		out := new(bytes.Buffer)
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
-		err = Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
-		assert.ErrorIs(t, err, errInvalidQueue)
-		assert.NotContains(t, out.String(), expectedOutMessage)
-	})
-	t.Run("returns an error if user chooses to delete default queue", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
-		err := Delete("test-ws-id", "test-deployment-id", "", "default", true, mockClient, out)
-		assert.ErrorIs(t, err, errCannotDeleteDefaultQueue)
-		mockClient.AssertExpectations(t)
-	})
-	t.Run("returns an error if trying to delete a queue that does not exist", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Once()
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-non-existent-queue", true, mockClient, out)
-		assert.ErrorIs(t, err, errQueueDoesNotExist)
-		mockClient.AssertExpectations(t)
-	})
-	t.Run("returns an error if deployment update fails", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(deploymentRespWithQueues, nil).Twice()
-		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
-		assert.ErrorIs(t, err, errUpdateDeployment)
-		mockClient.AssertExpectations(t)
-	})
-}
-
 func TestSelectQueue(t *testing.T) {
 	var (
 		out           *bytes.Buffer
@@ -842,5 +1076,76 @@ func TestSelectQueue(t *testing.T) {
 		queueToDelete, err = selectQueue(queueList, out)
 		assert.ErrorIs(t, err, errInvalidQueue)
 		assert.Equal(t, "", queueToDelete)
+	})
+}
+
+func TestUpdateQueueList(t *testing.T) {
+	existingQs := []astro.WorkerQueue{
+		{
+			ID:                "q-1",
+			Name:              "test-q",
+			IsDefault:         true,
+			MaxWorkerCount:    10,
+			MinWorkerCount:    1,
+			WorkerConcurrency: 16,
+			NodePoolID:        "test-worker",
+		},
+		{
+			ID:                "q-2",
+			Name:              "test-q-1",
+			IsDefault:         false,
+			MaxWorkerCount:    15,
+			MinWorkerCount:    2,
+			WorkerConcurrency: 18,
+			NodePoolID:        "test-worker",
+		},
+	}
+	t.Run("updates min, max, concurrency and node pool when queue exists", func(t *testing.T) {
+		updatedQ := astro.WorkerQueue{
+			ID:                "q-2",
+			Name:              "test-q-1",
+			IsDefault:         false,
+			MaxWorkerCount:    16,
+			MinWorkerCount:    3,
+			WorkerConcurrency: 20,
+			NodePoolID:        "test-worker-1",
+		}
+		updatedQueueList := updateQueueList(existingQs, &updatedQ)
+		assert.Equal(t, updatedQ, updatedQueueList[1])
+	})
+	t.Run("does not update id or isDefault when queue exists", func(t *testing.T) {
+		updatedQRequest := astro.WorkerQueue{
+			ID:                "q-3",
+			Name:              "test-q-1",
+			IsDefault:         true,
+			MaxWorkerCount:    16,
+			MinWorkerCount:    3,
+			WorkerConcurrency: 20,
+			NodePoolID:        "test-worker-1",
+		}
+		updatedQ := astro.WorkerQueue{
+			ID:                "q-2",
+			Name:              "test-q-1",
+			IsDefault:         false,
+			MaxWorkerCount:    16,
+			MinWorkerCount:    3,
+			WorkerConcurrency: 20,
+			NodePoolID:        "test-worker-1",
+		}
+		updatedQueueList := updateQueueList(existingQs, &updatedQRequest)
+		assert.Equal(t, updatedQ, updatedQueueList[1])
+	})
+	t.Run("does not change any queues if queue to update does not exist", func(t *testing.T) {
+		updatedQRequest := astro.WorkerQueue{
+			ID:                "q-4",
+			Name:              "test-q-does-not-exist",
+			IsDefault:         true,
+			MaxWorkerCount:    16,
+			MinWorkerCount:    3,
+			WorkerConcurrency: 20,
+			NodePoolID:        "test-worker-1",
+		}
+		updatedQueueList := updateQueueList(existingQs, &updatedQRequest)
+		assert.Equal(t, existingQs, updatedQueueList)
 	})
 }
