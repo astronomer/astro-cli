@@ -252,7 +252,7 @@ func newAirflowRestartCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart Airflow with")
 	return cmd
 }
 
