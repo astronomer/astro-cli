@@ -1,29 +1,38 @@
 package organization
 
 import (
-	"io"
-	"encoding/json"
-	"strconv"
-	// "net/url"
-	"fmt"
 	http_context "context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"strconv"
 
 	"github.com/pkg/errors"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 var (
 	httpClient = httputil.NewHTTPClient()
 
-	errInvalidOrganizationKey = errors.New("invalid organization selection")
-	authLogin = auth.Login
+	errInvalidOrganizationKey  = errors.New("invalid organization selection")
+	errInvalidOrganizationName = errors.New("invalid organization name")
+	authLogin                  = auth.Login
 )
+
+type OrgRes struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	AuthServiceID string   `json:"authServiceId"`
+	Domains       []string `json:"domains"`
+	ShortName     string   `json:"shortName"`
+	CreatedAt     string   `json:"createdAt"`
+}
 
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
@@ -34,35 +43,29 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func ListOrganizations(c config.Context) ([]astro.Organization, error) {
-	orgDomain := "https://api.astronomer-dev.io/v1alpha1/organizations"
+var ListOrganizations = func(c config.Context) ([]OrgRes, error) {
+	orgDomain := "https://api." + c.Domain + "/v1alpha1/organizations"
 	authToken := c.Token
-	// data := url.Values{
-	// 	"authorization": {authToken},
-	// }
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"authorization": authToken},
 	}
-	res, err := httpClient.Do("POST", orgDomain, doOptions)
+	res, err := httpClient.Do("GET", orgDomain, doOptions)
 	if err != nil {
-		return []astro.Organization{}, fmt.Errorf("could not retrieve token: %w", err)
+		return []OrgRes{}, fmt.Errorf("could not retrieve token: %w", err)
 	}
-	defer res.Body.Close()
-	var orgRes []astro.Organization
-	fmt.Println(res)
-	fmt.Println(res.Body)
-	err = json.NewDecoder(res.Body).Decode(&orgRes)
+	var orgResponse []OrgRes
+	err = json.NewDecoder(res.Body).Decode(&orgResponse)
 	if err != nil {
-		return []astro.Organization{}, fmt.Errorf("cannot decode response: %w", err)
+		return []OrgRes{}, fmt.Errorf("cannot decode response: %w", err)
 	}
 
-	return orgRes, err
+	return orgResponse, err
 }
 
 // List all Organizations
-func List(client astro.Client, out io.Writer) error {
+func List(out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
@@ -93,7 +96,7 @@ func List(client astro.Client, out io.Writer) error {
 	return nil
 }
 
-func getOrganizationSelection(client astro.Client, out io.Writer) (string, error) {
+func getOrganizationSelection(out io.Writer) (string, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -112,7 +115,7 @@ func getOrganizationSelection(client astro.Client, out io.Writer) (string, error
 		return "", err
 	}
 
-	deployMap := map[string]astro.Organization{}
+	deployMap := map[string]OrgRes{}
 	for i := range or {
 		index := i + 1
 
@@ -128,23 +131,38 @@ func getOrganizationSelection(client astro.Client, out io.Writer) (string, error
 		return "", errInvalidOrganizationKey
 	}
 
-	return selected.ID, nil
+	return selected.AuthServiceID, nil
 }
 
 // Switch switches organizations
-func Switch(id string, client astro.Client, out io.Writer) error {
-	if id == "" {
-		_id, err := getOrganizationSelection(client, out)
+func Switch(orgName string, client astro.Client, out io.Writer) error {
+	// get current context
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	// get auth id
+	var id string
+	if orgName == "" {
+		_id, err := getOrganizationSelection(out)
 		if err != nil {
 			return err
 		}
 
 		id = _id
-	}
-
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
+	} else {
+		or, err := ListOrganizations(c)
+		if err != nil {
+			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		}
+		for i := range or {
+			if or[i].Name == orgName {
+				id = or[i].AuthServiceID
+			}
+		}
+		if id == "" {
+			return errInvalidOrganizationName
+		}
 	}
 
 	// log user into new organization
@@ -152,24 +170,5 @@ func Switch(id string, client astro.Client, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
-	// // validate workspace
-	// _, err = client.ListOrganizations()
-	// if err != nil {
-	// 	return errors.Wrap(err, "organization id is not valid")
-	// }
-
-	// // set organization id in context
-	// err = c.SetContextKey("organization", id)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // update workspace
-	// workspaces, err := client.ListWorkspaces(id)
-	// if err != nil {
-	// 	return errors.Wrap(err, "Invalid authentication token. Try to log in again with a new token or check your internet connection.\n\nDetails")
-	// }
-
 	return nil
 }

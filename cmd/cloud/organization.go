@@ -52,7 +52,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return organization.List(astroClient, out)
+	return organization.List(out)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {

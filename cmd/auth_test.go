@@ -26,7 +26,7 @@ func TestLogin(t *testing.T) {
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+	cloudLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 		assert.Equal(t, cloudDomain, domain)
 		return nil
 	}
