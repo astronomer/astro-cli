@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
