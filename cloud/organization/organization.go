@@ -22,7 +22,7 @@ var (
 
 	errInvalidOrganizationKey  = errors.New("invalid organization selection")
 	errInvalidOrganizationName = errors.New("invalid organization name")
-	authLogin                  = auth.Login
+	AuthLogin                  = auth.Login
 )
 
 type OrgRes struct {
@@ -166,7 +166,7 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 	}
 
 	// log user into new organization
-	err = authLogin(c.Domain, id, client, out, false, false)
+	err = AuthLogin(c.Domain, id, client, out, false, false)
 	if err != nil {
 		return err
 	}

@@ -63,6 +63,10 @@ func TestOrganizationSwitch(t *testing.T) {
 		return orgResponse, nil
 	}
 
+	organization.AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		return nil
+	}
+
 	// mock os.Stdin
 	input := []byte("1")
 	r, w, err := os.Pipe()
@@ -79,9 +83,6 @@ func TestOrganizationSwitch(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	authLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
-		return nil
-	}
 	cmdArgs := []string{"switch"}
 	resp, err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)

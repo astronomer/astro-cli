@@ -123,7 +123,7 @@ func TestSwitch(t *testing.T) {
 			return orgResponse, nil
 		}
 
-		authLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -153,7 +153,7 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		authLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -167,7 +167,7 @@ func TestSwitch(t *testing.T) {
 			return orgResponse, nil
 		}
 
-		authLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -197,7 +197,7 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		authLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -211,7 +211,7 @@ func TestSwitch(t *testing.T) {
 			return orgResponse, nil
 		}
 
-		authLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 			return errMock
 		}
 		buf := new(bytes.Buffer)
