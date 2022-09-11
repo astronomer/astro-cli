@@ -10,15 +10,15 @@ func TestAddConnectionsAirflowOne(t *testing.T) {
 	var testExtra map[string]string
 
 	testConn := Connection{
-		Conn_ID:       "test-id",
-		Conn_Type:     "test-type",
-		Conn_Host:     "test-host",
-		Conn_Schema:   "test-schema",
-		Conn_Login:    "test-login",
-		Conn_Password: "test-password",
-		Conn_Port:     1,
-		Conn_URI:      "test-uri",
-		Conn_Extra:    testExtra,
+		ConnID:       "test-id",
+		ConnType:     "test-type",
+		ConnHost:     "test-host",
+		ConnSchema:   "test-schema",
+		ConnLogin:    "test-login",
+		ConnPassword: "test-password",
+		ConnPort:     1,
+		ConnURI:      "test-uri",
+		ConnExtra:    testExtra,
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
@@ -35,15 +35,15 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 	var testExtra map[string]string
 
 	testConn := Connection{
-		Conn_ID:       "test-id",
-		Conn_Type:     "test-type",
-		Conn_Host:     "test-host",
-		Conn_Schema:   "test-schema",
-		Conn_Login:    "test-login",
-		Conn_Password: "test-password",
-		Conn_Port:     1,
-		Conn_URI:      "test-uri",
-		Conn_Extra:    testExtra,
+		ConnID:       "test-id",
+		ConnType:     "test-type",
+		ConnHost:     "test-host",
+		ConnSchema:   "test-schema",
+		ConnLogin:    "test-login",
+		ConnPassword: "test-password",
+		ConnPort:     1,
+		ConnURI:      "test-uri",
+		ConnExtra:    testExtra,
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
@@ -62,7 +62,7 @@ func TestAddConnectionsAirflowTwo(t *testing.T) {
 
 func TestAddConnectionsAirflowTwoURI(t *testing.T) {
 	testConn := Connection{
-		Conn_URI: "test-uri",
+		ConnURI: "test-uri",
 	}
 	settings.Airflow.Connections = []Connection{testConn}
 
@@ -82,8 +82,8 @@ func TestAddConnectionsAirflowTwoURI(t *testing.T) {
 func TestAddVariableAirflowOne(t *testing.T) {
 	settings.Airflow.Variables = Variables{
 		{
-			Variable_Name:  "test-var-name",
-			Variable_Value: "test-var-val",
+			VariableName:  "test-var-name",
+			VariableValue: "test-var-val",
 		},
 	}
 
@@ -98,8 +98,8 @@ func TestAddVariableAirflowOne(t *testing.T) {
 func TestAddVariableAirflowTwo(t *testing.T) {
 	settings.Airflow.Variables = Variables{
 		{
-			Variable_Name:  "test-var-name",
-			Variable_Value: "test-var-val",
+			VariableName:  "test-var-name",
+			VariableValue: "test-var-val",
 		},
 	}
 
@@ -114,9 +114,9 @@ func TestAddVariableAirflowTwo(t *testing.T) {
 func TestAddPoolsAirflowOne(t *testing.T) {
 	settings.Airflow.Pools = Pools{
 		{
-			Pool_Name:        "test-pool-name",
-			Pool_Slot:        1,
-			Pool_Description: "test-pool-description",
+			PoolName:        "test-pool-name",
+			PoolSlot:        1,
+			PoolDescription: "test-pool-description",
 		},
 	}
 
@@ -131,9 +131,9 @@ func TestAddPoolsAirflowOne(t *testing.T) {
 func TestAddPoolsAirflowTwo(t *testing.T) {
 	settings.Airflow.Pools = Pools{
 		{
-			Pool_Name:        "test-pool-name",
-			Pool_Slot:        1,
-			Pool_Description: "test-pool-description",
+			PoolName:        "test-pool-name",
+			PoolSlot:        1,
+			PoolDescription: "test-pool-description",
 		},
 	}
 
@@ -164,15 +164,15 @@ func TestEnvExport(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		execAirflowCommand = func(id, airflowCommand string) string {
 			switch airflowCommand {
-			case "airflow variables export tmp.var":
+			case airflowVarExport:
 				return "1 variables successfully exported to tmp.var"
-			case "cat tmp.var":
+			case catVarFile:
 				return `{
 					"myvar": "myval"
 				}`
-			case "airflow connections export tmp.connections --file-format env":
+			case airflowConnExport:
 				return "Connections successfully exported to tmp.json"
-			case "cat tmp.connections":
+			case catConnFile:
 				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema"
 			default:
 				return ""
@@ -190,7 +190,7 @@ func TestEnvExport(t *testing.T) {
 	t.Run("variable failure", func(t *testing.T) {
 		execAirflowCommand = func(id, airflowCommand string) string {
 			switch airflowCommand {
-			case "airflow variables export tmp.var":
+			case airflowVarExport:
 				return ""
 			default:
 				return ""
@@ -204,7 +204,7 @@ func TestEnvExport(t *testing.T) {
 	t.Run("connection failure", func(t *testing.T) {
 		execAirflowCommand = func(id, airflowCommand string) string {
 			switch airflowCommand {
-			case "airflow connections export tmp.connections --file-format env":
+			case airflowConnExport:
 				return ""
 			default:
 				return ""
@@ -225,7 +225,7 @@ func TestExport(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		execAirflowCommand = func(id, airflowCommand string) string {
 			switch airflowCommand {
-			case "airflow connections list -o yaml":
+			case airflowConnectionList:
 				return `
 - conn_id: local_postgres
   conn_type: postgres
@@ -240,13 +240,13 @@ func TestExport(t *testing.T) {
   password: password
   port: '5432'
   schema: schema`
-			case "airflow variables export tmp.var":
+			case airflowVarExport:
 				return "1 variables successfully exported to tmp.var"
-			case "cat tmp.var":
+			case catVarFile:
 				return `{
 					"myvar": "myval"
 				}`
-			case "airflow pools list -o yaml":
+			case ariflowPoolsList:
 				return `
 - description: Default pool
   pool: default_pool
@@ -266,7 +266,7 @@ func TestExport(t *testing.T) {
 	t.Run("variable failure", func(t *testing.T) {
 		execAirflowCommand = func(id, airflowCommand string) string {
 			switch airflowCommand {
-			case "airflow variables export tmp.var":
+			case airflowVarExport:
 				return ""
 			default:
 				return ""

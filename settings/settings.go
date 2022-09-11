@@ -3,12 +3,13 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -21,7 +22,6 @@ var (
 	// ConfigFileName = "airflow_settings"
 	// ConfigFileType is the config file extension
 	ConfigFileType = "yaml"
-	tmpFile        = "tmp.json"
 	// WorkingPath is the path to the working directory
 	WorkingPath, _ = fileutil.GetWorkingDir()
 
@@ -39,12 +39,21 @@ var (
 )
 
 const (
-	configReadErrorMsg = "Error reading config in home dir: %s\n"
-	noColorString      = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+	airflowConnectionList = "airflow connections list -o yaml"
+	ariflowPoolsList      = "airflow pools list -o yaml"
+	airflowConnExport     = "airflow connections export tmp.connections --file-format env"
+	airflowVarExport      = "airflow variables export tmp.var"
+	catVarFile            = "cat tmp.var"
+	rmVarFile             = "rm tmp.var"
+	catConnFile           = "cat tmp.connections"
+	configReadErrorMsg    = "Error reading config in home dir: %s\n"
+	noColorString         = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
 )
 
-var errNoID = errors.New("container ID is not found, the webserver may not be running")
-var re = regexp.MustCompile(noColorString)
+var (
+	errNoID = errors.New("container ID is not found, the webserver may not be running")
+	re      = regexp.MustCompile(noColorString)
+)
 
 // ConfigSettings is the main builder of the settings package
 func ConfigSettings(id, settingsFile string, version uint64, connections, variables, pools, logs bool) error {
@@ -97,11 +106,11 @@ func InitSettings(settingsFile string) error {
 func AddVariables(id string, version uint64, logs bool) {
 	variables := settings.Airflow.Variables
 	for _, variable := range variables {
-		if !objectValidator(0, variable.Variable_Name) {
-			if objectValidator(0, variable.Variable_Value) {
+		if !objectValidator(0, variable.VariableName) {
+			if objectValidator(0, variable.VariableValue) {
 				fmt.Print("Skipping Variable Creation: No Variable Name Specified.\n")
 			}
-		} else if objectValidator(0, variable.Variable_Value) {
+		} else if objectValidator(0, variable.VariableValue) {
 			baseCmd := "airflow variables "
 			if version >= AirflowVersionTwo {
 				baseCmd += "set %s " // Airflow 2.0.0 command
@@ -109,14 +118,14 @@ func AddVariables(id string, version uint64, logs bool) {
 				baseCmd += "-s %s"
 			}
 
-			airflowCommand := fmt.Sprintf(baseCmd, variable.Variable_Name)
+			airflowCommand := fmt.Sprintf(baseCmd, variable.VariableName)
 
-			airflowCommand += fmt.Sprintf("'%s'", variable.Variable_Value)
+			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 			out := execAirflowCommand(id, airflowCommand)
 			if logs {
 				fmt.Println("Adding variable logs:\n" + out)
 			}
-			fmt.Printf("Added Variable: %s\n", variable.Variable_Name)
+			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
 }
@@ -163,71 +172,62 @@ func AddConnections(id string, version uint64, logs bool) {
 	for i := range connections {
 		var j int
 		conn := connections[i]
-		if !objectValidator(0, conn.Conn_ID) {
+		if !objectValidator(0, conn.ConnID) {
 			continue
 		}
 
-		var extra_string string
-		v, ok := conn.Conn_Extra.(map[interface{}]interface{})
-		if !ok {
-			t, ok := conn.Conn_Extra.(string)
-			if ok {
-				extra_string = t
-			}
-		} else {
-			extra_string = jsonString(v)
-		}
+		extraString := jsonString(&conn)
 
-		quotedConnID := "'" + conn.Conn_ID + "'"
+		quotedConnID := "'" + conn.ConnID + "'"
 
-		if strings.Contains(out, quotedConnID) || strings.Contains(out, conn.Conn_ID) {
-			fmt.Printf("Updating Connection %q...\n", conn.Conn_ID)
-			airflowCommand = fmt.Sprintf("%s %s %q", baseRmCmd, connIDArg, conn.Conn_ID)
+		if strings.Contains(out, quotedConnID) || strings.Contains(out, conn.ConnID) {
+			fmt.Printf("Updating Connection %q...\n", conn.ConnID)
+			airflowCommand = fmt.Sprintf("%s %s %q", baseRmCmd, connIDArg, conn.ConnID)
 			execAirflowCommand(id, airflowCommand)
 		}
 
-		if !objectValidator(1, conn.Conn_Type, conn.Conn_URI) {
-			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.Conn_ID)
+		if !objectValidator(1, conn.ConnType, conn.ConnURI) {
+			fmt.Printf("Skipping %s: conn_type or conn_uri must be specified.\n", conn.ConnID)
 			continue
 		}
 
-		airflowCommand = fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.Conn_ID)
-		if objectValidator(0, conn.Conn_Type) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.Conn_Type)
+		airflowCommand = fmt.Sprintf("%s %s '%s' ", baseAddCmd, connIDArg, conn.ConnID)
+		if objectValidator(0, conn.ConnType) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connTypeArg, conn.ConnType)
 			j++
 		}
-		if extra_string != "" {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, extra_string)
+		if extraString != "" {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connExtraArg, extraString)
 		}
-		if objectValidator(0, conn.Conn_Host) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.Conn_Host)
+		if objectValidator(0, conn.ConnHost) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connHostArg, conn.ConnHost)
 			j++
 		}
-		if objectValidator(0, conn.Conn_Login) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.Conn_Login)
+		if objectValidator(0, conn.ConnLogin) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connLoginArg, conn.ConnLogin)
 			j++
 		}
-		if objectValidator(0, conn.Conn_Password) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.Conn_Password)
+		if objectValidator(0, conn.ConnPassword) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connPasswordArg, conn.ConnPassword)
 			j++
 		}
-		if objectValidator(0, conn.Conn_Schema) {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.Conn_Schema)
+		if objectValidator(0, conn.ConnSchema) {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connSchemaArg, conn.ConnSchema)
 			j++
 		}
-		if conn.Conn_Port != 0 {
-			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.Conn_Port)
+		if conn.ConnPort != 0 {
+			airflowCommand += fmt.Sprintf("%s %v", connPortArg, conn.ConnPort)
 			j++
 		}
-		if objectValidator(0, conn.Conn_URI) && j == 0 {
-			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.Conn_URI)
+		if objectValidator(0, conn.ConnURI) && j == 0 {
+			airflowCommand += fmt.Sprintf("%s '%s' ", connURIArg, conn.ConnURI)
 		}
 
 		out := execAirflowCommand(id, airflowCommand)
 		if logs {
 			fmt.Printf("Adding Connection logs:\n\n" + out)
 		}
-		fmt.Printf("Added Connection: %s\n", conn.Conn_ID)
+		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
 
@@ -245,12 +245,12 @@ func AddPools(id string, version uint64, logs bool) {
 	}
 
 	for _, pool := range pools {
-		if objectValidator(0, pool.Pool_Name) {
-			airflowCommand := fmt.Sprintf("%s %s ", baseCmd, pool.Pool_Name)
-			if pool.Pool_Slot != 0 {
-				airflowCommand += fmt.Sprintf("%v ", pool.Pool_Slot)
-				if objectValidator(0, pool.Pool_Description) {
-					airflowCommand += fmt.Sprintf("'%s' ", pool.Pool_Description)
+		if objectValidator(0, pool.PoolName) {
+			airflowCommand := fmt.Sprintf("%s %s ", baseCmd, pool.PoolName)
+			if pool.PoolSlot != 0 {
+				airflowCommand += fmt.Sprintf("%v ", pool.PoolSlot)
+				if objectValidator(0, pool.PoolDescription) {
+					airflowCommand += fmt.Sprintf("'%s' ", pool.PoolDescription)
 				} else {
 					airflowCommand += "''"
 				}
@@ -259,9 +259,9 @@ func AddPools(id string, version uint64, logs bool) {
 				if logs {
 					fmt.Println("Adding pool logs:\n" + out)
 				}
-				fmt.Printf("Added Pool: %s\n", pool.Pool_Name)
+				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
-				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.Pool_Name)
+				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
 			}
 		}
 	}
@@ -310,16 +310,14 @@ func EnvExport(id, envFile string, version uint64, connections, variables, logs 
 
 func EnvExportVariables(id, envFile string, logs bool) error {
 	// setup airflow command to export variables
-	airflowCommand := "airflow variables export tmp.var"
-	out := execAirflowCommand(id, airflowCommand)
+	out := execAirflowCommand(id, airflowVarExport)
 	if logs {
 		fmt.Printf("Env Export Variables logs:\n\n" + out)
 	}
 
 	if strings.Contains(out, "successfully") {
 		// get variables from file created by airflow command
-		fileCmd := "cat tmp.var"
-		out = execAirflowCommand(id, fileCmd)
+		out = execAirflowCommand(id, catVarFile)
 
 		m := map[string]string{}
 		err := json.Unmarshal([]byte(out), &m)
@@ -344,8 +342,7 @@ func EnvExportVariables(id, envFile string, logs bool) error {
 			}
 		}
 		fmt.Println("Aiflow variables successfully export to the file " + envFile + "\n")
-		rmCmd := "rm tmp.var"
-		_ = execAirflowCommand(id, rmCmd)
+		_ = execAirflowCommand(id, rmVarFile)
 		return nil
 	}
 	return errors.New("variable export unsuccessful")
@@ -353,16 +350,14 @@ func EnvExportVariables(id, envFile string, logs bool) error {
 
 func EnvExportConnections(id, envFile string, logs bool) error {
 	// Airflow command to export connections to env uris
-	airflowCommand := "airflow connections export tmp.connections --file-format env"
-	out := execAirflowCommand(id, airflowCommand)
+	out := execAirflowCommand(id, airflowConnExport)
 	if logs {
 		fmt.Println("Env Export Connections logs:\n" + out)
 	}
 
 	if strings.Contains(out, "successfully") {
 		// get connections from file craeted by airflow command
-		fileCmd := "cat tmp.connections"
-		out = execAirflowCommand(id, fileCmd)
+		out = execAirflowCommand(id, catConnFile)
 
 		vars := strings.Split(out, "\n")
 		// add connections to the env file
@@ -374,7 +369,7 @@ func EnvExportConnections(id, envFile string, logs bool) error {
 		defer f.Close()
 
 		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2)
+			varSplit := strings.SplitN(vars[i], "=", 2) // nolint:gomnd
 			if len(varSplit) > 1 {
 				fmt.Println("Exporting Connection: " + varSplit[0])
 				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
@@ -436,17 +431,16 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 
 func ExportConnections(id string, logs bool) error {
 	// Setup airflow command to export connections
-	airflowCommand := "airflow connections list -o yaml"
-	out := execAirflowCommand(id, airflowCommand)
+	out := execAirflowCommand(id, airflowConnectionList)
 	if logs {
 		fmt.Println("Export Connections logs:\n" + out)
 	}
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1]
+	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] // nolint:gomnd
 
-	var connections ListConnections
+	var connections AirflowConnections
 
 	err := yaml.Unmarshal([]byte(yamlCons), &connections)
 	if err != nil {
@@ -459,18 +453,26 @@ func ExportConnections(id string, logs bool) error {
 			fmt.Println("Issue with parsing port number: ")
 			fmt.Println(err)
 		}
+		for j := range settings.Airflow.Connections {
+			if settings.Airflow.Connections[j].ConnID == connections[i].ConnID {
+				fmt.Println("Updating Connection: " + connections[i].ConnID)
+				// Remove connection if it already exits
+				settings.Airflow.Connections = append(settings.Airflow.Connections[:j], settings.Airflow.Connections[j+1:]...)
+				break
+			}
+		}
 		fmt.Println("Exporting Connection: " + connections[i].ConnID)
 
 		newConnection := Connection{
-			Conn_ID:       connections[i].ConnID,
-			Conn_Type:     connections[i].ConnType,
-			Conn_Host:     connections[i].ConnHost,
-			Conn_Schema:   connections[i].ConnSchema,
-			Conn_Login:    connections[i].ConnLogin,
-			Conn_Password: connections[i].ConnPassword,
-			Conn_Port:     port,
-			Conn_URI:      connections[i].ConnURI,
-			Conn_Extra:    connections[i].ConnExtra,
+			ConnID:       connections[i].ConnID,
+			ConnType:     connections[i].ConnType,
+			ConnHost:     connections[i].ConnHost,
+			ConnSchema:   connections[i].ConnSchema,
+			ConnLogin:    connections[i].ConnLogin,
+			ConnPassword: connections[i].ConnPassword,
+			ConnPort:     port,
+			ConnURI:      connections[i].ConnURI,
+			ConnExtra:    connections[i].ConnExtra,
 		}
 
 		settings.Airflow.Connections = append(settings.Airflow.Connections, newConnection)
@@ -487,16 +489,14 @@ func ExportConnections(id string, logs bool) error {
 
 func ExportVariables(id string, logs bool) error {
 	// setup files
-	airflowCommand := "airflow variables export tmp.var"
-	out := execAirflowCommand(id, airflowCommand)
+	out := execAirflowCommand(id, airflowVarExport)
 	if logs {
 		fmt.Println("Export Variables logs:\n" + out)
 	}
 
 	if strings.Contains(out, "successfully") {
 		// get variables created by the airflow command
-		fileCmd := "cat tmp.var"
-		out = execAirflowCommand(id, fileCmd)
+		out = execAirflowCommand(id, catVarFile)
 
 		m := map[string]string{}
 		err := json.Unmarshal([]byte(out), &m)
@@ -505,6 +505,15 @@ func ExportVariables(id string, logs bool) error {
 		}
 		// add the variables to settings object
 		for k, v := range m {
+			for j := range settings.Airflow.Variables {
+				if settings.Airflow.Variables[j].VariableName == k {
+					fmt.Println("Updating Pool: " + k)
+					// Remove variable if it already exits
+					settings.Airflow.Variables = append(settings.Airflow.Variables[:j], settings.Airflow.Variables[j+1:]...)
+					break
+				}
+			}
+
 			newVariables := Variables{{k, v}}
 			fmt.Println("Exporting Variable: " + k)
 			settings.Airflow.Variables = append(settings.Airflow.Variables, newVariables...)
@@ -515,8 +524,7 @@ func ExportVariables(id string, logs bool) error {
 		if err != nil {
 			return err
 		}
-		rmCmd := "rm tmp.var"
-		_ = execAirflowCommand(id, rmCmd)
+		_ = execAirflowCommand(id, rmVarFile)
 		fmt.Printf("successfully exported variables\n\n")
 		return nil
 	}
@@ -525,7 +533,7 @@ func ExportVariables(id string, logs bool) error {
 
 func ExportPools(id string, logs bool) error {
 	// Setup airflow command to export pools
-	airflowCommand := "airflow pools list -o yaml"
+	airflowCommand := ariflowPoolsList
 	out := execAirflowCommand(id, airflowCommand)
 	if logs {
 		fmt.Println("Export Pools logs:\n" + out)
@@ -534,9 +542,9 @@ func ExportPools(id string, logs bool) error {
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 
-	var pools ListPools
+	var pools AirflowPools
 	// remove warnings and extra text from the the output
-	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1]
+	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1] //nolint:gomnd
 
 	err := yaml.Unmarshal([]byte(yamlpools), &pools)
 	if err != nil {
@@ -545,15 +553,24 @@ func ExportPools(id string, logs bool) error {
 	// add pools to the settings object
 	for i := range pools {
 		if pools[i].PoolName != "default_pool" {
-			slot, err := strconv.Atoi(pools[i].PoolSlot)
-			if err != nil {
-				fmt.Println("Issue with parsing pool slot number: ")
-				fmt.Println(err)
-			}
-			fmt.Println("Exporting Pool: " + pools[i].PoolName)
-			newPools := Pools{{pools[i].PoolName, slot, pools[i].PoolDescription}}
-			settings.Airflow.Pools = append(settings.Airflow.Pools, newPools...)
+			continue
 		}
+		slot, err := strconv.Atoi(pools[i].PoolSlot)
+		if err != nil {
+			fmt.Println("Issue with parsing pool slot number: ")
+			fmt.Println(err)
+		}
+		for j := range settings.Airflow.Pools {
+			if settings.Airflow.Pools[j].PoolName == pools[i].PoolName {
+				fmt.Println("Updating Pool: " + pools[i].PoolName)
+				// Remove pool if it already exits
+				settings.Airflow.Pools = append(settings.Airflow.Pools[:j], settings.Airflow.Pools[j+1:]...)
+				break
+			}
+		}
+		fmt.Println("Exporting Pool: " + pools[i].PoolName)
+		newPools := Pools{{pools[i].PoolName, slot, pools[i].PoolDescription}}
+		settings.Airflow.Pools = append(settings.Airflow.Pools, newPools...)
 	}
 	// write pools to the airflow settings file
 	viperSettings.Set("airflow", settings.Airflow)
@@ -565,23 +582,31 @@ func ExportPools(id string, logs bool) error {
 	return nil
 }
 
-func jsonString(connExtra map[interface{}]interface{}) string {
-	var extra_string string
+func jsonString(conn *Connection) string {
+	var extraString string
+	connExtra, ok := conn.ConnExtra.(map[interface{}]interface{})
+	if !ok {
+		t, ok := conn.ConnExtra.(string)
+		if ok {
+			extraString = t
+		}
+		return extraString
+	}
 	i := 0
 	for k, v := range connExtra {
 		key, ok := k.(string)
-		value, ok := v.(string)
-		if ok {
+		value, ok2 := v.(string)
+		if ok && ok2 {
 			if i == 0 {
-				extra_string = extra_string + "\"" + key + "\": \"" + value + "\""
+				extraString = extraString + "\"" + key + "\": \"" + value + "\""
 			} else {
-				extra_string = extra_string + ", \"" + key + "\": \"" + value + "\""
+				extraString = extraString + ", \"" + key + "\": \"" + value + "\""
 			}
 			i++
 		}
 	}
-	if extra_string != "" {
-		extra_string = "{" + extra_string + "}"
+	if extraString != "" {
+		extraString = "{" + extraString + "}"
 	}
-	return extra_string
+	return extraString
 }

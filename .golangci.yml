@@ -3,9 +3,6 @@ run:
   # timeout for analysis, e.g. 30s, 5m
   timeout: 3m
   skip-files:
-    - settings/old_settings.go
-    - settings/settings.go
-    - settings/types.go
 linters-settings:
   depguard:
     list-type: blacklist

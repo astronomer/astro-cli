@@ -5,28 +5,28 @@ type Connections []Connection
 
 // Connection contains structure of airflow connection
 type Connection struct {
-	Conn_ID       string      `mapstructure:"conn_id"`
-	Conn_Type     string      `mapstructure:"conn_type"`
-	Conn_Host     string      `mapstructure:"conn_host"`
-	Conn_Schema   string      `mapstructure:"conn_schema"`
-	Conn_Login    string      `mapstructure:"conn_login"`
-	Conn_Password string      `mapstructure:"conn_password"`
-	Conn_Port     int         `mapstructure:"conn_port"`
-	Conn_URI      string      `mapstructure:"conn_uri"`
-	Conn_Extra    interface{} `mapstructure:"conn_extra"`
+	ConnID       string      `mapstructure:"conn_id" yaml:"conn_id"`
+	ConnType     string      `mapstructure:"conn_type" yaml:"conn_type"`
+	ConnHost     string      `mapstructure:"conn_host" yaml:"conn_host"`
+	ConnSchema   string      `mapstructure:"conn_schema" yaml:"conn_schema"`
+	ConnLogin    string      `mapstructure:"conn_login" yaml:"conn_login"`
+	ConnPassword string      `mapstructure:"conn_password" yaml:"conn_password"`
+	ConnPort     int         `mapstructure:"conn_port" yaml:"conn_port"`
+	ConnURI      string      `mapstructure:"conn_uri" yaml:"conn_uri"`
+	ConnExtra    interface{} `mapstructure:"conn_extra" yaml:"conn_extra"`
 }
 
 // Pools contains structure of airflow pools
 type Pools []struct {
-	Pool_Name        string `mapstructure:"pool_name"`
-	Pool_Slot        int    `mapstructure:"pool_slot"`
-	Pool_Description string `mapstructure:"pool_description"`
+	PoolName        string `mapstructure:"pool_name" yaml:"pool_name"`
+	PoolSlot        int    `mapstructure:"pool_slot" yaml:"pool_slot"`
+	PoolDescription string `mapstructure:"pool_description" yaml:"pool_description"`
 }
 
 // Variables contains structure of airflow variables
 type Variables []struct {
-	Variable_Name  string `mapstructure:"variable_name"`
-	Variable_Value string `mapstructure:"variable_value"`
+	VariableName  string `mapstructure:"variable_name" yaml:"variable_name"`
+	VariableValue string `mapstructure:"variable_value" yaml:"variable_value"`
 }
 
 // Airflow contains structure of airflow settings
@@ -41,9 +41,9 @@ type Config struct {
 	Airflow `mapstructure:"airflow"`
 }
 
-type ListConnections []ListConnection
+type AirflowConnections []AirflowConnection
 
-type ListConnection struct {
+type AirflowConnection struct {
 	ConnID       string            `yaml:"conn_id"`
 	ConnType     string            `yaml:"conn_type"`
 	ConnHost     string            `yaml:"host"`
@@ -55,7 +55,7 @@ type ListConnection struct {
 	ConnExtra    map[string]string `yaml:"extra_dejson"`
 }
 
-type ListPools []struct {
+type AirflowPools []struct {
 	PoolName        string `yaml:"pool"`
 	PoolSlot        string `yaml:"slots"`
 	PoolDescription string `yaml:"description"`
