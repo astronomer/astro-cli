@@ -322,8 +322,7 @@ func EnvExportVariables(id, envFile string, logs bool) error {
 		m := map[string]string{}
 		err := json.Unmarshal([]byte(out), &m)
 		if err != nil {
-			fmt.Println(err)
-			fmt.Println("variable json decode unsuccessful")
+			fmt.Printf("variable json decode unsuccessful: %s", err.Error())
 		}
 		// add variables to the env file
 		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
@@ -337,8 +336,7 @@ func EnvExportVariables(id, envFile string, logs bool) error {
 			fmt.Println("Exporting Variable: " + k)
 			_, err := f.WriteString("\nAIRFLOW_VAR_" + strings.ToUpper(k) + "=" + v)
 			if err != nil {
-				fmt.Println(err)
-				fmt.Printf("error adding variable %s to file\n", k)
+				fmt.Printf("error adding variable %s to file: %s\n", k, err.Error())
 			}
 		}
 		fmt.Println("Aiflow variables successfully export to the file " + envFile + "\n")
@@ -374,8 +372,7 @@ func EnvExportConnections(id, envFile string, logs bool) error {
 				fmt.Println("Exporting Connection: " + varSplit[0])
 				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
 				if err != nil {
-					fmt.Println(err)
-					fmt.Printf("error adding connection %s to file\n", varSplit[0])
+					fmt.Printf("error adding connection %s to file: %s\n", varSplit[0], err.Error())
 				}
 			}
 		}
@@ -398,35 +395,31 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	}
 	var parseErr bool
 	// export Airflow Objects
-	if version >= AirflowVersionTwo {
-		if pools {
-			err = ExportPools(id, logs)
-			if err != nil {
-				fmt.Println(err)
-				parseErr = true
-			}
+	if version < AirflowVersionTwo {
+	        return errors.New("Command must be used with Airflow 2.X")
+	}        
+	if pools {
+		if err = ExportPools(id, logs) && err != nil {
+			fmt.Println(err)
+			parseErr = true
 		}
-		if variables {
-			err = ExportVariables(id, logs)
-			if err != nil {
-				fmt.Println(err)
-				parseErr = true
-			}
-		}
-		if connections {
-			err := ExportConnections(id, logs)
-			if err != nil {
-				fmt.Println(err)
-				parseErr = true
-			}
-		}
-		if parseErr {
-			return errors.New("there was an error during export")
-		}
-		return nil
 	}
-
-	return errors.New("Command must be used with Airflow 2.X")
+	if variables {
+		if err = ExportVariables(id, logs) && err != nil {
+			fmt.Println(err)
+			parseErr = true
+		}
+	}
+	if connections {
+		if err := ExportConnections(id, logs) && err != nil {
+			fmt.Println(err)
+			parseErr = true
+		}
+	}
+	if parseErr {
+		return errors.New("there was an error during export")
+	}
+	return nil
 }
 
 func ExportConnections(id string, logs bool) error {
@@ -450,8 +443,7 @@ func ExportConnections(id string, logs bool) error {
 	for i := range connections {
 		port, err := strconv.Atoi(connections[i].ConnPort)
 		if err != nil {
-			fmt.Println("Issue with parsing port number: ")
-			fmt.Println(err)
+			fmt.Printf("Issue with parsing port number: %s", err.Error())
 		}
 		for j := range settings.Airflow.Connections {
 			if settings.Airflow.Connections[j].ConnID == connections[i].ConnID {
