@@ -399,19 +399,22 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	        return errors.New("Command must be used with Airflow 2.X")
 	}        
 	if pools {
-		if err = ExportPools(id, logs) && err != nil {
+		err = ExportPools(id, logs)
+		if err != nil {
 			fmt.Println(err)
 			parseErr = true
 		}
 	}
 	if variables {
-		if err = ExportVariables(id, logs) && err != nil {
+		err = ExportVariables(id, logs)
+		if err != nil {
 			fmt.Println(err)
 			parseErr = true
 		}
 	}
 	if connections {
-		if err := ExportConnections(id, logs) && err != nil {
+		err := ExportConnections(id, logs)
+		if err != nil {
 			fmt.Println(err)
 			parseErr = true
 		}
