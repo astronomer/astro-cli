@@ -519,7 +519,7 @@ func (d *DockerCompose) Bash(container string) error {
 	return nil
 }
 
-func (d *DockerCompose) Settings(settingsFile, envFile string, connections, variables, pools, export, envExport, logs bool) error {
+func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport, logs bool) error {
 	// setup bools
 	if !connections && !variables && !pools {
 		connections = true
@@ -528,28 +528,17 @@ func (d *DockerCompose) Settings(settingsFile, envFile string, connections, vari
 	}
 
 	// Get project containers
-	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
-		All: true,
-	})
-	if err != nil {
-		return errors.Wrap(err, composeCreateErrMsg)
-	}
-	if len(psInfo) == 0 {
-		return errors.New("project not running, run docker dev start to start project")
-	}
-
-	imageLabels, err := d.imageHandler.ListLabels()
+	containerID, err := d.getWebServerContainerID()
 	if err != nil {
 		return err
 	}
 
-	airflowDockerVersion := defaultAirflowVersion
-	airflowVersion, ok := imageLabels[airflowVersionLabelName]
-	if ok {
-		if version := semver.MustParse(airflowVersion); version != nil {
-			airflowDockerVersion = version.Major()
-		}
+	// Get airflow version
+	airflowDockerVersion, err := d.CheckAiflowVersion()
+	if err != nil {
+		return err
 	}
+
 	fileState, err := fileutil.Exists(settingsFile, nil)
 	if err != nil {
 		return errors.Wrap(err, errSettingsPath)
@@ -557,34 +546,56 @@ func (d *DockerCompose) Settings(settingsFile, envFile string, connections, vari
 	if !fileState {
 		return errors.New("file specified does not exist")
 	}
-	var containerID string
-	for i := range psInfo {
-		if strings.Contains(psInfo[i].Name, d.projectName) &&
-			strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-			containerID = psInfo[i].ID
-		}
-	}
-	if export && !envExport {
-		err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
-		if err != nil {
-			return err
-		}
-		fmt.Println("\nAirflow objects exported to settings file")
-	}
-	if envExport && export {
+
+	if envExport {
 		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables, logs)
 		if err != nil {
 			return err
 		}
 		fmt.Println("\nAirflow objects exported to env file")
 	}
-	if !envExport && !export {
-		err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
-		if err != nil {
-			return err
-		}
-		fmt.Println("\nAirflow objects created from settings file")
+
+	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
+	if err != nil {
+		return err
 	}
+	fmt.Println("\nAirflow objects exported to settings file")
+	return nil
+}
+
+func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections, variables, pools, logs bool) error {
+	// setup bools
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	// Get project containers
+	containerID, err := d.getWebServerContainerID()
+	if err != nil {
+		return err
+	}
+
+	// Get airflow version
+	airflowDockerVersion, err := d.CheckAiflowVersion()
+	if err != nil {
+		return err
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errors.New("file specified does not exist")
+	}
+
+	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects created from settings file")
 	return nil
 }
 
@@ -594,6 +605,9 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	})
 	if err != nil {
 		return "", errors.Wrap(err, composeStatusCheckErrMsg)
+	}
+	if len(psInfo) == 0 {
+		return "", errors.New("project not running, run astro dev start to start project")
 	}
 
 	replacer := strings.NewReplacer("_", "", "-", "")
@@ -605,6 +619,24 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 		}
 	}
 	return "", err
+}
+
+func (d *DockerCompose) CheckAiflowVersion() (uint64, error) {
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return 0, err
+	}
+
+	airflowDockerVersion := defaultAirflowVersion
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if version, err := semver.NewVersion(airflowVersion); err == nil {
+			airflowDockerVersion = version.Major()
+		} else {
+			fmt.Printf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
+		}
+	}
+	return airflowDockerVersion, nil
 }
 
 // createProject creates project with yaml config as context

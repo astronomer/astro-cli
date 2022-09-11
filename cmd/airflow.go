@@ -42,7 +42,6 @@ var (
 	variables              bool
 	pools                  bool
 	envExport              bool
-	export                 bool
 	noBrowser              bool
 	logs                   bool
 	RunExample             = `
@@ -729,7 +728,7 @@ func airflowSettingsImport(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
+	return containerHandler.ImportSettings(settingsFile, envFile, connections, variables, pools, logs)
 }
 
 func airflowSettingsExport(cmd *cobra.Command, args []string) error {
@@ -740,10 +739,8 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	// export command was called
-	export = true
 
-	return containerHandler.Settings(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
+	return containerHandler.ExportSettings(settingsFile, envFile, connections, variables, pools, envExport, logs)
 }
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client) string {

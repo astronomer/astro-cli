@@ -396,8 +396,8 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	var parseErr bool
 	// export Airflow Objects
 	if version < AirflowVersionTwo {
-	        return errors.New("Command must be used with Airflow 2.X")
-	}        
+		return errors.New("Command must be used with Airflow 2.X")
+	}
 	if pools {
 		err = ExportPools(id, logs)
 		if err != nil {
