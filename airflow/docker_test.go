@@ -1049,7 +1049,7 @@ func TestDockerComposeSettings(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 
 		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", true, true, true, false)
-		assert.Contains(t, err.Error(), "project not running, run docker dev start to start project")
+		assert.Contains(t, err.Error(), "project not running, run astro dev start to start project")
 		composeMock.AssertExpectations(t)
 	})
 
