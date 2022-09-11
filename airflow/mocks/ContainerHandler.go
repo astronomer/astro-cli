@@ -23,6 +23,34 @@ func (_m *ContainerHandler) Bash(container string) error {
 	return r0
 }
 
+// ExportSettings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, envExport, logs
+func (_m *ContainerHandler) ExportSettings(settingsFile string, envFile string, connections bool, variables bool, pools bool, envExport bool, logs bool) error {
+	ret := _m.Called(settingsFile, envFile, connections, variables, pools, envExport, logs)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool, bool) error); ok {
+		r0 = rf(settingsFile, envFile, connections, variables, pools, envExport, logs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ImportSettings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, logs
+func (_m *ContainerHandler) ImportSettings(settingsFile string, envFile string, connections bool, variables bool, pools bool, logs bool) error {
+	ret := _m.Called(settingsFile, envFile, connections, variables, pools, logs)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool) error); ok {
+		r0 = rf(settingsFile, envFile, connections, variables, pools, logs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Kill provides a mock function with given fields:
 func (_m *ContainerHandler) Kill() error {
 	ret := _m.Called()
@@ -114,20 +142,6 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func([]string, string) error); ok {
 		r0 = rf(args, user)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Settings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, export, envExport, logs
-func (_m *ContainerHandler) Settings(settingsFile string, envFile string, connections bool, variables bool, pools bool, export bool, envExport bool, logs bool) error {
-	ret := _m.Called(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool, bool, bool) error); ok {
-		r0 = rf(settingsFile, envFile, connections, variables, pools, export, envExport, logs)
 	} else {
 		r0 = ret.Error(0)
 	}
