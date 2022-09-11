@@ -553,6 +553,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 			return err
 		}
 		fmt.Println("\nAirflow objects exported to env file")
+		return nil
 	}
 
 	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
