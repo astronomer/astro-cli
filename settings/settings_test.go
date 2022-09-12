@@ -6,6 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestConfigSettings(t *testing.T) {
+	err := ConfigSettings("container-id", "", 2, false, false, false, false)
+	assert.NoError(t, err)
+}
+
 func TestAddConnectionsAirflowOne(t *testing.T) {
 	var testExtra map[string]string
 
