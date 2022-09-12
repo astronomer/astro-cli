@@ -14,7 +14,7 @@ func TestConfigSettings(t *testing.T) {
 	err = ConfigSettings("", "", 2, false, false, false, false)
 	assert.ErrorIs(t, err, errNoID)
 	// config settings settings file error
-	err = ConfigSettings("container-id", "airflow_settings_invalid.yaml", 2, false, false, false, false)
+	err = ConfigSettings("container-id", "testfiles/airflow_settings_invalid.yaml", 2, false, false, false, false)
 	assert.Contains(t, err.Error(), "unable to decode file")
 }
 
