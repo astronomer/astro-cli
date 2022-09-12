@@ -11,7 +11,7 @@ import (
 func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "organization",
-		Aliases: []string{"or"},
+		Aliases: []string{"org"},
 		Short:   "Manage Astronomer Organizations",
 		Long:    "Manage your Astro Organizations. These commands are for users in more than one Organization",
 	}
@@ -37,7 +37,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "switch [workspace_id]",
+		Use:     "switch [organization_id]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Organization",
 		Long:    "Switch to a different Organization",

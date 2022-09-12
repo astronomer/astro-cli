@@ -58,7 +58,7 @@ var ListOrganizations = func(c config.Context) ([]OrgRes, error) {
 	var orgResponse []OrgRes
 	err = json.NewDecoder(res.Body).Decode(&orgResponse)
 	if err != nil {
-		return []OrgRes{}, fmt.Errorf("cannot decode response: %w", err)
+		return []OrgRes{}, fmt.Errorf("cannot decode organization list response: %w", err)
 	}
 
 	return orgResponse, err
@@ -79,7 +79,7 @@ func List(out io.Writer) error {
 	tab := newTableOut()
 	for i := range or {
 		name := or[i].Name
-		OrganizationID := or[i].ID
+		organizationID := or[i].ID
 
 		var color bool
 
@@ -144,12 +144,10 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 	// get auth id
 	var id string
 	if orgName == "" {
-		_id, err := getOrganizationSelection(out)
+		id, err = getOrganizationSelection(out)
 		if err != nil {
 			return err
 		}
-
-		id = _id
 	} else {
 		or, err := ListOrganizations(c)
 		if err != nil {
