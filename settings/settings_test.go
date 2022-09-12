@@ -299,3 +299,23 @@ func TestExport(t *testing.T) {
 		assert.Contains(t, err.Error(), "Command must be used with Airflow 2.X")
 	})
 }
+
+func TestJsonString(t *testing.T) {
+	t.Run("basic string", func(t *testing.T) {
+		conn := Connection{ConnExtra: "test"}
+		res := jsonString(&conn)
+		assert.Equal(t, "test", res)
+	})
+
+	t.Run("basic map", func(t *testing.T) {
+		conn := Connection{ConnExtra: map[interface{}]interface{}{"key1": "value1", "key2": "value2"}}
+		res := jsonString(&conn)
+		assert.Equal(t, `{"key1": "value1", "key2": "value2"}`, res)
+	})
+
+	t.Run("empty extra", func(t *testing.T) {
+		conn := Connection{ConnExtra: ""}
+		res := jsonString(&conn)
+		assert.Equal(t, "", res)
+	})
+}
