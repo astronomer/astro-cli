@@ -222,6 +222,36 @@ func TestDockerComposeStart(t *testing.T) {
 		composeMock.AssertExpectations(t)
 	})
 
+	t.Run("success with invalid airflow version label", func(t *testing.T) {
+		noCache := false
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}).Return(nil).Once()
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.3.4.dev+astro1"}, nil).Twice()
+		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Twice()
+		composeMock.On("Up", mock.Anything, mock.Anything, api.UpOptions{Create: api.CreateOptions{}}).Return(nil).Twice()
+
+		orgCheckWebserverHealthFunc := checkWebserverHealth
+		checkWebserverHealth = func(project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+			return nil
+		}
+		defer func() { checkWebserverHealth = orgCheckWebserverHealthFunc }()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.Start("", noCache, false)
+		assert.NoError(t, err)
+
+		err = mockDockerCompose.Start("custom-image", noCache, false)
+		assert.NoError(t, err)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
 	t.Run("project already running", func(t *testing.T) {
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", State: "running"}}, nil).Once()
