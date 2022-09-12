@@ -7,8 +7,15 @@ import (
 )
 
 func TestConfigSettings(t *testing.T) {
+	// config settings success
 	err := ConfigSettings("container-id", "", 2, false, false, false, false)
 	assert.NoError(t, err)
+	// config setttings no id error
+	err = ConfigSettings("", "", 2, false, false, false, false)
+	assert.ErrorIs(t, err, errNoID)
+	// config settings settings file error
+	err = ConfigSettings("container-id", "airflow_settings_invalid.yaml", 2, false, false, false, false)
+	assert.Contains(t, err.Error(), "unable to decode file")
 }
 
 func TestAddConnectionsAirflowOne(t *testing.T) {
