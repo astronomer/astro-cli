@@ -971,7 +971,7 @@ func TestAirflowObjectImport(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport, logs).Return(nil).Once()
+			mockContainerHandler.On("ImportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, logs).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -986,7 +986,7 @@ func TestAirflowObjectImport(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport, logs).Return(nil).Once()
+			mockContainerHandler.On("ImportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, logs).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1004,7 +1004,7 @@ func TestAirflowObjectImport(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport, logs).Return(errMock).Once()
+			mockContainerHandler.On("ImportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, logs).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1035,11 +1035,9 @@ func TestAirflowObjectExport(t *testing.T) {
 
 		args := []string{}
 
-		export = true
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport, logs).Return(nil).Once()
+			mockContainerHandler.On("ExportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, envExport, logs).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1052,11 +1050,9 @@ func TestAirflowObjectExport(t *testing.T) {
 		cmd := newObjectExportCmd()
 		args := []string{}
 
-		export = true
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport, logs).Return(nil).Once()
+			mockContainerHandler.On("ExportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, envExport, logs).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1072,11 +1068,9 @@ func TestAirflowObjectExport(t *testing.T) {
 		cmd.Flag("variables").Value.Set("true")
 		args := []string{}
 
-		export = true
-
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("Settings", "airflow_settings.yaml", ".env", connections, variables, pools, export, envExport, logs).Return(errMock).Once()
+			mockContainerHandler.On("ExportSettings", "airflow_settings.yaml", ".env", connections, variables, pools, envExport, logs).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -1088,8 +1082,6 @@ func TestAirflowObjectExport(t *testing.T) {
 	t.Run("containerHandlerInit failure", func(t *testing.T) {
 		cmd := newObjectExportCmd()
 		args := []string{}
-
-		export = true
 
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
 			return nil, errMock
