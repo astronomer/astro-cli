@@ -36,6 +36,7 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -209,8 +210,10 @@ func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
 	airflowDockerVersion := defaultAirflowVersion
 	airflowVersion, ok := imageLabels[airflowVersionLabelName]
 	if ok {
-		if version := semver.MustParse(airflowVersion); version != nil {
+		if version, err := semver.NewVersion(airflowVersion); err == nil {
 			airflowDockerVersion = version.Major()
+		} else {
+			logrus.Debugf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
 		}
 	}
 
