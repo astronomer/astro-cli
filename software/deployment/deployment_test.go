@@ -1337,7 +1337,7 @@ func TestRuntimeMigrate(t *testing.T) {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		mockMigrateRuntimeResp := *mockDeployment
 		mockMigrateRuntimeResp.RuntimeVersion = "4.2.4"
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeResp, nil)
