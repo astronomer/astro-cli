@@ -1,6 +1,5 @@
 .astro/
 .DS_Store
-.env
 .idea/
 .vscode/
 airflow/pod-config.yml
@@ -15,3 +14,4 @@ packages.txt
 requirements.txt
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile
+.env

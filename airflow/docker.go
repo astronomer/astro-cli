@@ -64,6 +64,7 @@ const (
 )
 
 var (
+	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
 
@@ -541,7 +542,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if !fileState {
-		return errors.New("file specified does not exist")
+		return errNoFile 
 	}
 
 	if envExport {
@@ -586,7 +587,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if !fileState {
-		return errors.New("file specified does not exist")
+		return errNoFile 
 	}
 
 	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
