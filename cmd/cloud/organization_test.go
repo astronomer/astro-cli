@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var orgResponse = []organization.OrgRes{
+var mockResponse = []organization.OrgRes{
 	{
 		AuthServiceID: "auth-service-id",
 		Name:          "name",
@@ -46,9 +46,20 @@ func TestOrganizationRootCommand(t *testing.T) {
 func TestOrganizationList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
-		return orgResponse, nil
-	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+			Header:     make(http.Header),
+		}
+	})
+
+	// organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
+	// 	return orgResponse, nil
+	// }
 
 	cmdArgs := []string{"list"}
 	resp, err := execOrganizationCmd(cmdArgs...)
@@ -59,13 +70,27 @@ func TestOrganizationList(t *testing.T) {
 func TestOrganizationSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+
+
 	organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
 		return orgResponse, nil
 	}
 
-	organization.AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
-		return nil
-	}
+	t.Run("organization list success", func(t *testing.T) {
+		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+
+	// organization.AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+	// 	return nil
+	// }
 
 	// mock os.Stdin
 	input := []byte("1")
