@@ -2,13 +2,15 @@ package cloud
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
+	"net/http"
 	"os"
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/organization"
-	"github.com/astronomer/astro-cli/config"
+	// "github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,22 +77,20 @@ func TestOrganizationSwitch(t *testing.T) {
 
 
 
-	organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
-		return orgResponse, nil
-	}
-
-	t.Run("organization list success", func(t *testing.T) {
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-
-	// organization.AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
-	// 	return nil
+	// organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
+	// 	return orgResponse, nil
 	// }
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+			Header:     make(http.Header),
+		}
+	})
+
+	organization.AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+		return nil
+	}
 
 	// mock os.Stdin
 	input := []byte("1")
