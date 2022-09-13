@@ -41,6 +41,7 @@ type ImageHandler interface {
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
+	RunTest(dagId, envFile, settingsFile string) error
 }
 
 type DockerComposeAPI interface {

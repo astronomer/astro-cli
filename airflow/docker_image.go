@@ -199,6 +199,34 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
+func (d *DockerImage) RunTest(dagID, envFile, settingsFile string) error {
+	args := []string{
+		"run",
+		"-it",
+		"-v",
+		"$(pwd)/dags:/usr/local/airflow/dags",
+		"-v",
+		"$(pwd)/"+settingsFile+":usr/local/",
+		"-e",
+		"DAG_DIR=./dags/",
+		"-e",
+		"DAG_ID="+dagID,
+		"--env-file",
+		envFile,
+		d.imageName,
+	}
+	// Run Image
+	var stdout, stderr io.Writer
+	stdout = os.Stdout
+	stderr = os.Stderr
+
+	err := cmdExec(DockerCmd, stdout, stderr, args...)
+	if err != nil {
+		return fmt.Errorf("command 'docker run -it %s failed: %w", d.imageName, err)
+	}
+	return nil
+}
+
 // Exec executes a docker command
 var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	_, lookErr := exec.LookPath(cmd)

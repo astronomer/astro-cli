@@ -542,6 +542,27 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	return "", err
 }
 
+func (d *DockerCompose) RunTest( dagID, settingsFile string, noCache bool) error {
+	// // Get project name from config
+	// projectName, err := ProjectNameUnique(isPyTestCompose)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error retrieving working directory: %w", err)
+	// }
+
+	// imageHandler := DockerImageInit(ImageName(projectName, "latest"))
+	// build image
+	err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+	if err != nil {
+		return err
+	}
+
+	err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // createProject creates project with yaml config as context
 var createDockerProject = func(projectName, airflowHome, envFile, pytestFile, buildImage string, imageLabels map[string]string, pytest bool) (*types.Project, error) {
 	// Generate the docker-compose yaml
