@@ -93,7 +93,7 @@ func NewRootCmd() *cobra.Command {
 		)
 	}
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
-	
+
 	return rootCmd
 }
 
