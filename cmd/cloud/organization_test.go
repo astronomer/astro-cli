@@ -75,8 +75,6 @@ func TestOrganizationSwitch(t *testing.T) {
 	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
 
-
-
 	// organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
 	// 	return orgResponse, nil
 	// }
