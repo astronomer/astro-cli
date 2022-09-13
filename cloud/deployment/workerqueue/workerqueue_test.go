@@ -53,9 +53,6 @@ func TestCreate(t *testing.T) {
 			},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
-				Workers: astro.Workers{
-					AU: 12,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -68,9 +65,6 @@ func TestCreate(t *testing.T) {
 			Label:          "test-deployment-label-1",
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
-				Workers: astro.Workers{
-					AU: 10,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       9,
 					Replicas: 3,
@@ -102,9 +96,6 @@ func TestCreate(t *testing.T) {
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Executor: "CeleryExecutor",
-				Workers: astro.Workers{
-					AU: 12,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -136,9 +127,6 @@ func TestCreate(t *testing.T) {
 			Label:          "test-deployment-label-1",
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
-				Workers: astro.Workers{
-					AU: 10,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -171,7 +159,6 @@ func TestCreate(t *testing.T) {
 		Label: deploymentRespWithQueues[0].Label,
 		DeploymentSpec: astro.DeploymentCreateSpec{
 			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
-			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
 			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
 		},
 		WorkerQueues: []astro.WorkerQueue{
@@ -360,9 +347,6 @@ func TestUpdate(t *testing.T) {
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Executor: "CeleryExecutor",
-				Workers: astro.Workers{
-					AU: 12,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -415,7 +399,6 @@ func TestUpdate(t *testing.T) {
 		Label: deploymentRespWithQueues[0].Label,
 		DeploymentSpec: astro.DeploymentCreateSpec{
 			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
-			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
 			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
 		},
 		WorkerQueues: listToUpdate,
@@ -588,9 +571,6 @@ func TestDelete(t *testing.T) {
 			Label: "test-deployment-label",
 			DeploymentSpec: astro.DeploymentSpec{
 				Executor: "CeleryExecutor",
-				Workers: astro.Workers{
-					AU: 12,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -635,7 +615,6 @@ func TestDelete(t *testing.T) {
 		Label: deploymentRespWithQueues[0].Label,
 		DeploymentSpec: astro.DeploymentCreateSpec{
 			Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
-			Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
 			Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
 		},
 		WorkerQueues: listToDelete,

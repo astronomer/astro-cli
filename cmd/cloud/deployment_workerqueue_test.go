@@ -63,9 +63,6 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 			},
 			DeploymentSpec: astro.DeploymentSpec{
 				Executor: "CeleryExecutor",
-				Workers: astro.Workers{
-					AU: 10,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -97,9 +94,6 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 			Label:          "test-deployment-label-1",
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
-				Workers: astro.Workers{
-					AU: 10,
-				},
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -158,7 +152,6 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		Label: deploymentRespDefaultQueue[0].Label,
 		DeploymentSpec: astro.DeploymentCreateSpec{
 			Executor:  deploymentRespDefaultQueue[0].DeploymentSpec.Executor,
-			Workers:   deploymentRespDefaultQueue[0].DeploymentSpec.Workers,
 			Scheduler: deploymentRespDefaultQueue[0].DeploymentSpec.Scheduler,
 		},
 		WorkerQueues: listToCreate,
@@ -291,9 +284,6 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 				Label: "test-deployment-label",
 				DeploymentSpec: astro.DeploymentSpec{
 					Executor: "CeleryExecutor",
-					Workers: astro.Workers{
-						AU: 12,
-					},
 					Scheduler: astro.Scheduler{
 						AU:       5,
 						Replicas: 3,
@@ -338,7 +328,6 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 			Label: deploymentRespWithQueues[0].Label,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
-				Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
 				Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
 			},
 			WorkerQueues: listToDelete,
@@ -398,9 +387,6 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 				},
 				DeploymentSpec: astro.DeploymentSpec{
 					Executor: "CeleryExecutor",
-					Workers: astro.Workers{
-						AU: 10,
-					},
 					Scheduler: astro.Scheduler{
 						AU:       5,
 						Replicas: 3,
@@ -453,7 +439,6 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 			Label: deploymentRespWithQueues[0].Label,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor:  deploymentRespWithQueues[0].DeploymentSpec.Executor,
-				Workers:   deploymentRespWithQueues[0].DeploymentSpec.Workers,
 				Scheduler: deploymentRespWithQueues[0].DeploymentSpec.Scheduler,
 			},
 			WorkerQueues: listToUpdate,
