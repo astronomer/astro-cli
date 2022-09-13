@@ -46,7 +46,7 @@ func TestOrganizationRootCommand(t *testing.T) {
 }
 
 func TestOrganizationList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
@@ -70,7 +70,7 @@ func TestOrganizationList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
