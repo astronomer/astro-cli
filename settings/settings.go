@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -56,7 +57,7 @@ var (
 )
 
 // ConfigSettings is the main builder of the settings package
-func ConfigSettings(id, settingsFile string, version uint64, connections, variables, pools, logs bool) error {
+func ConfigSettings(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 	if id == "" {
 		return errNoID
 	}
@@ -65,13 +66,13 @@ func ConfigSettings(id, settingsFile string, version uint64, connections, variab
 		return err
 	}
 	if pools {
-		AddPools(id, version, logs)
+		AddPools(id, version)
 	}
 	if variables {
-		AddVariables(id, version, logs)
+		AddVariables(id, version)
 	}
 	if connections {
-		AddConnections(id, version, logs)
+		AddConnections(id, version)
 	}
 	return nil
 }
@@ -103,7 +104,7 @@ func InitSettings(settingsFile string) error {
 }
 
 // AddVariables is a function to add Variables from settings.yaml
-func AddVariables(id string, version uint64, logs bool) {
+func AddVariables(id string, version uint64) {
 	variables := settings.Airflow.Variables
 	for _, variable := range variables {
 		if !objectValidator(0, variable.VariableName) {
@@ -122,16 +123,14 @@ func AddVariables(id string, version uint64, logs bool) {
 
 			airflowCommand += fmt.Sprintf("'%s'", variable.VariableValue)
 			out := execAirflowCommand(id, airflowCommand)
-			if logs {
-				fmt.Println("Adding variable logs:\n" + out)
-			}
+			logrus.Debugf("Adding variable logs:\n" + out)
 			fmt.Printf("Added Variable: %s\n", variable.VariableName)
 		}
 	}
 }
 
 // AddConnections is a function to add Connections from settings.yaml
-func AddConnections(id string, version uint64, logs bool) {
+func AddConnections(id string, version uint64) {
 	connections := settings.Airflow.Connections
 	baseCmd := "airflow connections "
 	var baseAddCmd, baseRmCmd, baseListCmd, connIDArg, connTypeArg, connURIArg, connExtraArg, connHostArg, connLoginArg, connPasswordArg, connSchemaArg, connPortArg string
@@ -224,15 +223,13 @@ func AddConnections(id string, version uint64, logs bool) {
 		}
 
 		out := execAirflowCommand(id, airflowCommand)
-		if logs {
-			fmt.Printf("Adding Connection logs:\n\n" + out)
-		}
+		logrus.Debugf("Adding Connection logs:\n\n" + out)
 		fmt.Printf("Added Connection: %s\n", conn.ConnID)
 	}
 }
 
 // AddPools  is a function to add Pools from settings.yaml
-func AddPools(id string, version uint64, logs bool) {
+func AddPools(id string, version uint64) {
 	pools := settings.Airflow.Pools
 	baseCmd := "airflow "
 
@@ -256,9 +253,7 @@ func AddPools(id string, version uint64, logs bool) {
 				}
 				fmt.Println(airflowCommand)
 				out := execAirflowCommand(id, airflowCommand)
-				if logs {
-					fmt.Println("Adding pool logs:\n" + out)
-				}
+				logrus.Debugf("Adding pool logs:\n" + out)
 				fmt.Printf("Added Pool: %s\n", pool.PoolName)
 			} else {
 				fmt.Printf("Skipping %s: Pool Slot must be set.\n", pool.PoolName)
@@ -277,7 +272,7 @@ func objectValidator(bound int, args ...string) bool {
 	return count <= bound
 }
 
-func EnvExport(id, envFile string, version uint64, connections, variables, logs bool) error {
+func EnvExport(id, envFile string, version uint64, connections, variables bool) error {
 	if id == "" {
 		return errNoID
 	}
@@ -285,7 +280,7 @@ func EnvExport(id, envFile string, version uint64, connections, variables, logs 
 	if version >= AirflowVersionTwo {
 		// env export variables if variables is true
 		if variables {
-			err := EnvExportVariables(id, envFile, logs)
+			err := EnvExportVariables(id, envFile)
 			if err != nil {
 				fmt.Println(err)
 				parseErr = true
@@ -293,7 +288,7 @@ func EnvExport(id, envFile string, version uint64, connections, variables, logs 
 		}
 		// env export connections if connections is true
 		if connections {
-			err := EnvExportConnections(id, envFile, logs)
+			err := EnvExportConnections(id, envFile)
 			if err != nil {
 				fmt.Println(err)
 				parseErr = true
@@ -308,12 +303,10 @@ func EnvExport(id, envFile string, version uint64, connections, variables, logs 
 	return errors.New("Command must be used with Airflow 2.X")
 }
 
-func EnvExportVariables(id, envFile string, logs bool) error {
+func EnvExportVariables(id, envFile string) error {
 	// setup airflow command to export variables
 	out := execAirflowCommand(id, airflowVarExport)
-	if logs {
-		fmt.Printf("Env Export Variables logs:\n\n" + out)
-	}
+	logrus.Debugf("Env Export Variables logs:\n\n" + out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables from file created by airflow command
@@ -346,12 +339,10 @@ func EnvExportVariables(id, envFile string, logs bool) error {
 	return errors.New("variable export unsuccessful")
 }
 
-func EnvExportConnections(id, envFile string, logs bool) error {
+func EnvExportConnections(id, envFile string) error {
 	// Airflow command to export connections to env uris
 	out := execAirflowCommand(id, airflowConnExport)
-	if logs {
-		fmt.Println("Env Export Connections logs:\n" + out)
-	}
+	logrus.Debugf("Env Export Connections logs:\n" + out)
 
 	if strings.Contains(out, "successfully") {
 		// get connections from file craeted by airflow command
@@ -384,7 +375,7 @@ func EnvExportConnections(id, envFile string, logs bool) error {
 	return errors.New("connection export unsuccessful")
 }
 
-func Export(id, settingsFile string, version uint64, connections, variables, pools, logs bool) error {
+func Export(id, settingsFile string, version uint64, connections, variables, pools bool) error {
 	if id == "" {
 		return errNoID
 	}
@@ -399,21 +390,21 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 		return errors.New("Command must be used with Airflow 2.X")
 	}
 	if pools {
-		err = ExportPools(id, logs)
+		err = ExportPools(id)
 		if err != nil {
 			fmt.Println(err)
 			parseErr = true
 		}
 	}
 	if variables {
-		err = ExportVariables(id, logs)
+		err = ExportVariables(id)
 		if err != nil {
 			fmt.Println(err)
 			parseErr = true
 		}
 	}
 	if connections {
-		err := ExportConnections(id, logs)
+		err := ExportConnections(id)
 		if err != nil {
 			fmt.Println(err)
 			parseErr = true
@@ -425,12 +416,10 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	return nil
 }
 
-func ExportConnections(id string, logs bool) error {
+func ExportConnections(id string) error {
 	// Setup airflow command to export connections
 	out := execAirflowCommand(id, airflowConnectionList)
-	if logs {
-		fmt.Println("Export Connections logs:\n" + out)
-	}
+	logrus.Debugf("Export Connections logs:\n" + out)
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
@@ -482,12 +471,10 @@ func ExportConnections(id string, logs bool) error {
 	return nil
 }
 
-func ExportVariables(id string, logs bool) error {
+func ExportVariables(id string) error {
 	// setup files
 	out := execAirflowCommand(id, airflowVarExport)
-	if logs {
-		fmt.Println("Export Variables logs:\n" + out)
-	}
+	logrus.Debugf("Export Variables logs:\n" + out)
 
 	if strings.Contains(out, "successfully") {
 		// get variables created by the airflow command
@@ -526,13 +513,11 @@ func ExportVariables(id string, logs bool) error {
 	return errors.New("variable export unsuccessful")
 }
 
-func ExportPools(id string, logs bool) error {
+func ExportPools(id string) error {
 	// Setup airflow command to export pools
 	airflowCommand := ariflowPoolsList
 	out := execAirflowCommand(id, airflowCommand)
-	if logs {
-		fmt.Println("Export Pools logs:\n" + out)
-	}
+	logrus.Debugf("Export Pools logs:\n" + out)
 
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")

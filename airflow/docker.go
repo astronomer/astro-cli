@@ -36,7 +36,6 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -207,14 +206,9 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 
 	fmt.Println("\n\nAirflow is starting up! This might take a few minutes…")
 
-	airflowDockerVersion := defaultAirflowVersion
-	airflowVersion, ok := imageLabels[airflowVersionLabelName]
-	if ok {
-		if version, err := semver.NewVersion(airflowVersion); err == nil {
-			airflowDockerVersion = version.Major()
-		} else {
-			logrus.Debugf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
-		}
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
 	}
 
 	err = checkWebserverHealth(settingsFile, project, d.composeService, airflowDockerVersion, noBrowser)
@@ -522,7 +516,7 @@ func (d *DockerCompose) Bash(container string) error {
 	return nil
 }
 
-func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport, logs bool) error {
+func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error {
 	// setup bools
 	if !connections && !variables && !pools {
 		connections = true
@@ -537,7 +531,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.CheckAiflowVersion()
+	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
 		return err
 	}
@@ -551,7 +545,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 	}
 
 	if envExport {
-		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables, logs)
+		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
 		if err != nil {
 			return err
 		}
@@ -559,7 +553,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		return nil
 	}
 
-	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
+	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
 	if err != nil {
 		return err
 	}
@@ -567,7 +561,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 	return nil
 }
 
-func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections, variables, pools, logs bool) error {
+func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error {
 	// setup bools
 	if !connections && !variables && !pools {
 		connections = true
@@ -582,7 +576,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 	}
 
 	// Get airflow version
-	airflowDockerVersion, err := d.CheckAiflowVersion()
+	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
 		return err
 	}
@@ -595,7 +589,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return errors.New("file specified does not exist")
 	}
 
-	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools, logs)
+	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
 	if err != nil {
 		return err
 	}
@@ -625,7 +619,7 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	return "", err
 }
 
-func (d *DockerCompose) CheckAiflowVersion() (uint64, error) {
+func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {
 		return 0, err
@@ -720,7 +714,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 					for i := range psInfo {
 						if strings.Contains(psInfo[i].Name, project.Name) &&
 							strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true, true)
+							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
 							if err != nil {
 								return err
 							}
