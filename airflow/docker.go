@@ -542,7 +542,7 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if !fileState {
-		return errNoFile 
+		return errNoFile
 	}
 
 	if envExport {
@@ -587,7 +587,7 @@ func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections
 		return errors.Wrap(err, errSettingsPath)
 	}
 	if !fileState {
-		return errNoFile 
+		return errNoFile
 	}
 
 	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
