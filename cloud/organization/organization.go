@@ -43,17 +43,17 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-var ListOrganizations = func(c config.Context) ([]OrgRes, error) {
+func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	orgDomain := "https://api." + c.Domain + "/v1alpha1/organizations"
 	authToken := c.Token
-	ctx := http_context.Background()
+	ctx := context.Background()
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"authorization": authToken},
 	}
 	res, err := httpClient.Do("GET", orgDomain, doOptions)
 	if err != nil {
-		return []OrgRes{}, fmt.Errorf("could not retrieve token: %w", err)
+		return []OrgRes{}, fmt.Errorf("could not retrieve organization list: %w", err)
 	}
 	var orgResponse []OrgRes
 	err = json.NewDecoder(res.Body).Decode(&orgResponse)
@@ -71,7 +71,7 @@ func List(out io.Writer) error {
 		return err
 	}
 
-	or, err := ListOrganizations(c)
+	or, err := listOrganizations(&c)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -88,7 +88,7 @@ func List(out io.Writer) error {
 		} else {
 			color = false
 		}
-		tab.AddRow([]string{name, OrganizationID}, color)
+		tab.AddRow([]string{name, organizationID}, color)
 	}
 
 	tab.Print(out)
@@ -110,7 +110,7 @@ func getOrganizationSelection(out io.Writer) (string, error) {
 		return "", err
 	}
 
-	or, err := ListOrganizations(c)
+	or, err := listOrganizations(&c)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +149,7 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 			return err
 		}
 	} else {
-		or, err := ListOrganizations(c)
+		or, err := listOrganizations(&c)
 		if err != nil {
 			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}
