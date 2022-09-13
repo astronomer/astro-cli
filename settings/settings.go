@@ -14,8 +14,8 @@ import (
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 var (
