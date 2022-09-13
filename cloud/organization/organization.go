@@ -1,7 +1,7 @@
 package organization
 
 import (
-     "context"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
