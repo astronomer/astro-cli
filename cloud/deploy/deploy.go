@@ -203,7 +203,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		}
 
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, repository, nextTag, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, client)
 		if err != nil {
 			return err
 		}
@@ -408,11 +408,12 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 }
 
 // Deploy the image
-func imageDeploy(imageCreateResID, repository, nextTag string, client astro.Client) error {
+func imageDeploy(imageCreateResID, deploymentID, repository, nextTag string, client astro.Client) error {
 	imageDeployInput := astro.DeployImageInput{
-		ID:         imageCreateResID,
-		Repository: repository,
-		Tag:        nextTag,
+		ImageID:      imageCreateResID,
+		DeploymentID: deploymentID,
+		Repository:   repository,
+		Tag:          nextTag,
 	}
 	resp, err := client.DeployImage(imageDeployInput)
 	if err != nil {

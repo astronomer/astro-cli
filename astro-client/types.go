@@ -247,9 +247,10 @@ type CreateImageInput struct {
 }
 
 type DeployImageInput struct {
-	ID         string `json:"id"`
-	Tag        string `json:"tag"`
-	Repository string `json:"repository"`
+	ImageID      string `json:"imageId"`
+	DeploymentID string `json:"deploymentId"`
+	Tag          string `json:"tag"`
+	Repository   string `json:"repository"`
 }
 
 type CreateDeploymentInput struct {
