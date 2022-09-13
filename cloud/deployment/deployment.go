@@ -36,10 +36,8 @@ const (
 // TODO: get these values from the Astrohub API
 var (
 	SchedulerAuMin       = 5
-	WorkerAuMin          = 10
 	SchedulerReplicasMin = 1
 	schedulerAuMax       = 30
-	workerAuMax          = 175
 	schedulerReplicasMax = 4
 	sleepTime            = 180
 	tickNum              = 10
@@ -134,7 +132,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client, waitForStatus bool) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 
@@ -144,7 +142,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	}
 
 	// validate resources requests
-	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
+	resourcesValid := validateResources(schedulerAU, schedulerReplicas)
 	if !resourcesValid {
 		return nil
 	}
@@ -201,11 +199,6 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		return err
 	}
 
-	workers := astro.Workers{
-		AU:                            workerAU,
-		TerminationGracePeriodSeconds: 86400,
-	}
-
 	scheduler := astro.Scheduler{
 		AU:       schedulerAU,
 		Replicas: schedulerReplicas,
@@ -213,7 +206,6 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 
 	spec := astro.DeploymentCreateSpec{
 		Executor:  "CeleryExecutor",
-		Workers:   workers,
 		Scheduler: scheduler,
 	}
 
@@ -279,12 +271,7 @@ func createOutput(organizationID, workspaceID string, d *astro.Deployment) error
 	return nil
 }
 
-func validateResources(workerAU, schedulerAU, schedulerReplicas int) bool {
-	// TODO will be deprecating this when removing the --worker-au flag
-	if workerAU > workerAuMax || workerAU < WorkerAuMin {
-		fmt.Printf("\nWorker AUs must be between a min of %d and a max of %d AUs", WorkerAuMin, workerAuMax)
-		return false
-	}
+func validateResources(schedulerAU, schedulerReplicas int) bool {
 	if schedulerAU > schedulerAuMax || schedulerAU < SchedulerAuMin {
 		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", SchedulerAuMin, schedulerAuMax)
 		return false
@@ -405,7 +392,8 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas, workerAU int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+	var queueCreateUpdate bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
@@ -424,15 +412,6 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 	}
 
 	// build query input
-	workers := astro.Workers{}
-
-	if workerAU != 0 {
-		workers.AU = workerAU
-	} else {
-		workerAU = currentDeployment.DeploymentSpec.Workers.AU
-		workers.AU = currentDeployment.DeploymentSpec.Workers.AU
-	}
-
 	scheduler := astro.Scheduler{}
 
 	if schedulerAU != 0 {
@@ -450,7 +429,6 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 	}
 
 	spec := astro.DeploymentCreateSpec{
-		Workers:   workers,
 		Scheduler: scheduler,
 		Executor:  "CeleryExecutor",
 	}
@@ -473,10 +451,11 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 
 	// if we have worker queues add them to the input
 	if len(wQueueList) > 0 {
+		queueCreateUpdate = true
 		deploymentUpdate.WorkerQueues = wQueueList
 	}
 	// validate resources requests
-	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
+	resourcesValid := validateResources(schedulerAU, schedulerReplicas)
 	if !resourcesValid {
 		return nil
 	}
@@ -491,18 +470,21 @@ func Update(deploymentID, label, ws, description, deploymentName string, schedul
 		fmt.Printf("Something went wrong. Deployment %s was not updated", currentDeployment.Label)
 	}
 
-	tabDeployment := newTableOut()
+	// do not print table if worker queue create or update was used
+	if !queueCreateUpdate {
+		tabDeployment := newTableOut()
 
-	currentTag := d.DeploymentSpec.Image.Tag
-	if currentTag == "" {
-		currentTag = "?"
+		currentTag := d.DeploymentSpec.Image.Tag
+		if currentTag == "" {
+			currentTag = "?"
+		}
+
+		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
+
+		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
+		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
+		tabDeployment.Print(os.Stdout)
 	}
-
-	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
-
-	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
-	tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
-	tabDeployment.Print(os.Stdout)
 	return nil
 }
 
@@ -643,7 +625,6 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 			currentDeployment = deployments[i]
 		}
 	}
-	fmt.Println(currentDeployment.ID)
 	if currentDeployment.ID == "" {
 		return astro.Deployment{}, errInvalidDeployment
 	}
@@ -664,7 +645,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, WorkerAuMin, client, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, client, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
