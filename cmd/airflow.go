@@ -43,7 +43,6 @@ var (
 	pools                  bool
 	envExport              bool
 	noBrowser              bool
-	logs                   bool
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
