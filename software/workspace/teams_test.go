@@ -174,7 +174,7 @@ func TestGetWorkspaceLevelRole(t *testing.T) {
 				{Role: houston.WorkspaceEditorRole, Workspace: houston.Workspace{ID: "test-id-2"}},
 			},
 			workspaceID: "test-id-1",
-			result:      houston.NoneTeamRole,
+			result:      houston.NoneRole,
 		},
 	}
 
