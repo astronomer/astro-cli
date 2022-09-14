@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/cloud/organization"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
