@@ -206,21 +206,25 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile string) error {
 		"-it",
 		"-v",
 		config.WorkingPath+"/dags:/usr/local/airflow/dags",
-		// "-v",
-		// "$(pwd)/"+settingsFile+":usr/local/",
+		"-v",
+		config.WorkingPath+"/"+settingsFile+":/usr/local/"+settingsFile,
 		"-e",
 		"DAG_DIR=./dags/",
 		"-e",
 		"DAG_ID="+dagID,
+		"-e",
+		settingsFile,
 		"--env-file",
 		envFile,
-		"dimberman/local-airflow-test:0.0.2",
-		// d.imageName,
+		// "dimberman/local-airflow-test:0.0.2",
+		d.imageName,
 	}
 	// Run Image
 	var stdout, stderr io.Writer
 	stdout = os.Stdout
 	stderr = os.Stderr
+
+	fmt.Println(args)
 
 	err := cmdExec(DockerCmd, stdout, stderr, args...)
 	if err != nil {

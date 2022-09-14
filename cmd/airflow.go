@@ -28,6 +28,7 @@ var (
 	envFile                string
 	pytestFile             string
 	customImageName        string
+	settingsFile           string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
