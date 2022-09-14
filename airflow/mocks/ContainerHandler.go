@@ -23,6 +23,34 @@ func (_m *ContainerHandler) Bash(container string) error {
 	return r0
 }
 
+// ExportSettings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, envExport
+func (_m *ContainerHandler) ExportSettings(settingsFile string, envFile string, connections bool, variables bool, pools bool, envExport bool) error {
+	ret := _m.Called(settingsFile, envFile, connections, variables, pools, envExport)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool, bool) error); ok {
+		r0 = rf(settingsFile, envFile, connections, variables, pools, envExport)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ImportSettings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools
+func (_m *ContainerHandler) ImportSettings(settingsFile string, envFile string, connections bool, variables bool, pools bool) error {
+	ret := _m.Called(settingsFile, envFile, connections, variables, pools)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, bool) error); ok {
+		r0 = rf(settingsFile, envFile, connections, variables, pools)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Kill provides a mock function with given fields:
 func (_m *ContainerHandler) Kill() error {
 	ret := _m.Called()
@@ -121,13 +149,13 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	return r0
 }
 
-// Start provides a mock function with given fields: imageName, noCache, noBrowser
-func (_m *ContainerHandler) Start(imageName string, noCache bool, noBrowser bool) error {
-	ret := _m.Called(imageName, noCache, noBrowser)
+// Start provides a mock function with given fields: imageName, settingsFile, noCache, noBrowser
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, noCache bool, noBrowser bool) error {
+	ret := _m.Called(imageName, settingsFile, noCache, noBrowser)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, bool, bool) error); ok {
-		r0 = rf(imageName, noCache, noBrowser)
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool) error); ok {
+		r0 = rf(imageName, settingsFile, noCache, noBrowser)
 	} else {
 		r0 = ret.Error(0)
 	}

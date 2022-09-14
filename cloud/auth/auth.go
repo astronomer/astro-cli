@@ -204,7 +204,7 @@ func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
 	return userEmail, err
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain string) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain, orgID string) (Result, error) { //nolint:gocritic
 	// try to get UserEmail from config first
 	userEmail, err := getUserEmail(c)
 	if err != nil {
@@ -215,9 +215,11 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 		userEmail = input.Text("Please enter your account email: ")
 	}
 
-	orgID, err := a.orgChecker(domain)
-	if err != nil {
-		log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
+	if orgID == "" {
+		orgID, err = a.orgChecker(domain)
+		if err != nil {
+			log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
+		}
 	}
 
 	// Generate PKCE verifier and challenge
@@ -371,7 +373,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+func Login(domain, orgID string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -385,7 +387,7 @@ func Login(domain string, client astro.Client, out io.Writer, shouldDisplayLogin
 	c, _ := context.GetCurrentContext()
 
 	if !shouldLoginWithToken {
-		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain)
+		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain, orgID)
 		if err != nil {
 			return err
 		}

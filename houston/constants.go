@@ -13,7 +13,7 @@ const (
 	DeploymentAdminRole  = "DEPLOYMENT_ADMIN"
 	DeploymentEditorRole = "DEPLOYMENT_EDITOR"
 	DeploymentViewerRole = "DEPLOYMENT_VIEWER"
-	NoneTeamRole         = "NONE"
+	NoneRole             = "NONE"
 
 	// Deployment
 	AirflowURLType = "airflow"

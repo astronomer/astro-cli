@@ -2,6 +2,7 @@
 run:
   # timeout for analysis, e.g. 30s, 5m
   timeout: 3m
+  skip-files:
 linters-settings:
   depguard:
     list-type: blacklist

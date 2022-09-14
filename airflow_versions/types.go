@@ -128,7 +128,7 @@ func (v *AirflowVersion) Compare(o *AirflowVersion) int {
 	return 0
 }
 
-// AirflowVersions is a collection of AriflowVersion instances and implements the sort
+// AirflowVersions is a collection of AirflowVersion instances and implements the sort
 // interface. See the sort package for more details.
 // https://golang.org/pkg/sort/
 type AirflowVersions []*AirflowVersion
