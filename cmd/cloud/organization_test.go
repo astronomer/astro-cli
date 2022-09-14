@@ -2,15 +2,12 @@ package cloud
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
-	"net/http"
 	"os"
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/organization"
-	// "github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -46,68 +43,21 @@ func TestOrganizationRootCommand(t *testing.T) {
 }
 
 func TestOrganizationList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-			Header:     make(http.Header),
-		}
-	})
-
-	// organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
-	// 	return orgResponse, nil
-	// }
-
-	cmdArgs := []string{"list"}
-	resp, err := execOrganizationCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "name")
-}
-
-func TestOrganizationSwitch(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	// organization.ListOrganizations = func(c config.Context) ([]organization.OrgRes, error) {
-	// 	return orgResponse, nil
-	// }
-	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-			Header:     make(http.Header),
-		}
-	})
-
-	organization.AuthLogin = func(domain, id string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+	orgList = func(out io.Writer) error {
 		return nil
 	}
 
-	// mock os.Stdin
-	input := []byte("1")
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+	cmdArgs := []string{"list"}
+	_, err := execOrganizationCmd(cmdArgs...)
+	assert.NoError(t, err)
+}
+
+func TestOrganizationSwitch(t *testing.T) {
+	orgSwitch = func(orgName string, client astro.Client, out io.Writer) error {
+		return nil
 	}
-	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
-	w.Close()
-	stdin := os.Stdin
-	// Restore stdin right after the test.
-	defer func() { os.Stdin = stdin }()
-	os.Stdin = r
 
 	cmdArgs := []string{"switch"}
-	resp, err := execOrganizationCmd(cmdArgs...)
+	_, err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
-	assert.Contains(t, resp, "name")
 }

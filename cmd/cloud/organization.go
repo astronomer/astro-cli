@@ -8,6 +8,11 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 )
 
+var (
+	orgList   = organization.List
+	orgSwitch = organization.Switch
+)
+
 func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "organization",
@@ -52,7 +57,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return organization.List(out)
+	return orgList(out)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -65,5 +70,5 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationName = args[0]
 	}
 
-	return organization.Switch(organizationName, astroClient, out)
+	return orgSwitch(organizationName, astroClient, out)
 }
