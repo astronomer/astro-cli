@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/config"
 )
 
 const (
@@ -204,16 +205,17 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile string) error {
 		"run",
 		"-it",
 		"-v",
-		"$(pwd)/dags:/usr/local/airflow/dags",
-		"-v",
-		"$(pwd)/"+settingsFile+":usr/local/",
+		config.WorkingPath+"/dags:/usr/local/airflow/dags",
+		// "-v",
+		// "$(pwd)/"+settingsFile+":usr/local/",
 		"-e",
 		"DAG_DIR=./dags/",
 		"-e",
 		"DAG_ID="+dagID,
 		"--env-file",
 		envFile,
-		d.imageName,
+		"dimberman/local-airflow-test:0.0.2",
+		// d.imageName,
 	}
 	// Run Image
 	var stdout, stderr io.Writer

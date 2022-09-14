@@ -79,8 +79,9 @@ func NewRootCmd() *cobra.Command {
 		newVersionCommand(),
 		newDevRootCmd(),
 		newContextCmd(os.Stdout),
-		newConfigRootCmd(os.Stdout),
+		// newConfigRootCmd(os.Stdout),
 		newAuthCommand(),
+		newTestCommand(),
 	)
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
