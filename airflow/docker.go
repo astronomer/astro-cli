@@ -36,7 +36,6 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -65,13 +64,14 @@ const (
 )
 
 var (
+	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
 
-	airflowSettingsFile = "airflow_settings.yaml"
-
-	inspectContainer = inspect.Inspect
-	initSettings     = settings.ConfigSettings
+	inspectContainer  = inspect.Inspect
+	initSettings      = settings.ConfigSettings
+	exportSettings    = settings.Export
+	envExportSettings = settings.EnvExport
 
 	openURL    = browser.OpenURL
 	timeoutNum = 60
@@ -147,7 +147,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
+func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
@@ -207,17 +207,12 @@ func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
 
 	fmt.Println("\n\nAirflow is starting up! This might take a few minutes…")
 
-	airflowDockerVersion := defaultAirflowVersion
-	airflowVersion, ok := imageLabels[airflowVersionLabelName]
-	if ok {
-		if version, err := semver.NewVersion(airflowVersion); err == nil {
-			airflowDockerVersion = version.Major()
-		} else {
-			logrus.Debugf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
-		}
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
 	}
 
-	err = checkWebserverHealth(project, d.composeService, airflowDockerVersion, noBrowser)
+	err = checkWebserverHealth(settingsFile, project, d.composeService, airflowDockerVersion, noBrowser)
 	if err != nil {
 		return err
 	}
@@ -522,13 +517,96 @@ func (d *DockerCompose) Bash(container string) error {
 	return nil
 }
 
-// getWebServerContainerId return webserver container id
+func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error {
+	// setup bools
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	// Get project containers
+	containerID, err := d.getWebServerContainerID()
+	if err != nil {
+		return err
+	}
+
+	// Get airflow version
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errNoFile
+	}
+
+	if envExport {
+		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nAirflow objects exported to env file")
+		return nil
+	}
+
+	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects exported to settings file")
+	return nil
+}
+
+func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error {
+	// setup bools
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	// Get project containers
+	containerID, err := d.getWebServerContainerID()
+	if err != nil {
+		return err
+	}
+
+	// Get airflow version
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errNoFile
+	}
+
+	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects created from settings file")
+	return nil
+}
+
 func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
 	})
 	if err != nil {
 		return "", errors.Wrap(err, composeStatusCheckErrMsg)
+	}
+	if len(psInfo) == 0 {
+		return "", errors.New("project not running, run astro dev start to start project")
 	}
 
 	replacer := strings.NewReplacer("_", "", "-", "")
@@ -540,6 +618,24 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 		}
 	}
 	return "", err
+}
+
+func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return 0, err
+	}
+
+	airflowDockerVersion := defaultAirflowVersion
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if version, err := semver.NewVersion(airflowVersion); err == nil {
+			airflowDockerVersion = version.Major()
+		} else {
+			fmt.Printf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
+		}
+	}
+	return airflowDockerVersion, nil
 }
 
 // createProject creates project with yaml config as context
@@ -591,7 +687,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, pytestFile, bu
 	return project, err
 }
 
-var checkWebserverHealth = func(project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+var checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	// check if webserver is healthy for user
 	err := composeService.Events(context.Background(), project.Name, api.EventsOptions{
 		Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
@@ -610,7 +706,7 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 					return errors.Wrap(err, composeStatusCheckErrMsg)
 				}
 
-				fileState, err := fileutil.Exists(airflowSettingsFile, nil)
+				fileState, err := fileutil.Exists(settingsFile, nil)
 				if err != nil {
 					return errors.Wrap(err, errSettingsPath)
 				}
@@ -619,7 +715,7 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 					for i := range psInfo {
 						if strings.Contains(psInfo[i].Name, project.Name) &&
 							strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-							err = initSettings(psInfo[i].ID, airflowDockerVersion)
+							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
 							if err != nil {
 								return err
 							}
