@@ -12,17 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var mockResponse = []organization.OrgRes{
-	{
-		AuthServiceID: "auth-service-id",
-		Name:          "name",
-	},
-	{
-		AuthServiceID: "auth-service-id-2",
-		Name:          "name-2",
-	},
-}
-
 func execOrganizationCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newOrganizationCmd(buf)
