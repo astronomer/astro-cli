@@ -85,8 +85,6 @@ func List(out io.Writer) error {
 
 		if c.Organization == or[i].ID {
 			color = true
-		} else {
-			color = false
 		}
 		tab.AddRow([]string{name, organizationID}, color)
 	}
