@@ -59,15 +59,15 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.W
 		if !context.IsCloudDomain(args[0]) {
 			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)
 		}
-		return cloudLogin(args[0], astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
+		return cloudLogin(args[0], "", astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(cloudAuth.Domain, astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
+		return cloudLogin(cloudAuth.Domain, "", astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
+		return cloudLogin(ctx.Domain, "", astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonClient, out)
 }

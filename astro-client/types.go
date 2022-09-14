@@ -193,6 +193,11 @@ type Workspace struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Image struct {
 	ID           string   `json:"id"`
 	DeploymentID string   `json:"deploymentId"`
