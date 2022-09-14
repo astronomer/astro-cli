@@ -3,7 +3,7 @@ airflow:
     - conn_id: 'local_postgres'
       conn_type: 'postgres'
       conn_host: 'postres.host'
-      conn_schema: 'postges.shcema'
+      conn_schema: 'postges.schema'
       conn_login: 'postgres.login'
       conn_password: 'postgres.pass'
       conn_port: 'testing' # Expected an int, passing a string

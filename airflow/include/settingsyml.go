@@ -9,7 +9,8 @@ var Settingsyml = strings.TrimSpace(`
 # NOTE: If putting a dict in conn_extra, please wrap in single quotes.
 
 # For more information, refer to our docs: https://docs.astronomer.io/develop-project#configure-airflow_settingsyaml-local-development-only
-# For issues or questions, reach out to: https://support.astronomer.io
+# For questions, reach out to: https://support.astronomer.io
+# For issues create an issue ticket here: https://github.com/astronomer/astro-cli/issues
 
 airflow:
   connections:
