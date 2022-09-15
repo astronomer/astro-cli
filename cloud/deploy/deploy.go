@@ -323,14 +323,11 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 		return deploymentInfo{}, err
 	}
 
-	if len(deployments) == 0 {
-		return deploymentInfo{}, errors.New("invalid Deployment ID")
-	}
-	currentVersion := deployments[0].RuntimeRelease.Version
-	namespace := deployments[0].ReleaseName
-	organizationID := deployments[0].Workspace.OrganizationID
-	workspaceID := deployments[0].Workspace.ID
-	webserverURL := deployments[0].DeploymentSpec.Webserver.URL
+	currentVersion := dep.RuntimeRelease.Version
+	namespace := dep.ReleaseName
+	organizationID := dep.Workspace.OrganizationID
+	workspaceID := dep.Workspace.ID
+	webserverURL := dep.DeploymentSpec.Webserver.URL
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
