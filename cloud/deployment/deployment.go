@@ -263,7 +263,7 @@ func createOutput(organizationID, workspaceID string, d *astro.Deployment) error
 		return err
 	}
 
-	deploymentURL := "cloud." + c.Domain + "/" + organizationID + "/deployments/" + d.ID
+	deploymentURL := "cloud." + c.Domain + "/" + workspaceID + "/deployments/" + d.ID + "/analytics"
 
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully created Deployment: %s", ansi.Bold(d.Label)) +
 		"\n Deployment can be accessed at the following URLs \n" +

@@ -63,6 +63,7 @@ type deploymentInfo struct {
 	deployImage    string
 	currentVersion string
 	organizationID string
+	workspaceID    string
 	webserverURL   string
 }
 
@@ -111,7 +112,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		return err
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 		"\n\nDeployment can be accessed at the following URLs: \n" +
@@ -208,7 +209,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 			return err
 		}
 
-		deploymentURL := "cloud." + domain + "/" + deployInfo.organizationID + "/deployments/" + deployInfo.deploymentID
+		deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Deployment can be accessed at the following URLs: \n" +
@@ -245,6 +246,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 			airflow.ImageName(currentDeployment.ReleaseName, "latest"),
 			currentDeployment.RuntimeRelease.Version,
 			currentDeployment.Workspace.OrganizationID,
+			currentDeployment.Workspace.ID,
 			currentDeployment.DeploymentSpec.Webserver.URL,
 		}, nil
 	}
@@ -321,15 +323,19 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 		return deploymentInfo{}, err
 	}
 
-	currentVersion := dep.RuntimeRelease.Version
-	namespace := dep.ReleaseName
-	organizationID := dep.Workspace.OrganizationID
-	webserverURL := dep.DeploymentSpec.Webserver.URL
+	if len(deployments) == 0 {
+		return deploymentInfo{}, errors.New("invalid Deployment ID")
+	}
+	currentVersion := deployments[0].RuntimeRelease.Version
+	namespace := deployments[0].ReleaseName
+	organizationID := deployments[0].Workspace.OrganizationID
+	workspaceID := deployments[0].Workspace.ID
+	webserverURL := deployments[0].DeploymentSpec.Webserver.URL
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
 
-	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, webserverURL: webserverURL}, nil
+	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, workspaceID: workspaceID, webserverURL: webserverURL}, nil
 }
 
 func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, client astro.Client) (string, error) {
