@@ -91,7 +91,6 @@ type DeploymentSpec struct {
 	Image                       Image                        `json:"image,omitempty"`
 	Webserver                   Webserver                    `json:"webserver,omitempty"`
 	Executor                    string                       `json:"executor"`
-	Workers                     Workers                      `json:"workers"`
 	Scheduler                   Scheduler                    `json:"scheduler"`
 	EnvironmentVariablesObjects []EnvironmentVariablesObject `json:"environmentVariablesObjects"`
 }
@@ -194,6 +193,11 @@ type Workspace struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Image struct {
 	ID           string   `json:"id"`
 	DeploymentID string   `json:"deploymentId"`
@@ -208,11 +212,6 @@ type Image struct {
 
 type Webserver struct {
 	URL string `json:"url"`
-}
-
-type Workers struct {
-	AU                            int `json:"au"`
-	TerminationGracePeriodSeconds int `json:"terminationGracePeriodSeconds"`
 }
 
 type Scheduler struct {
@@ -270,7 +269,6 @@ type CreateDeploymentInput struct {
 
 type DeploymentCreateSpec struct {
 	Executor  string    `json:"executor"`
-	Workers   Workers   `json:"workers"`
 	Scheduler Scheduler `json:"scheduler"`
 }
 

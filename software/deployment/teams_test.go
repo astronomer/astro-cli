@@ -139,7 +139,7 @@ func TestGetDeploymentLevelRole(t *testing.T) {
 				{Role: houston.DeploymentEditorRole, Deployment: houston.Deployment{ID: "test-id-2"}},
 			},
 			deploymentID: "test-id-1",
-			result:       houston.NoneTeamRole,
+			result:       houston.NoneRole,
 		},
 	}
 

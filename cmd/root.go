@@ -91,8 +91,9 @@ func NewRootCmd() *cobra.Command {
 		rootCmd.AddCommand(
 			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
-		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
+	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
+
 	return rootCmd
 }
 

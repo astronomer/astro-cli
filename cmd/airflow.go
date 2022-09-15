@@ -28,6 +28,7 @@ var (
 	envFile                string
 	pytestFile             string
 	customImageName        string
+	settingsFile           string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -37,6 +38,10 @@ var (
 	postgresExec           bool
 	webserverExec          bool
 	triggererExec          bool
+	connections            bool
+	variables              bool
+	pools                  bool
+	envExport              bool
 	noBrowser              bool
 	RunExample             = `
 # Create default admin user.
@@ -104,6 +109,7 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowRestartCmd(),
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
+		newAirflowObjectRootCmd(),
 	)
 	return cmd
 }
@@ -154,6 +160,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	return cmd
 }
@@ -252,7 +259,9 @@ func newAirflowRestartCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart Airflow with")
+	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
+
 	return cmd
 }
 
@@ -325,6 +334,61 @@ func newAirflowBashCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&webserverExec, "webserver", "w", false, "Exec into the webserver container")
 	cmd.Flags().BoolVarP(&postgresExec, "postgres", "p", false, "Exec into the postgres container")
 	cmd.Flags().BoolVarP(&triggererExec, "triggerer", "t", false, "Exec into the triggerer container")
+	return cmd
+}
+
+func newAirflowObjectRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "object",
+		Aliases: []string{"obj"},
+		Short:   "Manage local Airflow Connections, Variables, and Pools",
+		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings file",
+	}
+	cmd.AddCommand(
+		newObjectImportCmd(),
+		newObjectExportCmd(),
+	)
+	return cmd
+}
+
+func newObjectImportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "import",
+		Short: "Create and update local Airflow objects from an Airflow Settings file",
+		Long:  "This command will create all connections, variables, and pools in an Airflow Settings file locally. Airflow must be running locally for this command to work",
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE: utils.EnsureProjectDir,
+		RunE:    airflowSettingsImport,
+	}
+	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from an Airflow Settings File")
+	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from an Airflow Settings File")
+	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from an Airflow Settings File")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
+	return cmd
+}
+
+func newObjectExportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "Export all Airflow objects to an airflow settings or env file. Does not overwrite objects that already exist in the file",
+		Long:  "This command will export all Airflow objects to an airflow settings or env file(--env-export). Objects already in the file will not be over written. Airflow must be running locally for this command to work",
+		Args:  cobra.MaximumNArgs(1),
+		// ignore PersistentPreRunE of root command
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		PreRunE: utils.EnsureProjectDir,
+		RunE:    airflowSettingsExport,
+	}
+	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to an Airflow Settings File")
+	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to an Airflow Settings File")
+	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to an Airflow Settings File")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
+	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "This exports the objects in the form of Airflow environment variables to an env file")
+	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to export objects as environment variables too")
 	return cmd
 }
 
@@ -428,7 +492,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(customImageName, noCache, noBrowser)
+	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser)
 }
 
 // airflowRun
@@ -538,7 +602,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// don't startup browser on restart
 	noBrowser = true
 
-	return containerHandler.Start(customImageName, noCache, noBrowser)
+	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser)
 }
 
 // run pytest on an airflow project
@@ -650,6 +714,29 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Execing into the %s container\n\n", container)
 	return containerHandler.Bash(container)
+}
+
+func airflowSettingsImport(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	if err != nil {
+		return err
+	}
+	return containerHandler.ImportSettings(settingsFile, envFile, connections, variables, pools)
+}
+
+func airflowSettingsExport(cmd *cobra.Command, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	if err != nil {
+		return err
+	}
+
+	return containerHandler.ExportSettings(settingsFile, envFile, connections, variables, pools, envExport)
 }
 
 func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowversions.Client) string {
