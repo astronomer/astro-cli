@@ -97,6 +97,7 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error { //noli
 	}
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
 
+	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
 		f, err := os.Open(fullpath)
 		if err != nil {
