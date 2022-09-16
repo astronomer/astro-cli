@@ -268,15 +268,19 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	}
 
 	// get workspace ID
-	deployments, err := astroClient.ListDeployments(astro.DeploymentsInput{})
+	deployments, err := astroClient.ListDeployments(c.Organization, "")
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 	workspaceID = deployments[0].Workspace.ID
 
-	err = c.SetContextKey("workspace", workspaceID) // c.Workspace)
+	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
 	if err != nil {
 		fmt.Println("no workspace set")
+	}
+	err = c.SetContextKey("organization", c.Organization) // c.Organization
+	if err != nil {
+		fmt.Println("no organization set")
 	}
 
 	return true, nil

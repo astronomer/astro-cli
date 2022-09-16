@@ -34,11 +34,11 @@ func (_m *Client) CreateDeployment(input *astro.CreateDeploymentInput) (astro.De
 }
 
 // CreateImage provides a mock function with given fields: input
-func (_m *Client) CreateImage(input astro.ImageCreateInput) (*astro.Image, error) {
+func (_m *Client) CreateImage(input astro.CreateImageInput) (*astro.Image, error) {
 	ret := _m.Called(input)
 
 	var r0 *astro.Image
-	if rf, ok := ret.Get(0).(func(astro.ImageCreateInput) *astro.Image); ok {
+	if rf, ok := ret.Get(0).(func(astro.CreateImageInput) *astro.Image); ok {
 		r0 = rf(input)
 	} else {
 		if ret.Get(0) != nil {
@@ -47,7 +47,7 @@ func (_m *Client) CreateImage(input astro.ImageCreateInput) (*astro.Image, error
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(astro.ImageCreateInput) error); ok {
+	if rf, ok := ret.Get(1).(func(astro.CreateImageInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)
@@ -78,18 +78,18 @@ func (_m *Client) CreateUserInvite(input astro.CreateUserInviteInput) (astro.Use
 }
 
 // DeleteDeployment provides a mock function with given fields: input
-func (_m *Client) DeleteDeployment(input astro.DeploymentDeleteInput) (astro.Deployment, error) {
+func (_m *Client) DeleteDeployment(input astro.DeleteDeploymentInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
 
 	var r0 astro.Deployment
-	if rf, ok := ret.Get(0).(func(astro.DeploymentDeleteInput) astro.Deployment); ok {
+	if rf, ok := ret.Get(0).(func(astro.DeleteDeploymentInput) astro.Deployment); ok {
 		r0 = rf(input)
 	} else {
 		r0 = ret.Get(0).(astro.Deployment)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(astro.DeploymentDeleteInput) error); ok {
+	if rf, ok := ret.Get(1).(func(astro.DeleteDeploymentInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)
@@ -99,11 +99,11 @@ func (_m *Client) DeleteDeployment(input astro.DeploymentDeleteInput) (astro.Dep
 }
 
 // DeployImage provides a mock function with given fields: input
-func (_m *Client) DeployImage(input astro.ImageDeployInput) (*astro.Image, error) {
+func (_m *Client) DeployImage(input astro.DeployImageInput) (*astro.Image, error) {
 	ret := _m.Called(input)
 
 	var r0 *astro.Image
-	if rf, ok := ret.Get(0).(func(astro.ImageDeployInput) *astro.Image); ok {
+	if rf, ok := ret.Get(0).(func(astro.DeployImageInput) *astro.Image); ok {
 		r0 = rf(input)
 	} else {
 		if ret.Get(0) != nil {
@@ -112,8 +112,29 @@ func (_m *Client) DeployImage(input astro.ImageDeployInput) (*astro.Image, error
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(astro.ImageDeployInput) error); ok {
+	if rf, ok := ret.Get(1).(func(astro.DeployImageInput) error); ok {
 		r1 = rf(input)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetDeployment provides a mock function with given fields: deploymentID
+func (_m *Client) GetDeployment(deploymentID string) (astro.Deployment, error) {
+	ret := _m.Called(deploymentID)
+
+	var r0 astro.Deployment
+	if rf, ok := ret.Get(0).(func(string) astro.Deployment); ok {
+		r0 = rf(deploymentID)
+	} else {
+		r0 = ret.Get(0).(astro.Deployment)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(deploymentID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -156,6 +177,29 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	var r1 error
 	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
 		r1 = rf(vars)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetUserInfo provides a mock function with given fields:
+func (_m *Client) GetUserInfo() (*astro.Self, error) {
+	ret := _m.Called()
+
+	var r0 *astro.Self
+	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astro.Self)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -249,13 +293,13 @@ func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
 	return r0, r1
 }
 
-// ListDeployments provides a mock function with given fields: input
-func (_m *Client) ListDeployments(input astro.DeploymentsInput) ([]astro.Deployment, error) {
-	ret := _m.Called(input)
+// ListDeployments provides a mock function with given fields: organizationID, workspaceID
+func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]astro.Deployment, error) {
+	ret := _m.Called(organizationID, workspaceID)
 
 	var r0 []astro.Deployment
-	if rf, ok := ret.Get(0).(func(astro.DeploymentsInput) []astro.Deployment); ok {
-		r0 = rf(input)
+	if rf, ok := ret.Get(0).(func(string, string) []astro.Deployment); ok {
+		r0 = rf(organizationID, workspaceID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]astro.Deployment)
@@ -263,54 +307,8 @@ func (_m *Client) ListDeployments(input astro.DeploymentsInput) ([]astro.Deploym
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(astro.DeploymentsInput) error); ok {
-		r1 = rf(input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListInternalRuntimeReleases provides a mock function with given fields:
-func (_m *Client) ListInternalRuntimeReleases() ([]astro.RuntimeRelease, error) {
-	ret := _m.Called()
-
-	var r0 []astro.RuntimeRelease
-	if rf, ok := ret.Get(0).(func() []astro.RuntimeRelease); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.RuntimeRelease)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ListPublicRuntimeReleases provides a mock function with given fields:
-func (_m *Client) ListPublicRuntimeReleases() ([]astro.RuntimeRelease, error) {
-	ret := _m.Called()
-
-	var r0 []astro.RuntimeRelease
-	if rf, ok := ret.Get(0).(func() []astro.RuntimeRelease); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.RuntimeRelease)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(organizationID, workspaceID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -385,42 +383,19 @@ func (_m *Client) ReportDagDeploymentStatus(input *astro.ReportDagDeploymentStat
 	return r0, r1
 }
 
-// GetUserInfo provides a mock function with given fields:
-func (_m *Client) GetUserInfo() (*astro.Self, error) {
-	ret := _m.Called()
-
-	var r0 *astro.Self
-	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*astro.Self)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // UpdateDeployment provides a mock function with given fields: input
-func (_m *Client) UpdateDeployment(input *astro.DeploymentUpdateInput) (astro.Deployment, error) {
+func (_m *Client) UpdateDeployment(input *astro.UpdateDeploymentInput) (astro.Deployment, error) {
 	ret := _m.Called(input)
 
 	var r0 astro.Deployment
-	if rf, ok := ret.Get(0).(func(*astro.DeploymentUpdateInput) astro.Deployment); ok {
+	if rf, ok := ret.Get(0).(func(*astro.UpdateDeploymentInput) astro.Deployment); ok {
 		r0 = rf(input)
 	} else {
 		r0 = ret.Get(0).(astro.Deployment)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*astro.DeploymentUpdateInput) error); ok {
+	if rf, ok := ret.Get(1).(func(*astro.UpdateDeploymentInput) error); ok {
 		r1 = rf(input)
 	} else {
 		r1 = ret.Error(1)

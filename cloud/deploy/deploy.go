@@ -173,7 +173,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		}
 
 		// Create the image
-		imageCreateInput := astro.ImageCreateInput{
+		imageCreateInput := astro.CreateImageInput{
 			Tag:          version,
 			DeploymentID: deployInfo.deploymentID,
 		}
@@ -204,7 +204,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		}
 
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, repository, nextTag, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, client)
 		if err != nil {
 			return err
 		}
@@ -318,23 +318,16 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 		fmt.Printf(deploymentHeaderMsg, cloudDomain)
 	}
 
-	// get current version and namespace
-	deploymentsInput := astro.DeploymentsInput{
-		DeploymentID: deploymentID,
-	}
-	deployments, err := client.ListDeployments(deploymentsInput)
+	dep, err := client.GetDeployment(deploymentID)
 	if err != nil {
 		return deploymentInfo{}, err
 	}
 
-	if len(deployments) == 0 {
-		return deploymentInfo{}, errors.New("invalid Deployment ID")
-	}
-	currentVersion := deployments[0].RuntimeRelease.Version
-	namespace := deployments[0].ReleaseName
-	organizationID := deployments[0].Workspace.OrganizationID
-	workspaceID := deployments[0].Workspace.ID
-	webserverURL := deployments[0].DeploymentSpec.Webserver.URL
+	currentVersion := dep.RuntimeRelease.Version
+	namespace := dep.ReleaseName
+	organizationID := dep.Workspace.OrganizationID
+	workspaceID := dep.Workspace.ID
+	webserverURL := dep.DeploymentSpec.Webserver.URL
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
 	deployImage := airflow.ImageName(namespace, "latest")
@@ -384,19 +377,11 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 		version = defaultRuntimeVersion
 	}
 
-	// Allows System Admins to test with internal runtime releases
-	admin, _ := c.GetSystemAdmin()
-	var runtimeReleases []astro.RuntimeRelease
-	if admin {
-		runtimeReleases, err = client.ListInternalRuntimeReleases()
-	} else {
-		runtimeReleases, err = client.ListPublicRuntimeReleases()
-	}
-
+	ConfigOptions, err := client.GetDeploymentConfig()
 	if err != nil {
 		return "", err
 	}
-
+	runtimeReleases := ConfigOptions.RuntimeReleases
 	runtimeVersions := []string{}
 
 	for _, runtimeRelease := range runtimeReleases {
@@ -426,11 +411,12 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 }
 
 // Deploy the image
-func imageDeploy(imageCreateResID, repository, nextTag string, client astro.Client) error {
-	imageDeployInput := astro.ImageDeployInput{
-		ID:         imageCreateResID,
-		Repository: repository,
-		Tag:        nextTag,
+func imageDeploy(imageCreateResID, deploymentID, repository, nextTag string, client astro.Client) error {
+	imageDeployInput := astro.DeployImageInput{
+		ImageID:      imageCreateResID,
+		DeploymentID: deploymentID,
+		Repository:   repository,
+		Tag:          nextTag,
 	}
 	resp, err := client.DeployImage(imageDeployInput)
 	if err != nil {

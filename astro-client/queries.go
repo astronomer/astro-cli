@@ -13,9 +13,9 @@ var (
 
 	WorkspaceDeploymentsGetRequest = `
 	query WorkspaceDeployments(
-		$deploymentsInput: DeploymentsInput
+		$organizationId: Id!, $workspaceId: Id
 	) {
-		deployments(input: $deploymentsInput) {
+		deployments(organizationId: $organizationId, workspaceId: $workspaceId) {
 			id
 			label
 			releaseName
@@ -79,6 +79,49 @@ var (
 	}
 	`
 
+	GetDeployment = `
+	query GetDeployment($deploymentId: Id!) {
+		deployment(id: $deploymentId) {
+			id
+			label
+			releaseName
+			cluster {
+				id
+			}
+			createdAt
+			status
+			runtimeRelease {
+				version
+				airflowVersion
+			}
+			deploymentSpec {
+				image {
+					tag
+				}
+				workers {
+					au
+				}
+				scheduler {
+					au
+					replicas
+				}
+				environmentVariablesObjects {
+					key
+					value
+					isSecret
+					updatedAt
+				}
+				webserver {
+					url
+				}
+			}
+			workspace {
+				id
+				organizationId
+			}
+		}
+	}`
+
 	SelfQuery = `
 	query selfQuery {
 		self {
@@ -88,24 +131,6 @@ var (
 			}
 		}
 		authenticatedOrganizationId
-		}
-	}
-	`
-
-	InternalRuntimeReleases = `
-	query RuntimeReleasesQuery($channel: String) {
-		runtimeReleases(channel: $channel) {
-			version
-			channel
-		}
-	}
-	`
-
-	PublicRuntimeReleases = `
-	query RuntimeReleasesQuery {
-		runtimeReleases {
-			version
-			channel
 		}
 	}
 	`
@@ -152,6 +177,7 @@ var (
 		}
 		executors
 		runtimeReleases {
+			channel
 			version
 		}
 	  }

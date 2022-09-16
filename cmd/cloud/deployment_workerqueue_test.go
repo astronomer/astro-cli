@@ -147,7 +147,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 			NodePoolID:        "test-pool-id",
 		},
 	}
-	deploymentUpdateInput := astro.DeploymentUpdateInput{
+	updateDeploymentInput := astro.UpdateDeploymentInput{
 		ID:    deploymentRespDefaultQueue[0].ID,
 		Label: deploymentRespDefaultQueue[0].Label,
 		DeploymentSpec: astro.DeploymentCreateSpec{
@@ -177,9 +177,9 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespDefaultQueue[0], nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-n", "test-queue", "-t", "test-instance-type"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -200,9 +200,9 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespDefaultQueue[0], nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -223,9 +223,9 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespDefaultQueue[0], nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test-deployment-label", "-t", "test-instance-type", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -246,9 +246,9 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespDefaultQueue[0], nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
@@ -323,7 +323,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 				NodePoolID:        "test-pool-id",
 			},
 		}
-		deploymentUpdateInput := astro.DeploymentUpdateInput{
+		updateDeploymentInput := astro.UpdateDeploymentInput{
 			ID:    deploymentRespWithQueues[0].ID,
 			Label: deploymentRespWithQueues[0].Label,
 			DeploymentSpec: astro.DeploymentCreateSpec{
@@ -333,8 +333,8 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 			WorkerQueues: listToDelete,
 		}
 		expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace deleted\n"
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 
 		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
@@ -434,7 +434,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 				NodePoolID:        "test-pool-id",
 			},
 		}
-		deploymentUpdateInput := astro.DeploymentUpdateInput{
+		updateDeploymentInput := astro.UpdateDeploymentInput{
 			ID:    deploymentRespWithQueues[0].ID,
 			Label: deploymentRespWithQueues[0].Label,
 			DeploymentSpec: astro.DeploymentCreateSpec{
@@ -462,9 +462,9 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		}
 
 		expectedOutMessage := "worker queue test-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace updated\n"
-		mockClient.On("ListDeployments", mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(deploymentRespWithQueues[0], nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 
 		// updating min, max and concurrency to defaults along with worker type
 		cmdArgs := []string{"worker-queue", "update", "-n", "test-queue-1", "-t", "test-instance-type"}

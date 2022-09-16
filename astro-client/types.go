@@ -9,8 +9,8 @@ type Response struct {
 }
 
 type ResponseData struct {
-	CreateImage               *Image                       `json:"imageCreate,omitempty"`
-	DeployImage               *Image                       `json:"imageDeploy,omitempty"`
+	CreateImage               *Image                       `json:"createImage,omitempty"`
+	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
@@ -21,9 +21,9 @@ type ResponseData struct {
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
 	GetDeploymentHistory      DeploymentHistory            `json:"deploymentHistory,omitempty"`
-	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
-	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
-	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
+	DeleteDeployment          Deployment                   `json:"DeleteDeployment,omitempty"`
+	UpdateDeployment          Deployment                   `json:"UpdateDeployment,omitempty"`
+	UpdateDeploymentVariables []EnvironmentVariablesObject `json:"UpdateDeploymentVariables,omitempty"`
 	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
@@ -246,15 +246,16 @@ type DeploymentsInput struct {
 	DeploymentID string `json:"deploymentId"`
 }
 
-type ImageCreateInput struct {
+type CreateImageInput struct {
 	Tag          string `json:"tag"`
 	DeploymentID string `json:"deploymentId"`
 }
 
-type ImageDeployInput struct {
-	ID         string `json:"id"`
-	Tag        string `json:"tag"`
-	Repository string `json:"repository"`
+type DeployImageInput struct {
+	ImageID      string `json:"imageId"`
+	DeploymentID string `json:"deploymentId"`
+	Tag          string `json:"tag"`
+	Repository   string `json:"repository"`
 }
 
 type CreateDeploymentInput struct {
@@ -271,7 +272,7 @@ type DeploymentCreateSpec struct {
 	Scheduler Scheduler `json:"scheduler"`
 }
 
-type DeploymentUpdateInput struct {
+type UpdateDeploymentInput struct {
 	ID             string               `json:"id"`
 	ClusterID      string               `json:"clusterId"`
 	Label          string               `json:"label"`
@@ -280,7 +281,7 @@ type DeploymentUpdateInput struct {
 	WorkerQueues   []WorkerQueue        `json:"workerQueues"`
 }
 
-type DeploymentDeleteInput struct {
+type DeleteDeploymentInput struct {
 	ID string `json:"id"`
 }
 
