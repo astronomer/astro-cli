@@ -213,7 +213,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile string) error {
 		"-e",
 		"DAG_ID="+dagID,
 		"-e",
-		settingsFile,
+		"SETTINGS_FILE=/usr/local/"+settingsFile,
 		"--env-file",
 		envFile,
 		// "dimberman/local-airflow-test:0.0.2",
