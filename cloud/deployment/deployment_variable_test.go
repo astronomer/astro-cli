@@ -12,9 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// var org = "test-org-id"
-// var ws = "test-ws-id"
-
 func TestVariableList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
