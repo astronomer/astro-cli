@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -310,7 +311,11 @@ func TestJsonString(t *testing.T) {
 	t.Run("basic map", func(t *testing.T) {
 		conn := Connection{ConnExtra: map[interface{}]interface{}{"key1": "value1", "key2": "value2"}}
 		res := jsonString(&conn)
-		assert.Equal(t, `{"key1": "value1", "key2": "value2"}`, res)
+		var result map[string]interface{}
+		json.Unmarshal([]byte(res), &result)
+
+		assert.Equal(t, result["key1"], "value1")
+		assert.Equal(t, result["key2"], "value2")
 	})
 
 	t.Run("empty extra", func(t *testing.T) {
