@@ -16,6 +16,7 @@ type cfgs struct {
 	Contexts             cfg
 	LocalEnabled         cfg
 	LocalAstro           cfg
+	LocalCore            cfg
 	LocalPublicAstro     cfg
 	LocalRegistry        cfg
 	LocalHouston         cfg

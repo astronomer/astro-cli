@@ -44,7 +44,12 @@ func newTableOut() *printutil.Table {
 }
 
 func listOrganizations(c *config.Context) ([]OrgRes, error) {
-	orgDomain := "https://api." + c.Domain + "/v1alpha1/organizations"
+	var orgDomain string
+	if c.Domain == "localhost" {
+		orgDomain = config.CFG.LocalCore.GetString() + "/organizations"
+	} else {
+		orgDomain = "https://api." + c.Domain + "/v1alpha1/organizations"
+	}
 	authToken := c.Token
 	ctx := context.Background()
 	doOptions := &httputil.DoOptions{
