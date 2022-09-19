@@ -30,6 +30,8 @@ type Client interface {
 	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 	// WorkerQueues
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
+	// Organizations
+	GetOrganizations() ([]Organization, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -270,4 +272,17 @@ func (c *HTTPClient) GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error) 
 		return WorkerQueueDefaultOptions{}, err
 	}
 	return wqResp.Data.GetWorkerQueueOptions, nil
+}
+
+// Gets a list of Organizations
+func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
+	req := Request{
+		Query: GetOrganizations,
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return []Organization{}, err
+	}
+	return resp.Data.GetOrganizations, nil
 }

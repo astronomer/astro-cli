@@ -28,6 +28,7 @@ type ResponseData struct {
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
 	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
+	GetOrganizations          []Organization               `json:"organizations,omitempty"`
 }
 
 type Self struct {

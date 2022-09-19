@@ -907,3 +907,48 @@ func TestWorkerQueueOptions(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestGetOrganizations(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetOrganizations: []Organization{
+				{
+					ID:   "test-org-id",
+					Name: "test-org-name",
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("happy path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.GetOrganizations()
+		assert.NoError(t, err)
+		assert.Equal(t, resp, mockResponse.Data.GetOrganizations)
+	})
+
+	t.Run("error path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetOrganizations()
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}

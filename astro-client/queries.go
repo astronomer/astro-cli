@@ -212,4 +212,13 @@ var (
 			}
 		}
 	}`
+
+	GetOrganizations = `
+	query Query {
+		organizations {
+		  id
+		  name
+		}
+	  }
+	`
 )
