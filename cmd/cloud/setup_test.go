@@ -12,7 +12,6 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestSetup(t *testing.T) {
@@ -110,8 +109,16 @@ func TestSetup(t *testing.T) {
 			},
 		}
 
+		mockOrgResp := []astro.Organization{
+			{
+				ID:   "test-org-id",
+				Name: "test-org-name",
+			},
+		}
+
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", mock.Anything, "").Return(mockDeplyResp, nil).Once()
+		mockClient.On("GetOrganizations").Return(mockOrgResp, nil).Once()
+		mockClient.On("ListDeployments", mockOrgResp[0].ID, "").Return(mockDeplyResp, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
 		cmd, err := cmd.ExecuteC()

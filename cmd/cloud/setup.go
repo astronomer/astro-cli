@@ -267,8 +267,14 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 		fmt.Println("admin settings incorrectly set you may experince permissions issues")
 	}
 
+	organizations, err := astroClient.GetOrganizations()
+	if err != nil {
+		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+	}
+	organizationID := organizations[0].ID
+
 	// get workspace ID
-	deployments, err := astroClient.ListDeployments(c.Organization, "")
+	deployments, err := astroClient.ListDeployments(organizationID, "")
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -278,7 +284,7 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	if err != nil {
 		fmt.Println("no workspace set")
 	}
-	err = c.SetContextKey("organization", c.Organization) // c.Organization
+	err = c.SetContextKey("organization", organizationID) // c.Organization
 	if err != nil {
 		fmt.Println("no organization set")
 	}
