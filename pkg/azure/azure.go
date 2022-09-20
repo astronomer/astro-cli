@@ -7,8 +7,14 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 )
 
+var azureUploader = Upload
+
 type Azure interface {
 	Upload(sasLink string, dagFileReader io.Reader) (string, error)
+}
+
+func azureUpload(sasLink string, dagFileReader io.Reader) (string, error) {
+	return azureUploader(sasLink, dagFileReader)
 }
 
 func Upload(sasLink string, dagFileReader io.Reader) (string, error) {
