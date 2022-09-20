@@ -7,14 +7,15 @@ import (
 )
 
 var (
-	dagID string
+	dagID     string
+	startDate string
 )
 
 func newTestCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "test DAG-ID",
-		Short: "Test a local DAG by running it's tasks sequentially",
-		Long:  "Test a local DAG by running it's tasks sequentially. This command will spin up a docker container with airflow environment and execute your DAG code",
+		Short: "Test a local DAG by running its tasks sequentially",
+		Long:  "Test a local DAG by running its tasks sequentially. This command will spin up a docker container with airflow environment and execute your DAG code",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -26,6 +27,7 @@ func newTestCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
+	cmd.Flags().StringVarP(&startDate, "start-date", "d", "", "The start date for the DAG this is the current date and time by defualt")
 
 	return cmd
 }
@@ -43,5 +45,5 @@ func test(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.RunTest(dagID, settingsFile, noCache)
+	return containerHandler.RunTest(dagID, settingsFile, startDate, noCache)
 }

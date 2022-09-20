@@ -27,7 +27,7 @@ type ContainerHandler interface {
 	Pytest(imageName, pytestFile, projectImageName string) (string, error)
 	Parse(imageName, buildImage string) error
 	Bash(container string) error
-	RunTest(dagId, settingsFile string, noCache bool) error
+	RunTest(dagId, settingsFile, startDate string, noCache bool) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -42,7 +42,7 @@ type ImageHandler interface {
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
-	RunTest(dagId, envFile, settingsFile string) error
+	RunTest(dagId, envFile, settingsFile, startDate string) error
 }
 
 type DockerComposeAPI interface {
