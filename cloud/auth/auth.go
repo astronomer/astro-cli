@@ -372,7 +372,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, orgID, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, orgID, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -385,17 +385,15 @@ func Login(domain, orgID, shouldLoginWithToken string, client astro.Client, out 
 
 	c, _ := context.GetCurrentContext()
 
-	if shouldLoginWithToken == "" {
+	if token == "" {
 		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain, orgID)
 		if err != nil {
 			return err
 		}
 	} else {
 		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
-		fmt.Printf("\nPlease visit the following URL, authenticate and paste token in next prompt\n")
-		fmt.Println("cloud." + domain + "/token\n")
 		res = Result{
-			AccessToken: shouldLoginWithToken,
+			AccessToken: token,
 			ExpiresIn:   time.Now().Add(24 * time.Hour).Unix(), // nolint:gomnd
 		}
 	}

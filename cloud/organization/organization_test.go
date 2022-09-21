@@ -156,7 +156,7 @@ func TestSwitch(t *testing.T) {
 			}
 		})
 
-		AuthLogin = func(domain, id, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -190,7 +190,7 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		AuthLogin = func(domain, id, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -208,7 +208,7 @@ func TestSwitch(t *testing.T) {
 			}
 		})
 
-		AuthLogin = func(domain, id, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -242,7 +242,7 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		AuthLogin = func(domain, id, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -260,7 +260,7 @@ func TestSwitch(t *testing.T) {
 			}
 		})
 
-		AuthLogin = func(domain, id, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return errMock
 		}
 		buf := new(bytes.Buffer)
