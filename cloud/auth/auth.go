@@ -28,9 +28,8 @@ import (
 )
 
 const (
-	Domain          = "astronomer.io"
-	localDomain     = "localhost"
-	inputOAuthToken = "OAuth Token: " // nolint:gosec // false positive
+	Domain      = "astronomer.io"
+	localDomain = "localhost"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -373,7 +372,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, orgID string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+func Login(domain, orgID, shouldLoginWithToken string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -381,12 +380,12 @@ func Login(domain, orgID string, client astro.Client, out io.Writer, shouldDispl
 		return err
 	}
 	// Welcome User
-	fmt.Print("Welcome to the Astro CLI 🚀\n\n")
+	fmt.Print("\nWelcome to the Astro CLI 🚀\n\n")
 	fmt.Print("To learn more about Astro, go to https://docs.astronomer.io\n\n")
 
 	c, _ := context.GetCurrentContext()
 
-	if !shouldLoginWithToken {
+	if shouldLoginWithToken == "" {
 		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain, orgID)
 		if err != nil {
 			return err
@@ -395,9 +394,8 @@ func Login(domain, orgID string, client astro.Client, out io.Writer, shouldDispl
 		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
 		fmt.Printf("\nPlease visit the following URL, authenticate and paste token in next prompt\n")
 		fmt.Println("cloud." + domain + "/token\n")
-		token := input.Text(inputOAuthToken)
 		res = Result{
-			AccessToken: token,
+			AccessToken: shouldLoginWithToken,
 			ExpiresIn:   time.Now().Add(24 * time.Hour).Unix(), // nolint:gomnd
 		}
 	}

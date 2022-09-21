@@ -13,7 +13,7 @@ import (
 
 var (
 	shouldDisplayLoginLink bool
-	shouldLoginWithToken   bool
+	shouldLoginWithToken   string
 	oAuth                  bool
 
 	cloudLogin     = cloudAuth.Login
@@ -33,7 +33,7 @@ func newLoginCommand(astroClient astro.Client, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().BoolVarP(&shouldLoginWithToken, "token-login", "t", false, "Login with a token for browserless cloud CLI login")
+	cmd.Flags().StringVarP(&shouldLoginWithToken, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
 	return cmd
 }
@@ -59,15 +59,15 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.W
 		if !context.IsCloudDomain(args[0]) {
 			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)
 		}
-		return cloudLogin(args[0], "", astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
+		return cloudLogin(args[0], "", shouldLoginWithToken, astroClient, out, shouldDisplayLoginLink)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(cloudAuth.Domain, "", astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
+		return cloudLogin(cloudAuth.Domain, "", shouldLoginWithToken, astroClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, "", astroClient, out, shouldDisplayLoginLink, shouldLoginWithToken)
+		return cloudLogin(ctx.Domain, "", shouldLoginWithToken, astroClient, out, shouldDisplayLoginLink)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonClient, out)
 }
