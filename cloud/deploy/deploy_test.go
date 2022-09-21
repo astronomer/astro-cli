@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -100,6 +101,59 @@ func TestDeploySuccess(t *testing.T) {
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
 	mockContainerHandler.AssertExpectations(t)
+}
+
+func TestDagsDeploySuccess(t *testing.T) {
+	mockDeplyResp := []astro.Deployment{
+		{
+			ID:             "test-id",
+			ReleaseName:    "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:             "test-id-2",
+			ReleaseName:    "test-name-2",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+	}
+
+	initiatedDagDeploymentID := "test-dag-deployment-id"
+	deploymentID := "test-id"
+	dagURL := "http://fake-url.windows.core.net"
+
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{DeploymentID: deploymentID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentID: initiatedDagDeploymentID,
+		DeploymentID:             deploymentID,
+		Action:                   "UPLOAD",
+		VersionID:                "version-id",
+		Status:                   "SUCCEEDED",
+		Message:                  "Dags uploaded successfully",
+	}
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
+
+	err := Deploy("./testfiles", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
 }
 
 func TestDeployFailure(t *testing.T) {

@@ -53,6 +53,7 @@ var (
 	// Monkey patched to write unit tests
 	airflowImageHandler  = airflow.ImageHandlerInit
 	containerHandlerInit = airflow.ContainerHandlerInit
+	azureUploader        = azure.Upload
 )
 
 var errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
@@ -83,11 +84,6 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		return err
 	}
 
-	sasDagClient, err := azure.CreateSASDagClient(dagDeployment.DagURL)
-	if err != nil {
-		return err
-	}
-
 	dagsFilePath := path + "/dags.tar"
 	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
@@ -95,7 +91,7 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 	}
 	defer dagFile.Close()
 
-	versionID, err := azure.Upload(sasDagClient, dagFile)
+	versionID, err := azureUploader(dagDeployment.DagURL, dagFile)
 	if err != nil {
 		return err
 	}
