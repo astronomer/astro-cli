@@ -5,8 +5,6 @@ package azure_mocks
 import (
 	io "io"
 
-	azure "github.com/astronomer/astro-cli/pkg/azure"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -15,41 +13,20 @@ type Azure struct {
 	mock.Mock
 }
 
-// CreateSASDagClient provides a mock function with given fields: sasLink
-func (_m *Azure) CreateSASDagClient(sasLink string) (azure.DagClient, error) {
-	ret := _m.Called(sasLink)
-
-	var r0 azure.DagClient
-	if rf, ok := ret.Get(0).(func(string) azure.DagClient); ok {
-		r0 = rf(sasLink)
-	} else {
-		r0 = ret.Get(0).(azure.DagClient)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(sasLink)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Upload provides a mock function with given fields: ac, dagFileReader
-func (_m *Azure) Upload(ac azure.DagClient, dagFileReader io.Reader) (string, error) {
-	ret := _m.Called(ac, dagFileReader)
+// Upload provides a mock function with given fields: sasLink, dagFileReader
+func (_m *Azure) Upload(sasLink string, dagFileReader io.Reader) (string, error) {
+	ret := _m.Called(sasLink, dagFileReader)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(azure.DagClient, io.Reader) string); ok {
-		r0 = rf(ac, dagFileReader)
+	if rf, ok := ret.Get(0).(func(string, io.Reader) string); ok {
+		r0 = rf(sasLink, dagFileReader)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(azure.DagClient, io.Reader) error); ok {
-		r1 = rf(ac, dagFileReader)
+	if rf, ok := ret.Get(1).(func(string, io.Reader) error); ok {
+		r1 = rf(sasLink, dagFileReader)
 	} else {
 		r1 = ret.Error(1)
 	}
