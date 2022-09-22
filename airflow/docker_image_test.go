@@ -63,6 +63,17 @@ func TestDockerImageBuild(t *testing.T) {
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 
+	t.Run("unable to read file error", func(t *testing.T) {
+		options := airflowTypes.ImageBuildConfig{
+			Path:            "incorrect-path",
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+		}
+
+		err = handler.Build(options)
+		assert.Error(t, err)
+	})
+
 	cmdExec = previousCmdExec
 }
 

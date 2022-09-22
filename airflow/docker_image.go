@@ -96,6 +96,9 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		stderr = nil
 	}
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
+	if err != nil {
+		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
+	}
 
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
@@ -127,10 +130,6 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if err != nil {
-		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
 
 	return nil
