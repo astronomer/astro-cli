@@ -215,14 +215,14 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 		"DAG_ID="+dagID,
 		"-e",
 		"SETTINGS_FILE=/usr/local/"+settingsFile,
-		"--env-file",
-		envFile,
-		d.imageName,
 	}
 	if startDate != "" {
 		startDateArgs := []string{"-e", "START_DATE="+startDate}
 		args = append(args, startDateArgs...)
 	}
+
+	endArgs := []string{"--env-file", envFile, d.imageName,}
+	args = append(args, endArgs...)
 
 	// Run Image
 	err := cmdExec(DockerCmd, os.Stdout, os.Stderr, args...)
@@ -361,7 +361,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 //             fmt.Println(v)
 //     }
 // 	return nil
-}
+// }
 
 // Exec executes a docker command
 var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -400,84 +400,84 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 }
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
-func RunCommandCh(stdoutCh chan<- string, cutset string, command string, flags ...string) error {
-    cmd := exec.Command(command, flags...)
+// func RunCommandCh(stdoutCh chan<- string, cutset string, command string, flags ...string) error {
+//     cmd := exec.Command(command, flags...)
 
-	// fmt.Println(command)
-	fmt.Println(flags)
-	fmt.Println("\n\n")
+// 	// fmt.Println(command)
+// 	fmt.Println(flags)
+// 	fmt.Println("\n\n")
 
-    stdOutput, err := cmd.StdoutPipe()
-    if err != nil {
-        return fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
-    }
+//     stdOutput, err := cmd.StdoutPipe()
+//     if err != nil {
+//         return fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
+//     }
 
-	stdError, err := cmd.StderrPipe()
-    if err != nil {
-        return fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
-    }
+// 	stdError, err := cmd.StderrPipe()
+//     if err != nil {
+//         return fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
+//     }
 
-    if err := cmd.Start(); err != nil {
-            return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
-    }
+//     if err := cmd.Start(); err != nil {
+//             return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
+//     }
 
-    go func() {
-            defer close(stdoutCh)
+//     go func() {
+//             defer close(stdoutCh)
 
-            for {
-                    bufOut := make([]byte, 1024)
-					bufErr := make([]byte, 1024)
-                    n, err := stdOutput.Read(bufOut)
-                    o, err := stdError.Read(bufErr)
+//             for {
+//                     bufOut := make([]byte, 1024)
+// 					bufErr := make([]byte, 1024)
+//                     n, err := stdOutput.Read(bufOut)
+//                     o, err := stdError.Read(bufErr)
 
-                    if err != nil {
-						if err != io.EOF {
-								log.Fatal(err)
-						}
-						if o == 0 {
-								break
-						}
-						if n == 0 {
-							break
-						}
-                    }
-                    outText := strings.TrimSpace(string(bufOut[:n]))
-					fmt.Println("out:"+outText)
+//                     if err != nil {
+// 						if err != io.EOF {
+// 								log.Fatal(err)
+// 						}
+// 						if o == 0 {
+// 								break
+// 						}
+// 						if n == 0 {
+// 							break
+// 						}
+//                     }
+//                     outText := strings.TrimSpace(string(bufOut[:n]))
+// 					// fmt.Println("out:"+outText)
 	
-                    errText := strings.TrimSpace(string(bufErr[:o]))
-					fmt.Println("error:"+errText)
-                    for {
-                            // Take the index of any of the given cutset
-                            n := strings.IndexAny(outText, cutset)
-                            if n == -1 {
-                                    // If not found, but still have data, send it
-                                    if len(outText) > 0 {// && strings.Contains(outText, "Running") {
-                                            stdoutCh <- outText
-                                    }
-                                    break
-                            }
-                            // Send data up to the found cutset
-							// if strings.Contains(outText[:n], "Running task ") {
-							// 	stdoutCh <-"\n"+outText[:n]+"\n"
-							// } else if strings.Contains(outText[:n], " successfully!") {
-							// 	stdoutCh <-"\n"+outText[:n]+"\n"
-							// } else {
-							// 	stdoutCh <- outText[:n]
-							// }
-							// fmt.Println(outText[:n])
-							stdoutCh <- outText[:n]
-                            // If cutset is last element, stop there.
-                            if n == len(outText) {
-                                    break
-                            }
-                            // Shift the text and start again.
-                            outText = outText[n+1:]
-                    }
-            }
-    }()
+//                     errText := strings.TrimSpace(string(bufErr[:o]))
+// 					fmt.Println("error:"+errText)
+//                     for {
+//                             // Take the index of any of the given cutset
+//                             n := strings.IndexAny(outText, cutset)
+//                             if n == -1 {
+//                                     // If not found, but still have data, send it
+//                                     if len(outText) > 0 {// && strings.Contains(outText, "Running") {
+//                                             stdoutCh <- outText
+//                                     }
+//                                     break
+//                             }
+//                             // Send data up to the found cutset
+// 							// if strings.Contains(outText[:n], "Running task ") {
+// 							// 	stdoutCh <-"\n"+outText[:n]+"\n"
+// 							// } else if strings.Contains(outText[:n], " successfully!") {
+// 							// 	stdoutCh <-"\n"+outText[:n]+"\n"
+// 							// } else {
+// 							// 	stdoutCh <- outText[:n]
+// 							// }
+// 							// fmt.Println(outText[:n])
+// 							stdoutCh <- outText[:n]
+//                             // If cutset is last element, stop there.
+//                             if n == len(outText) {
+//                                     break
+//                             }
+//                             // Shift the text and start again.
+//                             outText = outText[n+1:]
+//                     }
+//             }
+//     }()
 
-    if err := cmd.Wait(); err != nil {
-            return fmt.Errorf("RunCommand: cmd.Wait(): %v", err)
-    }
-    return nil
-}
+//     if err := cmd.Wait(); err != nil {
+//             return fmt.Errorf("RunCommand: cmd.Wait(): %v", err)
+//     }
+//     return nil
+// }
