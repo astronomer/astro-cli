@@ -33,8 +33,9 @@ const (
 	defaultRuntimeVersion  = "4.2.5"
 	dagParseAllowedVersion = "4.1.0"
 
-	composeImageBuildingPromptMsg = "Building image..."
-	deploymentHeaderMsg           = "Authenticated to %s \n\n"
+	composeImageBuildingPromptMsg     = "Building image..."
+	composeSkipImageBuildingPromptMsg = "Skipping building image..."
+	deploymentHeaderMsg               = "Authenticated to %s \n\n"
 
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nPlease use one of the following supported tags: %s"
@@ -68,8 +69,7 @@ type deploymentInfo struct {
 	webserverURL   string
 }
 
-func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Client) error {
-	fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
+func deployDags(path string, deployInfo *deploymentInfo, client astro.Client) error {
 	dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
 	if err != nil {
 		return err
@@ -108,13 +108,6 @@ func deployDags(path, domain string, deployInfo *deploymentInfo, client astro.Cl
 		return err
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
-
-	fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
-		"\n\nDeployment can be accessed at the following URLs: \n" +
-		fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-		fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
-
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
@@ -151,14 +144,22 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		return err
 	}
 
+	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
+
 	if dags {
-		err = deployDags(path, domain, &deployInfo, client)
+		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
+		err = deployDags(path, &deployInfo, client)
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+			"\n\nDeployment can be accessed at the following URLs: \n" +
+			fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
+			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		// Build our image
-		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
+		version, dagDeployEnabled, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
 		if err != nil {
 			return err
 		}
@@ -200,12 +201,17 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		}
 
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
 
-		deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
+		if dagDeployEnabled {
+			err = deployDags(path, &deployInfo, client)
+			if err != nil {
+				return err
+			}
+		}
 
 		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Deployment can be accessed at the following URLs: \n" +
@@ -331,34 +337,38 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, workspaceID: workspaceID, webserverURL: webserverURL}, nil
 }
 
-func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, client astro.Client) (string, error) {
-	// Build our image
-	fmt.Println(composeImageBuildingPromptMsg)
-
+func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, client astro.Client) (version string, dagDeployEnabled bool, err error) {
 	imageHandler := airflowImageHandler(deployImage)
+	dagDeployEnabled = false
 
 	if imageName == "" {
+		// Build our image
+		fmt.Println(composeImageBuildingPromptMsg)
+
 		err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 		if err != nil {
-			return "", err
+			return "", dagDeployEnabled, err
 		}
+		dagDeployEnabled = true
 	} else {
 		// skip build if an imageName is passed
+		fmt.Println(composeSkipImageBuildingPromptMsg)
+
 		err := imageHandler.TagLocalImage(imageName)
 		if err != nil {
-			return "", err
+			return "", dagDeployEnabled, err
 		}
 	}
 
 	// parse dockerfile
 	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
+		return "", false, errors.Wrapf(err, "failed to parse dockerfile: %s", filepath.Join(path, dockerfile))
 	}
 
 	DockerfileImage := docker.GetImageFromParsedFile(cmds)
 
-	version, err := imageHandler.GetLabel(runtimeImageLabel)
+	version, err = imageHandler.GetLabel(runtimeImageLabel)
 	if err != nil {
 		fmt.Println("unable get runtime version from image")
 	}
@@ -375,7 +385,7 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 
 	ConfigOptions, err := client.GetDeploymentConfig()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	runtimeReleases := ConfigOptions.RuntimeReleases
 	runtimeVersions := []string{}
@@ -403,16 +413,17 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 		os.Exit(1)
 	}
 
-	return version, nil
+	return version, dagDeployEnabled, nil
 }
 
 // Deploy the image
-func imageDeploy(imageCreateResID, deploymentID, repository, nextTag string, client astro.Client) error {
+func imageDeploy(imageCreateResID, deploymentID, repository, nextTag string, dagDeployEnabled bool, client astro.Client) error {
 	imageDeployInput := astro.DeployImageInput{
-		ImageID:      imageCreateResID,
-		DeploymentID: deploymentID,
-		Repository:   repository,
-		Tag:          nextTag,
+		ImageID:          imageCreateResID,
+		DeploymentID:     deploymentID,
+		Repository:       repository,
+		Tag:              nextTag,
+		DagDeployEnabled: dagDeployEnabled,
 	}
 	resp, err := client.DeployImage(imageDeployInput)
 	if err != nil {
