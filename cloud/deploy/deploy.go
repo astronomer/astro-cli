@@ -37,7 +37,7 @@ const (
 	deploymentHeaderMsg           = "Authenticated to %s \n\n"
 
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
-	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nPlease use one of the following supported tags: %s"
+	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nConsider using one of the following supported tags: %s"
 
 	message = "Dags uploaded successfully"
 	action  = "UPLOAD"
@@ -415,8 +415,6 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 
 	if !isTagValid {
 		fmt.Println(fmt.Sprintf(warningInvalidImageTagMsg, version, isValidRuntimeVersions))
-		fmt.Println("Canceling deploy...")
-		os.Exit(1)
 	}
 
 	return version, nil
