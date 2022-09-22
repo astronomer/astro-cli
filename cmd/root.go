@@ -47,7 +47,13 @@ func NewRootCmd() *cobra.Command {
 	}
 	houstonClient = houston.NewClient(httpClient)
 
-	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+	// FIXME I think it is correct and recommended to share our HTTP client across all wrappers.
+	astroClient := astro.NewAstroClient(httpClient)
+	astroPublicRESTClient, err := astro.NewAstroRESTClient(httpClient, "public")
+	if err != nil {
+		// TODO better error handling
+		panic(err)
+	}
 
 	ctx := cloudPlatform
 	currCtx := context.IsCloudContext()
@@ -102,7 +108,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroClient, os.Stdout)...,
+			cloudCmd.AddCmds(astroClient, astroPublicRESTClient, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(

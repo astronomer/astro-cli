@@ -10,9 +10,11 @@ import (
 
 var (
 	shouldDisplayLoginLink bool
-
-	orgList   = organization.List
-	orgSwitch = organization.Switch
+	orgList                 = organization.List
+	orgSwitch               = organization.Switch
+	orgExportAuditLogs      = organization.ExportAuditLogs
+	auditLogsOutputFilePath string
+	auditLogsEarliestParam  int
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -25,6 +27,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
+		newOrganizationExportAuditLogs(out),
 	)
 	return cmd
 }
@@ -58,6 +61,23 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "export-audit-logs --output-file [output_file.json]",
+		Aliases: []string{"sw"},
+		Short:   "Export your organization audit logs. Requires being an organization owner.",
+		Long:    "Export your organization audit logs. Requires being an organization owner.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return organizationExportAuditLogs(cmd, out, args)
+		},
+	}
+	cmd.PersistentFlags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
+	cmd.PersistentFlags().IntVarP(
+		&auditLogsEarliestParam, "earliest", "e", 90,
+		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90. Defaults to 90 days.")
+	return cmd
+}
+
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -75,4 +95,13 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	}
 
 	return orgSwitch(organizationNameOrID, astroClient, out, shouldDisplayLoginLink)
+}
+
+func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []string) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	// TODO handle arg and create io.Writer if filename provided
+	// TODO handle earliest param if provided
+	return orgExportAuditLogs(publicRESTClient, out)
 }

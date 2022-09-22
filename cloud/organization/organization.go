@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	astroPublicApi "github.com/astronomer/astro/apps/core-api-bindings/golang/public"
 )
 
 var (
@@ -174,5 +175,26 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func ExportAuditLogs(publicRESTClient *astroPublicApi.APIClient, out io.Writer) error {
+	// get current context
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "ContextAccessToken", c.Token)
+
+	// FIXME need org short name
+	requestParameters := publicRESTClient.OrganizationApi.GetOrganizationAuditLogs(ctx, "astronomer")
+	_, resp, err := publicRESTClient.OrganizationApi.GetOrganizationAuditLogsExecute(requestParameters)
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp)
+
 	return nil
 }

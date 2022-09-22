@@ -9,6 +9,8 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
+
+	astroPublicApi "github.com/astronomer/astro/apps/core-api-bindings/golang/public"
 )
 
 const (
@@ -105,4 +107,38 @@ func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
 	}
 
 	return &decode, nil
+}
+
+/****** REST CLIENT ******/
+func NewAstroRESTClient(c *httputil.HTTPClient, schema string) (*astroPublicApi.APIClient, error) {
+	cl, err := context.GetCurrentContext()
+	if err != nil {
+		return nil, err
+	}
+
+	var basePath string
+	switch schema {
+	case "public":
+		basePath = fmt.Sprintf("https://api.%s/v1alpha1", cl.Domain)
+	case "internal":
+		basePath = fmt.Sprintf("https://api.%s/internal/v1alpha1", cl.Domain)
+	default:
+		return nil, fmt.Errorf("Invalid schema: %s", schema)
+	}
+
+	client := astroPublicApi.NewAPIClient(
+		&astroPublicApi.Configuration{
+			Debug:      false, // TODO enable toggling Debug on/off
+			Scheme:     "https",
+			UserAgent:  "astro-cli",
+			HTTPClient: c.HTTPClient,
+			Servers: astroPublicApi.ServerConfigurations{
+				{
+					URL:         basePath,
+					Description: fmt.Sprintf("API server for core schema: %s", schema),
+				},
+			},
+		},
+	)
+	return client, nil
 }
