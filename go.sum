@@ -119,7 +119,6 @@ github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuy
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae/go.mod h1:CgnQgUtFrFz9mxFNtED3jI5tLDjKlOM+oUF/sTk6ps0=
-github.com/antihax/optional v1.0.0 h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwcg=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/apache/thrift v0.12.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb+bacwQ=
 github.com/apparentlymart/go-cidr v1.0.1/go.mod h1:EBcsNrHc3zQeuaeCeCtQruQm+n9/YjEn/vI25Lg7Gwc=
@@ -132,20 +131,6 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-radix v1.0.0/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220921224422-a8750ebbaaf2 h1:EgWDDs6gdP594+rI8f28XAQj4UvjmH12dr5afnW2mMA=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220921224422-a8750ebbaaf2/go.mod h1:zIySFJ511MMuZR7iLFF83rOXEHQNzKUfbpE8EwQoNWY=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922153805-f18737983b0f h1:hurzZumVjaE9mC1gKxwQTc+UVFyWxj5n9TWMG5/cPOU=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922153805-f18737983b0f/go.mod h1:zIySFJ511MMuZR7iLFF83rOXEHQNzKUfbpE8EwQoNWY=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922154015-4c3c23d0111e h1:FCjnCS2d0GdLHflKp8l7A/lhEnay6nKiXQ8aFQju1lk=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922154015-4c3c23d0111e/go.mod h1:zIySFJ511MMuZR7iLFF83rOXEHQNzKUfbpE8EwQoNWY=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922154659-3a364f82c7a8 h1:AeX/h2C27n/0Pdg4NxmqK2tt0BWDBGI8El5rngMdC5Q=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922154659-3a364f82c7a8/go.mod h1:zIySFJ511MMuZR7iLFF83rOXEHQNzKUfbpE8EwQoNWY=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922165744-c1baccc70022 h1:4BNeVWROX+UxhUiYmvTZ5bBIrfNf9uYfNJlxLdj03dQ=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922165744-c1baccc70022/go.mod h1:VKHzrOjplJKUqNfX5zdaf/UZLQETLvRHOAj89TF8Rkk=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922165954-dd4afb6adae4 h1:Sa6dnC17IuUyzWtil2S6T43P9g1bZ+M8lcoUP2tOu/o=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922165954-dd4afb6adae4/go.mod h1:VKHzrOjplJKUqNfX5zdaf/UZLQETLvRHOAj89TF8Rkk=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922170156-7f8d846ce7b5 h1:x4Bmc5jeWdsO80Bh9ja0ScBMdiI96cCCizkCF6aRF/c=
-github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922170156-7f8d846ce7b5/go.mod h1:VKHzrOjplJKUqNfX5zdaf/UZLQETLvRHOAj89TF8Rkk=
 github.com/aws/aws-sdk-go v1.15.11/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZoCYDt7FT0=
 github.com/aws/aws-sdk-go v1.34.9/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
 github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -1219,6 +1204,7 @@ golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5/go.mod h1:KelEdhl1UZF7XfJ
 golang.org/x/oauth2 v0.0.0-20210218202405-ba52d332ba99/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210220000619-9bb904979d93/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
+golang.org/x/oauth2 v0.0.0-20210323180902-22b0adad7558/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=
 golang.org/x/oauth2 v0.0.0-20210628180205-a41e5a781914/go.mod h1:KelEdhl1UZF7XfJ4dDtk6s++YSgaE7mD/BuKKDLBl4A=

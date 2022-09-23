@@ -32,7 +32,7 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
-	github.com/astronomer/astro/apps/core-api-bindings/golang/public v0.0.0-20220922170156-7f8d846ce7b5
+	github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi v0.0.0-00010101000000-000000000000
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/opencontainers/image-spec v1.0.2
@@ -49,7 +49,6 @@ require (
 	github.com/Microsoft/go-winio v0.4.17 // indirect
 	github.com/Microsoft/hcsshim v0.8.18 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
-	github.com/antihax/optional v1.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/goterm v1.0.0 // indirect
 	github.com/bugsnag/bugsnag-go v1.5.0 // indirect
@@ -154,3 +153,5 @@ require (
 )
 
 replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
+
+replace github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi => ./astro-client/generated/golang/astropublicapi

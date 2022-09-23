@@ -10,7 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
 
-	astroPublicApi "github.com/astronomer/astro/apps/core-api-bindings/golang/public"
+	"github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi"
 )
 
 const (
@@ -110,7 +110,7 @@ func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
 }
 
 /****** REST CLIENT ******/
-func NewAstroRESTClient(c *httputil.HTTPClient, schema string) (*astroPublicApi.APIClient, error) {
+func NewAstroRESTClient(c *httputil.HTTPClient, schema string) (*astropublicapi.APIClient, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -126,13 +126,13 @@ func NewAstroRESTClient(c *httputil.HTTPClient, schema string) (*astroPublicApi.
 		return nil, fmt.Errorf("Invalid schema: %s", schema)
 	}
 
-	client := astroPublicApi.NewAPIClient(
-		&astroPublicApi.Configuration{
+	client := astropublicapi.NewAPIClient(
+		&astropublicapi.Configuration{
 			Debug:      false, // TODO enable toggling Debug on/off
 			Scheme:     "https",
 			UserAgent:  "astro-cli",
 			HTTPClient: c.HTTPClient,
-			Servers: astroPublicApi.ServerConfigurations{
+			Servers: astropublicapi.ServerConfigurations{
 				{
 					URL:         basePath,
 					Description: fmt.Sprintf("API server for core schema: %s", schema),

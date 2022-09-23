@@ -10,12 +10,12 @@ import (
 	"github.com/pkg/errors"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	astroPublicApi "github.com/astronomer/astro/apps/core-api-bindings/golang/public"
 )
 
 var (
@@ -178,7 +178,7 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 	return nil
 }
 
-func ExportAuditLogs(publicRESTClient *astroPublicApi.APIClient, out io.Writer) error {
+func ExportAuditLogs(publicRESTClient *astropublicapi.APIClient, out io.Writer) error {
 	// get current context
 	c, err := config.GetCurrentContext()
 	if err != nil {

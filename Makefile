@@ -13,8 +13,12 @@ lint:
 	${ENVTEST_ASSETS_DIR}/golangci-lint version
 	${ENVTEST_ASSETS_DIR}/golangci-lint run --timeout 3m0s
 
-build:
+build: astro_client
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
+
+astro_client:
+	@echo "Building astro clients"
+	./astro-client/build-astro-clients.sh
 
 test:
 	go test -count=1 -cover ./...
