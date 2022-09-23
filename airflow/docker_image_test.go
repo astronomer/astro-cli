@@ -8,8 +8,10 @@ import (
 	"testing"
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,6 +24,10 @@ func TestDockerImageBuild(t *testing.T) {
 
 	cwd, err := os.Getwd()
 	assert.NoError(t, err)
+
+	dockerIgnoreFile := cwd + "/.dockerignore"
+	fileutil.WriteStringToFile(dockerIgnoreFile, "")
+	defer afero.NewOsFs().Remove(dockerIgnoreFile)
 
 	options := airflowTypes.ImageBuildConfig{
 		Path:            cwd,
@@ -55,6 +61,17 @@ func TestDockerImageBuild(t *testing.T) {
 		}
 		err = handler.Build(options)
 		assert.Contains(t, err.Error(), errMock.Error())
+	})
+
+	t.Run("unable to read file error", func(t *testing.T) {
+		options := airflowTypes.ImageBuildConfig{
+			Path:            "incorrect-path",
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+		}
+
+		err = handler.Build(options)
+		assert.Error(t, err)
 	})
 
 	cmdExec = previousCmdExec

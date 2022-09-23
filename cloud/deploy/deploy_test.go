@@ -21,9 +21,12 @@ import (
 )
 
 var (
-	errMock = errors.New("mock error")
-	org     = "test-org-id"
-	ws      = "test-ws-id"
+	errMock                  = errors.New("mock error")
+	org                      = "test-org-id"
+	ws                       = "test-ws-id"
+	initiatedDagDeploymentID = "test-dag-deployment-id"
+	deploymentID             = "test-id"
+	dagURL                   = "http://fake-url.windows.core.net"
 )
 
 func TestDeploySuccess(t *testing.T) {
@@ -39,11 +42,27 @@ func TestDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
+
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{DeploymentID: deploymentID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(2)
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentID: initiatedDagDeploymentID,
+		DeploymentID:             deploymentID,
+		Action:                   "UPLOAD",
+		VersionID:                "version-id",
+		Status:                   "SUCCEEDED",
+		Message:                  "Dags uploaded successfully",
+	}
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(2)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -124,10 +143,6 @@ func TestDagsDeploySuccess(t *testing.T) {
 			CreatedAt: time.Now(),
 		},
 	}
-
-	initiatedDagDeploymentID := "test-dag-deployment-id"
-	deploymentID := "test-id"
-	dagURL := "http://fake-url.windows.core.net"
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -230,7 +245,8 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	_, dagDeployEnabled, err := buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	assert.Equal(t, dagDeployEnabled, false)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -241,7 +257,8 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	_, dagDeployEnabled, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	assert.Equal(t, dagDeployEnabled, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
@@ -249,7 +266,8 @@ func TestBuildImageFailure(t *testing.T) {
 	dockerfile = "Dockerfile"
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
+	_, dagDeployEnabled, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
+	assert.Equal(t, dagDeployEnabled, false)
 	assert.ErrorIs(t, err, errMock)
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
