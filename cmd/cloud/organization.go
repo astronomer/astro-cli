@@ -103,5 +103,5 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []strin
 
 	// TODO handle arg and create io.Writer if filename provided
 	// TODO handle earliest param if provided
-	return orgExportAuditLogs(publicRESTClient, out)
+	return orgExportAuditLogs(astroClient, out)
 }

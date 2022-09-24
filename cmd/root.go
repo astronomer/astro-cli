@@ -49,11 +49,6 @@ func NewRootCmd() *cobra.Command {
 
 	// FIXME I think it is correct and recommended to share our HTTP client across all wrappers.
 	astroClient := astro.NewAstroClient(httpClient)
-	astroPublicRESTClient, err := astro.NewAstroRESTClient(httpClient, "public")
-	if err != nil {
-		// TODO better error handling
-		panic(err)
-	}
 
 	ctx := cloudPlatform
 	currCtx := context.IsCloudContext()

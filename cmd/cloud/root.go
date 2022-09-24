@@ -11,13 +11,11 @@ import (
 
 var (
 	astroClient      astro.Client
-	publicRESTClient *astropublicapi.APIClient
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
-func AddCmds(client astro.Client, prc *astropublicapi.APIClient, out io.Writer) []*cobra.Command {
+func AddCmds(client astro.Client, out io.Writer) []*cobra.Command {
 	astroClient = client
-	publicRESTClient = prc
 	return []*cobra.Command{
 		newDeployCmd(),
 		newDeploymentRootCmd(out),
