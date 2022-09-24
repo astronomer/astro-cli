@@ -4,13 +4,12 @@ import (
 	"io"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	astroClient      astro.Client
+	astroClient astro.Client
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import

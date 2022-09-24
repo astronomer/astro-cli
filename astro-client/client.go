@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
-
-	"github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi"
 )
 
 const (
@@ -54,43 +53,42 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 		},
 	}
 
-	return api.DoPublic(doOpts)
+	return api.DoPublicGraphQLQuery(doOpts)
 }
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
-func (r *Request) DoPublic() (*Response, error) {
-	return r.DoWithPublicClient(NewAstroClient(httputil.NewHTTPClient()))
-}
-
-// Do executes a query against the Astrohub API, logging out any errors contained in the response object
-func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
+// DoPublicRESTQuery executes a query against core API
+func (c *HTTPClient) DoPublicRESTQuery(opts httputil.DoOptions) (*httputil.HTTPResponse, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
-	// set headers
 	if cl.Token != "" {
-		doOpts.Headers["authorization"] = cl.Token
+		opts.Headers["authorization"] = cl.Token
 	}
-	doOpts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
-	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
+	opts.Path = cl.GetPublicRESTAPIURL() + opts.Path
 
-	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", cl.GetPublicAPIURL(), &doOpts)
+	return c.DoPublic(opts)
+}
+
+// DoPublicGraphQLQuery executes a query against Astrohub GraphQL API, logging out any errors contained in the response object
+func (c *HTTPClient) DoPublicGraphQLQuery(opts httputil.DoOptions) (*Response, error) {
+	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	defer httpResponse.Body.Close()
 
-	body, err := io.ReadAll(httpResponse.Body)
-	if err != nil {
-		return nil, err
+	if cl.Token != "" {
+		opts.Headers["authorization"] = cl.Token
 	}
+	opts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
+	opts.Headers["apollographql-client-version"] = version.CurrVersion
+	opts.Method = http.MethodPost
+	opts.Path = cl.GetPublicGraphQLAPIURL()
 
-	response = httputil.HTTPResponse{
-		Raw:  httpResponse,
-		Body: string(body),
+	response, err := c.DoPublic(opts)
+	if err != nil {
+		return nil, fmt.Errorf("Error processing GraphQL request: %s", err)
 	}
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
@@ -109,36 +107,22 @@ func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
 	return &decode, nil
 }
 
-/****** REST CLIENT ******/
-func NewAstroRESTClient(c *httputil.HTTPClient, schema string) (*astropublicapi.APIClient, error) {
-	cl, err := context.GetCurrentContext()
+func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*httputil.HTTPResponse, error) {
+	httpResponse, err := c.HTTPClient.Do(&doOpts)
+	if err != nil {
+		return nil, err
+	}
+	defer httpResponse.Body.Close()
+
+	body, err := io.ReadAll(httpResponse.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var basePath string
-	switch schema {
-	case "public":
-		basePath = fmt.Sprintf("https://api.%s/v1alpha1", cl.Domain)
-	case "internal":
-		basePath = fmt.Sprintf("https://api.%s/internal/v1alpha1", cl.Domain)
-	default:
-		return nil, fmt.Errorf("Invalid schema: %s", schema)
+	response := &httputil.HTTPResponse{
+		Raw:  httpResponse,
+		Body: string(body),
 	}
 
-	client := astropublicapi.NewAPIClient(
-		&astropublicapi.Configuration{
-			Debug:      false, // TODO enable toggling Debug on/off
-			Scheme:     "https",
-			UserAgent:  "astro-cli",
-			HTTPClient: c.HTTPClient,
-			Servers: astropublicapi.ServerConfigurations{
-				{
-					URL:         basePath,
-					Description: fmt.Sprintf("API server for core schema: %s", schema),
-				},
-			},
-		},
-	)
-	return client, nil
+	return response, nil
 }

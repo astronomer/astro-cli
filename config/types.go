@@ -18,6 +18,7 @@ type cfgs struct {
 	LocalAstro           cfg
 	LocalCore            cfg
 	LocalPublicAstro     cfg
+	LocalPublicRESTAstro cfg
 	LocalRegistry        cfg
 	LocalHouston         cfg
 	LocalPlatform        cfg

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
@@ -164,8 +165,10 @@ func (c *Client) DoWithContext(doOpts httputil.DoOptions, ctx *config.Context) (
 		doOpts.Headers["authorization"] = ctx.Token
 	}
 	newLogger.Debugf("Request Data: %v\n", string(doOpts.Data))
+	doOpts.Method = http.MethodPost
+	doOpts.Path = ctx.GetSoftwareAPIURL()
 	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", ctx.GetSoftwareAPIURL(), &doOpts)
+	httpResponse, err := c.HTTPClient.Do(&doOpts)
 	if err != nil {
 		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err

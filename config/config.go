@@ -57,6 +57,7 @@ var (
 		LocalAstro:           newCfg("local.astrohub", "http://localhost:8871/v1"),
 		LocalCore:            newCfg("local.core", "http://localhost:8888/v1alpha1"),
 		LocalPublicAstro:     newCfg("local.public_astrohub", "http://localhost:8871/graphql"),
+		LocalPublicRESTAstro: newCfg("local.public_rest_astro", "http://localhost:8888/v1alpha1"),
 		LocalRegistry:        newCfg("local.registry", "localhost:5555"),
 		LocalHouston:         newCfg("local.houston", ""),
 		LocalPlatform:        newCfg("local.platform", CloudPlatform),

@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 
 	"github.com/pkg/errors"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/astro-client/generated/golang/astropublicapi"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -44,6 +44,7 @@ func newTableOut() *printutil.Table {
 	}
 }
 
+// TODO use astro.go wrapper around REST client
 func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	var orgDomain string
 	if c.Domain == "localhost" {
@@ -56,8 +57,10 @@ func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"authorization": authToken},
+		Path:    orgDomain,
+		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do("GET", orgDomain, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return []OrgRes{}, fmt.Errorf("could not retrieve organization list: %w", err)
 	}
@@ -178,23 +181,11 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 	return nil
 }
 
-func ExportAuditLogs(publicRESTClient *astropublicapi.APIClient, out io.Writer) error {
-	// get current context
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, "ContextAccessToken", c.Token)
-
-	// FIXME need org short name
-	requestParameters := publicRESTClient.OrganizationApi.GetOrganizationAuditLogs(ctx, "astronomer")
-	_, resp, err := publicRESTClient.OrganizationApi.GetOrganizationAuditLogsExecute(requestParameters)
+func ExportAuditLogs(client astro.Client, out io.Writer) error {
+	resp, err := client.GetOrganizationAuditLogs()
 	if err != nil {
 		return err
 	}
 	fmt.Println(resp)
-
 	return nil
 }

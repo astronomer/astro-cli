@@ -3,6 +3,9 @@ package astro
 import (
 	"errors"
 	"fmt"
+	"net/http"
+
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 type Client interface {
@@ -32,6 +35,7 @@ type Client interface {
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
 	GetOrganizations() ([]Organization, error)
+	GetOrganizationAuditLogs() (string, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -285,4 +289,17 @@ func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
 		return []Organization{}, err
 	}
 	return resp.Data.GetOrganizations, nil
+}
+
+func (c *HTTPClient) GetOrganizationAuditLogs() (string, error) {
+	doOpts := httputil.DoOptions{
+		Method:  http.MethodGet,
+		Headers: make(map[string]string),
+		Path:    "/organizations/astronomer/audit-logs",
+	}
+	resp, err := c.DoPublicRESTQuery(doOpts)
+	if err != nil {
+		return "", err
+	}
+	return resp.Body, nil
 }

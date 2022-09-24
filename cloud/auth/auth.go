@@ -84,8 +84,10 @@ func orgLookup(domain string) (string, error) {
 		Data:    reqData,
 		Context: ctx,
 		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
-	res, err := httpClient.Do("POST", addr, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return "", err
 	}
@@ -118,8 +120,10 @@ func requestToken(authConfig astro.AuthConfig, verifier, code string) (Result, e
 		Data:    []byte(data.Encode()),
 		Context: ctx,
 		Headers: map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
-	res, err := httpClient.Do("POST", addr, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return Result{}, fmt.Errorf("could not retrieve token: %w", err)
 	}
@@ -473,8 +477,10 @@ func ValidateDomain(domain string) (astro.AuthConfig, error) {
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
+		Path:    addr,
+		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do("GET", addr, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return authConfig, err
 	}

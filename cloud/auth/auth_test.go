@@ -190,7 +190,11 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		go func() {
 			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
 
-			_, err = httpClient.Do("GET", "http://localhost:12345/callback?code=test", &httputil.DoOptions{}) //nolint
+			opts := &httputil.DoOptions{
+				Method: http.MethodGet,
+				Path:   "http://localhost:12345/callback?code=test",
+			}
+			_, err = httpClient.Do(opts) // nolint
 			assert.NoError(t, err)
 		}()
 		code, err := authorizeCallbackHandler()
