@@ -8,9 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	astroClient astro.Client
-)
+var astroClient astro.Client
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
 func AddCmds(client astro.Client, out io.Writer) []*cobra.Command {
