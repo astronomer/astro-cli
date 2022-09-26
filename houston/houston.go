@@ -133,7 +133,7 @@ func (r *Request) DoWithClient(api *Client) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Data: req,
 		Headers: map[string]string{
 			"Accept": "application/json",
@@ -149,7 +149,7 @@ func (r *Request) Do() (*Response, error) {
 }
 
 // Do fetches the current context, and returns Houston API response, error
-func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
+func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 }
 
 // DoWithContext executes a query against the Houston API, logging out any errors contained in the response object
-func (c *Client) DoWithContext(doOpts httputil.DoOptions, ctx *config.Context) (*Response, error) {
+func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) (*Response, error) {
 	// set headers
 	if ctx.Token != "" {
 		doOpts.Headers["authorization"] = ctx.Token
@@ -168,7 +168,7 @@ func (c *Client) DoWithContext(doOpts httputil.DoOptions, ctx *config.Context) (
 	doOpts.Method = http.MethodPost
 	doOpts.Path = ctx.GetSoftwareAPIURL()
 	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do(&doOpts)
+	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
 		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err

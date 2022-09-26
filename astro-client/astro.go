@@ -298,7 +298,7 @@ func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (str
 	shortNameRegex := regexp.MustCompile("[^a-z0-9-]")
 	orgShortName := strings.ToLower(orgName)
 	orgShortName = shortNameRegex.ReplaceAllString(orgShortName, "")
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Method:  http.MethodGet,
 		Headers: make(map[string]string),
 		Path:    fmt.Sprintf("/organizations/%s/audit-logs?earliest=%d", orgShortName, earliest),

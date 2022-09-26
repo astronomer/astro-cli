@@ -34,7 +34,7 @@ type Request struct{}
 
 // DoWithClient (request) is a wrapper to more easily pass variables to a client.Do request
 func (r *Request) DoWithClient(api *Client) (*Response, error) {
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Headers: map[string]string{
 			"Accept": "application/json",
 		},
@@ -49,14 +49,14 @@ func (r *Request) Do() (*Response, error) {
 }
 
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
-func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
+func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 	var response httputil.HTTPResponse
 	doOpts.Path = RuntimeReleaseURL
 	if c.useAstronomerCertified {
 		doOpts.Path = AirflowReleaseURL
 	}
 	doOpts.Method = http.MethodGet
-	httpResponse, err := c.HTTPClient.Do(&doOpts)
+	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
 		return nil, err
 	}

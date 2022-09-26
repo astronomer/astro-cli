@@ -189,6 +189,9 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 	}
 	// `out` can be either `os.Stdout` or a `bufio.NewWriter` from a `File`. The `File` type does not implement a `WriteString` method,
 	// so the command bellow will trigger a second copy (see https://cs.opensource.google/go/go/+/refs/tags/go1.19.1:src/io/io.go;l=311)
-	io.WriteString(out, resp)
+	_, err = io.WriteString(out, resp)
+	if err != nil {
+		return err
+	}
 	return nil
 }

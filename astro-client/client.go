@@ -46,7 +46,7 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Data: data,
 		Headers: map[string]string{
 			"Accept": "application/json",
@@ -57,36 +57,36 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 }
 
 // DoPublicRESTQuery executes a query against core API
-func (c *HTTPClient) DoPublicRESTQuery(opts httputil.DoOptions) (*httputil.HTTPResponse, error) {
+func (c *HTTPClient) DoPublicRESTQuery(doOpts *httputil.DoOptions) (*httputil.HTTPResponse, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
 	if cl.Token != "" {
-		opts.Headers["authorization"] = cl.Token
+		doOpts.Headers["authorization"] = cl.Token
 	}
-	opts.Path = cl.GetPublicRESTAPIURL() + opts.Path
+	doOpts.Path = cl.GetPublicRESTAPIURL() + doOpts.Path
 
-	return c.DoPublic(opts)
+	return c.DoPublic(doOpts)
 }
 
 // DoPublicGraphQLQuery executes a query against Astrohub GraphQL API, logging out any errors contained in the response object
-func (c *HTTPClient) DoPublicGraphQLQuery(opts httputil.DoOptions) (*Response, error) {
+func (c *HTTPClient) DoPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
 	if cl.Token != "" {
-		opts.Headers["authorization"] = cl.Token
+		doOpts.Headers["authorization"] = cl.Token
 	}
-	opts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
-	opts.Headers["apollographql-client-version"] = version.CurrVersion
-	opts.Method = http.MethodPost
-	opts.Path = cl.GetPublicGraphQLAPIURL()
+	doOpts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
+	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
+	doOpts.Method = http.MethodPost
+	doOpts.Path = cl.GetPublicGraphQLAPIURL()
 
-	response, err := c.DoPublic(opts)
+	response, err := c.DoPublic(doOpts)
 	if err != nil {
 		return nil, fmt.Errorf("Error processing GraphQL request: %s", err)
 	}
@@ -107,8 +107,8 @@ func (c *HTTPClient) DoPublicGraphQLQuery(opts httputil.DoOptions) (*Response, e
 	return &decode, nil
 }
 
-func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*httputil.HTTPResponse, error) {
-	httpResponse, err := c.HTTPClient.Do(&doOpts)
+func (c *HTTPClient) DoPublic(doOpts *httputil.DoOptions) (*httputil.HTTPResponse, error) {
+	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
 		return nil, err
 	}
