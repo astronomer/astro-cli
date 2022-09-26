@@ -3,6 +3,7 @@ package cloud
 import (
 	"bufio"
 	"io"
+	"io/fs"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -106,8 +107,9 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []strin
 	cmd.SilenceUsage = true
 
 	if auditLogsOutputFilePath != "" {
+		var filePerms fs.FileMode = 0o755
 		// In CLI mode we should not need to close f
-		f, err := os.OpenFile(auditLogsOutputFilePath, os.O_RDWR|os.O_CREATE, 0755)
+		f, err := os.OpenFile(auditLogsOutputFilePath, os.O_RDWR|os.O_CREATE, filePerms)
 		if err != nil {
 			return err
 		}
