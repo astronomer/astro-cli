@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -35,7 +37,7 @@ type Client interface {
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
 	GetOrganizations() ([]Organization, error)
-	GetOrganizationAuditLogs(earliest int) (string, error)
+	GetOrganizationAuditLogs(orgName string, earliest int) (string, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -291,11 +293,15 @@ func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
 	return resp.Data.GetOrganizations, nil
 }
 
-func (c *HTTPClient) GetOrganizationAuditLogs(earliest int) (string, error) {
+func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (string, error) {
+	// An organization short name has only lower case characters and is stripped of non-alphanumeric characters (expect for hyphens)
+	shortNameRegex := regexp.MustCompile("[^a-z0-9-]")
+	orgShortName := strings.ToLower(orgName)
+	orgShortName = shortNameRegex.ReplaceAllString(orgShortName, "")
 	doOpts := httputil.DoOptions{
 		Method:  http.MethodGet,
 		Headers: make(map[string]string),
-		Path:    fmt.Sprintf("/organizations/astronomer/audit-logs?earliest=%d", earliest),
+		Path:    fmt.Sprintf("/organizations/%s/audit-logs?earliest=%d", orgShortName, earliest),
 	}
 	resp, err := c.DoPublicRESTQuery(doOpts)
 	if err != nil {

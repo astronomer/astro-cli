@@ -65,10 +65,11 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "export-audit-logs --output-file [output_file.json]",
-		Aliases: []string{"sw"},
+		Use:     "export-audit-logs [organization_name] --output-file [output_file.json]",
+		Aliases: []string{"eal"},
 		Short:   "Export your organization audit logs. Requires being an organization owner.",
 		Long:    "Export your organization audit logs. Requires being an organization owner.",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationExportAuditLogs(cmd, out, args)
 		},
@@ -112,5 +113,7 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []strin
 		out = bufio.NewWriter(f)
 	}
 
-	return orgExportAuditLogs(astroClient, out, auditLogsEarliestParam)
+	organizationName := args[0]
+
+	return orgExportAuditLogs(astroClient, out, organizationName, auditLogsEarliestParam)
 }
