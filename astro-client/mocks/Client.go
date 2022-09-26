@@ -184,6 +184,27 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	return r0, r1
 }
 
+// GetOrganizationAuditLogs provides a mock function with given fields: orgName, earliest
+func (_m *Client) GetOrganizationAuditLogs(orgName string, earliest int) (string, error) {
+	ret := _m.Called(orgName, earliest)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, int) string); ok {
+		r0 = rf(orgName, earliest)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, int) error); ok {
+		r1 = rf(orgName, earliest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetOrganizations provides a mock function with given fields:
 func (_m *Client) GetOrganizations() ([]astro.Organization, error) {
 	ret := _m.Called()
