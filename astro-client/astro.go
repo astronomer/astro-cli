@@ -35,7 +35,7 @@ type Client interface {
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
 	GetOrganizations() ([]Organization, error)
-	GetOrganizationAuditLogs() (string, error)
+	GetOrganizationAuditLogs(earliest int) (string, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -291,11 +291,11 @@ func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
 	return resp.Data.GetOrganizations, nil
 }
 
-func (c *HTTPClient) GetOrganizationAuditLogs() (string, error) {
+func (c *HTTPClient) GetOrganizationAuditLogs(earliest int) (string, error) {
 	doOpts := httputil.DoOptions{
 		Method:  http.MethodGet,
 		Headers: make(map[string]string),
-		Path:    "/organizations/astronomer/audit-logs",
+		Path:    fmt.Sprintf("/organizations/astronomer/audit-logs?earliest=%d", earliest),
 	}
 	resp, err := c.DoPublicRESTQuery(doOpts)
 	if err != nil {

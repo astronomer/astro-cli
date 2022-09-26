@@ -181,11 +181,13 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 	return nil
 }
 
-func ExportAuditLogs(client astro.Client, out io.Writer) error {
-	resp, err := client.GetOrganizationAuditLogs()
+// Write the audit logs to the provided io.Writer.
+// This means we have two copies from the original network buffer: one in DoPublic() and another here.
+func ExportAuditLogs(client astro.Client, out io.Writer, earliest int) error {
+	resp, err := client.GetOrganizationAuditLogs(earliest)
 	if err != nil {
 		return err
 	}
-	fmt.Println(resp)
+	io.WriteString(out, resp)
 	return nil
 }

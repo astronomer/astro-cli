@@ -1,7 +1,9 @@
 package cloud
 
 import (
+	"bufio"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -101,7 +103,14 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []strin
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	// TODO handle arg and create io.Writer if filename provided
-	// TODO handle earliest param if provided
-	return orgExportAuditLogs(astroClient, out)
+	if auditLogsOutputFilePath != "" {
+		// In CLI mode we should not need to close f
+		f, err := os.OpenFile(auditLogsOutputFilePath, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			return err
+		}
+		out = bufio.NewWriter(f)
+	}
+
+	return orgExportAuditLogs(astroClient, out, auditLogsEarliestParam)
 }
