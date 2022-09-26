@@ -8,6 +8,7 @@ airflow/pod-config.yml
 airflow_settings_dev.yaml
 astro
 astro-cli
+astro-client/generated/
 cover.out
 coverage.txt
 dist/
@@ -16,4 +17,3 @@ packages.txt
 requirements.txt
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile
-astro-client/generated/
