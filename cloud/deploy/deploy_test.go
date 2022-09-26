@@ -171,6 +171,38 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestDagsDeployVR(t *testing.T) {
+	runtimeID := "vr-test-id"
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, errMock).Times(1)
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentID: initiatedDagDeploymentID,
+		RuntimeID:                runtimeID,
+		Action:                   "UPLOAD",
+		VersionID:                "version-id",
+		Status:                   "SUCCEEDED",
+		Message:                  "Dags uploaded successfully",
+	}
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
+
+	err := Deploy("./testfiles", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.NoError(t, err)
+
+	err = Deploy("./testfiles", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.ErrorIs(t, err, errMock)
+
+	mockClient.AssertExpectations(t)
+}
+
 func TestDeployFailure(t *testing.T) {
 	// no context set failure
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
