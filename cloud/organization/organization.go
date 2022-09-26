@@ -182,12 +182,13 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 }
 
 // Write the audit logs to the provided io.Writer.
-// This means we have two copies from the original network buffer: one in DoPublic() and another here.
 func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
 	resp, err := client.GetOrganizationAuditLogs(orgName, earliest)
 	if err != nil {
 		return err
 	}
+	// `out` can be either `os.Stdout` or a `bufio.NewWriter` from a `File`. The `File` type does not implement a `WriteString` method,
+	// so the command bellow will trigger a second copy (see https://cs.opensource.google/go/go/+/refs/tags/go1.19.1:src/io/io.go;l=311)
 	io.WriteString(out, resp)
 	return nil
 }
