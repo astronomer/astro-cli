@@ -39,7 +39,7 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		doOpts := httputil.DoOptions{
+		doOpts := &httputil.DoOptions{
 			Headers: map[string]string{
 				"Accept": "application/json",
 			},
