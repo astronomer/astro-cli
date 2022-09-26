@@ -69,8 +69,8 @@ type deploymentInfo struct {
 	webserverURL   string
 }
 
-func deployDags(path string, deployInfo *deploymentInfo, client astro.Client) error {
-	dagDeployment, err := deployment.Initiate(deployInfo.deploymentID, client)
+func deployDags(path, runtimeID string, client astro.Client) error {
+	dagDeployment, err := deployment.Initiate(runtimeID, client)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func deployDags(path string, deployInfo *deploymentInfo, client astro.Client) er
 		status = "FAILED"
 	}
 
-	_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, deployInfo.deploymentID, action, versionID, status, message, client)
+	_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, runtimeID, action, versionID, status, message, client)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func deployDags(path string, deployInfo *deploymentInfo, client astro.Client) er
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error {
+func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error {
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -139,7 +139,19 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		domain = splitDomain[1]
 	}
 
-	deployInfo, err := getDeploymentInfo(deploymentID, wsID, deploymentName, prompt, domain, client)
+	// Deploy dags if input id is virtual runtime
+	if strings.HasPrefix(runtimeID, "vr-") {
+		fmt.Println("Initiating DAGs Deployment for: " + runtimeID)
+		err = deployDags(path, runtimeID, client)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Successfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
+		return nil
+	}
+
+	deployInfo, err := getDeploymentInfo(runtimeID, wsID, deploymentName, prompt, domain, client)
 	if err != nil {
 		return err
 	}
@@ -148,7 +160,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 
 	if dags {
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-		err = deployDags(path, &deployInfo, client)
+		err = deployDags(path, deployInfo.deploymentID, client)
 		if err != nil {
 			return err
 		}
@@ -207,7 +219,7 @@ func Deploy(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName
 		}
 
 		if dagDeployEnabled {
-			err = deployDags(path, &deployInfo, client)
+			err = deployDags(path, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
