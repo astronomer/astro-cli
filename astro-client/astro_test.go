@@ -571,7 +571,7 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		Data: ResponseData{
 			ReportDagDeploymentStatus: DagDeploymentStatus{
 				ID:            "test-id",
-				DeploymentID:  "test-deployment-id",
+				RuntimeID:     "test-runtime-id",
 				Action:        "test-action",
 				VersionID:     "test-version-id",
 				Status:        "test-status",

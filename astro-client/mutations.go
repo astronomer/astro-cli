@@ -123,7 +123,7 @@ var (
 	mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
 		reportDagDeploymentStatus(input: $input) {
 			id
-			deploymentId
+			runtimeId
 			action
 			versionId
 			status

@@ -6,10 +6,10 @@ import (
 )
 
 // Initiates a Dag Deployment Request
-func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeployment, error) {
+func Initiate(runtimeID string, client astro.Client) (astro.InitiateDagDeployment, error) {
 	// create initiate dag deployment input
 	initiateDagDeploymentInput := astro.InitiateDagDeploymentInput{
-		DeploymentID: deploymentID,
+		RuntimeID: runtimeID,
 	}
 
 	// initiate dag deployment
@@ -22,11 +22,11 @@ func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeploy
 }
 
 // Report upload dags status back to astro
-func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
+func ReportDagDeploymentStatus(initiatedDagDeploymentID, runtimeID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
 	// create report dag deployment status input
 	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
 		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		DeploymentID:             deploymentID,
+		RuntimeID:                runtimeID,
 		Action:                   action,
 		VersionID:                versionID,
 		Status:                   status,

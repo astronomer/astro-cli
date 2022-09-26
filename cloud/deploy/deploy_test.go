@@ -25,7 +25,7 @@ var (
 	org                      = "test-org-id"
 	ws                       = "test-ws-id"
 	initiatedDagDeploymentID = "test-dag-deployment-id"
-	deploymentID             = "test-id"
+	runtimeID                = "test-id"
 	dagURL                   = "http://fake-url.windows.core.net"
 )
 
@@ -48,7 +48,7 @@ func TestDeploySuccess(t *testing.T) {
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{DeploymentID: deploymentID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(2)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(2)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -56,7 +56,7 @@ func TestDeploySuccess(t *testing.T) {
 
 	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
 		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		DeploymentID:             deploymentID,
+		RuntimeID:                runtimeID,
 		Action:                   "UPLOAD",
 		VersionID:                "version-id",
 		Status:                   "SUCCEEDED",
@@ -149,7 +149,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{DeploymentID: deploymentID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -157,7 +157,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
 		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		DeploymentID:             deploymentID,
+		RuntimeID:                runtimeID,
 		Action:                   "UPLOAD",
 		VersionID:                "version-id",
 		Status:                   "SUCCEEDED",

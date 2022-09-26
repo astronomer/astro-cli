@@ -15,12 +15,12 @@ var errorMock = errors.New("mock error")
 func TestInitiate(t *testing.T) {
 	initiatedDagDeploymentID := "test-dag-deployment-id"
 	dagURL := "test-dag-url"
-	deploymentID := "test-id"
+	runtimeID := "test-id"
 	t.Run("initiate dag deployment with correct deployment ID", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{DeploymentID: deploymentID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Once()
+		mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Once()
 
-		initiateDagDeployment, err := Initiate(deploymentID, mockClient)
+		initiateDagDeployment, err := Initiate(runtimeID, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, initiatedDagDeploymentID, initiateDagDeployment.ID)
 		assert.Equal(t, dagURL, initiateDagDeployment.DagURL)
@@ -29,9 +29,9 @@ func TestInitiate(t *testing.T) {
 
 	t.Run("failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{DeploymentID: deploymentID}).Return(astro.InitiateDagDeployment{}, errorMock).Once()
+		mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{}, errorMock).Once()
 
-		_, err := Initiate(deploymentID, mockClient)
+		_, err := Initiate(runtimeID, mockClient)
 		assert.ErrorIs(t, err, errorMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -40,7 +40,7 @@ func TestInitiate(t *testing.T) {
 func TestReportDagDeploymentStatus(t *testing.T) {
 	initiatedDagDeploymentID := "test-dag-deployment-id"
 	dagDeploymentStatusID := "test-dag-deployment-status-id"
-	deploymentID := "test-id"
+	runtimeID := "test-id"
 	action := "UPLOAD"
 	versionID := "version-id"
 	status := "SUCCESS"
@@ -53,7 +53,7 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockResponse := astro.DagDeploymentStatus{
 			ID:            dagDeploymentStatusID,
-			DeploymentID:  deploymentID,
+			RuntimeID:     runtimeID,
 			Action:        action,
 			VersionID:     versionID,
 			Status:        status,
@@ -64,10 +64,10 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		}
 		mockClient.On("ReportDagDeploymentStatus", mock.Anything).Return(mockResponse, nil).Once()
 
-		dagDeploymentStatus, err := ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message, mockClient)
+		dagDeploymentStatus, err := ReportDagDeploymentStatus(initiatedDagDeploymentID, runtimeID, action, versionID, status, message, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, dagDeploymentStatusID, dagDeploymentStatus.ID)
-		assert.Equal(t, deploymentID, dagDeploymentStatus.DeploymentID)
+		assert.Equal(t, runtimeID, dagDeploymentStatus.RuntimeID)
 		assert.Equal(t, action, dagDeploymentStatus.Action)
 		assert.Equal(t, versionID, dagDeploymentStatus.VersionID)
 		assert.Equal(t, status, dagDeploymentStatus.Status)
@@ -83,7 +83,7 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ReportDagDeploymentStatus", mock.Anything).Return(astro.DagDeploymentStatus{}, errorMock).Once()
 
-		_, err := ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message, mockClient)
+		_, err := ReportDagDeploymentStatus(initiatedDagDeploymentID, runtimeID, action, versionID, status, message, mockClient)
 		assert.ErrorIs(t, err, errorMock)
 		mockClient.AssertExpectations(t)
 	})
