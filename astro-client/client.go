@@ -88,7 +88,7 @@ func (c *HTTPClient) DoPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response
 
 	response, err := c.DoPublic(doOpts)
 	if err != nil {
-		return nil, fmt.Errorf("Error processing GraphQL request: %s", err)
+		return nil, fmt.Errorf("Error processing GraphQL request: %w", err)
 	}
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)

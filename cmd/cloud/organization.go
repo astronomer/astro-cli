@@ -12,11 +12,12 @@ import (
 
 var (
 	shouldDisplayLoginLink bool
-	orgList                 = organization.List
-	orgSwitch               = organization.Switch
-	orgExportAuditLogs      = organization.ExportAuditLogs
-	auditLogsOutputFilePath string
-	auditLogsEarliestParam  int
+	orgList                            = organization.List
+	orgSwitch                          = organization.Switch
+	orgExportAuditLogs                 = organization.ExportAuditLogs
+	auditLogsOutputFilePath            string
+	auditLogsEarliestParam             int
+	auditLogsEarliestParamDefaultValue = 90
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -76,7 +77,7 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.PersistentFlags().IntVarP(
-		&auditLogsEarliestParam, "earliest", "e", 90,
+		&auditLogsEarliestParam, "earliest", "e", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90. Defaults to 90 days.")
 	return cmd
 }
