@@ -93,7 +93,7 @@ func TestContextGetPublicAPIURL(t *testing.T) {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
-			if got := c.GetPublicAPIURL(); got != tt.want {
+			if got := c.GetPublicGraphQLAPIURL(); got != tt.want {
 				t.Errorf("Context.GetPublicAPIURL() = %v, want %v", got, tt.want)
 			}
 		})
