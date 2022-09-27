@@ -135,7 +135,7 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	return nil
 }
 
-func (d *DockerImage)Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
 	// Change to location of Dockerfile
 	err := os.Chdir(config.Path)
 	if err != nil {
@@ -200,7 +200,7 @@ func (d *DockerImage)Pytest(pytestFile, airflowHome, envFile string, pytestArgs 
 	}
 
 	// delete container
-	err = cmdExec(DockerCmd, stdout, stderr, "rm", "astro-pytest",)
+	err = cmdExec(DockerCmd, stdout, stderr, "rm", "astro-pytest")
 	if err != nil {
 		return outb.String(), fmt.Errorf("command 'docker rm astro-pytest failed: %w", err)
 	}

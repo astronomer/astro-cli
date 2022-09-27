@@ -26,7 +26,6 @@ var (
 	runtimeVersion         string
 	airflowVersion         string
 	envFile                string
-	pytestFile             string
 	customImageName        string
 	settingsFile           string
 	pytestArgs             []string

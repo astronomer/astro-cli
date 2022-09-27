@@ -24,7 +24,6 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/command/inspect"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -344,39 +343,22 @@ func (d *DockerCompose) Run(args []string, user string) error {
 func (d *DockerCompose) Pytest(pytestArgs []string, projectImageName string) (string, error) {
 	// projectImageName may be provided to the function if it is being used in the deploy command
 	if projectImageName == "" {
-		var err error
-		// get same image as what's used for other dev commands
-		// This makes it so we don't have to rebuild this image if it was used in other commands
-		projectImageName, err = ProjectNameUnique()
-		if err != nil {
-			return "", errors.Wrap(err, "error retrieving working directory")
-		}
-
-		projectImageName = ImageName(projectImageName, "latest")
 		// build image
-		if imageName == "" {
-			err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
-			if err != nil {
-				return "", err
-			}
-		} else {
-			// skip build if an imageName is passed
-			err := d.imageHandler.TagLocalImage(imageName)
-			if err != nil {
-				return "", err
-			}
+		err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+		if err != nil {
+			return "", err
 		}
 	}
 
 	// determine pytest args and file
 	var pytestFile string
-	if  len(pytestArgs) > 0 {
+	if len(pytestArgs) > 0 {
 		pytestFile = pytestArgs[0]
 	}
 	if len(strings.Fields(pytestFile)) > 1 {
 		pytestArgs = strings.Fields(pytestFile)
 		pytestFile = ""
-	} else if  len(pytestArgs) > 1{
+	} else if len(pytestArgs) > 1 {
 		pytestArgs = strings.Fields(pytestArgs[1])
 	}
 
@@ -395,8 +377,8 @@ func (d *DockerCompose) Pytest(pytestArgs []string, projectImageName string) (st
 		return "", err
 	}
 	if strings.Contains(exitCode, "0") { // if the error code is 0 the pytests passed
-			return "", nil
-		}
+		return "", nil
+	}
 	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
@@ -595,20 +577,6 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage str
 		Filename: "compose.yaml",
 		Content:  []byte(yaml),
 	})
-
-	// if !pytest {
-	// 	composeFile := "docker-compose.override.yml"
-	// 	composeBytes, err := os.ReadFile(composeFile)
-	// 	if err != nil && !os.IsNotExist(err) {
-	// 		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeFile)
-	// 	}
-	// 	if err == nil {
-	// 		configs = append(configs, types.ConfigFile{
-	// 			Filename: "docker-compose.override.yml",
-	// 			Content:  composeBytes,
-	// 		})
-	// 	}
-	// }
 
 	var loadOptions []func(*loader.Options)
 
