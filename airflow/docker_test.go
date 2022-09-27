@@ -15,7 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/cli/cli/command/inspect"
+	// "github.com/docker/cli/cli/command/inspect"
 	"github.com/docker/compose/v2/pkg/api"
 	docker_types "github.com/docker/docker/api/types"
 	"github.com/spf13/afero"
@@ -23,12 +23,17 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+<<<<<<< HEAD
 var (
 	errMockDocker   = errors.New("mock docker compose error")
 	errMockSettings = errors.New("mock Settings error")
 )
 
 var airflowVersionLabel = "2.2.5"
+=======
+var errMockDocker = errors.New("mock docker compose error")
+var errMockPytest = errors.New("pytest error")
+>>>>>>> 19e0f7c6 (update pytest and parse command)
 
 func TestRepositoryName(t *testing.T) {
 	assert.Equal(t, repositoryName("test-repo"), "test-repo/airflow")
@@ -52,7 +57,7 @@ func TestGenerateConfig(t *testing.T) {
 	err := afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	assert.NoError(t, err)
 	config.InitConfig(fs)
-	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "", map[string]string{}, false)
+	cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", map[string]string{})
 	assert.NoError(t, err)
 	expectedCfg := `version: '3.1'
 
@@ -185,7 +190,7 @@ func TestCheckTriggererEnabled(t *testing.T) {
 
 func TestDockerComposeInit(t *testing.T) {
 	testUtils.InitTestConfig(testUtils.LocalPlatform)
-	_, err := DockerComposeInit("./testfiles", "", "Dockerfile", "", false)
+	_, err := DockerComposeInit("./testfiles", "", "Dockerfile", "")
 	assert.NoError(t, err)
 }
 
@@ -612,152 +617,149 @@ func TestDockerComposePytest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Twice()
-		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
+		// imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, []string{}, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
 
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Twice()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Twice()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Twice()
+		// composeMock := new(mocks.DockerComposeAPI)
+		// composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+		// composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+		// composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
 
-		mockResponse := "0"
-		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
-			io.WriteString(out, mockResponse)
-			return nil
-		}
+		// mockResponse := "0"
+		// inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
+		// 	io.WriteString(out, mockResponse)
+		// 	return nil
+		// }
 
-		mockDockerCompose.composeService = composeMock
+		// mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest("", "test", "")
+		resp, err := mockDockerCompose.Pytest([]string{}, "")
+
 		assert.NoError(t, err)
 		assert.Equal(t, "", resp)
-
-		resp, err = mockDockerCompose.Pytest("custom-image", "test", "")
-		assert.NoError(t, err)
-		assert.Equal(t, "", resp)
-
-		composeMock.AssertExpectations(t)
+		// composeMock.AssertExpectations(t)
 		imageHandler.AssertExpectations(t)
 	})
 
 	t.Run("unexpected exit code", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		// imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("1", nil).Once()
 
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
+		// composeMock := new(mocks.DockerComposeAPI)
+		// composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+		// composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+		// composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
 
 		mockResponse := "1"
-		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
-			io.WriteString(out, mockResponse)
-			return nil
-		}
+		// inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
+		// 	io.WriteString(out, mockResponse)
+		// 	return nil
+		// }
 
-		mockDockerCompose.composeService = composeMock
+		// mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest("", "test", "")
+		resp, err := mockDockerCompose.Pytest([]string{}, "")
 		assert.Contains(t, err.Error(), "something went wrong while Pytesting your DAGs")
 		assert.Equal(t, mockResponse, resp)
-		composeMock.AssertExpectations(t)
+		// composeMock.AssertExpectations(t)
 		imageHandler.AssertExpectations(t)
 	})
 
-	t.Run("inspect container failure", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+	// t.Run("inspect container failure", func(t *testing.T) {
+	// 	imageHandler := new(mocks.ImageHandler)
+	// 	imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+	// 	imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
 
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
+	// 	composeMock := new(mocks.DockerComposeAPI)
+	// 	composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+	// 	composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+	// 	composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
 
-		mockResponse := "1"
-		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
-			io.WriteString(out, mockResponse)
-			return errMockDocker
-		}
+	// 	mockResponse := "1"
+	// 	inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
+	// 		io.WriteString(out, mockResponse)
+	// 		return errMockDocker
+	// 	}
 
-		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
+	// 	mockDockerCompose.composeService = composeMock
+	// 	mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest("", "test", "")
-		assert.ErrorIs(t, err, errMockDocker)
-		composeMock.AssertExpectations(t)
-		imageHandler.AssertExpectations(t)
-	})
+	// 	_, err := mockDockerCompose.Pytest([]string{}, "test")
+	// 	assert.ErrorIs(t, err, errMockDocker)
+	// 	composeMock.AssertExpectations(t)
+	// 	imageHandler.AssertExpectations(t)
+	// })
 
-	t.Run("no test containers", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+	// t.Run("no test containers", func(t *testing.T) {
+	// 	imageHandler := new(mocks.ImageHandler)
+	// 	imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+	// 	imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
 
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(errMockDocker).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+	// 	composeMock := new(mocks.DockerComposeAPI)
+	// 	composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+	// 	composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(errMockDocker).Once()
+	// 	composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
 
-		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
+	// 	mockDockerCompose.composeService = composeMock
+	// 	mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest("", "test", "")
-		assert.Contains(t, err.Error(), "error finding the testing container")
-		composeMock.AssertExpectations(t)
-		imageHandler.AssertExpectations(t)
-	})
+	// 	_, err := mockDockerCompose.Pytest([]string{}, "test")
+	// 	assert.Contains(t, err.Error(), "error finding the testing container")
+	// 	composeMock.AssertExpectations(t)
+	// 	imageHandler.AssertExpectations(t)
+	// })
 
-	t.Run("compose ps failure", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+	// t.Run("compose ps failure", func(t *testing.T) {
+	// 	imageHandler := new(mocks.ImageHandler)
+	// 	imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+	// 	imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
 
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
+	// 	composeMock := new(mocks.DockerComposeAPI)
+	// 	composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+	// 	composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+	// 	composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
 
-		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
+	// 	mockDockerCompose.composeService = composeMock
+	// 	mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest("", "test", "")
-		assert.ErrorIs(t, err, errMockDocker)
-		composeMock.AssertExpectations(t)
-		imageHandler.AssertExpectations(t)
-	})
+	// 	_, err := mockDockerCompose.Pytest([]string{}, "test")
+	// 	assert.ErrorIs(t, err, errMockDocker)
+	// 	composeMock.AssertExpectations(t)
+	// 	imageHandler.AssertExpectations(t)
+	// })
 
-	t.Run("compose up failure", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+	// t.Run("compose up failure", func(t *testing.T) {
+	// 	imageHandler := new(mocks.ImageHandler)
+	// 	imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+	// 	imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
 
-		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(errMockDocker).Once()
+	// 	composeMock := new(mocks.DockerComposeAPI)
+	// 	composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(errMockDocker).Once()
 
-		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
+	// 	mockDockerCompose.composeService = composeMock
+	// 	mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest("", "test", "")
-		assert.ErrorIs(t, err, errMockDocker)
-		composeMock.AssertExpectations(t)
-		imageHandler.AssertExpectations(t)
-	})
+	// 	_, err := mockDockerCompose.Pytest([]string{}, "test")
+	// 	assert.ErrorIs(t, err, errMockDocker)
+	// 	composeMock.AssertExpectations(t)
+	// 	imageHandler.AssertExpectations(t)
+	// })
 
-	t.Run("list labels failure", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
-		imageHandler.On("ListLabels").Return(map[string]string{}, errMockDocker).Once()
+	// t.Run("list labels failure", func(t *testing.T) {
+	// 	imageHandler := new(mocks.ImageHandler)
+	// 	imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return(nil).Once()
+	// 	imageHandler.On("ListLabels").Return(map[string]string{}, errMockDocker).Once()
 
-		mockDockerCompose.imageHandler = imageHandler
+	// 	mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest("", "test", "")
-		assert.ErrorIs(t, err, errMockDocker)
-		imageHandler.AssertExpectations(t)
-	})
+	// 	_, err := mockDockerCompose.Pytest([]string{}, "test")
+	// 	assert.ErrorIs(t, err, errMockDocker)
+	// 	imageHandler.AssertExpectations(t)
+	// })
 
 	t.Run("image build failure", func(t *testing.T) {
 		imageHandler := new(mocks.ImageHandler)
@@ -765,18 +767,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest("", "test", "")
-		assert.ErrorIs(t, err, errMockDocker)
-		imageHandler.AssertExpectations(t)
-	})
-
-	t.Run("image Tag local image failure", func(t *testing.T) {
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("TagLocalImage", mock.Anything).Return(nil).Return(errMockDocker).Once()
-
-		mockDockerCompose.imageHandler = imageHandler
-
-		_, err := mockDockerCompose.Pytest("custom-image", "test", "")
+		_, err := mockDockerCompose.Pytest([]string{}, "")
 		assert.ErrorIs(t, err, errMockDocker)
 		imageHandler.AssertExpectations(t)
 	})
@@ -789,18 +780,19 @@ func TestDockerComposeParse(t *testing.T) {
 		DefaultTestPath = "test_dag_integrity_file.py"
 
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		// imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("0", nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
+		// composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+		// composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+		// composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
 
-		mockResponse := "0"
-		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
-			io.WriteString(out, mockResponse)
-			return nil
-		}
+		// mockResponse := "0"
+		// inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
+		// 	io.WriteString(out, mockResponse)
+		// 	return nil
+		// }
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
@@ -815,18 +807,19 @@ func TestDockerComposeParse(t *testing.T) {
 		DefaultTestPath = "test_dag_integrity_file.py"
 
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		// imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("1", errors.New("errors detected in your local DAGs are listed above")).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
+		// composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+		// composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+		// composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
 
-		mockResponse := "exit code 1"
-		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
-			io.WriteString(out, mockResponse)
-			return nil
-		}
+		// mockResponse := "exit code 1"
+		// inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
+		// 	io.WriteString(out, mockResponse)
+		// 	return nil
+		// }
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
@@ -841,18 +834,19 @@ func TestDockerComposeParse(t *testing.T) {
 		DefaultTestPath = "test_dag_integrity_file.py"
 
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+		// imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "2.2.5"}, nil).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("2", errMockPytest).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
-		composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
-		composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
-		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
+		// composeMock.On("Up", mock.Anything, mock.Anything, mock.AnythingOfType("api.UpOptions")).Return(nil).Once()
+		// composeMock.On("Down", mock.Anything, mock.Anything, api.DownOptions{Volumes: true, RemoveOrphans: true}).Return(nil).Once()
+		// composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-1", Name: "test-1"}}, nil).Once()
 
-		mockResponse := "exit code 2"
-		inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
-			io.WriteString(out, mockResponse)
-			return nil
-		}
+		// mockResponse := "exit code 2"
+		// inspectContainer = func(out io.Writer, references []string, tmplStr string, getRef inspect.GetRefFunc) error {
+		// 	io.WriteString(out, mockResponse)
+		// 	return nil
+		// }
 
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler

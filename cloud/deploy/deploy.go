@@ -279,7 +279,7 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 	}
 
 	fmt.Println("testing", deployImage)
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace, true)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace)
 	if err != nil {
 		return err
 	}
@@ -312,8 +312,9 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	if pytest != "all-tests" {
 		pytestFile = pytest
 	}
+	pytestArgs := []string{pytestFile}
 
-	exitCode, err := containerHandler.Pytest("", pytestFile, deployImage)
+	exitCode, err := containerHandler.Pytest(pytestArgs, deployImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")

@@ -114,20 +114,20 @@ func (_m *ContainerHandler) Parse(imageName string, buildImage string) error {
 	return r0
 }
 
-// Pytest provides a mock function with given fields: imageName, pytestFile, projectImageName
-func (_m *ContainerHandler) Pytest(imageName string, pytestFile string, projectImageName string) (string, error) {
-	ret := _m.Called(imageName, pytestFile, projectImageName)
+// Pytest provides a mock function with given fields: pytestArgs, projectImageName
+func (_m *ContainerHandler) Pytest(pytestArgs []string, projectImageName string) (string, error) {
+	ret := _m.Called(pytestArgs, projectImageName)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(string, string, string) string); ok {
-		r0 = rf(imageName, pytestFile, projectImageName)
+	if rf, ok := ret.Get(0).(func([]string, string) string); ok {
+		r0 = rf(pytestArgs, projectImageName)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
-		r1 = rf(imageName, pytestFile, projectImageName)
+	if rf, ok := ret.Get(1).(func([]string, string) error); ok {
+		r1 = rf(pytestArgs, projectImageName)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -29,6 +29,7 @@ var (
 	pytestFile             string
 	customImageName        string
 	settingsFile           string
+	pytestArgs             []string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -270,7 +271,7 @@ func newAirflowPytestCmd() *cobra.Command {
 		Use:   "pytest [pytest file/directory]",
 		Short: "Run pytests in a local Airflow environment",
 		Long:  "This command spins up a local Python environment to run pytests against your DAGs. If a specific pytest file is not specified, all pytests in the tests directory will be run. To run pytests with a different environment file, specify that with the '--env' flag. ",
-		Args:  cobra.MaximumNArgs(1),
+		// Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -487,7 +488,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -504,7 +505,7 @@ func airflowRun(cmd *cobra.Command, args []string) error {
 	args = append([]string{"airflow"}, args...)
 	// ignore last user parameter
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -517,7 +518,7 @@ func airflowPS(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -546,7 +547,7 @@ func airflowLogs(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -559,7 +560,7 @@ func airflowKill(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -572,7 +573,7 @@ func airflowStop(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -585,7 +586,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -612,7 +613,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
-		pytestFile = args[0]
+		pytestArgs = args
 	}
 
 	// Check if tests directory exists
@@ -625,19 +626,19 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return errors.New("the 'tests' directory does not exist, please run `astro dev init` to create it")
 	}
 
-	imageName, err := projectNameUnique(false)
+	imageName, err := projectNameUnique()
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Running Pytest\nThis may take a minute if you have not run this command before…")
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName, true)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}
 
-	exitCode, err := containerHandler.Pytest(customImageName, pytestFile, "")
+	exitCode, err := containerHandler.Pytest(pytestArgs, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
@@ -653,12 +654,12 @@ func airflowParse(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	imageName, err := projectNameUnique(false)
+	imageName, err := projectNameUnique()
 	if err != nil {
 		return err
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName, true)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, imageName)
 	if err != nil {
 		return err
 	}
@@ -674,7 +675,7 @@ func airflowUpgradeCheck(cmd *cobra.Command, args []string) error {
 	// Add airflow command, to simplify astro cli usage
 	args = append(airflowUpgradeCheckCmd, args...)
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}

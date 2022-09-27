@@ -135,6 +135,79 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	return nil
 }
 
+func (d *DockerImage)Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+	// Change to location of Dockerfile
+	err := os.Chdir(config.Path)
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Println("airflowhome: " + airflowHome)
+	fmt.Println("pytestFile: " + pytestFile)
+	fmt.Println("d.imageName: " + d.imageName)
+	args := []string{
+		"run",
+		"-i",
+		"--name",
+		"astro-pytest",
+		"-v",
+		airflowHome + "/dags:/usr/local/airflow/dags:ro",
+		"-v",
+		airflowHome + "/plugins:/usr/local/airflow/plugins:z",
+		"-v",
+		airflowHome + "/include:/usr/local/airflow/include:z",
+		"-v",
+		airflowHome + "/.astro:/usr/local/airflow/.astro:z",
+		"-v",
+		airflowHome + "/tests:/usr/local/airflow/tests:z",
+		"--env-file",
+		envFile,
+		d.imageName,
+		"pytest",
+		pytestFile,
+	}
+	args = append(args, pytestArgs...)
+	// run pytest image
+	var stdout, stderr io.Writer
+	if config.Output {
+		stdout = os.Stdout
+		stderr = os.Stderr
+	} else {
+		stdout = nil
+		stderr = nil
+	}
+	// run pytest
+	err = cmdExec(DockerCmd, stdout, stderr, args...)
+	if err != nil {
+		// delete container
+		err2 := cmdExec(DockerCmd, stdout, stderr, "rm", "astro-pytest")
+		if err2 != nil {
+			return "", fmt.Errorf("command 'docker rm astro-pytest failed: %w", err2)
+		}
+		return "", fmt.Errorf("command 'docker run -i %s pytest failed: %w", d.imageName, err)
+	}
+
+	// get exit code
+	args = []string{
+		"inspect",
+		"astro-pytest",
+		"--format='{{.State.ExitCode}}'",
+	}
+	var outb bytes.Buffer
+	err = cmdExec(DockerCmd, &outb, stderr, args...)
+	if err != nil {
+		return "", fmt.Errorf("command 'docker inspect astro-pytest failed: %w", err)
+	}
+
+	// delete container
+	err = cmdExec(DockerCmd, stdout, stderr, "rm", "astro-pytest",)
+	if err != nil {
+		return outb.String(), fmt.Errorf("command 'docker rm astro-pytest failed: %w", err)
+	}
+
+	return outb.String(), nil
+}
+
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
 	err := cmdExec(DockerCmd, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
