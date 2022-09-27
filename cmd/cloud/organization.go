@@ -31,7 +31,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
-		newOrganizationExportAuditLogs(out),
+		newOrganizationAuditLogs(out),
 	)
 	return cmd
 }
@@ -65,10 +65,23 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "audit-logs",
+		Aliases: []string{"al"},
+		Short:   "Manage your organization audit logs.",
+		Long:    "Manage your organization audit logs.",
+	}
+	cmd.AddCommand(
+		newOrganizationExportAuditLogs(out),
+	)
+	return cmd
+}
+
 func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "export-audit-logs [organization_name] --output-file [output_file.json]",
-		Aliases: []string{"eal"},
+		Use:     "export [organization_name] --output-file [output_file.json]",
+		Aliases: []string{"e"},
 		Short:   "Export your organization audit logs. Requires being an organization owner.",
 		Long:    "Export your organization audit logs. Requires being an organization owner.",
 		Args:    cobra.ExactArgs(1),
