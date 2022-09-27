@@ -10,6 +10,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
+var (
+	organizationShortNameRegex = regexp.MustCompile("[^a-z0-9-]")
+)
+
 type Client interface {
 	GetUserInfo() (*Self, error)
 	// Workspace
@@ -295,9 +299,8 @@ func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
 
 func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (string, error) {
 	// An organization short name has only lower case characters and is stripped of non-alphanumeric characters (expect for hyphens)
-	shortNameRegex := regexp.MustCompile("[^a-z0-9-]")
 	orgShortName := strings.ToLower(orgName)
-	orgShortName = shortNameRegex.ReplaceAllString(orgShortName, "")
+	orgShortName = organizationShortNameRegex.ReplaceAllString(orgShortName, "")
 	doOpts := &httputil.DoOptions{
 		Method:  http.MethodGet,
 		Headers: make(map[string]string),
