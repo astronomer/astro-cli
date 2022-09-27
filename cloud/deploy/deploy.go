@@ -70,16 +70,11 @@ type deploymentInfo struct {
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
-	dagDeployment, err := deployment.Initiate(runtimeID, client)
-	if err != nil {
-		return err
-	}
-
 	// Check the dags directory
 	dagsPath := path + "/dags"
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, path)
+	err := fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return err
 	}
@@ -90,6 +85,11 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 	defer dagFile.Close()
+
+	dagDeployment, err := deployment.Initiate(runtimeID, client)
+	if err != nil {
+		return err
+	}
 
 	versionID, err := azureUploader(dagDeployment.DagURL, dagFile)
 	if err != nil {
@@ -139,6 +139,16 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		domain = splitDomain[1]
 	}
 
+	dagFiles := fileutil.GetFilesWithSpecificExtension(path+"/dags", ".py")
+	if len(dagFiles) == 0 {
+		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+
+		if !i {
+			fmt.Println("Canceling deploy...")
+			return nil
+		}
+	}
+
 	// Deploy dags if input id is virtual runtime
 	if strings.HasPrefix(runtimeID, "vr-") {
 		fmt.Println("Initiating DAGs Deployment for: " + runtimeID)
@@ -147,7 +157,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 			return err
 		}
 
-		fmt.Println("Successfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
+		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
 		return nil
 	}
 
@@ -165,7 +175,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 			return err
 		}
 
-		fmt.Println("Successfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 			"\n\nDeployment can be accessed at the following URLs: \n" +
 			fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
