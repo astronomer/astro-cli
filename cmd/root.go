@@ -47,8 +47,7 @@ func NewRootCmd() *cobra.Command {
 	}
 	houstonClient = houston.NewClient(httpClient)
 
-	// FIXME I think it is correct and recommended to share our HTTP client across all wrappers.
-	astroClient := astro.NewAstroClient(httpClient)
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	currCtx := context.IsCloudContext()
