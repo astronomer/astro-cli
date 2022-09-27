@@ -10,9 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-var (
-	organizationShortNameRegex = regexp.MustCompile("[^a-z0-9-]")
-)
+var organizationShortNameRegex = regexp.MustCompile("[^a-z0-9-]")
 
 type Client interface {
 	GetUserInfo() (*Self, error)
