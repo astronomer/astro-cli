@@ -57,22 +57,6 @@ func NewRootCmd() *cobra.Command {
 		Use:   "astro",
 		Short: "Run Apache Airflow locally and interact with Astronomer",
 		Long: `
-                                          _..._
-                                        .'     '.      _
-                                       /    .-""-\   _/ \
-                                     .-|   /:.   |  |   |
-                                     |  \  |:.   /.-'-./
-                                     | .-'-;:__.'    =/
-                                     .'=  *=ASTRO _.='
-                                    /   _.  |    ;
-                                   ;-.-'|    \   |
-                                  /   | \    _\  _\
-                                  \__/'._;.  ==' ==\
-                                           \    \   |
-                                           /    /   /
-                                           /-._/-._/
-                                           \   '\  \
-                                            '-._/._/
  ________   ______   _________  ______    ______             ______   __        ________
 /_______/\ /_____/\ /________/\/_____/\  /_____/\           /_____/\ /_/\      /_______/\
 \::: _  \ \\::::_\/_\__.::.__\/\:::_ \ \ \:::_ \ \   _______\:::__\/ \:\ \     \__.::._\/
@@ -81,7 +65,7 @@ func NewRootCmd() *cobra.Command {
    \:.\ \  \ \ /____\:\  \::\ \   \ \ '\ \ \\:\_\ \ \          \:\_\ \ \\:\/___/\/__\::\__/\
     \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
 
-Welcome to the Astro CLI. Astro is the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or local development.`,
+Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if currCtx {
 				return cloudCmd.Setup(cmd, args, astroClient)
