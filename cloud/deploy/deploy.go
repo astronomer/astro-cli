@@ -140,7 +140,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 	}
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(path+"/dags", ".py")
-	if len(dagFiles) == 0 {
+	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 		if !i {
