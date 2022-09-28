@@ -74,7 +74,7 @@ func Switch(domain string) error {
 			return err
 		}
 	}
-	c := config.Context{Domain: domain}	
+	c := config.Context{Domain: domain}
 	return c.SwitchContext()
 }
 
