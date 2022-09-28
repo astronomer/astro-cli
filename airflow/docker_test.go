@@ -615,7 +615,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest([]string{}, "")
+		resp, err := mockDockerCompose.Pytest([]string{}, "", "")
 
 		assert.NoError(t, err)
 		assert.Equal(t, "", resp)
@@ -630,7 +630,7 @@ func TestDockerComposePytest(t *testing.T) {
 		mockResponse := "1"
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest([]string{}, "")
+		resp, err := mockDockerCompose.Pytest([]string{}, "", "")
 		assert.Contains(t, err.Error(), "something went wrong while Pytesting your DAGs")
 		assert.Equal(t, mockResponse, resp)
 		imageHandler.AssertExpectations(t)
@@ -642,7 +642,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest([]string{}, "")
+		_, err := mockDockerCompose.Pytest([]string{}, "", "")
 		assert.ErrorIs(t, err, errMockDocker)
 		imageHandler.AssertExpectations(t)
 	})
@@ -687,7 +687,7 @@ func TestDockerComposeParse(t *testing.T) {
 		DefaultTestPath = "test_dag_integrity_file.py"
 
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("2", errMockPytest).Once()
+		imageHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: false}).Return("2", nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		mockDockerCompose.composeService = composeMock
