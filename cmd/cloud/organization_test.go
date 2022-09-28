@@ -55,7 +55,15 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 		return nil
 	}
 
-	cmdArgs := []string{"audit-logs", "export", "organization-name"}
-	_, err := execOrganizationCmd(cmdArgs...)
-	assert.NoError(t, err)
+	t.Run("without params", func(t *testing.T) {
+		cmdArgs := []string{"audit-logs", "export", "organization-name"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with auditLogsOutputFilePath param", func(t *testing.T) {
+		cmdArgs := []string{"audit-logs", "export", "organization-name", "--output-file", "test.json"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 }
