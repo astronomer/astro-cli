@@ -5,7 +5,7 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod download
-    - go mod tidy -compat=1.17
+    - go mod tidy -compat=1.18
 release:
   github:
     owner: astronomer
@@ -48,7 +48,7 @@ archives:
   - format: tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        format: binary
     name_template: '{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:
       - licence*

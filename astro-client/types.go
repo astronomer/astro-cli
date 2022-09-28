@@ -9,24 +9,31 @@ type Response struct {
 }
 
 type ResponseData struct {
-	CreateImage               *Image                       `json:"imageCreate,omitempty"`
-	DeployImage               *Image                       `json:"imageDeploy,omitempty"`
+	CreateImage               *Image                       `json:"createImage,omitempty"`
+	DeployImage               *Image                       `json:"deployImage,omitempty"`
 	GetDeployment             Deployment                   `json:"deployment,omitempty"`
 	GetDeployments            []Deployment                 `json:"deployments,omitempty"`
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
-	GetOrchestrators          []Orchestrator               `json:"orchestrators,omitempty"`
+	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
+	GetClusters               []Cluster                    `json:"clusters,omitempty"`
 	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
-	DeploymentCreate          Deployment                   `json:"DeploymentCreate,omitempty"`
+	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
 	GetDeploymentHistory      DeploymentHistory            `json:"deploymentHistory,omitempty"`
-	DeploymentDelete          Deployment                   `json:"deploymentDelete,omitempty"`
-	DeploymentUpdate          Deployment                   `json:"deploymentUpdate,omitempty"`
-	DeploymentVariablesUpdate []EnvironmentVariablesObject `json:"deploymentVariablesUpdate,omitempty"`
+	DeleteDeployment          Deployment                   `json:"DeleteDeployment,omitempty"`
+	UpdateDeployment          Deployment                   `json:"UpdateDeployment,omitempty"`
+	UpdateDeploymentVariables []EnvironmentVariablesObject `json:"UpdateDeploymentVariables,omitempty"`
+	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
+	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
+	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
+	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
+	GetOrganizations          []Organization               `json:"organizations,omitempty"`
 }
 
 type Self struct {
-	User User `json:"user"`
+	User                        User   `json:"user"`
+	AuthenticatedOrganizationID string `json:"authenticatedOrganizationId"`
 }
 
 type AuthProvider struct {
@@ -56,20 +63,21 @@ type Deployment struct {
 	Status          string         `json:"status"`
 	ReleaseName     string         `json:"releaseName"`
 	Version         string         `json:"version"`
-	Orchestrator    Orchestrator   `json:"orchestrator"`
+	Cluster         Cluster        `json:"cluster"`
 	Workspace       Workspace      `json:"workspace"`
 	RuntimeRelease  RuntimeRelease `json:"runtimeRelease"`
 	DeploymentSpec  DeploymentSpec `json:"deploymentSpec"`
+	WorkerQueues    []WorkerQueue  `json:"workerQueues"`
 	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt       string         `json:"updatedAt"`
 }
 
-// Orchestrator contains all components of an Astronomer Orchestrator
-type Orchestrator struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	IsManaged     bool   `json:"isManaged"`
-	CloudProvider string `json:"cloudProvider"`
+// Cluster contains all components of an Astronomer Cluster
+type Cluster struct {
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	CloudProvider string     `json:"cloudProvider"`
+	NodePools     []NodePool `json:"nodePools"`
 }
 
 type RuntimeRelease struct {
@@ -84,9 +92,38 @@ type DeploymentSpec struct {
 	Image                       Image                        `json:"image,omitempty"`
 	Webserver                   Webserver                    `json:"webserver,omitempty"`
 	Executor                    string                       `json:"executor"`
-	Workers                     Workers                      `json:"workers"`
 	Scheduler                   Scheduler                    `json:"scheduler"`
 	EnvironmentVariablesObjects []EnvironmentVariablesObject `json:"environmentVariablesObjects"`
+}
+
+type InitiateDagDeployment struct {
+	ID     string `json:"id"`
+	DagURL string `json:"dagUrl"`
+}
+
+type InitiateDagDeploymentInput struct {
+	RuntimeID string `json:"runtimeId"`
+}
+
+type DagDeploymentStatus struct {
+	ID            string `json:"id"`
+	RuntimeID     string `json:"runtimeId"`
+	Action        string `json:"action"`
+	VersionID     string `json:"versionId"`
+	Status        string `json:"status"`
+	Message       string `json:"message"`
+	CreatedAt     string `json:"createdAt"`
+	InitiatorID   string `json:"initiatorId"`
+	InitiatorType string `json:"initiatorType"`
+}
+
+type ReportDagDeploymentStatusInput struct {
+	InitiatedDagDeploymentID string `json:"initiatedDagDeploymentId"`
+	RuntimeID                string `json:"runtimeId"`
+	Action                   string `json:"action"`
+	VersionID                string `json:"versionId"`
+	Status                   string `json:"status"`
+	Message                  string `json:"message"`
 }
 
 type EnvironmentVariablesObject struct {
@@ -157,6 +194,11 @@ type Workspace struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
+type Organization struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Image struct {
 	ID           string   `json:"id"`
 	DeploymentID string   `json:"deploymentId"`
@@ -171,11 +213,6 @@ type Image struct {
 
 type Webserver struct {
 	URL string `json:"url"`
-}
-
-type Workers struct {
-	AU                            int `json:"au"`
-	TerminationGracePeriodSeconds int `json:"terminationGracePeriodSeconds"`
 }
 
 type Scheduler struct {
@@ -210,42 +247,43 @@ type DeploymentsInput struct {
 	DeploymentID string `json:"deploymentId"`
 }
 
-type ImageCreateInput struct {
+type CreateImageInput struct {
 	Tag          string `json:"tag"`
 	DeploymentID string `json:"deploymentId"`
 }
 
-type ImageDeployInput struct {
-	ID         string `json:"id"`
-	Tag        string `json:"tag"`
-	Repository string `json:"repository"`
+type DeployImageInput struct {
+	ImageID          string `json:"imageId"`
+	DeploymentID     string `json:"deploymentId"`
+	Tag              string `json:"tag"`
+	Repository       string `json:"repository"`
+	DagDeployEnabled bool   `json:"dagDeployEnabled"`
 }
 
-type DeploymentCreateInput struct {
+type CreateDeploymentInput struct {
 	WorkspaceID           string               `json:"workspaceId"`
-	OrchestratorID        string               `json:"orchestratorId"`
+	ClusterID             string               `json:"clusterId"`
 	Label                 string               `json:"label"`
 	Description           string               `json:"description"`
-	AirflowTag            string               `json:"airflowTag"`
 	RuntimeReleaseVersion string               `json:"runtimeReleaseVersion"`
 	DeploymentSpec        DeploymentCreateSpec `json:"deploymentSpec"`
 }
 
 type DeploymentCreateSpec struct {
 	Executor  string    `json:"executor"`
-	Workers   Workers   `json:"workers"`
 	Scheduler Scheduler `json:"scheduler"`
 }
 
-type DeploymentUpdateInput struct {
+type UpdateDeploymentInput struct {
 	ID             string               `json:"id"`
-	OrchestratorID string               `json:"orchestratorId"`
+	ClusterID      string               `json:"clusterId"`
 	Label          string               `json:"label"`
 	Description    string               `json:"description"`
 	DeploymentSpec DeploymentCreateSpec `json:"deploymentSpec"`
+	WorkerQueues   []WorkerQueue        `json:"workerQueues"`
 }
 
-type DeploymentDeleteInput struct {
+type DeleteDeploymentInput struct {
 	ID string `json:"id"`
 }
 
@@ -258,4 +296,48 @@ type EnvironmentVariable struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 	IsSecret bool   `json:"isSecret"`
+}
+
+// Input for creating a user invite
+type CreateUserInviteInput struct {
+	InviteeEmail   string `json:"inviteeEmail"`
+	Role           string `json:"role"`
+	OrganizationID string `json:"organizationId"`
+}
+
+// Output returned when a user invite is created
+type UserInvite struct {
+	UserID         string `json:"userId"`
+	OrganizationID string `json:"organizationId"`
+	OauthInviteID  string `json:"oauthInviteId"`
+	ExpiresAt      string `json:"expiresAt"`
+}
+
+type WorkerQueue struct {
+	ID                string `json:"id,omitempty"` // Empty when creating new WorkerQueues
+	Name              string `json:"name"`
+	IsDefault         bool   `json:"isDefault"`
+	MaxWorkerCount    int    `json:"maxWorkerCount"`
+	MinWorkerCount    int    `json:"minWorkerCount"`
+	WorkerConcurrency int    `json:"workerConcurrency"`
+	NodePoolID        string `json:"nodePoolId"`
+}
+
+type WorkerQueueDefaultOptions struct {
+	MinWorkerCount    WorkerQueueOption `json:"minWorkerCount"`
+	MaxWorkerCount    WorkerQueueOption `json:"maxWorkerCount"`
+	WorkerConcurrency WorkerQueueOption `json:"workerConcurrency"`
+}
+
+type WorkerQueueOption struct {
+	Floor   int `json:"floor"`
+	Ceiling int `json:"ceiling"`
+	Default int `json:"default"`
+}
+
+type NodePool struct {
+	ID               string    `json:"id"`
+	IsDefault        bool      `json:"isDefault"`
+	NodeInstanceType string    `json:"nodeInstanceType"`
+	CreatedAt        time.Time `json:"createdAt"`
 }

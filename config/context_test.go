@@ -139,11 +139,13 @@ contexts:
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
+    organization: test-org-id
   test_com:
     domain: test.com
     token: token
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
+    organization: test-org-id
 `)
 	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
 	InitConfig(fs)
@@ -169,7 +171,7 @@ func TestGetContexts(t *testing.T) {
 	initTestConfig()
 	ctxs, err := GetContexts()
 	assert.NoError(t, err)
-	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
+	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
 }
 
 func TestSetContextKey(t *testing.T) {

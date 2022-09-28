@@ -14,7 +14,6 @@ import (
 
 func TestVariableList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	ws := "test-ws-id"
 
 	mockResponse := []astro.Deployment{
 		{
@@ -33,15 +32,15 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "", false, mockClient, buf)
+		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-value-1")
 
-		err = VariableList("test-id-1", "", ws, "", false, mockClient, buf)
+		err = VariableList("test-id-1", "", ws, "", "", false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-value-1")
@@ -50,11 +49,11 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("invalid deployment", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-invalid-id", "test-key-1", ws, "", false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		err := VariableList("test-invalid-id", "test-key-1", ws, "", "", false, mockClient, buf)
+		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -72,17 +71,17 @@ func TestVariableList(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = VariableList("", "test-key-1", ws, "", false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		err = VariableList("", "test-key-1", ws, "", "", false, mockClient, buf)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid variable key", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-invalid-key", ws, "", false, mockClient, buf)
+		err := VariableList("test-id-1", "test-invalid-key", ws, "", "", false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "No variables found")
 		mockClient.AssertExpectations(t)
@@ -90,20 +89,20 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "", false, mockClient, buf)
+		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid file", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableList("test-id-1", "test-key-1", ws, "\000x", true, mockClient, buf)
+		err := VariableList("test-id-1", "test-key-1", ws, "\000x", "", true, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "unable to write environment variables to file")
 	})
@@ -111,7 +110,6 @@ func TestVariableList(t *testing.T) {
 
 func TestVariableModify(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	ws := "test-ws-id"
 
 	mockListResponse := []astro.Deployment{
 		{
@@ -141,11 +139,11 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Once()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", true, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, true, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-key-1")
 		assert.Contains(t, buf.String(), "test-key-2")
@@ -156,21 +154,21 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", false, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid deployment", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", false, false, false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
+		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -188,23 +186,23 @@ func TestVariableModify(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = VariableModify("", "test-key-2", "test-value-2", ws, "", false, false, false, mockClient, buf)
-		assert.ErrorIs(t, err, errInvalidDeploymentKey)
+		err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
+		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("missing var key or value", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Twice()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "", "test-value-2", ws, "", false, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable key")
 
 		buf = new(bytes.Buffer)
-		err = VariableModify("test-id-1", "test-key-2", "", ws, "", false, false, false, mockClient, buf)
+		err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable value")
 		mockClient.AssertExpectations(t)
@@ -212,22 +210,22 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("create env var failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Once()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", false, false, false, mockClient, buf)
+		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("no env var for deployment", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Once()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-2", "", "", ws, "", false, false, false, mockClient, buf)
+		err := VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "No variables for this Deployment")
 	})
@@ -266,6 +264,13 @@ func TestAddVariableFromFile(t *testing.T) {
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, false, false)
 
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
+
+	resp = addVariablesFromFile(
+		"./testfiles/test-env-file-wrong", []string{"test-key-1"},
+		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-2"}},
+		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, false, false)
+
+	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
 }
 
 func TestWriteVarToFile(t *testing.T) {
@@ -279,18 +284,44 @@ func TestWriteVarToFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAddVariableFromFlag(t *testing.T) {
-	resp := addVariableFromFlag([]string{"test-key-1"},
+func TestAddVariable(t *testing.T) {
+	buf := new(bytes.Buffer)
+	resp := addVariable([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
-		"test-key-1", "test-value-3", true, false,
+		"test-key-1", "test-value-3", true, false, buf,
 	)
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
 
-	resp = addVariableFromFlag([]string{"test-key-1"},
+	buf = new(bytes.Buffer)
+	resp = addVariable([]string{"test-key-1"},
 		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
 		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
-		"test-key-1", "test-value-3", false, false,
+		"test-key-1", "test-value-3", false, false, buf,
 	)
 	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}}, resp)
+}
+
+func TestAddVariablesFromArgs(t *testing.T) {
+	buf := new(bytes.Buffer)
+	resp := addVariablesFromArgs([]string{"test-key-1"},
+		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
+		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
+		[]string{"test-key-1=test-value-3"}, true, false, buf,
+	)
+	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-3"}}, resp)
+
+	resp = addVariablesFromArgs([]string{"test-key-1"},
+		[]astro.EnvironmentVariablesObject{{Key: "test-key-1", Value: "test-value-1"}},
+		[]astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}},
+		[]string{"test-key-1=test-value-3"}, false, false, buf,
+	)
+	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-1", Value: "test-value-2"}}, resp)
+
+	resp = addVariablesFromArgs([]string{"test-key-1"},
+		[]astro.EnvironmentVariablesObject{},
+		[]astro.EnvironmentVariable{},
+		[]string{"test-key-2=test-value-3", "test-key-3=", "test-key-3"}, false, false, buf,
+	)
+	assert.Equal(t, []astro.EnvironmentVariable{{Key: "test-key-2", Value: "test-value-3"}}, resp)
 }

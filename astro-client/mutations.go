@@ -1,9 +1,9 @@
 package astro
 
 var (
-	ImageCreate = `
-	mutation ImageCreate($imageCreateInput: ImageCreateInput!) {
-		imageCreate(input: $imageCreateInput) {
+	CreateImage = `
+	mutation CreateImage($imageCreateInput: CreateImageInput!) {
+		createImage(input: $imageCreateInput) {
 			id
 			deploymentId
 			tag
@@ -11,9 +11,9 @@ var (
 	}
 	`
 
-	ImageDeploy = `
-	mutation ImageDeploy($imageDeployInput: ImageDeployInput!) {
-		imageDeploy(input: $imageDeployInput) {
+	DeployImage = `
+	mutation DeployImage($imageDeployInput: DeployImageInput!) {
+		deployImage(input: $imageDeployInput) {
 			id
 			tag
 			repository
@@ -21,11 +21,11 @@ var (
 	}
 	`
 
-	DeploymentDelete = `
-	mutation deploymentDelete(
-		$input: DeploymentDeleteInput!
+	DeleteDeployment = `
+	mutation deleteDeployment(
+		$input: DeleteDeploymentInput!
 	  ) {
-		deploymentDelete(
+		deleteDeployment(
 			input: $input
 		) {
 		  id
@@ -33,17 +33,17 @@ var (
 	}
 	`
 
-	DeploymentCreate = `
-	mutation deploymentCreate(
-		$input: DeploymentCreateInput
+	CreateDeployment = `
+	mutation createDeployment(
+		$input: CreateDeploymentInput!
 	  ) {
-		deploymentCreate (
+		createDeployment (
 		  input: $input
 		){
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {
@@ -62,17 +62,17 @@ var (
 	}
 	`
 
-	DeploymentUpdate = `
-	mutation deploymentUpdate(
-		$input: DeploymentUpdateInput
+	UpdateDeployment = `
+	mutation updateDeployment(
+		$input: UpdateDeploymentInput!
 	  ) {
-		deploymentUpdate(
+		updateDeployment(
 			input: $input
 		) {
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
 			runtimeRelease {
@@ -87,11 +87,11 @@ var (
 	  	}
 	}
 	`
-	DeploymentVariablesCreate = `
-	mutation deploymentVariablesUpdate(
+	CreateDeploymentVariables = `
+	mutation updateDeploymentVariables(
 	  $input: EnvironmentVariablesInput!
 	) {
-	  deploymentVariablesUpdate(
+		updateDeploymentVariables(
 		input: $input
 	  ) {
 		key
@@ -99,6 +99,39 @@ var (
 		isSecret
 		updatedAt
 	  }
+	}
+  `
+	CreateUserInvite = `
+  	mutation createUserInvite($input: CreateUserInviteInput!) {
+	  createUserInvite(input: $input) {
+			userId
+			organizationId
+			oauthInviteId
+			expiresAt
+	  }
+  	}
+  `
+	DagDeploymentInitiate = `
+	mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
+		initiateDagDeployment(input: $input) {
+			id
+			dagUrl
+		}
+	}
+  `
+	ReportDagDeploymentStatus = `
+	mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
+		reportDagDeploymentStatus(input: $input) {
+			id
+			runtimeId
+			action
+			versionId
+			status
+			message
+			createdAt
+			initiatorId
+			initiatorType
+		}
 	}
   `
 )

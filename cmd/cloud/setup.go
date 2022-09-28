@@ -37,6 +37,7 @@ type TokenResponse struct {
 	IDToken          string  `json:"id_token"`
 	TokenType        string  `json:"token_type"`
 	ExpiresIn        int64   `json:"expires_in"`
+	Scope            string  `json:"scope"`
 	Error            *string `json:"error,omitempty"`
 	ErrorDescription string  `json:"error_description,omitempty"`
 }
@@ -72,19 +73,16 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 		return nil
 	}
 
-	// deploy command can use API keys
-	if cmd.CalledAs() == "deploy" && cmd.Parent().Use == topLvlCmd {
-		apiKey, err := checkAPIKeys()
-		if err != nil {
-			fmt.Println(err)
-			fmt.Println("\nThere was an error using API keys, using regular auth instead")
-		}
-		if apiKey {
-			return nil
-		}
-	}
-
 	// run auth setup for any command that requires auth
+
+	apiKey, err := checkAPIKeys(client)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+	}
+	if apiKey {
+		return nil
+	}
 	return checkToken(client, os.Stdout)
 }
 
@@ -97,7 +95,7 @@ func checkToken(client astro.Client, out io.Writer) error {
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, client, out, false)
+		err := authLogin(c.Domain, "", "", client, out, false)
 		if err != nil {
 			return err
 		}
@@ -111,7 +109,7 @@ func checkToken(client astro.Client, out io.Writer) error {
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, client, out, false)
+			err := authLogin(c.Domain, "", "", client, out, false)
 			if err != nil {
 				return err
 			}
@@ -183,7 +181,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys() (bool, error) {
+func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -212,10 +210,12 @@ func checkAPIKeys() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	authConfig, err := auth.ValidateDomain(c.Domain)
 	if err != nil {
 		return false, err
 	}
+
 	// setup request
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
@@ -252,26 +252,42 @@ func checkAPIKeys() (bool, error) {
 		return false, errors.New(tokenRes.ErrorDescription)
 	}
 
-	// persist the updated context with the access token from API keys
 	err = c.SetContextKey("token", "Bearer "+tokenRes.AccessToken)
 	if err != nil {
 		return false, err
 	}
+
 	err = c.SetExpiresIn(tokenRes.ExpiresIn)
 	if err != nil {
 		return false, err
 	}
-	err = c.SetContextKey("workspace", c.Workspace)
-	if err != nil {
-		fmt.Println("no workspace set")
-	}
-	err = c.SetContextKey("workspace", c.LastUsedWorkspace)
-	if err != nil {
-		fmt.Println("no last used workspace")
-	}
+
 	err = c.SetSystemAdmin(false)
 	if err != nil {
 		fmt.Println("admin settings incorrectly set you may experince permissions issues")
 	}
+
+	organizations, err := astroClient.GetOrganizations()
+	if err != nil {
+		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+	}
+	organizationID := organizations[0].ID
+
+	// get workspace ID
+	deployments, err := astroClient.ListDeployments(organizationID, "")
+	if err != nil {
+		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+	}
+	workspaceID = deployments[0].Workspace.ID
+
+	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+	if err != nil {
+		fmt.Println("no workspace set")
+	}
+	err = c.SetContextKey("organization", organizationID) // c.Organization
+	if err != nil {
+		fmt.Println("no organization set")
+	}
+
 	return true, nil
 }

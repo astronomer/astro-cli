@@ -4,7 +4,9 @@ import (
 	"errors"
 	"io"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/software/workspace"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -18,10 +20,14 @@ var (
 	workspaceCreateLabel       string
 	workspaceUpdateLabel       string
 	workspaceUpdateDescription string
+	workspacePaginated         bool
+	workspacePageSize          int
 	workspaceDeleteExample     = `
   $ astro workspace delete <workspace-id>
 `
 )
+
+const defaultPageSize = 100
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -38,6 +44,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUpdateCmd(out),
 		newWorkspaceUserRootCmd(out),
 		newWorkspaceSaRootCmd(out),
+		newWorkspaceTeamRootCmd(out),
 	)
 	return cmd
 }
@@ -98,6 +105,8 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 			return workspaceSwitch(cmd, out, args)
 		},
 	}
+	cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated workspace list")
+	cmd.Flags().IntVarP(&workspacePageSize, "page-size", "s", 0, "Page size of the workspace list if paginated is set to true")
 	return cmd
 }
 
@@ -176,5 +185,18 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 
-	return workspace.Switch(id, houstonClient, out)
+	pageSize := config.CFG.PageSize.GetInt()
+
+	if config.CFG.Interactive.GetBool() || workspacePaginated {
+		if workspacePageSize <= 0 && pageSize > 0 {
+			workspacePageSize = pageSize
+		}
+
+		if !(workspacePageSize > 0 && workspacePageSize <= defaultPageSize) {
+			logrus.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
+			workspacePageSize = defaultPageSize
+		}
+	}
+
+	return workspace.Switch(id, workspacePageSize, houstonClient, out)
 }

@@ -6,108 +6,128 @@ import (
 )
 
 type Client interface {
-	// UserRoleBinding
-	ListUserRoleBindings() ([]RoleBinding, error)
+	GetUserInfo() (*Self, error)
 	// Workspace
-	ListWorkspaces() ([]Workspace, error)
+	ListWorkspaces(organizationID string) ([]Workspace, error)
+	GetWorkspace(workspaceID string) (Workspace, error)
 	// Deployment
-	CreateDeployment(input *DeploymentCreateInput) (Deployment, error)
-	UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error)
-	ListDeployments(input DeploymentsInput) ([]Deployment, error)
-	DeleteDeployment(input DeploymentDeleteInput) (Deployment, error)
+	CreateDeployment(input *CreateDeploymentInput) (Deployment, error)
+	UpdateDeployment(input *UpdateDeploymentInput) (Deployment, error)
+	ListDeployments(organizationID, workspaceID string) ([]Deployment, error)
+	GetDeployment(deploymentID string) (Deployment, error)
+	DeleteDeployment(input DeleteDeploymentInput) (Deployment, error)
 	GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error)
 	GetDeploymentConfig() (DeploymentConfig, error)
 	ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error)
+	InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error)
+	ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error)
 	// Image
-	CreateImage(input ImageCreateInput) (*Image, error)
-	DeployImage(input ImageDeployInput) (*Image, error)
-	// Orchestrator
-	ListOrchestrators(vars map[string]interface{}) ([]Orchestrator, error)
-	// RuntimeRelease
-	ListInternalRuntimeReleases() ([]RuntimeRelease, error)
-	ListPublicRuntimeReleases() ([]RuntimeRelease, error)
+	CreateImage(input CreateImageInput) (*Image, error)
+	DeployImage(input DeployImageInput) (*Image, error)
+	// Cluster
+	ListClusters(organizationID string) ([]Cluster, error)
+	// UserInvite
+	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
+	// WorkerQueues
+	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
+	// Organizations
+	GetOrganizations() ([]Organization, error)
 }
 
-func (c *HTTPClient) ListUserRoleBindings() ([]RoleBinding, error) {
+func (c *HTTPClient) GetUserInfo() (*Self, error) {
 	req := Request{
 		Query: SelfQuery,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
-		return []RoleBinding{}, err
+		return nil, err
 	}
 
 	if resp.Data.SelfQuery == nil {
 		fmt.Printf("Something went wrong! Try again or contact Astronomer Support")
-		return []RoleBinding{}, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
+		return nil, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
 	}
 
-	return resp.Data.SelfQuery.User.RoleBindings, nil
+	return resp.Data.SelfQuery, nil
 }
 
-func (c *HTTPClient) ListWorkspaces() ([]Workspace, error) {
+func (c *HTTPClient) ListWorkspaces(organizationID string) ([]Workspace, error) {
 	wsReq := Request{
-		Query: WorkspacesGetRequest,
+		Query:     WorkspacesGetRequest,
+		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
-	wsResp, err := wsReq.DoWithClient(c)
+	wsResp, err := wsReq.DoWithPublicClient(c)
 	if err != nil {
 		return []Workspace{}, err
 	}
 	return wsResp.Data.GetWorkspaces, nil
 }
 
-func (c *HTTPClient) CreateDeployment(input *DeploymentCreateInput) (Deployment, error) {
+func (c *HTTPClient) CreateDeployment(input *CreateDeploymentInput) (Deployment, error) {
 	req := Request{
-		Query:     DeploymentCreate,
+		Query:     CreateDeployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
-	return resp.Data.DeploymentCreate, nil
+	return resp.Data.CreateDeployment, nil
 }
 
-func (c *HTTPClient) UpdateDeployment(input *DeploymentUpdateInput) (Deployment, error) {
+func (c *HTTPClient) UpdateDeployment(input *UpdateDeploymentInput) (Deployment, error) {
 	req := Request{
-		Query:     DeploymentUpdate,
+		Query:     UpdateDeployment,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
-	return resp.Data.DeploymentUpdate, nil
+	return resp.Data.UpdateDeployment, nil
 }
 
-func (c *HTTPClient) ListDeployments(input DeploymentsInput) ([]Deployment, error) {
+func (c *HTTPClient) ListDeployments(organizationID, workspaceID string) ([]Deployment, error) {
 	req := Request{
 		Query:     WorkspaceDeploymentsGetRequest,
-		Variables: map[string]interface{}{"deploymentsInput": input},
+		Variables: map[string]interface{}{"organizationId": organizationID, "workspaceId": workspaceID},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []Deployment{}, err
 	}
 	return resp.Data.GetDeployments, nil
 }
 
-func (c *HTTPClient) DeleteDeployment(input DeploymentDeleteInput) (Deployment, error) {
+func (c *HTTPClient) GetDeployment(deploymentID string) (Deployment, error) {
 	req := Request{
-		Query:     DeploymentDelete,
-		Variables: map[string]interface{}{"input": input},
+		Query:     GetDeployment,
+		Variables: map[string]interface{}{"deploymentId": deploymentID},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return Deployment{}, err
 	}
-	return resp.Data.DeploymentDelete, nil
+	return resp.Data.GetDeployment, nil
+}
+
+func (c *HTTPClient) DeleteDeployment(input DeleteDeploymentInput) (Deployment, error) {
+	req := Request{
+		Query:     DeleteDeployment,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return Deployment{}, err
+	}
+	return resp.Data.DeleteDeployment, nil
 }
 
 func (c *HTTPClient) GetDeploymentHistory(vars map[string]interface{}) (DeploymentHistory, error) {
@@ -116,7 +136,7 @@ func (c *HTTPClient) GetDeploymentHistory(vars map[string]interface{}) (Deployme
 		Variables: vars,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return DeploymentHistory{}, err
 	}
@@ -128,7 +148,7 @@ func (c *HTTPClient) GetDeploymentConfig() (DeploymentConfig, error) {
 		Query: GetDeploymentConfigOptions,
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return DeploymentConfig{}, err
 	}
@@ -137,78 +157,132 @@ func (c *HTTPClient) GetDeploymentConfig() (DeploymentConfig, error) {
 
 func (c *HTTPClient) ModifyDeploymentVariable(input EnvironmentVariablesInput) ([]EnvironmentVariablesObject, error) {
 	req := Request{
-		Query:     DeploymentVariablesCreate,
+		Query:     CreateDeploymentVariables,
 		Variables: map[string]interface{}{"input": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return []EnvironmentVariablesObject{}, err
 	}
-	return resp.Data.DeploymentVariablesUpdate, nil
+	return resp.Data.UpdateDeploymentVariables, nil
 }
 
-func (c *HTTPClient) CreateImage(input ImageCreateInput) (*Image, error) {
+func (c *HTTPClient) InitiateDagDeployment(input InitiateDagDeploymentInput) (InitiateDagDeployment, error) {
 	req := Request{
-		Query:     ImageCreate,
+		Query:     DagDeploymentInitiate,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return InitiateDagDeployment{}, err
+	}
+	return resp.Data.InitiateDagDeployment, nil
+}
+
+func (c *HTTPClient) ReportDagDeploymentStatus(input *ReportDagDeploymentStatusInput) (DagDeploymentStatus, error) {
+	req := Request{
+		Query:     ReportDagDeploymentStatus,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return DagDeploymentStatus{}, err
+	}
+	return resp.Data.ReportDagDeploymentStatus, nil
+}
+
+func (c *HTTPClient) CreateImage(input CreateImageInput) (*Image, error) {
+	req := Request{
+		Query:     CreateImage,
 		Variables: map[string]interface{}{"imageCreateInput": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return nil, err
 	}
 	return resp.Data.CreateImage, nil
 }
 
-func (c *HTTPClient) DeployImage(input ImageDeployInput) (*Image, error) {
+func (c *HTTPClient) DeployImage(input DeployImageInput) (*Image, error) {
 	req := Request{
-		Query:     ImageDeploy,
+		Query:     DeployImage,
 		Variables: map[string]interface{}{"imageDeployInput": input},
 	}
 
-	resp, err := req.DoWithClient(c)
+	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
 		return nil, err
 	}
 	return resp.Data.DeployImage, nil
 }
 
-func (c *HTTPClient) ListOrchestrators(vars map[string]interface{}) ([]Orchestrator, error) {
+func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
 	req := Request{
-		Query:     GetOrchestrators,
-		Variables: map[string]interface{}{"input": vars},
-	}
-
-	resp, err := req.DoWithClient(c)
-	if err != nil {
-		return []Orchestrator{}, err
-	}
-	return resp.Data.GetOrchestrators, nil
-}
-
-func (c *HTTPClient) ListInternalRuntimeReleases() ([]RuntimeRelease, error) {
-	req := Request{
-		Query:     InternalRuntimeReleases,
-		Variables: map[string]interface{}{"channel": ""},
-	}
-
-	resp, err := req.DoWithClient(c)
-	if err != nil {
-		return []RuntimeRelease{}, err
-	}
-	return resp.Data.RuntimeReleases, nil
-}
-
-func (c *HTTPClient) ListPublicRuntimeReleases() ([]RuntimeRelease, error) {
-	req := Request{
-		Query:     PublicRuntimeReleases,
-		Variables: map[string]interface{}{"channel": ""},
+		Query:     GetClusters,
+		Variables: map[string]interface{}{"organizationId": organizationID},
 	}
 
 	resp, err := req.DoWithPublicClient(c)
 	if err != nil {
-		return []RuntimeRelease{}, err
+		return []Cluster{}, err
 	}
-	return resp.Data.RuntimeReleases, nil
+	return resp.Data.GetClusters, nil
+}
+
+// CreateUserInvite create a user invite request
+func (c *HTTPClient) CreateUserInvite(input CreateUserInviteInput) (UserInvite, error) {
+	req := Request{
+		Query:     CreateUserInvite,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return UserInvite{}, err
+	}
+	return resp.Data.CreateUserInvite, nil
+}
+
+// GetWorkspace returns information about the workspace
+func (c *HTTPClient) GetWorkspace(workspaceID string) (Workspace, error) {
+	wsReq := Request{
+		Query:     GetWorkspace,
+		Variables: map[string]interface{}{"workspaceId": workspaceID},
+	}
+
+	wsResp, err := wsReq.DoWithPublicClient(c)
+	if err != nil {
+		return Workspace{}, err
+	}
+	return wsResp.Data.GetWorkspace, nil
+}
+
+// GetWorkerQueueOptions gets the worker-queue default options
+func (c *HTTPClient) GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error) {
+	wqReq := Request{
+		Query: GetWorkerQueueOptions,
+	}
+
+	wqResp, err := wqReq.DoWithPublicClient(c)
+	if err != nil {
+		return WorkerQueueDefaultOptions{}, err
+	}
+	return wqResp.Data.GetWorkerQueueOptions, nil
+}
+
+// Gets a list of Organizations
+func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
+	req := Request{
+		Query: GetOrganizations,
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return []Organization{}, err
+	}
+	return resp.Data.GetOrganizations, nil
 }

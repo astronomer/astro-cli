@@ -1,1 +1,1 @@
-pkg/ is a collection of utility packages used by cloud-cli without being specific to cloud-cli itself. A package belongs here only if it could possibly be moved out into its own repository in the future.
+pkg/ is a collection of utility packages used by astro-cli without being specific to astro-cli itself. A package belongs here only if it could possibly be moved out into its own repository in the future.

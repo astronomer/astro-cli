@@ -116,8 +116,9 @@ Welcome to the Astro CLI. Astro is the modern command line interface for data or
 		rootCmd.AddCommand(
 			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
-		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
+	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
+
 	return rootCmd
 }
 

@@ -37,16 +37,35 @@ type ResponseData struct {
 	GetWorkspaceServiceAccounts    []ServiceAccount            `json:"workspaceServiceAccounts,omitempty"`
 	GetUsers                       []User                      `json:"users,omitempty"`
 	GetWorkspaces                  []Workspace                 `json:"workspaces,omitempty"`
+	GetPaginatedWorkspaces         []Workspace                 `json:"paginatedWorkspaces,omitempty"`
 	GetWorkspace                   *Workspace                  `json:"workspace,omitempty"`
 	UpdateDeployment               *Deployment                 `json:"updateDeployment,omitempty"`
 	UpdateDeploymentAirflow        *Deployment                 `json:"updateDeploymentAirflow,omitempty"`
+	UpdateDeploymentRuntime        *Deployment                 `json:"updateDeploymentRuntime,omitempty"`
+	CancelUpdateDeploymentRuntime  *Deployment                 `json:"cancelRuntimeUpdate,omitempty"`
 	UpdateWorkspace                *Workspace                  `json:"updateWorkspace,omitempty"`
 	DeploymentLog                  []DeploymentLog             `json:"logs,omitempty"`
-	WorkspaceUpdateUserRole        string                      `json:"workspaceUpdateUserRole,omitempty"`
+	WorkspaceUpsertUserRole        string                      `json:"workspaceUpsertUserRole,omitempty"`
 	WorkspaceGetUser               WorkspaceUserRoleBindings   `json:"workspaceUser,omitempty"`
 	WorkspaceGetUsers              []WorkspaceUserRoleBindings `json:"workspaceUsers,omitempty"`
+	WorkspacePaginatedGetUsers     []WorkspaceUserRoleBindings `json:"paginatedWorkspaceUsers,omitempty"`
 	DeploymentConfig               DeploymentConfig            `json:"deploymentConfig,omitempty"`
 	GetDeploymentNamespaces        []Namespace                 `json:"availableNamespaces,omitempty"`
+	RuntimeReleases                RuntimeReleases             `json:"runtimeReleases,omitempty"`
+	GetTeam                        *Team                       `json:"team,omitempty"`
+	GetTeamUsers                   []User                      `json:"teamUsers,omitempty"`
+	AddWorkspaceTeam               *Workspace                  `json:"workspaceAddTeam,omitempty"`
+	RemoveWorkspaceTeam            *Workspace                  `json:"workspaceRemoveTeam,omitempty"`
+	WorkspaceUpdateTeamRole        string                      `json:"workspaceUpdateTeamRole,omitempty"`
+	WorkspaceGetTeams              []Team                      `json:"workspaceTeams,omitempty"`
+	UpdateDeploymentImage          UpdateDeploymentImageResp   `json:"updateDeploymentImage,omitempty"`
+	ListTeams                      ListTeamsResp               `json:"paginatedTeams,omitempty"`
+	CreateTeamSystemRoleBinding    RoleBinding                 `json:"createTeamSystemRoleBinding"`
+	DeleteTeamSystemRoleBinding    RoleBinding                 `json:"deleteTeamSystemRoleBinding"`
+	AddDeploymentTeam              *RoleBinding                `json:"deploymentAddTeamRole,omitempty"`
+	RemoveDeploymentTeam           *RoleBinding                `json:"deploymentRemoveTeamRole,omitempty"`
+	UpdateDeploymentTeam           *RoleBinding                `json:"deploymentUpdateTeamRole,omitempty"`
+	DeploymentGetTeams             []Team                      `json:"deploymentTeams,omitempty"`
 }
 
 type Namespace struct {
@@ -89,6 +108,9 @@ type Deployment struct {
 	Version               string          `json:"version"`
 	AirflowVersion        string          `json:"airflowVersion"`
 	DesiredAirflowVersion string          `json:"desiredAirflowVersion"`
+	RuntimeVersion        string          `json:"runtimeVersion"`
+	RuntimeAirflowVersion string          `json:"runtimeAirflowVersion"`
+	DesiredRuntimeVersion string          `json:"desiredRuntimeVersion"`
 	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
 	Workspace             Workspace       `json:"workspace"`
 	Urls                  []DeploymentURL `json:"urls"`
@@ -106,6 +128,12 @@ type DeploymentURL struct {
 type DeploymentInfo struct {
 	NextCli string `json:"NextCli"`
 	Current string `json:"current"`
+}
+
+// DeploymentTeam defines a structure of RBAC deployment teams
+type DeploymentTeam struct {
+	ID           string        `json:"id"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 // Email contains various pieces of a users email
@@ -199,24 +227,33 @@ type User struct {
 	Emails   []Email `json:"emails"`
 	Username string  `json:"username"`
 	Status   string  `json:"status"`
+	Teams    []Team  `json:"teams"`
 	// created at
 	// updated at
 	// profile
 }
 
-type RoleBindingWorkspace struct {
-	Role      string `json:"role"`
-	Workspace struct {
-		ID string `json:"id"`
-	} `json:"workspace"`
+// Team contains all components of an Astronomer Team
+type Team struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	SortID       int           `json:"sortId"`
+	CreatedAt    string        `json:"createdAt"`
+	UpdatedAt    string        `json:"updatedAt"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
+}
+
+type ListTeamsResp struct {
+	Count int    `json:"count"`
+	Teams []Team `json:"teams"`
 }
 
 type WorkspaceUserRoleBindings struct {
-	ID           string                 `json:"id"`
-	Username     string                 `json:"username"`
-	FullName     string                 `json:"fullName"`
-	Emails       []Email                `json:"emails"`
-	RoleBindings []RoleBindingWorkspace `json:"roleBindings"`
+	ID           string        `json:"id"`
+	Username     string        `json:"username"`
+	FullName     string        `json:"fullName"`
+	Emails       []Email       `json:"emails"`
+	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
 type RoleBinding struct {
@@ -224,6 +261,8 @@ type RoleBinding struct {
 	User           RoleBindingUser         `json:"user"`
 	ServiceAccount WorkspaceServiceAccount `json:"serviceAccount"`
 	Deployment     Deployment              `json:"deployment"`
+	Team           Team                    `json:"team"`
+	Workspace      Workspace               `json:"workspace"`
 }
 
 type RoleBindingUser struct {
@@ -255,6 +294,12 @@ type DeploymentLog struct {
 type AirflowImage struct {
 	Version string `json:"version"`
 	Tag     string `json:"tag"`
+}
+
+type UpdateDeploymentImageResp struct {
+	ReleaseName    string `json:"releaseName"`
+	AirflowVersion string `json:"airflowVersion"`
+	RuntimeVersion string `json:"runtimeVersion"`
 }
 
 // DeploymentConfig contains current airflow image tag
@@ -298,6 +343,7 @@ func (config *DeploymentConfig) IsValidTag(tag string) bool {
 type AppConfig struct {
 	Version                string       `json:"version"`
 	BaseDomain             string       `json:"baseDomain"`
+	BYORegistryDomain      string       `json:"byoUpdateRegistryHost"`
 	SMTPConfigured         bool         `json:"smtpConfigured"`
 	ManualReleaseNames     bool         `json:"manualReleaseNames"`
 	ConfigureDagDeployment bool         `json:"configureDagDeployment"`
@@ -315,6 +361,8 @@ type FeatureFlags struct {
 	TriggererEnabled       bool `json:"triggererEnabled"`
 	GitSyncEnabled         bool `json:"gitSyncDagDeployment"`
 	NamespaceFreeFormEntry bool `json:"namespaceFreeFormEntry"`
+	BYORegistryEnabled     bool `json:"byoUpdateRegistryEnabled"`
+	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 }
 
 // coerce a string into SemVer if possible
@@ -328,4 +376,40 @@ func coerce(version string) (*semver.Version, error) {
 		return nil, err
 	}
 	return coerceVer, nil
+}
+
+// RuntimeRelease contains info releated to a runtime release
+type RuntimeRelease struct {
+	Version           string `json:"version"`
+	AirflowVersion    string `json:"airflowVersion"`
+	AirflowDBMigraion bool   `json:"airflowDatabaseMigrations"`
+}
+
+type RuntimeReleases []RuntimeRelease
+
+func (r RuntimeReleases) IsValidVersion(version string) bool {
+	for idx := range r {
+		if r[idx].Version == version {
+			return true
+		}
+	}
+	return false
+}
+
+func (r RuntimeReleases) GreaterVersions(version string) []string {
+	greaterVersions := []string{}
+	currentVersion, err := coerce(version)
+	if err != nil {
+		return greaterVersions
+	}
+	for idx := range r {
+		runtimeVersion, err := coerce(r[idx].Version)
+		if err != nil {
+			continue
+		}
+		if runtimeVersion.Compare(currentVersion) >= 0 {
+			greaterVersions = append(greaterVersions, r[idx].Version)
+		}
+	}
+	return greaterVersions
 }

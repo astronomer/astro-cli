@@ -16,6 +16,7 @@ type cfgs struct {
 	Contexts             cfg
 	LocalEnabled         cfg
 	LocalAstro           cfg
+	LocalCore            cfg
 	LocalPublicAstro     cfg
 	LocalRegistry        cfg
 	LocalHouston         cfg
@@ -32,6 +33,9 @@ type cfgs struct {
 	Verbosity            cfg
 	HoustonDialTimeout   cfg
 	HoustonSkipVerifyTLS cfg
+	SkipParse            cfg
+	Interactive          cfg
+	PageSize             cfg
 }
 
 // Creates a new cfg struct

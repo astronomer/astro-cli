@@ -73,7 +73,23 @@ func (t *Table) Print(out io.Writer) error {
 	}
 
 	t.PrintHeader(out)
-	t.PrintRows(out)
+	t.PrintRows(out, 0)
+
+	if t.SuccessMsg != "" {
+		fmt.Fprintln(out, t.SuccessMsg)
+	}
+	return nil
+}
+
+// Print header __as well as__ rows
+func (t *Table) PrintWithPageNumber(pageNumber int, out io.Writer) error {
+	if len(t.Rows) == 0 && t.NoResultsMsg != "" {
+		fmt.Fprintln(out, t.NoResultsMsg)
+		return nil
+	}
+
+	t.PrintHeader(out)
+	t.PrintRows(out, pageNumber)
 
 	if t.SuccessMsg != "" {
 		fmt.Fprintln(out, t.SuccessMsg)
@@ -103,7 +119,7 @@ func (t *Table) PrintHeader(out io.Writer) {
 }
 
 // PrintRows prints rows with an "S"
-func (t *Table) PrintRows(out io.Writer) {
+func (t *Table) PrintRows(out io.Writer, pageNumber int) {
 	if t.RenderedPadding == "" {
 		p := getPadding(t.altPadding)
 		t.RenderedPadding = p
@@ -116,7 +132,7 @@ func (t *Table) PrintRows(out io.Writer) {
 		// Responsible for adding the int in front of a row for selection by user
 		rowSelectPrefix := ""
 		if t.GetUserInput {
-			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(i+1))
+			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(pageNumber+i+1))
 		}
 		if r.Colored && len(t.ColorRowCode) == 2 {
 			fmt.Fprintln(out, rowSelectPrefix+t.ColorRowCode[0]+rr+t.ColorRowCode[1])

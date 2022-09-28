@@ -6,7 +6,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/software/deployment"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +35,8 @@ var (
 	releaseName             string
 	nfsLocation             string
 	dagDeploymentType       string
-	triggererReplicas       int
+	createTriggererReplicas int
+	updateTriggererReplicas int
 	gitRevision             string
 	gitRepoURL              string
 	gitBranchName           string
@@ -44,6 +44,8 @@ var (
 	gitSyncInterval         int
 	sshKey                  string
 	knowHosts               string
+	runtimeVersion          string
+	desiredRuntimeVersion   string
 	deploymentCreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
   $ astro deployment create --label=new-deployment-name --executor=celery
@@ -67,6 +69,16 @@ var (
 # Abort the initial airflow upgrade step:
   $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
 `
+	deploymentRuntimeUpgradeExample = `
+$ astro deployment runtime upgrade --deployment-id=<deployment-id> --desired-runtime-version=<desired-runtime-version>
+# Abort the initial runtime upgrade step:
+$ astro deployment runtime upgrade --deployment-id=<deployment-id> --cancel
+`
+	deploymentRuntimeMigrateExample = `
+$ astro deployment runtime migrate --deployment-id=<deployment-id>
+# Abort the initial runtime migrate step:
+$ astro deployment runtime migrate --deployment-id=<deployment-id> --cancel
+`
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -86,7 +98,13 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentSaRootCmd(out),
 		newDeploymentUserRootCmd(out),
 		newDeploymentAirflowRootCmd(out),
+		newDeploymentTeamRootCmd(out),
 	)
+
+	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
+		cmd.AddCommand(newDeploymentRuntimeRootCmd(out))
+	}
+
 	return cmd
 }
 
@@ -102,14 +120,12 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
-	} else {
+	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled bool
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+		runtimeEnabled = appConfig.Flags.AstroRuntimeEnabled
 	}
 
 	// let's hide under feature flag
@@ -127,7 +143,11 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 1, "Number of replicas to use for triggerer airflow component, valid 0-2")
+	}
+
+	if runtimeEnabled {
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	}
 
 	cmd.Flags().StringVarP(&deploymentCreateLabel, "label", "l", "", "Label of your deployment")
@@ -150,7 +170,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentDelete(cmd, args, out)
 		},
 	}
-	if deployment.CheckHardDeleteDeployment(houstonClient) {
+	if appConfig != nil && appConfig.Flags.HardDeleteDeployment {
 		cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deletes all infrastructure and records for this Deployment")
 	}
 	return cmd
@@ -191,10 +211,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 	}
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
-	} else {
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		triggererEnabled = appConfig.Flags.TriggererEnabled
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
@@ -213,7 +230,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&triggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&updateTriggererReplicas, "triggerer-replicas", "", -1, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
 	//noline:dupl
@@ -250,6 +267,7 @@ func newDeploymentAirflowRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// nolint:dupl
 func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade",
@@ -264,6 +282,62 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to upgrade")
 	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "Desired Airflow version to upgrade to")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
+	return cmd
+}
+
+func newDeploymentRuntimeRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "runtime",
+		Aliases: []string{"r"},
+		Short:   "Manage runtime deployments",
+		Long:    "Manage runtime deployments",
+	}
+	cmd.AddCommand(
+		newDeploymentRuntimeUpgradeCmd(out),
+		newDeploymentRuntimeMigrateCmd(out),
+	)
+	return cmd
+}
+
+// nolint:dupl
+func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "upgrade",
+		Aliases: []string{"up"},
+		Short:   "Upgrade Runtime image version",
+		Long:    "Upgrade Runtime image version",
+		Example: deploymentRuntimeUpgradeExample,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return deploymentRuntimeUpgrade(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to upgrade")
+	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "Desired Runtime version you wish to upgrade your deployment to")
+	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime upgrade step")
+	err := cmd.MarkFlagRequired("deployment-id")
+	if err != nil {
+		fmt.Println("error adding deployment-id flag: ", err.Error())
+	}
+	return cmd
+}
+
+func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "migrate",
+		Aliases: []string{"m"},
+		Short:   "Migrate to runtime image based deployment",
+		Long:    "Migrate to runtime image based deployment",
+		Example: deploymentRuntimeMigrateExample,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return deploymentRuntimeMigrate(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to migrate")
+	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime migrate step")
 	err := cmd.MarkFlagRequired("deployment-id")
 	if err != nil {
 		fmt.Println("error adding deployment-id flag: ", err.Error())
@@ -286,10 +360,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		logrus.Debugln("Error checking feature flag", err)
-	} else {
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 	}
@@ -302,7 +373,26 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	return deployment.Create(deploymentCreateLabel, ws, releaseName, cloudRole, executorType, airflowVersion, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, gitSyncInterval, triggererReplicas, houstonClient, out)
+	req := &deployment.CreateDeploymentRequest{
+		Label:             deploymentCreateLabel,
+		WS:                ws,
+		ReleaseName:       releaseName,
+		CloudRole:         cloudRole,
+		Executor:          executorType,
+		AirflowVersion:    airflowVersion,
+		RuntimeVersion:    runtimeVersion,
+		DAGDeploymentType: dagDeploymentType,
+		NFSLocation:       nfsLocation,
+		GitRepoURL:        gitRepoURL,
+		GitRevision:       gitRevision,
+		GitBranchName:     gitBranchName,
+		GitDAGDir:         gitDAGDir,
+		SSHKey:            sshKey,
+		KnownHosts:        knowHosts,
+		GitSyncInterval:   gitSyncInterval,
+		TriggererReplicas: createTriggererReplicas,
+	}
+	return deployment.Create(req, houstonClient, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -349,23 +439,21 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled bool
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		logrus.Debugln("Error checking feature flag", err)
-	} else {
+	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
 	}
 
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled {
-		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
+		err := validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
 		if err != nil {
 			return err
 		}
 	}
 
 	var executorType string
+	var err error
 	if executorUpdate != "" {
 		executorType, err = validateExecutorArg(executorUpdate)
 		if err != nil {
@@ -373,7 +461,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, triggererReplicas, houstonClient, out)
+	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
@@ -383,4 +471,22 @@ func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
 		return deployment.AirflowUpgradeCancel(deploymentID, houstonClient, out)
 	}
 	return deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, out)
+}
+
+func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	if cancel {
+		return deployment.RuntimeUpgradeCancel(deploymentID, houstonClient, out)
+	}
+	return deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient, out)
+}
+
+func deploymentRuntimeMigrate(cmd *cobra.Command, out io.Writer) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+	if cancel {
+		return deployment.RuntimeMigrateCancel(deploymentID, houstonClient, out)
+	}
+	return deployment.RuntimeMigrate(deploymentID, houstonClient, out)
 }

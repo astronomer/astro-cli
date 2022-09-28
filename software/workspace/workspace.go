@@ -12,6 +12,26 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+type workspacePaginationOptions struct {
+	pageSize      int
+	pageNumber    int
+	quit          bool
+	userSelection int
+}
+
+type workspaceSelection struct {
+	id   string
+	quit bool
+	err  error
+}
+
+const (
+	defaultWorkspacePaginationOptions      = "f. first p. previous n. next q. quit\n> "
+	workspacePaginationWithoutNextOptions  = "f. first p. previous q. quit\n> "
+	workspacePaginationWithNextQuitOptions = "n. next q. quit\n> "
+	workspacePaginationWithQuitOptions     = "q. quit\n> "
+)
+
 var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
 func newTableOut() *printutil.Table {
@@ -102,18 +122,64 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-func getWorkspaceSelection(client houston.ClientInterface, out io.Writer) (string, error) {
+// workspacesPromptPaginatedOption Show pagination option based on page size and total record
+var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) workspacePaginationOptions {
+	for {
+		gotoOptionMessage := defaultWorkspacePaginationOptions
+		gotoOptions := make(map[string]workspacePaginationOptions)
+		gotoOptions["f"] = workspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
+		gotoOptions["p"] = workspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
+		gotoOptions["n"] = workspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
+		gotoOptions["q"] = workspacePaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
+
+		if totalRecord < pageSize {
+			delete(gotoOptions, "n")
+			gotoOptionMessage = workspacePaginationWithoutNextOptions
+		}
+
+		if pageNumber == 0 {
+			delete(gotoOptions, "p")
+			delete(gotoOptions, "f")
+			gotoOptionMessage = workspacePaginationWithNextQuitOptions
+		}
+
+		if pageNumber == 0 && totalRecord < pageSize {
+			gotoOptionMessage = workspacePaginationWithQuitOptions
+		}
+
+		in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
+		value, found := gotoOptions[in]
+		i, err := strconv.ParseInt(in, 10, 8) //nolint:gomnd
+
+		if found {
+			return value
+		} else if err == nil && int(i) > pageSize*pageNumber {
+			userSelection := gotoOptions["q"]
+			userSelection.userSelection = int(i) - pageSize*pageNumber
+			return userSelection
+		}
+		fmt.Print("\nInvalid option")
+	}
+}
+
+func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterface, out io.Writer) workspaceSelection {
 	tab := newTableOut()
 	tab.GetUserInput = true
+	var ws []houston.Workspace
+	var err error
 
-	ws, err := client.ListWorkspaces()
+	if pageSize > 0 {
+		ws, err = client.PaginatedListWorkspaces(pageSize, pageNumber)
+	} else {
+		ws, err = client.ListWorkspaces()
+	}
 	if err != nil {
-		return "", err
+		return workspaceSelection{id: "", quit: false, err: err}
 	}
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return "", err
+		return workspaceSelection{id: "", quit: false, err: err}
 	}
 
 	for i := range ws {
@@ -131,26 +197,44 @@ func getWorkspaceSelection(client houston.ClientInterface, out io.Writer) (strin
 		tab.AddRow([]string{name, workspace}, color)
 	}
 
-	tab.Print(out)
+	tabPrintErr := tab.PrintWithPageNumber(pageNumber*pageSize, out)
+	if tabPrintErr != nil {
+		return workspaceSelection{id: "", quit: false, err: fmt.Errorf("unable to print with page number: %w", tabPrintErr)}
+	}
+	totalRecords := len(ws)
+
+	if pageSize > 0 {
+		selectedOption := workspacesPromptPaginatedOption(pageSize, pageNumber, totalRecords)
+		if selectedOption.quit {
+			if selectedOption.userSelection == 0 {
+				return workspaceSelection{id: "", quit: true, err: nil}
+			}
+			return workspaceSelection{id: ws[selectedOption.userSelection-1].ID, quit: false, err: nil}
+		}
+		return getWorkspaceSelection(selectedOption.pageSize, selectedOption.pageNumber, client, out)
+	}
 
 	in := input.Text("\n> ")
 	i, err := strconv.ParseInt(in, 10, 64) //nolint:gomnd
 	if err != nil {
-		return "", fmt.Errorf("cannot parse %s to int: %w", in, err)
+		return workspaceSelection{id: "", quit: false, err: fmt.Errorf("cannot parse %s to int: %w", in, err)}
 	}
-
-	return ws[i-1].ID, nil
+	return workspaceSelection{id: ws[i-1].ID, quit: false, err: nil}
 }
 
 // Switch switches workspaces
-func Switch(id string, client houston.ClientInterface, out io.Writer) error {
+func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writer) error {
 	if id == "" {
-		_id, err := getWorkspaceSelection(client, out)
-		if err != nil {
-			return err
+		workspaceSelection := getWorkspaceSelection(pageSize, 0, client, out)
+
+		if workspaceSelection.quit {
+			return nil
+		}
+		if workspaceSelection.err != nil {
+			return workspaceSelection.err
 		}
 
-		id = _id
+		id = workspaceSelection.id
 	}
 	// validate workspace
 	_, err := client.GetWorkspace(id)

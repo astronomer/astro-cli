@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -10,8 +11,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -46,6 +49,30 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		return err
 	}
 
+	// flag to determine if we are setting the dags folder in the ignore path
+	dagsIgnoreSet := false
+	fullpath := filepath.Join(config.Path, ".dockerignore")
+
+	lines, err := fileutil.Read(fullpath)
+	if err != nil {
+		return err
+	}
+	contains, _ := fileutil.Contains(lines, "dags/")
+	if !contains {
+		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+
+		if _, err := f.WriteString("\ndags/"); err != nil {
+			return err
+		}
+
+		dagsIgnoreSet = true
+	}
+
 	args := []string{
 		"build",
 		"-t",
@@ -54,6 +81,10 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	}
 	if config.NoCache {
 		args = append(args, "--no-cache")
+	}
+
+	if len(config.TargetPlatforms) > 0 {
+		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(config.TargetPlatforms, ",")))
 	}
 	// Build image
 	var stdout, stderr io.Writer
@@ -67,6 +98,38 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
+	}
+
+	// remove dags from .dockerignore file if we set it
+	if dagsIgnoreSet {
+		f, err := os.Open(fullpath)
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+
+		var bs []byte
+		buf := bytes.NewBuffer(bs)
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			text := scanner.Text()
+			if text != "dags/" {
+				_, err = buf.WriteString(text + "\n")
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -89,11 +152,21 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 		return fmt.Errorf("error reading credentials: %w", err)
 	}
 
-	if username != "" {
-		authConfig.Username = username
+	if username == "" && token == "" {
+		registryDomain := strings.Split(registry, "/")[0]
+		creds := configFile.GetCredentialsStore(registryDomain)
+		authConfig, err = creds.Get(registryDomain)
+		if err != nil {
+			log.Debugf("Error reading credentials for domain: %s from docker credentials store: %v", registryDomain, err)
+		}
+	} else {
+		if username != "" {
+			authConfig.Username = username
+		}
+		authConfig.Password = token
+		authConfig.ServerAddress = registry
 	}
-	authConfig.Password = token
-	authConfig.ServerAddress = registry
+
 	log.Debugf("Exec Push docker creds %v \n", authConfig)
 
 	ctx := context.Background()
@@ -175,6 +248,14 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 		return labels, err
 	}
 	return labels, nil
+}
+
+func (d *DockerImage) TagLocalImage(localImage string) error {
+	err := cmdExec(DockerCmd, nil, nil, "tag", localImage, d.imageName)
+	if err != nil {
+		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
+	}
+	return nil
 }
 
 // Exec executes a docker command

@@ -1,7 +1,6 @@
 package software
 
 import (
-	"fmt"
 	"io"
 	"time"
 
@@ -50,10 +49,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 		newWorkersLogsCmd(out),
 	)
 
-	appConfig, err := houstonClient.GetAppConfig()
-	if err != nil {
-		initDebugLogs = append(initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", err.Error()))
-	} else if appConfig.Flags.TriggererEnabled {
+	if appConfig != nil && appConfig.Flags.TriggererEnabled {
 		cmd.AddCommand(newTriggererLogsCmd(out))
 	}
 

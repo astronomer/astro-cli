@@ -29,6 +29,21 @@ func (h ClientImplementation) ListWorkspaces() ([]Workspace, error) {
 	return r.Data.GetWorkspaces, nil
 }
 
+// PaginatedListWorkspaces - list workspaces
+func (h ClientImplementation) PaginatedListWorkspaces(pageSize, pageNumber int) ([]Workspace, error) {
+	req := Request{
+		Query:     WorkspacesPaginatedGetRequest,
+		Variables: map[string]interface{}{"pageSize": pageSize, "pageNumber": pageNumber},
+	}
+
+	r, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return r.Data.GetPaginatedWorkspaces, nil
+}
+
 // DeleteWorkspace - delete a workspace
 func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, error) {
 	req := Request{

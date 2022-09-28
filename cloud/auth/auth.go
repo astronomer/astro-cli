@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	Domain = "astronomer.io"
+	Domain      = "astronomer.io"
+	localDomain = "localhost"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -64,11 +65,16 @@ func orgLookup(domain string) (string, error) {
 		splitDomain := strings.SplitN(domain, ".", splitNum)
 		domain = splitDomain[1]
 	}
-	addr := fmt.Sprintf(
-		"%s://api.%s/hub/organization-lookup",
-		config.CFG.CloudAPIProtocol.GetString(),
-		domain,
-	)
+	var addr string
+	if domain == localDomain {
+		addr = "http://localhost:8871/organization-lookup"
+	} else {
+		addr = fmt.Sprintf(
+			"%s://api.%s/hub/organization-lookup",
+			config.CFG.CloudAPIProtocol.GetString(),
+			domain,
+		)
+	}
 	ctx := http_context.Background()
 	reqData, err := json.Marshal(orgLookupRequest{Email: userEmail})
 	if err != nil {
@@ -197,7 +203,7 @@ func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
 	return userEmail, err
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, loginLink bool, domain string) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain, orgID string) (Result, error) { //nolint:gocritic
 	// try to get UserEmail from config first
 	userEmail, err := getUserEmail(c)
 	if err != nil {
@@ -208,9 +214,11 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 		userEmail = input.Text("Please enter your account email: ")
 	}
 
-	orgID, err := a.orgChecker(domain)
-	if err != nil {
-		log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
+	if orgID == "" {
+		orgID, err = a.orgChecker(domain)
+		if err != nil {
+			log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
+		}
 	}
 
 	// Generate PKCE verifier and challenge
@@ -238,7 +246,7 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
 
 	// open browser
-	if !loginLink {
+	if !shouldDisplayLoginLink {
 		fmt.Printf("\n%s to open the browser to log in or %s to quit…", ansi.Green("Press Enter"), ansi.Red("^C"))
 		fmt.Scanln()
 		err = openURL(authorizeURL)
@@ -292,10 +300,12 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 // checkToken requests a users rolebindings and sets the workspace to make sure that token works
 // TODO check orgID is in the token
 func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
-	roleBindings, err := client.ListUserRoleBindings()
+	self, err := client.GetUserInfo()
 	if err != nil {
 		return err
 	}
+	organizationID := self.AuthenticatedOrganizationID
+	roleBindings := self.User.RoleBindings
 
 	err = c.SetSystemAdmin(false)
 	if err != nil {
@@ -312,7 +322,14 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 		}
 	}
 
-	workspaces, err := client.ListWorkspaces()
+	if organizationID != "" {
+		err = c.SetContextKey("organization", organizationID)
+		if err != nil {
+			return err
+		}
+	}
+
+	workspaces, err := client.ListWorkspaces(organizationID)
 	if err != nil {
 		return errors.Wrap(err, "Invalid authentication token. Try to log in again with a new token or check your internet connection.\n\nDetails")
 	}
@@ -330,7 +347,6 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 		}
 		fmt.Printf(configSetDefaultWorkspace, w.Label)
 	}
-
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in context
 		w, isSwitched, err := switchToLastUsedWorkspace(c, workspaces)
@@ -356,7 +372,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain string, client astro.Client, out io.Writer, loginLink bool) error {
+func Login(domain, orgID, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -364,14 +380,22 @@ func Login(domain string, client astro.Client, out io.Writer, loginLink bool) er
 		return err
 	}
 	// Welcome User
-	fmt.Print("Welcome to the Astro CLI 🚀\n\n")
+	fmt.Print("\nWelcome to the Astro CLI 🚀\n\n")
 	fmt.Print("To learn more about Astro, go to https://docs.astronomer.io\n\n")
 
 	c, _ := context.GetCurrentContext()
 
-	res, err = authenticator.authDeviceLogin(c, authConfig, loginLink, domain)
-	if err != nil {
-		return err
+	if token == "" {
+		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain, orgID)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
+		res = Result{
+			AccessToken: token,
+			ExpiresIn:   time.Now().Add(24 * time.Hour).Unix(), // nolint:gomnd
+		}
 	}
 
 	// If no domain specified

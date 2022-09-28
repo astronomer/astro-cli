@@ -8,11 +8,18 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/software/utils"
 )
 
-var errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
+var (
+	errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
+
+	// monkey patched to write unit tests
+	promptPaginatedOption = utils.PromptPaginatedOption
+)
 
 // Add a user to a workspace with specified role
+// nolint: dupl
 func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
 	w, err := client.AddWorkspaceUser(workspaceID, email, role)
 	if err != nil {
@@ -33,6 +40,7 @@ func Add(workspaceID, email, role string, client houston.ClientInterface, out io
 }
 
 // Remove a user from a workspace
+// nolint: dupl
 func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error {
 	w, err := client.DeleteWorkspaceUser(workspaceID, userID)
 	if err != nil {
@@ -64,10 +72,63 @@ func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer
 	}
 	for i := range users {
 		var color bool
-		tab.AddRow([]string{users[i].Username, users[i].ID, users[i].RoleBindings[0].Role}, color)
+		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
+		if role != houston.NoneRole {
+			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
+		}
 	}
 	tab.Print(out)
 	return nil
+}
+
+// PaginatedListRoles print users and roles from a workspace
+func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, client houston.ClientInterface, out io.Writer) error {
+	users, err := client.ListWorkspacePaginatedUserAndRoles(workspaceID, cursorID, float64(take))
+	if err != nil {
+		return err
+	}
+
+	tab := printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         []string{"USERNAME", "ID", "ROLE"},
+	}
+	for i := range users {
+		var color bool
+		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
+		if role != houston.NoneRole {
+			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
+		}
+	}
+	tab.Print(out)
+
+	totalUsers := len(users)
+	if pageNumber == 0 && totalUsers < take {
+		return nil
+	}
+
+	var (
+		previousCursorID string
+		nextCursorID     string
+	)
+	if totalUsers > 0 {
+		previousCursorID = users[0].ID
+		nextCursorID = users[totalUsers-1].ID
+	}
+
+	if totalUsers == 0 && take < 0 {
+		nextCursorID = ""
+	} else if totalUsers == 0 && take > 0 {
+		previousCursorID = ""
+	}
+
+	// Houston query does not send back total records in response to calculate if its last page or not
+	selectedOption := promptPaginatedOption(previousCursorID, nextCursorID, take, totalUsers, pageNumber, false)
+	if selectedOption.Quit {
+		return nil
+	}
+
+	return PaginatedListRoles(workspaceID, selectedOption.CursorID, selectedOption.PageSize, selectedOption.PageNumber, client, out)
 }
 
 // Update workspace user role
@@ -78,15 +139,17 @@ func UpdateRole(workspaceID, email, role string, client houston.ClientInterface,
 		return err
 	}
 
-	var rb houston.RoleBindingWorkspace
-	for _, val := range roles.RoleBindings {
-		if val.Workspace.ID == workspaceID && strings.Contains(val.Role, "WORKSPACE") {
-			rb = val
+	var rb houston.RoleBinding
+	var found bool
+	for idx := range roles.RoleBindings {
+		if roles.RoleBindings[idx].Workspace.ID == workspaceID && strings.Contains(roles.RoleBindings[idx].Role, "WORKSPACE") {
+			rb = roles.RoleBindings[idx]
+			found = true
 			break
 		}
 	}
 	// check if rolebinding is an empty structure
-	if (rb == houston.RoleBindingWorkspace{}) {
+	if !found {
 		return errUserNotInWorkspace
 	}
 

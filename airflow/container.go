@@ -18,14 +18,17 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(noCache bool) error
+	Start(imageName, settingsFile string, noCache bool, noBrowser bool) error
 	Stop() error
 	PS() error
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
-	Pytest(pytestFile, projectImageName string) (string, error)
-	Parse(buildImage string) error
+	Pytest(imageName, pytestFile, projectImageName string) (string, error)
+	Parse(imageName, buildImage string) error
+	Bash(container string) error
+	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
+	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -39,6 +42,7 @@ type ImageHandler interface {
 	Push(registry, username, token, remoteImage string) error
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
+	TagLocalImage(localImage string) error
 }
 
 type DockerComposeAPI interface {
@@ -53,8 +57,8 @@ type DockerRegistryAPI interface {
 	client.CommonAPIClient
 }
 
-func ContainerHandlerInit(airflowHome, envFile, dockerfile string, isPyTestCompose bool) (ContainerHandler, error) {
-	return DockerComposeInit(airflowHome, envFile, dockerfile, isPyTestCompose)
+func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string, isPyTestCompose bool) (ContainerHandler, error) {
+	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName, isPyTestCompose)
 }
 
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
@@ -65,10 +69,10 @@ func ImageHandlerInit(image string) ImageHandler {
 	return DockerImageInit(image)
 }
 
-// projectNameUnique creates a reasonably unique project name based on the hashed
+// ProjectNameUnique creates a reasonably unique project name based on the hashed
 // path of the project. This prevents collisions of projects with identical dir names
 // in different paths. ie (~/dev/project1 vs ~/prod/project1)
-func projectNameUnique(pytest bool) (string, error) {
+func ProjectNameUnique(pytest bool) (string, error) {
 	projectName := config.CFG.ProjectName.GetString()
 
 	pwd, err := fileutil.GetWorkingDir()

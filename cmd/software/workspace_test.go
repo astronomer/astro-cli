@@ -14,18 +14,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var (
-	mockWorkspace = &houston.Workspace{
-		ID:           "ck05r3bor07h40d02y2hw4n4v",
-		Label:        "airflow",
-		Description:  "test description",
-		Users:        nil,
-		CreatedAt:    "2019-10-16T21:14:22.105Z",
-		UpdatedAt:    "2019-10-16T21:14:22.105Z",
-		RoleBindings: nil,
-	}
-	mockAppConfig = &houston.AppConfig{}
-)
+var mockWorkspace = &houston.Workspace{
+	ID:           "ck05r3bor07h40d02y2hw4n4v",
+	Label:        "airflow",
+	Description:  "test description",
+	Users:        nil,
+	CreatedAt:    "2019-10-16T21:14:22.105Z",
+	UpdatedAt:    "2019-10-16T21:14:22.105Z",
+	RoleBindings: nil,
+}
 
 func execWorkspaceCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
@@ -52,7 +49,7 @@ func TestWorkspaceList(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig").Return(&houston.AppConfig{}, nil)
 	api.On("ListWorkspaces").Return(mockWorkspaces, nil)
 
 	houstonClient = api
@@ -126,19 +123,60 @@ func TestWorkspaceUpdate(t *testing.T) {
 }
 
 func TestWorkspaceSwitch(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	wsID := "test-id"
-	buf := new(bytes.Buffer)
+	t.Run("Without pagination", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		wsID := "test-id"
+		buf := new(bytes.Buffer)
 
-	houstonMock := new(mocks.ClientInterface)
-	currentClient := houstonClient
-	houstonClient = houstonMock
-	defer func() { houstonClient = currentClient }()
+		houstonMock := new(mocks.ClientInterface)
+		currentClient := houstonClient
+		houstonClient = houstonMock
+		defer func() { houstonClient = currentClient }()
 
-	houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
 
-	err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), wsID)
-	houstonMock.AssertExpectations(t)
+		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), wsID)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("With pagination default pageSize", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		wsID := "test-id"
+		buf := new(bytes.Buffer)
+		workspacePaginated = true
+
+		houstonMock := new(mocks.ClientInterface)
+		currentClient := houstonClient
+		houstonClient = houstonMock
+		defer func() { houstonClient = currentClient }()
+
+		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+
+		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), wsID)
+		houstonMock.AssertExpectations(t)
+	})
+
+	t.Run("With pagination, invalid/negative pageSize", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		wsID := "test-id"
+		workspacePaginated = true
+		workspacePageSize = -10
+		buf := new(bytes.Buffer)
+
+		houstonMock := new(mocks.ClientInterface)
+		currentClient := houstonClient
+		houstonClient = houstonMock
+		defer func() { houstonClient = currentClient }()
+
+		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+
+		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), wsID)
+		houstonMock.AssertExpectations(t)
+	})
 }

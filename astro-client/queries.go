@@ -3,8 +3,8 @@ package astro
 // TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
 	WorkspacesGetRequest = `
-	query GetWorkspaces {
-		workspaces {
+	query GetWorkspaces($organizationId: Id!) {
+		workspaces(organizationId: $organizationId) {
 			id
 			label
 			organizationId
@@ -13,16 +13,39 @@ var (
 
 	WorkspaceDeploymentsGetRequest = `
 	query WorkspaceDeployments(
-		$deploymentsInput: DeploymentsInput
+		$organizationId: Id!, $workspaceId: Id
 	) {
-		deployments(input: $deploymentsInput) {
+		deployments(organizationId: $organizationId, workspaceId: $workspaceId) {
 			id
 			label
 			releaseName
-			orchestrator {
+			cluster {
 				id
 			}
+			cluster {
+				id
+				name
+				cloudProvider
+				nodePools {
+					id
+					isDefault
+					nodeInstanceType
+					createdAt
+				}
+			}
+			workerQueues {
+				id
+				name
+				isDefault
+				nodePoolId
+				podCpu
+				podRam
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
+			}
 			createdAt
+			status
 			runtimeRelease {
 				version
 				airflowVersion
@@ -49,11 +72,55 @@ var (
 				}
 			}
 			workspace {
+				id
 				organizationId
 			}
 		}
 	}
 	`
+
+	GetDeployment = `
+	query GetDeployment($deploymentId: Id!) {
+		deployment(id: $deploymentId) {
+			id
+			label
+			releaseName
+			cluster {
+				id
+			}
+			createdAt
+			status
+			runtimeRelease {
+				version
+				airflowVersion
+			}
+			deploymentSpec {
+				image {
+					tag
+				}
+				workers {
+					au
+				}
+				scheduler {
+					au
+					replicas
+				}
+				environmentVariablesObjects {
+					key
+					value
+					isSecret
+					updatedAt
+				}
+				webserver {
+					url
+				}
+			}
+			workspace {
+				id
+				organizationId
+			}
+		}
+	}`
 
 	SelfQuery = `
 	query selfQuery {
@@ -63,24 +130,7 @@ var (
 			role
 			}
 		}
-		}
-	}
-	`
-
-	InternalRuntimeReleases = `
-	query RuntimeReleasesQuery($channel: String) {
-		runtimeReleases(channel: $channel) {
-			version
-			channel
-		}
-	}
-	`
-
-	PublicRuntimeReleases = `
-	query RuntimeReleasesQuery {
-		runtimeReleases {
-			version
-			channel
+		authenticatedOrganizationId
 		}
 	}
 	`
@@ -107,12 +157,12 @@ var (
 	}
 	`
 
-	GetOrchestrators = `
-	query orchestrators($input: OrchestratorInput!) {
-		orchestrators(input: $input) {
+	GetClusters = `
+	query clusters($organizationId: Id!) {
+		clusters(organizationId: $organizationId) {
 			id
-			cloudProvider
 			name
+			cloudProvider
 		}
 	}
 	`
@@ -127,9 +177,48 @@ var (
 		}
 		executors
 		runtimeReleases {
+			channel
 			version
 		}
 	  }
 	}
   `
+	GetWorkspace = `
+	query GetWorkspace($workspaceId: Id!) {
+		workspace(id:$workspaceId) {
+			id
+			label
+			organizationId
+		}
+	}`
+
+	GetWorkerQueueOptions = `
+	query workerQueueOptions {
+		workerQueueOptions {
+			minWorkerCount {
+			  floor
+			  ceiling
+			  default
+			}
+			maxWorkerCount {
+			  floor
+			  ceiling
+			  default
+			}
+			workerConcurrency {
+			  floor
+			  ceiling
+			  default
+			}
+		}
+	}`
+
+	GetOrganizations = `
+	query Query {
+		organizations {
+		  id
+		  name
+		}
+	  }
+	`
 )

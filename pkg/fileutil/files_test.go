@@ -108,6 +108,7 @@ func TestWriteStringToFile(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	defer afero.NewOsFs().Remove("./test.out")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := WriteStringToFile(tt.args.path, tt.args.s); (err != nil) != tt.wantErr {
@@ -116,6 +117,119 @@ func TestWriteStringToFile(t *testing.T) {
 			if _, err := os.Open(tt.args.path); err != nil {
 				t.Errorf("Error opening file %s", tt.args.path)
 			}
+		})
+	}
+}
+
+func TestTar(t *testing.T) {
+	os.Mkdir("./test", os.ModePerm)
+
+	type args struct {
+		source string
+		target string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "basic case",
+			args:    args{source: "./test", target: "/tmp"},
+			wantErr: false,
+		},
+	}
+	defer afero.NewOsFs().Remove("./test")
+	defer afero.NewOsFs().Remove("/tmp/test.tar")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := Tar(tt.args.source, tt.args.target); (err != nil) != tt.wantErr {
+				t.Errorf("Tar() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			filePath := "/tmp/test.tar"
+			if _, err := os.Create(filePath); err != nil {
+				t.Errorf("Error creating file %s", filePath)
+			}
+			if _, err := os.Stat(tt.args.source); err != nil {
+				t.Errorf("Error getting file stats %s", tt.args.source)
+			}
+			if _, err := os.Open(tt.args.source); err != nil {
+				t.Errorf("Error opening file %s", tt.args.source)
+			}
+		})
+	}
+}
+
+func TestContains(t *testing.T) {
+	type args struct {
+		elems []string
+		param string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		expectedResp bool
+		expectedPos  int
+	}{
+		{
+			name:         "should contain element case",
+			args:         args{elems: []string{"sample.yaml", "test.yaml"}, param: "test.yaml"},
+			expectedResp: true,
+			expectedPos:  1,
+		},
+		{
+			name:         "should not contain element case",
+			args:         args{elems: []string{"sample.yaml", "test.yaml"}, param: "random.yaml"},
+			expectedResp: false,
+			expectedPos:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exist, index := Contains(tt.args.elems, tt.args.param)
+			assert.Equal(t, exist, tt.expectedResp)
+			assert.Equal(t, index, tt.expectedPos)
+		})
+	}
+}
+
+func TestRead(t *testing.T) {
+	filePath := "./test.out"
+	content := "testing"
+	WriteStringToFile(filePath, content)
+	defer afero.NewOsFs().Remove(filePath)
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		expectedResp []string
+		errResp      string
+	}{
+		{
+			name:         "should read file contents successfully",
+			args:         args{path: filePath},
+			expectedResp: []string{content},
+			errResp:      "",
+		},
+		{
+			name:         "error on read file content",
+			args:         args{path: "incorrect-file"},
+			expectedResp: nil,
+			errResp:      "no such file or directory",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualResp, actualErr := Read(tt.args.path)
+			if tt.errResp != "" && actualErr != nil {
+				assert.Contains(t, actualErr.Error(), tt.errResp)
+			} else {
+				assert.NoError(t, actualErr)
+			}
+			assert.Equal(t, tt.expectedResp, actualResp)
 		})
 	}
 }

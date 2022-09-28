@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	loginLink bool
-	oAuth     bool
+	shouldDisplayLoginLink bool
+	token                  string
+	oAuth                  bool
 
 	cloudLogin     = cloudAuth.Login
 	cloudLogout    = cloudAuth.Logout
@@ -31,7 +32,9 @@ func newLoginCommand(astroClient astro.Client, out io.Writer) *cobra.Command {
 			return login(cmd, args, astroClient, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&loginLink, "login-link", "l", false, "Get login link to login on a separate device for browserless cloud CLI login")
+
+	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for software login")
 	return cmd
 }
@@ -52,19 +55,20 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+
 	if len(args) == 1 {
 		if !context.IsCloudDomain(args[0]) {
 			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)
 		}
-		return cloudLogin(args[0], astroClient, out, loginLink)
+		return cloudLogin(args[0], "", token, astroClient, out, shouldDisplayLoginLink)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(cloudAuth.Domain, astroClient, out, loginLink)
+		return cloudLogin(cloudAuth.Domain, "", token, astroClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, astroClient, out, loginLink)
+		return cloudLogin(ctx.Domain, "", token, astroClient, out, shouldDisplayLoginLink)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonClient, out)
 }

@@ -134,7 +134,7 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 					Username: "test@astronomer.com",
 					FullName: "test",
 					Emails:   []Email{{Address: "test@astronomer.com"}},
-					RoleBindings: []RoleBindingWorkspace{
+					RoleBindings: []RoleBinding{
 						{
 							Role: WorkspaceViewerRole,
 						},
@@ -176,12 +176,65 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 	})
 }
 
+func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
+	testUtil.InitTestConfig("software")
+
+	mockResponse := &Response{
+		Data: ResponseData{
+			WorkspacePaginatedGetUsers: []WorkspaceUserRoleBindings{
+				{
+					ID:       "user-id",
+					Username: "test@astronomer.com",
+					FullName: "test",
+					Emails:   []Email{{Address: "test@astronomer.com"}},
+					RoleBindings: []RoleBinding{
+						{
+							Role: WorkspaceViewerRole,
+						},
+					},
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		response, err := api.ListWorkspacePaginatedUserAndRoles("workspace-id", "cursor-id", 100)
+		assert.NoError(t, err)
+		assert.Equal(t, response, mockResponse.Data.WorkspacePaginatedGetUsers)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.ListWorkspacePaginatedUserAndRoles("workspace-id", "cursor-id", 100)
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
 func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
 		Data: ResponseData{
-			WorkspaceUpdateUserRole: DeploymentAdminRole,
+			WorkspaceUpsertUserRole: DeploymentAdminRole,
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
@@ -199,7 +252,7 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 
 		response, err := api.UpdateWorkspaceUserRole("workspace-id", "email", DeploymentAdminRole)
 		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspaceUpdateUserRole)
+		assert.Equal(t, response, mockResponse.Data.WorkspaceUpsertUserRole)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -223,7 +276,7 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 	mockResponse := &Response{
 		Data: ResponseData{
 			WorkspaceGetUser: WorkspaceUserRoleBindings{
-				RoleBindings: []RoleBindingWorkspace{
+				RoleBindings: []RoleBinding{
 					{
 						Role: DeploymentAdminRole,
 					},

@@ -1,15 +1,19 @@
 package deployment
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strconv"
+	"time"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -17,8 +21,12 @@ import (
 )
 
 var (
-	errInvalidDeploymentKey = errors.New("invalid deployment selection")
-	errNoDeployments        = errors.New("no Deployments found in this Workspace")
+	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
+	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
+	// Monkey patched to write unit tests
+	createDeployment = Create
 )
 
 const (
@@ -28,11 +36,12 @@ const (
 // TODO: get these values from the Astrohub API
 var (
 	SchedulerAuMin       = 5
-	WorkerAuMin          = 10
 	SchedulerReplicasMin = 1
 	schedulerAuMax       = 30
-	workerAuMax          = 175
 	schedulerReplicasMax = 4
+	sleepTime            = 180
+	tickNum              = 10
+	timeoutNum           = 180
 )
 
 func newTableOut() *printutil.Table {
@@ -45,11 +54,15 @@ func newTableOut() *printutil.Table {
 
 // List all airflow deployments
 func List(ws string, all bool, client astro.Client, out io.Writer) error {
-	deploymentsInput := astro.DeploymentsInput{}
-	if !all {
-		deploymentsInput.WorkspaceID = ws
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
 	}
-	deployments, err := client.ListDeployments(deploymentsInput)
+
+	if all {
+		ws = ""
+	}
+	deployments, err := client.ListDeployments(c.Organization, ws)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -67,13 +80,13 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 	}
 
 	return tab.Print(out)
 }
 
-func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount int, client astro.Client) error {
+func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs bool, logCount int, client astro.Client) error {
 	logLevels := []string{}
 
 	// log level
@@ -90,20 +103,13 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 		logLevels = []string{"WARN", "ERROR", "INFO"}
 	}
 
-	// select a deployment
-	if deploymentID == "" {
-		// get deployments
-		deployments, err := getDeployments(ws, client)
-		if err != nil {
-			return err
-		}
-
-		// select deployment
-		deploymentID, err = selectDeployment(deployments, "Select a Deployment to view its logs")
-		if err != nil {
-			return err
-		}
+	// get deployment
+	deployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
+	if err != nil {
+		return err
 	}
+
+	deploymentID = deployment.ID
 
 	// deployment logs request
 	vars := map[string]interface{}{
@@ -121,7 +127,7 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 	Logs := deploymentHistoryResp.SchedulerLogs
 
 	if len(Logs) == 0 {
-		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deploymentID)
+		fmt.Println("No matching logs have been recorded in the past 24 hours for Deployment " + deployment.Label)
 		return nil
 	}
 
@@ -130,11 +136,17 @@ func Logs(deploymentID, ws string, warnLogs, errorLogs, infoLogs bool, logCount 
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas, workerAU int, client astro.Client) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
+
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+
 	// validate resources requests
-	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
+	resourcesValid := validateResources(schedulerAU, schedulerReplicas)
 	if !resourcesValid {
 		return nil
 	}
@@ -149,7 +161,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	}
 
 	// validate workspace
-	ws, err := client.ListWorkspaces()
+	ws, err := client.ListWorkspaces(c.Organization)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -173,17 +185,22 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		if label == "" {
 			return errors.New("you must give your Deployment a name")
 		}
+		deployments, err := getDeployments(workspaceID, client)
+		if err != nil {
+			return errors.Wrap(err, errInvalidDeployment.Error())
+		}
+
+		for i := range deployments {
+			if deployments[i].Label == label {
+				return errors.New("A Deployment with that name already exists")
+			}
+		}
 	}
 
 	// select and validate cluster
 	clusterID, err = selectCluster(clusterID, organizationID, client)
 	if err != nil {
 		return err
-	}
-
-	workers := astro.Workers{
-		AU:                            workerAU,
-		TerminationGracePeriodSeconds: 86400,
 	}
 
 	scheduler := astro.Scheduler{
@@ -193,13 +210,12 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 
 	spec := astro.DeploymentCreateSpec{
 		Executor:  "CeleryExecutor",
-		Workers:   workers,
 		Scheduler: scheduler,
 	}
 
-	createInput := &astro.DeploymentCreateInput{
+	createInput := &astro.CreateDeploymentInput{
 		WorkspaceID:           workspaceID,
-		OrchestratorID:        clusterID,
+		ClusterID:             clusterID,
 		Label:                 label,
 		Description:           description,
 		RuntimeReleaseVersion: runtimeVersion,
@@ -212,6 +228,26 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
+	if waitForStatus {
+		err = healthPoll(d.ID, workspaceID, client)
+		if err != nil {
+			errOutput := createOutput(organizationID, workspaceID, &d)
+			if errOutput != nil {
+				return errOutput
+			}
+			return err
+		}
+	}
+
+	err = createOutput(organizationID, workspaceID, &d)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createOutput(organizationID, workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	currentTag := d.DeploymentSpec.Image.Tag
@@ -220,14 +256,14 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	}
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	deploymentURL := "cloud." + c.Domain + "/" + organizationID + "/deployments/" + d.ID
+	deploymentURL := "cloud." + c.Domain + "/" + workspaceID + "/deployments/" + d.ID + "/analytics"
 
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully created Deployment: %s", ansi.Bold(d.Label)) +
 		"\n Deployment can be accessed at the following URLs \n" +
@@ -239,11 +275,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 	return nil
 }
 
-func validateResources(workerAU, schedulerAU, schedulerReplicas int) bool {
-	if workerAU > workerAuMax || workerAU < WorkerAuMin {
-		fmt.Printf("\nWorker AUs must be between a min of %d and a max of %d AUs", WorkerAuMin, workerAuMax)
-		return false
-	}
+func validateResources(schedulerAU, schedulerReplicas int) bool {
 	if schedulerAU > schedulerAuMax || schedulerAU < SchedulerAuMin {
 		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", SchedulerAuMin, schedulerAuMax)
 		return false
@@ -290,8 +322,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
 	// cluster request
-	clusterInput := map[string]interface{}{"organizationId": organizationID}
-	cs, err := client.ListOrchestrators(clusterInput)
+	cs, err := client.ListClusters(organizationID)
 	if err != nil {
 		return "", errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -300,7 +331,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	if clusterID == "" {
 		fmt.Println("\nPlease select a Cluster for your Deployment:")
 
-		clusterMap := map[string]astro.Orchestrator{}
+		clusterMap := map[string]astro.Cluster{}
 		for i := range cs {
 			index := i + 1
 			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, cs[i].CloudProvider, cs[i].ID}, false)
@@ -312,7 +343,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 		choice := input.Text("\n> ")
 		selected, ok := clusterMap[choice]
 		if !ok {
-			return "", errInvalidDeploymentKey
+			return "", ErrInvalidDeploymentKey
 		}
 
 		clusterID = selected.ID
@@ -331,30 +362,46 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	return clusterID, nil
 }
 
-func Update(deploymentID, label, ws, description string, schedulerAU, schedulerReplicas, workerAU int, forceDeploy bool, client astro.Client) error {
-	// get deployments
-	deployments, err := getDeployments(ws, client)
+func healthPoll(deploymentID, ws string, client astro.Client) error {
+	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+	time.Sleep(time.Duration(sleepTime) * time.Second)
+	buf := new(bytes.Buffer)
+	timeout := time.After(time.Duration(timeoutNum) * time.Second)
+	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeout:
+			return errTimedOut
+		// Got a tick, we should check if deployment is healthy
+		case <-ticker.C:
+			buf.Reset()
+			deployments, err := getDeployments(ws, client)
+			if err != nil {
+				return err
+			}
+
+			var currentDeployment astro.Deployment
+			for i := range deployments {
+				if deployments[i].ID == deploymentID {
+					currentDeployment = deployments[i]
+				}
+			}
+			if currentDeployment.Status == "HEALTHY" {
+				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
+				return nil
+			}
+			continue
+		}
+	}
+}
+
+func Update(deploymentID, label, ws, description, deploymentName string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+	var queueCreateUpdate bool
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
-	}
-
-	// select deployment
-	if deploymentID == "" {
-		deploymentID, err = selectDeployment(deployments, "Select which Deployment you want to update")
-		if err != nil {
-			return err
-		}
-	}
-
-	// validate deployment id
-	var currentDeployment astro.Deployment
-	for i := range deployments {
-		if deployments[i].ID == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.ID == "" {
-		return errInvalidDeploymentKey
 	}
 
 	// prompt user
@@ -369,15 +416,6 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 	}
 
 	// build query input
-	workers := astro.Workers{}
-
-	if workerAU != 0 {
-		workers.AU = workerAU
-	} else {
-		workerAU = currentDeployment.DeploymentSpec.Workers.AU
-		workers.AU = currentDeployment.DeploymentSpec.Workers.AU
-	}
-
 	scheduler := astro.Scheduler{}
 
 	if schedulerAU != 0 {
@@ -395,14 +433,13 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 	}
 
 	spec := astro.DeploymentCreateSpec{
-		Workers:   workers,
 		Scheduler: scheduler,
 		Executor:  "CeleryExecutor",
 	}
 
-	deploymentUpdate := &astro.DeploymentUpdateInput{
+	deploymentUpdate := &astro.UpdateDeploymentInput{
 		ID:             currentDeployment.ID,
-		OrchestratorID: currentDeployment.Orchestrator.ID,
+		ClusterID:      currentDeployment.Cluster.ID,
 		DeploymentSpec: spec,
 	}
 	if label != "" {
@@ -416,8 +453,13 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 		deploymentUpdate.Description = currentDeployment.Description
 	}
 
+	// if we have worker queues add them to the input
+	if len(wQueueList) > 0 {
+		queueCreateUpdate = true
+		deploymentUpdate.WorkerQueues = wQueueList
+	}
 	// validate resources requests
-	resourcesValid := validateResources(workerAU, schedulerAU, schedulerReplicas)
+	resourcesValid := validateResources(schedulerAU, schedulerReplicas)
 	if !resourcesValid {
 		return nil
 	}
@@ -432,45 +474,29 @@ func Update(deploymentID, label, ws, description string, schedulerAU, schedulerR
 		fmt.Printf("Something went wrong. Deployment %s was not updated", currentDeployment.Label)
 	}
 
-	tabDeployment := newTableOut()
+	// do not print table if worker queue create or update was used
+	if !queueCreateUpdate {
+		tabDeployment := newTableOut()
 
-	currentTag := d.DeploymentSpec.Image.Tag
-	if currentTag == "" {
-		currentTag = "?"
+		currentTag := d.DeploymentSpec.Image.Tag
+		if currentTag == "" {
+			currentTag = "?"
+		}
+
+		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
+
+		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText}, false)
+		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
+		tabDeployment.Print(os.Stdout)
 	}
-
-	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
-
-	tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Orchestrator.ID, d.ID, currentTag, runtimeVersionText}, false)
-	tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
-	tabDeployment.Print(os.Stdout)
 	return nil
 }
 
-func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) error {
-	// get deployments
-	deployments, err := getDeployments(ws, client)
+func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client astro.Client) error {
+	// get deployment
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
-	}
-
-	// select deployment
-	if deploymentID == "" {
-		deploymentID, err = selectDeployment(deployments, "Select the deployment that you want to delete")
-		if err != nil {
-			return err
-		}
-	}
-
-	// validate deployment id
-	var currentDeployment astro.Deployment
-	for i := range deployments {
-		if deployments[i].ID == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.ID == "" {
-		return errInvalidDeploymentKey
 	}
 
 	// prompt user
@@ -485,7 +511,7 @@ func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) erro
 	}
 
 	// delete deployment
-	deploymentInput := astro.DeploymentDeleteInput{
+	deploymentInput := astro.DeleteDeploymentInput{
 		ID: currentDeployment.ID,
 	}
 	deploymentDeleteResp, err := client.DeleteDeployment(deploymentInput)
@@ -503,11 +529,12 @@ func Delete(deploymentID, ws string, forceDelete bool, client astro.Client) erro
 }
 
 func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) {
-	deploymentsInput := astro.DeploymentsInput{
-		WorkspaceID: ws,
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return []astro.Deployment{}, err
 	}
 
-	deployments, err := client.ListDeployments(deploymentsInput)
+	deployments, err := client.ListDeployments(c.Organization, ws)
 	if err != nil {
 		return deployments, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -515,10 +542,23 @@ func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) 
 	return deployments, nil
 }
 
-func selectDeployment(deployments []astro.Deployment, message string) (string, error) {
+func selectDeployment(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
-		return "", errNoDeployments
+		i, _ := input.Confirm(noDeployments)
+		if !i {
+			fmt.Println("Exiting command...")
+			os.Exit(1)
+		}
+		return astro.Deployment{}, nil
+	}
+
+	if len(deployments) == 1 {
+		fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
+			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
+			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
+
+		return deployments[0], nil
 	}
 
 	tab := printutil.Table{
@@ -545,7 +585,85 @@ func selectDeployment(deployments []astro.Deployment, message string) (string, e
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
-		return "", errInvalidDeploymentKey
+		return astro.Deployment{}, ErrInvalidDeploymentKey
 	}
-	return selected.ID, nil
+	return selected, nil
+}
+
+func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client) (astro.Deployment, error) {
+	deployments, err := getDeployments(ws, client)
+	if err != nil {
+		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
+	}
+
+	if deploymentID != "" && deploymentName != "" {
+		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used\n", deploymentID)
+	}
+	// find deployment by name
+	if deploymentID == "" && deploymentName != "" {
+		var stageDeployments []astro.Deployment
+		for i := range deployments {
+			if deployments[i].Label == deploymentName {
+				stageDeployments = append(stageDeployments, deployments[i])
+			}
+		}
+		if len(stageDeployments) > 1 {
+			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
+		}
+		if len(stageDeployments) == 1 {
+			return stageDeployments[0], nil
+		}
+		if len(stageDeployments) < 1 {
+			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
+		}
+	}
+
+	var currentDeployment astro.Deployment
+
+	// select deployment if deploymentID is empty
+	if deploymentID == "" {
+		return deploymentSelectionProcess(ws, deployments, client)
+	}
+	// find deployment by ID
+	for i := range deployments {
+		if deployments[i].ID == deploymentID {
+			currentDeployment = deployments[i]
+		}
+	}
+	if currentDeployment.ID == "" {
+		return astro.Deployment{}, errInvalidDeployment
+	}
+	return currentDeployment, nil
+}
+
+func deploymentSelectionProcess(ws string, deployments []astro.Deployment, client astro.Client) (astro.Deployment, error) {
+	currentDeployment, err := selectDeployment(deployments, "Select a Deployment")
+	if err != nil {
+		return astro.Deployment{}, err
+	}
+	if currentDeployment.ID == "" {
+		// get latest runtime version
+		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false)
+		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		// walk user through creating a deployment
+		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, client, false)
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		// get a new deployment list
+		deployments, err = getDeployments(ws, client)
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+	}
+	return currentDeployment, nil
 }

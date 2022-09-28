@@ -27,6 +27,7 @@ type ClientInterface interface {
 	// workspace
 	CreateWorkspace(label, description string) (*Workspace, error)
 	ListWorkspaces() ([]Workspace, error)
+	PaginatedListWorkspaces(pageSize int, pageNumber int) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)
@@ -34,6 +35,7 @@ type ClientInterface interface {
 	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)
 	DeleteWorkspaceUser(workspaceID, userID string) (*Workspace, error)
 	ListWorkspaceUserAndRoles(workspaceID string) ([]WorkspaceUserRoleBindings, error)
+	ListWorkspacePaginatedUserAndRoles(workspaceID string, cursorID string, take float64) ([]WorkspaceUserRoleBindings, error)
 	UpdateWorkspaceUserRole(workspaceID, email, role string) (string, error)
 	GetWorkspaceUserRole(workspaceID, email string) (WorkspaceUserRoleBindings, error)
 	// auth
@@ -46,8 +48,11 @@ type ClientInterface interface {
 	UpdateDeployment(variables map[string]interface{}) (*Deployment, error)
 	GetDeployment(deploymentID string) (*Deployment, error)
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
+	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
+	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	GetDeploymentConfig() (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
+	UpdateDeploymentImage(req UpdateDeploymentImageRequest) error
 	// deployment users
 	ListDeploymentUsers(filters ListDeploymentUsersRequest) ([]DeploymentUser, error)
 	AddDeploymentUser(variables UpdateDeploymentUserRequest) (*RoleBinding, error)
@@ -63,6 +68,25 @@ type ClientInterface interface {
 	// app
 	GetAppConfig() (*AppConfig, error)
 	GetAvailableNamespaces() ([]Namespace, error)
+	// runtime
+	GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error)
+	// teams
+	GetTeam(teamID string) (*Team, error)
+	GetTeamUsers(teamID string) ([]User, error)
+	ListTeams(cursor string, take int) (ListTeamsResp, error)
+	CreateTeamSystemRoleBinding(teamID, role string) (string, error)
+	DeleteTeamSystemRoleBinding(teamID, role string) (string, error)
+	// deployment teams
+	AddDeploymentTeam(deploymentID string, teamID string, role string) (*RoleBinding, error)
+	RemoveDeploymentTeam(deploymentID string, teamID string) (*RoleBinding, error)
+	ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error)
+	UpdateDeploymentTeamRole(deploymentID string, teamID string, role string) (*RoleBinding, error)
+	// workspace teams and roles
+	AddWorkspaceTeam(workspaceID, teamID, role string) (*Workspace, error)
+	DeleteWorkspaceTeam(workspaceID, teamID string) (*Workspace, error)
+	ListWorkspaceTeamsAndRoles(workspaceID string) ([]Team, error)
+	UpdateWorkspaceTeamRole(workspaceID, teamID, role string) (string, error)
+	GetWorkspaceTeamRole(workspaceID, teamID string) (*Team, error)
 }
 
 // ClientImplementation - implementation of the Houston Client Interface

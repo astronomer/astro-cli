@@ -2,6 +2,7 @@ package software
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
@@ -24,9 +25,21 @@ func TestAddCmds(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace"}, cmds[cmdIdx].Use)
+		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(t)
+}
+
+func TestAppConfigFailure(t *testing.T) {
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetAppConfig").Return(nil, errMock)
+	buf := new(bytes.Buffer)
+	cmds := AddCmds(houstonMock, buf)
+	for cmdIdx := range cmds {
+		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+	}
+	houstonMock.AssertExpectations(t)
+	assert.Contains(t, initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
 }
 
 func TestSetupLogs(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -92,7 +93,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain string, client astro.Client, out io.Writer, loginLink bool) error {
+		authLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -100,7 +101,25 @@ func TestSetup(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("use refresh token", func(t *testing.T) {
+	t.Run("use API token", func(t *testing.T) {
+		mockDeplyResp := []astro.Deployment{
+			{
+				ID:        "test-id",
+				Workspace: astro.Workspace{ID: "workspace-id"},
+			},
+		}
+
+		mockOrgResp := []astro.Organization{
+			{
+				ID:   "test-org-id",
+				Name: "test-org-name",
+			},
+		}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetOrganizations").Return(mockOrgResp, nil).Once()
+		mockClient.On("ListDeployments", mockOrgResp[0].ID, "").Return(mockDeplyResp, nil).Once()
+
 		cmd := &cobra.Command{Use: "deploy"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -108,7 +127,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		authLogin = func(domain string, client astro.Client, out io.Writer, loginLink bool) error {
+		authLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
@@ -130,7 +149,8 @@ func TestSetup(t *testing.T) {
 			}
 		})
 
-		err = Setup(cmd, []string{}, nil)
+		err = Setup(cmd, []string{}, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 }
