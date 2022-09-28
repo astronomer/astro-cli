@@ -987,7 +987,6 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 
 		_, err = astroClient.GetOrganizationAuditLogs("test-org-id", 50)
 		assert.Contains(t, err.Error(), errorMessage)
-
 	})
 
 	t.Run("Invalid earliest parameter", func(t *testing.T) {
@@ -1005,6 +1004,5 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 
 		_, err = astroClient.GetOrganizationAuditLogs("test-org-id", 50)
 		assert.Contains(t, err.Error(), errorMessage)
-
 	})
 }
