@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	LocalPlatform    = "local"
-	CloudPlatform    = "cloud"
-	SoftwarePlatform = "software"
-	Initial          = "initial"
+	LocalPlatform         = "local"
+	CloudPlatform         = "cloud"
+	SoftwarePlatform      = "software"
+	Initial               = "initial"
+	ErrorReturningContext = "error"
 )
 
 var perm os.FileMode = 0o777
@@ -70,6 +71,10 @@ contexts:
 		testConfig = fmt.Sprintf(testConfig, "localhost", "localhost", "localhost")
 	case Initial:
 		testConfig = ""
+	case ErrorReturningContext:
+		// this is an error returning case
+		testConfig = fmt.Sprintf(testConfig, "error", "error", "error")
+		testConfig = strings.Replace(testConfig, "context: error", "context: ", 1)
 	default:
 		testConfig = fmt.Sprintf(testConfig, "localhost", "localhost", "localhost")
 	}
