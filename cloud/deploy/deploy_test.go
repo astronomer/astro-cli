@@ -213,7 +213,7 @@ func TestDagsDeployVR(t *testing.T) {
 func TestNoDagsDeploy(t *testing.T) {
 	defer testUtil.MockUserInput(t, "n")()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	config.CFG.ShowWarnings.SetHomeString("false")
+	config.CFG.ShowWarnings.SetHomeString("true")
 	mockClient := new(astro_mocks.Client)
 
 	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
