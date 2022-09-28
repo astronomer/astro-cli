@@ -49,3 +49,13 @@ func TestOrganizationSwitch(t *testing.T) {
 	_, err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
 }
+
+func TestOrganizationExportAuditLogs(t *testing.T) {
+	orgExportAuditLogs = func(client astro.Client, out io.Writer, orgName string, earliest int) error {
+		return nil
+	}
+
+	cmdArgs := []string{"audit-logs", "export", "organization-name"}
+	_, err := execOrganizationCmd(cmdArgs...)
+	assert.NoError(t, err)
+}
