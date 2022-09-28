@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -145,4 +146,20 @@ func Contains(elems []string, param string) (exist bool, position int) {
 		}
 	}
 	return false, 0
+}
+
+// This function finds all files of a specific extension
+func GetFilesWithSpecificExtension(folderPath, ext string) []string {
+	var files []string
+	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck
+		if f != nil && !f.IsDir() {
+			r, err := regexp.MatchString(ext, f.Name())
+			if err == nil && r {
+				files = append(files, f.Name())
+			}
+		}
+		return nil
+	})
+
+	return files
 }

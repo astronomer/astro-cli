@@ -102,18 +102,22 @@ func TestDeploySuccess(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", "", true, false, mockClient)
 	assert.NoError(t, err)
 
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", "", false, false, mockClient)
 	assert.NoError(t, err)
 
 	// test custom image
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "", false, false, mockClient)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "test-name", false, false, mockClient)
 	assert.NoError(t, err)
 
@@ -165,7 +169,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 	}
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
 
-	err := Deploy("./testfiles", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
+	defer testUtil.MockUserInput(t, "y")()
+	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
@@ -194,11 +199,25 @@ func TestDagsDeployVR(t *testing.T) {
 	}
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
 
-	err := Deploy("./testfiles", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
+	defer testUtil.MockUserInput(t, "y")()
+	err := Deploy("./testfiles/", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
 	assert.NoError(t, err)
 
-	err = Deploy("./testfiles", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
+	defer testUtil.MockUserInput(t, "y")()
+	err = Deploy("./testfiles/", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
 	assert.ErrorIs(t, err, errMock)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestNoDagsDeploy(t *testing.T) {
+	defer testUtil.MockUserInput(t, "n")()
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("true")
+	mockClient := new(astro_mocks.Client)
+
+	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
 }
@@ -208,6 +227,7 @@ func TestDeployFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", "", true, false, nil)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
@@ -256,6 +276,7 @@ func TestDeployFailure(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", "", true, false, mockClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
