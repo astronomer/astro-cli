@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -186,7 +187,6 @@ func TestDagsDeploySuccess(t *testing.T) {
 
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
-		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
 	}
@@ -228,6 +228,7 @@ func TestDagsDeployVR(t *testing.T) {
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
 	assert.ErrorIs(t, err, errMock)
+	defer afero.NewOsFs().Remove("./testfiles/dags.tar")
 
 	mockClient.AssertExpectations(t)
 }

@@ -167,21 +167,21 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		return err
 	}
 
-	if pytest == allTests {
-		version, _, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
-		if err != nil {
-			return err
-		}
-
-		err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
-		if err != nil {
-			return err
-		}
-	}
-
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 	if dags {
+		if pytest == allTests {
+			version, _, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
+			if err != nil {
+				return err
+			}
+
+			err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+			if err != nil {
+				return err
+			}
+		}
+
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
 		err = deployDags(path, deployInfo.deploymentID, client)
 		if err != nil {
