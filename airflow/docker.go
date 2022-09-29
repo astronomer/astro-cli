@@ -1,9 +1,9 @@
 package airflow
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"bytes"
 	"fmt"
 	"log"
 	"os"
