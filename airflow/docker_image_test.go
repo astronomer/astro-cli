@@ -77,6 +77,58 @@ func TestDockerImageBuild(t *testing.T) {
 	cmdExec = previousCmdExec
 }
 
+func TestDockerImagePytest(t *testing.T) {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	cwd, err := os.Getwd()
+	assert.NoError(t, err)
+
+	dockerIgnoreFile := cwd + "/.dockerignore"
+	fileutil.WriteStringToFile(dockerIgnoreFile, "")
+	defer afero.NewOsFs().Remove(dockerIgnoreFile)
+
+	options := airflowTypes.ImageBuildConfig{
+		Path:            cwd,
+		TargetPlatforms: []string{"linux/amd64"},
+		NoCache:         false,
+	}
+
+	previousCmdExec := cmdExec
+
+	t.Run("pytest success", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		_, err = handler.Pytest("", "", "", []string{}, options)
+		assert.NoError(t, err)
+	})
+
+
+
+	t.Run("pytest error", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
+		_, err = handler.Pytest("", "", "", []string{}, options)
+		assert.Contains(t, err.Error(), errMock.Error())
+	})
+
+	t.Run("unable to read file error", func(t *testing.T) {
+		options := airflowTypes.ImageBuildConfig{
+			Path:            "incorrect-path",
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+		}
+
+		_, err = handler.Pytest("", "", "", []string{}, options)
+		assert.Error(t, err)
+	})
+
+	cmdExec = previousCmdExec
+}
+
 func TestDockerImagePush(t *testing.T) {
 	handler := DockerImage{
 		imageName: "testing",
