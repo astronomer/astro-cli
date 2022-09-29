@@ -637,7 +637,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestArgs, "")
+	exitCode, err := containerHandler.Pytest(pytestArgs, customImageName, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
@@ -707,7 +707,7 @@ func airflowBash(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -720,7 +720,7 @@ func airflowSettingsImport(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
@@ -731,7 +731,7 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, "", dockerfile, "")
 	if err != nil {
 		return err
 	}
