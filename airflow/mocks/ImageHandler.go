@@ -98,6 +98,27 @@ func (_m *ImageHandler) TagLocalImage(localImage string) error {
 	return r0
 }
 
+// Pytest provides a mock function with given fields: pytestFile, airflowHome, envFile, pytestArgs, config
+func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error) {
+	ret := _m.Called(pytestFile, airflowHome, envFile, pytestArgs, config)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, string, string, []string, types.ImageBuildConfig) string); ok {
+		r0 = rf(pytestFile, airflowHome, envFile, pytestArgs, config)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string, []string, types.ImageBuildConfig) error); ok {
+		r1 = rf(pytestFile, airflowHome, envFile, pytestArgs, config)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewImageHandler interface {
 	mock.TestingT
 	Cleanup(func())
