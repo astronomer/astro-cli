@@ -21,6 +21,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/astronomer/astro-cli/pkg/util"
 	log "github.com/sirupsen/logrus"
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
@@ -141,10 +142,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	if err != nil {
 		return "", err
 	}
-
-	fmt.Println("airflowhome: " + airflowHome)
-	fmt.Println("pytestFile: " + pytestFile)
-	fmt.Println("d.imageName: " + d.imageName)
 	args := []string{
 		"run",
 		"-i",
@@ -160,12 +157,15 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		airflowHome + "/.astro:/usr/local/airflow/.astro:z",
 		"-v",
 		airflowHome + "/tests:/usr/local/airflow/tests:z",
-		"--env-file",
-		envFile,
-		d.imageName,
-		"pytest",
-		pytestFile,
 	}
+	fileExist, err := util.Exists(airflowHome + envFile)
+	if err != nil {
+		return "", err
+	}
+	if fileExist {
+		args = append(args, []string{"--env-file", envFile}...)
+	}
+	args = append(args, []string{d.imageName, "pytest", pytestFile}...)
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
@@ -180,7 +180,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
 	if err != nil {
 		// delete container
-		err2 := cmdExec(DockerCmd, stdout, stderr, "rm", "astro-pytest")
+		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
 		if err2 != nil {
 			return "", fmt.Errorf("command 'docker rm astro-pytest failed: %w", err2)
 		}
@@ -200,7 +200,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	}
 
 	// delete container
-	err = cmdExec(DockerCmd, stdout, stderr, "rm", "astro-pytest")
+	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
 	if err != nil {
 		return outb.String(), fmt.Errorf("command 'docker rm astro-pytest failed: %w", err)
 	}
