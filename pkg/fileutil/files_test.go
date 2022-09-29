@@ -233,3 +233,31 @@ func TestRead(t *testing.T) {
 		})
 	}
 }
+
+func TestGetFilesWithSpecificExtension(t *testing.T) {
+	filePath := "./test.py"
+	content := "testing"
+	WriteStringToFile(filePath, content)
+	defer afero.NewOsFs().Remove(filePath)
+
+	expectedFiles := []string{"test.py"}
+	type args struct {
+		folderPath string
+		ext        string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "basic case",
+			args: args{folderPath: filePath, ext: ".py"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := GetFilesWithSpecificExtension(tt.args.folderPath, tt.args.ext)
+			assert.Equal(t, expectedFiles, files)
+		})
+	}
+}
