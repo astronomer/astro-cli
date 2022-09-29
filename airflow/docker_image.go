@@ -15,13 +15,13 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/astronomer/astro-cli/pkg/util"
 	log "github.com/sirupsen/logrus"
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
