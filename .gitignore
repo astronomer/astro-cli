@@ -5,7 +5,6 @@
 .vscode/
 airflow/pod-config.yml
 airflow_settings_dev.yaml
-airflow_settings_dev.yaml
 astro
 astro-cli
 cover.out

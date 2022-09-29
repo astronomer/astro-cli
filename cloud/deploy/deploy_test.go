@@ -74,7 +74,7 @@ func TestDeploySuccess(t *testing.T) {
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
@@ -255,7 +255,7 @@ func TestDeployFailure(t *testing.T) {
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
 		return mockContainerHandler, nil
 	}
@@ -371,7 +371,7 @@ func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	mockContainerHandler.On("Pytest", mock.Anything, "", mockDeployImage).Return("", errMock).Once()
+	mockContainerHandler.On("Pytest", []string{""}, "", mockDeployImage).Return("", errMock).Once()
 
 	// random error on running airflow pytest
 	err := checkPytest("", mockDeployImage, mockContainerHandler)
@@ -379,7 +379,7 @@ func TestCheckPyTest(t *testing.T) {
 	mockContainerHandler.AssertExpectations(t)
 
 	// airflow pytest exited with status code 1
-	mockContainerHandler.On("Pytest", mock.Anything, "", mockDeployImage).Return("exit code 1", errMock).Once()
+	mockContainerHandler.On("Pytest", []string{""}, "", mockDeployImage).Return("exit code 1", errMock).Once()
 	err = checkPytest("", mockDeployImage, mockContainerHandler)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
