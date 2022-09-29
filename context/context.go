@@ -66,6 +66,14 @@ func SetContext(domain string) error {
 
 // Switch switches to context of domain
 func Switch(domain string) error {
+	// Create context if it does not exist
+	if !Exists(domain) {
+		// Save new context since it did not exists
+		err := SetContext(domain)
+		if err != nil {
+			return err
+		}
+	}
 	c := config.Context{Domain: domain}
 	return c.SwitchContext()
 }

@@ -401,14 +401,6 @@ func Login(domain, orgID, token string, client astro.Client, out io.Writer, shou
 	// If no domain specified
 	// Create context if it does not exist
 	if domain != "" {
-		if !context.Exists(domain) {
-			// Save new context since it did not exists
-			err = context.SetContext(domain)
-			if err != nil {
-				return err
-			}
-		}
-
 		// Switch context now that we ensured context exists
 		err = context.Switch(domain)
 		if err != nil {
