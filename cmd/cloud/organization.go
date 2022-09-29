@@ -16,6 +16,7 @@ var (
 	orgList                            = organization.List
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
+	orgName                            string
 	auditLogsOutputFilePath            string
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 90
@@ -67,7 +68,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "audit-logs",
+		Use:     "audit-logs --organization-name [organization_name]",
 		Aliases: []string{"al"},
 		Short:   "Manage your organization audit logs.",
 		Long:    "Manage your organization audit logs.",
@@ -75,22 +76,26 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationExportAuditLogs(out),
 	)
+	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
+	err := cmd.MarkPersistentFlagRequired("organization-name")
+	if err != nil {
+		panic(err)
+	}
 	return cmd
 }
 
 func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "export [organization_name] --output-file [output_file.json]",
+		Use:     "export --output-file [output_file.json]",
 		Aliases: []string{"e"},
 		Short:   "Export your organization audit logs. Requires being an organization owner.",
 		Long:    "Export your organization audit logs. Requires being an organization owner.",
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return organizationExportAuditLogs(cmd, out, args)
+			return organizationExportAuditLogs(cmd, out)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
-	cmd.PersistentFlags().IntVarP(
+	cmd.LocalFlags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
+	cmd.LocalFlags().IntVarP(
 		&auditLogsEarliestParam, "earliest", "e", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90. Defaults to 90 days.")
 	return cmd
@@ -115,7 +120,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	return orgSwitch(organizationNameOrID, astroClient, out, shouldDisplayLoginLink)
 }
 
-func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []string) error {
+func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -129,7 +134,5 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer, args []strin
 		out = bufio.NewWriter(f)
 	}
 
-	organizationName := args[0]
-
-	return orgExportAuditLogs(astroClient, out, organizationName, auditLogsEarliestParam)
+	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
 }
