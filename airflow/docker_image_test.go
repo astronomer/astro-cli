@@ -105,8 +105,6 @@ func TestDockerImagePytest(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-
-
 	t.Run("pytest error", func(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
