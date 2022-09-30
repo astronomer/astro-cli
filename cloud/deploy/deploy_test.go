@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -20,9 +21,12 @@ import (
 )
 
 var (
-	errMock = errors.New("mock error")
-	org     = "test-org-id"
-	ws      = "test-ws-id"
+	errMock                  = errors.New("mock error")
+	org                      = "test-org-id"
+	ws                       = "test-ws-id"
+	initiatedDagDeploymentID = "test-dag-deployment-id"
+	runtimeID                = "test-id"
+	dagURL                   = "http://fake-url.windows.core.net"
 )
 
 func TestDeploySuccess(t *testing.T) {
@@ -38,11 +42,27 @@ func TestDeploySuccess(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
+
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(2)
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentID: initiatedDagDeploymentID,
+		RuntimeID:                runtimeID,
+		Action:                   "UPLOAD",
+		VersionID:                "version-id",
+		Status:                   "SUCCEEDED",
+		Message:                  "Dags uploaded successfully",
+	}
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(2)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -54,7 +74,7 @@ func TestDeploySuccess(t *testing.T) {
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
 		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return mockContainerHandler, nil
@@ -82,18 +102,22 @@ func TestDeploySuccess(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", "", true, false, mockClient)
 	assert.NoError(t, err)
 
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", "", false, false, mockClient)
 	assert.NoError(t, err)
 
 	// test custom image
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "", false, false, mockClient)
 	assert.NoError(t, err)
 
 	config.CFG.ProjectDeployment.SetProjectString("test-id")
 	// test both deploymentID and name used
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "test-name", false, false, mockClient)
 	assert.NoError(t, err)
 
@@ -102,11 +126,108 @@ func TestDeploySuccess(t *testing.T) {
 	mockContainerHandler.AssertExpectations(t)
 }
 
+func TestDagsDeploySuccess(t *testing.T) {
+	mockDeplyResp := []astro.Deployment{
+		{
+			ID:             "test-id",
+			ReleaseName:    "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:             "test-id-2",
+			ReleaseName:    "test-name-2",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+	}
+
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentID: initiatedDagDeploymentID,
+		RuntimeID:                runtimeID,
+		Action:                   "UPLOAD",
+		VersionID:                "version-id",
+		Status:                   "SUCCEEDED",
+		Message:                  "Dags uploaded successfully",
+	}
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
+
+	defer testUtil.MockUserInput(t, "y")()
+	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestDagsDeployVR(t *testing.T) {
+	runtimeID := "vr-test-id"
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, errMock).Times(1)
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
+		InitiatedDagDeploymentID: initiatedDagDeploymentID,
+		RuntimeID:                runtimeID,
+		Action:                   "UPLOAD",
+		VersionID:                "version-id",
+		Status:                   "SUCCEEDED",
+		Message:                  "Dags uploaded successfully",
+	}
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
+
+	defer testUtil.MockUserInput(t, "y")()
+	err := Deploy("./testfiles/", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	err = Deploy("./testfiles/", runtimeID, "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.ErrorIs(t, err, errMock)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestNoDagsDeploy(t *testing.T) {
+	defer testUtil.MockUserInput(t, "n")()
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("true")
+	mockClient := new(astro_mocks.Client)
+
+	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
 func TestDeployFailure(t *testing.T) {
 	// no context set failure
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", "", true, false, nil)
 	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 
@@ -134,7 +255,7 @@ func TestDeployFailure(t *testing.T) {
 	}
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (airflow.ContainerHandler, error) {
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
 		return mockContainerHandler, nil
 	}
@@ -155,6 +276,7 @@ func TestDeployFailure(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
+	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", "", true, false, mockClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
 
@@ -176,7 +298,8 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	_, dagDeployEnabled, err := buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	assert.Equal(t, dagDeployEnabled, false)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -187,7 +310,8 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	_, dagDeployEnabled, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
+	assert.Equal(t, dagDeployEnabled, false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
@@ -195,7 +319,8 @@ func TestBuildImageFailure(t *testing.T) {
 	dockerfile = "Dockerfile"
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
-	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
+	_, dagDeployEnabled, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
+	assert.Equal(t, dagDeployEnabled, false)
 	assert.ErrorIs(t, err, errMock)
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
@@ -246,7 +371,7 @@ func TestCheckPyTest(t *testing.T) {
 	mockDeployImage := "test-image"
 
 	mockContainerHandler := new(mocks.ContainerHandler)
-	mockContainerHandler.On("Pytest", mock.Anything, "", mockDeployImage).Return("", errMock).Once()
+	mockContainerHandler.On("Pytest", []string{""}, "", mockDeployImage).Return("", errMock).Once()
 
 	// random error on running airflow pytest
 	err := checkPytest("", mockDeployImage, mockContainerHandler)
@@ -254,7 +379,7 @@ func TestCheckPyTest(t *testing.T) {
 	mockContainerHandler.AssertExpectations(t)
 
 	// airflow pytest exited with status code 1
-	mockContainerHandler.On("Pytest", mock.Anything, "", mockDeployImage).Return("exit code 1", errMock).Once()
+	mockContainerHandler.On("Pytest", []string{""}, "", mockDeployImage).Return("exit code 1", errMock).Once()
 	err = checkPytest("", mockDeployImage, mockContainerHandler)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")

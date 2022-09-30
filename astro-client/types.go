@@ -102,12 +102,12 @@ type InitiateDagDeployment struct {
 }
 
 type InitiateDagDeploymentInput struct {
-	DeploymentID string `json:"deploymentId"`
+	RuntimeID string `json:"runtimeId"`
 }
 
 type DagDeploymentStatus struct {
 	ID            string `json:"id"`
-	DeploymentID  string `json:"deploymentId"`
+	RuntimeID     string `json:"runtimeId"`
 	Action        string `json:"action"`
 	VersionID     string `json:"versionId"`
 	Status        string `json:"status"`
@@ -119,7 +119,7 @@ type DagDeploymentStatus struct {
 
 type ReportDagDeploymentStatusInput struct {
 	InitiatedDagDeploymentID string `json:"initiatedDagDeploymentId"`
-	DeploymentID             string `json:"deploymentId"`
+	RuntimeID                string `json:"runtimeId"`
 	Action                   string `json:"action"`
 	VersionID                string `json:"versionId"`
 	Status                   string `json:"status"`
@@ -253,10 +253,11 @@ type CreateImageInput struct {
 }
 
 type DeployImageInput struct {
-	ImageID      string `json:"imageId"`
-	DeploymentID string `json:"deploymentId"`
-	Tag          string `json:"tag"`
-	Repository   string `json:"repository"`
+	ImageID          string `json:"imageId"`
+	DeploymentID     string `json:"deploymentId"`
+	Tag              string `json:"tag"`
+	Repository       string `json:"repository"`
+	DagDeployEnabled bool   `json:"dagDeployEnabled"`
 }
 
 type CreateDeploymentInput struct {

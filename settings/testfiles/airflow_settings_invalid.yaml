@@ -6,5 +6,5 @@ airflow:
       conn_schema: 'postges.schema'
       conn_login: 'postgres.login'
       conn_password: 'postgres.pass'
-      conn_port: 'testing' # Expected an int, passing a string
-      conn_extra:
+      conn_port: 'testing'  # Expected an int, passing a string
+      conn_extra: {}
