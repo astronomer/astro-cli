@@ -69,25 +69,25 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "audit-logs --organization-name [organization_name]",
+		Use:     "audit-logs",
 		Aliases: []string{"al"},
 		Short:   "Manage your organization audit logs.",
 		Long:    "Manage your organization audit logs.",
 	}
-	cmd.AddCommand(
-		newOrganizationExportAuditLogs(out),
-	)
 	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
 	err := cmd.MarkPersistentFlagRequired("organization-name")
 	if err != nil {
 		log.Fatalf("Error marking organization-name flag as required in astro organization audit-logs command: %s", err.Error())
 	}
+	cmd.AddCommand(
+		newOrganizationExportAuditLogs(out),
+	)
 	return cmd
 }
 
 func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "export --output-file [output_file.json]",
+		Use:     "export",
 		Aliases: []string{"e"},
 		Short:   "Export your organization audit logs. Requires being an organization owner.",
 		Long:    "Export your organization audit logs. Requires being an organization owner.",
@@ -95,8 +95,8 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 			return organizationExportAuditLogs(cmd, out)
 		},
 	}
-	cmd.LocalFlags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
-	cmd.LocalFlags().IntVarP(
+	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
+	cmd.Flags().IntVarP(
 		&auditLogsEarliestParam, "earliest", "e", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
 	return cmd
