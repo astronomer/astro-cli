@@ -79,7 +79,7 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
 	err := cmd.MarkPersistentFlagRequired("organization-name")
 	if err != nil {
-		panic(err)
+		log.Fatalf("Error marking organization-name flag as required in astro organization audit-logs command: %s", err.Error())
 	}
 	return cmd
 }
