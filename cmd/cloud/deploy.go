@@ -62,7 +62,6 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
-	_ = cmd.Flags().MarkHidden("dags")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	return cmd
 }

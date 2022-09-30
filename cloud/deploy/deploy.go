@@ -40,8 +40,9 @@ const (
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nConsider using one of the following supported tags: %s"
 
-	message = "Dags uploaded successfully"
-	action  = "UPLOAD"
+	message            = "Dags uploaded successfully"
+	action             = "UPLOAD"
+	enableDagDeployMsg = "Dag Deploy is not enabled for Deployment. Run 'astro deploy update <deployment-id> --dag-deploy enable' to enable dags deploy"
 )
 
 var (
@@ -70,11 +71,16 @@ type deploymentInfo struct {
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
+	dagDeployment, err := deployment.Initiate(runtimeID, client)
+	if err != nil {
+		return err
+	}
+
 	// Check the dags directory
 	dagsPath := path + "/dags"
 
 	// Generate the dags tar
-	err := fileutil.Tar(dagsPath, path)
+	err = fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return err
 	}
@@ -85,11 +91,6 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 	defer dagFile.Close()
-
-	dagDeployment, err := deployment.Initiate(runtimeID, client)
-	if err != nil {
-		return err
-	}
 
 	versionID, err := azureUploader(dagDeployment.DagURL, dagFile)
 	if err != nil {
@@ -172,6 +173,10 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
 		err = deployDags(path, deployInfo.deploymentID, client)
 		if err != nil {
+			if strings.Contains(err.Error(), "dag deploy is not enabled for deployment") {
+				return errors.New(enableDagDeployMsg)
+			}
+
 			return err
 		}
 

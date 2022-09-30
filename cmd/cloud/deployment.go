@@ -19,6 +19,7 @@ var (
 	forceDelete                   bool
 	description                   string
 	clusterID                     string
+	dagDeploy                     string
 	schedulerAU                   int
 	schedulerReplicas             int
 	updateSchedulerReplicas       int
@@ -137,6 +138,7 @@ func newDeploymentUpdateCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "To enable or disable dag deploy for the Deployment")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
 	return cmd
@@ -307,7 +309,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {

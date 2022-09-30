@@ -86,6 +86,7 @@ func TestDeploymentCreate(t *testing.T) {
 		Label:                 "test-name",
 		Description:           "",
 		RuntimeReleaseVersion: "4.2.5",
+		DagDeployEnabled:      true,
 		DeploymentSpec: astro.DeploymentCreateSpec{
 			Executor: "CeleryExecutor",
 			Scheduler: astro.Scheduler{
