@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
