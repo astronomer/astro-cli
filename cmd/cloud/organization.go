@@ -98,7 +98,7 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd.LocalFlags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.LocalFlags().IntVarP(
 		&auditLogsEarliestParam, "earliest", "e", auditLogsEarliestParamDefaultValue,
-		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90. Defaults to 90 days.")
+		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
 	return cmd
 }
 
