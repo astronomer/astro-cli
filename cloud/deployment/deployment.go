@@ -136,9 +136,10 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
+	var dagDeployEnabled bool
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -213,12 +214,18 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion string, s
 		Scheduler: scheduler,
 	}
 
+	if dagDeploy == "enable" { //nolint: goconst
+		dagDeployEnabled = true
+	} else {
+		dagDeployEnabled = false
+	}
+
 	createInput := &astro.CreateDeploymentInput{
 		WorkspaceID:           workspaceID,
 		ClusterID:             clusterID,
 		Label:                 label,
 		Description:           description,
-		DagDeployEnabled:      true,
+		DagDeployEnabled:      dagDeployEnabled,
 		RuntimeReleaseVersion: runtimeVersion,
 		DeploymentSpec:        spec,
 	}
@@ -657,7 +664,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, SchedulerAuMin, SchedulerReplicasMin, client, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", SchedulerAuMin, SchedulerReplicasMin, client, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

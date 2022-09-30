@@ -118,7 +118,7 @@ func TestDeploymentCreate(t *testing.T) {
 		}
 	})
 
-	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
+	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
