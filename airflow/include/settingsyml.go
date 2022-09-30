@@ -6,7 +6,7 @@ import "strings"
 var Settingsyml = strings.TrimSpace(`
 
 # This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
-# NOTE: If putting a dict in conn_extra, please wrap in single quotes.
+# NOTE: json dicts can be added to the conn_extra field as yaml key value pairs. See the example below.
 
 # For more information, refer to our docs: https://docs.astronomer.io/develop-project#configure-airflow_settingsyaml-local-development-only
 # For questions, reach out to: https://support.astronomer.io
@@ -22,6 +22,7 @@ airflow:
       conn_password:
       conn_port:
       conn_extra:
+        example_extra_field: example-value
   pools:
     - pool_name:
       pool_slot:
