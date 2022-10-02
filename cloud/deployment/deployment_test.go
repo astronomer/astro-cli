@@ -742,6 +742,34 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
+
+	t.Run("update deployment to disable dag deploy", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		deploymentUpdateInput := astro.UpdateDeploymentInput{
+			ID:               "test-id",
+			ClusterID:        "",
+			Label:            "",
+			Description:      "",
+			DagDeployEnabled: false,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor:  "CeleryExecutor",
+				Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
+			},
+			WorkerQueues: nil,
+		}
+
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Times(2)
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+
+		defer testUtil.MockUserInput(t, "y")()
+		err := Update("test-id", "", ws, "", "", "disable", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		assert.NoError(t, err)
+
+		defer testUtil.MockUserInput(t, "n")()
+		err = Update("test-id", "", ws, "", "", "disable", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestDelete(t *testing.T) {
