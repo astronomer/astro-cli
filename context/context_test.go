@@ -58,7 +58,7 @@ func TestIsCloudContext(t *testing.T) {
 		{"cloud-perf-domain", "cloud.astronomer-perf.io", config.CloudPlatform, true},
 		{"local-cloud", "localhost", config.CloudPlatform, true},
 		{"software-domain", "dev.astrodev.com", config.SoftwarePlatform, false},
-		{"software-domain", "qa.astronomer.io", config.SoftwarePlatform, false},
+		{"software-domain", "software.astronomer-test.io", config.SoftwarePlatform, false},
 		{"local-software", "localhost", config.SoftwarePlatform, false},
 	}
 
