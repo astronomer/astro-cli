@@ -19,6 +19,7 @@ var (
 			id
 			label
 			releaseName
+			dagDeployEnabled
 			cluster {
 				id
 			}
@@ -90,6 +91,7 @@ var (
 			}
 			createdAt
 			status
+			dagDeployEnabled
 			runtimeRelease {
 				version
 				airflowVersion
