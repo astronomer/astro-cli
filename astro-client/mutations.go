@@ -43,6 +43,7 @@ var (
 			id
 			label
 			releaseName
+			dagDeployEnabled
 			cluster {
 				id
 			}
@@ -72,6 +73,7 @@ var (
 			id
 			label
 			releaseName
+			dagDeployEnabled
 			cluster {
 				id
 			}

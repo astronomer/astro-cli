@@ -40,8 +40,11 @@ const (
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nConsider using one of the following supported tags: %s"
 
-	message = "Dags uploaded successfully"
-	action  = "UPLOAD"
+	message            = "Dags uploaded successfully"
+	action             = "UPLOAD"
+	allTests           = "all-tests"
+	enableDagDeployMsg = "Dag Deploy is not enabled for Deployment. Run 'astro deploy update <deployment-id> --dag-deploy enable' to enable dags deploy"
+	dagDeployDisabled  = "dag deploy is not enabled for deployment"
 )
 
 var (
@@ -70,11 +73,16 @@ type deploymentInfo struct {
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
+	dagDeployment, err := deployment.Initiate(runtimeID, client)
+	if err != nil {
+		return err
+	}
+
 	// Check the dags directory
 	dagsPath := path + "/dags"
 
 	// Generate the dags tar
-	err := fileutil.Tar(dagsPath, path)
+	err = fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return err
 	}
@@ -85,11 +93,6 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 	defer dagFile.Close()
-
-	dagDeployment, err := deployment.Initiate(runtimeID, client)
-	if err != nil {
-		return err
-	}
 
 	versionID, err := azureUploader(dagDeployment.DagURL, dagFile)
 	if err != nil {
@@ -122,7 +125,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error {
+func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error { //nolint: gocognit
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -169,9 +172,25 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 	if dags {
+		if pytest == allTests {
+			version, _, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, client)
+			if err != nil {
+				return err
+			}
+
+			err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+			if err != nil {
+				return err
+			}
+		}
+
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
 		err = deployDags(path, deployInfo.deploymentID, client)
 		if err != nil {
+			if strings.Contains(err.Error(), dagDeployDisabled) {
+				return errors.New(enableDagDeployMsg)
+			}
+
 			return err
 		}
 
@@ -319,7 +338,7 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 
 // Validate code with pytest
 func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerHandler) error {
-	if pytest != "all-tests" {
+	if pytest != allTests {
 		pytestFile = pytest
 	}
 	pytestArgs := []string{pytestFile}

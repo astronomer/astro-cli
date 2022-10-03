@@ -2,7 +2,6 @@ package deployment
 
 import (
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/pkg/errors"
 )
 
 // Initiates a Dag Deployment Request
@@ -15,7 +14,7 @@ func Initiate(runtimeID string, client astro.Client) (astro.InitiateDagDeploymen
 	// initiate dag deployment
 	dagDeployment, err := client.InitiateDagDeployment(initiateDagDeploymentInput)
 	if err != nil {
-		return astro.InitiateDagDeployment{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return astro.InitiateDagDeployment{}, err
 	}
 
 	return dagDeployment, nil
@@ -36,7 +35,7 @@ func ReportDagDeploymentStatus(initiatedDagDeploymentID, runtimeID, action, vers
 	// report dag deployment status
 	dagDeploymentStatus, err := client.ReportDagDeploymentStatus(reportDagDeploymentStatusInput)
 	if err != nil {
-		return astro.DagDeploymentStatus{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return astro.DagDeploymentStatus{}, err
 	}
 
 	return dagDeploymentStatus, nil
