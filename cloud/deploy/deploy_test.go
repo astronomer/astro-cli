@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -195,6 +196,43 @@ func TestDagsDeploySuccess(t *testing.T) {
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy("./testfiles/", "test-id", "test-ws-id", "all-tests", "", "", "", true, true, mockClient)
 	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestDagsDeployFailed(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	mockDeplyResp := []astro.Deployment{
+		{
+			ID:             "test-id",
+			ReleaseName:    "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:             "test-id-2",
+			ReleaseName:    "test-name-2",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt: time.Now(),
+		},
+	}
+
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+	dagDeployErr := errors.New("dag deploy is not enabled for deployment") //nolint: goerr113
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, fmt.Errorf("%w", dagDeployErr)).Times(1)
+
+	defer testUtil.MockUserInput(t, "y")()
+	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
+	assert.Equal(t, err.Error(), "Dag Deploy is not enabled for Deployment. Run 'astro deploy update <deployment-id> --dag-deploy enable' to enable dags deploy")
 
 	mockClient.AssertExpectations(t)
 }

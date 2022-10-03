@@ -26,7 +26,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
     ports:
-      - {{ .PostgresPort }}:5432
+      - 127.0.0.1:{{ .PostgresPort }}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -89,7 +89,7 @@ services:
       AIRFLOW__WEBSERVER__RBAC: "True"
       ASTRONOMER_ENVIRONMENT: local
     ports:
-      - {{ .AirflowWebserverPort }}:8080
+      - 127.0.0.1:{{ .AirflowWebserverPort }}:8080
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
