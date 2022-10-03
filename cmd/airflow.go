@@ -160,7 +160,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings yaml file to import airflow objects from")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	return cmd
 }
@@ -260,7 +260,7 @@ func newAirflowRestartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to restart airflow with")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings yaml file to import airflow objects from")
 
 	return cmd
 }
@@ -342,7 +342,7 @@ func newAirflowObjectRootCmd() *cobra.Command {
 		Use:     "object",
 		Aliases: []string{"obj"},
 		Short:   "Manage local Airflow Connections, Variables, and Pools",
-		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings file",
+		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings yaml file",
 	}
 	cmd.AddCommand(
 		newObjectImportCmd(),
@@ -354,8 +354,8 @@ func newAirflowObjectRootCmd() *cobra.Command {
 func newObjectImportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Create and update local Airflow objects from an Airflow Settings file",
-		Long:  "This command will create all connections, variables, and pools in an Airflow Settings file locally. Airflow must be running locally for this command to work",
+		Short: "Create and update local Airflow objects from an Airflow Settings yaml file",
+		Long:  "This command will create all connections, variables, and pools in an Airflow Settings yaml file locally. Airflow must be running locally for this command to work",
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -363,18 +363,18 @@ func newObjectImportCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowSettingsImport,
 	}
-	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from an Airflow Settings File")
-	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from an Airflow Settings File")
-	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from an Airflow Settings File")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to export objects to")
+	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from an Airflow Settings yaml file")
+	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from an Airflow Settings yaml file")
+	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from an Airflow Settings yaml file")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings yaml file to export objects to")
 	return cmd
 }
 
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export all Airflow objects to an airflow settings or env file. Does not overwrite objects that already exist in the file",
-		Long:  "This command will export all Airflow objects to an airflow settings or env file(--env-export). Objects already in the file will not be over written. Airflow must be running locally for this command to work",
+		Short: "Export all Airflow objects to an Airflow Settings yaml or env file(--env-export). Does not overwrite objects that already exist in the file",
+		Long:  "This command will export all Airflow objects to an Airflow Settings yaml or env file(--env-export). Objects already in the file will not be over written. Airflow must be running locally for this command to work",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -383,10 +383,10 @@ func newObjectExportCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowSettingsExport,
 	}
-	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to an Airflow Settings File")
-	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to an Airflow Settings File")
-	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to an Airflow Settings File")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to export objects to")
+	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to an Airflow Settings yaml file or env file")
+	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to an Airflow Settings yaml file or env file ")
+	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to an Airflow Settings yaml file. This flag doesn't work with env-export")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings yaml file to export objects to")
 	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "This exports the objects in the form of Airflow environment variables to an env file")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to export objects as environment variables to")
 	return cmd
