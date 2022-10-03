@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	// "time"
 
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
@@ -348,18 +349,16 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 	}
 	// Run Image
 	// fmt.Println(args)
-	ch := make(chan string)
+	// ch := make(chan string)
 
-	go func() {
-		err := RunCommandCh(ch, "\n", DockerCmd, args...)
-		if err != nil {
-			log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
-		}
-    }()
-
-    for v := range ch {
-            fmt.Println(v)
-    }
+	err := RunCommandCh("\n", DockerCmd, args...)
+	if err != nil {
+		log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
+	}
+	// time.Sleep(10*time.Second)
+    // for v := range ch {
+    //         fmt.Println(v)
+    // }
 	return nil
 }
 
@@ -400,7 +399,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 }
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
-func RunCommandCh(stdoutCh chan<- string, cutset string, command string, flags ...string) error {
+func RunCommandCh(cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
     cmd := exec.Command(command, flags...)
 
 	// fmt.Println(command)
@@ -420,61 +419,66 @@ func RunCommandCh(stdoutCh chan<- string, cutset string, command string, flags .
     if err := cmd.Start(); err != nil {
             return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
     }
+	// defer close(stdoutCh)
 
-    go func() {
-            defer close(stdoutCh)
+	for {
+			bufOut := make([]byte, 1024)
+			bufErr := make([]byte, 1024)
+			n, err1 := stdOutput.Read(bufOut)
+			o, err2 := stdError.Read(bufErr)
 
-            for {
-                    bufOut := make([]byte, 1024)
-					bufErr := make([]byte, 1024)
-                    n, err := stdOutput.Read(bufOut)
-                    o, err := stdError.Read(bufErr)
+			// outText := strings.TrimSpace(string(bufOut[:n]))
+			// fmt.Println("out:"+outText)
 
-                    if err != nil {
-						if err != io.EOF {
-								log.Fatal(err)
-						}
-						if o == 0 {
-								break
-						}
-						if n == 0 {
-							break
-						}
-                    }
-                    outText := strings.TrimSpace(string(bufOut[:n]))
-					// fmt.Println("out:"+outText)
-	
-                    errText := strings.TrimSpace(string(bufErr[:o]))
-					fmt.Println("error:"+errText)
-                    for {
-                            // Take the index of any of the given cutset
-                            n := strings.IndexAny(outText, cutset)
-                            if n == -1 {
-                                    // If not found, but still have data, send it
-                                    if len(outText) > 0 {// && strings.Contains(outText, "Running") {
-                                            stdoutCh <- outText
-                                    }
-                                    break
-                            }
-                            // Send data up to the found cutset
-							// if strings.Contains(outText[:n], "Running task ") {
-							// 	stdoutCh <-"\n"+outText[:n]+"\n"
-							// } else if strings.Contains(outText[:n], " successfully!") {
-							// 	stdoutCh <-"\n"+outText[:n]+"\n"
-							// } else {
-							// 	stdoutCh <- outText[:n]
-							// }
-							// fmt.Println(outText[:n])
-							stdoutCh <- outText[:n]
-                            // If cutset is last element, stop there.
-                            if n == len(outText) {
-                                    break
-                            }
-                            // Shift the text and start again.
-                            outText = outText[n+1:]
-                    }
-            }
-    }()
+			if o == 0 && n == 0 {
+				break
+			}
+			if err1 != nil {
+				if err1 != io.EOF {
+						log.Fatal(err1)
+				}
+			}
+			if err2 != nil {
+				if err2 != io.EOF {
+						log.Fatal(err2)
+				}
+			}
+			outText := strings.TrimSpace(string(bufOut[:n]))
+			// fmt.Println("out:"+outText)
+
+			errText := strings.TrimSpace(string(bufErr[:o]))
+			fmt.Println("error:"+errText)
+
+			for {
+					// Take the index of any of the given cutset
+					n := strings.IndexAny(outText, cutset)
+					if n == -1 {
+						// If not found, but still have data, send it
+						// if len(outText) > 0 && strings.Contains(outText, "Running") {
+						// 	fmt.Println(outText)
+						// }
+						fmt.Println(outText)
+						break
+					}
+					// Send data up to the found cutset
+					// if strings.Contains(outText[:n], "Running task ") {
+					// 	fmt.Println("\n"+outText[:n]+"\n")
+					// } else if strings.Contains(outText[:n], " successfully!") {
+					// 	fmt.Println("\n"+outText[:n]+"\n")
+					// } else {
+					// 	fmt.Println(outText[:n])
+					// }
+
+					fmt.Println(outText[:n])
+					// stdoutCh <- outText[:n]
+					// If cutset is last element, stop there.
+					if n == len(outText) {
+						break
+					}
+					// Shift the text and start again.
+					outText = outText[n+1:]
+			}
+		}
 
     if err := cmd.Wait(); err != nil {
             return fmt.Errorf("RunCommand: cmd.Wait(): %v", err)
