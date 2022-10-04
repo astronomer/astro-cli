@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	// "time"
 
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
@@ -23,7 +22,7 @@ import (
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
-	// "github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 const (
@@ -202,129 +201,6 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-// func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) error {
-// 	args := []string{
-// 		"run",
-// 		"-i",
-// 		"-v",
-// 		config.WorkingPath+"/dags:/usr/local/airflow/dags",
-// 		"-v",
-// 		config.WorkingPath+"/"+settingsFile+":/usr/local/"+settingsFile,
-// 		"-e",
-// 		"DAG_DIR=./dags/",
-// 		"-e",
-// 		"DAG_ID="+dagID,
-// 		"-e",
-// 		"SETTINGS_FILE=/usr/local/"+settingsFile,
-// 	}
-// 	if startDate != "" {
-// 		startDateArgs := []string{"-e", "START_DATE="+startDate}
-// 		args = append(args, startDateArgs...)
-// 	}
-
-// 	endArgs := []string{"--env-file", envFile, d.imageName,}
-// 	args = append(args, endArgs...)
-
-// 	// Run Image
-// 	err := cmdExec(DockerCmd, os.Stdout, os.Stderr, args...)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-
-// }
-
-
-// func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) error {
-// 	args := []string{
-// 		"run",
-// 		"-i",
-// 		"-v",
-// 		config.WorkingPath+"/dags:/usr/local/airflow/dags",
-// 		"-v",
-// 		config.WorkingPath+"/"+settingsFile+":/usr/local/"+settingsFile,
-// 		"-e",
-// 		"DAG_DIR=./dags/",
-// 		"-e",
-// 		"DAG_ID="+dagID,
-// 		"-e",
-// 		"SETTINGS_FILE=/usr/local/"+settingsFile,
-// 		"--env-file",
-// 		envFile,
-// 		// "dimberman/local-airflow-test:0.0.2",
-// 		d.imageName,
-// 	}
-// 	if startDate != "" {
-// 		startDateArgs := []string{"-e", "START_DATE="+startDate}
-// 		args = append(args, startDateArgs...)
-// 	}
-// 	// Run Image
-// 	// var stdout, stderr io.Writer
-// 	var stdBuffer bytes.Buffer
-// 	mw := io.Writer(&stdBuffer)
-
-// 	// fmt.Println(args)
-
-// 	// ch := make(chan string)
-
-// 	// args = []string{
-// 	// 	"ps",
-// 	// }
-
-// 	// go func() {
-// 	// 	err := RunCommandCh(ch, "\n", DockerCmd, args...)
-// 	// 	if err != nil {
-// 	// 		log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
-// 	// 	}
-//     // }()
-// 	fmt.Println("Running DAG "+dagID+"...")
-// 	fmt.Println("\nLoading DAGS...")
-// 	err := cmdExec(DockerCmd, mw, mw, args...)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	outText := stdBuffer.String()
-// 	tasks := 0
-// 	success := 0
-// 	for {
-// 		// Take the index of any of the given cutset
-// 		n := strings.IndexAny(outText, "\n")
-// 		if n == -1 {
-// 			break
-// 		}
-
-// 		if strings.Contains(outText[:n], "Running task ") {
-// 			fmt.Println("\n"+outText[:n]+"...")
-// 			tasks = tasks + 1
-// 		} else if strings.Contains(outText[:n], " successfully!") {
-// 			fmt.Println(ansi.Green("\n"+outText[:n]))
-// 			success = success + 1
-// 		} else if strings.Contains(outText[:n], "Time:  ")  {
-// 			fmt.Println("\n"+outText[:n])
-// 		} else {
-// 			log.Debugf("\t"+outText[:n])
-// 		}
-// 		if n == len(outText) {
-// 			break
-// 	}
-// 		// Shift the text and start again.
-// 		outText = outText[n+1:]
-// 	}
-
-// 	if tasks == success {
-// 		fmt.Printf("All tasks in %s ran successfully", dagID)
-// 	} else {
-// 		fmt.Printf("%s out of %s tasks ran successfully", success, tasks)
-// 	}
-
-//     // for v := range ch {
-//     //         fmt.Println(v)
-//     // }
-// 	return nil
-// }
-
 func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) error {
 	args := []string{
 		"run",
@@ -347,18 +223,15 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 		startDateArgs := []string{"-e", "START_DATE="+startDate}
 		args = append(args, startDateArgs...)
 	}
-	// Run Image
-	// fmt.Println(args)
-	// ch := make(chan string)
+
+	fmt.Println("\nRunning DAG "+dagID+"...")
+	fmt.Println("\nLoading DAGS...")
 
 	err := RunCommandCh("\n", DockerCmd, args...)
 	if err != nil {
 		log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
 	}
-	// time.Sleep(10*time.Second)
-    // for v := range ch {
-    //         fmt.Println(v)
-    // }
+	fmt.Println("\nDAG "+dagID+" is finished running. Check above for errors")
 	return nil
 }
 
@@ -400,11 +273,8 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
 func RunCommandCh(cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
+	time := 0
     cmd := exec.Command(command, flags...)
-
-	// fmt.Println(command)
-	fmt.Println(flags)
-	fmt.Println("\n\n")
 
     stdOutput, err := cmd.StdoutPipe()
     if err != nil {
@@ -419,69 +289,72 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
     if err := cmd.Start(); err != nil {
             return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
     }
-	// defer close(stdoutCh)
 
 	for {
-			bufOut := make([]byte, 1024)
-			bufErr := make([]byte, 1024)
-			n, err1 := stdOutput.Read(bufOut)
-			o, err2 := stdError.Read(bufErr)
+		bufOut := make([]byte, 1024)
+		bufErr := make([]byte, 1024)
+		n, err1 := stdOutput.Read(bufOut)
+		o, err2 := stdError.Read(bufErr)
 
-			// outText := strings.TrimSpace(string(bufOut[:n]))
-			// fmt.Println("out:"+outText)
-
-			if o == 0 && n == 0 {
-				break
-			}
-			if err1 != nil {
-				if err1 != io.EOF {
-						log.Fatal(err1)
-				}
-			}
-			if err2 != nil {
-				if err2 != io.EOF {
-						log.Fatal(err2)
-				}
-			}
-			outText := strings.TrimSpace(string(bufOut[:n]))
-			// fmt.Println("out:"+outText)
-
-			errText := strings.TrimSpace(string(bufErr[:o]))
-			fmt.Println("error:"+errText)
-
-			for {
-					// Take the index of any of the given cutset
-					n := strings.IndexAny(outText, cutset)
-					if n == -1 {
-						// If not found, but still have data, send it
-						// if len(outText) > 0 && strings.Contains(outText, "Running") {
-						// 	fmt.Println(outText)
-						// }
-						fmt.Println(outText)
-						break
-					}
-					// Send data up to the found cutset
-					// if strings.Contains(outText[:n], "Running task ") {
-					// 	fmt.Println("\n"+outText[:n]+"\n")
-					// } else if strings.Contains(outText[:n], " successfully!") {
-					// 	fmt.Println("\n"+outText[:n]+"\n")
-					// } else {
-					// 	fmt.Println(outText[:n])
-					// }
-
-					fmt.Println(outText[:n])
-					// stdoutCh <- outText[:n]
-					// If cutset is last element, stop there.
-					if n == len(outText) {
-						break
-					}
-					// Shift the text and start again.
-					outText = outText[n+1:]
+		if o == 0 && n == 0 {
+			break
+		}
+		if err1 != nil {
+			if err1 != io.EOF {
+					log.Fatal(err1)
 			}
 		}
+		if err2 != nil {
+			if err2 != io.EOF {
+					log.Fatal(err2)
+			}
+		}
+		outText := strings.TrimSpace(string(bufOut[:n]))
+		// fmt.Println("out:"+outText)
 
-    if err := cmd.Wait(); err != nil {
-            return fmt.Errorf("RunCommand: cmd.Wait(): %v", err)
-    }
+		errText := strings.TrimSpace(string(bufErr[:o]))
+		if errText != "" && !strings.Contains(errText, "+ python ./run_local_dag.py")  {
+			fmt.Println("\n\t"+errText)
+		}
+
+		for {
+			// Take the index of any of the given cutset
+			n := strings.IndexAny(outText, cutset)
+			if n == -1 {
+				// If not found, but still have data, parse it
+				if strings.Contains(outText, "Running task ") {
+					fmt.Println("\n"+outText+"...")
+				} else if strings.Contains(outText, "Time:  ") {
+					fmt.Println("\n"+outText)
+					time = 1
+				} else if strings.Contains(outText, " successfully!") {
+					fmt.Println(ansi.Green("\nTask "+outText))
+				} else if time == 0 {
+					log.Debugf("\t"+outText)
+				}
+				break
+			}
+			// parse data from cutset
+			if strings.Contains(outText[:n], "Running task ") {
+				fmt.Println("\n"+outText[:n]+"...")
+			} else if strings.Contains(outText[:n], "Time:  ") {
+				fmt.Println("\n"+outText[:n])
+				time = 1
+			} else if strings.Contains(outText[:n], " successfully!") {
+				fmt.Println(ansi.Green("\nTask "+outText[:n]))
+			} else if time == 0 {
+				log.Debugf("\t"+outText[:n])
+			}
+			// If cutset is last element, stop there.
+			if n == len(outText) {
+				break
+			}
+			// Shift the text and start again.
+			outText = outText[n+1:]
+		}
+		if o == 0 && n == 0 {
+			break
+		}
+	}
     return nil
 }

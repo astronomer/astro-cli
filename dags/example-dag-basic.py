@@ -51,7 +51,9 @@ def example_dag_basic():
         total_order_value = 0
 
         for value in order_data_dict.values():
+            
             total_order_value += value
+            # total_order_value += "fail"
 
         return {"total_order_value": total_order_value}
 
