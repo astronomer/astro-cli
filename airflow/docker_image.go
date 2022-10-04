@@ -158,7 +158,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		"-v",
 		airflowHome + "/tests:/usr/local/airflow/tests:z",
 	}
-	fileExist, err := util.Exists(airflowHome + envFile)
+	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
 		return "", err
 	}
