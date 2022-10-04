@@ -316,7 +316,7 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy("./testfiles/", "test-id", "test-ws-id", "", "", "", "", true, true, mockClient)
-	assert.Equal(t, err.Error(), "Dag Deploy is not enabled for Deployment. Run 'astro deploy update <deployment-id> --dag-deploy enable' to enable dags deploy")
+	assert.Equal(t, err.Error(), "Dag Deploy is not enabled for deployment. Run 'astro deployment update test-id --dag-deploy enable' to enable dags deploy")
 
 	mockClient.AssertExpectations(t)
 }

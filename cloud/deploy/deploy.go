@@ -45,7 +45,7 @@ const (
 	message            = "Dags uploaded successfully"
 	action             = "UPLOAD"
 	allTests           = "all-tests"
-	enableDagDeployMsg = "Dag Deploy is not enabled for Deployment. Run 'astro deploy update <deployment-id> --dag-deploy enable' to enable dags deploy"
+	enableDagDeployMsg = "Dag Deploy is not enabled for deployment. Run 'astro deployment update %s --dag-deploy enable' to enable dags deploy"
 	dagDeployDisabled  = "dag deploy is not enabled for deployment"
 )
 
@@ -191,7 +191,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		err = deployDags(path, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
-				return errors.New(enableDagDeployMsg)
+				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 			}
 
 			return err
