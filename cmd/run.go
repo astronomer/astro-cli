@@ -17,10 +17,6 @@ func newRunCommand() *cobra.Command {
 		Short: "Run a local DAG withpython by running its tasks sequentially",
 		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code",
 		Args:  cobra.MaximumNArgs(1),
-		// ignore PersistentPreRunE of root command
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    run,
 	}
