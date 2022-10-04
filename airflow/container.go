@@ -39,6 +39,7 @@ type RegistryHandler interface {
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
 	Build(config types.ImageBuildConfig) error
+	BuildWithoutDags(config types.ImageBuildConfig) error
 	Push(registry, username, token, remoteImage string) error
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)

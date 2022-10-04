@@ -50,6 +50,43 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		return err
 	}
 
+	args := []string{
+		"build",
+		"-t",
+		d.imageName,
+		".",
+	}
+	if config.NoCache {
+		args = append(args, "--no-cache")
+	}
+
+	if len(config.TargetPlatforms) > 0 {
+		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(config.TargetPlatforms, ",")))
+	}
+	// Build image
+	var stdout, stderr io.Writer
+	if config.Output {
+		stdout = os.Stdout
+		stderr = os.Stderr
+	} else {
+		stdout = nil
+		stderr = nil
+	}
+	err = cmdExec(DockerCmd, stdout, stderr, args...)
+	if err != nil {
+		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
+	}
+
+	return nil
+}
+
+func (d *DockerImage) BuildWithoutDags(config airflowTypes.ImageBuildConfig) error {
+	// Change to location of Dockerfile
+	err := os.Chdir(config.Path)
+	if err != nil {
+		return err
+	}
+
 	// flag to determine if we are setting the dags folder in the ignore path
 	dagsIgnoreSet := false
 	fullpath := filepath.Join(config.Path, ".dockerignore")

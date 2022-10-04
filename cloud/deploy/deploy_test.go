@@ -31,7 +31,7 @@ var (
 	dagURL                   = "http://fake-url.windows.core.net"
 )
 
-func TestDeploySuccess(t *testing.T) {
+func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockDeplyResp := astro.Deployment{
 		ID:             "test-id",
 		ReleaseName:    "test-name",
@@ -39,7 +39,8 @@ func TestDeploySuccess(t *testing.T) {
 		DeploymentSpec: astro.DeploymentSpec{
 			Webserver: astro.Webserver{URL: "test-url"},
 		},
-		CreatedAt: time.Now(),
+		CreatedAt:        time.Now(),
+		DagDeployEnabled: false,
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -47,6 +48,89 @@ func TestDeploySuccess(t *testing.T) {
 
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+
+	mockImageHandler := new(mocks.ImageHandler)
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
+		return mockImageHandler
+	}
+
+	mockContainerHandler := new(mocks.ContainerHandler)
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(nil)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+		return mockContainerHandler, nil
+	}
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+	ctx.Token = "test testing"
+	err = ctx.SetContext()
+	assert.NoError(t, err)
+
+	// mock os.Stdin
+	input := []byte("1")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.Write(input)
+	if err != nil {
+		t.Error(err)
+	}
+	w.Close()
+	stdin := os.Stdin
+	// Restore stdin right after the test.
+	defer func() { os.Stdin = stdin }()
+	os.Stdin = r
+
+	defer testUtil.MockUserInput(t, "y")()
+	err = Deploy("./testfiles/", "", "test-ws-id", "parse", "", "", "", true, false, mockClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "", "", false, false, mockClient)
+	assert.NoError(t, err)
+
+	// test custom image
+	defer testUtil.MockUserInput(t, "y")()
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "", false, false, mockClient)
+	assert.NoError(t, err)
+
+	config.CFG.ProjectDeployment.SetProjectString("test-id")
+	// test both deploymentID and name used
+	defer testUtil.MockUserInput(t, "y")()
+	err = Deploy("./testfiles/", "test-id", "test-ws-id", "pytest", "", "custom-image", "test-name", false, false, mockClient)
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+	mockImageHandler.AssertExpectations(t)
+	mockContainerHandler.AssertExpectations(t)
+}
+
+func TestDeployWithDagsDeploySuccess(t *testing.T) {
+	mockDeplyResp := astro.Deployment{
+		ID:             "test-id",
+		ReleaseName:    "test-name",
+		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+		DeploymentSpec: astro.DeploymentSpec{
+			Webserver: astro.Webserver{URL: "test-url"},
+		},
+		CreatedAt:        time.Now(),
+		DagDeployEnabled: true,
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	config.CFG.ShowWarnings.SetHomeString("false")
+	mockClient := new(astro_mocks.Client)
+
+	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", DagDeployEnabled: true}}, nil).Times(1)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
@@ -68,7 +152,7 @@ func TestDeploySuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("BuildWithoutDags", mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
@@ -362,8 +446,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, dagDeployEnabled, err := buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
-	assert.Equal(t, dagDeployEnabled, false)
+	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", false, nil)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -374,8 +457,7 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// dockerfile parsing error
 	dockerfile = "Dockerfile.invalid"
-	_, dagDeployEnabled, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", nil)
-	assert.Equal(t, dagDeployEnabled, false)
+	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", false, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse dockerfile")
 
@@ -383,8 +465,7 @@ func TestBuildImageFailure(t *testing.T) {
 	dockerfile = "Dockerfile"
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
-	_, dagDeployEnabled, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", mockClient)
-	assert.Equal(t, dagDeployEnabled, false)
+	_, err = buildImage(&ctx, "./testfiles/", "4.2.5", "", "", false, mockClient)
 	assert.ErrorIs(t, err, errMock)
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)

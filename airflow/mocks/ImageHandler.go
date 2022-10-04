@@ -26,6 +26,20 @@ func (_m *ImageHandler) Build(config types.ImageBuildConfig) error {
 	return r0
 }
 
+// BuildWithoutDags provides a mock function with given fields: config
+func (_m *ImageHandler) BuildWithoutDags(config types.ImageBuildConfig) error {
+	ret := _m.Called(config)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(types.ImageBuildConfig) error); ok {
+		r0 = rf(config)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetLabel provides a mock function with given fields: labelName
 func (_m *ImageHandler) GetLabel(labelName string) (string, error) {
 	ret := _m.Called(labelName)
@@ -84,20 +98,6 @@ func (_m *ImageHandler) Push(registry string, username string, token string, rem
 	return r0
 }
 
-// TagLocalImage provides a mock function with given fields: localImage
-func (_m *ImageHandler) TagLocalImage(localImage string) error {
-	ret := _m.Called(localImage)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(localImage)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Pytest provides a mock function with given fields: pytestFile, airflowHome, envFile, pytestArgs, config
 func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error) {
 	ret := _m.Called(pytestFile, airflowHome, envFile, pytestArgs, config)
@@ -117,6 +117,20 @@ func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile st
 	}
 
 	return r0, r1
+}
+
+// TagLocalImage provides a mock function with given fields: localImage
+func (_m *ImageHandler) TagLocalImage(localImage string) error {
+	ret := _m.Called(localImage)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(localImage)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewImageHandler interface {
