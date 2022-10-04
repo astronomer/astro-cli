@@ -1,7 +1,6 @@
 package airflow
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -11,10 +10,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
@@ -50,30 +47,6 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		return err
 	}
 
-	// flag to determine if we are setting the dags folder in the ignore path
-	dagsIgnoreSet := false
-	fullpath := filepath.Join(config.Path, ".dockerignore")
-
-	lines, err := fileutil.Read(fullpath)
-	if err != nil {
-		return err
-	}
-	contains, _ := fileutil.Contains(lines, "dags/")
-	if !contains {
-		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		if _, err := f.WriteString("\ndags/"); err != nil {
-			return err
-		}
-
-		dagsIgnoreSet = true
-	}
-
 	args := []string{
 		"build",
 		"-t",
@@ -99,38 +72,6 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	err = cmdExec(DockerCmd, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
-	}
-
-	// remove dags from .dockerignore file if we set it
-	if dagsIgnoreSet {
-		f, err := os.Open(fullpath)
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		var bs []byte
-		buf := bytes.NewBuffer(bs)
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			text := scanner.Text()
-			if text != "dags/" {
-				_, err = buf.WriteString(text + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
