@@ -1,6 +1,6 @@
 ---
 coverage:
-  range: 55..100
+  range: 85..100
   round: down
   precision: 2
 
@@ -9,7 +9,7 @@ coverage:
       default:  # context, you can create multiple ones with custom titles
         enabled: yes  # must be yes|true to enable this status
         target:
-          55  # specify the target coverage for each commit status
+          85  # specify the target coverage for each commit status
           #   option: "auto" (must increase from parent commit or pull request base)
           #   option: "X%" a static target percentage to hit
         if_not_found: success  # if parent is not found report status as success, error, or failure
@@ -19,4 +19,4 @@ coverage:
         enabled: yes
         target: auto
         threshold: 1%  # allowed to drop X% and still result in a "success" commit status
-        base: 55.55
+        base: auto

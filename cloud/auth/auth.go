@@ -28,9 +28,8 @@ import (
 )
 
 const (
-	Domain          = "astronomer.io"
-	localDomain     = "localhost"
-	inputOAuthToken = "OAuth Token: " // nolint:gosec // false positive
+	Domain      = "astronomer.io"
+	localDomain = "localhost"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -204,7 +203,7 @@ func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
 	return userEmail, err
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain string) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain, orgID string) (Result, error) { //nolint:gocritic
 	// try to get UserEmail from config first
 	userEmail, err := getUserEmail(c)
 	if err != nil {
@@ -215,9 +214,11 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 		userEmail = input.Text("Please enter your account email: ")
 	}
 
-	orgID, err := a.orgChecker(domain)
-	if err != nil {
-		log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
+	if orgID == "" {
+		orgID, err = a.orgChecker(domain)
+		if err != nil {
+			log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
+		}
 	}
 
 	// Generate PKCE verifier and challenge
@@ -371,7 +372,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain string, client astro.Client, out io.Writer, shouldDisplayLoginLink, shouldLoginWithToken bool) error {
+func Login(domain, orgID, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -379,38 +380,27 @@ func Login(domain string, client astro.Client, out io.Writer, shouldDisplayLogin
 		return err
 	}
 	// Welcome User
-	fmt.Print("Welcome to the Astro CLI 🚀\n\n")
+	fmt.Print("\nWelcome to the Astro CLI 🚀\n\n")
 	fmt.Print("To learn more about Astro, go to https://docs.astronomer.io\n\n")
 
 	c, _ := context.GetCurrentContext()
 
-	if !shouldLoginWithToken {
-		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain)
+	if token == "" {
+		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain, orgID)
 		if err != nil {
 			return err
 		}
 	} else {
 		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
-		fmt.Printf("\nPlease visit the following URL, authenticate and paste token in next prompt\n")
-		fmt.Println("cloud." + domain + "/token\n")
-		token := input.Text(inputOAuthToken)
 		res = Result{
 			AccessToken: token,
-			ExpiresIn:   time.Now().Add(24 * time.Hour).Unix(), // nolint:gomnd
+			ExpiresIn:   86400, // nolint:gomnd
 		}
 	}
 
 	// If no domain specified
 	// Create context if it does not exist
 	if domain != "" {
-		if !context.Exists(domain) {
-			// Save new context since it did not exists
-			err = context.SetContext(domain)
-			if err != nil {
-				return err
-			}
-		}
-
 		// Switch context now that we ensured context exists
 		err = context.Switch(domain)
 		if err != nil {

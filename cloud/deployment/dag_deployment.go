@@ -2,31 +2,30 @@ package deployment
 
 import (
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/pkg/errors"
 )
 
 // Initiates a Dag Deployment Request
-func Initiate(deploymentID string, client astro.Client) (astro.InitiateDagDeployment, error) {
+func Initiate(runtimeID string, client astro.Client) (astro.InitiateDagDeployment, error) {
 	// create initiate dag deployment input
 	initiateDagDeploymentInput := astro.InitiateDagDeploymentInput{
-		DeploymentID: deploymentID,
+		RuntimeID: runtimeID,
 	}
 
 	// initiate dag deployment
 	dagDeployment, err := client.InitiateDagDeployment(initiateDagDeploymentInput)
 	if err != nil {
-		return astro.InitiateDagDeployment{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return astro.InitiateDagDeployment{}, err
 	}
 
 	return dagDeployment, nil
 }
 
 // Report upload dags status back to astro
-func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
+func ReportDagDeploymentStatus(initiatedDagDeploymentID, runtimeID, action, versionID, status, message string, client astro.Client) (astro.DagDeploymentStatus, error) {
 	// create report dag deployment status input
 	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
 		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		DeploymentID:             deploymentID,
+		RuntimeID:                runtimeID,
 		Action:                   action,
 		VersionID:                versionID,
 		Status:                   status,
@@ -36,7 +35,7 @@ func ReportDagDeploymentStatus(initiatedDagDeploymentID, deploymentID, action, v
 	// report dag deployment status
 	dagDeploymentStatus, err := client.ReportDagDeploymentStatus(reportDagDeploymentStatusInput)
 	if err != nil {
-		return astro.DagDeploymentStatus{}, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return astro.DagDeploymentStatus{}, err
 	}
 
 	return dagDeploymentStatus, nil

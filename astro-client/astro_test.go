@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSelfQuery(t *testing.T) {
+func TestGetUserInfo(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -189,7 +189,7 @@ func TestUpdateDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentUpdate: Deployment{
+			UpdateDeployment: Deployment{
 				ID:             "test-deployment-id",
 				Label:          "test-deployment-label",
 				ReleaseName:    "test-release-name",
@@ -211,9 +211,9 @@ func TestUpdateDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployment, err := astroClient.UpdateDeployment(&DeploymentUpdateInput{})
+		deployment, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.DeploymentUpdate)
+		assert.Equal(t, deployment, mockResponse.Data.UpdateDeployment)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -226,13 +226,14 @@ func TestUpdateDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.UpdateDeployment(&DeploymentUpdateInput{})
+		_, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
 
 func TestListDeployments(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	org := "test-org-id"
 	mockResponse := &Response{
 		Data: ResponseData{
 			GetDeployments: []Deployment{
@@ -259,7 +260,7 @@ func TestListDeployments(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployments, err := astroClient.ListDeployments(DeploymentsInput{})
+		deployments, err := astroClient.ListDeployments(org, "")
 		assert.NoError(t, err)
 		assert.Equal(t, deployments, mockResponse.Data.GetDeployments)
 	})
@@ -274,7 +275,56 @@ func TestListDeployments(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.ListDeployments(DeploymentsInput{})
+		_, err := astroClient.ListDeployments(org, "")
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestGetDeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	deployment := "test-deployment-id"
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetDeployments: []Deployment{
+				{
+					ID:             "test-deployment-id",
+					Label:          "test-deployment-label",
+					ReleaseName:    "test-release-name",
+					RuntimeRelease: RuntimeRelease{Version: "4.2.5"},
+					Workspace:      Workspace{ID: "test-workspace-id"},
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		deployments, err := astroClient.GetDeployment(deployment)
+		assert.NoError(t, err)
+		assert.Equal(t, deployments, mockResponse.Data.GetDeployment)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetDeployment(deployment)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -283,7 +333,7 @@ func TestDeleteDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentDelete: Deployment{
+			DeleteDeployment: Deployment{
 				ID:             "test-deployment-id",
 				Label:          "test-deployment-label",
 				ReleaseName:    "test-release-name",
@@ -305,9 +355,9 @@ func TestDeleteDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		deployment, err := astroClient.DeleteDeployment(DeploymentDeleteInput{})
+		deployment, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.DeploymentDelete)
+		assert.Equal(t, deployment, mockResponse.Data.DeleteDeployment)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -320,7 +370,7 @@ func TestDeleteDeployment(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.DeleteDeployment(DeploymentDeleteInput{})
+		_, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -430,7 +480,7 @@ func TestModifyDeploymentVariable(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
-			DeploymentVariablesUpdate: []EnvironmentVariablesObject{
+			UpdateDeploymentVariables: []EnvironmentVariablesObject{
 				{
 					Key:      "test-env-key",
 					Value:    "test-env-value",
@@ -454,7 +504,7 @@ func TestModifyDeploymentVariable(t *testing.T) {
 
 		envVars, err := astroClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
 		assert.NoError(t, err)
-		assert.Equal(t, envVars, mockResponse.Data.DeploymentVariablesUpdate)
+		assert.Equal(t, envVars, mockResponse.Data.UpdateDeploymentVariables)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -521,7 +571,7 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		Data: ResponseData{
 			ReportDagDeploymentStatus: DagDeploymentStatus{
 				ID:            "test-id",
-				DeploymentID:  "test-deployment-id",
+				RuntimeID:     "test-runtime-id",
 				Action:        "test-action",
 				VersionID:     "test-version-id",
 				Status:        "test-status",
@@ -592,7 +642,7 @@ func TestCreateImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		image, err := astroClient.CreateImage(ImageCreateInput{})
+		image, err := astroClient.CreateImage(CreateImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.CreateImage)
 	})
@@ -607,7 +657,7 @@ func TestCreateImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.CreateImage(ImageCreateInput{})
+		_, err := astroClient.CreateImage(CreateImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -639,7 +689,7 @@ func TestDeployImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		image, err := astroClient.DeployImage(ImageDeployInput{})
+		image, err := astroClient.DeployImage(DeployImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.DeployImage)
 	})
@@ -654,7 +704,7 @@ func TestDeployImage(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 
-		_, err := astroClient.DeployImage(ImageDeployInput{})
+		_, err := astroClient.DeployImage(DeployImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -701,102 +751,6 @@ func TestListClusters(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ListClusters("test-org-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-}
-
-func TestListInternalRuntimeReleases(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := &Response{
-		Data: ResponseData{
-			RuntimeReleases: []RuntimeRelease{
-				{
-					Version:                  "4.2.5",
-					AirflowVersion:           "2.2.5",
-					Channel:                  "stable",
-					ReleaseDate:              "2020-06-25",
-					AirflowDatabaseMigration: true,
-				},
-			},
-		},
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	t.Run("success", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		resp, err := astroClient.ListInternalRuntimeReleases()
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.RuntimeReleases)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		_, err := astroClient.ListInternalRuntimeReleases()
-		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-}
-
-func TestListPublicRuntimeReleases(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := &Response{
-		Data: ResponseData{
-			RuntimeReleases: []RuntimeRelease{
-				{
-					Version:                  "4.2.5",
-					AirflowVersion:           "2.2.5",
-					Channel:                  "stable",
-					ReleaseDate:              "2020-06-25",
-					AirflowDatabaseMigration: true,
-				},
-			},
-		},
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	t.Run("success", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		resp, err := astroClient.ListPublicRuntimeReleases()
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.RuntimeReleases)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		_, err := astroClient.ListPublicRuntimeReleases()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -950,6 +904,51 @@ func TestWorkerQueueOptions(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.GetWorkerQueueOptions()
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
+func TestGetOrganizations(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetOrganizations: []Organization{
+				{
+					ID:   "test-org-id",
+					Name: "test-org-name",
+				},
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("happy path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.GetOrganizations()
+		assert.NoError(t, err)
+		assert.Equal(t, resp, mockResponse.Data.GetOrganizations)
+	})
+
+	t.Run("error path", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.GetOrganizations()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

@@ -95,7 +95,7 @@ func checkToken(client astro.Client, out io.Writer) error {
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, client, out, false, false)
+		err := authLogin(c.Domain, "", "", client, out, false)
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func checkToken(client astro.Client, out io.Writer) error {
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, client, out, false, false)
+			err := authLogin(c.Domain, "", "", client, out, false)
 			if err != nil {
 				return err
 			}
@@ -267,16 +267,26 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 		fmt.Println("admin settings incorrectly set you may experince permissions issues")
 	}
 
+	organizations, err := astroClient.GetOrganizations()
+	if err != nil {
+		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+	}
+	organizationID := organizations[0].ID
+
 	// get workspace ID
-	deployments, err := astroClient.ListDeployments(astro.DeploymentsInput{})
+	deployments, err := astroClient.ListDeployments(organizationID, "")
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 	workspaceID = deployments[0].Workspace.ID
 
-	err = c.SetContextKey("workspace", workspaceID) // c.Workspace)
+	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
 	if err != nil {
 		fmt.Println("no workspace set")
+	}
+	err = c.SetContextKey("organization", organizationID) // c.Organization
+	if err != nil {
+		fmt.Println("no organization set")
 	}
 
 	return true, nil

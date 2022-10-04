@@ -1,7 +1,6 @@
 package airflow
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -26,7 +25,6 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/command/inspect"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/compose/v2/cmd/formatter"
@@ -36,7 +34,6 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -65,13 +62,13 @@ const (
 )
 
 var (
+	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
 
-	airflowSettingsFile = "airflow_settings.yaml"
-
-	inspectContainer = inspect.Inspect
-	initSettings     = settings.ConfigSettings
+	initSettings      = settings.ConfigSettings
+	exportSettings    = settings.Export
+	envExportSettings = settings.EnvExport
 
 	openURL    = browser.OpenURL
 	timeoutNum = 60
@@ -105,9 +102,9 @@ type DockerCompose struct {
 	imageHandler   ImageHandler
 }
 
-func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyTestCompose bool) (*DockerCompose, error) {
+func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*DockerCompose, error) {
 	// Get project name from config
-	projectName, err := ProjectNameUnique(isPyTestCompose)
+	projectName, err := ProjectNameUnique()
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving working directory: %w", err)
 	}
@@ -118,9 +115,6 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
 	composeFile := include.Composeyml
-	if isPyTestCompose {
-		composeFile = include.Pytestyml
-	}
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
@@ -147,7 +141,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string, isPyT
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
+func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
@@ -192,7 +186,7 @@ func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", imageLabels, false)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -207,17 +201,12 @@ func (d *DockerCompose) Start(imageName string, noCache, noBrowser bool) error {
 
 	fmt.Println("\n\nAirflow is starting up! This might take a few minutes…")
 
-	airflowDockerVersion := defaultAirflowVersion
-	airflowVersion, ok := imageLabels[airflowVersionLabelName]
-	if ok {
-		if version, err := semver.NewVersion(airflowVersion); err == nil {
-			airflowDockerVersion = version.Major()
-		} else {
-			logrus.Debugf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
-		}
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
 	}
 
-	err = checkWebserverHealth(project, d.composeService, airflowDockerVersion, noBrowser)
+	err = checkWebserverHealth(settingsFile, project, d.composeService, airflowDockerVersion, noBrowser)
 	if err != nil {
 		return err
 	}
@@ -232,7 +221,7 @@ func (d *DockerCompose) Stop() error {
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", imageLabels, false)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -351,36 +340,34 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(imageName, pytestFile, projectImageName string) (string, error) {
-	// projectImageName may be provided to the function if it is being used in the deploy command
-	if projectImageName == "" {
-		var err error
-		// get same image as what's used for other dev commands
-		// This makes it so we don't have to rebuild this image if it was used in other commands
-		projectImageName, err = ProjectNameUnique(false)
-		if err != nil {
-			return "", errors.Wrap(err, "error retrieving working directory")
-		}
-
-		projectImageName = ImageName(projectImageName, "latest")
+func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error) {
+	// deployImageName may be provided to the function if it is being used in the deploy command
+	if deployImageName == "" {
 		// build image
-		if imageName == "" {
-			err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+		if customImageName == "" {
+			err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 			if err != nil {
 				return "", err
 			}
 		} else {
-			// skip build if an imageName is passed
-			err := d.imageHandler.TagLocalImage(imageName)
+			// skip build if an customImageName is passed
+			err := d.imageHandler.TagLocalImage(customImageName)
 			if err != nil {
 				return "", err
 			}
 		}
 	}
 
-	imageLabels, err := d.imageHandler.ListLabels()
-	if err != nil {
-		return "", err
+	// determine pytest args and file
+	var pytestFile string
+	if len(pytestArgs) > 0 {
+		pytestFile = pytestArgs[0]
+	}
+	if len(strings.Fields(pytestFile)) > 1 {
+		pytestArgs = strings.Fields(pytestFile)
+		pytestFile = ""
+	} else if len(pytestArgs) > 1 {
+		pytestArgs = strings.Fields(pytestArgs[1])
 	}
 
 	// Determine pytest file
@@ -392,78 +379,18 @@ func (d *DockerCompose) Pytest(imageName, pytestFile, projectImageName string) (
 		}
 	}
 
-	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, pytestFile, projectImageName, imageLabels, true)
+	// run pytests
+	exitCode, err := d.imageHandler.Pytest(pytestFile, d.airflowHome, d.envFile, pytestArgs, airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
 	if err != nil {
-		return "", errors.Wrap(err, composeCreateErrMsg)
+		return "", err
 	}
-
-	consumer := formatter.NewLogConsumer(context.Background(), os.Stdout, true, true)
-
-	// runs the equivalent of 'docker-compose up' on the file located at include/pytestyml(project)
-	err = d.composeService.Up(context.Background(), project, api.UpOptions{
-		Create: api.CreateOptions{
-			IgnoreOrphans: true,
-		},
-		Start: api.StartOptions{
-			Attach:   consumer,
-			AttachTo: project.ServiceNames(), // streams logs
-		},
-	})
-	if err != nil {
-		return "", errors.Wrap(err, composeRecreateErrMsg)
-	}
-
-	defer func() {
-		// runs the equivalent of 'docker-compose down' to kill compose project
-		err = d.composeService.Down(context.Background(), d.projectName, api.DownOptions{Volumes: true, RemoveOrphans: true})
-		if err != nil {
-			log.Printf("%s: %s", composeStopErrMsg, err.Error())
-		}
-	}()
-
-	// runs the equivalent of 'docker-compose ps' on the project to get the container name
-	psInfo, err := d.composeService.Ps(context.Background(), project.Name, api.PsOptions{
-		All: true,
-	})
-	if err != nil {
-		return "", errors.Wrap(err, composeStatusCheckErrMsg)
-	}
-
-	// capture exit code
-	refs := []string{}
-	for i := range psInfo {
-		if strings.Contains(psInfo[i].Name, "test-1") {
-			refs = []string{psInfo[i].Name}
-		}
-	}
-
-	if len(refs) == 0 {
-		return "", errors.New("error finding the testing container")
-	}
-
-	ctx := context.Background()
-	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf) // creates writer to capture exit code
-	getRefFunc := func(ref string) (interface{}, []byte, error) {
-		return d.cliClient.ContainerInspectWithRaw(ctx, ref, false)
-	}
-
-	// runs the equivalent of 'docker container inspect --format '{{.State.ExitCode}}' <container name>' to get the exit code
-	err = inspectContainer(w, refs, "{{.State.ExitCode}}", getRefFunc)
-	if err != nil {
-		return "", errors.Wrap(err, composeStopErrMsg)
-	}
-	// Flush() sends the output from the writer to buf
-	w.Flush()
-
-	if strings.Contains(buf.String(), "0") { // if the error code is 0 the pytests passed
+	if strings.Contains(exitCode, "0") { // if the error code is 0 the pytests passed
 		return "", nil
 	}
-	return buf.String(), errors.New("something went wrong while Pytesting your DAGs")
+	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
-func (d *DockerCompose) Parse(imageName, buildImage string) error {
+func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
 	// check for file
 	path := d.airflowHome + "/" + DefaultTestPath
 
@@ -480,7 +407,8 @@ func (d *DockerCompose) Parse(imageName, buildImage string) error {
 	fmt.Println("\nChecking your DAGs for errors,\nthis might take a minute if you haven't run this command before…")
 
 	pytestFile := DefaultTestPath
-	exitCode, err := d.Pytest(imageName, pytestFile, buildImage)
+	pytestArgs := []string{pytestFile}
+	exitCode, err := d.Pytest(pytestArgs, customImageName, deployImageName)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("errors detected in your local DAGs are listed above")
@@ -522,13 +450,96 @@ func (d *DockerCompose) Bash(container string) error {
 	return nil
 }
 
-// getWebServerContainerId return webserver container id
+func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error {
+	// setup bools
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	// Get project containers
+	containerID, err := d.getWebServerContainerID()
+	if err != nil {
+		return err
+	}
+
+	// Get airflow version
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errNoFile
+	}
+
+	if envExport {
+		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\nAirflow objects exported to env file")
+		return nil
+	}
+
+	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects exported to settings file")
+	return nil
+}
+
+func (d *DockerCompose) ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error {
+	// setup bools
+	if !connections && !variables && !pools {
+		connections = true
+		variables = true
+		pools = true
+	}
+
+	// Get project containers
+	containerID, err := d.getWebServerContainerID()
+	if err != nil {
+		return err
+	}
+
+	// Get airflow version
+	airflowDockerVersion, err := d.checkAiflowVersion()
+	if err != nil {
+		return err
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errNoFile
+	}
+
+	err = initSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
+	if err != nil {
+		return err
+	}
+	fmt.Println("\nAirflow objects created from settings file")
+	return nil
+}
+
 func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
 	})
 	if err != nil {
 		return "", errors.Wrap(err, composeStatusCheckErrMsg)
+	}
+	if len(psInfo) == 0 {
+		return "", errors.New("project not running, run astro dev start to start project")
 	}
 
 	replacer := strings.NewReplacer("_", "", "-", "")
@@ -555,11 +566,28 @@ func (d *DockerCompose) RunTest( dagID, settingsFile, startDate string, noCache 
 	}
 	return nil
 }
+func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return 0, err
+	}
+
+	airflowDockerVersion := defaultAirflowVersion
+	airflowVersion, ok := imageLabels[airflowVersionLabelName]
+	if ok {
+		if version, err := semver.NewVersion(airflowVersion); err == nil {
+			airflowDockerVersion = version.Major()
+		} else {
+			fmt.Printf("unable to parse airflow version, defaulting to major version 2, error: %s", err.Error())
+		}
+	}
+	return airflowDockerVersion, nil
+}
 
 // createProject creates project with yaml config as context
-var createDockerProject = func(projectName, airflowHome, envFile, pytestFile, buildImage string, imageLabels map[string]string, pytest bool) (*types.Project, error) {
+var createDockerProject = func(projectName, airflowHome, envFile, buildImage string, imageLabels map[string]string) (*types.Project, error) {
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile, pytestFile, buildImage, imageLabels, pytest)
+	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, imageLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
@@ -570,20 +598,6 @@ var createDockerProject = func(projectName, airflowHome, envFile, pytestFile, bu
 		Filename: "compose.yaml",
 		Content:  []byte(yaml),
 	})
-
-	if !pytest {
-		composeFile := "docker-compose.override.yml"
-		composeBytes, err := os.ReadFile(composeFile)
-		if err != nil && !os.IsNotExist(err) {
-			return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeFile)
-		}
-		if err == nil {
-			configs = append(configs, types.ConfigFile{
-				Filename: "docker-compose.override.yml",
-				Content:  composeBytes,
-			})
-		}
-	}
 
 	var loadOptions []func(*loader.Options)
 
@@ -605,7 +619,7 @@ var createDockerProject = func(projectName, airflowHome, envFile, pytestFile, bu
 	return project, err
 }
 
-var checkWebserverHealth = func(project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+var checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
 	// check if webserver is healthy for user
 	err := composeService.Events(context.Background(), project.Name, api.EventsOptions{
 		Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
@@ -624,7 +638,7 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 					return errors.Wrap(err, composeStatusCheckErrMsg)
 				}
 
-				fileState, err := fileutil.Exists(airflowSettingsFile, nil)
+				fileState, err := fileutil.Exists(settingsFile, nil)
 				if err != nil {
 					return errors.Wrap(err, errSettingsPath)
 				}
@@ -633,7 +647,7 @@ var checkWebserverHealth = func(project *types.Project, composeService api.Servi
 					for i := range psInfo {
 						if strings.Contains(psInfo[i].Name, project.Name) &&
 							strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-							err = initSettings(psInfo[i].ID, airflowDockerVersion)
+							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
 							if err != nil {
 								return err
 							}

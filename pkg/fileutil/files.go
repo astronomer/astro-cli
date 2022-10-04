@@ -2,10 +2,12 @@ package fileutil
 
 import (
 	"archive/tar"
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -119,4 +121,45 @@ func Tar(source, target string) error {
 			_, err = io.Copy(tarball, file)
 			return err
 		})
+}
+
+// this functions reads a whole file into memory and returns a slice of its lines.
+func Read(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
+func Contains(elems []string, param string) (exist bool, position int) {
+	for index, elem := range elems {
+		if param == elem {
+			return true, index
+		}
+	}
+	return false, 0
+}
+
+// This function finds all files of a specific extension
+func GetFilesWithSpecificExtension(folderPath, ext string) []string {
+	var files []string
+	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck
+		if f != nil && !f.IsDir() {
+			r, err := regexp.MatchString(ext, f.Name())
+			if err == nil && r {
+				files = append(files, f.Name())
+			}
+		}
+		return nil
+	})
+
+	return files
 }

@@ -14,7 +14,6 @@ import (
 
 func TestVariableList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	ws := "test-ws-id"
 
 	mockResponse := []astro.Deployment{
 		{
@@ -33,7 +32,7 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockClient, buf)
@@ -50,7 +49,7 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("invalid deployment", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-invalid-id", "test-key-1", ws, "", "", false, mockClient, buf)
@@ -79,7 +78,7 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("invalid variable key", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-id-1", "test-invalid-key", ws, "", "", false, mockClient, buf)
@@ -90,7 +89,7 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-id-1", "test-key-1", ws, "", "", false, mockClient, buf)
@@ -100,7 +99,7 @@ func TestVariableList(t *testing.T) {
 
 	t.Run("invalid file", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := VariableList("test-id-1", "test-key-1", ws, "\000x", "", true, mockClient, buf)
@@ -111,7 +110,6 @@ func TestVariableList(t *testing.T) {
 
 func TestVariableModify(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	ws := "test-ws-id"
 
 	mockListResponse := []astro.Deployment{
 		{
@@ -141,7 +139,7 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Once()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
@@ -156,7 +154,7 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{}, errMock).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
@@ -166,7 +164,7 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("invalid deployment", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
@@ -195,7 +193,7 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("missing var key or value", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Twice()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Twice()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Twice()
 
 		buf := new(bytes.Buffer)
@@ -212,7 +210,7 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("create env var failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Once()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
@@ -223,7 +221,7 @@ func TestVariableModify(t *testing.T) {
 
 	t.Run("no env var for deployment", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return(mockListResponse, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return(mockListResponse, nil).Once()
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil).Once()
 
 		buf := new(bytes.Buffer)

@@ -18,16 +18,18 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName string, noCache bool, noBrowser bool) error
+	Start(imageName, settingsFile string, noCache bool, noBrowser bool) error
 	Stop() error
 	PS() error
 	Kill() error
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
-	Pytest(imageName, pytestFile, projectImageName string) (string, error)
-	Parse(imageName, buildImage string) error
 	Bash(container string) error
 	RunTest(dagId, settingsFile, startDate string, noCache bool) error
+	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
+	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
+	Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error)
+	Parse(customImageName, deployImageName string) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -43,6 +45,7 @@ type ImageHandler interface {
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
 	RunTest(dagId, envFile, settingsFile, startDate string) error
+	Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error)
 }
 
 type DockerComposeAPI interface {
@@ -57,8 +60,8 @@ type DockerRegistryAPI interface {
 	client.CommonAPIClient
 }
 
-func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string, isPyTestCompose bool) (ContainerHandler, error) {
-	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName, isPyTestCompose)
+func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string) (ContainerHandler, error) {
+	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName)
 }
 
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
@@ -72,7 +75,7 @@ func ImageHandlerInit(image string) ImageHandler {
 // ProjectNameUnique creates a reasonably unique project name based on the hashed
 // path of the project. This prevents collisions of projects with identical dir names
 // in different paths. ie (~/dev/project1 vs ~/prod/project1)
-func ProjectNameUnique(pytest bool) (string, error) {
+func ProjectNameUnique() (string, error) {
 	projectName := config.CFG.ProjectName.GetString()
 
 	pwd, err := fileutil.GetWorkingDir()
@@ -84,9 +87,6 @@ func ProjectNameUnique(pytest bool) (string, error) {
 	b := md5.Sum([]byte(pwd))
 	s := fmt.Sprintf("%x", b[:])
 
-	if pytest {
-		return s[0:6], nil
-	}
 	return projectName + "_" + s[0:6], nil
 }
 
@@ -98,15 +98,10 @@ func normalizeName(s string) string {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile, pytestFile, buildImage string, imageLabels map[string]string, pytest bool) (string, error) {
+func generateConfig(projectName, airflowHome, envFile, buildImage string, imageLabels map[string]string) (string, error) {
 	var tmpl *template.Template
 	var err error
-
-	if pytest {
-		tmpl, err = template.New("yml").Parse(include.Pytestyml)
-	} else {
-		tmpl, err = template.New("yml").Parse(include.Composeyml)
-	}
+	tmpl, err = template.New("yml").Parse(include.Composeyml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
 	}
@@ -137,7 +132,6 @@ func generateConfig(projectName, airflowHome, envFile, pytestFile, buildImage st
 	}
 
 	cfg := ComposeConfig{
-		PytestFile:           pytestFile,
 		PostgresUser:         config.CFG.PostgresUser.GetString(),
 		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
 		PostgresHost:         config.CFG.PostgresHost.GetString(),
