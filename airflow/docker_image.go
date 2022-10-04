@@ -338,32 +338,32 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 		"run",
 		"-i",
 		"-v",
-		config.WorkingPath+"/dags:/usr/local/airflow/dags",
+		config.WorkingPath + "/dags:/usr/local/airflow/dags",
 		"-v",
-		config.WorkingPath+"/"+settingsFile+":/usr/local/"+settingsFile,
+		config.WorkingPath + "/" + settingsFile + ":/usr/local/" + settingsFile,
 		"-e",
 		"DAG_DIR=./dags/",
 		"-e",
-		"DAG_ID="+dagID,
+		"DAG_ID=" + dagID,
 		"-e",
-		"SETTINGS_FILE=/usr/local/"+settingsFile,
+		"SETTINGS_FILE=/usr/local/" + settingsFile,
 		"--env-file",
 		envFile,
 		d.imageName,
 	}
 	if startDate != "" {
-		startDateArgs := []string{"-e", "START_DATE="+startDate}
+		startDateArgs := []string{"-e", "START_DATE=" + startDate}
 		args = append(args, startDateArgs...)
 	}
 
-	fmt.Println("\nRunning DAG "+dagID+"...")
+	fmt.Println("\nRunning DAG " + dagID + "...")
 	fmt.Println("\nLoading DAGS...")
 
 	err := RunCommandCh("\n", DockerCmd, args...)
 	if err != nil {
 		log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
 	}
-	fmt.Println("\nDAG "+dagID+" is finished running. Check above for errors")
+	fmt.Println("\nDAG " + dagID + " is finished running. Check above for errors")
 	return nil
 }
 
@@ -406,21 +406,21 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
 func RunCommandCh(cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
 	time := 0
-    cmd := exec.Command(command, flags...)
+	cmd := exec.Command(command, flags...)
 
-    stdOutput, err := cmd.StdoutPipe()
-    if err != nil {
-        return fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
-    }
+	stdOutput, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
+	}
 
 	stdError, err := cmd.StderrPipe()
-    if err != nil {
-        return fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
-    }
+	if err != nil {
+		return fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
+	}
 
-    if err := cmd.Start(); err != nil {
-            return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
-    }
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
+	}
 
 	for {
 		bufOut := make([]byte, 1024)
@@ -433,20 +433,20 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
 		}
 		if err1 != nil {
 			if err1 != io.EOF {
-					log.Fatal(err1)
+				log.Fatal(err1)
 			}
 		}
 		if err2 != nil {
 			if err2 != io.EOF {
-					log.Fatal(err2)
+				log.Fatal(err2)
 			}
 		}
 		outText := strings.TrimSpace(string(bufOut[:n]))
 		// fmt.Println("out:"+outText)
 
 		errText := strings.TrimSpace(string(bufErr[:o]))
-		if errText != "" && !strings.Contains(errText, "+ python ./run_local_dag.py")  {
-			fmt.Println("\n\t"+errText)
+		if errText != "" && !strings.Contains(errText, "+ python ./run_local_dag.py") {
+			fmt.Println("\n\t" + errText)
 		}
 
 		for {
@@ -455,27 +455,27 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
 			if n == -1 {
 				// If not found, but still have data, parse it
 				if strings.Contains(outText, "Running task ") {
-					fmt.Println("\n"+outText+"...")
+					fmt.Println("\n" + outText + "...")
 				} else if strings.Contains(outText, "Time:  ") {
-					fmt.Println("\n"+outText)
+					fmt.Println("\n" + outText)
 					time = 1
 				} else if strings.Contains(outText, " successfully!") {
-					fmt.Println(ansi.Green("\nTask "+outText))
+					fmt.Println(ansi.Green("\nTask " + outText))
 				} else if time == 0 {
-					log.Debugf("\t"+outText)
+					log.Debugf("\t" + outText)
 				}
 				break
 			}
 			// parse data from cutset
 			if strings.Contains(outText[:n], "Running task ") {
-				fmt.Println("\n"+outText[:n]+"...")
+				fmt.Println("\n" + outText[:n] + "...")
 			} else if strings.Contains(outText[:n], "Time:  ") {
-				fmt.Println("\n"+outText[:n])
+				fmt.Println("\n" + outText[:n])
 				time = 1
 			} else if strings.Contains(outText[:n], " successfully!") {
-				fmt.Println(ansi.Green("\nTask "+outText[:n]))
+				fmt.Println(ansi.Green("\nTask " + outText[:n]))
 			} else if time == 0 {
-				log.Debugf("\t"+outText[:n])
+				log.Debugf("\t" + outText[:n])
 			}
 			// If cutset is last element, stop there.
 			if n == len(outText) {
@@ -488,5 +488,5 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
 			break
 		}
 	}
-    return nil
+	return nil
 }

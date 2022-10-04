@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/spf13/cobra"
 )
 
 var (

@@ -553,7 +553,7 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	return "", err
 }
 
-func (d *DockerCompose) RunTest( dagID, settingsFile, startDate string, noCache bool) error {
+func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache bool) error {
 
 	err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 	if err != nil {
