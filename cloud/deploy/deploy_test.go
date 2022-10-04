@@ -152,7 +152,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("BuildWithoutDags", mock.Anything).Return(nil)
+		mockImageHandler.On("Build", mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)

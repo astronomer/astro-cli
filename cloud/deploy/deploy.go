@@ -1,6 +1,8 @@
 package deploy
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -387,6 +389,70 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 	return deploymentInfo{namespace: namespace, deployImage: deployImage, currentVersion: currentVersion, organizationID: organizationID, workspaceID: workspaceID, webserverURL: webserverURL, dagDeployEnabled: dagDeployEnabled}, nil
 }
 
+func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
+	// flag to determine if we are setting the dags folder in dockerignore
+	dagsIgnoreSet := false
+	fullpath := filepath.Join(path, ".dockerignore")
+
+	lines, err := fileutil.Read(fullpath)
+	if err != nil {
+		return err
+	}
+	contains, _ := fileutil.Contains(lines, "dags/")
+	if !contains {
+		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+
+		if _, err := f.WriteString("\ndags/"); err != nil {
+			return err
+		}
+
+		dagsIgnoreSet = true
+	}
+
+	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+	if err != nil {
+		return err
+	}
+	// remove dags from .dockerignore file if we set it
+	if dagsIgnoreSet {
+		f, err := os.Open(fullpath)
+		if err != nil {
+			return err
+		}
+
+		defer f.Close()
+
+		var bs []byte
+		buf := bytes.NewBuffer(bs)
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			text := scanner.Text()
+			if text != "dags/" {
+				_, err = buf.WriteString(text + "\n")
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, dagDeployEnabled bool, client astro.Client) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
@@ -394,14 +460,16 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 		// Build our image
 		fmt.Println(composeImageBuildingPromptMsg)
 
-		var err error
 		if dagDeployEnabled {
-			err = imageHandler.BuildWithoutDags(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+			err := buildImageWithoutDags(path, imageHandler)
+			if err != nil {
+				return "", err
+			}
 		} else {
-			err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
-		}
-		if err != nil {
-			return "", err
+			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+			if err != nil {
+				return "", err
+			}
 		}
 	} else {
 		// skip build if an imageName is passed

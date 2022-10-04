@@ -26,20 +26,6 @@ func (_m *ImageHandler) Build(config types.ImageBuildConfig) error {
 	return r0
 }
 
-// BuildWithoutDags provides a mock function with given fields: config
-func (_m *ImageHandler) BuildWithoutDags(config types.ImageBuildConfig) error {
-	ret := _m.Called(config)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(types.ImageBuildConfig) error); ok {
-		r0 = rf(config)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // GetLabel provides a mock function with given fields: labelName
 func (_m *ImageHandler) GetLabel(labelName string) (string, error) {
 	ret := _m.Called(labelName)
