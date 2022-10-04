@@ -11,18 +11,18 @@ var (
 	startDate string
 )
 
-func newTestCommand() *cobra.Command {
+func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "test DAG-ID",
-		Short: "Test a local DAG by running its tasks sequentially",
-		Long:  "Test a local DAG by running its tasks sequentially. This command will spin up a docker container with airflow environment and execute your DAG code",
+		Use:   "run DAG-ID",
+		Short: "Run a local DAG withpython by running its tasks sequentially",
+		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
 		PreRunE: utils.EnsureProjectDir,
-		RunE:    test,
+		RunE:    run,
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
@@ -32,7 +32,7 @@ func newTestCommand() *cobra.Command {
 	return cmd
 }
 
-func test(cmd *cobra.Command, args []string) error {
+func run(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -40,7 +40,7 @@ func test(cmd *cobra.Command, args []string) error {
 		dagID = args[0]
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "", false)
+	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
 	}
