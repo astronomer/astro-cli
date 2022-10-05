@@ -334,6 +334,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 }
 
 func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) error {
+	log.Debugf("testing!!")
 	args := []string{
 		"run",
 		"-i",
@@ -407,6 +408,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 func RunCommandCh(cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
 	time := 0
 	cmd := exec.Command(command, flags...)
+	log.Debugf("testing!!")
 
 	stdOutput, err := cmd.StdoutPipe()
 	if err != nil {
@@ -476,6 +478,7 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
 				fmt.Println(ansi.Green("\nTask " + outText[:n]))
 			} else if time == 0 {
 				log.Debugf("\t" + outText[:n])
+				//log.Debugf(outText[:n])
 			}
 			// If cutset is last element, stop there.
 			if n == len(outText) {
