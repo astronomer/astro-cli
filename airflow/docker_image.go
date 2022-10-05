@@ -333,11 +333,13 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) error {
+func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, taskLogs bool) error {
 	log.Debugf("testing!!")
 	args := []string{
 		"run",
 		"-i",
+		"--name",
+		"astro-run",
 		"-v",
 		config.WorkingPath + "/dags:/usr/local/airflow/dags",
 		"-v",
@@ -348,10 +350,15 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 		"DAG_ID=" + dagID,
 		"-e",
 		"SETTINGS_FILE=/usr/local/" + settingsFile,
-		"--env-file",
-		envFile,
-		d.imageName,
 	}
+	fileExist, err := util.Exists(config.WorkingPath  + "/" + envFile)
+	if err != nil {
+		log.Fatal(err)
+	}	
+	if fileExist {
+		args = append(args, []string{"--env-file", envFile}...)
+	}
+	args = append(args, []string{d.imageName}...)
 	if startDate != "" {
 		startDateArgs := []string{"-e", "START_DATE=" + startDate}
 		args = append(args, startDateArgs...)
@@ -360,8 +367,14 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string) er
 	fmt.Println("\nRunning DAG " + dagID + "...")
 	fmt.Println("\nLoading DAGS...")
 
-	err := RunCommandCh("\n", DockerCmd, args...)
+	err = RunCommandCh(taskLogs, "\n", DockerCmd, args...)
 	if err != nil {
+		// delete container
+		stderr := new(bytes.Buffer)
+		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
+		if err2 != nil {
+			log.Fatal("command 'docker rm astro-run failed: %w", err2)
+		}
 		log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
 	}
 	fmt.Println("\nDAG " + dagID + " is finished running. Check above for errors")
@@ -405,7 +418,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 }
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
-func RunCommandCh(cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
+func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
 	time := 0
 	cmd := exec.Command(command, flags...)
 	log.Debugf("testing!!")
@@ -464,7 +477,10 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
 				} else if strings.Contains(outText, " successfully!") {
 					fmt.Println(ansi.Green("\nTask " + outText))
 				} else if time == 0 {
-					log.Debugf("\t" + outText)
+				// log.Debugf("\t" + outText)
+					if taskLogs {
+						fmt.Println("\t" + outText)
+					}
 				}
 				break
 			}
@@ -477,8 +493,10 @@ func RunCommandCh(cutset string, command string, flags ...string) error { //stdo
 			} else if strings.Contains(outText[:n], " successfully!") {
 				fmt.Println(ansi.Green("\nTask " + outText[:n]))
 			} else if time == 0 {
-				log.Debugf("\t" + outText[:n])
-				//log.Debugf(outText[:n])
+				// log.Debugf("\t" + outText[:n])
+				if taskLogs {
+					fmt.Println("\t" + outText[:n])
+				}
 			}
 			// If cutset is last element, stop there.
 			if n == len(outText) {
