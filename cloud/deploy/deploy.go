@@ -128,7 +128,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error { //nolint: gocognit, gocyclo
+func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, dagDeploy string, prompt, dags bool, client astro.Client) error { //nolint: gocognit, gocyclo
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -165,6 +165,45 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 
 		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
 		return nil
+	}
+
+	if dagDeploy != "" {
+		currentDeployment, err := deployment.GetDeployment(wsID, runtimeID, deploymentName, client)
+		if err != nil {
+			return err
+		}
+
+		spec := astro.DeploymentCreateSpec{
+			Executor: "CeleryExecutor",
+		}
+
+		deploymentUpdate := &astro.UpdateDeploymentInput{
+			ID:             currentDeployment.ID,
+			ClusterID:      currentDeployment.Cluster.ID,
+			DeploymentSpec: spec,
+		}
+		if dagDeploy == "enable" {
+			fmt.Println("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled." +
+				"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..")
+			deploymentUpdate.DagDeployEnabled = true
+		} else if dagDeploy == "disable" {
+			if config.CFG.ShowWarnings.GetBool() {
+				i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
+					"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
+					"\nAre you sure you want to continue?")
+				if !i {
+					fmt.Println("Canceling deployment update...")
+					return nil
+				}
+			}
+			deploymentUpdate.DagDeployEnabled = false
+		}
+
+		// update deployment
+		_, err = client.UpdateDeployment(deploymentUpdate)
+		if err != nil {
+			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		}
 	}
 
 	deployInfo, err := getDeploymentInfo(runtimeID, wsID, deploymentName, prompt, domain, client)
