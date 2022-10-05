@@ -363,18 +363,18 @@ func newObjectImportCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowSettingsImport,
 	}
-	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from a settings file")
-	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from a settings file")
-	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from a settings File")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "The YAML settings file from which to import Airflow objects. Default is 'airflow_settings.yaml'")
+	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Import connections from a settings YAML file")
+	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Import variables from a settings YAML file")
+	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Import pools from a settings YAML file")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "The settings YAML file from which to import Airflow objects. Default is 'airflow_settings.yaml'")
 	return cmd
 }
 
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export all Airflow objects to a YAML or env file. Does not overwrite objects that already exist in the destination file",
-		Long:  "This command exports all Airflow objects to a YAML file or env file. Objects already in the file will not be over written. Airflow must be running locally for this command to work",
+		Short: "Export all Airflow objects to a settings YAML or env file.",
+		Long:  "This command exports all Airflow objects to a settings YAML file or env file. Airflow must be running locally for this command to work",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -383,9 +383,9 @@ func newObjectExportCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowSettingsExport,
 	}
-	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to a settings file")
-	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to a settings file")
-	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to a settings file")
+	cmd.Flags().BoolVarP(&connections, "connections", "c", false, "Export connections to a settings YAML or env file")
+	cmd.Flags().BoolVarP(&variables, "variables", "v", false, "Export variables to a settings YAML or env file")
+	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to a settings file. Note pools cannot be exported to a env file ")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "The location of the file to store exported Airflow objects as YAML. Default is 'airflow_settings.yaml'")
 	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "Export Airflow objects as Astro environment variables.")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "The location of the file to store exported Airflow objects as Astro environment variables. Default is '.env'.")
