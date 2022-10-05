@@ -71,7 +71,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if currCtx {
 				if err := cloudCmd.Setup(cmd, args, astroClient); err != nil {
-						 return err
+					return err
 				}
 			}
 			// Software PersistentPreRunE component
