@@ -11,11 +11,13 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
+	sql "github.com/astronomer/astro-cli/cmd/sql"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -91,6 +93,12 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newConfigRootCmd(os.Stdout),
 		newAuthCommand(),
 	)
+
+	if config.CFG.SQLCLI.GetBool() {
+		rootCmd.AddCommand(
+			sql.NewFlowCommand(),
+		)
+	}
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
