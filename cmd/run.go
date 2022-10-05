@@ -13,10 +13,10 @@ var (
 
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run DAG-ID",
-		Short: "Run a local DAG withpython by running its tasks sequentially",
-		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code",
-		Args:  cobra.MaximumNArgs(1),
+		Use:     "run DAG-ID",
+		Short:   "Run a local DAG withpython by running its tasks sequentially",
+		Long:    "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code",
+		Args:    cobra.MaximumNArgs(1),
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    run,
 	}
