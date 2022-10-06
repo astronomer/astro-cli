@@ -64,7 +64,6 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "To enable or disable dag deploy for the Deployment")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
-	_ = cmd.Flags().MarkHidden("dags")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	return cmd
 }

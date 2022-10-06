@@ -173,12 +173,19 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 			return err
 		}
 
+		runtimeID = currentDeployment.ID
+		scheduler := astro.Scheduler{}
+		scheduler.AU = currentDeployment.DeploymentSpec.Scheduler.AU
+		scheduler.Replicas = currentDeployment.DeploymentSpec.Scheduler.Replicas
 		spec := astro.DeploymentCreateSpec{
-			Executor: "CeleryExecutor",
+			Executor:  "CeleryExecutor",
+			Scheduler: scheduler,
 		}
 
 		deploymentUpdate := &astro.UpdateDeploymentInput{
 			ID:             currentDeployment.ID,
+			Label:          currentDeployment.Label,
+			Description:    currentDeployment.Description,
 			ClusterID:      currentDeployment.Cluster.ID,
 			DeploymentSpec: spec,
 		}
