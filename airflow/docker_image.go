@@ -42,10 +42,10 @@ type DockerImage struct {
 }
 
 type dagRunInfo struct {
-	tasksRun int
+	tasksRun          int
 	successfullyTasks int
-	failedTasks int
-	time string
+	failedTasks       int
+	time              string
 }
 
 func DockerImageInit(image string) *DockerImage {
@@ -367,7 +367,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
 	if err != nil {
 		log.Debug(err)
-	}	
+	}
 	if fileExist {
 		args = append(args, []string{"--env-file", envFile}...)
 	}
@@ -441,9 +441,9 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
 func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string) (dagRunInfo, error) { //stdoutCh chan<- string,
 	var (
-		tasks int
+		tasks         int
 		successfulRun int
-		time string
+		time          string
 	)
 	cmd := exec.Command(command, flags...)
 	log.Debugf("testing!!")
@@ -495,7 +495,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			if n == -1 {
 				// If not found, but still have data, parse it
 				if strings.Contains(outText, "Running task ") {
-					fmt.Printf("\nRunning task " + ansi.Bold(strings.ReplaceAll(outText, "Running task ", ""))+"...")
+					fmt.Printf("\nRunning task " + ansi.Bold(strings.ReplaceAll(outText, "Running task ", "")) + "...")
 					// fmt.Println("\n" + outText + "...")
 					tasks++
 				} else if strings.Contains(outText, "Time:  ") {
@@ -506,7 +506,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 					// fmt.Println(ansi.Green("\nTask " + outText))
 					successfulRun++
 				} else if time == "" {
-				// log.Debugf("\t" + outText)
+					// log.Debugf("\t" + outText)
 					if taskLogs {
 						fmt.Println("\t" + outText)
 					}
@@ -515,7 +515,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			}
 			// parse data from cutset
 			if strings.Contains(outText[:n], "Running task ") {
-				fmt.Printf("\nRunning task " + ansi.Bold(strings.ReplaceAll(outText[:n], "Running task ", ""))+"...\n")
+				fmt.Printf("\nRunning task " + ansi.Bold(strings.ReplaceAll(outText[:n], "Running task ", "")) + "...\n")
 				// if taskLogs {
 				// 	fmt.Printf("\n")
 				// }
@@ -547,14 +547,14 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			break
 		}
 	}
-	if tasks - successfulRun != 0 {
+	if tasks-successfulRun != 0 {
 		fmt.Println("\nThe last task to run appears to have failed")
 	}
 	runInfo := dagRunInfo{
-		tasksRun: tasks,
+		tasksRun:          tasks,
 		successfullyTasks: successfulRun,
-		failedTasks: tasks - successfulRun,
-		time: time,
+		failedTasks:       tasks - successfulRun,
+		time:              time,
 	}
 	return runInfo, nil
 }
@@ -564,5 +564,5 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 // }
 
 // func parseSuccessfulTask(output string) {
-	
+
 // }
