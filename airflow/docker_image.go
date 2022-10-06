@@ -41,6 +41,13 @@ type DockerImage struct {
 	imageName string
 }
 
+type dagRunInfo struct {
+	tasksRun int
+	successfullyTasks int
+	failedTasks int
+	time string
+}
+
 func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
@@ -334,6 +341,12 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 }
 
 func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, taskLogs bool) error {
+	// delete container
+	stderr := new(bytes.Buffer)
+	err := cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
+	if err != nil {
+		log.Warn(err)
+	}
 	log.Debugf("testing!!")
 	args := []string{
 		"run",
@@ -353,7 +366,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	}
 	fileExist, err := util.Exists(config.WorkingPath  + "/" + envFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Debug(err)
 	}	
 	if fileExist {
 		args = append(args, []string{"--env-file", envFile}...)
@@ -364,20 +377,28 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		args = append(args, startDateArgs...)
 	}
 
-	fmt.Println("\nRunning DAG " + dagID + "...")
+	fmt.Println("\nStarting a DAG run for " + dagID + "...")
 	fmt.Println("\nLoading DAGS...")
 
-	err = RunCommandCh(taskLogs, "\n", DockerCmd, args...)
+	runInfo, err := RunCommandCh(taskLogs, "\n", DockerCmd, args...)
 	if err != nil {
-		// delete container
-		stderr := new(bytes.Buffer)
-		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
-		if err2 != nil {
-			log.Fatal("command 'docker rm astro-run failed: %w", err2)
-		}
-		log.Fatal("command 'docker run -it %s failed: %w", d.imageName, err)
+		log.Error("command 'docker run -it %s failed: %w", d.imageName, err)
 	}
-	fmt.Println("\nDAG " + dagID + " is finished running. Check above for errors")
+
+	// delete container
+	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
+	if err != nil {
+		log.Debug(err)
+	}
+	fmt.Println("\nDAG name: " + dagID)
+	fmt.Printf("Total tasks ran: %d\n", runInfo.tasksRun)
+	fmt.Printf("Successful tasks: %d\n", runInfo.successfullyTasks)
+	fmt.Printf("Failed tasks detected: %d\n", runInfo.failedTasks)
+	if runInfo.time != "" {
+		fmt.Printf("Time to run: %v seconds\n", runInfo.time)
+	}
+
+	fmt.Println("\nDAG " + dagID + " is finished running. See the output of this command for errors. To view task logs, use the --task-logs` flag.")
 	return nil
 }
 
@@ -418,23 +439,27 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 }
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
-func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string) error { //stdoutCh chan<- string,
-	time := 0
+func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string) (dagRunInfo, error) { //stdoutCh chan<- string,
+	var (
+		tasks int
+		successfulRun int
+		time string
+	)
 	cmd := exec.Command(command, flags...)
 	log.Debugf("testing!!")
 
 	stdOutput, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
+		return dagRunInfo{}, fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
 	}
 
 	stdError, err := cmd.StderrPipe()
 	if err != nil {
-		return fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
+		return dagRunInfo{}, fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("RunCommand: cmd.Start(): %v", err)
+		return dagRunInfo{}, fmt.Errorf("RunCommand: cmd.Start(): %v", err)
 	}
 
 	for {
@@ -470,13 +495,17 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			if n == -1 {
 				// If not found, but still have data, parse it
 				if strings.Contains(outText, "Running task ") {
-					fmt.Println("\n" + outText + "...")
+					fmt.Printf("\nRunning task " + ansi.Bold(strings.ReplaceAll(outText, "Running task ", ""))+"...")
+					// fmt.Println("\n" + outText + "...")
+					tasks++
 				} else if strings.Contains(outText, "Time:  ") {
-					fmt.Println("\n" + outText)
-					time = 1
+					// fmt.Println("\n" + outText)
+					time = strings.ReplaceAll(outText, "Time:  ", "")
 				} else if strings.Contains(outText, " successfully!") {
-					fmt.Println(ansi.Green("\nTask " + outText))
-				} else if time == 0 {
+					fmt.Printf(ansi.Green("✔ ") + ansi.Bold(strings.ReplaceAll(outText, " ran successfully!", "")) + " ran successfully!\n\n")
+					// fmt.Println(ansi.Green("\nTask " + outText))
+					successfulRun++
+				} else if time == "" {
 				// log.Debugf("\t" + outText)
 					if taskLogs {
 						fmt.Println("\t" + outText)
@@ -486,13 +515,22 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			}
 			// parse data from cutset
 			if strings.Contains(outText[:n], "Running task ") {
-				fmt.Println("\n" + outText[:n] + "...")
+				fmt.Printf("\nRunning task " + ansi.Bold(strings.ReplaceAll(outText[:n], "Running task ", ""))+"...\n")
+				// if taskLogs {
+				// 	fmt.Printf("\n")
+				// }
+				// fmt.Println("\n" + outText[:n] + "...")
+				tasks++
 			} else if strings.Contains(outText[:n], "Time:  ") {
-				fmt.Println("\n" + outText[:n])
-				time = 1
-			} else if strings.Contains(outText[:n], " successfully!") {
-				fmt.Println(ansi.Green("\nTask " + outText[:n]))
-			} else if time == 0 {
+				// fmt.Println("\n" + outText[:n])
+				time = strings.ReplaceAll(outText[:n], "Time:  ", "")
+			} else if strings.Contains(outText[:n], " ran successfully!") {
+				if taskLogs {
+					fmt.Printf("\n")
+				}
+				fmt.Printf(ansi.Green("✔ ") + ansi.Bold(strings.ReplaceAll(outText[:n], " ran successfully!", "")) + " ran successfully!\n\n")
+				successfulRun++
+			} else if time == "" {
 				// log.Debugf("\t" + outText[:n])
 				if taskLogs {
 					fmt.Println("\t" + outText[:n])
@@ -509,5 +547,22 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			break
 		}
 	}
-	return nil
+	if tasks - successfulRun != 0 {
+		fmt.Println("\nThe last task to run appears to have failed")
+	}
+	runInfo := dagRunInfo{
+		tasksRun: tasks,
+		successfullyTasks: successfulRun,
+		failedTasks: tasks - successfulRun,
+		time: time,
+	}
+	return runInfo, nil
 }
+
+// func parseRunningTask(output string) {
+// 	fmt.Printf("Running task " + ansi.bold()
+// }
+
+// func parseSuccessfulTask(output string) {
+	
+// }
