@@ -141,6 +141,7 @@ func newDeploymentUpdateCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
+	cmd.Flags().StringVarP(&dagDeployEnable, "dag-deploy", "", "", "To enable or disable dag deploy for the Deployment. Possible Values (enable, disable)")
 	return cmd
 }
 
@@ -309,7 +310,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeployEnable, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {

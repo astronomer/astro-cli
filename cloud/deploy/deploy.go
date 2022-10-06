@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -83,6 +84,13 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 
 	// Check the dags directory
 	dagsPath := path + "/dags"
+	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
+
+	// Create monitoring dag file
+	err = fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
+	if err != nil {
+		return err
+	}
 
 	// Generate the dags tar
 	err = fileutil.Tar(dagsPath, path)
@@ -117,6 +125,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
+		os.Remove(monitoringDagPath)
 		err = os.Remove(dagFile.Name())
 		if err != nil {
 			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
@@ -199,7 +208,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 					"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
 					"\nAre you sure you want to continue?")
 				if !i {
-					fmt.Println("Canceling deployment update...")
+					fmt.Println("Canceling deploy...")
 					return nil
 				}
 			}
