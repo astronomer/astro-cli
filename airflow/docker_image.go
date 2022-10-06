@@ -351,10 +351,10 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		"-e",
 		"SETTINGS_FILE=/usr/local/" + settingsFile,
 	}
-	fileExist, err := util.Exists(config.WorkingPath  + "/" + envFile)
+	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
 	if err != nil {
 		log.Fatal(err)
-	}	
+	}
 	if fileExist {
 		args = append(args, []string{"--env-file", envFile}...)
 	}
@@ -477,7 +477,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 				} else if strings.Contains(outText, " successfully!") {
 					fmt.Println(ansi.Green("\nTask " + outText))
 				} else if time == 0 {
-				// log.Debugf("\t" + outText)
+					// log.Debugf("\t" + outText)
 					if taskLogs {
 						fmt.Println("\t" + outText)
 					}
