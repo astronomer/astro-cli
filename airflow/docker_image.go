@@ -364,7 +364,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		"-e",
 		"SETTINGS_FILE=/usr/local/" + settingsFile,
 	}
-	fileExist, err := util.Exists(config.WorkingPath  + "/" + envFile)
+	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
 	if err != nil {
 		log.Debug(err)
 	}	
