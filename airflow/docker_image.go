@@ -125,7 +125,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		if err2 != nil {
 			return "", fmt.Errorf("command 'docker rm astro-pytest failed: %w", err2)
 		}
-		return "", fmt.Errorf("command 'docker run -i %s pytest failed: %w", d.imageName, err)
+		return "", err
 	}
 
 	// get exit code
