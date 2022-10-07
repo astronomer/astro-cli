@@ -192,6 +192,5 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 		return err
 	}
 	logStreamBuffer.Close()
-	fmt.Println(fmt.Sprintf("Streamed audit logs from Splunk. bytes streamed: %d", i))
 	return nil
 }
