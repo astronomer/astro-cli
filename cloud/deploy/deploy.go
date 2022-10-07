@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
+	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -83,6 +84,13 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 
 	// Check the dags directory
 	dagsPath := path + "/dags"
+	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
+
+	// Create monitoring dag file
+	err = fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
+	if err != nil {
+		return err
+	}
 
 	// Generate the dags tar
 	err = fileutil.Tar(dagsPath, path)
@@ -102,6 +110,17 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 
+	// Delete the tar file
+	defer func() {
+		dagFile.Close()
+		os.Remove(monitoringDagPath)
+		err = os.Remove(dagFile.Name())
+		if err != nil {
+			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
+			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
+		}
+	}()
+
 	var status string
 	if versionID != "" {
 		status = "SUCCEEDED"
@@ -114,21 +133,11 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 
-	// Delete the tar file
-	defer func() {
-		dagFile.Close()
-		err = os.Remove(dagFile.Name())
-		if err != nil {
-			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
-			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
-		}
-	}()
-
 	return nil
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error { //nolint: gocognit, gocyclo
+func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, dagDeploy string, prompt, dags bool, client astro.Client) error { //nolint: gocognit, gocyclo
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -165,6 +174,52 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 
 		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
 		return nil
+	}
+
+	if dagDeploy != "" {
+		currentDeployment, err := deployment.GetDeployment(wsID, runtimeID, deploymentName, client)
+		if err != nil {
+			return err
+		}
+
+		runtimeID = currentDeployment.ID
+		scheduler := astro.Scheduler{}
+		scheduler.AU = currentDeployment.DeploymentSpec.Scheduler.AU
+		scheduler.Replicas = currentDeployment.DeploymentSpec.Scheduler.Replicas
+		spec := astro.DeploymentCreateSpec{
+			Executor:  "CeleryExecutor",
+			Scheduler: scheduler,
+		}
+
+		deploymentUpdate := &astro.UpdateDeploymentInput{
+			ID:             currentDeployment.ID,
+			Label:          currentDeployment.Label,
+			Description:    currentDeployment.Description,
+			ClusterID:      currentDeployment.Cluster.ID,
+			DeploymentSpec: spec,
+		}
+		if dagDeploy == "enable" {
+			fmt.Println("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled." +
+				"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..")
+			deploymentUpdate.DagDeployEnabled = true
+		} else if dagDeploy == "disable" {
+			if config.CFG.ShowWarnings.GetBool() {
+				i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
+					"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
+					"\nAre you sure you want to continue?")
+				if !i {
+					fmt.Println("Canceling deploy...")
+					return nil
+				}
+			}
+			deploymentUpdate.DagDeployEnabled = false
+		}
+
+		// update deployment
+		_, err = client.UpdateDeployment(deploymentUpdate)
+		if err != nil {
+			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		}
 	}
 
 	deployInfo, err := getDeploymentInfo(runtimeID, wsID, deploymentName, prompt, domain, client)
