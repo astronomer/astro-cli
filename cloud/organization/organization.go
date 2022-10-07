@@ -183,15 +183,15 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 
 // Write the audit logs to the provided io.Writer.
 func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
-	resp, err := client.GetOrganizationAuditLogs(orgName, earliest)
+	logStreamBuffer, err := client.GetOrganizationAuditLogs(orgName, earliest)
 	if err != nil {
 		return err
 	}
-	// `out` can be either `os.Stdout` or a `bufio.NewWriter` from a `File`. The `File` type does not implement a `WriteString` method,
-	// so the command bellow will trigger a second copy (see https://cs.opensource.google/go/go/+/refs/tags/go1.19.1:src/io/io.go;l=311)
-	_, err = io.WriteString(out, resp)
+	i, err := io.Copy(out, logStreamBuffer)
 	if err != nil {
 		return err
 	}
+	logStreamBuffer.Close()
+	fmt.Println(fmt.Sprintf("Streamed audit logs from Splunk. bytes streamed: %d", i))
 	return nil
 }

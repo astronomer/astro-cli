@@ -56,19 +56,35 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 	return api.DoPublicGraphQLQuery(doOpts)
 }
 
-// DoPublicRESTQuery executes a query against core API
-func (c *HTTPClient) DoPublicRESTQuery(doOpts *httputil.DoOptions) (*httputil.HTTPResponse, error) {
+// Set the path and Authorization header for a REST request to core API
+func (c *HTTPClient) prepareRESTRequest(doOpts *httputil.DoOptions) error {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
 	doOpts.Path = cl.GetPublicRESTAPIURL() + doOpts.Path
+	return nil
+}
 
+// DoPublicRESTQuery executes a query against core API
+func (c *HTTPClient) DoPublicRESTQuery(doOpts *httputil.DoOptions) (*httputil.HTTPResponse, error) {
+	err := c.prepareRESTRequest(doOpts)
+	if err != nil {
+		return nil, err
+	}
 	return c.DoPublic(doOpts)
+}
+
+// DoPublicRESTQuery executes a query against core API and returns a raw buffer to stream
+func (c *HTTPClient) DoPublicRESTStreamQuery(doOpts *httputil.DoOptions) (io.ReadCloser, error) {
+	err := c.prepareRESTRequest(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoPublicStream(doOpts)
 }
 
 // DoPublicGraphQLQuery executes a query against Astrohub GraphQL API, logging out any errors contained in the response object
@@ -125,4 +141,12 @@ func (c *HTTPClient) DoPublic(doOpts *httputil.DoOptions) (*httputil.HTTPRespons
 	}
 
 	return response, nil
+}
+
+func (c *HTTPClient) DoPublicStream(doOpts *httputil.DoOptions) (io.ReadCloser, error) {
+	httpResponse, err := c.HTTPClient.Do(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	return httpResponse.Body, nil
 }

@@ -3,6 +3,7 @@ package astro
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -39,7 +40,7 @@ type Client interface {
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
 	GetOrganizations() ([]Organization, error)
-	GetOrganizationAuditLogs(orgName string, earliest int) (string, error)
+	GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -295,7 +296,7 @@ func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
 	return resp.Data.GetOrganizations, nil
 }
 
-func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (string, error) {
+func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error) {
 	// An organization short name has only lower case characters and is stripped of non-alphanumeric characters (expect for hyphens)
 	orgShortName := strings.ToLower(orgName)
 	orgShortName = organizationShortNameRegex.ReplaceAllString(orgShortName, "")
@@ -304,9 +305,9 @@ func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (str
 		Headers: make(map[string]string),
 		Path:    fmt.Sprintf("/organizations/%s/audit-logs?earliest=%d", orgShortName, earliest),
 	}
-	resp, err := c.DoPublicRESTQuery(doOpts)
+	streamBuffer, err := c.DoPublicRESTStreamQuery(doOpts)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return resp.Body, nil
+	return streamBuffer, nil
 }
