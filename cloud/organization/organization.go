@@ -187,7 +187,7 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 	if err != nil {
 		return err
 	}
-	i, err := io.Copy(out, logStreamBuffer)
+	_, err = io.Copy(out, logStreamBuffer)
 	if err != nil {
 		return err
 	}
