@@ -42,6 +42,8 @@ var (
 
 const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
+	dagDeployEnabled             = "enable"
+	dagDeployDisabled            = "disable"
 )
 
 func newDeployCmd() *cobra.Command {
@@ -106,6 +108,9 @@ func deploy(cmd *cobra.Command, args []string) error {
 		pytestFile = "parse"
 	}
 
+	if dagDeploy != "" && !(dagDeploy == dagDeployEnabled || dagDeploy == dagDeployDisabled) {
+		return errors.New("Invalid --dag-deploy value. Possible values are (enable, disable)")
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 

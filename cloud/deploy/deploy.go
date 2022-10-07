@@ -110,6 +110,17 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 
+	// Delete the tar file
+	defer func() {
+		dagFile.Close()
+		os.Remove(monitoringDagPath)
+		err = os.Remove(dagFile.Name())
+		if err != nil {
+			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
+			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
+		}
+	}()
+
 	var status string
 	if versionID != "" {
 		status = "SUCCEEDED"
@@ -121,17 +132,6 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 	if err != nil {
 		return err
 	}
-
-	// Delete the tar file
-	defer func() {
-		dagFile.Close()
-		os.Remove(monitoringDagPath)
-		err = os.Remove(dagFile.Name())
-		if err != nil {
-			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
-			fmt.Println("\nPlease delete the dags tar file manually from path: " + dagFile.Name())
-		}
-	}()
 
 	return nil
 }

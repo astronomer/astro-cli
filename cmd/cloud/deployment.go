@@ -12,6 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	enable  = "enable"
+	disable = "disable"
+)
+
 var (
 	label                         string
 	runtimeVersion                string
@@ -300,6 +305,10 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	if dagDeployEnable != "" && !(dagDeployEnable == enable || dagDeployEnable == disable) {
+		return errors.New("Invalid --dag-deploy value. Possible values are (enable, disable)")
 	}
 
 	// Silence Usage as we have now validated command input
