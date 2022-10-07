@@ -27,7 +27,8 @@ func TestPrepareRESTRequest(t *testing.T) {
 	err := client.prepareRESTRequest(doOpts)
 	assert.NoError(t, err)
 	assert.Equal(t, "test", doOpts.Headers["test"])
-	assert.Equal(t, "Bearer: ", doOpts.Headers["Authorization"])
+	// Test context has no token
+	assert.Equal(t, "", doOpts.Headers["Authorization"])
 }
 
 func TestDoPublicRESTQuery(t *testing.T) {
