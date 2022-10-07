@@ -16,7 +16,7 @@ func TestNewAstroClient(t *testing.T) {
 	assert.NotNil(t, client, "Can't create new Astro client")
 }
 
-func TestprepareRESTRequest(t *testing.T) {
+func TestPrepareRESTRequest(t *testing.T) {
 	client := NewAstroClient(httputil.NewHTTPClient())
 	doOpts := &httputil.DoOptions{
 		Path: "/test",
