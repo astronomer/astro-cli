@@ -969,7 +969,9 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 
 		resp, err := astroClient.GetOrganizationAuditLogs("test-org-id", 50)
 		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse)
+		output := new(bytes.Buffer)
+		io.Copy(output, resp)
+		assert.Equal(t, mockResponse, output.String())
 	})
 
 	t.Run("Permission denied", func(t *testing.T) {
