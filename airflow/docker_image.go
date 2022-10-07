@@ -78,8 +78,13 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 }
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+	// delete container
+	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-pytest")
+	if err != nil {
+		log.Debug(err)
+	}
 	// Change to location of Dockerfile
-	err := os.Chdir(config.Path)
+	err = os.Chdir(config.Path)
 	if err != nil {
 		return "", err
 	}
@@ -99,7 +104,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		"-v",
 		airflowHome + "/tests:/usr/local/airflow/tests:z",
 	}
-	fileExist, err := util.Exists(airflowHome + envFile)
+	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
 		return "", err
 	}
@@ -123,9 +128,9 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		// delete container
 		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
 		if err2 != nil {
-			return "", fmt.Errorf("command 'docker rm astro-pytest failed: %w", err2)
+			log.Debug(err2)
 		}
-		return "", fmt.Errorf("command 'docker run -i %s pytest failed: %w", d.imageName, err)
+		return "", err
 	}
 
 	// get exit code
@@ -143,7 +148,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	// delete container
 	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
 	if err != nil {
-		return outb.String(), fmt.Errorf("command 'docker rm astro-pytest failed: %w", err)
+		log.Debug(err)
 	}
 
 	return outb.String(), nil
