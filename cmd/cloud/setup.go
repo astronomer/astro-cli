@@ -262,11 +262,6 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 		return false, err
 	}
 
-	err = c.SetSystemAdmin(false)
-	if err != nil {
-		fmt.Println("admin settings incorrectly set you may experince permissions issues")
-	}
-
 	organizations, err := astroClient.GetOrganizations()
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)

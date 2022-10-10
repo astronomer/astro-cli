@@ -305,22 +305,6 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 		return err
 	}
 	organizationID := self.AuthenticatedOrganizationID
-	roleBindings := self.User.RoleBindings
-
-	err = c.SetSystemAdmin(false)
-	if err != nil {
-		return err
-	}
-
-	for i := range roleBindings {
-		if roleBindings[i].Role == "SYSTEM_ADMIN" {
-			err = c.SetSystemAdmin(true)
-			if err != nil {
-				return err
-			}
-			break
-		}
-	}
 
 	if organizationID != "" {
 		err = c.SetContextKey("organization", organizationID)
@@ -431,10 +415,6 @@ func Logout(domain string, out io.Writer) {
 	c, _ := context.GetContext(domain)
 
 	err = c.SetContextKey("token", "")
-	if err != nil {
-		return
-	}
-	err = c.SetContextKey("isSystemAdmin", "")
 	if err != nil {
 		return
 	}

@@ -183,32 +183,6 @@ func TestSetContextKey(t *testing.T) {
 	assert.Equal(t, "test", outCtx.Token)
 }
 
-func TestSystemAdmin(t *testing.T) {
-	initTestConfig()
-	ctx := Context{Domain: "localhost"}
-	err := ctx.SetSystemAdmin(true)
-	assert.NoError(t, err)
-
-	outCtx, err := ctx.GetContext()
-	assert.NoError(t, err)
-
-	val, err := outCtx.GetSystemAdmin()
-	assert.NoError(t, err)
-	assert.Equal(t, "localhost", outCtx.Domain)
-	assert.Equal(t, true, val)
-}
-
-func TestSystemAdminFailure(t *testing.T) {
-	initTestConfig()
-	ctx := Context{}
-	err := ctx.SetSystemAdmin(true)
-	assert.ErrorIs(t, err, ErrCtxConfigErr)
-
-	val, err := ctx.GetSystemAdmin()
-	assert.ErrorIs(t, err, ErrCtxConfigErr)
-	assert.Equal(t, false, val)
-}
-
 func TestExpiresIn(t *testing.T) {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
