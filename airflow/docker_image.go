@@ -42,8 +42,8 @@ type DockerImage struct {
 }
 
 type dagRunInfo struct {
-	failedTask string
-	tasksRun int
+	failedTask        string
+	tasksRun          int
 	successfullyTasks int
 	failedTasks       int
 	time              string
@@ -447,8 +447,8 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 	var (
 		tasks         int
 		successfulRun int
-		time string
-		failedTask string
+		time          string
+		failedTask    string
 	)
 	cmd := exec.Command(command, flags...)
 	log.Debugf("testing!!")
@@ -504,7 +504,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 						fmt.Printf("\n")
 					}
 					taskName := strings.ReplaceAll(outText, "Running task ", "")
-					fmt.Printf("\nRunning task " + ansi.Bold(taskName)+"...")
+					fmt.Printf("\nRunning task " + ansi.Bold(taskName) + "...")
 					failedTask = taskName
 					// fmt.Println("\n" + outText + "...")
 					tasks++
@@ -570,8 +570,8 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 	// 	fmt.Println("\nThe last task to run appears to have failed")
 	// }
 	runInfo := dagRunInfo{
-		failedTask: failedTask,
-		tasksRun: tasks,
+		failedTask:        failedTask,
+		tasksRun:          tasks,
 		successfullyTasks: successfulRun,
 		failedTasks:       tasks - successfulRun,
 		time:              time,
