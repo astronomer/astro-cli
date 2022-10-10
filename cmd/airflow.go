@@ -640,12 +640,12 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 	exitCode, err := containerHandler.Pytest(pytestArgs, customImageName, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New("pytests failed")
+			return errors.New("❌ pytests failed")
 		}
 		return err
 	}
 
-	fmt.Println("\nAll Pytests passed!")
+	fmt.Println("\n✅ All Pytests passed!")
 	return err
 }
 

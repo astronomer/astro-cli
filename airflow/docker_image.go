@@ -123,14 +123,9 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		stderr = nil
 	}
 	// run pytest
-	err = cmdExec(DockerCmd, stdout, stderr, args...)
-	if err != nil {
-		// delete container
-		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
-		if err2 != nil {
-			log.Debug(err2)
-		}
-		return "", err
+	docErr := cmdExec(DockerCmd, stdout, stderr, args...)
+	if docErr != nil {
+		log.Debug(docErr)
 	}
 
 	// get exit code
@@ -142,7 +137,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	var outb bytes.Buffer
 	err = cmdExec(DockerCmd, &outb, stderr, args...)
 	if err != nil {
-		return "", fmt.Errorf("command 'docker inspect astro-pytest failed: %w", err)
+		log.Debug(err)
 	}
 
 	// delete container
@@ -151,7 +146,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		log.Debug(err)
 	}
 
-	return outb.String(), nil
+	return outb.String(), docErr
 }
 
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
