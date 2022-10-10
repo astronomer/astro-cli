@@ -643,7 +643,6 @@ func TestBuildImageFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	ctx, err := config.GetCurrentContext()
 	assert.NoError(t, err)
-	ctx.SetSystemAdmin(true)
 
 	mockImageHandler := new(mocks.ImageHandler)
 
