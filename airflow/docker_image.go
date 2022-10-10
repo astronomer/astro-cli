@@ -45,8 +45,8 @@ type dagRunInfo struct {
 	failedTask string
 	tasksRun int
 	successfullyTasks int
-	failedTasks int
-	time string
+	failedTasks       int
+	time              string
 }
 
 func DockerImageInit(image string) *DockerImage {
@@ -368,7 +368,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
 	if err != nil {
 		log.Debug(err)
-	}	
+	}
 	if fileExist {
 		args = append(args, []string{"--env-file", envFile}...)
 	}
@@ -445,7 +445,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
 func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string) (dagRunInfo, error) { //stdoutCh chan<- string,
 	var (
-		tasks int
+		tasks         int
 		successfulRun int
 		time string
 		failedTask string
@@ -521,7 +521,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 					fmt.Printf(ansi.Green("success ✔\n\n"))
 					successfulRun++
 				} else if time == "" {
-				// log.Debugf("\t" + outText)
+					// log.Debugf("\t" + outText)
 					if taskLogs {
 						fmt.Println("\t" + outText)
 					}
@@ -573,8 +573,8 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 		failedTask: failedTask,
 		tasksRun: tasks,
 		successfullyTasks: successfulRun,
-		failedTasks: tasks - successfulRun,
-		time: time,
+		failedTasks:       tasks - successfulRun,
+		time:              time,
 	}
 	return runInfo, nil
 }
