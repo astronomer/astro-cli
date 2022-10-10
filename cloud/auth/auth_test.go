@@ -29,7 +29,7 @@ var (
 		User: astro.User{
 			RoleBindings: []astro.RoleBinding{
 				{
-					Role: "SYSTEM_ADMIN",
+					Role: "WORKSPACE_ADMIN",
 				},
 			},
 		},
