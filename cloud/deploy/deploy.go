@@ -77,15 +77,15 @@ type deploymentInfo struct {
 }
 
 type DeployInput struct {
-	Path			string
-	RuntimeID		string
-	WsID			string
-	Pytest			string
-	EnvFile			string
-	ImageName		string
-	DeploymentName 	string 
-	Prompt			bool
-	Dags 			bool
+	Path           string
+	RuntimeID      string
+	WsID           string
+	Pytest         string
+	EnvFile        string
+	ImageName      string
+	DeploymentName string
+	Prompt         bool
+	Dags           bool
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
@@ -166,7 +166,7 @@ func Deploy(deployInput DeployInput, client astro.Client) error { //nolint: goco
 		domain = splitDomain[1]
 	}
 
-	dagFiles := fileutil.GetFilesWithSpecificExtension(deployInput.Path + "/dags", ".py")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(deployInput.Path+"/dags", ".py")
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 

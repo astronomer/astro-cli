@@ -108,15 +108,15 @@ func deploy(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	deployInput := cloud.DeployInput{
-		Path: 				config.WorkingPath,
-		RuntimeID: 			deploymentID,
-		WsID: 				ws,
-		Pytest: 			pytestFile,
-		EnvFile: 			envFile,
-		ImageName:			imageName, 
-		DeploymentName: 	deploymentName,
-		Prompt:				forcePrompt,
-		Dags:				dags,
+		Path:           config.WorkingPath,
+		RuntimeID:      deploymentID,
+		WsID:           ws,
+		Pytest:         pytestFile,
+		EnvFile:        envFile,
+		ImageName:      imageName,
+		DeploymentName: deploymentName,
+		Prompt:         forcePrompt,
+		Dags:           dags,
 	}
 
 	return deployImage(deployInput, astroClient)
