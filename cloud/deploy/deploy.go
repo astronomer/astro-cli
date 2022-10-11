@@ -51,7 +51,6 @@ const (
 )
 
 var (
-	splitNum   = 2
 	pytestFile string
 	dockerfile = "Dockerfile"
 
