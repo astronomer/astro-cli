@@ -161,11 +161,6 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		return errors.New("no domain set, re-authenticate")
 	}
 
-	if strings.Contains(domain, "cloud") {
-		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
-		domain = splitDomain[1]
-	}
-
 	dagFiles := fileutil.GetFilesWithSpecificExtension(deployInput.Path+"/dags", ".py")
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
