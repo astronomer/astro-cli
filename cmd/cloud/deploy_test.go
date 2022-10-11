@@ -23,7 +23,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	deployImage = func(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName, dagDeploy string, prompt, dags bool, client astro.Client) error {
+	deployImage = func(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error {
 		return nil
 	}
 
