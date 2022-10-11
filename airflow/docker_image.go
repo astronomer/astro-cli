@@ -212,9 +212,8 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	defer responseBody.Close()
 	err = displayJSONMessagesToStream(responseBody, nil)
 	if err != nil {
-		return err
+		return useBash(&authConfig, remoteImage)
 	}
-
 	// Delete the image tags we just generated
 	err = cmdExec(DockerCmd, nil, nil, "rmi", remoteImage)
 	if err != nil {
@@ -300,7 +299,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		err = cmdExec(EchoCmd, nil, nil, fmt.Sprintf("%q", authConfig.Password), "|", DockerCmd, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
+		err = cmdExec(EchoCmd, nil, os.Stderr, fmt.Sprintf("%q", authConfig.Password), "|", DockerCmd, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
 	}
 	if err != nil {
 		return err
@@ -309,6 +308,11 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "push", image)
 	if err != nil {
 		return err
+	}
+	// Delete the image tags we just generated
+	err = cmdExec(DockerCmd, nil, nil, "rmi", image)
+	if err != nil {
+		return fmt.Errorf("command 'docker rmi %s' failed: %w", image, err)
 	}
 	return nil
 }
