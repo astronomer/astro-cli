@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	deployImage = func(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error {
+	deployImage = func(deployInput cloud.InputDeploy, client astro.Client) error {
 		return nil
 	}
 

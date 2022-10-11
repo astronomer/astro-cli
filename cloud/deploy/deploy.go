@@ -51,7 +51,6 @@ const (
 )
 
 var (
-	splitNum   = 2
 	pytestFile string
 	dockerfile = "Dockerfile"
 
@@ -74,6 +73,18 @@ type deploymentInfo struct {
 	workspaceID      string
 	webserverURL     string
 	dagDeployEnabled bool
+}
+
+type InputDeploy struct {
+	Path           string
+	RuntimeID      string
+	WsID           string
+	Pytest         string
+	EnvFile        string
+	ImageName      string
+	DeploymentName string
+	Prompt         bool
+	Dags           bool
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
@@ -137,7 +148,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName string, prompt, dags bool, client astro.Client) error { //nolint: gocognit, gocyclo
+func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -149,12 +160,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		return errors.New("no domain set, re-authenticate")
 	}
 
-	if strings.Contains(domain, "cloud") {
-		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
-		domain = splitDomain[1]
-	}
-
-	dagFiles := fileutil.GetFilesWithSpecificExtension(path+"/dags", ".py")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(deployInput.Path+"/dags", ".py")
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
@@ -164,10 +170,10 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		}
 	}
 
-	// Deploy dags if input id is virtual runtime
-	if strings.HasPrefix(runtimeID, "vr-") {
-		fmt.Println("Initiating DAGs Deployment for: " + runtimeID)
-		err = deployDags(path, runtimeID, client)
+	// Deploy dags if deployInput runtimeId is virtual runtime
+	if strings.HasPrefix(deployInput.RuntimeID, "vr-") {
+		fmt.Println("Initiating DAGs Deployment for: " + deployInput.RuntimeID)
+		err = deployDags(deployInput.Path, deployInput.RuntimeID, client)
 		if err != nil {
 			return err
 		}
@@ -176,28 +182,28 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		return nil
 	}
 
-	deployInfo, err := getDeploymentInfo(runtimeID, wsID, deploymentName, prompt, domain, client)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client)
 	if err != nil {
 		return err
 	}
 
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
-	if dags {
-		if pytest == allTests {
-			version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, deployInfo.dagDeployEnabled, client)
+	if deployInput.Dags {
+		if deployInput.Pytest == allTests {
+			version, err := buildImage(&c, deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 			if err != nil {
 				return err
 			}
 
-			err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+			err = parseDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
 			if err != nil {
 				return err
 			}
 		}
 
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-		err = deployDags(path, deployInfo.deploymentID, client)
+		err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -212,12 +218,12 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		// Build our image
-		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, deployInfo.dagDeployEnabled, client)
+		version, err := buildImage(&c, deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
 
-		err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+		err = parseDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
 		if err != nil {
 			return err
 		}
@@ -254,7 +260,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		}
 
 		dagDeployEnabled := false
-		if imageName == "" && deployInfo.dagDeployEnabled {
+		if deployInput.ImageName == "" && deployInfo.dagDeployEnabled {
 			dagDeployEnabled = true
 		}
 
@@ -265,7 +271,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName st
 		}
 
 		if dagDeployEnabled {
-			err = deployDags(path, deployInfo.deploymentID, client)
+			err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
