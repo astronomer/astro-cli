@@ -879,3 +879,51 @@ func TestDelete(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 }
+
+func TestGetDeploymentURL(t *testing.T) {
+	deploymentID := "deployment-id"
+	workspaceID := "workspace-id"
+
+	t.Run("returns deploymentURL for dev environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudDevPlatform)
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
+	t.Run("returns deploymentURL for stage environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudStagePlatform)
+		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
+	t.Run("returns deploymentURL for perf environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPerfPlatform)
+		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
+	t.Run("returns deploymentURL for cloud (prod) environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
+	t.Run("returns deploymentURL for local environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		expectedURL := "cloud.localhost/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
+	t.Run("returns an error if getting current context fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
+		expectedURL := ""
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.ErrorContains(t, err, "no context set")
+		assert.Equal(t, expectedURL, actualURL)
+	})
+}

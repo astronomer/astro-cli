@@ -15,6 +15,9 @@ import (
 const (
 	LocalPlatform         = "local"
 	CloudPlatform         = "cloud"
+	CloudDevPlatform      = "dev"
+	CloudPerfPlatform     = "perf"
+	CloudStagePlatform    = "stage"
 	SoftwarePlatform      = "software"
 	Initial               = "initial"
 	ErrorReturningContext = "error"
@@ -65,6 +68,12 @@ contexts:
 	switch platform {
 	case CloudPlatform:
 		testConfig = fmt.Sprintf(testConfig, "astronomer.io", strings.Replace("astronomer.io", ".", "_", -1), "astronomer.io")
+	case CloudDevPlatform:
+		testConfig = fmt.Sprintf(testConfig, "astronomer-dev.io", strings.Replace("astronomer-dev.io", ".", "_", -1), "astronomer-dev.io")
+	case CloudStagePlatform:
+		testConfig = fmt.Sprintf(testConfig, "astronomer-stage.io", strings.Replace("astronomer-stage.io", ".", "_", -1), "astronomer-stage.io")
+	case CloudPerfPlatform:
+		testConfig = fmt.Sprintf(testConfig, "astronomer-perf.io", strings.Replace("astronomer-perf.io", ".", "_", -1), "astronomer-perf.io")
 	case SoftwarePlatform:
 		testConfig = fmt.Sprintf(testConfig, "astronomer_dev.com", strings.Replace("astronomer_dev.com", ".", "_", -1), "astronomer_dev.com")
 	case LocalPlatform:

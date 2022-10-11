@@ -9,7 +9,6 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/config"
 )
 
 var (
@@ -54,16 +53,13 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 func getDeploymentInspectInfo(sourceDeployment *astro.Deployment) (map[string]interface{}, error) {
 	var (
 		deploymentURL string
-		c             config.Context
 		err           error
 	)
-	c, err = config.GetCurrentContext()
+
+	deploymentURL, err = deployment.GetDeploymentURL(sourceDeployment.ID, sourceDeployment.Workspace.ID)
 	if err != nil {
 		return nil, err
 	}
-
-	deploymentURL = "cloud." + c.Domain + "/" + sourceDeployment.Workspace.ID + "/deployments/" + sourceDeployment.ID + "/analytics"
-
 	return map[string]interface{}{
 		"deployment_id":   sourceDeployment.ID,
 		"workspace_id":    sourceDeployment.Workspace.ID,
