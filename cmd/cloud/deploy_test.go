@@ -24,7 +24,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	deployImage = func(deployInput cloud.DeployInput, client astro.Client) error {
+	deployImage = func(deployInput cloud.InputDeploy, client astro.Client) error {
 		return nil
 	}
 

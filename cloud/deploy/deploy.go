@@ -76,7 +76,7 @@ type deploymentInfo struct {
 	dagDeployEnabled bool
 }
 
-type DeployInput struct {
+type InputDeploy struct {
 	Path           string
 	RuntimeID      string
 	WsID           string
@@ -149,7 +149,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput DeployInput, client astro.Client) error { //nolint: gocognit, gocyclo
+func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
