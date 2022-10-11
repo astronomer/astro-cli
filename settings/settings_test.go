@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConfigSettings(t *testing.T) {
