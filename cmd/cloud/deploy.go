@@ -107,5 +107,17 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, imageName, deploymentName, forcePrompt, dags, astroClient)
+	deployInput := cloud.InputDeploy{
+		Path:           config.WorkingPath,
+		RuntimeID:      deploymentID,
+		WsID:           ws,
+		Pytest:         pytestFile,
+		EnvFile:        envFile,
+		ImageName:      imageName,
+		DeploymentName: deploymentName,
+		Prompt:         forcePrompt,
+		Dags:           dags,
+	}
+
+	return deployImage(deployInput, astroClient)
 }
