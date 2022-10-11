@@ -53,7 +53,7 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 		},
 	}
 
-	return api.DoPublicGraphQLQuery(doOpts)
+	return api.doPublicGraphQLQuery(doOpts)
 }
 
 // Set the path and Authorization header for a REST request to core API
@@ -66,6 +66,8 @@ func (c *HTTPClient) prepareRESTRequest(doOpts *httputil.DoOptions) error {
 		doOpts.Headers["authorization"] = cl.Token
 	}
 	doOpts.Path = cl.GetPublicRESTAPIURL() + doOpts.Path
+	doOpts.Headers["x-astro-client-identifier"] = "cli" // nolint: goconst
+	doOpts.Headers["x-astro-client-version"] = version.CurrVersion
 	return nil
 }
 
@@ -88,7 +90,7 @@ func (c *HTTPClient) DoPublicRESTStreamQuery(doOpts *httputil.DoOptions) (io.Rea
 }
 
 // DoPublicGraphQLQuery executes a query against Astrohub GraphQL API, logging out any errors contained in the response object
-func (c *HTTPClient) DoPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response, error) {
+func (c *HTTPClient) doPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
