@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
@@ -24,6 +24,8 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -38,7 +40,7 @@ type DockerImage struct {
 	imageName string
 }
 
-type dagRunInfo struct {
+type DagRunInfo struct {
 	failedTask        string
 	tasksRun          int
 	successfullyTasks int
@@ -50,9 +52,9 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 	// Change to location of Dockerfile
-	err := os.Chdir(config.Path)
+	err := os.Chdir(buildConfig.Path)
 	if err != nil {
 		return err
 	}
@@ -63,16 +65,16 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		d.imageName,
 		".",
 	}
-	if config.NoCache {
+	if buildConfig.NoCache {
 		args = append(args, "--no-cache")
 	}
 
-	if len(config.TargetPlatforms) > 0 {
-		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(config.TargetPlatforms, ",")))
+	if len(buildConfig.TargetPlatforms) > 0 {
+		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
 	}
 	// Build image
 	var stdout, stderr io.Writer
-	if config.Output {
+	if buildConfig.Output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -87,14 +89,14 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	return nil
 }
 
-func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	// delete container
 	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-pytest")
 	if err != nil {
 		log.Debug(err)
 	}
 	// Change to location of Dockerfile
-	err = os.Chdir(config.Path)
+	err = os.Chdir(buildConfig.Path)
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +127,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if config.Output {
+	if buildConfig.Output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -294,16 +296,27 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	if err != nil {
 		log.Warn(err)
 	}
-	log.Debugf("testing!!")
+	// create file
+	runTestPath := config.WorkingPath + "/astronmer-tmp/run.py"
+	err = fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
+	if err != nil {
+		return errors.Wrap(err, "failed to create dag execution script")
+	}
 	args := []string{
 		"run",
 		"-i",
 		"--name",
 		"astro-run",
 		"-v",
-		config.WorkingPath + "/dags:/usr/local/airflow/dags",
+		config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
 		"-v",
 		config.WorkingPath + "/" + settingsFile + ":/usr/local/" + settingsFile,
+		"-v",
+		config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
+		"-v",
+		config.WorkingPath + "/include:/usr/local/airflow/include:z",
+		"-v",
+		runTestPath,
 		"-e",
 		"DAG_DIR=./dags/",
 		"-e",
@@ -329,9 +342,10 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 
 	runInfo, err := RunCommandCh(taskLogs, "\n", DockerCmd, args...)
 	if err != nil {
-		log.Error("command 'docker run -it %s failed: %w", d.imageName, err)
+		log.Debug(err)
 	}
-
+	// remove file
+	os.Remove(runTestPath)
 	// delete container
 	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
 	if err != nil {
@@ -389,7 +403,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 }
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
-func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string) (dagRunInfo, error) { //stdoutCh chan<- string,
+func RunCommandCh(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) { // nolint:gocognit
 	var (
 		tasks         int
 		successfulRun int
@@ -401,25 +415,25 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 
 	stdOutput, err := cmd.StdoutPipe()
 	if err != nil {
-		return dagRunInfo{}, fmt.Errorf("RunCommand: cmd.StdoutPipe(): %v", err)
+		return DagRunInfo{}, errors.Wrap(err, "error parsing docker standard output")
 	}
 
 	stdError, err := cmd.StderrPipe()
 	if err != nil {
-		return dagRunInfo{}, fmt.Errorf("RunCommand: cmd.StderrPipe(): %v", err)
+		return DagRunInfo{}, errors.Wrap(err, "error parsing docker error output")
 	}
 
 	if err := cmd.Start(); err != nil {
-		return dagRunInfo{}, fmt.Errorf("RunCommand: cmd.Start(): %v", err)
+		return DagRunInfo{}, errors.Wrap(err, "error running docker command")
 	}
 
 	for {
-		bufOut := make([]byte, 1024)
-		bufErr := make([]byte, 1024)
-		n, err1 := stdOutput.Read(bufOut)
+		bufOut := make([]byte, 1024) // nolint:gomnd
+		bufErr := make([]byte, 1024) // nolint:gomnd
+		i, err1 := stdOutput.Read(bufOut)
 		o, err2 := stdError.Read(bufErr)
 
-		if o == 0 && n == 0 {
+		if o == 0 && i == 0 {
 			break
 		}
 		if err1 != nil {
@@ -432,9 +446,7 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 				log.Fatal(err2)
 			}
 		}
-		outText := strings.TrimSpace(string(bufOut[:n]))
-		// fmt.Println("out:"+outText)
-
+		outText := strings.TrimSpace(string(bufOut[:i]))
 		errText := strings.TrimSpace(string(bufErr[:o]))
 		if errText != "" && !strings.Contains(errText, "+ python ./run_local_dag.py") {
 			fmt.Println("\n\t" + errText)
@@ -444,63 +456,10 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			// Take the index of any of the given cutset
 			n := strings.IndexAny(outText, cutset)
 			if n == -1 {
-				// If not found, but still have data, parse it
-				if strings.Contains(outText, "Running task ") {
-					if taskLogs {
-						fmt.Printf("\n")
-					}
-					taskName := strings.ReplaceAll(outText, "Running task ", "")
-					fmt.Printf("\nRunning task " + ansi.Bold(taskName) + "...")
-					failedTask = taskName
-					// fmt.Println("\n" + outText + "...")
-					tasks++
-				} else if strings.Contains(outText, "Time:  ") {
-					// fmt.Println("\n" + outText)
-					time = strings.ReplaceAll(outText, "Time:  ", "")
-				} else if strings.Contains(outText, " successfully!") {
-					// fmt.Printf(ansi.Green("✔ ") + ansi.Bold(strings.ReplaceAll(outText, " ran successfully!", "")) + " ran successfully!\n\n")
-					// fmt.Println(ansi.Green("\nTask " + outText))
-					if taskLogs {
-						// fmt.Printf("\n")
-						// fmt.Printf("\n" + ansi.Green("✔ ") + ansi.Bold(strings.ReplaceAll(outText, " ran successfully!", "")) + " ran successfully!\n\n")
-					}
-					fmt.Printf(ansi.Green("success ✔\n\n"))
-					successfulRun++
-				} else if time == "" {
-					// log.Debugf("\t" + outText)
-					if taskLogs {
-						fmt.Println("\t" + outText)
-					}
-				}
+				failedTask, time, successfulRun, tasks = parseOuputLine(outText, failedTask, time, successfulRun, tasks, taskLogs)
 				break
 			}
-			// parse data from cutset
-			if strings.Contains(outText[:n], "Running task ") {
-				taskName := strings.ReplaceAll(outText[:n], "Running task ", "")
-				fmt.Printf("\nRunning task " + taskName + "...")
-				if taskLogs {
-					fmt.Printf("\n")
-				}
-				// fmt.Println("\n" + outText[:n] + "...")
-				failedTask = taskName
-				tasks++
-			} else if strings.Contains(outText[:n], "Time:  ") {
-				// fmt.Println("\n" + outText[:n])
-				time = strings.ReplaceAll(outText[:n], "Time:  ", "")
-			} else if strings.Contains(outText[:n], " ran successfully!") {
-				if taskLogs {
-					// fmt.Printf("\n")
-					// fmt.Printf("\n" + ansi.Green("✔ ") + ansi.Bold(strings.ReplaceAll(outText[:n], " ran successfully!", "")) + " ran successfully!\n\n")
-				}
-				// fmt.Printf(ansi.Green("✔ ") + ansi.Bold(strings.ReplaceAll(outText[:n], " ran successfully!", "")) + " ran successfully!\n\n")
-				fmt.Printf(ansi.Green("success ✔\n\n"))
-				successfulRun++
-			} else if time == "" {
-				// log.Debugf("\t" + outText[:n])
-				if taskLogs {
-					fmt.Println("\t" + outText[:n])
-				}
-			}
+			failedTask, time, successfulRun, tasks = parseOuputLine(outText[:n], failedTask, time, successfulRun, tasks, taskLogs)
 			// If cutset is last element, stop there.
 			if n == len(outText) {
 				break
@@ -508,14 +467,8 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 			// Shift the text and start again.
 			outText = outText[n+1:]
 		}
-		if o == 0 && n == 0 {
-			break
-		}
 	}
-	// if tasks - successfulRun != 0 {
-	// 	fmt.Println("\nThe last task to run appears to have failed")
-	// }
-	runInfo := dagRunInfo{
+	runInfo := DagRunInfo{
 		failedTask:        failedTask,
 		tasksRun:          tasks,
 		successfullyTasks: successfulRun,
@@ -523,4 +476,29 @@ func RunCommandCh(taskLogs bool, cutset string, command string, flags ...string)
 		time:              time,
 	}
 	return runInfo, nil
+}
+
+func parseOuputLine(outputLine, failedTask, time string, successfulRun, tasks int, taskLogs bool) (newFailedTask, newTime string, newSuccessfulRun, newTasks int) {
+	switch {
+	case strings.Contains(outputLine, "Running task "):
+		taskName := strings.ReplaceAll(outputLine, "Running task ", "")
+		fmt.Printf("\nRunning task " + taskName + "...")
+		if taskLogs {
+			fmt.Printf("\n")
+		}
+		failedTask = taskName
+		tasks++
+	case strings.Contains(outputLine, "Time:  "):
+		time = strings.ReplaceAll(outputLine, "Time:  ", "")
+	case strings.Contains(outputLine, " ran successfully!"):
+		fmt.Println(ansi.Green("success ✔\n"))
+		successfulRun++
+	default:
+		if time == "" {
+			if taskLogs {
+				fmt.Println("\t" + outputLine)
+			}
+		}
+	}
+	return failedTask, time, successfulRun, tasks
 }

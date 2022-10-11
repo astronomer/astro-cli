@@ -554,18 +554,17 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 }
 
 func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, taskLogs bool) error {
-
 	err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 	if err != nil {
 		return err
 	}
-
 	err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile, startDate, taskLogs)
 	if err != nil {
 		return err
 	}
 	return nil
 }
+
 func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 	imageLabels, err := d.imageHandler.ListLabels()
 	if err != nil {

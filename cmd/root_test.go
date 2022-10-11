@@ -49,6 +49,7 @@ func TestRootCommandCloudContext(t *testing.T) {
 	assert.Contains(t, output, "help")
 	assert.Contains(t, output, "version")
 	assert.Contains(t, output, "workspace")
+	assert.Contains(t, output, "run")
 }
 
 func TestRootCommandSoftwareContext(t *testing.T) {
@@ -64,4 +65,5 @@ func TestRootCommandSoftwareContext(t *testing.T) {
 	assert.Contains(t, output, "user")
 	assert.Contains(t, output, "deploy")
 	assert.Contains(t, output, "deployment")
+	assert.Contains(t, output, "run")
 }
