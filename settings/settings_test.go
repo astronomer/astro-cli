@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 func TestConfigSettings(t *testing.T) {
@@ -194,6 +195,7 @@ func TestEnvExport(t *testing.T) {
 
 		err := EnvExport("id", "testfiles/test.env", 2, true, true)
 		assert.NoError(t, err)
+		err = fileutil.WriteStringToFile("testfiles/test.env", "")
 	})
 	t.Run("missing id", func(t *testing.T) {
 		err := EnvExport("", "", 2, true, true)
@@ -212,6 +214,7 @@ func TestEnvExport(t *testing.T) {
 
 		err := EnvExport("id", "testfiles/test.env", 2, false, true)
 		assert.Contains(t, err.Error(), "there was an error during env export")
+		err = fileutil.WriteStringToFile("testfiles/test.env", "")
 	})
 
 	t.Run("connection failure", func(t *testing.T) {
@@ -226,6 +229,7 @@ func TestEnvExport(t *testing.T) {
 
 		err := EnvExport("id", "testfiles/test.env", 2, true, false)
 		assert.Contains(t, err.Error(), "there was an error during env export")
+		err = fileutil.WriteStringToFile("testfiles/test.env", "")
 	})
 
 	t.Run("not airflow 2", func(t *testing.T) {
