@@ -1,7 +1,6 @@
 package airflow
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -11,10 +10,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
@@ -60,30 +57,6 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		return err
 	}
 
-	// flag to determine if we are setting the dags folder in the ignore path
-	dagsIgnoreSet := false
-	fullpath := filepath.Join(config.Path, ".dockerignore")
-
-	lines, err := fileutil.Read(fullpath)
-	if err != nil {
-		return err
-	}
-	contains, _ := fileutil.Contains(lines, "dags/")
-	if !contains {
-		f, err := os.OpenFile(fullpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gomnd
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		if _, err := f.WriteString("\ndags/"); err != nil {
-			return err
-		}
-
-		dagsIgnoreSet = true
-	}
-
 	args := []string{
 		"build",
 		"-t",
@@ -111,44 +84,17 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
 
-	// remove dags from .dockerignore file if we set it
-	if dagsIgnoreSet {
-		f, err := os.Open(fullpath)
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		var bs []byte
-		buf := bytes.NewBuffer(bs)
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			text := scanner.Text()
-			if text != "dags/" {
-				_, err = buf.WriteString(text + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+	// delete container
+	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-pytest")
+	if err != nil {
+		log.Debug(err)
+	}
 	// Change to location of Dockerfile
-	err := os.Chdir(config.Path)
+	err = os.Chdir(config.Path)
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +114,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		"-v",
 		airflowHome + "/tests:/usr/local/airflow/tests:z",
 	}
-	fileExist, err := util.Exists(airflowHome + envFile)
+	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
 		return "", err
 	}
@@ -192,9 +138,9 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		// delete container
 		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
 		if err2 != nil {
-			return "", fmt.Errorf("command 'docker rm astro-pytest failed: %w", err2)
+			log.Debug(err2)
 		}
-		return "", fmt.Errorf("command 'docker run -i %s pytest failed: %w", d.imageName, err)
+		return "", err
 	}
 
 	// get exit code
@@ -212,7 +158,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	// delete container
 	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
 	if err != nil {
-		return outb.String(), fmt.Errorf("command 'docker rm astro-pytest failed: %w", err)
+		log.Debug(err)
 	}
 
 	return outb.String(), nil

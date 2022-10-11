@@ -48,20 +48,20 @@ var (
 	desiredRuntimeVersion   string
 	deploymentCreateExample = `
 # Create new deployment with Celery executor (default: celery without params).
-  $ astro deployment create --label=new-deployment-name --executor=celery
+$ astro deployment create --label=new-deployment-name --executor=celery
 
 # Create new deployment with Local executor.
-  $ astro deployment create --label=new-deployment-name-local --executor=local
+$ astro deployment create --label=new-deployment-name-local --executor=local
 
 # Create new deployment with Kubernetes executor.
-  $ astro deployment create --label=new-deployment-name-k8s --executor=k8s
+$ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airflow-version=2.4.1
 
-# Create new deployment with Kubernetes executor.
-  $ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=1.10.10
+# Create new deployment with Astronomer Runtime.
+$ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1
 `
 	createExampleDagDeployment = `
 # Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
-  $ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.0.0 --dag-deployment-type=volume --nfs-location=test:/test
+$ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test
 `
 	deploymentAirflowUpgradeExample = `
   $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
