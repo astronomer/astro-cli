@@ -64,13 +64,14 @@ type Deployment struct {
 	ReleaseName      string         `json:"releaseName"`
 	Version          string         `json:"version"`
 	DagDeployEnabled bool           `json:"dagDeployEnabled"`
+	AlertEmails      []string       `json:"alertEmails"`
 	Cluster          Cluster        `json:"cluster"`
 	Workspace        Workspace      `json:"workspace"`
 	RuntimeRelease   RuntimeRelease `json:"runtimeRelease"`
 	DeploymentSpec   DeploymentSpec `json:"deploymentSpec"`
 	WorkerQueues     []WorkerQueue  `json:"workerQueues"`
 	CreatedAt        time.Time      `json:"createdAt"`
-	UpdatedAt        string         `json:"updatedAt"`
+	UpdatedAt        time.Time      `json:"updatedAt"`
 }
 
 // Cluster contains all components of an Astronomer Cluster
