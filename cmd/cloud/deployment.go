@@ -24,7 +24,7 @@ var (
 	forceDelete                   bool
 	description                   string
 	clusterID                     string
-	dagDeployEnable               string
+	dagDeploy                     string
 	schedulerAU                   int
 	schedulerReplicas             int
 	updateSchedulerReplicas       int
@@ -124,7 +124,7 @@ func newDeploymentCreateCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
-	cmd.Flags().StringVarP(&dagDeployEnable, "dag-deploy", "", "disable", "To enable or disable dag deploy for the Deployment. Possible Values (enable, disable)")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "To enable dag deploy for the Deployment")
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
@@ -146,7 +146,7 @@ func newDeploymentUpdateCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
-	cmd.Flags().StringVarP(&dagDeployEnable, "dag-deploy", "", "", "To enable or disable dag deploy for the Deployment. Possible Values (enable, disable)")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "To enable dag deploy for the Deployment.")
 	return cmd
 }
 
@@ -289,6 +289,10 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
+		return errors.New("Invalid --dag-deploy value)")
+	}
+
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false)
@@ -297,7 +301,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeployEnable, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {
@@ -307,8 +311,8 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
-	if dagDeployEnable != "" && !(dagDeployEnable == enable || dagDeployEnable == disable) {
-		return errors.New("Invalid --dag-deploy value. Possible values are (enable, disable)")
+	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
+		return errors.New("Invalid --dag-deploy value)")
 	}
 
 	// Silence Usage as we have now validated command input
@@ -319,7 +323,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeployEnable, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
