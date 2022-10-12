@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"net"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -486,6 +487,17 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		envFile = args[0]
 	}
+
+	port := config.CFG.WebserverPort.GetString()
+
+	ln, err := net.Listen("tcp", ":" + port)
+  
+	if err != nil {
+	   return errors.Wrap( err, "can't listen on port" + port)
+	}
+  
+	_ = ln.Close()
+	fmt.Printf("TCP Port %q is available", port)
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {

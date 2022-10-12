@@ -25,8 +25,6 @@ services:
     labels:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
-    ports:
-      - 127.0.0.1:{{ .PostgresPort }}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
