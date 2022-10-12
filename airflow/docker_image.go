@@ -294,7 +294,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	stderr := new(bytes.Buffer)
 	err := cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
 	if err != nil {
-		log.Warn(err)
+		log.Debug(err)
 	}
 	// create file
 	runTestPath := config.WorkingPath + "/astronmer-tmp/run.py"
@@ -359,7 +359,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		fmt.Printf("  Error: The task %v in DAG %v appears to have failed\n", ansi.Bold(runInfo.failedTask), ansi.Bold(dagID))
 	}
 	if runInfo.time != "" {
-		fmt.Printf(" Time to run: %v seconds\n", runInfo.time)
+		fmt.Printf("  Time to run: %v seconds\n", runInfo.time)
 	}
 
 	fmt.Println("\nSee the output of this command for errors. To view task logs, use the --task-logs` flag.")
