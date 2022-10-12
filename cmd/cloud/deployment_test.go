@@ -95,11 +95,29 @@ func TestDeploymentCreate(t *testing.T) {
 			},
 		},
 	}
+
+	deploymentCreateInput1 := astro.CreateDeploymentInput{
+		WorkspaceID:           ws,
+		ClusterID:             csID,
+		Label:                 "test-name",
+		Description:           "",
+		RuntimeReleaseVersion: "4.2.5",
+		DagDeployEnabled:      false,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 1,
+			},
+		},
+	}
+
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
-	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(2)
+	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(2)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
 	mockResponse := &airflowversions.Response{
@@ -118,9 +136,18 @@ func TestDeploymentCreate(t *testing.T) {
 		}
 	})
 
-	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
+	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
+
+	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.Error(t, err)
+
 	mockClient.AssertExpectations(t)
 }
 
@@ -154,6 +181,11 @@ func TestDeploymentUpdate(t *testing.T) {
 	cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
+
+	cmdArgs = []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--dag-deploy", "some-value"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.Error(t, err)
+
 	mockClient.AssertExpectations(t)
 }
 
