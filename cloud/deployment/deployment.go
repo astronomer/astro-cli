@@ -692,3 +692,20 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 	}
 	return currentDeployment, nil
 }
+
+// GetDeploymentURL takes a deploymentID, WorkspaceID as parameters
+// and returns a deploymentURL
+func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
+	var (
+		deploymentURL string
+		ctx           config.Context
+		err           error
+	)
+
+	ctx, err = config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+	deploymentURL = "cloud." + ctx.Domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	return deploymentURL, nil
+}
