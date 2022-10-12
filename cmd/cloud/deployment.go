@@ -289,6 +289,10 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
+		return errors.New("Invalid --dag-deploy value)")
+	}
+
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false)
