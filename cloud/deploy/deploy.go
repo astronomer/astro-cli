@@ -400,7 +400,7 @@ func parseDAGs(deployImage string, containerHandler airflow.ContainerHandler) er
 
 // Validate code with pytest
 func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerHandler) error {
-	if pytest != allTests {
+	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
 	pytestArgs := []string{pytestFile}
