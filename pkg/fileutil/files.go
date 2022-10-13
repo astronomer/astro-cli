@@ -119,7 +119,7 @@ func Tar(source, target string) error {
 				return err
 			}
 
-			if !info.Mode().IsRegular() { //nothing more to do for non-regular
+			if !info.Mode().IsRegular() { // nothing more to do for non-regular
 				return nil
 			}
 
