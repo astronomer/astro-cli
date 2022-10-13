@@ -3,7 +3,6 @@ package deploy
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -268,7 +267,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
 		},
 		{
 			ID:             "test-id-2",
@@ -277,7 +277,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
 		},
 	}
 
@@ -371,7 +372,8 @@ func TestDagsDeployFailed(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: false,
 		},
 		{
 			ID:             "test-id-2",
@@ -380,7 +382,8 @@ func TestDagsDeployFailed(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
 		},
 	}
 
@@ -398,8 +401,6 @@ func TestDagsDeployFailed(t *testing.T) {
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
-	dagDeployErr := errors.New("dag deploy is not enabled for deployment") //nolint: goerr113
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, fmt.Errorf("%w", dagDeployErr)).Times(1)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient)

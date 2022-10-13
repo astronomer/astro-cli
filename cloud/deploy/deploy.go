@@ -91,23 +91,23 @@ type InputDeploy struct {
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
-	dagDeployment, err := deployment.Initiate(runtimeID, client)
-	if err != nil {
-		return err
-	}
-
 	// Check the dags directory
 	dagsPath := path + "/dags"
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
-	err = fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
+	err := fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
 	if err != nil {
 		return err
 	}
 
 	// Generate the dags tar
 	err = fileutil.Tar(dagsPath, path)
+	if err != nil {
+		return err
+	}
+
+	dagDeployment, err := deployment.Initiate(runtimeID, client)
 	if err != nil {
 		return err
 	}
@@ -207,11 +207,15 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 
 			if deployInput.Parse {
-				err = parseOrPytestDAG(parse, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+				err = parseOrPytestDAG("parse", version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
 				if err != nil {
 					return err
 				}
 			}
+		}
+
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
 
 		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
