@@ -16,7 +16,6 @@ import (
 )
 
 func GetContext(filePath string) io.Reader {
-	// Use homedir.Expand to resolve paths like '~/repos/myrepo'
 	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
 	return ctx
 }
