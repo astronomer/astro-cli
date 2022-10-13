@@ -2,14 +2,24 @@ package sql
 
 import (
 	"context"
+	"io"
 	"os"
+	"path"
+	"runtime"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/spf13/cobra"
 )
+
+func GetContext(filePath string) io.Reader {
+	// Use homedir.Expand to resolve paths like '~/repos/myrepo'
+	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
+	return ctx
+}
 
 func Flow(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
@@ -18,13 +28,18 @@ func Flow(cmd *cobra.Command, args []string) error {
 		panic(err)
 	}
 
-	// reader, err := cli.ImagePull(ctx, "docker.io/library/alpine", types.ImagePullOptions{})
-	// if err != nil {
-	// 	panic(err)
-	// }
+	opts := types.ImageBuildOptions{
+		Dockerfile: "Dockerfile.sql_cli",
+		Tags:       []string{"sql_cli"},
+		NoCache:    true,
+	}
 
-	// defer reader.Close()
-	// io.Copy(os.Stdout, reader)
+	_, currentfilePath, _, _ := runtime.Caller(0)
+	dockerfilePath := path.Join(path.Dir(currentfilePath), "../Dockerfile.sql_cli")
+	_, err = cli.ImageBuild(ctx, GetContext(dockerfilePath), opts)
+	if err != nil {
+		panic(err)
+	}
 
 	args = append([]string{"flow"}, args...)
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
