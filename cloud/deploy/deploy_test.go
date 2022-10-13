@@ -513,8 +513,8 @@ func TestDeployFailure(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Once()
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Times(2)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -526,6 +526,7 @@ func TestDeployFailure(t *testing.T) {
 	mockContainerHandler := new(mocks.ContainerHandler)
 	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything).Return("", errMock)
 		return mockContainerHandler, nil
 	}
 
@@ -549,6 +550,11 @@ func TestDeployFailure(t *testing.T) {
 	deployInput.RuntimeID = ""
 	err = Deploy(deployInput, mockClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = "parse-and-all-tests"
+	err = Deploy(deployInput, mockClient)
+	assert.Error(t, err)
 
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)

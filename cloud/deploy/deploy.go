@@ -207,7 +207,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 
 			if deployInput.Parse {
-				err = parseOrPytestDAG("parse", version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+				err = parseOrPytestDAG(parse, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
 				if err != nil {
 					return err
 				}
