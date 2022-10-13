@@ -1,3 +1,5 @@
-FROM python:3.9
+ARG PYTHON_MAJOR_MINOR_VERSION="3.9"
+ARG PYTHON_BASE_IMAGE="python:${PYTHON_MAJOR_MINOR_VERSION}-slim-bullseye"
+FROM ${PYTHON_BASE_IMAGE}
 
-RUN pip install astro-sql-cli
+RUN pip install --upgrade astro-sql-cli
