@@ -46,6 +46,8 @@ var (
 				maxWorkerCount
 			}
 			createdAt
+			updatedAt
+			alertEmails
 			status
 			runtimeRelease {
 				version

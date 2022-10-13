@@ -17,6 +17,7 @@ var (
 	forcePrompt      bool
 	saveDeployConfig bool
 	pytest           bool
+	parse            bool
 	dags             bool
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
@@ -37,13 +38,10 @@ var (
 	envFile        string
 	imageName      string
 	deploymentName string
-	dagDeploy      string
 )
 
 const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
-	dagDeployEnabled             = "enable"
-	dagDeployDisabled            = "disable"
 )
 
 func newDeployCmd() *cobra.Command {
@@ -64,9 +62,9 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "To enable or disable dag deploy for the Deployment")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
+	cmd.Flags().BoolVar(&parse, "parse", false, "Deploy code to Astro only if all DAGs in your Astro project parse correctly")
 	return cmd
 }
 
@@ -100,7 +98,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if pytest && pytestFile == "" {
+	if pytest && pytestFile == "" && !forceDeploy {
 		pytestFile = "all-tests"
 	}
 
@@ -108,11 +106,26 @@ func deploy(cmd *cobra.Command, args []string) error {
 		pytestFile = "parse"
 	}
 
-	if dagDeploy != "" && !(dagDeploy == dagDeployEnabled || dagDeploy == dagDeployDisabled) {
-		return errors.New("Invalid --dag-deploy value. Possible values are (enable, disable)")
+	if parse && pytest && !forceDeploy {
+		pytestFile = "parse-and-all-tests"
 	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, imageName, deploymentName, dagDeploy, forcePrompt, dags, astroClient)
+	deployInput := cloud.InputDeploy{
+		Path:           config.WorkingPath,
+		RuntimeID:      deploymentID,
+		WsID:           ws,
+		Pytest:         pytestFile,
+		EnvFile:        envFile,
+		ImageName:      imageName,
+		DeploymentName: deploymentName,
+		Prompt:         forcePrompt,
+		Dags:           dags,
+		ForceDeploy:    forceDeploy,
+		Parse:          parse,
+	}
+
+	return deployImage(deployInput, astroClient)
 }
