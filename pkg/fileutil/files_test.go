@@ -2,6 +2,7 @@ package fileutil
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -124,6 +125,9 @@ func TestWriteStringToFile(t *testing.T) {
 func TestTar(t *testing.T) {
 	os.Mkdir("./test", os.ModePerm)
 
+	path := "./test/test.txt"
+	WriteStringToFile(path, "testing")
+	os.Symlink(path, filepath.Join("test", "symlink"))
 	type args struct {
 		source string
 		target string
@@ -139,6 +143,8 @@ func TestTar(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	defer afero.NewOsFs().Remove(path)
+	defer afero.NewOsFs().Remove("./test/symlink")
 	defer afero.NewOsFs().Remove("./test")
 	defer afero.NewOsFs().Remove("/tmp/test.tar")
 	for _, tt := range tests {
