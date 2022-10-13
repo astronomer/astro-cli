@@ -396,13 +396,39 @@ func TestDagsDeployFailed(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		ForceDeploy:    false,
 		Dags:           true,
 	}
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient)
 	assert.Equal(t, err.Error(), "Dag Deploy is not enabled for deployment. Run 'astro deployment update test-id --dag-deploy enable' to enable dags deploy")
+
+	mockImageHandler := new(mocks.ImageHandler)
+	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("Build", mock.Anything).Return(nil)
+		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("4.2.5", nil)
+		return mockImageHandler
+	}
+
+	mockContainerHandler := new(mocks.ContainerHandler)
+	containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+		mockContainerHandler.On("Parse", mock.Anything, mock.Anything).Return(errMock)
+		mockContainerHandler.On("Pytest", mock.Anything, mock.Anything, mock.Anything).Return("", errMock)
+		return mockContainerHandler, nil
+	}
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Parse = true
+	err = Deploy(deployInput, mockClient)
+	assert.Error(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = allTests
+	err = Deploy(deployInput, mockClient)
+	assert.Error(t, err)
 
 	mockClient.AssertExpectations(t)
 }

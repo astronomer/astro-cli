@@ -98,15 +98,15 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if pytest && pytestFile == "" && !forceDeploy {
+	if pytest && pytestFile == "" {
 		pytestFile = "all-tests"
 	}
 
-	if !pytest && !forceDeploy {
+	if !parse && !pytest && !forceDeploy || parse && !pytest && !forceDeploy || parse && !pytest && forceDeploy {
 		pytestFile = "parse"
 	}
 
-	if parse && pytest && !forceDeploy {
+	if parse && pytest {
 		pytestFile = "parse-and-all-tests"
 	}
 
