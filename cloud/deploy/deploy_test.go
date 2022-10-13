@@ -3,7 +3,6 @@ package deploy
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -150,17 +149,18 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		Parse:          false,
 		Dags:           false,
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
+	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(5)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", DagDeployEnabled: true}}, nil).Times(1)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(6)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(6)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(6)
 	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(2)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
@@ -239,7 +239,16 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.DeploymentName = "test-name"
 	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
 
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Parse = true
+	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Pytest = "parse-and-all-tests"
+	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
@@ -258,7 +267,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
 		},
 		{
 			ID:             "test-id-2",
@@ -267,7 +277,8 @@ func TestDagsDeploySuccess(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
 		},
 	}
 
@@ -280,15 +291,16 @@ func TestDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
+		Parse:          false,
 		Dags:           true,
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(1)
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(2)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(2)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(3)
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(4)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(4)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -302,7 +314,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		Status:                   "SUCCEEDED",
 		Message:                  "Dags uploaded successfully",
 	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(2)
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient)
@@ -326,6 +338,18 @@ func TestDagsDeploySuccess(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Parse = true
+	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Parse = false
+	deployInput.Pytest = "all-tests"
+	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.Parse = true
 	deployInput.Pytest = "all-tests"
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
@@ -348,7 +372,8 @@ func TestDagsDeployFailed(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: false,
 		},
 		{
 			ID:             "test-id-2",
@@ -357,7 +382,8 @@ func TestDagsDeployFailed(t *testing.T) {
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
 			},
-			CreatedAt: time.Now(),
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
 		},
 	}
 
@@ -373,8 +399,6 @@ func TestDagsDeployFailed(t *testing.T) {
 		Dags:           true,
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
-	dagDeployErr := errors.New("dag deploy is not enabled for deployment") //nolint: goerr113
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, fmt.Errorf("%w", dagDeployErr)).Times(1)
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient)

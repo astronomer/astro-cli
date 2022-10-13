@@ -100,7 +100,13 @@ func Tar(source, target string) error {
 			if err != nil {
 				return err
 			}
-			header, err := tar.FileInfoHeader(info, info.Name())
+			var link string
+			if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+				if link, err = os.Readlink(path); err != nil {
+					return err
+				}
+			}
+			header, err := tar.FileInfoHeader(info, link)
 			if err != nil {
 				return err
 			}
@@ -111,6 +117,10 @@ func Tar(source, target string) error {
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err
+			}
+
+			if !info.Mode().IsRegular() { // nothing more to do for non-regular
+				return nil
 			}
 
 			file, err := os.Open(path)
