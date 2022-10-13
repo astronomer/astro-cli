@@ -80,7 +80,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-		tab.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		tab.AddRow([]string{d.Label, d.ReleaseName, d.Workspace.ID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 	}
 
 	return tab.Print(out)
@@ -691,4 +691,21 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 	}
 	return currentDeployment, nil
+}
+
+// GetDeploymentURL takes a deploymentID, WorkspaceID as parameters
+// and returns a deploymentURL
+func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
+	var (
+		deploymentURL string
+		ctx           config.Context
+		err           error
+	)
+
+	ctx, err = config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+	deploymentURL = "cloud." + ctx.Domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	return deploymentURL, nil
 }
