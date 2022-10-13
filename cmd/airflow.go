@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	// "net/http"
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
@@ -488,16 +489,27 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 
-	port := config.CFG.WebserverPort.GetString()
+	// webPort := config.CFG.WebserverPort.GetString()
+	dbPort := config.CFG.PostgresPort.GetString()
 
-	ln, err := net.Listen("tcp", ":" + port)
-  
+	// lsnr, err := net.Listen("tcp", ":" + webPort)
+    // if err != nil {
+	// 	return errors.Wrap( err, "can't listen on port" + webPort)
+	//  }
+    // fmt.Println("Listening on:", lsnr.Addr())
+    // err = http.Serve(lsnr, nil)
+	// if err != nil {
+	// 	return errors.Wrap( err, "can't listen on port" + webPort)
+	// }
+	// _ = lsnr.Close()
+	// fmt.Printf("TCP Port %q is available", webPort)
+	ln, err := net.Listen("tcp", "127.0.0.1:" + dbPort)
 	if err != nil {
-	   return errors.Wrap( err, "can't listen on port" + port)
+	   return errors.Wrap( err, "can't listen on port" + dbPort)
 	}
-  
 	_ = ln.Close()
-	fmt.Printf("TCP Port %q is available", port)
+	fmt.Printf("TCP Port %q is available", dbPort)
+
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
