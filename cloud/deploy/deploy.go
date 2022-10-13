@@ -357,7 +357,7 @@ func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace string) e
 		if err != nil {
 			return err
 		}
-	case pytest != "" && pytest != parse:
+	case pytest != "" && pytest != parse && pytest != parseAndPytest:
 		// check pytests
 		fmt.Println("Testing image...")
 		err := checkPytest(pytest, deployImage, containerHandler)
