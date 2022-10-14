@@ -295,12 +295,31 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	if err != nil {
 		log.Debug(err)
 	}
-	// create file
+	// create airflow db file
+	fileExist, err := util.Exists(config.WorkingPath + "/.astro/airflow.db")
+	if err != nil {
+		log.Debug(err)
+	}
+	if !fileExist {
+		args := []string{
+			"run",
+			"-i",
+			"astro-run",
+			"bash", "-c", "\"airflow db init; cat airflow.db\"", ">", ".astro/airflow.db",
+		}
+		err := cmdExec(DockerCmd, nil, stderr, args...)
+		if err != nil {
+			log.Debug(err)
+		}
+	}
+	// astronomer run script
 	runTestPath := config.WorkingPath + "/astronmer-tmp/run.py"
 	err = fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
 	if err != nil {
 		return errors.Wrap(err, "failed to create dag execution script")
 	}
+	// convert settingsFile
+	err = convertSettingsFile(settingsFile)
 	args := []string{
 		"run",
 		"-i",
@@ -314,8 +333,10 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
 		"-v",
 		config.WorkingPath + "/include:/usr/local/airflow/include:z",
+		// "-v",
+		// runTestPath,
 		"-v",
-		runTestPath,
+		config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow.db",
 		"-e",
 		"DAG_DIR=./dags/",
 		"-e",
@@ -323,7 +344,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		"-e",
 		"SETTINGS_FILE=/usr/local/" + settingsFile,
 	}
-	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
+	fileExist, err = util.Exists(config.WorkingPath + "/" + envFile)
 	if err != nil {
 		log.Debug(err)
 	}
@@ -505,4 +526,8 @@ func parseOuputLine(outputLine, failedTask, time string, successfulRun, tasks in
 		}
 	}
 	return failedTask, time, successfulRun, tasks
+}
+
+func convertSettingsFile(settingsFile string) error {
+	return nil
 }

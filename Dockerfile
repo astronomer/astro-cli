@@ -12,6 +12,8 @@
 
 # WORKDIR $GOPATH
 
-FROM docker.io/dimberman/local-airflow-test:0.0.2
-COPY requirements.txt .
-RUN  pip install --no-cache-dir -r requirements.txt
+# FROM docker.io/dimberman/local-airflow-test:0.0.2
+# COPY requirements.txt .
+# RUN  pip install --no-cache-dir -r requirements.txt
+
+FROM quay.io/astronomer/astro-runtime:6.0.2
