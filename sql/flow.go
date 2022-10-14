@@ -2,25 +2,26 @@ package sql
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
 	"runtime"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/spf13/cobra"
 )
 
-func GetContext(filePath string) io.Reader {
+func getContext(filePath string) io.Reader {
 	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
 	return ctx
 }
 
-func Flow(cmd *cobra.Command, args []string) error {
+func CommonDockerUtil(cmd []string, flags map[string]string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -29,21 +30,28 @@ func Flow(cmd *cobra.Command, args []string) error {
 
 	opts := types.ImageBuildOptions{
 		Dockerfile: "Dockerfile.sql_cli",
-		Tags:       []string{"sql_cli"},
+		Tags:       []string{"sql_cli6"},
 		NoCache:    true,
 	}
 
 	_, currentfilePath, _, _ := runtime.Caller(0)
 	dockerfilePath := path.Join(path.Dir(currentfilePath), "../Dockerfile.sql_cli")
-	_, err = cli.ImageBuild(ctx, GetContext(dockerfilePath), opts)
+	body, err := cli.ImageBuild(ctx, getContext(dockerfilePath), opts)
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, body.Body)
+	// check errors
+	fmt.Println(buf.String())
+	fmt.Println(body, err)
 	if err != nil {
 		panic(err)
 	}
-
-	args = append([]string{"flow"}, args...)
+	for key, value := range flags {
+		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
+	}
+	fmt.Println(cmd)
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: "sql_cli",
-		Cmd:   args,
+		Image: "sql_cli6",
+		Cmd:   cmd,
 		Tty:   false,
 	}, nil, nil, nil, "")
 	if err != nil {
