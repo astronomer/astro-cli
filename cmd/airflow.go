@@ -5,6 +5,7 @@ import (
 	"net"
 	"path/filepath"
 	"regexp"
+	// "strconv"
 	"strings"
 	// "net/http"
 
@@ -488,29 +489,16 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		envFile = args[0]
 	}
-
-	// webPort := config.CFG.WebserverPort.GetString()
-	dbPort := config.CFG.PostgresPort.GetString()
-
-	// lsnr, err := net.Listen("tcp", ":" + webPort)
-    // if err != nil {
-	// 	return errors.Wrap( err, "can't listen on port" + webPort)
-	//  }
-    // fmt.Println("Listening on:", lsnr.Addr())
-    // err = http.Serve(lsnr, nil)
-	// if err != nil {
-	// 	return errors.Wrap( err, "can't listen on port" + webPort)
-	// }
-	// _ = lsnr.Close()
-	// fmt.Printf("TCP Port %q is available", webPort)
-	ln, err := net.Listen("tcp", "127.0.0.1:" + dbPort)
+	// check if ports are allocated
+	err := checkPort(config.CFG.PostgresPort.GetString())
 	if err != nil {
-	   return errors.Wrap( err, "can't listen on port" + dbPort)
+		return errors.Wrap(err, "the Postgres port " + config.CFG.PostgresPort.GetString() + " is already in use. Either Airflow is already running in this Astro project, another Astro project, or another service is using this port")
+	 }
+	err = checkPort(config.CFG.WebserverPort.GetString())
+	if err != nil {
+		return errors.Wrap(err, "the Webserver port " + config.CFG.WebserverPort.GetString() + " is already in use. Either Airflow is already running in the Astro project, another Astro project, or another service is using this port")	
 	}
-	_ = ln.Close()
-	fmt.Printf("TCP Port %q is available", dbPort)
-
-
+	// intiate container handler
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err
@@ -776,4 +764,14 @@ func prepareDefaultAirflowImageTag(airflowVersion string, httpClient *airflowver
 		}
 	}
 	return defaultImageTag
+}
+
+func checkPort(port string) error {
+	host := "localhost:" + port
+	ln, err := net.Listen("tcp", host)
+	if err != nil {
+	   return err
+	}
+	_ = ln.Close()
+	return nil
 }
