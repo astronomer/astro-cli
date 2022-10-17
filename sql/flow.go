@@ -19,18 +19,16 @@ import (
 )
 
 func getPypiVersion() string {
-
 	url := "https://pypi.org/pypi/astro-sql-cli/json"
 	method := "GET"
 
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, nil)
-
+	http_client := &http.Client{}
+	req, err := http.NewRequest(method, url, http.NoBody)
 	if err != nil {
 		fmt.Println(err)
 		return ""
 	}
-	res, err := client.Do(req)
+	res, err := http_client.Do(req)
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -64,22 +62,28 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		panic(err)
 	}
 
-	astro_sql_cli_version := getPypiVersion()
+	astroSqlCliVersion := getPypiVersion()
 	opts := types.ImageBuildOptions{
 		Dockerfile: "Dockerfile.sql_cli",
 		Tags:       []string{"sql_cli"},
 	}
 
-	if astro_sql_cli_version != "" {
-		opts.BuildArgs = map[string]*string{"VERSION": &astro_sql_cli_version}
+	if astroSqlCliVersion != "" {
+		opts.BuildArgs = map[string]*string{"VERSION": &astroSqlCliVersion}
 	}
 
 	_, currentfilePath, _, _ := runtime.Caller(0)
 	dockerfilePath := path.Join(path.Dir(currentfilePath), "../Dockerfile.sql_cli")
 	fmt.Println("Building image...")
 	body, err := cli.ImageBuild(ctx, getContext(dockerfilePath), opts)
+	if err != nil {
+		fmt.Printf("Image building failed %v ", err)
+	}
 	buf := new(strings.Builder)
 	_, err = io.Copy(buf, body.Body)
+	if err != nil {
+		fmt.Printf("Image build response read failed %s", err)
+	}
 
 	for key, value := range flags {
 		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
@@ -112,7 +116,11 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		panic(err)
 	}
 
-	stdcopy.StdCopy(os.Stdout, os.Stderr, cout)
+	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, cout)
+
+	if err != nil {
+		panic(err)
+	}
 
 	return nil
 }

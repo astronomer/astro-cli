@@ -11,8 +11,10 @@ var (
 )
 
 func versionCmd() error {
-	sql.CommonDockerUtil([]string{"flow", "version"}, map[string]string{})
-
+	err := sql.CommonDockerUtil([]string{"flow", "version"}, map[string]string{})
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 
@@ -21,7 +23,10 @@ func initCmd() error {
 	if environment != "" {
 		vars["environment"] = environment
 	}
-	sql.CommonDockerUtil([]string{"flow", "init"}, vars)
+	err := sql.CommonDockerUtil([]string{"flow", "init"}, vars)
+	if err != nil {
+		panic(err)
+	}
 
 	return nil
 }
@@ -34,8 +39,10 @@ func validateCmd() error {
 	if connection != "" {
 		vars["connection"] = connection
 	}
-	sql.CommonDockerUtil([]string{"flow", "validate"}, vars)
-
+	err := sql.CommonDockerUtil([]string{"flow", "validate"}, vars)
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 
@@ -47,8 +54,10 @@ func generateCmd() error {
 	if connection != "" {
 		vars["connection"] = connection
 	}
-	sql.CommonDockerUtil([]string{"flow", "generate"}, vars)
-
+	err := sql.CommonDockerUtil([]string{"flow", "generate"}, vars)
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 
@@ -61,8 +70,10 @@ func runCmd() error {
 		vars["connection"] = connection
 	}
 
-	sql.CommonDockerUtil([]string{"flow", "run"}, vars)
-
+	err := sql.CommonDockerUtil([]string{"flow", "run"}, vars)
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 
@@ -82,8 +93,8 @@ func NewFlowVersionCommand() *cobra.Command {
 func NewFlowInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialise flow directory",
-		Long:  "Initialise flow directory",
+		Short: "Initialize flow directory",
+		Long:  "Initialize flow directory",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return initCmd()
 		},
