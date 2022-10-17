@@ -22,13 +22,13 @@ func getPypiVersion() string {
 	url := "https://pypi.org/pypi/astro-sql-cli/json"
 	method := "GET"
 
-	http_client := &http.Client{}
+	httpClient := &http.Client{}
 	req, err := http.NewRequest(method, url, http.NoBody)
 	if err != nil {
 		fmt.Println(err)
 		return ""
 	}
-	res, err := http_client.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
 		return ""
@@ -62,17 +62,20 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		panic(err)
 	}
 
-	astroSqlCliVersion := getPypiVersion()
+	astroSQLCliVersion := getPypiVersion()
 	opts := types.ImageBuildOptions{
 		Dockerfile: "Dockerfile.sql_cli",
 		Tags:       []string{"sql_cli"},
 	}
 
-	if astroSqlCliVersion != "" {
-		opts.BuildArgs = map[string]*string{"VERSION": &astroSqlCliVersion}
+	if astroSQLCliVersion != "" {
+		opts.BuildArgs = map[string]*string{"VERSION": &astroSQLCliVersion}
 	}
 
-	_, currentfilePath, _, _ := runtime.Caller(0)
+	_, currentfilePath, _, ok := runtime.Caller(0)
+	if !ok {
+		fmt.Println("Failed to get current file path and hence cannot locate Dockerfile for building the image")
+	}
 	dockerfilePath := path.Join(path.Dir(currentfilePath), "../Dockerfile.sql_cli")
 	fmt.Println("Building image...")
 	body, err := cli.ImageBuild(ctx, getContext(dockerfilePath), opts)
