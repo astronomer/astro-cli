@@ -1,8 +1,6 @@
 package sql
 
 import (
-	"fmt"
-
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
 )
@@ -12,21 +10,58 @@ var (
 	connection  string
 )
 
-const (
-	versionCmd  = "flow version"
-	validateCmd = "flow validate"
-)
-
-func version(cmd string) error {
-	fmt.Println("hello version")
+func versionCmd() error {
 	sql.CommonDockerUtil([]string{"flow", "version"}, map[string]string{})
 
 	return nil
 }
 
-func validate(cmd string) error {
-	fmt.Println("hello validate")
-	sql.CommonDockerUtil([]string{"flow", "validate"}, map[string]string{"environment": environment, "connection": connection})
+func initCmd() error {
+	vars := make(map[string]string)
+	if environment != "" {
+		vars["environment"] = environment
+	}
+	sql.CommonDockerUtil([]string{"flow", "init"}, vars)
+
+	return nil
+}
+
+func validateCmd() error {
+	vars := make(map[string]string)
+	if environment != "" {
+		vars["environment"] = environment
+	}
+	if connection != "" {
+		vars["connection"] = connection
+	}
+	sql.CommonDockerUtil([]string{"flow", "validate"}, vars)
+
+	return nil
+}
+
+func generateCmd() error {
+	vars := make(map[string]string)
+	if environment != "" {
+		vars["environment"] = environment
+	}
+	if connection != "" {
+		vars["connection"] = connection
+	}
+	sql.CommonDockerUtil([]string{"flow", "generate"}, vars)
+
+	return nil
+}
+
+func runCmd() error {
+	vars := make(map[string]string)
+	if environment != "" {
+		vars["environment"] = environment
+	}
+	if connection != "" {
+		vars["connection"] = connection
+	}
+
+	sql.CommonDockerUtil([]string{"flow", "run"}, vars)
 
 	return nil
 }
@@ -37,10 +72,22 @@ func NewFlowVersionCommand() *cobra.Command {
 		Short: "Get the version of flow being used",
 		Long:  "Get the version of flow being used",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return version(versionCmd)
+			return versionCmd()
 		},
 	}
 
+	return cmd
+}
+
+func NewFlowInitCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Initialise flow directory",
+		Long:  "Initialise flow directory",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return initCmd()
+		},
+	}
 	return cmd
 }
 
@@ -50,10 +97,35 @@ func NewFlowValidateCommand() *cobra.Command {
 		Short: "Validate connections",
 		Long:  "Validate connections",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return validate(validateCmd)
+			return validateCmd()
 		},
 	}
 	cmd.Flags().StringVarP(&connection, "connection", "c", "", "Connection to use for the validate command")
+	return cmd
+}
+
+func NewFlowGenerateCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "generate",
+		Short: "Generate DAGs",
+		Long:  "Generate DAGs",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return generateCmd()
+		},
+	}
+	return cmd
+}
+
+func NewFlowRunCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run workflow",
+		Long:  "Run workflow",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCmd()
+		},
+	}
+	cmd.Flags().StringVarP(&connection, "connection", "c", "", "Connection to use for the run command")
 	return cmd
 }
 
@@ -65,7 +137,10 @@ func NewFlowCommand() *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "default", "Environment for the flow project")
 	cmd.AddCommand(NewFlowVersionCommand())
+	cmd.AddCommand(NewFlowInitCommand())
 	cmd.AddCommand(NewFlowValidateCommand())
+	cmd.AddCommand(NewFlowGenerateCommand())
+	cmd.AddCommand(NewFlowRunCommand())
 
 	return cmd
 }
