@@ -47,7 +47,16 @@ func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "astro",
 		Short: "Run Apache Airflow locally and interact with Astronomer",
-		Long:  "Welcome to the Astro CLI. Astro is the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or local development.",
+		Long: `
+ ________   ______   _________  ______    ______             ______   __        ________
+/_______/\ /_____/\ /________/\/_____/\  /_____/\           /_____/\ /_/\      /_______/\
+\::: _  \ \\::::_\/_\__.::.__\/\:::_ \ \ \:::_ \ \   _______\:::__\/ \:\ \     \__.::._\/
+ \::(_)  \ \\:\/___/\  \::\ \   \:(_) ) )_\:\ \ \ \ /______/\\:\ \  __\:\ \       \::\ \
+  \:: __  \ \\_::._\:\  \::\ \   \: __ '\ \\:\ \ \ \\__::::\/ \:\ \/_/\\:\ \____  _\::\ \__
+   \:.\ \  \ \ /____\:\  \::\ \   \ \ '\ \ \\:\_\ \ \          \:\_\ \ \\:\/___/\/__\::\__/\
+    \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
+
+Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if currCtx {
 				return cloudCmd.Setup(cmd, args, astroClient)
@@ -81,10 +90,10 @@ func NewRootCmd() *cobra.Command {
 			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
-		rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 	}
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
+	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 
 	return rootCmd
 }

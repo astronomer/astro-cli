@@ -34,9 +34,12 @@ var (
 			id
 			fullName
 			username
-				roleBindings {
+			roleBindings {
 				role
+				deployment {
+					id
 				}
+			}
 		}
 	}`
 

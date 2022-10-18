@@ -65,7 +65,7 @@ func ListTeamRoles(workspaceID string, client houston.ClientInterface, out io.Wr
 	}
 	for i := range workspaceTeams {
 		role := getWorkspaceLevelRole(workspaceTeams[i].RoleBindings, workspaceID)
-		if role != houston.NoneTeamRole {
+		if role != houston.NoneRole {
 			tab.AddRow([]string{workspaceID, workspaceTeams[i].ID, workspaceTeams[i].Name, role}, false)
 		}
 	}
@@ -108,7 +108,7 @@ func UpdateTeamRole(workspaceID, teamID, role string, client houston.ClientInter
 // IsValidWorkspaceLevelRole checks if the role is amongst valid workspace roles
 func IsValidWorkspaceLevelRole(role string) bool {
 	switch role {
-	case houston.WorkspaceAdminRole, houston.WorkspaceEditorRole, houston.WorkspaceViewerRole, houston.NoneTeamRole:
+	case houston.WorkspaceAdminRole, houston.WorkspaceEditorRole, houston.WorkspaceViewerRole, houston.NoneRole:
 		return true
 	}
 	return false
@@ -121,5 +121,5 @@ func getWorkspaceLevelRole(roles []houston.RoleBinding, workspaceID string) stri
 			return roles[i].Role
 		}
 	}
-	return houston.NoneTeamRole
+	return houston.NoneRole
 }

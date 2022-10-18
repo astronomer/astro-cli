@@ -156,7 +156,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
 		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
-		err := Update("test-id", houston.NoneTeamRole, mockClient, buf)
+		err := Update("test-id", houston.NoneRole, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "test-id")
 		assert.Contains(t, buf.String(), houston.SystemAdminRole)
@@ -185,7 +185,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(nil, errMockHouston).Once()
 
-		err := Update("test-id", houston.NoneTeamRole, mockClient, buf)
+		err := Update("test-id", houston.NoneRole, mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)
 		mockClient.AssertExpectations(t)
 	})
@@ -195,7 +195,7 @@ func TestUpdate(t *testing.T) {
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{}}, nil).Once()
 
-		err := Update("test-id", houston.NoneTeamRole, mockClient, buf)
+		err := Update("test-id", houston.NoneRole, mockClient, buf)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "Role for the team test-id already set to None, nothing to update")
 		mockClient.AssertExpectations(t)
@@ -207,7 +207,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
 		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
-		err := Update("test-id", houston.NoneTeamRole, mockClient, buf)
+		err := Update("test-id", houston.NoneRole, mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)
 		mockClient.AssertExpectations(t)
 	})
@@ -221,7 +221,7 @@ func TestIsValidSystemRole(t *testing.T) {
 		{role: houston.SystemAdminRole, result: true},
 		{role: houston.SystemEditorRole, result: true},
 		{role: houston.SystemViewerRole, result: true},
-		{role: houston.NoneTeamRole, result: true},
+		{role: houston.NoneRole, result: true},
 		{role: "invalid-role", result: false},
 		{role: "", result: false},
 	}

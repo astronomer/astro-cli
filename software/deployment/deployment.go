@@ -143,7 +143,7 @@ func CheckTriggererEnabled(client houston.ClientInterface) bool {
 func addTriggererReplicasArg(vars map[string]interface{}, client houston.ClientInterface, airflowVersion string, triggererReplicas int) {
 	// reset triggerer count to zero in case airflowVersion < 2.2.0
 	if airflowVersion != "" {
-		if version := semver.MustParse(airflowVersion); version != nil && version.LessThan(triggererAllowedAirflowVersion) {
+		if version, _ := semver.NewVersion(airflowVersion); version != nil && version.LessThan(triggererAllowedAirflowVersion) {
 			triggererReplicas = 0
 		}
 	}
@@ -457,7 +457,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 		return err
 	}
 
-	if deployment.RuntimeVersion == "" || deployment.AirflowVersion != "" {
+	if deployment.RuntimeVersion == "" && deployment.AirflowVersion != "" {
 		return errDeploymentNotOnRuntime
 	}
 
@@ -543,10 +543,11 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 
 	var latestRuntimeRelease *semver.Version
 	for idx := range runtimeReleases {
+		runtimeVersion, _ := semver.NewVersion(runtimeReleases[idx].Version)
 		if latestRuntimeRelease == nil {
-			latestRuntimeRelease = semver.MustParse(runtimeReleases[idx].Version)
-		} else if !latestRuntimeRelease.GreaterThan(semver.MustParse(runtimeReleases[idx].Version)) {
-			latestRuntimeRelease = semver.MustParse(runtimeReleases[idx].Version)
+			latestRuntimeRelease = runtimeVersion
+		} else if runtimeVersion != nil && !latestRuntimeRelease.GreaterThan(runtimeVersion) {
+			latestRuntimeRelease = runtimeVersion
 		}
 	}
 

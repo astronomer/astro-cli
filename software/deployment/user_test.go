@@ -21,9 +21,10 @@ func TestUserList(t *testing.T) {
 		Username: "somebody",
 		RoleBindings: []houston.RoleBinding{
 			{Role: houston.SystemAdminRole},
-			{Role: houston.WorkspaceAdminRole},
-			{Role: houston.WorkspaceViewerRole},
-			{Role: houston.DeploymentAdminRole},
+			{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "ws-1"}},
+			{Role: houston.WorkspaceViewerRole, Workspace: houston.Workspace{ID: "ws-2"}},
+			{Role: houston.DeploymentViewerRole, Deployment: houston.Deployment{ID: "deply-1"}},
+			{Role: houston.DeploymentAdminRole, Deployment: houston.Deployment{ID: "ckgqw2k2600081qc90nbage4h"}},
 		},
 		Emails: []houston.Email{
 			{Address: "somebody@astronomer.io"},
@@ -50,6 +51,7 @@ func TestUserList(t *testing.T) {
 	})
 
 	t.Run("multiple users", func(t *testing.T) {
+		deploymentID := "ckgqw2k2600081qc90nbage4h"
 		mockUsers := []houston.DeploymentUser{
 			mockUser,
 			{
@@ -61,12 +63,11 @@ func TestUserList(t *testing.T) {
 				Username: "anotherperson",
 				RoleBindings: []houston.RoleBinding{
 					{Role: houston.WorkspaceViewerRole},
-					{Role: houston.DeploymentEditorRole},
+					{Role: houston.DeploymentEditorRole, Deployment: houston.Deployment{ID: deploymentID}},
 				},
 			},
 		}
 
-		deploymentID := "ckgqw2k2600081qc90nbamgno"
 		expectedRequest := houston.ListDeploymentUsersRequest{
 			DeploymentID: deploymentID,
 		}

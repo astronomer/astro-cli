@@ -215,8 +215,8 @@ func TestGetWorkspaceSelectionError(t *testing.T) {
 	api.On("ListWorkspaces", nil).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
-	_, err := getWorkspaceSelection(0, 0, api, buf)
-	assert.EqualError(t, err, errMock.Error())
+	workspaceSelection := getWorkspaceSelection(0, 0, api, buf)
+	assert.EqualError(t, workspaceSelection.err, errMock.Error())
 	api.AssertExpectations(t)
 }
 
@@ -248,6 +248,67 @@ contexts:
 	buf := new(bytes.Buffer)
 	err := Switch("", 0, api, buf)
 	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), mockWorkspace.ID)
+	api.AssertExpectations(t)
+}
+
+func TestSwitchWithQuitSelection(t *testing.T) {
+	// prepare test config and init it
+	configRaw := []byte(`cloud:
+  api:
+    port: "443"
+    protocol: https
+    ws_protocol: wss
+context: localhost
+contexts:
+  localhost:
+    domain: localhost
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
+    workspace:
+`)
+	fs := afero.NewMemMapFs()
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	config.InitConfig(fs)
+
+	api := new(mocks.ClientInterface)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
+
+	defer testUtil.MockUserInput(t, "q")()
+
+	buf := new(bytes.Buffer)
+	err := Switch("", 10, api, buf)
+	assert.NoError(t, err)
+	api.AssertExpectations(t)
+}
+
+func TestSwitchWithError(t *testing.T) {
+	// prepare test config and init it
+	configRaw := []byte(`cloud:
+  api:
+    port: "443"
+    protocol: https
+    ws_protocol: wss
+context: localhost
+contexts:
+  localhost:
+    domain: localhost
+    token: token
+    last_used_workspace: ck05r3bor07h40d02y2hw4n4v
+    workspace:
+`)
+	fs := afero.NewMemMapFs()
+	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	config.InitConfig(fs)
+
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
+
+	defer testUtil.MockUserInput(t, "y")()
+
+	buf := new(bytes.Buffer)
+	err := Switch("", 0, api, buf)
+	assert.Contains(t, err.Error(), "cannot parse y to int")
 	assert.Contains(t, buf.String(), mockWorkspace.ID)
 	api.AssertExpectations(t)
 }
@@ -324,10 +385,10 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
-		resp, err := getWorkspaceSelection(0, 0, api, out)
+		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		assert.Contains(t, err.Error(), "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		assert.Equal(t, "", resp)
+		assert.Contains(t, workspaceSelection.err.Error(), "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		assert.Equal(t, "", workspaceSelection.id)
 	})
 
 	testUtil.InitTestConfig("software")
@@ -335,36 +396,37 @@ func TestGetWorkspaceSelection(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "1")()
-		resp, err := getWorkspaceSelection(0, 0, api, out)
+		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		assert.NoError(t, err)
-		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", resp)
+		assert.NoError(t, workspaceSelection.err)
+		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", workspaceSelection.id)
 	})
 
 	t.Run("success with pagination", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "1")()
-		resp, err := getWorkspaceSelection(10, 0, api, out)
+		workspaceSelection := getWorkspaceSelection(10, 0, api, out)
 
-		assert.NoError(t, err)
-		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", resp)
+		assert.NoError(t, workspaceSelection.err)
+		assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", workspaceSelection.id)
 	})
 
 	t.Run("invalid selection", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "y")()
-		resp, err := getWorkspaceSelection(0, 0, api, out)
+		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		assert.Contains(t, err.Error(), "cannot parse y to int")
-		assert.Equal(t, "", resp)
+		assert.Contains(t, workspaceSelection.err.Error(), "cannot parse y to int")
+		assert.Equal(t, "", workspaceSelection.id)
 	})
 
 	t.Run("quit selection when paginated", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(t, "q")()
-		resp, err := getWorkspaceSelection(10, 0, api, out)
-		assert.Nil(t, err)
-		assert.Equal(t, "", resp)
+		workspaceSelection := getWorkspaceSelection(10, 0, api, out)
+		assert.Nil(t, workspaceSelection.err)
+		assert.Equal(t, "", workspaceSelection.id)
+		assert.Equal(t, true, workspaceSelection.quit)
 	})
 }
 

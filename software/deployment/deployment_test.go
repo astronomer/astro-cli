@@ -1127,15 +1127,41 @@ func TestRuntimeUpgrade(t *testing.T) {
 		Label:                 "test123",
 		ReleaseName:           "burning-terrestrial-5940",
 		Version:               "0.0.0",
+		AirflowVersion:        "2.2.0",
+		DesiredAirflowVersion: "2.2.0",
 		RuntimeVersion:        "4.2.4",
 		RuntimeAirflowVersion: "2.2.4",
 		DesiredRuntimeVersion: "4.2.5",
 	}
 
-	t.Run("upgrade runtime success", func(t *testing.T) {
+	t.Run("upgrade runtime success when deployment is coming from AC migration", func(t *testing.T) {
 		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
 
 		api := new(mocks.ClientInterface)
+		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
+		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
+		buf := new(bytes.Buffer)
+		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		assert.NoError(t, err)
+		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
+ test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
+
+The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to Astronomer.
+To cancel, run: 
+ $ astro deployment runtime upgrade --cancel
+
+`
+
+		assert.Equal(t, expected, buf.String())
+		api.AssertExpectations(t)
+	})
+
+	t.Run("upgrade runtime success if deployment was always using runtime", func(t *testing.T) {
+		expectedVars := map[string]interface{}{"deploymentUuid": mockDeployment.ID, "desiredRuntimeVersion": mockDeployment.DesiredRuntimeVersion}
+
+		api := new(mocks.ClientInterface)
+		mockDeployment.AirflowVersion = ""
+		mockDeployment.DesiredAirflowVersion = ""
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
@@ -1311,7 +1337,7 @@ func TestRuntimeMigrate(t *testing.T) {
 
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
-		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
+		api.On("GetRuntimeReleases", mockDeployment.AirflowVersion).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.3", AirflowVersion: "2.2.3"}, houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		mockMigrateRuntimeResp := *mockDeployment
 		mockMigrateRuntimeResp.RuntimeVersion = "4.2.4"
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeResp, nil)

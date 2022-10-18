@@ -13,11 +13,11 @@ import (
 )
 
 func TestVersionMatchCmds(t *testing.T) {
-	t.Run("0.29.0 platform with teams command", func(t *testing.T) {
+	t.Run("0.28.0 platform with teams command", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockAPI := new(houston_mocks.ClientInterface)
-		mockAPI.On("GetAppConfig", nil).Return(&houston.AppConfig{Version: "0.29.0"}, nil)
-		mockAPI.On("GetPlatformVersion", nil).Return("0.29.0", nil)
+		mockAPI.On("GetAppConfig", nil).Return(&houston.AppConfig{Version: "0.28.0"}, nil)
+		mockAPI.On("GetPlatformVersion", nil).Return("0.28.0", nil)
 		cmd := &cobra.Command{Use: "astro"}
 		childCMDs := AddCmds(mockAPI, buf)
 		cmd.AddCommand(childCMDs...)

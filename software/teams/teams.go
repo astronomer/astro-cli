@@ -51,10 +51,10 @@ func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client housto
 		}
 
 		for i := range team.RoleBindings {
-			if workspace.IsValidWorkspaceLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneTeamRole {
+			if workspace.IsValidWorkspaceLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneRole {
 				workspaceRolesTable.AddRow([]string{team.RoleBindings[i].Workspace.ID, team.RoleBindings[i].Workspace.Label, team.RoleBindings[i].Role}, false)
 			}
-			if deployment.IsValidDeploymentLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneTeamRole {
+			if deployment.IsValidDeploymentLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneRole {
 				deploymentRolesTable.AddRow([]string{team.RoleBindings[i].Deployment.ID, team.RoleBindings[i].Deployment.Label, team.RoleBindings[i].Role}, false)
 			}
 		}
@@ -171,10 +171,10 @@ func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, page
 // Update will update the system role associated with the team
 func Update(teamID, role string, client houston.ClientInterface, out io.Writer) error {
 	if !isValidSystemLevelRole(role) {
-		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneTeamRole) //nolint:goerr113
+		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole) //nolint:goerr113
 	}
 
-	if role == houston.NoneTeamRole {
+	if role == houston.NoneRole {
 		// Get current role for the team
 		team, err := houston.Call(client.GetTeam)(teamID)
 		if err != nil {
@@ -188,7 +188,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 			}
 		}
 
-		if role == houston.NoneTeamRole { // No system level role set for the team
+		if role == houston.NoneRole { // No system level role set for the team
 			fmt.Fprintf(out, "Role for the team %s already set to None, nothing to update\n", teamID)
 			return nil
 		}
@@ -197,7 +197,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "Role has been changed from %s to %s for team %s\n\n", role, houston.NoneTeamRole, teamID)
+		fmt.Fprintf(out, "Role has been changed from %s to %s for team %s\n\n", role, houston.NoneRole, teamID)
 		return nil
 	}
 
@@ -213,7 +213,7 @@ func Update(teamID, role string, client houston.ClientInterface, out io.Writer) 
 // isValidSystemLevelRole checks if the role is amongst valid system adming role
 func isValidSystemLevelRole(role string) bool {
 	switch role {
-	case houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneTeamRole:
+	case houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole:
 		return true
 	}
 	return false
@@ -226,5 +226,5 @@ func getSystemLevelRole(roles []houston.RoleBinding) string {
 			return roles[i].Role
 		}
 	}
-	return houston.NoneTeamRole
+	return houston.NoneRole
 }

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/util"
 	cliCommand "github.com/docker/cli/cli/command"
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -76,6 +77,83 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	return nil
 }
 
+func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+	// delete container
+	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-pytest")
+	if err != nil {
+		log.Debug(err)
+	}
+	// Change to location of Dockerfile
+	err = os.Chdir(config.Path)
+	if err != nil {
+		return "", err
+	}
+	args := []string{
+		"run",
+		"-i",
+		"--name",
+		"astro-pytest",
+		"-v",
+		airflowHome + "/dags:/usr/local/airflow/dags:ro",
+		"-v",
+		airflowHome + "/plugins:/usr/local/airflow/plugins:z",
+		"-v",
+		airflowHome + "/include:/usr/local/airflow/include:z",
+		"-v",
+		airflowHome + "/.astro:/usr/local/airflow/.astro:z",
+		"-v",
+		airflowHome + "/tests:/usr/local/airflow/tests:z",
+	}
+	fileExist, err := util.Exists(airflowHome + "/" + envFile)
+	if err != nil {
+		return "", err
+	}
+	if fileExist {
+		args = append(args, []string{"--env-file", envFile}...)
+	}
+	args = append(args, []string{d.imageName, "pytest", pytestFile}...)
+	args = append(args, pytestArgs...)
+	// run pytest image
+	var stdout, stderr io.Writer
+	if config.Output {
+		stdout = os.Stdout
+		stderr = os.Stderr
+	} else {
+		stdout = nil
+		stderr = nil
+	}
+	// run pytest
+	err = cmdExec(DockerCmd, stdout, stderr, args...)
+	if err != nil {
+		// delete container
+		err2 := cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
+		if err2 != nil {
+			log.Debug(err2)
+		}
+		return "", err
+	}
+
+	// get exit code
+	args = []string{
+		"inspect",
+		"astro-pytest",
+		"--format='{{.State.ExitCode}}'",
+	}
+	var outb bytes.Buffer
+	err = cmdExec(DockerCmd, &outb, stderr, args...)
+	if err != nil {
+		return "", fmt.Errorf("command 'docker inspect astro-pytest failed: %w", err)
+	}
+
+	// delete container
+	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
+	if err != nil {
+		log.Debug(err)
+	}
+
+	return outb.String(), nil
+}
+
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
 	err := cmdExec(DockerCmd, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
@@ -134,9 +212,8 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	defer responseBody.Close()
 	err = displayJSONMessagesToStream(responseBody, nil)
 	if err != nil {
-		return err
+		return useBash(&authConfig, remoteImage)
 	}
-
 	// Delete the image tags we just generated
 	err = cmdExec(DockerCmd, nil, nil, "rmi", remoteImage)
 	if err != nil {
@@ -222,7 +299,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		err = cmdExec(EchoCmd, nil, nil, fmt.Sprintf("%q", authConfig.Password), "|", DockerCmd, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
+		err = cmdExec(EchoCmd, nil, os.Stderr, fmt.Sprintf("%q", authConfig.Password), "|", DockerCmd, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
 	}
 	if err != nil {
 		return err
@@ -231,6 +308,11 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "push", image)
 	if err != nil {
 		return err
+	}
+	// Delete the image tags we just generated
+	err = cmdExec(DockerCmd, nil, nil, "rmi", image)
+	if err != nil {
+		return fmt.Errorf("command 'docker rmi %s' failed: %w", image, err)
 	}
 	return nil
 }

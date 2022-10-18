@@ -40,7 +40,7 @@ func TestDeploymentList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, "").Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
 	astroClient = mockClient
 
 	cmdArgs := []string{"list", "-a"}
@@ -64,7 +64,7 @@ func TestDeploymentLogs(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return([]astro.Deployment{{ID: "test-id"}, {ID: "test-id-2"}}, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{{ID: "test-id"}, {ID: "test-id-2"}}, nil).Once()
 	mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 	astroClient = mockClient
 
@@ -80,11 +80,44 @@ func TestDeploymentCreate(t *testing.T) {
 	ws := "test-ws-id"
 	csID := "test-cluster-id"
 
+	deploymentCreateInput := astro.CreateDeploymentInput{
+		WorkspaceID:           ws,
+		ClusterID:             csID,
+		Label:                 "test-name",
+		Description:           "",
+		RuntimeReleaseVersion: "4.2.5",
+		DagDeployEnabled:      true,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 1,
+			},
+		},
+	}
+
+	deploymentCreateInput1 := astro.CreateDeploymentInput{
+		WorkspaceID:           ws,
+		ClusterID:             csID,
+		Label:                 "test-name",
+		Description:           "",
+		RuntimeReleaseVersion: "4.2.5",
+		DagDeployEnabled:      false,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 1,
+			},
+		},
+	}
+
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
-	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
-	mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(2)
+	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(2)
+	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
 	mockResponse := &airflowversions.Response{
@@ -103,9 +136,18 @@ func TestDeploymentCreate(t *testing.T) {
 		}
 	})
 
-	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
+	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
+
+	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.NoError(t, err)
+
+	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.Error(t, err)
+
 	mockClient.AssertExpectations(t)
 }
 
@@ -117,17 +159,33 @@ func TestDeploymentUpdate(t *testing.T) {
 		ID:             "test-id",
 		Label:          "test-name",
 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-		DeploymentSpec: astro.DeploymentSpec{Workers: astro.Workers{AU: 10}, Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+		DeploymentSpec: astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+	}
+	deploymentUpdateInput := astro.UpdateDeploymentInput{
+		ID:          "test-id",
+		ClusterID:   "",
+		Label:       "test-name",
+		Description: "",
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor:  "CeleryExecutor",
+			Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
+		},
+		WorkerQueues: nil,
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", astro.DeploymentsInput{WorkspaceID: ws}).Return([]astro.Deployment{deploymentResp}, nil).Once()
-	mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
 	cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
+
+	cmdArgs = []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--dag-deploy", "some-value"}
+	_, err = execDeploymentCmd(cmdArgs...)
+	assert.Error(t, err)
+
 	mockClient.AssertExpectations(t)
 }
 
@@ -137,11 +195,11 @@ func TestDeploymentDelete(t *testing.T) {
 	deploymentResp := astro.Deployment{
 		ID:             "test-id",
 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-		DeploymentSpec: astro.DeploymentSpec{Workers: astro.Workers{AU: 10}, Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+		DeploymentSpec: astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return([]astro.Deployment{deploymentResp}, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return([]astro.Deployment{deploymentResp}, nil).Once()
 	mockClient.On("DeleteDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
@@ -170,7 +228,7 @@ func TestDeploymentVariableList(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return(mockResponse, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockResponse, nil).Once()
 	astroClient = mockClient
 
 	cmdArgs := []string{"variable", "list", "--deployment-id", "test-id-1"}
@@ -215,7 +273,7 @@ func TestDeploymentVariableModify(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return(mockListResponse, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockListResponse, nil).Once()
 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockCreateResponse, nil).Once()
 	astroClient = mockClient
 
@@ -261,7 +319,7 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", mock.Anything).Return(mockListResponse, nil).Once()
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockListResponse, nil).Once()
 	mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockUpdateResponse, nil).Once()
 	astroClient = mockClient
 

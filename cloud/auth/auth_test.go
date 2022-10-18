@@ -29,7 +29,7 @@ var (
 		User: astro.User{
 			RoleBindings: []astro.RoleBinding{
 				{
-					Role: "SYSTEM_ADMIN",
+					Role: "WORKSPACE_ADMIN",
 				},
 			},
 		},
@@ -223,7 +223,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false, "test-domain")
+		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false, "test-domain", "")
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -241,7 +241,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false, "test-domain")
+		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false, "test-domain", "")
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -261,7 +261,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false, "test-domain")
+		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false, "test-domain", "")
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -279,7 +279,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain")
+		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain", "")
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -294,7 +294,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain")
+		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain", "")
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -311,7 +311,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain")
+		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain", "")
 		assert.ErrorIs(t, err, errMock)
 	})
 }
@@ -452,7 +452,7 @@ func TestLogin(t *testing.T) {
 		mockClient.On("GetUserInfo").Return(mockSelfResp, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 
-		err := Login("astronomer.io", mockClient, os.Stdout, false, false)
+		err := Login("astronomer.io", "", "", mockClient, os.Stdout, false)
 		assert.NoError(t, err)
 	})
 
@@ -461,14 +461,12 @@ func TestLogin(t *testing.T) {
 		mockClient.On("GetUserInfo").Return(mockSelfResp, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "OAuth Token")()
-
-		err := Login("astronomer.io", mockClient, os.Stdout, false, true)
+		err := Login("astronomer.io", "", "OAuth Token", mockClient, os.Stdout, false)
 		assert.NoError(t, err)
 	})
 
 	t.Run("invalid domain", func(t *testing.T) {
-		err := Login("fail.astronomer.io", nil, os.Stdout, false, false)
+		err := Login("fail.astronomer.io", "", "", nil, os.Stdout, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Invalid domain.")
 	})
@@ -481,7 +479,7 @@ func TestLogin(t *testing.T) {
 			return "", errMock
 		}
 		authenticator = Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
-		err := Login("cloud.astronomer.io", nil, os.Stdout, false, false)
+		err := Login("cloud.astronomer.io", "", "", nil, os.Stdout, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -504,7 +502,7 @@ func TestLogin(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetUserInfo").Return(nil, errMock).Once()
 
-		err := Login("", mockClient, os.Stdout, false, false)
+		err := Login("", "", "", mockClient, os.Stdout, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -533,7 +531,7 @@ func TestLogin(t *testing.T) {
 		// initialize stdin with user email input
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
 		// do the test
-		err = Login("astronomer.io", mockClient, os.Stdout, true, false)
+		err = Login("astronomer.io", "", "", mockClient, os.Stdout, true)
 		assert.NoError(t, err)
 	})
 
@@ -561,7 +559,7 @@ func TestLogin(t *testing.T) {
 		}
 		// initialize user input with email
 		defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
-		err := Login("astronomer.io", mockClient, os.Stdout, true, false)
+		err := Login("astronomer.io", "", "", mockClient, os.Stdout, true)
 		assert.NoError(t, err)
 		// assert that everything got set in the right spot
 		domainContext, err := context.GetContext("astronomer.io")
@@ -582,28 +580,24 @@ func TestLogout(t *testing.T) {
 	})
 
 	t.Run("success_with_email", func(t *testing.T) {
-		assertions := func(expIsSystemAdmin bool, expUserEmail string, expToken string) {
+		assertions := func(expUserEmail string, expToken string) {
 			contexts, err := config.GetContexts()
 			assert.NoError(t, err)
 			context := contexts.Contexts["localhost"]
 
-			isSystemAdmin, err := context.GetSystemAdmin()
 			assert.NoError(t, err)
-			assert.Equal(t, expIsSystemAdmin, isSystemAdmin)
 			assert.Equal(t, expUserEmail, context.UserEmail)
 			assert.Equal(t, expToken, context.Token)
 		}
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		err = c.SetSystemAdmin(true)
-		assert.NoError(t, err)
 		err = c.SetContextKey("user_email", "test.user@astronomer.io")
 		assert.NoError(t, err)
 		err = c.SetContextKey("token", "Bearer some-token")
 		assert.NoError(t, err)
 		// test before
-		assertions(true, "test.user@astronomer.io", "Bearer some-token")
+		assertions("test.user@astronomer.io", "Bearer some-token")
 
 		// log out
 		c, err = config.GetCurrentContext()
@@ -611,7 +605,7 @@ func TestLogout(t *testing.T) {
 		Logout(c.Domain, os.Stdout)
 
 		// test after logout
-		assertions(false, "", "")
+		assertions("", "")
 	})
 }
 

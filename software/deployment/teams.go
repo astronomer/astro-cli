@@ -31,7 +31,7 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 	// Build rows
 	for i := range deploymentTeams {
 		role := getDeploymentLevelRole(deploymentTeams[i].RoleBindings, deploymentID)
-		if role != houston.NoneTeamRole {
+		if role != houston.NoneRole {
 			tab.AddRow([]string{deploymentID, deploymentTeams[i].ID, deploymentTeams[i].Name, role}, false)
 		}
 	}
@@ -105,7 +105,7 @@ func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out
 // isValidDeploymentLevelRole checks if the role is amongst valid workspace roles
 func IsValidDeploymentLevelRole(role string) bool {
 	switch role {
-	case houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole, houston.NoneTeamRole:
+	case houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole, houston.NoneRole:
 		return true
 	}
 	return false
@@ -118,5 +118,5 @@ func getDeploymentLevelRole(roles []houston.RoleBinding, deploymentID string) st
 			return roles[i].Role
 		}
 	}
-	return houston.NoneTeamRole
+	return houston.NoneRole
 }

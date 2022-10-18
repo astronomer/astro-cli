@@ -1,9 +1,9 @@
 package astro
 
 var (
-	ImageCreate = `
-	mutation ImageCreate($imageCreateInput: ImageCreateInput!) {
-		imageCreate(input: $imageCreateInput) {
+	CreateImage = `
+	mutation CreateImage($imageCreateInput: CreateImageInput!) {
+		createImage(input: $imageCreateInput) {
 			id
 			deploymentId
 			tag
@@ -11,9 +11,9 @@ var (
 	}
 	`
 
-	ImageDeploy = `
-	mutation ImageDeploy($imageDeployInput: ImageDeployInput!) {
-		imageDeploy(input: $imageDeployInput) {
+	DeployImage = `
+	mutation DeployImage($imageDeployInput: DeployImageInput!) {
+		deployImage(input: $imageDeployInput) {
 			id
 			tag
 			repository
@@ -21,11 +21,11 @@ var (
 	}
 	`
 
-	DeploymentDelete = `
-	mutation deploymentDelete(
-		$input: DeploymentDeleteInput!
+	DeleteDeployment = `
+	mutation deleteDeployment(
+		$input: DeleteDeploymentInput!
 	  ) {
-		deploymentDelete(
+		deleteDeployment(
 			input: $input
 		) {
 		  id
@@ -43,6 +43,7 @@ var (
 			id
 			label
 			releaseName
+			dagDeployEnabled
 			cluster {
 				id
 			}
@@ -62,16 +63,17 @@ var (
 	}
 	`
 
-	DeploymentUpdate = `
-	mutation deploymentUpdate(
-		$input: DeploymentUpdateInput
+	UpdateDeployment = `
+	mutation updateDeployment(
+		$input: UpdateDeploymentInput!
 	  ) {
-		deploymentUpdate(
+		updateDeployment(
 			input: $input
 		) {
 			id
 			label
 			releaseName
+			dagDeployEnabled
 			cluster {
 				id
 			}
@@ -87,11 +89,11 @@ var (
 	  	}
 	}
 	`
-	DeploymentVariablesCreate = `
-	mutation deploymentVariablesUpdate(
+	CreateDeploymentVariables = `
+	mutation updateDeploymentVariables(
 	  $input: EnvironmentVariablesInput!
 	) {
-	  deploymentVariablesUpdate(
+		updateDeploymentVariables(
 		input: $input
 	  ) {
 		key
@@ -123,7 +125,7 @@ var (
 	mutation reportDagDeploymentStatus($input: ReportDagDeploymentStatusInput!) {
 		reportDagDeploymentStatus(input: $input) {
 			id
-			deploymentId
+			runtimeId
 			action
 			versionId
 			status

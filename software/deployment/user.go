@@ -3,7 +3,6 @@ package deployment
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -50,25 +49,15 @@ func UserList(deploymentID, email, userID, fullName string, client houston.Clien
 
 	// Build rows
 	for _, d := range deploymentUsers {
-		role := filterByRoleType(d.RoleBindings, houston.DeploymentRole)
-		tab.AddRow([]string{d.ID, d.FullName, d.Username, role}, false)
+		role := getDeploymentLevelRole(d.RoleBindings, deploymentID)
+		if role != houston.NoneRole {
+			tab.AddRow([]string{d.ID, d.FullName, d.Username, role}, false)
+		}
 	}
 
 	tab.Print(out)
 
 	return nil
-}
-
-// filterByRoleType selects the type of role from a list of roles
-func filterByRoleType(roleBindings []houston.RoleBinding, roleType string) string {
-	for i := range roleBindings {
-		roleBinding := roleBindings[i]
-		if strings.Contains(roleBinding.Role, roleType) {
-			return roleBinding.Role
-		}
-	}
-
-	return ""
 }
 
 // nolint:dupl
