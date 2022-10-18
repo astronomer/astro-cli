@@ -92,7 +92,7 @@ type InputDeploy struct {
 
 func deployDags(path, runtimeID string, client astro.Client) error {
 	// Check the dags directory
-	dagsPath := path + "/dags"
+	dagsPath := filepath.Join(path, "dags")
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
@@ -112,7 +112,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 
-	dagsFilePath := path + "/dags.tar"
+	dagsFilePath := filepath.Join(path, "dags.tar")
 	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
 		return err
