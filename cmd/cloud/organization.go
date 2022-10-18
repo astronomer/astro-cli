@@ -42,7 +42,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "switch [organization_id]",
+		Use:     "switch [organization name/id]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Organization",
 		Long:    "Switch to a different Organization",
@@ -64,11 +64,11 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	organizationName := ""
+	organizationNameOrID := ""
 
 	if len(args) == 1 {
-		organizationName = args[0]
+		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationName, astroClient, out)
+	return orgSwitch(organizationNameOrID, astroClient, out)
 }
