@@ -112,7 +112,7 @@ func Tar(source, target string) error {
 			}
 
 			if baseDir != "" {
-				header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, source))
+				header.Name = filepath.ToSlash(filepath.Join(baseDir, strings.TrimPrefix(path, source)))
 			}
 
 			if err := tarball.WriteHeader(header); err != nil {
