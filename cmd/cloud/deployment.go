@@ -77,6 +77,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentUpdateCmd(),
 		newDeploymentVariableRootCmd(out),
 		newDeploymentWorkerQueueRootCmd(out),
+		newDeploymentInspectCmd(out),
 	)
 	return cmd
 }

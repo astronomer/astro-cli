@@ -17,6 +17,7 @@ var (
 	forcePrompt      bool
 	saveDeployConfig bool
 	pytest           bool
+	parse            bool
 	dags             bool
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
@@ -63,6 +64,7 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
+	cmd.Flags().BoolVar(&parse, "parse", false, "Deploy code to Astro only if all DAGs in your Astro project parse correctly")
 	return cmd
 }
 
@@ -100,8 +102,12 @@ func deploy(cmd *cobra.Command, args []string) error {
 		pytestFile = "all-tests"
 	}
 
-	if !pytest && !forceDeploy {
+	if !parse && !pytest && !forceDeploy || parse && !pytest && !forceDeploy || parse && !pytest && forceDeploy {
 		pytestFile = "parse"
+	}
+
+	if parse && pytest {
+		pytestFile = "parse-and-all-tests"
 	}
 
 	// Silence Usage as we have now validated command input
@@ -117,6 +123,8 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DeploymentName: deploymentName,
 		Prompt:         forcePrompt,
 		Dags:           dags,
+		ForceDeploy:    forceDeploy,
+		Parse:          parse,
 	}
 
 	return deployImage(deployInput, astroClient)
