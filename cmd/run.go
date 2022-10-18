@@ -38,7 +38,7 @@ func run(cmd *cobra.Command, args []string) error {
 		dagID = args[0]
 	}
 
-	// err := checkForSQLCLI()
+	// err := checkRuntimeImage()
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {

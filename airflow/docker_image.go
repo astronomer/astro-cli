@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	// "io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -53,12 +54,27 @@ func DockerImageInit(image string) *DockerImage {
 }
 
 func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
+	// add airflow db init
+	f, err := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	if err != nil {
+		fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
+	}
+	content, err := os.ReadFile("./Dockerfile")
+	if err != nil {
+		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
+	}
+	if !strings.Contains(string(content), "RUN airflow db init") {
+		_, err = f.WriteString("\nRUN airflow db init")
+		if err != nil {
+			fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
+		}
+	}
+	f.Close()
 	// Change to location of Dockerfile
-	err := os.Chdir(buildConfig.Path)
+	err = os.Chdir(buildConfig.Path)
 	if err != nil {
 		return err
 	}
-
 	args := []string{
 		"build",
 		"-t",
@@ -86,6 +102,22 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
 
+	f, err = os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	if err != nil {
+		fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
+	}
+	content, err = os.ReadFile("./Dockerfile")
+	if err != nil {
+		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
+	}
+	if strings.Contains(string(content), "RUN airflow db init") {
+		lastInd := strings.LastIndex(string(content), "\nRUN airflow db init")
+		err = fileutil.WriteStringToFile("./Dockerfile", string(content)[:lastInd])
+		if err != nil {
+			fmt.Printf("Removing db from layer: %s\n", err.Error())
+		}
+	}
+	f.Close()
 	return nil
 }
 
@@ -295,31 +327,15 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	if err != nil {
 		log.Debug(err)
 	}
-	// create airflow db file
-	fileExist, err := util.Exists(config.WorkingPath + "/.astro/airflow.db")
-	if err != nil {
-		log.Debug(err)
-	}
-	if !fileExist {
-		args := []string{
-			"run",
-			"-i",
-			"astro-run",
-			"bash", "-c", "\"airflow db init; cat airflow.db\"", ">", ".astro/airflow.db",
-		}
-		err := cmdExec(DockerCmd, nil, stderr, args...)
-		if err != nil {
-			log.Debug(err)
-		}
-	}
 	// astronomer run script
-	runTestPath := config.WorkingPath + "/astronmer-tmp/run.py"
+	runTestPath := config.WorkingPath + "/astronmer-tmp/run_local_dag.py"
 	err = fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
 	if err != nil {
 		return errors.Wrap(err, "failed to create dag execution script")
 	}
 	// convert settingsFile
 	err = convertSettingsFile(settingsFile)
+	fmt.Println(config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow/airflow.db")
 	args := []string{
 		"run",
 		"-i",
@@ -336,26 +352,39 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 		// "-v",
 		// runTestPath,
 		"-v",
-		config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow.db",
-		"-e",
-		"DAG_DIR=./dags/",
-		"-e",
-		"DAG_ID=" + dagID,
-		"-e",
-		"SETTINGS_FILE=/usr/local/" + settingsFile,
+		config.WorkingPath + "/astronmer-tmp/run_local_dag.py:/usr/local/airflow/run_local_dag.py",
+		// "-v",
+		// config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow/airflow.db",
+		// "-e",
+		// "AIRFLOW__CORE=SQLite",
+		// "-e",
+		// "DAG_ID=" + dagID,
+		// "-e",
+		// "SETTINGS_FILE=/usr/local/" + settingsFile,
 	}
-	fileExist, err = util.Exists(config.WorkingPath + "/" + envFile)
+	// if env file exists append it to args
+	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
 	if err != nil {
 		log.Debug(err)
 	}
 	if fileExist {
 		args = append(args, []string{"--env-file", envFile}...)
 	}
-	args = append(args, []string{d.imageName}...)
-	if startDate != "" {
-		startDateArgs := []string{"-e", "START_DATE=" + startDate}
-		args = append(args, startDateArgs...)
+	// add rest of args
+	cmdArgs := []string{
+		d.imageName,
+		"python",
+		"run_local_dag.py",
+		"--dag_dir",
+		"./dags/",
+		"--dag_id",
+		dagID,
+		// "--settings_file",
+		// "/usr/local/" + settingsFile,
+		// "--execution_date",
+		// startDate,
 	}
+	args = append(args, cmdArgs...)
 
 	fmt.Println("\nStarting a DAG run for " + dagID + "...")
 	fmt.Println("\nLoading DAGS...")
