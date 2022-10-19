@@ -50,8 +50,7 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 
 	dockerfilePath := os.Getenv(SQLCliDockefilePathEnvVar)
 	if dockerfilePath == "" {
-		err = fmt.Errorf("environment variable %s not set", SQLCliDockefilePathEnvVar)
-		return err
+		return EnvVarNotSetError(SQLCliDockefilePathEnvVar)
 	}
 
 	body, err := cli.ImageBuild(ctx, getContext(dockerfilePath), opts)
@@ -76,12 +75,12 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		Tty:   false,
 	}, nil, nil, nil, "")
 	if err != nil {
-		err = fmt.Errorf("Docker container creation failed %w", err)
+		err = fmt.Errorf("docker container creation failed %w", err)
 		return err
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		err = fmt.Errorf("Docker container start failed %w", err)
+		err = fmt.Errorf("docker container start failed %w", err)
 		return err
 	}
 
@@ -89,7 +88,7 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			err = fmt.Errorf("Docker client run failed %w", err)
+			err = fmt.Errorf("docker client run failed %w", err)
 			return err
 		}
 	case <-statusCh:
