@@ -11,7 +11,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
-	sql "github.com/astronomer/astro-cli/cmd/sql"
+	"github.com/astronomer/astro-cli/cmd/sql"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"

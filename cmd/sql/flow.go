@@ -1,6 +1,8 @@
 package sql
 
 import (
+	"fmt"
+
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
 )
@@ -10,10 +12,20 @@ var (
 	connection  string
 )
 
+const flowCmd = "flow"
+
+var (
+	flowVersionCmd  = []string{flowCmd, "version"}
+	flowInitCmd     = []string{flowCmd, "init"}
+	flowValidateCmd = []string{flowCmd, "validate"}
+	flowGenerateCmd = []string{flowCmd, "generate"}
+	flowRunCmd      = []string{flowCmd, "run"}
+)
+
 func versionCmd() error {
-	err := sql.CommonDockerUtil([]string{"flow", "version"}, map[string]string{})
+	err := sql.CommonDockerUtil(flowVersionCmd, map[string]string{})
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error running %v: %w", flowVersionCmd, err)
 	}
 	return nil
 }
@@ -23,9 +35,9 @@ func initCmd() error {
 	if environment != "" {
 		vars["environment"] = environment
 	}
-	err := sql.CommonDockerUtil([]string{"flow", "init"}, vars)
+	err := sql.CommonDockerUtil(flowInitCmd, vars)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error running %v: %w", flowInitCmd, err)
 	}
 
 	return nil
@@ -39,9 +51,9 @@ func validateCmd() error {
 	if connection != "" {
 		vars["connection"] = connection
 	}
-	err := sql.CommonDockerUtil([]string{"flow", "validate"}, vars)
+	err := sql.CommonDockerUtil(flowValidateCmd, vars)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error running %v: %w", flowValidateCmd, err)
 	}
 	return nil
 }
@@ -54,9 +66,9 @@ func generateCmd() error {
 	if connection != "" {
 		vars["connection"] = connection
 	}
-	err := sql.CommonDockerUtil([]string{"flow", "generate"}, vars)
+	err := sql.CommonDockerUtil(flowGenerateCmd, vars)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error running %v: %w", flowGenerateCmd, err)
 	}
 	return nil
 }
@@ -70,9 +82,9 @@ func runCmd() error {
 		vars["connection"] = connection
 	}
 
-	err := sql.CommonDockerUtil([]string{"flow", "run"}, vars)
+	err := sql.CommonDockerUtil(flowRunCmd, vars)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error running %v: %w", flowRunCmd, err)
 	}
 	return nil
 }
