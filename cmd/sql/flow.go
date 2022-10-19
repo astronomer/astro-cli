@@ -30,7 +30,7 @@ var (
 	astro flow version
 	`
 	initCmdExample = `
-	# Initialise a project structure to write workflows using SQL files.
+	# Initialize a project structure to write workflows using SQL files.
 	astro flow init
 
 	# Initialize a project in the current directory
