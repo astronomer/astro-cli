@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -26,7 +27,7 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string) error {
+func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProjectDir string, mountDirectory string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -75,7 +76,15 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string) error {
 		Image: SQLCliDockerImageName,
 		Cmd:   cmd,
 		Tty:   false,
-	}, nil, nil, nil, "")
+	}, &container.HostConfig{
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeBind,
+				Source: absoluteProjectDir,
+				Target: mountDirectory,
+			},
+		},
+	}, nil, nil, "")
 	if err != nil {
 		err = fmt.Errorf("docker container creation failed %w", err)
 		return err

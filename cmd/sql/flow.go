@@ -2,6 +2,9 @@ package sql
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
@@ -12,7 +15,6 @@ var (
 	connection        string
 	airflowHome       string
 	airflowDagsFolder string
-	workflowName      string
 	projectDir        string
 	verbose           string
 )
@@ -72,22 +74,39 @@ var (
 	`
 )
 
-func buildVars() map[string]string {
+func createProjectDir(projectDir string) (string, string, error) {
+	if !filepath.IsAbs(projectDir) || projectDir == "" || projectDir == "." {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			err = fmt.Errorf("error getting current directory")
+			return "", "", err
+		}
+		projectDir = filepath.Join(currentDir, projectDir)
+	}
+
+	err := os.MkdirAll(projectDir, os.ModePerm)
+	if err != nil {
+		err = fmt.Errorf("error creating project directory %s", projectDir)
+		return "", "", err
+	}
+
+	absoluteProjectDirSplit := strings.Split(projectDir, "/")
+	relativeProjectDir := absoluteProjectDirSplit[len(absoluteProjectDirSplit)-1]
+	mountDir := strings.Join([]string{"", relativeProjectDir}, "/")
+
+	return projectDir, mountDir, nil
+}
+
+func buildCommonVars() map[string]string {
 	vars := make(map[string]string)
 	if environment != "" {
-		vars["environment"] = environment
-	}
-	if projectDir != "" {
-		vars["project_dir"] = projectDir
+		vars["env"] = environment
 	}
 	if airflowHome != "" {
 		vars["airflow_home"] = airflowHome
 	}
 	if airflowDagsFolder != "" {
 		vars["airflow_dags_folder"] = airflowDagsFolder
-	}
-	if workflowName != "" {
-		vars["workflow_name"] = workflowName
 	}
 	if connection != "" {
 		vars["connection"] = connection
@@ -96,17 +115,36 @@ func buildVars() map[string]string {
 }
 
 func versionCmd(args []string) error {
-	vars := buildVars()
-	err := sql.CommonDockerUtil(flowVersionCmd, args, vars)
+	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	if err != nil {
+		return err
+	}
+	vars := buildCommonVars()
+
+	err = sql.CommonDockerUtil(flowVersionCmd, args, vars, absoluteProjectDir, mountDirectory)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowVersionCmd, err)
 	}
+
 	return nil
 }
 
 func initCmd(args []string) error {
-	vars := buildVars()
-	err := sql.CommonDockerUtil(flowInitCmd, args, vars)
+	projectDir = "."
+	if len(args) > 0 {
+		projectDir = args[0]
+	}
+
+	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+
+	projectDirSplit := strings.Split(projectDir, "/")
+	args[0] = strings.Join([]string{"", projectDirSplit[len(projectDirSplit)-1]}, "/")
+	if err != nil {
+		return err
+	}
+	vars := buildCommonVars()
+
+	err = sql.CommonDockerUtil(flowInitCmd, args, vars, absoluteProjectDir, mountDirectory)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowInitCmd, err)
 	}
@@ -115,27 +153,60 @@ func initCmd(args []string) error {
 }
 
 func validateCmd(args []string) error {
-	vars := buildVars()
-	err := sql.CommonDockerUtil(flowValidateCmd, args, vars)
+	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	if err != nil {
+		return err
+	}
+
+	vars := buildCommonVars()
+
+	if len(args) == 0 {
+		args = append(args, mountDirectory)
+	}
+
+	err = sql.CommonDockerUtil(flowValidateCmd, args, vars, absoluteProjectDir, mountDirectory)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowValidateCmd, err)
 	}
+
 	return nil
 }
 
 func generateCmd(args []string) error {
-	vars := buildVars()
-	err := sql.CommonDockerUtil(flowGenerateCmd, args, vars)
+	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	if err != nil {
+		return err
+	}
+	vars := buildCommonVars()
+	vars["project-dir"] = mountDirectory
+	if len(args) < 1 {
+		return fmt.Errorf("workflow argument not given")
+	}
+	err = sql.CommonDockerUtil(flowGenerateCmd, args, vars, absoluteProjectDir, mountDirectory)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowGenerateCmd, err)
 	}
+
 	return nil
 }
 
 func runCmd(args []string) error {
-	vars := buildVars()
+	if len(args) < 1 {
+		return fmt.Errorf("argument workflow_name not given")
+	}
 
-	err := sql.CommonDockerUtil(flowRunCmd, args, vars)
+	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	if err != nil {
+		return err
+	}
+
+	vars := buildCommonVars()
+	vars["project-dir"] = mountDirectory
+	if verbose != "" {
+		vars["verbose"] = verbose
+	}
+
+	err = sql.CommonDockerUtil(flowRunCmd, args, vars, absoluteProjectDir, mountDirectory)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowRunCmd, err)
 	}
@@ -168,7 +239,6 @@ func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 			return initCmd(args)
 		},
 	}
-	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", "", "Directory of the project. Default: current directory")
 	cmd.Flags().StringVarP(&airflowHome, "airflow_home", "a", "", "Set the Airflow Home")
 	cmd.Flags().StringVarP(&airflowDagsFolder, "airflow_dags_folder", "d", "", "Set the DAGs Folder")
 	return cmd
@@ -185,7 +255,7 @@ func NewFlowValidateCommand() *cobra.Command {
 			return validateCmd(args)
 		},
 	}
-	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", "", "Directory of the project. Default: current directory")
+	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "Directory of the project. Default: current directory")
 	cmd.Flags().StringVarP(&connection, "connection", "c", "", "Identifier of the connection to be validated. By default checks all the env connections.")
 	return cmd
 }
@@ -201,8 +271,8 @@ func NewFlowGenerateCommand() *cobra.Command {
 			return generateCmd(args)
 		},
 	}
-	cmd.Flags().StringVarP(&workflowName, "workflow_name", "w", "", "Name of the workflow directory within workflows directory.")
-	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", "", "Directory of the project. Default: current directory")
+	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "Directory of the project. Default: current directory")
+
 	return cmd
 }
 
@@ -217,8 +287,7 @@ func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 			return runCmd(args)
 		},
 	}
-	cmd.Flags().StringVarP(&workflowName, "workflow_name", "w", "", "Name of the workflow directory within workflows directory.")
-	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", "", "Directory of the project. Default: current directory")
+	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "Directory of the project. Default: current directory")
 	cmd.Flags().StringVarP(&verbose, "verbose", "v", "", "Boolean value indicating whether to show airflow logs")
 	return cmd
 }
@@ -229,7 +298,7 @@ func NewFlowCommand() *cobra.Command {
 		Short: "Run flow commands",
 		Long:  "Forward flow subcommands to the flow python package",
 	}
-	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "default", "environment for the flow project")
+	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "", "environment for the flow project")
 	cmd.AddCommand(NewFlowVersionCommand())
 	cmd.AddCommand(NewFlowInitCommand())
 	cmd.AddCommand(NewFlowValidateCommand())
