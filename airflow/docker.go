@@ -554,11 +554,35 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 }
 
 func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, taskLogs bool) error {
-	err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+	// Get project containers
+	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeCreateErrMsg)
+	}
+	if len(psInfo) > 0 {
+		// Ensure project is not already running
+		for i := range psInfo {
+			if checkServiceState(psInfo[i].State, dockerStateUp) {
+				if strings.Contains(psInfo[i].Name, SchedulerDockerContainerName) {
+					err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile, startDate, psInfo[i].Name, taskLogs)
+					if err != nil {
+						return err
+					}
+					return nil
+				}
+			}
+		}
+	}
+
+	fmt.Println("Building image... For a faster 'astro run' experince run this command while Airflow is running with 'astro dev start'\n ")
+
+	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 	if err != nil {
 		return err
 	}
-	err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile, startDate, taskLogs)
+	err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile, startDate, "", taskLogs)
 	if err != nil {
 		return err
 	}

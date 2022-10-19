@@ -70,6 +70,12 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 		}
 	}
 	f.Close()
+	// add run script
+	runTestPath := config.WorkingPath + "/run_local_dag.py"
+	err = fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
+	if err != nil {
+		return errors.Wrap(err, "failed to create dag execution script")
+	}
 	// Change to location of Dockerfile
 	err = os.Chdir(buildConfig.Path)
 	if err != nil {
@@ -101,7 +107,9 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
-
+	// remove run script
+	os.Remove(runTestPath)
+	// remove airflow db init
 	f, err = os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 	if err != nil {
 		fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
@@ -320,59 +328,65 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, taskLogs bool) error {
+func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, containerName string, taskLogs bool) error {
 	// delete container
 	stderr := new(bytes.Buffer)
 	err := cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
 	if err != nil {
 		log.Debug(err)
 	}
-	// astronomer run script
-	runTestPath := config.WorkingPath + "/astronmer-tmp/run_local_dag.py"
-	err = fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
-	if err != nil {
-		return errors.Wrap(err, "failed to create dag execution script")
-	}
 	// convert settingsFile
-	err = convertSettingsFile(settingsFile)
-	fmt.Println(config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow/airflow.db")
-	args := []string{
-		"run",
-		"-i",
-		"--name",
-		"astro-run",
-		"-v",
-		config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
-		"-v",
-		config.WorkingPath + "/" + settingsFile + ":/usr/local/" + settingsFile,
-		"-v",
-		config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
-		"-v",
-		config.WorkingPath + "/include:/usr/local/airflow/include:z",
-		// "-v",
-		// runTestPath,
-		"-v",
-		config.WorkingPath + "/astronmer-tmp/run_local_dag.py:/usr/local/airflow/run_local_dag.py",
-		// "-v",
-		// config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow/airflow.db",
-		// "-e",
-		// "AIRFLOW__CORE=SQLite",
-		// "-e",
-		// "DAG_ID=" + dagID,
-		// "-e",
-		// "SETTINGS_FILE=/usr/local/" + settingsFile,
+	// err = convertSettingsFile(settingsFile)
+	// docker exec
+	var args []string
+	if containerName != "" {
+		args = []string{
+			"exec",
+			"-i",
+			containerName,
+		}
+		
 	}
-	// if env file exists append it to args
-	fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
-	if err != nil {
-		log.Debug(err)
-	}
-	if fileExist {
-		args = append(args, []string{"--env-file", envFile}...)
+	// docker exec
+	if containerName == "" {
+		args = []string{
+			"run",
+			"-i",
+			"--name",
+			"astro-run",
+			"-v",
+			config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
+			"-v",
+			config.WorkingPath + "/" + settingsFile + ":/usr/local/" + settingsFile,
+			"-v",
+			config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
+			"-v",
+			config.WorkingPath + "/include:/usr/local/airflow/include:z",
+			// "-v",
+			// runTestPath,
+			// "-v",
+			// config.WorkingPath + "/astronmer-tmp/run_local_dag.py:/usr/local/airflow/run_local_dag.py",
+			// "-v",
+			// config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow/airflow.db",
+			// "-e",
+			// "AIRFLOW__CORE=SQLite",
+			// "-e",
+			// "DAG_ID=" + dagID,
+			// "-e",
+			// "SETTINGS_FILE=/usr/local/" + settingsFile,
+		}
+		// if env file exists append it to args
+		fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
+		if err != nil {
+			log.Debug(err)
+		}
+		if fileExist {
+			args = append(args, []string{"--env-file", envFile}...)
+		}
+		args = append(args, []string{d.imageName,}...)
 	}
 	// add rest of args
 	cmdArgs := []string{
-		d.imageName,
 		"python",
 		"run_local_dag.py",
 		"--dag_dir",
@@ -393,8 +407,6 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate string, ta
 	if err != nil {
 		log.Debug(err)
 	}
-	// remove file
-	os.Remove(runTestPath)
 	// delete container
 	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-run")
 	if err != nil {

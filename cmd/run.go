@@ -38,8 +38,6 @@ func run(cmd *cobra.Command, args []string) error {
 		dagID = args[0]
 	}
 
-	// err := checkRuntimeImage()
-
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, dockerfile, "")
 	if err != nil {
 		return err

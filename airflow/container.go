@@ -44,7 +44,7 @@ type ImageHandler interface {
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
-	RunTest(dagID, envFile, settingsFile, startDate string, taskLogs bool) error
+	RunTest(dagID, envFile, settingsFile, startDate, containerName string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error)
 }
 
