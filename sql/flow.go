@@ -26,7 +26,7 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func CommonDockerUtil(cmd []string, flags map[string]string) error {
+func CommonDockerUtil(cmd []string, args []string, flags map[string]string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -64,6 +64,8 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		err = fmt.Errorf("image build response read failed %w", err)
 		return err
 	}
+
+	cmd = append(cmd, args...)
 
 	for key, value := range flags {
 		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
