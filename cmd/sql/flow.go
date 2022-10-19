@@ -157,7 +157,7 @@ func NewFlowVersionCommand() *cobra.Command {
 	return cmd
 }
 
-func NewFlowInitCommand() *cobra.Command {
+func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Initialize flow directory",
@@ -206,7 +206,7 @@ func NewFlowGenerateCommand() *cobra.Command {
 	return cmd
 }
 
-func NewFlowRunCommand() *cobra.Command {
+func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "run",
 		Short:   "Run workflow",
