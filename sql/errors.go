@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
-var envVarNotSetError = errors.New("Environment Variable not set")
+var errEnvVarNotSetError = errors.New("environment Variable not set")
 
 func EnvVarNotSetError(envVar string) error {
-	return fmt.Errorf("%w:%s", envVarNotSetError, envVar)
+	return fmt.Errorf("%w:%s", errEnvVarNotSetError, envVar)
 }

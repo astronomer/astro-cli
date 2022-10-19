@@ -18,12 +18,12 @@ func GetPypiVersion(projectURL string) (string, error) {
 	httpClient := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, projectURL, http.NoBody)
 	if err != nil {
-		err = fmt.Errorf("Error creating HTTP request %w", err)
+		err = fmt.Errorf("error creating HTTP request %w", err)
 		return "", err
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		err = fmt.Errorf("Error getting latest release version for project url %s,  %w", projectURL, err)
+		err = fmt.Errorf("error getting latest release version for project url %s,  %w", projectURL, err)
 		return "", err
 	}
 	defer res.Body.Close()
@@ -31,7 +31,7 @@ func GetPypiVersion(projectURL string) (string, error) {
 	var resp pypiVersionResponse
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		err = fmt.Errorf("Error parsing response for project version %w", err)
+		err = fmt.Errorf("error parsing response for project version %w", err)
 		return "", err
 	}
 

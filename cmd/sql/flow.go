@@ -25,7 +25,7 @@ var (
 func versionCmd() error {
 	err := sql.CommonDockerUtil(flowVersionCmd, map[string]string{})
 	if err != nil {
-		return fmt.Errorf("Error running %v: %w", flowVersionCmd, err)
+		return fmt.Errorf("error running %v: %w", flowVersionCmd, err)
 	}
 	return nil
 }
@@ -37,7 +37,7 @@ func initCmd() error {
 	}
 	err := sql.CommonDockerUtil(flowInitCmd, vars)
 	if err != nil {
-		return fmt.Errorf("Error running %v: %w", flowInitCmd, err)
+		return fmt.Errorf("error running %v: %w", flowInitCmd, err)
 	}
 
 	return nil
@@ -53,7 +53,7 @@ func validateCmd() error {
 	}
 	err := sql.CommonDockerUtil(flowValidateCmd, vars)
 	if err != nil {
-		return fmt.Errorf("Error running %v: %w", flowValidateCmd, err)
+		return fmt.Errorf("error running %v: %w", flowValidateCmd, err)
 	}
 	return nil
 }
@@ -68,7 +68,7 @@ func generateCmd() error {
 	}
 	err := sql.CommonDockerUtil(flowGenerateCmd, vars)
 	if err != nil {
-		return fmt.Errorf("Error running %v: %w", flowGenerateCmd, err)
+		return fmt.Errorf("error running %v: %w", flowGenerateCmd, err)
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func runCmd() error {
 
 	err := sql.CommonDockerUtil(flowRunCmd, vars)
 	if err != nil {
-		return fmt.Errorf("Error running %v: %w", flowRunCmd, err)
+		return fmt.Errorf("error running %v: %w", flowRunCmd, err)
 	}
 	return nil
 }
