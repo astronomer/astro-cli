@@ -1,7 +1,12 @@
 package sql
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+var envVarNotSetError = errors.New("Environment Variable not set")
 
 func EnvVarNotSetError(envVar string) error {
-	return fmt.Errorf("environment variable %s not set", envVar)
+	return fmt.Errorf("%w:%s", envVarNotSetError, envVar)
 }

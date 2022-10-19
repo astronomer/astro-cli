@@ -30,7 +30,7 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		err = fmt.Errorf("Docker client initialisation failed %w", err)
+		err = fmt.Errorf("docker client initialisation failed %w", err)
 		return err
 	}
 
@@ -96,14 +96,14 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
 	if err != nil {
-		err = fmt.Errorf("Docker container logs fetching failed %w", err)
+		err = fmt.Errorf("docker container logs fetching failed %w", err)
 		return err
 	}
 
 	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, cout)
 
 	if err != nil {
-		err = fmt.Errorf("Docker logs forwarding failed %w", err)
+		err = fmt.Errorf("docker logs forwarding failed %w", err)
 		return err
 	}
 
