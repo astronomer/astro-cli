@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	SQL_CLI_DOCKERFILE_PATH_ENV_VAR = "SQL_CLI_DOCKERFILE_PATH"
+	SQLCliDockefilePathEnvVar = "SQL_CLI_DOCKERFILE_PATH"
 	// TODO Remove the need for user to have the Dockerfile.sql_cli in their local machine alongside where the CLI binary resides to make this work.
-	SQL_CLI_DOCKERFILE_NAME   = "Dockerfile.sql_cli"
-	SQL_CLI_DOCKER_IMAGE_NAME = "sql_cli"
+	SQLCliDockerfileName  = "Dockerfile.sql_cli"
+	SQLCliDockerImageName = "sql_cli"
 )
 
 func getContext(filePath string) io.Reader {
@@ -34,35 +34,35 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		return err
 	}
 
-	astroSQLCliVersion, err := GetPypiVersion(ASTRO_SQL_CLI_PROJECT_URL)
+	astroSQLCliVersion, err := GetPypiVersion(astroSQLCliProjectURL)
 	if err != nil {
 		return err
 	}
 
 	opts := types.ImageBuildOptions{
-		Dockerfile: SQL_CLI_DOCKERFILE_NAME,
-		Tags:       []string{SQL_CLI_DOCKER_IMAGE_NAME},
+		Dockerfile: SQLCliDockerfileName,
+		Tags:       []string{SQLCliDockerImageName},
 	}
 
 	if astroSQLCliVersion != "" {
 		opts.BuildArgs = map[string]*string{"VERSION": &astroSQLCliVersion}
 	}
 
-	dockerfilePath := os.Getenv(SQL_CLI_DOCKERFILE_PATH_ENV_VAR)
+	dockerfilePath := os.Getenv(SQLCliDockefilePathEnvVar)
 	if dockerfilePath == "" {
-		err = fmt.Errorf("Environment variable %s not set", SQL_CLI_DOCKERFILE_PATH_ENV_VAR)
+		err = fmt.Errorf("environment variable %s not set", SQLCliDockefilePathEnvVar)
 		return err
 	}
 
 	body, err := cli.ImageBuild(ctx, getContext(dockerfilePath), opts)
 	if err != nil {
-		err = fmt.Errorf("Image building failed %w ", err)
+		err = fmt.Errorf("image building failed %w ", err)
 		return err
 	}
 	buf := new(strings.Builder)
 	_, err = io.Copy(buf, body.Body)
 	if err != nil {
-		err = fmt.Errorf("Image build response read failed %w", err)
+		err = fmt.Errorf("image build response read failed %w", err)
 		return err
 	}
 
@@ -71,7 +71,7 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 	}
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: SQL_CLI_DOCKER_IMAGE_NAME,
+		Image: SQLCliDockerImageName,
 		Cmd:   cmd,
 		Tty:   false,
 	}, nil, nil, nil, "")
