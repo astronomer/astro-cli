@@ -29,7 +29,11 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 		return err
 	}
 
-	astroSQLCliVersion := GetPypiVersion(ASTRO_SQL_CLI_PROJECT_URL)
+	astroSQLCliVersion, err := GetPypiVersion(ASTRO_SQL_CLI_PROJECT_URL)
+	if err != nil {
+		return err
+	}
+
 	opts := types.ImageBuildOptions{
 		Dockerfile: "Dockerfile.sql_cli",
 		Tags:       []string{"sql_cli"},
