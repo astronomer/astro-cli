@@ -14,7 +14,12 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-const SQL_CLI_DOCKERFILE_PATH_ENV_VAR = "SQL_CLI_DOCKERFILE_PATH"
+const (
+	SQL_CLI_DOCKERFILE_PATH_ENV_VAR = "SQL_CLI_DOCKERFILE_PATH"
+	// TODO Remove the need for user to have the Dockerfile.sql_cli in their local machine alongside where the CLI binary resides to make this work.
+	SQL_CLI_DOCKERFILE_NAME   = "Dockerfile.sql_cli"
+	SQL_CLI_DOCKER_IMAGE_NAME = "sql_cli"
+)
 
 func getContext(filePath string) io.Reader {
 	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
@@ -35,8 +40,8 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 	}
 
 	opts := types.ImageBuildOptions{
-		Dockerfile: "Dockerfile.sql_cli",
-		Tags:       []string{"sql_cli"},
+		Dockerfile: SQL_CLI_DOCKERFILE_NAME,
+		Tags:       []string{SQL_CLI_DOCKER_IMAGE_NAME},
 	}
 
 	if astroSQLCliVersion != "" {
@@ -66,7 +71,7 @@ func CommonDockerUtil(cmd []string, flags map[string]string) error {
 	}
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: "sql_cli",
+		Image: SQL_CLI_DOCKER_IMAGE_NAME,
 		Cmd:   cmd,
 		Tty:   false,
 	}, nil, nil, nil, "")
