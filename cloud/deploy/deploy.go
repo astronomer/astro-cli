@@ -63,7 +63,10 @@ var (
 	azureUploader        = azure.Upload
 )
 
-var errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+var (
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy")            //nolint:revive
+	customDeployError  = errors.New("Dag Deploy is enabled. To perform custom image deploy, you will need to contact Astronomer Support to disable dag deploy") //nolint:revive
+)
 
 type deploymentInfo struct {
 	deploymentID     string
@@ -92,7 +95,7 @@ type InputDeploy struct {
 
 func deployDags(path, runtimeID string, client astro.Client) error {
 	// Check the dags directory
-	dagsPath := path + "/dags"
+	dagsPath := filepath.Join(path, "dags")
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
@@ -112,7 +115,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 
-	dagsFilePath := path + "/dags.tar"
+	dagsFilePath := filepath.Join(path, "dags.tar")
 	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
 		return err
@@ -525,6 +528,9 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 			}
 		}
 	} else {
+		if dagDeployEnabled {
+			return "", customDeployError
+		}
 		// skip build if an imageName is passed
 		fmt.Println(composeSkipImageBuildingPromptMsg)
 
