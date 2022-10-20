@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -17,6 +16,11 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
+type MountVolume struct {
+	SourceDirectory string
+	TargetDirectory string
+}
+
 const (
 	SQLCliDockerfilePath  = ".Dockerfile.sql_cli"
 	SQLCliDockerImageName = "sql_cli"
@@ -28,7 +32,7 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProjectDir string, mountDirectory string) error {
+func CommonDockerUtil(cmd, args []string, flags map[string]string, volumeMounts []MountVolume) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -42,7 +46,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProje
 	}
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
-	err = ioutil.WriteFile(SQLCliDockerfilePath, dockerfileContent, 0644)
+	err = os.WriteFile(SQLCliDockerfilePath, dockerfileContent, 0o600) // nolint:gomnd
 	if err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
@@ -54,7 +58,6 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProje
 	}
 
 	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), opts)
-
 	if err != nil {
 		err = fmt.Errorf("image building failed %w ", err)
 		return err
@@ -72,18 +75,21 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProje
 		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
 	}
 
+	mounts := make([]mount.Mount, 0)
+	for _, volumeMount := range volumeMounts {
+		volumeMount := mount.Mount{
+			Type:   mount.TypeBind,
+			Source: volumeMount.SourceDirectory,
+			Target: volumeMount.TargetDirectory,
+		}
+		mounts = append(mounts, volumeMount)
+	}
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: SQLCliDockerImageName,
 		Cmd:   cmd,
 		Tty:   false,
 	}, &container.HostConfig{
-		Mounts: []mount.Mount{
-			{
-				Type:   mount.TypeBind,
-				Source: absoluteProjectDir,
-				Target: mountDirectory,
-			},
-		},
+		Mounts: mounts,
 	}, nil, nil, "")
 	if err != nil {
 		err = fmt.Errorf("docker container creation failed %w", err)

@@ -74,25 +74,30 @@ var (
 	`
 )
 
-func createProjectDir(projectDir string) (string, string, error) {
+func getLeafDirectory(directoryPath string) string {
+	directoryPathSplit := strings.Split(directoryPath, "/")
+	relativeProjectDir := directoryPathSplit[len(directoryPathSplit)-1]
+	leafDirectory := "/" + relativeProjectDir
+	return leafDirectory
+}
+
+func createProjectDir(projectDir string) (sourceMountDir, targetMountDir string, err error) {
 	if !filepath.IsAbs(projectDir) || projectDir == "" || projectDir == "." {
 		currentDir, err := os.Getwd()
 		if err != nil {
-			err = fmt.Errorf("error getting current directory")
+			err = fmt.Errorf("error getting current directory %w", err)
 			return "", "", err
 		}
 		projectDir = filepath.Join(currentDir, projectDir)
 	}
 
-	err := os.MkdirAll(projectDir, os.ModePerm)
+	err = os.MkdirAll(projectDir, os.ModePerm)
 	if err != nil {
-		err = fmt.Errorf("error creating project directory %s", projectDir)
+		err = fmt.Errorf("error creating project directory %s: %w", projectDir, err)
 		return "", "", err
 	}
 
-	absoluteProjectDirSplit := strings.Split(projectDir, "/")
-	relativeProjectDir := absoluteProjectDirSplit[len(absoluteProjectDirSplit)-1]
-	mountDir := strings.Join([]string{"", relativeProjectDir}, "/")
+	mountDir := getLeafDirectory(projectDir)
 
 	return projectDir, mountDir, nil
 }
@@ -114,14 +119,24 @@ func buildCommonVars() map[string]string {
 	return vars
 }
 
+func getBaseMountVolumes(projectDir string) ([]sql.MountVolume, error) {
+	projectMountSourceDir, projectMountTargetDir, err := createProjectDir(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	volumeMounts := make([]sql.MountVolume, 0)
+	volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: projectMountSourceDir, TargetDirectory: projectMountTargetDir})
+	return volumeMounts, nil
+}
+
 func versionCmd(args []string) error {
-	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	vars := buildCommonVars()
+	volumeMounts, err := getBaseMountVolumes(projectDir)
 	if err != nil {
 		return err
 	}
-	vars := buildCommonVars()
 
-	err = sql.CommonDockerUtil(flowVersionCmd, args, vars, absoluteProjectDir, mountDirectory)
+	err = sql.CommonDockerUtil(flowVersionCmd, args, vars, volumeMounts)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowVersionCmd, err)
 	}
@@ -135,16 +150,28 @@ func initCmd(args []string) error {
 		projectDir = args[0]
 	}
 
-	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	volumeMounts, err := getBaseMountVolumes(projectDir)
+	if err != nil {
+		return err
+	}
 
-	projectDirSplit := strings.Split(projectDir, "/")
-	args[0] = strings.Join([]string{"", projectDirSplit[len(projectDirSplit)-1]}, "/")
+	if airflowHome != "" {
+		airflowMountTargetDir := getLeafDirectory(airflowHome)
+		volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: airflowHome, TargetDirectory: airflowMountTargetDir})
+	}
+
+	if airflowDagsFolder != "" {
+		dagsMountTargetDir := getLeafDirectory(airflowDagsFolder)
+		volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: airflowDagsFolder, TargetDirectory: dagsMountTargetDir})
+	}
+
+	args[0] = volumeMounts[0].TargetDirectory
 	if err != nil {
 		return err
 	}
 	vars := buildCommonVars()
 
-	err = sql.CommonDockerUtil(flowInitCmd, args, vars, absoluteProjectDir, mountDirectory)
+	err = sql.CommonDockerUtil(flowInitCmd, args, vars, volumeMounts)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowInitCmd, err)
 	}
@@ -153,18 +180,17 @@ func initCmd(args []string) error {
 }
 
 func validateCmd(args []string) error {
-	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	vars := buildCommonVars()
+	volumeMounts, err := getBaseMountVolumes(projectDir)
 	if err != nil {
 		return err
 	}
 
-	vars := buildCommonVars()
-
 	if len(args) == 0 {
-		args = append(args, mountDirectory)
+		args = append(args, volumeMounts[0].TargetDirectory)
 	}
 
-	err = sql.CommonDockerUtil(flowValidateCmd, args, vars, absoluteProjectDir, mountDirectory)
+	err = sql.CommonDockerUtil(flowValidateCmd, args, vars, volumeMounts)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowValidateCmd, err)
 	}
@@ -173,16 +199,18 @@ func validateCmd(args []string) error {
 }
 
 func generateCmd(args []string) error {
-	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
+	if len(args) < 1 {
+		return sql.ArgNotSetError("workflow_name")
+	}
+
+	vars := buildCommonVars()
+	volumeMounts, err := getBaseMountVolumes(projectDir)
 	if err != nil {
 		return err
 	}
-	vars := buildCommonVars()
-	vars["project-dir"] = mountDirectory
-	if len(args) < 1 {
-		return fmt.Errorf("workflow argument not given")
-	}
-	err = sql.CommonDockerUtil(flowGenerateCmd, args, vars, absoluteProjectDir, mountDirectory)
+	vars["project-dir"] = volumeMounts[0].TargetDirectory
+
+	err = sql.CommonDockerUtil(flowGenerateCmd, args, vars, volumeMounts)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowGenerateCmd, err)
 	}
@@ -192,21 +220,20 @@ func generateCmd(args []string) error {
 
 func runCmd(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("argument workflow_name not given")
-	}
-
-	absoluteProjectDir, mountDirectory, err := createProjectDir(projectDir)
-	if err != nil {
-		return err
+		return sql.ArgNotSetError("workflow_name")
 	}
 
 	vars := buildCommonVars()
-	vars["project-dir"] = mountDirectory
+	volumeMounts, err := getBaseMountVolumes(projectDir)
+	if err != nil {
+		return err
+	}
+	vars["project-dir"] = volumeMounts[0].TargetDirectory
 	if verbose != "" {
 		vars["verbose"] = verbose
 	}
 
-	err = sql.CommonDockerUtil(flowRunCmd, args, vars, absoluteProjectDir, mountDirectory)
+	err = sql.CommonDockerUtil(flowRunCmd, args, vars, volumeMounts)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowRunCmd, err)
 	}

@@ -9,4 +9,5 @@ FROM python:%s-slim-bullseye
 
 RUN apt-get update -y && apt-get install -y gcc g++ libpq-dev python-dev libssl-dev libffi-dev
 
-RUN pip install astro-sql-cli==%s`)
+RUN pip install astro-sql-cli==%s
+`)
