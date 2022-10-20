@@ -46,6 +46,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProje
 	if err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
+	defer os.Remove(SQLCliDockerfilePath)
 
 	opts := types.ImageBuildOptions{
 		Dockerfile: SQLCliDockerfilePath,
