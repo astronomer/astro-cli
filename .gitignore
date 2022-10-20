@@ -1,4 +1,5 @@
 .astro/
+.Dockerfile.sql_cli
 .DS_Store
 .env
 .idea/

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
+	"github.com/astronomer/astro-cli/sql/include"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -16,10 +18,9 @@ import (
 )
 
 const (
-	SQLCliDockefilePathEnvVar = "SQL_CLI_DOCKERFILE_PATH"
-	// TODO Remove the need for user to have the Dockerfile.sql_cli in their local machine alongside where the CLI binary resides to make this work.
-	SQLCliDockerfileName  = "Dockerfile.sql_cli"
+	SQLCliDockerfilePath  = ".Dockerfile.sql_cli"
 	SQLCliDockerImageName = "sql_cli"
+	PythonVersion         = "3.9"
 )
 
 func getContext(filePath string) io.Reader {
@@ -40,21 +41,19 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProje
 		return err
 	}
 
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
+	err = ioutil.WriteFile(SQLCliDockerfilePath, dockerfileContent, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing dockerfile %w", err)
+	}
+
 	opts := types.ImageBuildOptions{
-		Dockerfile: SQLCliDockerfileName,
+		Dockerfile: SQLCliDockerfilePath,
 		Tags:       []string{SQLCliDockerImageName},
 	}
 
-	if astroSQLCliVersion != "" {
-		opts.BuildArgs = map[string]*string{"VERSION": &astroSQLCliVersion}
-	}
+	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), opts)
 
-	dockerfilePath := os.Getenv(SQLCliDockefilePathEnvVar)
-	if dockerfilePath == "" {
-		return EnvVarNotSetError(SQLCliDockefilePathEnvVar)
-	}
-
-	body, err := cli.ImageBuild(ctx, getContext(dockerfilePath), opts)
 	if err != nil {
 		err = fmt.Errorf("image building failed %w ", err)
 		return err
@@ -105,7 +104,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, absoluteProje
 	case <-statusCh:
 	}
 
-	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
 		err = fmt.Errorf("docker container logs fetching failed %w", err)
 		return err
