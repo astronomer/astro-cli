@@ -86,8 +86,6 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
-	ForceDeploy    bool
-	Parse          bool
 }
 
 func deployDags(path, runtimeID string, client astro.Client) error {
@@ -193,24 +191,15 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 	if deployInput.Dags {
-		if (deployInput.Pytest == allTests || deployInput.Parse) && !deployInput.ForceDeploy {
+		if deployInput.Pytest != "" {
 			version, err := buildImage(&c, deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 			if err != nil {
 				return err
 			}
 
-			if deployInput.Pytest == allTests {
-				err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
-				if err != nil {
-					return err
-				}
-			}
-
-			if deployInput.Parse {
-				err = parseOrPytestDAG("parse", version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
-				if err != nil {
-					return err
-				}
+			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+			if err != nil {
+				return err
 			}
 		}
 

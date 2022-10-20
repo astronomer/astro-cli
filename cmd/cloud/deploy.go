@@ -68,6 +68,22 @@ func newDeployCmd() *cobra.Command {
 	return cmd
 }
 
+func deployTests(pars, pytest, forceDeploy bool, pytestFile string) string {
+	if pytest && pytestFile == "" {
+		pytestFile = "all-tests"
+	}
+
+	if !parse && !pytest && !forceDeploy || parse && !pytest && !forceDeploy || parse && !pytest && forceDeploy {
+		pytestFile = "parse"
+	}
+
+	if parse && pytest {
+		pytestFile = "parse-and-all-tests"
+	}
+
+	return pytestFile
+}
+
 func deploy(cmd *cobra.Command, args []string) error {
 	deploymentID := ""
 	ws := ""
@@ -98,16 +114,11 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if pytest && pytestFile == "" {
-		pytestFile = "all-tests"
-	}
-
-	if !parse && !pytest && !forceDeploy || parse && !pytest && !forceDeploy || parse && !pytest && forceDeploy {
-		pytestFile = "parse"
-	}
-
-	if parse && pytest {
-		pytestFile = "parse-and-all-tests"
+	// case for astro deploy --dags whose default operation should be not running any tests
+	if dags && !parse && !pytest {
+		pytestFile = ""
+	} else {
+		pytestFile = deployTests(parse, pytest, forceDeploy, pytestFile)
 	}
 
 	// Silence Usage as we have now validated command input
@@ -123,8 +134,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DeploymentName: deploymentName,
 		Prompt:         forcePrompt,
 		Dags:           dags,
-		ForceDeploy:    forceDeploy,
-		Parse:          parse,
 	}
 
 	return deployImage(deployInput, astroClient)
