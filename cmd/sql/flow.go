@@ -107,12 +107,6 @@ func buildCommonVars() map[string]string {
 	if environment != "" {
 		vars["env"] = environment
 	}
-	if airflowHome != "" {
-		vars["airflow_home"] = airflowHome
-	}
-	if airflowDagsFolder != "" {
-		vars["airflow_dags_folder"] = airflowDagsFolder
-	}
 	if connection != "" {
 		vars["connection"] = connection
 	}
@@ -150,6 +144,8 @@ func initCmd(args []string) error {
 		projectDir = args[0]
 	}
 
+	vars := buildCommonVars()
+
 	volumeMounts, err := getBaseMountVolumes(projectDir)
 	if err != nil {
 		return err
@@ -158,18 +154,19 @@ func initCmd(args []string) error {
 	if airflowHome != "" {
 		airflowMountTargetDir := getLeafDirectory(airflowHome)
 		volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: airflowHome, TargetDirectory: airflowMountTargetDir})
+		vars["airflow-home"] = airflowMountTargetDir
 	}
 
 	if airflowDagsFolder != "" {
 		dagsMountTargetDir := getLeafDirectory(airflowDagsFolder)
 		volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: airflowDagsFolder, TargetDirectory: dagsMountTargetDir})
+		vars["airflow-dags-folder"] = dagsMountTargetDir
 	}
 
 	args[0] = volumeMounts[0].TargetDirectory
 	if err != nil {
 		return err
 	}
-	vars := buildCommonVars()
 
 	err = sql.CommonDockerUtil(flowInitCmd, args, vars, volumeMounts)
 	if err != nil {
