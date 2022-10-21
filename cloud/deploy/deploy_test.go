@@ -149,7 +149,6 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
-		Parse:          false,
 		Dags:           false,
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -234,12 +233,12 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.Parse = true
+	deployInput.Pytest = "parse"
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.Pytest = "parse-and-all-tests"
+	deployInput.Pytest = parseAndPytest
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
@@ -289,7 +288,6 @@ func TestDagsDeploySuccess(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
-		Parse:          false,
 		Dags:           true,
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -336,19 +334,17 @@ func TestDagsDeploySuccess(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.Parse = true
+	deployInput.Pytest = "parse"
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.Parse = false
-	deployInput.Pytest = "all-tests"
+	deployInput.Pytest = allTests
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.Parse = true
-	deployInput.Pytest = "all-tests"
+	deployInput.Pytest = parseAndPytest
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
@@ -394,7 +390,6 @@ func TestDagsDeployFailed(t *testing.T) {
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
-		ForceDeploy:    false,
 		Dags:           true,
 	}
 	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(3)
@@ -419,7 +414,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	}
 
 	defer testUtil.MockUserInput(t, "y")()
-	deployInput.Parse = true
+	deployInput.Pytest = "parse"
 	err = Deploy(deployInput, mockClient)
 	assert.Error(t, err)
 
