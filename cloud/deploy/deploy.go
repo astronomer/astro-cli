@@ -63,10 +63,7 @@ var (
 	azureUploader        = azure.Upload
 )
 
-var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy")            //nolint:revive
-	customDeployError  = errors.New("Dag Deploy is enabled. To perform custom image deploy, you will need to contact Astronomer Support to disable dag deploy") //nolint:revive
-)
+var errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 
 type deploymentInfo struct {
 	deploymentID     string
@@ -278,18 +275,13 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			return err
 		}
 
-		dagDeployEnabled := false
-		if deployInput.ImageName == "" && deployInfo.dagDeployEnabled {
-			dagDeployEnabled = true
-		}
-
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, dagDeployEnabled, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
 
-		if dagDeployEnabled {
+		if deployInfo.dagDeployEnabled {
 			err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
@@ -528,9 +520,6 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 			}
 		}
 	} else {
-		if dagDeployEnabled {
-			return "", customDeployError
-		}
 		// skip build if an imageName is passed
 		fmt.Println(composeSkipImageBuildingPromptMsg)
 
