@@ -244,6 +244,9 @@ func NewFlowVersionCommand() *cobra.Command {
 		Long:    "Get the version of flow being used",
 		Example: versionCmdExample,
 		Args:    cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return versionCmd(args)
 		},
@@ -259,6 +262,9 @@ func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 		Long:    "Initialize flow directory",
 		Example: initCmdExample,
 		Args:    cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return initCmd(args)
 		},
@@ -275,6 +281,9 @@ func NewFlowValidateCommand() *cobra.Command {
 		Long:    "Validate connections",
 		Example: validateCmdExample,
 		Args:    cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return validateCmd(args)
 		},
@@ -291,6 +300,9 @@ func NewFlowGenerateCommand() *cobra.Command {
 		Long:    "Generate DAGs",
 		Example: generateCmdExample,
 		Args:    cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return generateCmd(args)
 		},
@@ -307,6 +319,9 @@ func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 		Long:    "Run workflow",
 		Example: runCmdExample,
 		Args:    cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCmd(args)
 		},
