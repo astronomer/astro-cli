@@ -158,10 +158,10 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(5)
 	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", DagDeployEnabled: true}}, nil).Times(1)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
-	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
-	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(5)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(5)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(6)
+	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(6)
+	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(6)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(6)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -175,13 +175,14 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Status:                   "SUCCEEDED",
 		Message:                  "Dags uploaded successfully",
 	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(5)
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(6)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", runtimeImageLabel).Return("", nil)
+		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
 
@@ -246,7 +247,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	defer testUtil.MockUserInput(t, "y")()
 	deployInput.ImageName = "custom-image"
 	err = Deploy(deployInput, mockClient)
-	assert.ErrorIs(t, err, customDeployError)
+	assert.NoError(t, err)
 
 	defer os.RemoveAll("./testfiles/dags/")
 
