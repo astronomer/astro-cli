@@ -138,7 +138,7 @@ func getOrganizationSelection(out io.Writer) (string, error) {
 }
 
 // Switch switches organizations
-func Switch(orgName string, client astro.Client, out io.Writer) error {
+func Switch(orgNameOrID string, client astro.Client, out io.Writer) error {
 	// get current context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -146,7 +146,7 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 	}
 	// get auth id
 	var id string
-	if orgName == "" {
+	if orgNameOrID == "" {
 		id, err = getOrganizationSelection(out)
 		if err != nil {
 			return err
@@ -157,7 +157,10 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}
 		for i := range or {
-			if or[i].Name == orgName {
+			if or[i].Name == orgNameOrID {
+				id = or[i].AuthServiceID
+			}
+			if or[i].ID == orgNameOrID {
 				id = or[i].AuthServiceID
 			}
 		}

@@ -446,11 +446,12 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	return nil
 }
 
-// When login and push do not work use bash to run docker commands
+// When login and push do not work use bash to run docker commands, this function is for users using colima
 func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		err = cmdExec(EchoCmd, nil, os.Stderr, fmt.Sprintf("%q", authConfig.Password), "|", DockerCmd, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
+		cmd := "echo \"" + authConfig.Password + "\"" + " | docker login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
+		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
 	}
 	if err != nil {
 		return err
