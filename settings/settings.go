@@ -668,10 +668,15 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 
 	out, err := yaml.Marshal(connectionsYAML)
 	if err != nil {
-		return err
+		fmt.Printf("Error creating connections from settings file: %s\n", err.Error())
 	}
 
 	fmt.Println(string(out))
+
+	err = fileutil.WriteStringToFile("./connections.yaml", string(out))
+	if err != nil {
+		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
+	}
 
 	// Variables from settings file to variables YAML file
 	varYAMLs := VarYAMLs{}
@@ -692,10 +697,15 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 
 	out, err = yaml.Marshal(variablesYAML)
 	if err != nil {
-		return err
+		fmt.Printf("Error creating variabels from settings file: %s\n", err.Error())
 	}
 
 	fmt.Println(string(out))
+
+	err = fileutil.WriteStringToFile("./variables.yaml", string(out))
+	if err != nil {
+		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
+	}
 
 	return nil
 }
