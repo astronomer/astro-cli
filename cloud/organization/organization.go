@@ -60,6 +60,7 @@ func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	if err != nil {
 		return []OrgRes{}, fmt.Errorf("could not retrieve organization list: %w", err)
 	}
+	defer res.Body.Close()
 	var orgResponse []OrgRes
 	err = json.NewDecoder(res.Body).Decode(&orgResponse)
 	if err != nil {

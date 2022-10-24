@@ -42,7 +42,7 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",

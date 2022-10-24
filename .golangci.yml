@@ -74,7 +74,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - dupl
@@ -87,6 +86,8 @@ linters:
     - gofumpt
     - goimports
     - revive
+    - gocognit
+    - goerr113
     - gomnd
     - goprintffuncname
     - gosec
@@ -97,20 +98,15 @@ linters:
     - nakedret
     - noctx
     - nolintlint
-    - rowserrcheck
+    - prealloc
+    - revive
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
-    - goerr113
-    - prealloc
-    - revive
-    - gocognit
 
   # don't enable:
   # - asciicheck

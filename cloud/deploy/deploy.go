@@ -192,7 +192,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 
 	if deployInput.Dags {
 		if deployInput.Pytest != "" {
-			version, err := buildImage(&c, deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
+			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 			if err != nil {
 				return err
 			}
@@ -223,7 +223,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		// Build our image
-		version, err := buildImage(&c, deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
+		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
@@ -490,7 +490,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	return nil
 }
 
-func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, dagDeployEnabled bool, client astro.Client) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEnabled bool, client astro.Client) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {

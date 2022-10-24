@@ -199,7 +199,7 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [key1=val1 key2=val2]",
@@ -224,7 +224,7 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [key1=update_val1 key2=update_val2]",

@@ -56,7 +56,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newWebserverLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "webserver",
@@ -78,7 +78,7 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newSchedulerLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "scheduler",
@@ -100,7 +100,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newWorkersLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workers",
@@ -123,7 +123,7 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newTriggererLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "triggerer",

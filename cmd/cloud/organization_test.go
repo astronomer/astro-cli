@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func execOrganizationCmd(args ...string) (string, error) {
+func execOrganizationCmd(args ...string) error {
 	buf := new(bytes.Buffer)
 	cmd := newOrganizationCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
-	return buf.String(), err
+	return err
 }
 
 func TestOrganizationRootCommand(t *testing.T) {
@@ -36,7 +36,7 @@ func TestOrganizationList(t *testing.T) {
 	}
 
 	cmdArgs := []string{"list"}
-	_, err := execOrganizationCmd(cmdArgs...)
+	err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
 }
 
@@ -46,6 +46,6 @@ func TestOrganizationSwitch(t *testing.T) {
 	}
 
 	cmdArgs := []string{"switch"}
-	_, err := execOrganizationCmd(cmdArgs...)
+	err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
 }
