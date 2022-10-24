@@ -613,8 +613,8 @@ type variablesYAML struct {
 type VarYAMLs []VarYAML
 
 type VarYAML struct {
-	Key   string      `mapstructure:"key" yaml:"key"`
-	Value string      `mapstructure:"value" yaml:"value"`
+	Key   string `mapstructure:"key" yaml:"key"`
+	Value string `mapstructure:"value" yaml:"value"`
 }
 
 type ConnectionsYAML struct {
@@ -632,9 +632,7 @@ type ConnYAML struct {
 	Password string      `mapstructure:"password" yaml:"password"`
 	Port     int         `mapstructure:"port" yaml:"port"`
 	Extra    interface{} `mapstructure:"extra" yaml:"extra"`
-
 }
-
 
 func SettingsFileToConnectionYAML(settingsFile string) error {
 	err := InitSettings(settingsFile)
@@ -649,15 +647,15 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 	for i := range connections {
 
 		newConnYAML := ConnYAML{
-				ConnID: connections[i].ConnID,
-				ConnType: connections[i].ConnType,
-				Host: connections[i].ConnHost,
-				Schema: connections[i].ConnSchema,
-				Login: connections[i].ConnLogin,
-				Password: connections[i].ConnPassword,
-				Port: connections[i].ConnPort,
-				Extra: connections[i].ConnExtra,
-			}
+			ConnID:   connections[i].ConnID,
+			ConnType: connections[i].ConnType,
+			Host:     connections[i].ConnHost,
+			Schema:   connections[i].ConnSchema,
+			Login:    connections[i].ConnLogin,
+			Password: connections[i].ConnPassword,
+			Port:     connections[i].ConnPort,
+			Extra:    connections[i].ConnExtra,
+		}
 
 		connYAMLs = append(connYAMLs, newConnYAML)
 	}
@@ -679,7 +677,7 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 
 	for _, variable := range variables {
 		newVarYAML := VarYAML{
-			Key: variable.VariableName,
+			Key:   variable.VariableName,
 			Value: variable.VariableValue,
 		}
 
