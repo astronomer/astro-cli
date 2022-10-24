@@ -345,7 +345,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 			"-i",
 			containerName,
 		}
-		
+
 	}
 	// docker exec
 	if containerName == "" {
@@ -383,7 +383,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 		if fileExist {
 			args = append(args, []string{"--env-file", envFile}...)
 		}
-		args = append(args, []string{d.imageName,}...)
+		args = append(args, []string{d.imageName}...)
 	}
 	// add rest of args
 	cmdArgs := []string{
