@@ -577,8 +577,6 @@ func TestDeployFailure(t *testing.T) {
 
 func TestBuildImageFailure(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	ctx, err := config.GetCurrentContext()
-	assert.NoError(t, err)
 
 	mockImageHandler := new(mocks.ImageHandler)
 
@@ -587,7 +585,7 @@ func TestBuildImageFailure(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
-	_, err = buildImage("./testfiles/", "4.2.5", "", "", false, nil)
+	_, err := buildImage("./testfiles/", "4.2.5", "", "", false, nil)
 	assert.ErrorIs(t, err, errMock)
 
 	airflowImageHandler = func(image string) airflow.ImageHandler {
