@@ -1,0 +1,2 @@
+
+RUN airflow db init

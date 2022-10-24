@@ -590,3 +590,14 @@ func jsonString(conn *Connection) string {
 	}
 	return extraString
 }
+
+// func createConnectionsYAML(settingsFile string) error {
+// 	err := InitSettings(settingsFile)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	connections := settings.Airflow.Connections
+// 	for i := range connections {
+
+// 	}
+// }
