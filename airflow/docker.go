@@ -168,7 +168,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 
 	// Build this project image
 	if imageName == "" {
-		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache}, false)
 		if err != nil {
 			return err
 		}
@@ -345,7 +345,7 @@ func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImage
 	if deployImageName == "" {
 		// build image
 		if customImageName == "" {
-			err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true})
+			err := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true}, false)
 			if err != nil {
 				return "", err
 			}
@@ -577,8 +577,8 @@ func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, 
 	}
 
 	fmt.Println("Building image... For a faster 'astro run' experince run this command while Airflow is running with 'astro dev start'\n ")
-
-	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+	astroRun := true // do a build for astro run 
+	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache}, astroRun)
 	if err != nil {
 		return err
 	}

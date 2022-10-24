@@ -53,26 +53,28 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig, astroRun bool) error {
 	// add airflow db init
-	f, err := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
-	if err != nil {
-		fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
-	}
-	content, err := os.ReadFile("./Dockerfile")
-	if err != nil {
-		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
-	}
-	if !strings.Contains(string(content), "RUN airflow db init") {
-		_, err = f.WriteString("\nRUN airflow db init")
+	if astroRun {
+		f, err := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 		if err != nil {
 			fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
 		}
+		content, err := os.ReadFile("./Dockerfile")
+		if err != nil {
+			fmt.Printf("reading file unsuccessful: %s\n", err.Error())
+		}
+		if !strings.Contains(string(content), "RUN airflow db init") {
+			_, err = f.WriteString("\nRUN airflow db init")
+			if err != nil {
+				fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
+			}
+		}
+		f.Close()
 	}
-	f.Close()
 	// add run script
 	runTestPath := config.WorkingPath + "/run_local_dag.py"
-	err = fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
+	err := fileutil.WriteStringToFile(runTestPath, include.RunDagScript)
 	if err != nil {
 		return errors.Wrap(err, "failed to create dag execution script")
 	}
@@ -110,22 +112,24 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 	// remove run script
 	os.Remove(runTestPath)
 	// remove airflow db init
-	f, err = os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
-	if err != nil {
-		fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
-	}
-	content, err = os.ReadFile("./Dockerfile")
-	if err != nil {
-		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
-	}
-	if strings.Contains(string(content), "RUN airflow db init") {
-		lastInd := strings.LastIndex(string(content), "\nRUN airflow db init")
-		err = fileutil.WriteStringToFile("./Dockerfile", string(content)[:lastInd])
+	if astroRun {
+		f, err := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 		if err != nil {
-			fmt.Printf("Removing db from layer: %s\n", err.Error())
+			fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
 		}
+		content, err := os.ReadFile("./Dockerfile")
+		if err != nil {
+			fmt.Printf("reading file unsuccessful: %s\n", err.Error())
+		}
+		if strings.Contains(string(content), "RUN airflow db init") {
+			lastInd := strings.LastIndex(string(content), "\nRUN airflow db init")
+			err = fileutil.WriteStringToFile("./Dockerfile", string(content)[:lastInd])
+			if err != nil {
+				fmt.Printf("Removing db from layer: %s\n", err.Error())
+			}
+		}
+		f.Close()
 	}
-	f.Close()
 	return nil
 }
 

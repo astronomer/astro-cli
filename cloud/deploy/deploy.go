@@ -470,7 +470,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 		dagsIgnoreSet = true
 	}
 
-	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport}, false)
 	if err != nil {
 		return err
 	}
@@ -522,7 +522,7 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 				return "", err
 			}
 		} else {
-			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
+			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport}, false)
 			if err != nil {
 				return "", err
 			}

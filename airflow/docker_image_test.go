@@ -41,7 +41,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build(options)
+		err = handler.Build(options, true)
 		assert.NoError(t, err)
 	})
 
@@ -51,7 +51,7 @@ func TestDockerImageBuild(t *testing.T) {
 			assert.Contains(t, args, "--no-cache")
 			return nil
 		}
-		err = handler.Build(options)
+		err = handler.Build(options, false)
 		assert.NoError(t, err)
 	})
 
@@ -59,7 +59,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err = handler.Build(options)
+		err = handler.Build(options, false)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 
@@ -70,7 +70,7 @@ func TestDockerImageBuild(t *testing.T) {
 			NoCache:         false,
 		}
 
-		err = handler.Build(options)
+		err = handler.Build(options, false)
 		assert.Error(t, err)
 	})
 
