@@ -591,13 +591,111 @@ func jsonString(conn *Connection) string {
 	return extraString
 }
 
-// func createConnectionsYAML(settingsFile string) error {
+// SettingsFileToEnv(envFile, settingsFile string version uint64) error {
+// 	if version < AirflowVersionTwo {
+// 		return errors.New("Settings File must be used with Airflow 2.X for this Command")
+// 	}
 // 	err := InitSettings(settingsFile)
 // 	if err != nil {
 // 		return err
 // 	}
+// 	// Connections from settings file to env file
 // 	connections := settings.Airflow.Connections
-// 	for i := range connections {
 
-// 	}
 // }
+
+// type ConnectionYAMLs []ConnectionYAML
+
+type variablesYAML struct {
+	VarYAMLs `mapstructure:"connections" yaml:"variables"`
+}
+
+type VarYAMLs []VarYAML
+
+type VarYAML struct {
+	Key   string      `mapstructure:"key" yaml:"key"`
+	Value string      `mapstructure:"value" yaml:"value"`
+}
+
+type ConnectionsYAML struct {
+	ConnYAMLs `mapstructure:"connections" yaml:"connections"`
+}
+
+type ConnYAMLs []ConnYAML
+
+type ConnYAML struct {
+	ConnID   string      `mapstructure:"conn_id" yaml:"conn_id"`
+	ConnType string      `mapstructure:"conn_type" yaml:"conn_type"`
+	Host     string      `mapstructure:"host" yaml:"host"`
+	Schema   string      `mapstructure:"schema" yaml:"schema"`
+	Login    string      `mapstructure:"login" yaml:"login"`
+	Password string      `mapstructure:"password" yaml:"password"`
+	Port     int         `mapstructure:"port" yaml:"port"`
+	Extra    interface{} `mapstructure:"extra" yaml:"extra"`
+
+}
+
+
+func SettingsFileToConnectionYAML(settingsFile string) error {
+	err := InitSettings(settingsFile)
+	if err != nil {
+		return err
+	}
+
+	// Connections from settings file to connection YAML file
+	connYAMLs := ConnYAMLs{}
+	connections := settings.Airflow.Connections
+
+	for i := range connections {
+
+		newConnYAML := ConnYAML{
+				ConnID: connections[i].ConnID,
+				ConnType: connections[i].ConnType,
+				Host: connections[i].ConnHost,
+				Schema: connections[i].ConnSchema,
+				Login: connections[i].ConnLogin,
+				Password: connections[i].ConnPassword,
+				Port: connections[i].ConnPort,
+				Extra: connections[i].ConnExtra,
+			}
+
+		connYAMLs = append(connYAMLs, newConnYAML)
+	}
+
+	connectionsYAML := ConnectionsYAML{
+		ConnYAMLs: connYAMLs,
+	}
+
+	out, err := yaml.Marshal(connectionsYAML)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(out))
+
+	// Variables from settings file to variables YAML file
+	varYAMLs := VarYAMLs{}
+	variables := settings.Airflow.Variables
+
+	for _, variable := range variables {
+		newVarYAML := VarYAML{
+			Key: variable.VariableName,
+			Value: variable.VariableValue,
+		}
+
+		varYAMLs = append(varYAMLs, newVarYAML)
+	}
+
+	variablesYAML := variablesYAML{
+		VarYAMLs: varYAMLs,
+	}
+
+	out, err = yaml.Marshal(variablesYAML)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(out))
+
+	return nil
+}

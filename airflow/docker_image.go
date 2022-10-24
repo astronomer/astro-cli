@@ -26,6 +26,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/settings"
 	"github.com/pkg/errors"
 )
 
@@ -339,9 +340,6 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	if err != nil {
 		log.Debug(err)
 	}
-	// convert settingsFile
-	// err = convertSettingsFile(settingsFile)
-	// docker exec
 	var args []string
 	if containerName != "" {
 		args = []string{
@@ -353,6 +351,11 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	}
 	// docker exec
 	if containerName == "" {
+		// convert Settings file to variables and connection yaml
+		err = settings.SettingsFileToConnectionYAML(settingsFile)
+		if err != nil {
+			log.Debug(err)
+		}
 		args = []string{
 			"run",
 			"-i",
@@ -366,18 +369,10 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 			config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
 			"-v",
 			config.WorkingPath + "/include:/usr/local/airflow/include:z",
-			// "-v",
-			// runTestPath,
-			// "-v",
-			// config.WorkingPath + "/astronmer-tmp/run_local_dag.py:/usr/local/airflow/run_local_dag.py",
-			// "-v",
-			// config.WorkingPath + "/.astro/airflow.db:/usr/local/airflow/airflow.db",
-			// "-e",
-			// "AIRFLOW__CORE=SQLite",
-			// "-e",
-			// "DAG_ID=" + dagID,
-			// "-e",
-			// "SETTINGS_FILE=/usr/local/" + settingsFile,
+			"-v",
+			config.WorkingPath + "/variables.yaml:/usr/local/airflow/variables.yaml:z",
+			"-v",
+			config.WorkingPath + "/connections.yaml:/usr/local/airflow/connections.yaml:z",
 		}
 		// if env file exists append it to args
 		fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
@@ -397,10 +392,6 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 		"./dags/",
 		"--dag_id",
 		dagID,
-		// "--settings_file",
-		// "/usr/local/" + settingsFile,
-		// "--execution_date",
-		// startDate,
 	}
 	args = append(args, cmdArgs...)
 
