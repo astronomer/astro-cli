@@ -405,6 +405,11 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	if err != nil {
 		log.Debug(err)
 	}
+
+	// delete files
+	os.Remove("./variables.yaml")
+	os.Remove("./connections.yaml")
+
 	fmt.Println("\nDAG Run Summary 🏁")
 	fmt.Println("\n  DAG name: " + dagID)
 	fmt.Printf("  Total tasks ran: %d\n", runInfo.tasksRun)
