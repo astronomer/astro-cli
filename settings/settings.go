@@ -606,7 +606,7 @@ func jsonString(conn *Connection) string {
 
 // type ConnectionYAMLs []ConnectionYAML
 
-type variablesYAML struct {
+type VariablesYAML struct {
 	VarYAMLs `mapstructure:"connections" yaml:"variables"`
 }
 
@@ -634,7 +634,7 @@ type ConnYAML struct {
 	Extra    interface{} `mapstructure:"extra" yaml:"extra"`
 }
 
-func SettingsFileToConnectionYAML(settingsFile string) error {
+func FileToConnectionYAML(settingsFile string) error {
 	err := InitSettings(settingsFile)
 	if err != nil {
 		return err
@@ -643,9 +643,7 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 	// Connections from settings file to connection YAML file
 	connYAMLs := ConnYAMLs{}
 	connections := settings.Airflow.Connections
-
 	for i := range connections {
-
 		newConnYAML := ConnYAML{
 			ConnID:   connections[i].ConnID,
 			ConnType: connections[i].ConnType,
@@ -679,7 +677,6 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 	// Variables from settings file to variables YAML file
 	varYAMLs := VarYAMLs{}
 	variables := settings.Airflow.Variables
-
 	for _, variable := range variables {
 		newVarYAML := VarYAML{
 			Key:   variable.VariableName,
@@ -689,7 +686,7 @@ func SettingsFileToConnectionYAML(settingsFile string) error {
 		varYAMLs = append(varYAMLs, newVarYAML)
 	}
 
-	variablesYAML := variablesYAML{
+	variablesYAML := VariablesYAML{
 		VarYAMLs: varYAMLs,
 	}
 

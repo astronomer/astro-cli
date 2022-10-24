@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	// "io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -347,12 +346,11 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 			"-i",
 			containerName,
 		}
-
 	}
 	// docker exec
 	if containerName == "" {
 		// convert Settings file to variables and connection yaml
-		err = settings.SettingsFileToConnectionYAML(settingsFile)
+		err = settings.FileToConnectionYAML(settingsFile)
 		if err != nil {
 			log.Debug(err)
 		}
@@ -563,8 +561,4 @@ func parseOuputLine(outputLine, failedTask, time string, successfulRun, tasks in
 		}
 	}
 	return failedTask, time, successfulRun, tasks
-}
-
-func convertSettingsFile(settingsFile string) error {
-	return nil
 }
