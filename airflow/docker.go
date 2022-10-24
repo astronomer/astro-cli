@@ -577,7 +577,7 @@ func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, 
 	}
 
 	fmt.Println("Building image... For a faster 'astro run' experince run this command while Airflow is running with 'astro dev start'\n ")
-	astroRun := true // do a build for astro run 
+	astroRun := true // do a build for astro run
 	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache}, astroRun)
 	if err != nil {
 		return err
