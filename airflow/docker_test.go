@@ -1016,7 +1016,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.RunTest("", "", "", noCache, false)
-		assert.Contains(t, err.Error(), errMockDocker)
+		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)
@@ -1054,7 +1054,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.RunTest("", "", "", noCache, false)
-		assert.Contains(t, err.Error(), errMockDocker)
+		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)
@@ -1072,7 +1072,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.RunTest("", "", "", noCache, false)
-		assert.Contains(t, err.Error(), errMockDocker)
+		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)
