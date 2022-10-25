@@ -257,6 +257,9 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 	if deployInput.Dags {
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+		}
 		if len(dagFiles) == 0 {
 			fmt.Println("No DAGs found. Skipping DAG deploy.")
 			// set dagDeployEnabled flag to false, so we skip dag deploy and do image deploy
@@ -276,10 +279,6 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 				if err != nil {
 					return err
 				}
-			}
-
-			if !deployInfo.dagDeployEnabled {
-				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 			}
 
 			fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
