@@ -407,7 +407,6 @@ func TestDockerImageRunTest(t *testing.T) {
 }
 
 func TestRunCommandCh(t *testing.T) {
-
 	t.Run("RunCommandCh success", func(t *testing.T) {
 		_, err := RunCommandCh(true, "\n", "echo", []string{"\"\ntesting\nTestRunCommandCh\""}...)
 		assert.NoError(t, err)
