@@ -68,9 +68,7 @@ func NewRootCmd() *cobra.Command {
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if currCtx {
-				if err := cloudCmd.Setup(cmd, args, astroClient); err != nil {
-					return err
-				}
+				return cloudCmd.Setup(cmd, args, astroClient)
 			}
 			// Software PersistentPreRunE component
 			// setting up log verbosity and dumping debug logs collected during CLI-initialization
