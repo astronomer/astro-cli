@@ -13,7 +13,6 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/stdcopy"
 )
 
 type MountVolume struct {
@@ -32,7 +31,7 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, volumeMounts []MountVolume) error {
+func CommonDockerUtil(cmd []string, args []string, flags map[string]string, volumeMounts []MountVolume) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -87,7 +86,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, volumeMounts 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: SQLCliDockerImageName,
 		Cmd:   cmd,
-		Tty:   false,
+		Tty:   true,
 	}, &container.HostConfig{
 		Mounts: mounts,
 	}, nil, nil, "")
@@ -117,7 +116,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, volumeMounts 
 		return err
 	}
 
-	_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, cout)
+	_, err = io.Copy(os.Stdout, cout)
 
 	if err != nil {
 		err = fmt.Errorf("docker logs forwarding failed %w", err)
