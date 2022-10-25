@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"testing"
+	"os"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/stretchr/testify/assert"
@@ -327,4 +328,13 @@ func TestJsonString(t *testing.T) {
 		res := jsonString(&conn)
 		assert.Equal(t, "", res)
 	})
+}
+
+func TestFileToConnectionYAML(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		err := FileToConnectionYAML("testfiles/airflow_settings.yaml")
+		assert.NoError(t, err)
+		os.Remove("./connections.yaml")
+		os.Remove("./variables.yaml")
+	}) 
 }
