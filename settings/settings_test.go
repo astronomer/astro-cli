@@ -2,8 +2,8 @@ package settings
 
 import (
 	"encoding/json"
-	"testing"
 	"os"
+	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/stretchr/testify/assert"
@@ -336,5 +336,5 @@ func TestFileToConnectionYAML(t *testing.T) {
 		assert.NoError(t, err)
 		os.Remove("./connections.yaml")
 		os.Remove("./variables.yaml")
-	}) 
+	})
 }
