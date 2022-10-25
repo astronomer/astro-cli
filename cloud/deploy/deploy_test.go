@@ -472,7 +472,18 @@ func TestDagsDeployVR(t *testing.T) {
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
+	defer afero.NewOsFs().Remove("./testfiles/dags.tar")
+	defer os.RemoveAll("./testfiles/dags/")
 
+	config.CFG.ShowWarnings.SetHomeString("true")
+	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(t, "n")()
+	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
+	defer afero.NewOsFs().Remove("./testfiles/dags.tar")
+	defer os.RemoveAll("./testfiles/dags/")
+
+	config.CFG.ShowWarnings.SetHomeString("false")
 	defer testUtil.MockUserInput(t, "y")()
 	defer testUtil.MockUserInput(t, "y")()
 	err = Deploy(deployInput, mockClient)
