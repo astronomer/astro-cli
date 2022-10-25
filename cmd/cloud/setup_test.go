@@ -153,4 +153,49 @@ func TestSetup(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
+
+	t.Run("use API token for virtual runtime", func(t *testing.T) {
+		mockOrgResp := []astro.Organization{
+			{
+				ID:   "test-org-id",
+				Name: "test-org-name",
+			},
+		}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetOrganizations").Return(mockOrgResp, nil).Once()
+
+		cmd := &cobra.Command{Use: "deploy"}
+		cmd, err := cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "astro"}
+		rootCmd.AddCommand(cmd)
+
+		authLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		t.Setenv("ASTRONOMER_KEY_ID", "key")
+		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
+
+		mockResp := TokenResponse{
+			AccessToken: "test-token",
+			IDToken:     "test-id",
+		}
+		jsonResponse, err := json.Marshal(mockResp)
+		assert.NoError(t, err)
+
+		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+
+		err = Setup(cmd, []string{"vr-id"}, mockClient)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
