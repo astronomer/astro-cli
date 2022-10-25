@@ -422,7 +422,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	}
 
 	fmt.Println("\nSee the output of this command for errors. To view task logs, use the --task-logs` flag.")
-	return nil
+	return err
 }
 
 // Exec executes a docker command
@@ -468,7 +468,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 }
 
 // RunCommandCh runs an arbitrary command and streams output to a channnel.
-func RunCommandCh(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) { // nolint:gocognit
+var RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) { // nolint:gocognit
 	var (
 		tasks         int
 		successfulRun int
@@ -476,8 +476,6 @@ func RunCommandCh(taskLogs bool, cutset, command string, flags ...string) (DagRu
 		failedTask    string
 	)
 	cmd := exec.Command(command, flags...)
-	log.Debugf("testing!!")
-
 	stdOutput, err := cmd.StdoutPipe()
 	if err != nil {
 		return DagRunInfo{}, errors.Wrap(err, "error parsing docker standard output")
