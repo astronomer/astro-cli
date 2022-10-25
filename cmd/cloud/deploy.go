@@ -68,7 +68,7 @@ func newDeployCmd() *cobra.Command {
 	return cmd
 }
 
-func deployTests(pars, pytest, forceDeploy bool, pytestFile string) string {
+func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 	if pytest && pytestFile == "" {
 		pytestFile = "all-tests"
 	}

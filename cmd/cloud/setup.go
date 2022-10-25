@@ -75,7 +75,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 
 	// run auth setup for any command that requires auth
 
-	apiKey, err := checkAPIKeys(client)
+	apiKey, err := checkAPIKeys(client, args)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
@@ -181,7 +181,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -268,16 +268,19 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 	}
 	organizationID := organizations[0].ID
 
-	// get workspace ID
-	deployments, err := astroClient.ListDeployments(organizationID, "")
-	if err != nil {
-		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
-	workspaceID = deployments[0].Workspace.ID
+	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
+	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
+		// get workspace ID
+		deployments, err := astroClient.ListDeployments(organizationID, "")
+		if err != nil {
+			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		}
+		workspaceID = deployments[0].Workspace.ID
 
-	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
-	if err != nil {
-		fmt.Println("no workspace set")
+		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+		if err != nil {
+			fmt.Println("no workspace set")
+		}
 	}
 	err = c.SetContextKey("organization", organizationID) // c.Organization
 	if err != nil {
