@@ -361,7 +361,7 @@ func TestDockerImageRunTest(t *testing.T) {
 
 		RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) {
 			return DagRunInfo{
-				time: "time",
+				time:        "time",
 				failedTasks: 0,
 			}, nil
 		}
@@ -377,7 +377,7 @@ func TestDockerImageRunTest(t *testing.T) {
 
 		RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) {
 			return DagRunInfo{
-				time: "time",
+				time:        "time",
 				failedTasks: 0,
 			}, nil
 		}
@@ -393,7 +393,7 @@ func TestDockerImageRunTest(t *testing.T) {
 
 		RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) {
 			return DagRunInfo{
-				time: "",
+				time:        "",
 				failedTasks: 1,
 			}, errExecMock
 		}
@@ -409,7 +409,7 @@ func TestDockerImageRunTest(t *testing.T) {
 func TestRunCommandCh(t *testing.T) {
 
 	t.Run("RunCommandCh success", func(t *testing.T) {
-		_, err := RunCommandCh(true, "\n", "echo", []string{"\"\ntesting\nTestRunCommandCh\"",}... )
+		_, err := RunCommandCh(true, "\n", "echo", []string{"\"\ntesting\nTestRunCommandCh\""}...)
 		assert.NoError(t, err)
 	})
 	t.Run("RunCommandCh unsuccessful command", func(t *testing.T) {
