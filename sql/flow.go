@@ -31,7 +31,7 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func CommonDockerUtil(cmd []string, args []string, flags map[string]string, volumeMounts []MountVolume) error {
+func CommonDockerUtil(cmd, args []string, flags map[string]string, volumeMounts []MountVolume) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {

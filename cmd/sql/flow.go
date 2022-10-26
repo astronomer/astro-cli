@@ -163,7 +163,8 @@ func initCmd(args []string) error {
 		vars["airflow-dags-folder"] = dagsMountTargetDir
 	}
 
-	args[0] = volumeMounts[0].TargetDirectory
+	args = []string{volumeMounts[0].TargetDirectory}
+
 	if err != nil {
 		return err
 	}
@@ -237,7 +238,7 @@ func runCmd(args []string) error {
 	return nil
 }
 
-func NewFlowVersionCommand() *cobra.Command {
+func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "version",
 		Short:   "Get the version of flow being used",
@@ -274,7 +275,7 @@ func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 	return cmd
 }
 
-func NewFlowValidateCommand() *cobra.Command {
+func NewFlowValidateCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "validate",
 		Short:   "Validate connections",
@@ -293,7 +294,7 @@ func NewFlowValidateCommand() *cobra.Command {
 	return cmd
 }
 
-func NewFlowGenerateCommand() *cobra.Command {
+func NewFlowGenerateCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "generate",
 		Short:   "Generate DAGs",
