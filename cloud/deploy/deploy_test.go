@@ -172,7 +172,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Action:                   "UPLOAD",
 		VersionID:                "version-id",
 		Status:                   "SUCCEEDED",
-		Message:                  "Dags uploaded successfully",
+		Message:                  "DAGs uploaded successfully",
 	}
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(6)
 
@@ -308,7 +308,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		Action:                   "UPLOAD",
 		VersionID:                "version-id",
 		Status:                   "SUCCEEDED",
-		Message:                  "Dags uploaded successfully",
+		Message:                  "DAGs uploaded successfully",
 	}
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(4)
 
@@ -397,7 +397,7 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockClient)
-	assert.Equal(t, err.Error(), "Dag Deploy is not enabled for deployment. Run 'astro deployment update test-id --dag-deploy enable' to enable dags deploy")
+	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-id --dag-deploy enable' to enable DAG-only deploys.")
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -456,7 +456,7 @@ func TestDagsDeployVR(t *testing.T) {
 		Action:                   "UPLOAD",
 		VersionID:                "version-id",
 		Status:                   "SUCCEEDED",
-		Message:                  "Dags uploaded successfully",
+		Message:                  "DAGs uploaded successfully",
 	}
 	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
 
