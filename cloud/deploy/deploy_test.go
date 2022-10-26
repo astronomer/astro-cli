@@ -42,7 +42,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		CreatedAt:        time.Now(),
 		DagDeployEnabled: false,
 	}
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
 		WsID:           "test-ws-id",
@@ -141,7 +141,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		CreatedAt:        time.Now(),
 		DagDeployEnabled: true,
 	}
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
 		WsID:           "test-ws-id",
@@ -283,7 +283,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		},
 	}
 
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
 		WsID:           "test-ws-id",
@@ -388,7 +388,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		},
 	}
 
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
 		WsID:           "test-ws-id",
@@ -440,7 +440,7 @@ func TestDagsDeployVR(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("false")
 	mockClient := new(astro_mocks.Client)
 
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      runtimeID,
 		WsID:           "test-ws-id",
@@ -549,7 +549,7 @@ func TestNoDagsDeploy(t *testing.T) {
 		return mockContainerHandler, nil
 	}
 
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
 		WsID:           "test-ws-id",
@@ -572,7 +572,7 @@ func TestDeployFailure(t *testing.T) {
 	err := config.ResetCurrentContext()
 	assert.NoError(t, err)
 
-	deployInput := InputDeploy{
+	deployInput := &InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
 		WsID:           "test-ws-id",

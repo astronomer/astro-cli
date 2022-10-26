@@ -159,7 +159,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 	return nil
 }
 
-func deployImage(c *config.Context, deployInput InputDeploy, deployInfo deploymentInfo, client astro.Client) error { // nolint
+func deployImage(c *config.Context, deployInput *InputDeploy, deployInfo deploymentInfo, client astro.Client) error { // nolint
 	domain := c.Domain
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
@@ -222,7 +222,7 @@ func deployImage(c *config.Context, deployInput InputDeploy, deployInfo deployme
 }
 
 // Deploy pushes a new docker image
-func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
+func Deploy(deployInput *InputDeploy, client astro.Client) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
