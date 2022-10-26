@@ -209,10 +209,8 @@ func helpCommand(cmdName string) error {
 
 func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Get the version of flow being used",
-		Long:  "Get the version of flow being used",
-		Args:  cobra.MaximumNArgs(1),
+		Use:  "version",
+		Args: cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -228,10 +226,8 @@ func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize flow directory",
-		Long:  "Initialize flow directory",
-		Args:  cobra.MaximumNArgs(1),
+		Use:  "init",
+		Args: cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -249,10 +245,8 @@ func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowValidateCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:   "validate",
-		Short: "Validate connections",
-		Long:  "Validate connections",
-		Args:  cobra.MaximumNArgs(1),
+		Use:  "validate",
+		Args: cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -270,10 +264,8 @@ func NewFlowValidateCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowGenerateCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:   "generate",
-		Short: "Generate DAGs",
-		Long:  "Generate DAGs",
-		Args:  cobra.MaximumNArgs(1),
+		Use:  "generate",
+		Args: cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -290,10 +282,8 @@ func NewFlowGenerateCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run workflow",
-		Long:  "Run workflow",
-		Args:  cobra.MaximumNArgs(1),
+		Use:  "run",
+		Args: cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -311,9 +301,7 @@ func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "flow",
-		Short: "Run flow commands",
-		Long:  "Forward flow subcommands to the flow python package",
+		Use: "flow",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
