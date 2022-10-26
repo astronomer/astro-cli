@@ -22,56 +22,11 @@ var (
 const flowCmd = "flow"
 
 var (
-	flowVersionCmd    = []string{flowCmd, "version"}
-	flowInitCmd       = []string{flowCmd, "init"}
-	flowValidateCmd   = []string{flowCmd, "validate"}
-	flowGenerateCmd   = []string{flowCmd, "generate"}
-	flowRunCmd        = []string{flowCmd, "run"}
-	versionCmdExample = `
-	# Get astro sql cli version
-	astro flow version
-	`
-	initCmdExample = `
-	# Initialize a project structure to write workflows using SQL files.
-	astro flow init
-
-	# Initialize a project in the current directory
-	astro flow init .
-
-	# Initialize a project with creating a directory with the given project name
-	astro flow init project_name
-	`
-	validateCmdExample = `
-	# Validate Airflow connection(s) provided in the configuration file from a directory.
-	astro flow validate
-
-	# Validate connections for a project
-	astro flow validate project_name
-
-	# Validate a specific connection
-	astro flow validate --connection database_conn_id
-
-	# Validate connection for a specific environment
-	astro flow validate --environment production
-	`
-	generateCmdExample = `
-	# Generate the Airflow DAG from a directory of SQL files
-	astro flow generate
-
-	# Generate for a project
-	astro flow generate project_name
-	`
-	runCmdExample = `
-	# Run a workflow locally from a project directory. This task assumes that there is a local airflow DB (can be a SQLite file),
-	# that has been initialized with Airflow tables
-	astro flow run
-
-	# Run for a project
-	astro flow run project_name
-
-	# Run for a specific environment
-	astro flow run --environment production
-	`
+	flowVersionCmd  = []string{flowCmd, "version"}
+	flowInitCmd     = []string{flowCmd, "init"}
+	flowValidateCmd = []string{flowCmd, "validate"}
+	flowGenerateCmd = []string{flowCmd, "generate"}
+	flowRunCmd      = []string{flowCmd, "run"}
 )
 
 func getLeafDirectory(directoryPath string) string {
@@ -254,11 +209,10 @@ func helpCommand(cmdName string) error {
 
 func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:     "version",
-		Short:   "Get the version of flow being used",
-		Long:    "Get the version of flow being used",
-		Example: versionCmdExample,
-		Args:    cobra.MaximumNArgs(1),
+		Use:   "version",
+		Short: "Get the version of flow being used",
+		Long:  "Get the version of flow being used",
+		Args:  cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -274,11 +228,10 @@ func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:     "init",
-		Short:   "Initialize flow directory",
-		Long:    "Initialize flow directory",
-		Example: initCmdExample,
-		Args:    cobra.MaximumNArgs(1),
+		Use:   "init",
+		Short: "Initialize flow directory",
+		Long:  "Initialize flow directory",
+		Args:  cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -296,11 +249,10 @@ func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowValidateCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:     "validate",
-		Short:   "Validate connections",
-		Long:    "Validate connections",
-		Example: validateCmdExample,
-		Args:    cobra.MaximumNArgs(1),
+		Use:   "validate",
+		Short: "Validate connections",
+		Long:  "Validate connections",
+		Args:  cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -318,11 +270,10 @@ func NewFlowValidateCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowGenerateCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:     "generate",
-		Short:   "Generate DAGs",
-		Long:    "Generate DAGs",
-		Example: generateCmdExample,
-		Args:    cobra.MaximumNArgs(1),
+		Use:   "generate",
+		Short: "Generate DAGs",
+		Long:  "Generate DAGs",
+		Args:  cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
@@ -339,11 +290,10 @@ func NewFlowGenerateCommand() *cobra.Command { // nolint:dupl
 
 func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 	cmd := &cobra.Command{
-		Use:     "run",
-		Short:   "Run workflow",
-		Long:    "Run workflow",
-		Example: runCmdExample,
-		Args:    cobra.MaximumNArgs(1),
+		Use:   "run",
+		Short: "Run workflow",
+		Long:  "Run workflow",
+		Args:  cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
