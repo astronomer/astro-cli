@@ -462,7 +462,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	}
 
 	if dagDeploy == "enable" {
-		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled." +
+		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted and new tasks will continue to be scheduled." +
 			"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..\n\n")
 		deploymentUpdate.DagDeployEnabled = true
 	} else if dagDeploy == "disable" {
