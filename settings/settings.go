@@ -591,49 +591,6 @@ func jsonString(conn *Connection) string {
 	return extraString
 }
 
-// SettingsFileToEnv(envFile, settingsFile string version uint64) error {
-// 	if version < AirflowVersionTwo {
-// 		return errors.New("Settings File must be used with Airflow 2.X for this Command")
-// 	}
-// 	err := InitSettings(settingsFile)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	// Connections from settings file to env file
-// 	connections := settings.Airflow.Connections
-
-// }
-
-// type ConnectionYAMLs []ConnectionYAML
-
-type VariablesYAML struct {
-	VarYAMLs `mapstructure:"connections" yaml:"variables"`
-}
-
-type VarYAMLs []VarYAML
-
-type VarYAML struct {
-	Key   string `mapstructure:"key" yaml:"key"`
-	Value string `mapstructure:"value" yaml:"value"`
-}
-
-type ConnectionsYAML struct {
-	ConnYAMLs `mapstructure:"connections" yaml:"connections"`
-}
-
-type ConnYAMLs []ConnYAML
-
-type ConnYAML struct {
-	ConnID   string      `mapstructure:"conn_id" yaml:"conn_id"`
-	ConnType string      `mapstructure:"conn_type" yaml:"conn_type"`
-	Host     string      `mapstructure:"host" yaml:"host"`
-	Schema   string      `mapstructure:"schema" yaml:"schema"`
-	Login    string      `mapstructure:"login" yaml:"login"`
-	Password string      `mapstructure:"password" yaml:"password"`
-	Port     int         `mapstructure:"port" yaml:"port"`
-	Extra    interface{} `mapstructure:"extra" yaml:"extra"`
-}
-
 func FileToConnectionYAML(settingsFile string) error {
 	err := InitSettings(settingsFile)
 	if err != nil {
