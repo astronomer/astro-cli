@@ -23,6 +23,7 @@ const flowCmd = "flow"
 
 var (
 	flowVersionCmd  = []string{flowCmd, "version"}
+	flowAboutCmd    = []string{flowCmd, "about"}
 	flowInitCmd     = []string{flowCmd, "init"}
 	flowValidateCmd = []string{flowCmd, "validate"}
 	flowGenerateCmd = []string{flowCmd, "generate"}
@@ -76,6 +77,21 @@ func getBaseMountVolumes(projectDir string) ([]sql.MountVolume, error) {
 	volumeMounts := make([]sql.MountVolume, 0)
 	volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: projectMountSourceDir, TargetDirectory: projectMountTargetDir})
 	return volumeMounts, nil
+}
+
+func aboutCmd(args []string) error {
+	vars := buildCommonVars()
+	volumeMounts, err := getBaseMountVolumes(projectDir)
+	if err != nil {
+		return err
+	}
+
+	err = sql.CommonDockerUtil(flowAboutCmd, args, vars, volumeMounts)
+	if err != nil {
+		return fmt.Errorf("error running %v: %w", flowAboutCmd, err)
+	}
+
+	return nil
 }
 
 func versionCmd(args []string) error {
@@ -193,18 +209,28 @@ func runCmd(args []string) error {
 	return nil
 }
 
-func helpCommand(cmdName string) error {
+func help(c *cobra.Command, s []string) {
+	cmdName := c.Name()
 	cmd := []string{flowCmd, cmdName}
 	if cmdName == flowCmd {
 		cmd = []string{flowCmd}
 	}
+	sql.CommonDockerUtil(cmd, []string{"--help"}, nil, nil) // nolint:errcheck
+}
 
-	err := sql.CommonDockerUtil(cmd, []string{"--help"}, nil, nil)
-	if err != nil {
-		return err
+func NewFlowAboutCommand() *cobra.Command { // nolint:dupl
+	cmd := &cobra.Command{
+		Use:  "about",
+		Args: cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return aboutCmd(args)
+		},
 	}
-
-	return nil
+	cmd.SetHelpFunc(help)
+	return cmd
 }
 
 func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
@@ -218,9 +244,7 @@ func NewFlowVersionCommand() *cobra.Command { // nolint:dupl
 			return versionCmd(args)
 		},
 	}
-
-	cmd.SetHelpFunc(func(c *cobra.Command, s []string) { helpCommand(cmd.Name()) }) // nolint:errcheck
-
+	cmd.SetHelpFunc(help)
 	return cmd
 }
 
@@ -235,11 +259,9 @@ func NewFlowInitCommand() *cobra.Command { // nolint:dupl
 			return initCmd(args)
 		},
 	}
-
-	cmd.SetHelpFunc(func(c *cobra.Command, s []string) { helpCommand(cmd.Name()) }) // nolint:errcheck
+	cmd.SetHelpFunc(help)
 	cmd.Flags().StringVarP(&airflowHome, "airflow_home", "a", "", "Set the Airflow Home")
 	cmd.Flags().StringVarP(&airflowDagsFolder, "airflow_dags_folder", "d", "", "Set the DAGs Folder")
-
 	return cmd
 }
 
@@ -254,11 +276,9 @@ func NewFlowValidateCommand() *cobra.Command { // nolint:dupl
 			return validateCmd(args)
 		},
 	}
-
-	cmd.SetHelpFunc(func(c *cobra.Command, s []string) { helpCommand(cmd.Name()) }) // nolint:errcheck
+	cmd.SetHelpFunc(help)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "Directory of the project. Default: current directory")
 	cmd.Flags().StringVarP(&connection, "connection", "c", "", "Identifier of the connection to be validated. By default checks all the env connections.")
-
 	return cmd
 }
 
@@ -273,10 +293,8 @@ func NewFlowGenerateCommand() *cobra.Command { // nolint:dupl
 			return generateCmd(args)
 		},
 	}
-
-	cmd.SetHelpFunc(func(c *cobra.Command, s []string) { helpCommand(cmd.Name()) }) // nolint:errcheck
+	cmd.SetHelpFunc(help)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "Directory of the project. Default: current directory")
-
 	return cmd
 }
 
@@ -291,11 +309,9 @@ func NewFlowRunCommand() *cobra.Command { // nolint:dupl
 			return runCmd(args)
 		},
 	}
-
-	cmd.SetHelpFunc(func(c *cobra.Command, s []string) { helpCommand(cmd.Name()) }) // nolint:errcheck
+	cmd.SetHelpFunc(help)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "Directory of the project. Default: current directory")
 	cmd.Flags().StringVarP(&verbose, "verbose", "v", "", "Boolean value indicating whether to show airflow logs")
-
 	return cmd
 }
 
@@ -305,18 +321,14 @@ func NewFlowCommand() *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return helpCommand(cmd.Name())
-		},
 	}
-
-	cmd.SetHelpFunc(func(c *cobra.Command, s []string) { helpCommand(cmd.Name()) }) // nolint:errcheck
+	cmd.SetHelpFunc(help)
 	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "", "environment for the flow project")
 	cmd.AddCommand(NewFlowVersionCommand())
+	cmd.AddCommand(NewFlowAboutCommand())
 	cmd.AddCommand(NewFlowInitCommand())
 	cmd.AddCommand(NewFlowValidateCommand())
 	cmd.AddCommand(NewFlowGenerateCommand())
 	cmd.AddCommand(NewFlowRunCommand())
-
 	return cmd
 }
