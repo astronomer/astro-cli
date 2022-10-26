@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
@@ -30,32 +29,31 @@ var (
 	flowRunCmd      = []string{flowCmd, "run"}
 )
 
-func getLeafDirectory(directoryPath string) string {
-	directoryPathSplit := strings.Split(directoryPath, "/")
-	relativeProjectDir := directoryPathSplit[len(directoryPathSplit)-1]
-	leafDirectory := "/" + relativeProjectDir
-	return leafDirectory
-}
-
-func createProjectDir(projectDir string) (sourceMountDir, targetMountDir string, err error) {
-	if !filepath.IsAbs(projectDir) || projectDir == "" || projectDir == "." {
+func getAbsolutePath(path string) (string, error) {
+	if !filepath.IsAbs(path) || path == "" || path == "." {
 		currentDir, err := os.Getwd()
 		if err != nil {
 			err = fmt.Errorf("error getting current directory %w", err)
-			return "", "", err
+			return "", err
 		}
-		projectDir = filepath.Join(currentDir, projectDir)
+		path = filepath.Join(currentDir, path)
+	}
+	return path, nil
+}
+
+func createProjectDir(projectDir string) (mountDir string, err error) {
+	projectDir, err = getAbsolutePath(projectDir)
+	if err != nil {
+		return "", err
 	}
 
 	err = os.MkdirAll(projectDir, os.ModePerm)
 	if err != nil {
 		err = fmt.Errorf("error creating project directory %s: %w", projectDir, err)
-		return "", "", err
+		return "", err
 	}
 
-	mountDir := getLeafDirectory(projectDir)
-
-	return projectDir, mountDir, nil
+	return projectDir, nil
 }
 
 func buildCommonVars() map[string]string {
@@ -69,24 +67,23 @@ func buildCommonVars() map[string]string {
 	return vars
 }
 
-func getBaseMountVolumes(projectDir string) ([]sql.MountVolume, error) {
-	projectMountSourceDir, projectMountTargetDir, err := createProjectDir(projectDir)
+func getBaseMountDirs(projectDir string) ([]string, error) {
+	mountDir, err := createProjectDir(projectDir)
 	if err != nil {
 		return nil, err
 	}
-	volumeMounts := make([]sql.MountVolume, 0)
-	volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: projectMountSourceDir, TargetDirectory: projectMountTargetDir})
-	return volumeMounts, nil
+	mountDirs := []string{mountDir}
+	return mountDirs, nil
 }
 
 func aboutCmd(args []string) error {
 	vars := buildCommonVars()
-	volumeMounts, err := getBaseMountVolumes(projectDir)
+	mountDirs, err := getBaseMountDirs(projectDir)
 	if err != nil {
 		return err
 	}
 
-	err = sql.CommonDockerUtil(flowAboutCmd, args, vars, volumeMounts)
+	err = sql.CommonDockerUtil(flowAboutCmd, args, vars, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowAboutCmd, err)
 	}
@@ -96,12 +93,12 @@ func aboutCmd(args []string) error {
 
 func versionCmd(args []string) error {
 	vars := buildCommonVars()
-	volumeMounts, err := getBaseMountVolumes(projectDir)
+	mountDirs, err := getBaseMountDirs(projectDir)
 	if err != nil {
 		return err
 	}
 
-	err = sql.CommonDockerUtil(flowVersionCmd, args, vars, volumeMounts)
+	err = sql.CommonDockerUtil(flowVersionCmd, args, vars, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowVersionCmd, err)
 	}
@@ -117,30 +114,28 @@ func initCmd(args []string) error {
 
 	vars := buildCommonVars()
 
-	volumeMounts, err := getBaseMountVolumes(projectDir)
+	mountDirs, err := getBaseMountDirs(projectDir)
+	args = mountDirs
+
 	if err != nil {
 		return err
 	}
 
 	if airflowHome != "" {
-		airflowMountTargetDir := getLeafDirectory(airflowHome)
-		volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: airflowHome, TargetDirectory: airflowMountTargetDir})
-		vars["airflow-home"] = airflowMountTargetDir
+		mountDirs = append(mountDirs, airflowHome)
+		vars["airflow-home"] = airflowHome
 	}
 
 	if airflowDagsFolder != "" {
-		dagsMountTargetDir := getLeafDirectory(airflowDagsFolder)
-		volumeMounts = append(volumeMounts, sql.MountVolume{SourceDirectory: airflowDagsFolder, TargetDirectory: dagsMountTargetDir})
-		vars["airflow-dags-folder"] = dagsMountTargetDir
+		mountDirs = append(mountDirs, airflowDagsFolder)
+		vars["airflow-dags-folder"] = airflowDagsFolder
 	}
-
-	args = []string{volumeMounts[0].TargetDirectory}
 
 	if err != nil {
 		return err
 	}
 
-	err = sql.CommonDockerUtil(flowInitCmd, args, vars, volumeMounts)
+	err = sql.CommonDockerUtil(flowInitCmd, args, vars, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowInitCmd, err)
 	}
@@ -149,17 +144,19 @@ func initCmd(args []string) error {
 }
 
 func validateCmd(args []string) error {
+	if len(args) > 0 {
+		projectDir = args[0]
+	}
+
 	vars := buildCommonVars()
-	volumeMounts, err := getBaseMountVolumes(projectDir)
+
+	mountDirs, err := getBaseMountDirs(projectDir)
 	if err != nil {
 		return err
 	}
+	args = mountDirs
 
-	if len(args) == 0 {
-		args = append(args, volumeMounts[0].TargetDirectory)
-	}
-
-	err = sql.CommonDockerUtil(flowValidateCmd, args, vars, volumeMounts)
+	err = sql.CommonDockerUtil(flowValidateCmd, args, vars, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowValidateCmd, err)
 	}
@@ -173,13 +170,18 @@ func generateCmd(args []string) error {
 	}
 
 	vars := buildCommonVars()
-	volumeMounts, err := getBaseMountVolumes(projectDir)
+	mountDirs, err := getBaseMountDirs(projectDir)
 	if err != nil {
 		return err
 	}
-	vars["project-dir"] = volumeMounts[0].TargetDirectory
 
-	err = sql.CommonDockerUtil(flowGenerateCmd, args, vars, volumeMounts)
+	projectDir, err = getAbsolutePath(projectDir)
+	if err != nil {
+		return err
+	}
+	vars["project-dir"] = projectDir
+
+	err = sql.CommonDockerUtil(flowGenerateCmd, args, vars, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowGenerateCmd, err)
 	}
@@ -193,16 +195,22 @@ func runCmd(args []string) error {
 	}
 
 	vars := buildCommonVars()
-	volumeMounts, err := getBaseMountVolumes(projectDir)
+	mountDirs, err := getBaseMountDirs(projectDir)
 	if err != nil {
 		return err
 	}
-	vars["project-dir"] = volumeMounts[0].TargetDirectory
+
+	projectDir, err = getAbsolutePath(projectDir)
+	if err != nil {
+		return err
+	}
+	vars["project-dir"] = projectDir
+
 	if verbose != "" {
 		vars["verbose"] = verbose
 	}
 
-	err = sql.CommonDockerUtil(flowRunCmd, args, vars, volumeMounts)
+	err = sql.CommonDockerUtil(flowRunCmd, args, vars, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", flowRunCmd, err)
 	}
