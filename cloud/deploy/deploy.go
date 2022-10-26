@@ -88,6 +88,17 @@ type InputDeploy struct {
 	Dags           bool
 }
 
+func getRegistryURL(domain string) string {
+	var registry string
+	if domain == "localhost" {
+		registry = config.CFG.LocalRegistry.GetString()
+	} else {
+		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
+	}
+
+	return registry
+}
+
 func deployDags(path, runtimeID string, client astro.Client) error {
 	// Check the dags directory
 	dagsPath := filepath.Join(path, "dags")
@@ -174,12 +185,7 @@ func deployImage(c *config.Context, deployInput InputDeploy, deployInfo deployme
 	}
 
 	nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
-	var registry string
-	if domain == "localhost" {
-		registry = config.CFG.LocalRegistry.GetString()
-	} else {
-		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
-	}
+	registry := getRegistryURL(domain)
 	repository := registry + "/" + deployInfo.organizationID + "/" + deployInfo.deploymentID
 	// TODO: Resolve the edge case where two people push the same nextTag at the same time
 	remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
