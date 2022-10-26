@@ -21,9 +21,10 @@ type MountVolume struct {
 }
 
 const (
-	SQLCliDockerfilePath  = ".Dockerfile.sql_cli"
-	SQLCliDockerImageName = "sql_cli"
-	PythonVersion         = "3.9"
+	SQLCliDockerfilePath      = ".Dockerfile.sql_cli"
+	SQLCLIDockerfileWriteMode = 0o600
+	SQLCliDockerImageName     = "sql_cli"
+	PythonVersion             = "3.9"
 )
 
 func getContext(filePath string) io.Reader {
@@ -45,7 +46,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, volumeMounts 
 	}
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
-	err = os.WriteFile(SQLCliDockerfilePath, dockerfileContent, 0o600) // nolint:gomnd
+	err = os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode)
 	if err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
