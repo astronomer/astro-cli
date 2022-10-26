@@ -291,6 +291,9 @@ func NewFlowCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "flow",
 		PersistentPreRunE: login,
+		Run: func(cmd *cobra.Command, args []string) {
+			executeHelp(cmd, []string{cmd.Name(), "--help"})
+		},
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "", "")
