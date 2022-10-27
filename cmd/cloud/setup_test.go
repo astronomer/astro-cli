@@ -9,6 +9,7 @@ import (
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -197,5 +198,59 @@ func TestSetup(t *testing.T) {
 		err = Setup(cmd, []string{"vr-id"}, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+	})
+}
+
+func TestCheckAPIKeys(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("test context switch", func(t *testing.T) {
+		mockDeplyResp := []astro.Deployment{
+			{
+				ID:        "test-id",
+				Workspace: astro.Workspace{ID: "workspace-id"},
+			},
+		}
+
+		mockOrgResp := []astro.Organization{
+			{
+				ID:   "test-org-id",
+				Name: "test-org-name",
+			},
+		}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetOrganizations").Return(mockOrgResp, nil).Once()
+		mockClient.On("ListDeployments", mockOrgResp[0].ID, "").Return(mockDeplyResp, nil).Once()
+
+		authLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		t.Setenv("ASTRONOMER_KEY_ID", "key")
+		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
+
+		mockResp := TokenResponse{
+			AccessToken: "test-token",
+			IDToken:     "test-id",
+		}
+		jsonResponse, err := json.Marshal(mockResp)
+		assert.NoError(t, err)
+
+		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err = context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIKeys(mockClient, []string{})
+		assert.NoError(t, err)
 	})
 }

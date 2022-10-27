@@ -189,26 +189,28 @@ func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 		return false, nil
 	}
 	fmt.Println("Using an Astro API key")
-	// set context
-	domain := "astronomer.io"
-
-	if !context.Exists(domain) {
-		err := context.SetContext(domain)
-		if err != nil {
-			return false, err
-		}
-
-		// Switch context
-		err = context.Switch(domain)
-		if err != nil {
-			return false, err
-		}
-	}
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
-		return false, err
+		// set context
+		domain := "astronomer.io"
+		if !context.Exists(domain) {
+			err := context.SetContext(domain)
+			if err != nil {
+				return false, err
+			}
+
+			// Switch context
+			err = context.Switch(domain)
+			if err != nil {
+				return false, err
+			}
+		}
+		c, err = context.GetContext(domain) // get current context
+		if err != nil {
+			return false, err
+		}
 	}
 
 	authConfig, err := auth.ValidateDomain(c.Domain)
