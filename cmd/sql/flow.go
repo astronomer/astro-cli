@@ -73,10 +73,7 @@ func executeAbout(cmd *cobra.Command, args []string) error {
 	}
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	err = sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-	if err != nil {
-		return fmt.Errorf("error running %v: %w", cmdString, err)
-	}
+	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
 
 	return nil
 }
@@ -89,10 +86,7 @@ func executeVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	err = sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-	if err != nil {
-		return fmt.Errorf("error running %v: %w", cmdString, err)
-	}
+	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
 
 	return nil
 }
@@ -123,10 +117,7 @@ func executeInit(cmd *cobra.Command, args []string) error {
 	}
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	err = sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-	if err != nil {
-		return fmt.Errorf("error running %v: %w", cmdString, err)
-	}
+	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
 
 	return nil
 }
@@ -145,10 +136,7 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 	args = mountDirs
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	err = sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-	if err != nil {
-		return fmt.Errorf("error running %v: %w", cmdString, err)
-	}
+	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
 
 	return nil
 }
@@ -171,10 +159,7 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 	vars["project-dir"] = projectDir
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	err = sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-	if err != nil {
-		return fmt.Errorf("error running %v: %w", cmdString, err)
-	}
+	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
 
 	return nil
 }
@@ -201,18 +186,13 @@ func executeRun(cmd *cobra.Command, args []string) error {
 	}
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	err = sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-	if err != nil {
-		return fmt.Errorf("error running %v: %w", cmdString, err)
-	}
+	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
+
 	return nil
 }
 
 func executeHelp(cmd *cobra.Command, cmdString []string) {
-	err := sql.CommonDockerUtil(cmdString, nil, nil, nil)
-	if err != nil {
-		panic(fmt.Errorf("error running %v: %w", cmdString, err))
-	}
+	sql.CommonDockerUtil(cmdString, nil, nil, nil)
 }
 
 func aboutCommand() *cobra.Command {
