@@ -624,8 +624,6 @@ func FileToConnectionYAML(settingsFile string) error {
 		fmt.Printf("Error creating connections from settings file: %s\n", err.Error())
 	}
 
-	fmt.Println(string(out))
-
 	err = fileutil.WriteStringToFile("./connections.yaml", string(out))
 	if err != nil {
 		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
@@ -651,8 +649,6 @@ func FileToConnectionYAML(settingsFile string) error {
 	if err != nil {
 		fmt.Printf("Error creating variabels from settings file: %s\n", err.Error())
 	}
-
-	fmt.Println(string(out))
 
 	err = fileutil.WriteStringToFile("./variables.yaml", string(out))
 	if err != nil {

@@ -337,4 +337,14 @@ func TestFileToConnectionYAML(t *testing.T) {
 		os.Remove("./connections.yaml")
 		os.Remove("./variables.yaml")
 	})
+
+	t.Run("invalid setttings file", func(t *testing.T) {
+		err := FileToConnectionYAML("testfiles/airflow_settings_invalid.yaml")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decode file")
+		os.Remove("./connections.yaml")
+		os.Remove("./variables.yaml")
+	})
 }
+
+
