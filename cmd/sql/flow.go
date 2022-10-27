@@ -15,7 +15,7 @@ var (
 	airflowHome       string
 	airflowDagsFolder string
 	projectDir        string
-	verbose           string
+	verbose           bool
 )
 
 func getAbsolutePath(path string) (string, error) {
@@ -196,8 +196,8 @@ func executeRun(cmd *cobra.Command, args []string) error {
 	}
 	vars["project-dir"] = projectDir
 
-	if verbose != "" {
-		vars["verbose"] = verbose
+	if verbose {
+		args = append(args, "--verbose")
 	}
 
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
@@ -284,7 +284,7 @@ func runCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "")
-	cmd.Flags().StringVarP(&verbose, "verbose", "v", "", "")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "")
 	return cmd
 }
 
