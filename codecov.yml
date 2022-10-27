@@ -17,6 +17,6 @@ coverage:
     patch:
       default:
         enabled: yes
-        target: auto
+        target: 85 # TODO Set it back to "auto" once PR: https://github.com/astronomer/astro-cli/pull/819 is merged
         threshold: 1%  # allowed to drop X% and still result in a "success" commit status
         base: auto

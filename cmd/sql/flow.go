@@ -65,30 +65,47 @@ func getBaseMountDirs(projectDir string) ([]string, error) {
 	return mountDirs, nil
 }
 
-func executeAbout(cmd *cobra.Command, args []string) error {
-	vars := buildCommonVars()
-	mountDirs, err := getBaseMountDirs(projectDir)
+func buildVarsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder bool) (vars map[string]string, mountDirs []string, err error) {
+	vars = buildCommonVars()
+	mountDirs, err = getBaseMountDirs(projectDir)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
+	if setProjectDir {
+		projectDir, err = getAbsolutePath(projectDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		vars["project-dir"] = projectDir
+	}
+
+	if setAirflowHome && airflowHome != "" {
+		mountDirs = append(mountDirs, airflowHome)
+		vars["airflow-home"] = airflowHome
+	}
+
+	if setAirflowDagsFolder && airflowDagsFolder != "" {
+		mountDirs = append(mountDirs, airflowDagsFolder)
+		vars["airflow-dags-folder"] = airflowDagsFolder
+	}
+
+	return vars, mountDirs, nil
+}
+
+func executeCmd(cmd *cobra.Command, args []string, vars map[string]string, mountDirs []string) error {
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
 	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
 
 	return nil
 }
 
-func executeVersion(cmd *cobra.Command, args []string) error {
-	vars := buildCommonVars()
-	mountDirs, err := getBaseMountDirs(projectDir)
+func executeBase(cmd *cobra.Command, args []string) error {
+	vars, mountDirs, err := buildVarsAndMountDirs(projectDir, false, false, false)
 	if err != nil {
 		return err
 	}
-
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-
-	return nil
+	return executeCmd(cmd, args, vars, mountDirs)
 }
 
 func executeInit(cmd *cobra.Command, args []string) error {
@@ -97,29 +114,14 @@ func executeInit(cmd *cobra.Command, args []string) error {
 		projectDir = args[0]
 	}
 
-	vars := buildCommonVars()
-
-	mountDirs, err := getBaseMountDirs(projectDir)
-	args = mountDirs
-
+	vars, mountDirs, err := buildVarsAndMountDirs(projectDir, false, true, true)
 	if err != nil {
 		return err
 	}
 
-	if airflowHome != "" {
-		mountDirs = append(mountDirs, airflowHome)
-		vars["airflow-home"] = airflowHome
-	}
+	args = mountDirs
 
-	if airflowDagsFolder != "" {
-		mountDirs = append(mountDirs, airflowDagsFolder)
-		vars["airflow-dags-folder"] = airflowDagsFolder
-	}
-
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-
-	return nil
+	return executeCmd(cmd, args, vars, mountDirs)
 }
 
 func executeValidate(cmd *cobra.Command, args []string) error {
@@ -127,18 +129,14 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 		projectDir = args[0]
 	}
 
-	vars := buildCommonVars()
-
-	mountDirs, err := getBaseMountDirs(projectDir)
+	vars, mountDirs, err := buildVarsAndMountDirs(projectDir, false, false, false)
 	if err != nil {
 		return err
 	}
+
 	args = mountDirs
 
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-
-	return nil
+	return executeCmd(cmd, args, vars, mountDirs)
 }
 
 func executeGenerate(cmd *cobra.Command, args []string) error {
@@ -146,22 +144,12 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("workflow_name")
 	}
 
-	vars := buildCommonVars()
-	mountDirs, err := getBaseMountDirs(projectDir)
+	vars, mountDirs, err := buildVarsAndMountDirs(projectDir, true, false, false)
 	if err != nil {
 		return err
 	}
 
-	projectDir, err = getAbsolutePath(projectDir)
-	if err != nil {
-		return err
-	}
-	vars["project-dir"] = projectDir
-
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-
-	return nil
+	return executeCmd(cmd, args, vars, mountDirs)
 }
 
 func executeRun(cmd *cobra.Command, args []string) error {
@@ -169,26 +157,16 @@ func executeRun(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("workflow_name")
 	}
 
-	vars := buildCommonVars()
-	mountDirs, err := getBaseMountDirs(projectDir)
+	vars, mountDirs, err := buildVarsAndMountDirs(projectDir, true, false, false)
 	if err != nil {
 		return err
 	}
-
-	projectDir, err = getAbsolutePath(projectDir)
-	if err != nil {
-		return err
-	}
-	vars["project-dir"] = projectDir
 
 	if verbose {
 		args = append(args, "--verbose")
 	}
 
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
-
-	return nil
+	return executeCmd(cmd, args, vars, mountDirs)
 }
 
 func executeHelp(cmd *cobra.Command, cmdString []string) {
@@ -199,7 +177,7 @@ func aboutCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "about",
 		Args:         cobra.MaximumNArgs(1),
-		RunE:         executeAbout,
+		RunE:         executeBase,
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
@@ -210,7 +188,7 @@ func versionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "version",
 		Args:         cobra.MaximumNArgs(1),
-		RunE:         executeVersion,
+		RunE:         executeBase,
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
