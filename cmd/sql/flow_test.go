@@ -13,6 +13,11 @@ func execFlowCmd(args ...string) error {
 	return err
 }
 
+func TestFlowCmd(t *testing.T) {
+	err := execFlowCmd([]string{}...)
+	assert.NoError(t, err)
+}
+
 func TestFlowVersionCmd(t *testing.T) {
 	err := execFlowCmd([]string{"version"}...)
 	assert.NoError(t, err)
@@ -47,6 +52,15 @@ func TestFlowGenerateCmd(t *testing.T) {
 
 	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project_dir", tempDir}...)
 	assert.NoError(t, err)
+}
+
+func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
+	tempDir := t.TempDir()
+	err := execFlowCmd([]string{"init", tempDir}...)
+	assert.NoError(t, err)
+
+	err = execFlowCmd([]string{"generate"}...)
+	assert.EqualError(t, err, "argument not set:workflow_name")
 }
 
 func TestFlowRunCmd(t *testing.T) {
