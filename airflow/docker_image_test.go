@@ -33,6 +33,7 @@ func TestDockerImageBuild(t *testing.T) {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
+		Output:          true,
 	}
 
 	previousCmdExec := cmdExec
@@ -68,6 +69,7 @@ func TestDockerImageBuild(t *testing.T) {
 			Path:            "incorrect-path",
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
+			Output:          false,
 		}
 
 		err = handler.Build(options, false)
