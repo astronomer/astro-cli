@@ -217,9 +217,10 @@ func executeHelp(cmd *cobra.Command, cmdString []string) {
 
 func aboutCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "about",
-		Args: cobra.MaximumNArgs(1),
-		RunE: executeAbout,
+		Use:          "about",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         executeAbout,
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	return cmd
@@ -227,9 +228,10 @@ func aboutCommand() *cobra.Command {
 
 func versionCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "version",
-		Args: cobra.MaximumNArgs(1),
-		RunE: executeVersion,
+		Use:          "version",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         executeVersion,
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	return cmd
@@ -237,9 +239,10 @@ func versionCommand() *cobra.Command {
 
 func initCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "init",
-		Args: cobra.MaximumNArgs(1),
-		RunE: executeInit,
+		Use:          "init",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         executeInit,
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&airflowHome, "airflow_home", "a", "", "")
@@ -249,9 +252,10 @@ func initCommand() *cobra.Command {
 
 func validateCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "validate",
-		Args: cobra.MaximumNArgs(1),
-		RunE: executeValidate,
+		Use:          "validate",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         executeValidate,
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "")
@@ -261,9 +265,10 @@ func validateCommand() *cobra.Command {
 
 func generateCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "generate",
-		Args: cobra.MaximumNArgs(1),
-		RunE: executeGenerate,
+		Use:          "generate",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         executeGenerate,
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "")
@@ -272,9 +277,10 @@ func generateCommand() *cobra.Command {
 
 func runCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "run",
-		Args: cobra.MaximumNArgs(1),
-		RunE: executeRun,
+		Use:          "run",
+		Args:         cobra.MaximumNArgs(1),
+		RunE:         executeRun,
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&projectDir, "project_dir", "p", ".", "")
@@ -294,6 +300,7 @@ func NewFlowCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			executeHelp(cmd, []string{cmd.Name(), "--help"})
 		},
+		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "", "")
