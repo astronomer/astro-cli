@@ -95,6 +95,7 @@ func TestDockerImagePytest(t *testing.T) {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
+		Output:          true,
 	}
 
 	previousCmdExec := cmdExec
@@ -108,6 +109,13 @@ func TestDockerImagePytest(t *testing.T) {
 	})
 
 	t.Run("pytest error", func(t *testing.T) {
+		options = airflowTypes.ImageBuildConfig{
+			Path:            cwd,
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+			Output:          false,
+		}
+
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
