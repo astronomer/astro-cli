@@ -48,6 +48,7 @@ func TestDockerImageBuild(t *testing.T) {
 
 	t.Run("build --no-cache", func(t *testing.T) {
 		options.NoCache = true
+		options.Output = false
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			assert.Contains(t, args, "--no-cache")
 			return nil
@@ -392,7 +393,7 @@ func TestDockerImageRunTest(t *testing.T) {
 			}, nil
 		}
 
-		err = handler.RunTest("", "./testfiles/airflow_settings.yaml", "", "", "test-container", true)
+		err = handler.RunTest("", "", "", "", "test-container", true)
 		assert.NoError(t, err)
 	})
 
