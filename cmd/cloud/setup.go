@@ -52,6 +52,10 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
+	// If the user is using flow commands no need to go through auth setup.
+	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
 
 	// help command does not need auth setup
 	if cmd.CalledAs() == "help" && cmd.Parent().Use == topLvlCmd {
