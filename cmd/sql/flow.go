@@ -95,7 +95,10 @@ func buildVarsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, set
 
 func executeCmd(cmd *cobra.Command, args []string, vars map[string]string, mountDirs []string) error {
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
-	sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
+	err := sql.CommonDockerUtil(cmdString, args, vars, mountDirs)
+	if err != nil {
+		return fmt.Errorf("error running %v: %w", cmdString, err)
+	}
 
 	return nil
 }
@@ -170,7 +173,10 @@ func executeRun(cmd *cobra.Command, args []string) error {
 }
 
 func executeHelp(cmd *cobra.Command, cmdString []string) {
-	sql.CommonDockerUtil(cmdString, nil, nil, nil)
+	err := sql.CommonDockerUtil(cmdString, nil, nil, nil)
+	if err != nil {
+		panic(fmt.Errorf("error running %v: %w", cmdString, err))
+	}
 }
 
 func aboutCommand() *cobra.Command {

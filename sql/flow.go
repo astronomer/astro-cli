@@ -73,21 +73,23 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) {
+func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
 	cli, err := newDockerClient()
 	if err != nil {
-		err = fmt.Errorf("docker client initialisation failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("docker client initialization failed %w", err)
+		return err
 	}
 
-	astroSQLCliVersion := GetPypiVersion(astroSQLCliProjectURL)
+	astroSQLCliVersion, err := GetPypiVersion(astroSQLCliProjectURL)
+	if err != nil {
+		return err
+	}
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
 	err = os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode)
 	if err != nil {
-		err = fmt.Errorf("error writing dockerfile for command %v: %w", cmd, err)
-		panic(err)
+		return fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)
 
@@ -98,14 +100,14 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), &opts)
 	if err != nil {
-		err = fmt.Errorf("image building failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("image building failed %w ", err)
+		return err
 	}
 	buf := new(strings.Builder)
 	_, err = io.Copy(buf, body.Body)
 	if err != nil {
-		err = fmt.Errorf("image build response read failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("image build response read failed %w", err)
+		return err
 	}
 
 	cmd = append(cmd, args...)
@@ -127,35 +129,37 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		Binds: binds,
 	}, nil, nil, "")
 	if err != nil {
-		err = fmt.Errorf("docker container creation failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("docker container creation failed %w", err)
+		return err
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		err = fmt.Errorf("docker container start failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("docker container start failed %w", err)
+		return err
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			err = fmt.Errorf("docker client run failed for command %v: %w", cmd, err)
-			panic(err)
+			err = fmt.Errorf("docker client run failed %w", err)
+			return err
 		}
 	case <-statusCh:
 	}
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
-		err = fmt.Errorf("docker container logs fetching failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("docker container logs fetching failed %w", err)
+		return err
 	}
 
 	_, err = io.Copy(os.Stdout, cout)
 
 	if err != nil {
-		err = fmt.Errorf("docker logs forwarding failed for command %v: %w", cmd, err)
-		panic(err)
+		err = fmt.Errorf("docker logs forwarding failed %w", err)
+		return err
 	}
+
+	return nil
 }

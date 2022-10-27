@@ -14,17 +14,17 @@ type pypiVersionResponse struct {
 
 const astroSQLCliProjectURL = "https://pypi.org/pypi/astro-sql-cli/json"
 
-func GetPypiVersion(projectURL string) string {
+func GetPypiVersion(projectURL string) (string, error) {
 	httpClient := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, projectURL, http.NoBody)
 	if err != nil {
 		err = fmt.Errorf("error creating HTTP request %w", err)
-		panic(err)
+		return "", err
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
 		err = fmt.Errorf("error getting latest release version for project url %s,  %w", projectURL, err)
-		panic(err)
+		return "", err
 	}
 	defer res.Body.Close()
 
@@ -32,8 +32,8 @@ func GetPypiVersion(projectURL string) string {
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
 		err = fmt.Errorf("error parsing response for project version %w", err)
-		panic(err)
+		return "", err
 	}
 
-	return resp.Info.Version
+	return resp.Info.Version, nil
 }
