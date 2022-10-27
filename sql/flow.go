@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/sql/include"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
@@ -117,21 +116,17 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
 	}
 
-	mounts := make([]mount.Mount, 0)
-	for _, mountDir := range mountDirs {
-		volumeMount := mount.Mount{
-			Type:   mount.TypeBind,
-			Source: mountDir,
-			Target: mountDir,
-		}
-		mounts = append(mounts, volumeMount)
+	binds := []string{}
+	for _, moundDir := range mountDirs {
+		binds = append(binds, []string{moundDir + ":" + moundDir}...)
 	}
+
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: SQLCliDockerImageName,
 		Cmd:   cmd,
 		Tty:   true,
 	}, &container.HostConfig{
-		Mounts: mounts,
+		Binds: binds,
 	}, nil, nil, "")
 	if err != nil {
 		err = fmt.Errorf("docker container creation failed %w", err)
