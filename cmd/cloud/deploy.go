@@ -62,13 +62,13 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
+	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
-	cmd.Flags().BoolVar(&parse, "parse", false, "Deploy code to Astro only if all DAGs in your Astro project parse correctly")
+	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	return cmd
 }
 
-func deployTests(pars, pytest, forceDeploy bool, pytestFile string) string {
+func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 	if pytest && pytestFile == "" {
 		pytestFile = "all-tests"
 	}

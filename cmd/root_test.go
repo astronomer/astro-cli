@@ -50,6 +50,7 @@ func TestRootCommandCloudContext(t *testing.T) {
 	assert.Contains(t, output, "version")
 	assert.Contains(t, output, "workspace")
 	assert.Contains(t, output, "run")
+	assert.NotContains(t, output, "Run flow commands")
 }
 
 func TestRootCommandSoftwareContext(t *testing.T) {
@@ -66,4 +67,12 @@ func TestRootCommandSoftwareContext(t *testing.T) {
 	assert.Contains(t, output, "deploy")
 	assert.Contains(t, output, "deployment")
 	assert.Contains(t, output, "run")
+	assert.NotContains(t, output, "Run flow commands")
+}
+
+func TestRootCommandWithFlow(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SQLCLI)
+	output, err := executeCommand("help")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Run flow commands")
 }
