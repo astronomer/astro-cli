@@ -346,5 +346,3 @@ func TestFileToConnectionYAML(t *testing.T) {
 		os.Remove("./variables.yaml")
 	})
 }
-
-
