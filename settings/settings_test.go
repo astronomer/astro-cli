@@ -332,14 +332,14 @@ func TestJsonString(t *testing.T) {
 
 func TestFileToConnectionYAML(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		err := FileToConnectionYAML("testfiles/airflow_settings.yaml")
+		err := FileToConnectionYAML("airflow_settings.yaml")
 		assert.NoError(t, err)
 		os.Remove("./connections.yaml")
 		os.Remove("./variables.yaml")
 	})
 
 	t.Run("invalid setttings file", func(t *testing.T) {
-		err := FileToConnectionYAML("testfiles/airflow_settings_invalid.yaml")
+		err := FileToConnectionYAML("airflow_settings_invalid.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decode file")
 		os.Remove("./connections.yaml")

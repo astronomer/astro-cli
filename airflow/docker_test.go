@@ -1080,19 +1080,19 @@ func TestDockerComposeRunTest(t *testing.T) {
 
 	t.Run("PS error without container", func(t *testing.T) {
 		noCache := false
-		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}, mock.Anything).Return(nil).Once()
+		// imageHandler := new(mocks.ImageHandler)
+		// imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}, mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, errMockDocker).Once()
 
 		mockDockerCompose.composeService = composeMock
-		mockDockerCompose.imageHandler = imageHandler
+		// mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.RunTest("", "", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
-		imageHandler.AssertExpectations(t)
+		// imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)
 	})
 }
