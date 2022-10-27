@@ -393,7 +393,7 @@ func TestDockerImageRunTest(t *testing.T) {
 			}, nil
 		}
 
-		err = handler.RunTest("", "", "", "", "test-container", true)
+		err = handler.RunTest("", "./testfiles/airflow_settings_invalid.yaml", "", "", "test-container", true)
 		assert.NoError(t, err)
 	})
 
