@@ -3,7 +3,6 @@ package sql
 import (
 	"testing"
 
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,7 +14,6 @@ func execFlowCmd(args ...string) error {
 }
 
 func TestFlowCmd(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	tempDir := t.TempDir()
 
 	err := execFlowCmd([]string{"version"}...)
