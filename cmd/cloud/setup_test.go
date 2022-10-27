@@ -38,6 +38,18 @@ func TestSetup(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("flow cmd", func(t *testing.T) {
+		cmd := &cobra.Command{Use: "flow"}
+		cmd, err := cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "astro"}
+		rootCmd.AddCommand(cmd)
+
+		err = Setup(cmd, []string{}, nil)
+		assert.NoError(t, err)
+	})
+
 	t.Run("help cmd", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "help"}
 		cmd, err := cmd.ExecuteC()

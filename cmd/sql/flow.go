@@ -296,6 +296,7 @@ func login(cmd *cobra.Command, args []string) error {
 func NewFlowCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "flow",
+		Short:             "Run flow commands",
 		PersistentPreRunE: login,
 		Run: func(cmd *cobra.Command, args []string) {
 			executeHelp(cmd, []string{cmd.Name(), "--help"})
