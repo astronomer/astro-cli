@@ -68,7 +68,7 @@ func TestFlowRunCmd(t *testing.T) {
 	err := execFlowCmd([]string{"init", tempDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project_dir", tempDir}...)
+	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project_dir", tempDir, "--verbose"}...)
 	assert.NoError(t, err)
 }
 
