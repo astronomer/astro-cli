@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/context"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -203,7 +203,7 @@ func TestSetup(t *testing.T) {
 
 func TestCheckAPIKeys(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	t.Run("test context switch", func(t *testing.T) { 
+	t.Run("test context switch", func(t *testing.T) {
 		mockDeplyResp := []astro.Deployment{
 			{
 				ID:        "test-id",
@@ -254,4 +254,3 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
-
