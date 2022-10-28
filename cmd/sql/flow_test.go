@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,54 +30,61 @@ func TestFlowAboutCmd(t *testing.T) {
 }
 
 func TestFlowInitCmd(t *testing.T) {
-	tempDir := t.TempDir()
-	tempDirAirflowHome := t.TempDir()
-	tempDirAirflowDagsFolder := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir, "--airflow-home", tempDirAirflowHome, "--airflow-dags-folder", tempDirAirflowDagsFolder}...)
+	projectDir := t.TempDir()
+	os.Chdir(projectDir)
+	err := execFlowCmd([]string{"init"}...)
+	assert.NoError(t, err)
+}
+
+func TestFlowInitCmdWithFlags(t *testing.T) {
+	projectDir := t.TempDir()
+	AirflowHome := t.TempDir()
+	AirflowDagsFolder := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder}...)
 	assert.NoError(t, err)
 }
 
 func TestFlowValidateCmd(t *testing.T) {
-	tempDir := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir}...)
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"validate", tempDir, "--connection", "sqlite_conn"}...)
+	err = execFlowCmd([]string{"validate", projectDir, "--connection", "sqlite_conn"}...)
 	assert.NoError(t, err)
 }
 
 func TestFlowGenerateCmd(t *testing.T) {
-	tempDir := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir}...)
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", tempDir}...)
+	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir}...)
 	assert.NoError(t, err)
 }
 
 func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
-	tempDir := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir}...)
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"generate"}...)
+	err = execFlowCmd([]string{"generate", "--project-dir", projectDir}...)
 	assert.EqualError(t, err, "argument not set:workflow_name")
 }
 
 func TestFlowRunCmd(t *testing.T) {
-	tempDir := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir}...)
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project-dir", tempDir, "--verbose"}...)
+	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project-dir", projectDir, "--verbose"}...)
 	assert.NoError(t, err)
 }
 
 func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
-	tempDir := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir}...)
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run"}...)
+	err = execFlowCmd([]string{"run", "--project-dir", projectDir}...)
 	assert.EqualError(t, err, "argument not set:workflow_name")
 }
