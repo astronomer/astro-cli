@@ -60,7 +60,7 @@ func (d DockerBinder) ContainerLogs(ctx context.Context, containerID string, opt
 	return d.cli.ContainerLogs(ctx, containerID, options)
 }
 
-var newDockerClient = func() (DockerBind, error) {
+func NewDockerClient() (DockerBind, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func getContext(filePath string) io.Reader {
 
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
-	cli, err := newDockerClient()
+	cli, err := NewDockerClient()
 	if err != nil {
 		err = fmt.Errorf("docker client initialization failed %w", err)
 		return err
