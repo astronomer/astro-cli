@@ -65,7 +65,7 @@ func getBaseMountDirs(projectDir string) ([]string, error) {
 	return mountDirs, nil
 }
 
-func buildflagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder bool) (flags map[string]string, mountDirs []string, err error) {
+func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder bool) (flags map[string]string, mountDirs []string, err error) {
 	flags = buildCommonFlags()
 	mountDirs, err = getBaseMountDirs(projectDir)
 	if err != nil {
@@ -112,7 +112,7 @@ func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, moun
 }
 
 func executeBase(cmd *cobra.Command, args []string) error {
-	flags, mountDirs, err := buildflagsAndMountDirs(projectDir, false, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, false, false)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func executeInit(cmd *cobra.Command, args []string) error {
 		projectDir = args[0]
 	}
 
-	flags, mountDirs, err := buildflagsAndMountDirs(projectDir, false, true, true)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, true, true)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 		projectDir = args[0]
 	}
 
-	flags, mountDirs, err := buildflagsAndMountDirs(projectDir, false, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, false, false)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("workflow_name")
 	}
 
-	flags, mountDirs, err := buildflagsAndMountDirs(projectDir, true, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func executeRun(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("workflow_name")
 	}
 
-	flags, mountDirs, err := buildflagsAndMountDirs(projectDir, true, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false)
 	if err != nil {
 		return err
 	}
