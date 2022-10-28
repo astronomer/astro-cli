@@ -50,7 +50,7 @@ func TestFlowGenerateCmd(t *testing.T) {
 	err := execFlowCmd([]string{"init", tempDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project_dir", tempDir}...)
+	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", tempDir}...)
 	assert.NoError(t, err)
 }
 
@@ -68,7 +68,7 @@ func TestFlowRunCmd(t *testing.T) {
 	err := execFlowCmd([]string{"init", tempDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project_dir", tempDir, "--verbose"}...)
+	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project-dir", tempDir, "--verbose"}...)
 	assert.NoError(t, err)
 }
 
