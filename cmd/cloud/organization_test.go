@@ -41,7 +41,7 @@ func TestOrganizationList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
-	orgSwitch = func(orgName string, client astro.Client, out io.Writer) error {
+	orgSwitch = func(orgName string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 		return nil
 	}
 

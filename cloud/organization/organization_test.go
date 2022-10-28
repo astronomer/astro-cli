@@ -160,7 +160,7 @@ func TestSwitch(t *testing.T) {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name", mockClient, buf)
+		err := Switch("name", mockClient, buf, false)
 		assert.NoError(t, err)
 	})
 
@@ -194,7 +194,7 @@ func TestSwitch(t *testing.T) {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, buf)
+		err = Switch("", mockClient, buf, false)
 		assert.NoError(t, err)
 	})
 
@@ -212,7 +212,7 @@ func TestSwitch(t *testing.T) {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name-wrong", mockClient, buf)
+		err := Switch("name-wrong", mockClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationName)
 	})
 
@@ -246,7 +246,7 @@ func TestSwitch(t *testing.T) {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, buf)
+		err = Switch("", mockClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
 	})
 
@@ -264,7 +264,7 @@ func TestSwitch(t *testing.T) {
 			return errMock
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name", mockClient, buf)
+		err := Switch("name", mockClient, buf, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 }
