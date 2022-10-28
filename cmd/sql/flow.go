@@ -96,7 +96,6 @@ func buildflagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 		}
 		flags["airflow-dags-folder"] = airflowDagsFolderAbs
 		mountDirs = append(mountDirs, airflowDagsFolderAbs)
-
 	}
 
 	return flags, mountDirs, nil
