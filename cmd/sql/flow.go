@@ -129,7 +129,8 @@ func executeInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	args = []string{mountDirs[0]}
+	projectDirAbsolute := mountDirs[0]
+	args = []string{projectDirAbsolute}
 
 	return executeCmd(cmd, args, flags, mountDirs)
 }
@@ -144,7 +145,8 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	args = []string{mountDirs[0]}
+	projectDirAbsolute := mountDirs[0]
+	args = []string{projectDirAbsolute}
 
 	return executeCmd(cmd, args, flags, mountDirs)
 }
