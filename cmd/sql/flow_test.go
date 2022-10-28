@@ -32,7 +32,7 @@ func TestFlowInitCmd(t *testing.T) {
 	tempDir := t.TempDir()
 	tempDirAirflowHome := t.TempDir()
 	tempDirAirflowDagsFolder := t.TempDir()
-	err := execFlowCmd([]string{"init", tempDir, "--airflow_home", tempDirAirflowHome, "--airflow_dags_folder", tempDirAirflowDagsFolder}...)
+	err := execFlowCmd([]string{"init", tempDir, "--airflow-home", tempDirAirflowHome, "--airflow-dags-folder", tempDirAirflowDagsFolder}...)
 	assert.NoError(t, err)
 }
 

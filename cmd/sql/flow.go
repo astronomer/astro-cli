@@ -122,8 +122,6 @@ func executeInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	args = mountDirs
-
 	return executeCmd(cmd, args, vars, mountDirs)
 }
 
@@ -209,8 +207,8 @@ func initCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().StringVarP(&airflowHome, "airflow_home", "a", "", "")
-	cmd.Flags().StringVarP(&airflowDagsFolder, "airflow_dags_folder", "d", "", "")
+	cmd.Flags().StringVarP(&airflowHome, "airflow-home", "a", "", "")
+	cmd.Flags().StringVarP(&airflowDagsFolder, "airflow-dags-folder", "d", "", "")
 	return cmd
 }
 
