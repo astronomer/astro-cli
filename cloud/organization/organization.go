@@ -138,7 +138,7 @@ func getOrganizationSelection(out io.Writer) (string, error) {
 }
 
 // Switch switches organizations
-func Switch(orgNameOrID string, client astro.Client, out io.Writer) error {
+func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -170,7 +170,7 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer) error {
 	}
 
 	// log user into new organization
-	err = AuthLogin(c.Domain, id, "", client, out, false)
+	err = AuthLogin(c.Domain, id, "", client, out, shouldDisplayLoginLink)
 	if err != nil {
 		return err
 	}
