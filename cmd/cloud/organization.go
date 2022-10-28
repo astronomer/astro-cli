@@ -9,6 +9,8 @@ import (
 )
 
 var (
+	shouldDisplayLoginLink bool
+
 	orgList   = organization.List
 	orgSwitch = organization.Switch
 )
@@ -51,6 +53,8 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 			return organizationSwitch(cmd, out, args)
 		},
 	}
+
+	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for organization switch")
 	return cmd
 }
 
@@ -70,5 +74,5 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	return orgSwitch(organizationNameOrID, astroClient, out)
+	return orgSwitch(organizationNameOrID, astroClient, out, shouldDisplayLoginLink)
 }
