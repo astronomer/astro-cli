@@ -7,6 +7,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// chdir changes the current working directory to the named directory and
+// returns a function that, when called, restores the original working
+// directory.
+func chdir(t *testing.T, dir string) func() {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("chdir %s: %v", dir, err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	return func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Fatalf("restoring working directory: %v", err)
+		}
+	}
+}
+
 func execFlowCmd(args ...string) error {
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
@@ -31,7 +50,7 @@ func TestFlowAboutCmd(t *testing.T) {
 
 func TestFlowInitCmd(t *testing.T) {
 	projectDir := t.TempDir()
-	os.Chdir(projectDir)
+	defer chdir(t, projectDir)()
 	err := execFlowCmd([]string{"init"}...)
 	assert.NoError(t, err)
 }
