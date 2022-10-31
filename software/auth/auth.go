@@ -131,6 +131,8 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
+	var workspaces []houston.Workspace
+
 	interactive := config.CFG.Interactive.GetBool()
 	pageSize := config.CFG.PageSize.GetInt()
 	if !(pageSize > 0 && pageSize < defaultPageSize) {
@@ -173,7 +175,12 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		return err
 	}
 
-	workspaces, err := client.ListWorkspaces()
+	if interactive {
+		workspaces, err = client.PaginatedListWorkspaces(2, 0)
+	} else {
+		workspaces, err = client.ListWorkspaces()
+	}
+
 	if err != nil {
 		return err
 	}
