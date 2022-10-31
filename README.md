@@ -3,7 +3,7 @@
 The Astro CLI is a command-line interface for data orchestration. It allows you to get started with Apache Airflow quickly and it can be used with all Astronomer products.
 
 ## Usage
-  
+
   astro [command]
 
 ### Core commands
@@ -48,7 +48,7 @@ To install the Astro CLI on Windows with the Windows Package Manager winget comm
 - The latest version of the Windows [App Installer](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1?hl=en-ca&gl=ca)
 - [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
 - [Docker Engine 1.13.1 or later](https://docs.docker.com/engine/install/)
-- [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) enabled on your local machine 
+- [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) enabled on your local machine
 
 To install the Astro CLI on Linux, you'll need:
 
