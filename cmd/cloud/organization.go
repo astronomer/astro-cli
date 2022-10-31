@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	shouldDisplayLoginLink bool
 	orgList                            = organization.List
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
@@ -21,6 +20,7 @@ var (
 	auditLogsOutputFilePath            string
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 90
+	shouldDisplayLoginLink             bool
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
