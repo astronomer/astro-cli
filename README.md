@@ -1,6 +1,6 @@
 # Astro CLI [![Release](https://img.shields.io/github/v/release/astronomer/astro-cli.svg?logo=github)](https://github.com/astronomer/astro-cli/releases) [![GoDoc](https://godoc.org/github.com/astronomer/astro-cli?status.svg)](https://godoc.org/github.com/astronomer/astro-cli) [![Go Report Card](https://goreportcard.com/badge/github.com/astronomer/astro-cli)](https://goreportcard.com/report/github.com/astronomer/astro-cli) [![codecov](https://codecov.io/gh/astronomer/astro-cli/branch/main/graph/badge.svg)](https://codecov.io/gh/astronomer/astro-cli)
 
-The Astro CLI is the modern command-line interface for data orchestration. It is the easiest way to run Apache Airflow on your local machine. With the Astro CLI, you can both develop and test DAGs locally as well as interact with our Astro and Astronomer Software offerings.
+The Astro CLI is a command-line interface for data orchestration. It is the easiest way to run Apache Airflow on your local machine. With the Astro CLI, you can both develop and test DAGs locally as well as interact with our Astro and Astronomer Software offerings.
 
 ```
 astro is a command line interface for Airflow working within the Astronomer Cloud or Software
