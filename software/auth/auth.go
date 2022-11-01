@@ -60,7 +60,7 @@ var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.C
 	}
 
 	// validate workspace
-	workspace, err := client.ValidateWorkspaceId(c.LastUsedWorkspace)
+	workspace, err := client.ValidateWorkspaceID(c.LastUsedWorkspace)
 	if err != nil || workspace != nil && workspace.ID != c.LastUsedWorkspace {
 		log.Debugf("last used workspace id is not valid: %s", err.Error())
 		return false

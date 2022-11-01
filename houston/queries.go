@@ -457,7 +457,7 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}
     `
 
-	ValidateWorkspaceIdGetRequest = `
+	ValidateWorkspaceIDGetRequest = `
 	query GetWorkspace(
 		$workspaceUuid: Uuid!
 	){

@@ -79,10 +79,10 @@ func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, erro
 	return workspace, nil
 }
 
-// ValidateWorkspaceId - get a workspace
-func (h ClientImplementation) ValidateWorkspaceId(workspaceID string) (*Workspace, error) {
+// ValidateWorkspaceID - get a workspace
+func (h ClientImplementation) ValidateWorkspaceID(workspaceID string) (*Workspace, error) {
 	req := Request{
-		Query:     ValidateWorkspaceIdGetRequest,
+		Query:     ValidateWorkspaceIDGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
 	}
 

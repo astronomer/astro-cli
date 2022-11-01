@@ -237,7 +237,7 @@ func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writ
 		id = workspaceSelection.id
 	}
 	// validate workspace
-	_, err := client.ValidateWorkspaceId(id)
+	_, err := client.ValidateWorkspaceID(id)
 	if err != nil {
 		return fmt.Errorf("workspace id is not valid: %w", err)
 	}

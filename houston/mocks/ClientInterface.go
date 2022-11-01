@@ -675,8 +675,8 @@ func (_m *ClientInterface) GetWorkspace(workspaceID string) (*houston.Workspace,
 	return r0, r1
 }
 
-// ValidateWorkspaceId provides a mock function with given fields: workspaceID
-func (_m *ClientInterface) ValidateWorkspaceId(workspaceID string) (*houston.Workspace, error) {
+// ValidateWorkspaceID provides a mock function with given fields: workspaceID
+func (_m *ClientInterface) ValidateWorkspaceID(workspaceID string) (*houston.Workspace, error) {
 	ret := _m.Called(workspaceID)
 
 	var r0 *houston.Workspace
