@@ -33,5 +33,5 @@ func deploymentInspect(cmd *cobra.Command, _ []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, astroClient, out)
+	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, astroClient, out, "")
 }

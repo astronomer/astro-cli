@@ -158,11 +158,20 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "")
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse[0].ReleaseName)
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse[0].RuntimeRelease.Version)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("prints a deployment's specific field to stdout", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "configuration.cluster_id")
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), deploymentResponse[0].Cluster.ID)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -171,7 +180,7 @@ func TestInspect(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		defer testUtil.MockUserInput(t, "1")() // selecting test-deployment-id
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
-		err := Inspect(workspaceID, "", "", "yaml", mockClient, out)
+		err := Inspect(workspaceID, "", "", "yaml", mockClient, out, "")
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentName)
 		mockClient.AssertExpectations(t)
@@ -181,7 +190,7 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return([]astro.Deployment{}, errGetDeployment).Once()
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "")
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -193,7 +202,7 @@ func TestInspect(t *testing.T) {
 		yamlMarshal = errReturningYAMLMarshal
 		defer restoreYAMLMarshal(originalMarshal)
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "")
 		assert.ErrorIs(t, err, errMarshal)
 		mockClient.AssertExpectations(t)
 	})
@@ -202,7 +211,7 @@ func TestInspect(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out)
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "")
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		mockClient.AssertExpectations(t)
 	})
@@ -417,6 +426,97 @@ func TestGetDeploymentConfig(t *testing.T) {
 	})
 }
 
+func TestGetPrintableDeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	sourceDeployment := astro.Deployment{
+		ID:          "test-deployment-id",
+		Label:       "test-deployment-label",
+		Description: "description",
+		Workspace:   astro.Workspace{ID: "test-ws-id"},
+		ReleaseName: "great-release-name",
+		AlertEmails: []string{"email1", "email2"},
+		Cluster: astro.Cluster{
+			ID: "cluster-id",
+			NodePools: []astro.NodePool{
+				{
+					ID:               "test-pool-id",
+					IsDefault:        false,
+					NodeInstanceType: "test-instance-type",
+					CreatedAt:        time.Now(),
+				},
+				{
+					ID:               "test-pool-id-1",
+					IsDefault:        true,
+					NodeInstanceType: "test-instance-type-1",
+					CreatedAt:        time.Now(),
+				},
+			},
+		},
+		RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
+		DeploymentSpec: astro.DeploymentSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 3,
+			},
+			Webserver: astro.Webserver{URL: "some-url"},
+			EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
+				{
+					Key:       "foo",
+					Value:     "bar",
+					IsSecret:  false,
+					UpdatedAt: "NOW",
+				},
+				{
+					Key:       "bar",
+					Value:     "baz",
+					IsSecret:  true,
+					UpdatedAt: "NOW+1",
+				},
+			},
+		},
+		WorkerQueues: []astro.WorkerQueue{
+			{
+				ID:                "test-wq-id",
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    130,
+				MinWorkerCount:    12,
+				WorkerConcurrency: 110,
+				NodePoolID:        "test-pool-id",
+			},
+			{
+				ID:                "test-wq-id-1",
+				Name:              "test-queue-1",
+				IsDefault:         false,
+				MaxWorkerCount:    175,
+				MinWorkerCount:    8,
+				WorkerConcurrency: 150,
+				NodePoolID:        "test-pool-id-1",
+			},
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Status:    "UNHEALTHY",
+	}
+	t.Run("returns a deployment map", func(t *testing.T) {
+		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		config := getDeploymentConfig(&sourceDeployment)
+		additional := getAdditional(&sourceDeployment)
+		expectedDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actualDeployment := getPrintableDeployment(info, config, additional)
+		assert.Equal(t, expectedDeployment, actualDeployment)
+	})
+}
+
 func TestGetAdditional(t *testing.T) {
 	sourceDeployment := astro.Deployment{
 		ID:          "test-deployment-id",
@@ -590,7 +690,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte("\n    information:\n")
-		actualPrintableDeployment, err := formatPrintableDeployment(info, config, additional, "")
+		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
 		assert.NoError(t, err)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 		expectedPrintableDeployment = []byte("\n    configuration:\n")
@@ -602,13 +702,12 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		expectedPrintableDeployment = []byte("\n    astronomer_variables:\n")
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
-
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInspectInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte(",\n        \"information\":")
-		actualPrintableDeployment, err := formatPrintableDeployment(info, config, additional, "json")
+		actualPrintableDeployment, err := formatPrintableDeployment("json", getPrintableDeployment(info, config, additional))
 		assert.NoError(t, err)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 		expectedPrintableDeployment = []byte("\n        \"configuration\": ")
@@ -628,7 +727,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte{}
-		actualPrintableDeployment, err := formatPrintableDeployment(info, config, additional, "")
+		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
@@ -640,8 +739,198 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte{}
-		actualPrintableDeployment, err := formatPrintableDeployment(info, config, additional, "json")
+		actualPrintableDeployment, err := formatPrintableDeployment("json", getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
+	})
+}
+
+func TestGetSpecificField(t *testing.T) {
+	sourceDeployment := astro.Deployment{
+		ID:          "test-deployment-id",
+		Label:       "test-deployment-label",
+		Description: "description",
+		Workspace:   astro.Workspace{ID: "test-ws-id"},
+		ReleaseName: "great-release-name",
+		AlertEmails: []string{"email1", "email2"},
+		Cluster: astro.Cluster{
+			ID: "cluster-id",
+			NodePools: []astro.NodePool{
+				{
+					ID:               "test-pool-id",
+					IsDefault:        false,
+					NodeInstanceType: "test-instance-type",
+					CreatedAt:        time.Now(),
+				},
+				{
+					ID:               "test-pool-id-1",
+					IsDefault:        true,
+					NodeInstanceType: "test-instance-type-1",
+					CreatedAt:        time.Now(),
+				},
+			},
+		},
+		RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
+		DeploymentSpec: astro.DeploymentSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 3,
+			},
+			Webserver: astro.Webserver{URL: "some-url"},
+			EnvironmentVariablesObjects: []astro.EnvironmentVariablesObject{
+				{
+					Key:       "foo",
+					Value:     "bar",
+					IsSecret:  false,
+					UpdatedAt: "NOW",
+				},
+				{
+					Key:       "bar",
+					Value:     "baz",
+					IsSecret:  true,
+					UpdatedAt: "NOW+1",
+				},
+			},
+		},
+		WorkerQueues: []astro.WorkerQueue{
+			{
+				ID:                "test-wq-id",
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    130,
+				MinWorkerCount:    12,
+				WorkerConcurrency: 110,
+				NodePoolID:        "test-pool-id",
+			},
+			{
+				ID:                "test-wq-id-1",
+				Name:              "test-queue-1",
+				IsDefault:         false,
+				MaxWorkerCount:    175,
+				MinWorkerCount:    8,
+				WorkerConcurrency: 150,
+				NodePoolID:        "test-pool-id-1",
+			},
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Status:    "UNHEALTHY",
+	}
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	info, _ := getDeploymentInspectInfo(&sourceDeployment)
+	config := getDeploymentConfig(&sourceDeployment)
+	additional := getAdditional(&sourceDeployment)
+	t.Run("returns a value if key is found in deployment.information", func(t *testing.T) {
+		requestedField := "information.workspace_id"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, sourceDeployment.Workspace.ID, actual)
+	})
+	t.Run("returns a value if key is found in deployment.configuration", func(t *testing.T) {
+		requestedField := "configuration.scheduler_replicas"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, sourceDeployment.DeploymentSpec.Scheduler.Replicas, actual)
+	})
+	t.Run("returns a value if key is alert_emails", func(t *testing.T) {
+		requestedField := "alert_emails"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, sourceDeployment.AlertEmails, actual)
+	})
+	t.Run("returns a value if key is astronomer_variables", func(t *testing.T) {
+		requestedField := "astronomer_variables"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), actual)
+	})
+	t.Run("returns a value if key is worker_queues", func(t *testing.T) {
+		requestedField := "worker_queues"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues), actual)
+	})
+	t.Run("returns a value if key is information", func(t *testing.T) {
+		requestedField := "information"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, info, actual)
+	})
+	t.Run("returns nil if no value if found", func(t *testing.T) {
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		requestedField := "does-not-exist"
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, nil, actual)
+	})
+	t.Run("returns nil if incorrect field is requested", func(t *testing.T) {
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		requestedField := "configuration.does-not-exist"
+		actual := getSpecificField(printableDeployment, requestedField)
+		assert.Equal(t, nil, actual)
 	})
 }
