@@ -139,7 +139,6 @@ If you receive a `mkdir` error during installation, download and run the [godown
 
 :::
 
-
 #### Troubleshoot installation issues
 
 If you encounter issues when installing the Astro CLI:
@@ -187,73 +186,6 @@ If you encounter issues when installing the Astro CLI:
 3. Run `astro dev start` to start a local version of airflow on your machine. This will spin up a few locally running docker containers - one for the airflow scheduler, one for the webserver, and one for postgres.
 (Run `astro dev ps` to verify).
 
-## Local development
-
-1. Install `Go` 1.18 or later. See [Download and install Go](https://go.dev/doc/install).
-
-2. Run the following command to install `golangci-lint` and run linter locally:
-
-    ```brew install golangci-lint```
-
-    ```golangci-lint run .```
-
-3. Run the following command to install `pre-commit` and run lint on every commit:
-
-    ```brew install pre-commit```
-
-    ```pre-commit install```
-
-    Run lint locally:
-
-    ```pre-commit run --all-files```
-
-4. Clone and Build:
-
-    ```
-    $ cd $GOPATH/src/github.com/astronomer/astro-cli
-    $ git clone git@github.com:astronomer/astro-cli.git
-    $ cd astro-cli
-    $ make build
-    ```
-
-## Test locally
-
-To test Astro locally you'll need to update your global or local config to point to right platform type and local Astro endpoint. For example:
-
-```yaml
-local:
-  platform: cloud
-  astro: http://localhost:8871/v1
-```
-
-Similarly, to test software locally you'll need to update the platform type and local houston endpoint. For example:
-
-```yaml
-local:
-  platform: software
-  houston: http://localhost:8871/v1
-```
-
-### Run tests
-
-Before you run tests, make sure you have running locally houston or Astro on http://localhost:8871/v1. This is a requirement for running some tests.
-
-To run unit-tests run:
-
-```bash
-make test
-```
-
-### Generate mocks
-
-Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks for Golang interfaces. See the [mockery installation guide](https://github.com/vektra/mockery#installation).
-
-To regenerate an existing interface mocks, run `make mock`.
-
-To generate mocks for a new interface, add the following command below `mock` rule in `Makefile`:
-
-`mockery --filename=<file_name_where_interface_is_present> --output=<output_dir_to store_mocks> --dir=<directory_where_to_search_for_interface_file> --outpkg=<mock_package_name> --name <name_of_the_interface>`
-
 ## Versions
 
 Astro CLI versions are released regularly and use semantic versioning. Backwards compatibility between versions cannot be guaranteed. Compatibility is only guaranteed between matching **minor** versions of the platform and the Astro CLI. For example, Astro CLI 0.9.0` is guaranteed to be compatible with houston-api v0.9.x, but not houston-api v0.10.x.
@@ -272,38 +204,6 @@ The Astro CLI includes a debug flag that allows you to view queries and internal
 verbosity: debug
 ```
 Adding this entry to your `~/.astro/config.yaml` file turns on debugging for all requests until you change it to `info`, or you remove it from the file.
-
-## Request a documentation change
-
-If you notice something in our documentation that is wrong, misleading, or could use additional context, the easiest way to make an impact is to create a GitHub issue in this repository.
-
-GitHub issues are triaged by the Astronomer documentation team and addressed promptly. After you've created a GitHub issue, our team may follow up with you with additional questions or comments. Once our team has addressed it, you'll get a notification from GitHub that the issue has been closed and that a change is now live.
-
-1. Go to [Issues](https://github.com/astronomer/docs/issues).
-
-2. Select **New Issue**.
-
-3. Depending on the change you want implemented, select a GitHub issue template.
-
-4. Tell us what you think we can do better by answering the questions in the template.
-
-## Contribute
-
-If you'd like to contribute to Astronomer documentation, you're welcome to create a Pull Request (PR) to this repository with your suggested changes.
-
-1. Fork the repository.
-
-2. Create a branch from `main`.
-
-3. Make your changes in your branch.
-
-4. Submit a PR for review.
-
-    After you've submitted a PR for your changes, Netlify will add a comment to your PR that includes a link to a staging website with your changes.
-
-    Small edits and typo fixes don't need to be linked to an issue and should be merged quickly. To get a timely review on a larger contribution, we recommend first creating a detailed GitHub issue describing the problem and linking that within your PR.
-
-    Every update to the `main` branch of this repository triggers a rebuild of our production documentation page at https://www.docs.astronomer.io. It might take a few moments for your merged changes to appear.
 
 ## Support
 
