@@ -240,7 +240,7 @@ contexts:
 	config.InitConfig(fs)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspace", mockWorkspace.ID).Return(mockWorkspace, nil)
+	api.On("ValidateWorkspaceId", mockWorkspace.ID).Return(mockWorkspace, nil)
 	api.On("ListWorkspaces").Return(mockWorkspaceList, nil)
 
 	defer testUtil.MockUserInput(t, "3")()
@@ -335,7 +335,7 @@ contexts:
 	wsID := "ckbv7zvb100pe0760xp98qnh9"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspace", wsID).Return(nil, errMock)
+	api.On("ValidateWorkspaceId", wsID).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
 	err := Switch(wsID, 0, api, buf)
