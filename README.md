@@ -193,7 +193,7 @@ If you encounter issues when installing the Astro CLI:
 
 2. Run the following command to install `golangci-lint` and run linter locally:
 
-    ```brew install golangci-lint```
+    `brew install golangci-lint`
 
     ```golangci-lint run .```
 
@@ -250,7 +250,7 @@ Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks f
 
 To regenerate an existing interface mocks, run `make mock`.
 
-To generate mocks for a new interface, add the following command below `mock` rule in `Makefile`:
+To generate mocks for a new interface, add the following command below the `mock` rule in `Makefile` and then run `make mock`:
 
 `mockery --filename=<file_name_where_interface_is_present> --output=<output_dir_to store_mocks> --dir=<directory_where_to_search_for_interface_file> --outpkg=<mock_package_name> --name <name_of_the_interface>`
 
