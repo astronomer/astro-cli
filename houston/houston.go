@@ -30,6 +30,7 @@ type ClientInterface interface {
 	PaginatedListWorkspaces(pageSize int, pageNumber int) ([]Workspace, error)
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
+	ValidateWorkspaceId(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error)
 	// workspace users and roles
 	AddWorkspaceUser(workspaceID, email, role string) (*Workspace, error)

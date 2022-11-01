@@ -74,8 +74,9 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 	config.InitConfig(fs)
 
 	type args struct {
-		c          *config.Context
-		workspaces []houston.Workspace
+		c         *config.Context
+		workspace *houston.Workspace
+		err       error
 	}
 	tests := []struct {
 		name string
@@ -84,28 +85,33 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 	}{
 		{
 			name: "no context set",
-			args: args{c: &config.Context{}, workspaces: []houston.Workspace{}},
+			args: args{c: &config.Context{}},
 			want: false,
 		},
 		{
 			name: "context set, but no correct workspace set",
-			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id"}, workspaces: []houston.Workspace{{ID: "test-workspace-id-1"}}},
+			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id"}, err: errors.New("last used workspace id is not valid")},
 			want: false,
 		},
 		{
 			name: "workspace present, but no domain set",
-			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id"}, workspaces: []houston.Workspace{{ID: "test-workspace-id-1"}, {ID: "test-workspace-id"}}},
+			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id"}, err: errors.New("last used workspace id is not valid")},
 			want: false,
 		},
 		{
 			name: "workspace present, with set domain",
-			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id", Domain: "test-domain"}, workspaces: []houston.Workspace{{ID: "test-workspace-id-1"}, {ID: "test-workspace-id"}}},
+			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id", Domain: "test-domain"}, workspace: &houston.Workspace{ID: "test-workspace-id"}, err: nil},
 			want: true,
 		},
 	}
+
+	houstonMock := new(houstonMocks.ClientInterface)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := switchToLastUsedWorkspace(tt.args.c, tt.args.workspaces); got != tt.want {
+			if tt.args.c.LastUsedWorkspace != "" {
+				houstonMock.On("ValidateWorkspaceId", tt.args.c.LastUsedWorkspace).Return(tt.args.workspace, tt.args.err).Once()
+			}
+			if got := switchToLastUsedWorkspace(houstonMock, tt.args.c); got != tt.want {
 				t.Errorf("switchToLastUsedWorkspace() = %v, want %v", got, tt.want)
 			}
 		})
@@ -238,6 +244,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
 		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ValidateWorkspaceId", "test-workspace-id").Return(&houston.Workspace{ID: "test-workspace-id"}, nil).Once()
 
 		out := &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
@@ -275,10 +282,10 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
 		houstonMock.On("ListWorkspaces").Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}, {ID: "test-workspace-id"}}, nil).Twice()
-		switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+		switchToLastUsedWorkspace = func(houstonClient houston.ClientInterface, c *config.Context) bool {
 			return false
 		}
-		houstonMock.On("GetWorkspace", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceId", "ck05r3bor07h40d02y2hw4n4v").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {
@@ -306,7 +313,7 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
 		houstonMock.On("PaginatedListWorkspaces", 2, 0).Return([]houston.Workspace{{ID: "ck05r3bor07h40d02y2hw4n4v"}}, nil).Once()
-		switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+		switchToLastUsedWorkspace = func(houstonClient houston.ClientInterface, c *config.Context) bool {
 			return false
 		}
 
@@ -336,12 +343,12 @@ func TestLoginSuccess(t *testing.T) {
 		houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
 		houstonMock.On("AuthenticateWithBasicAuth", mock.Anything, mock.Anything, mock.Anything).Return(mockToken, nil)
 		houstonMock.On("PaginatedListWorkspaces", 2, 0).Return([]houston.Workspace{{ID: "test-workspace-id"}, {ID: "test-workspace"}}, nil).Once()
-		switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+		switchToLastUsedWorkspace = func(houstonClient houston.ClientInterface, c *config.Context) bool {
 			return false
 		}
 
 		houstonMock.On("PaginatedListWorkspaces", 100, 0).Return([]houston.Workspace{{ID: "test-workspace-1"}, {ID: "test-workspace-2"}}, nil).Once()
-		houstonMock.On("GetWorkspace", "test-workspace-1").Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceId", "test-workspace-1").Return(&houston.Workspace{}, nil).Once()
 
 		out := &bytes.Buffer{}
 		if err := Login("localhost", false, "test", "test", houstonMock, out); (err != nil) != false {

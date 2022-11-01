@@ -54,20 +54,24 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	return client.AuthenticateWithBasicAuth(username, password, ctx)
 }
 
-var switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.Context) bool {
 	if c.LastUsedWorkspace == "" {
 		return false
 	}
 
-	for idx := range workspaces {
-		if c.LastUsedWorkspace == workspaces[idx].ID {
-			if err := c.SetContextKey("workspace", workspaces[idx].ID); err != nil {
-				return false
-			}
-			return true
-		}
+	// validate workspace
+	workspace, err := client.ValidateWorkspaceId(c.LastUsedWorkspace)
+	if err != nil || workspace != nil && workspace.ID != c.LastUsedWorkspace {
+		log.Debugf("last used workspace id is not valid: %s", err.Error())
+		return false
 	}
-	return false
+
+	if err := c.SetContextKey("workspace", workspace.ID); err != nil {
+		log.Debugf("unable to set workspace context: %s", err.Error())
+		return false
+	}
+
+	return true
 }
 
 // oAuth handles oAuth with houston api
@@ -208,7 +212,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in cluster
-		isSwitched := switchToLastUsedWorkspace(&c, workspaces)
+		isSwitched := switchToLastUsedWorkspace(client, &c)
 
 		if !isSwitched {
 			// show switch menu with available workspace IDs

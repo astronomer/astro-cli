@@ -457,6 +457,22 @@ mutation UpdateDeployment($deploymentId: Uuid!, $payload: JSON!, $executor: Exec
 	}
     `
 
+	ValidateWorkspaceIdGetRequest = `
+	query GetWorkspace(
+		$workspaceUuid: Uuid!
+	){
+		workspace(
+			workspaceUuid: $workspaceUuid
+		){
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}
+    `
+
 	WorkspacesGetRequest = `
 	query GetWorkspaces {
 		workspaces {

@@ -79,6 +79,26 @@ func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, erro
 	return workspace, nil
 }
 
+// ValidateWorkspaceId - get a workspace
+func (h ClientImplementation) ValidateWorkspaceId(workspaceID string) (*Workspace, error) {
+	req := Request{
+		Query:     ValidateWorkspaceIdGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	workspace := res.Data.GetWorkspace
+	if workspace == nil {
+		return nil, ErrWorkspaceNotFound{workspaceID: workspaceID}
+	}
+
+	return workspace, nil
+}
+
 // UpdateWorkspace - update a workspace
 func (h ClientImplementation) UpdateWorkspace(workspaceID string, args map[string]string) (*Workspace, error) {
 	req := Request{
