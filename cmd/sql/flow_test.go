@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/sql"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,7 +87,7 @@ func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = execFlowCmd([]string{"generate", "--project-dir", projectDir}...)
-	assert.Equal(t, err, sql.ArgNotSetError("workflow_name"))
+	assert.EqualError(t, err, "argument not set:workflow_name")
 }
 
 func TestFlowRunCmd(t *testing.T) {
@@ -106,5 +105,5 @@ func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = execFlowCmd([]string{"run", "--project-dir", projectDir}...)
-	assert.Equal(t, err, sql.ArgNotSetError("workflow_name"))
+	assert.EqualError(t, err, "argument not set:workflow_name")
 }
