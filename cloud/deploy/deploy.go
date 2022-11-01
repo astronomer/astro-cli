@@ -435,8 +435,22 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
 	// flag to determine if we are setting the dags folder in dockerignore
 	dagsIgnoreSet := false
+	// flag to determine if dockerignore file was created on runtime
+	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	fileExist, err := fileutil.Exists(fullpath, nil)
+	if err != nil {
+		return err
+	}
+	if !fileExist {
+		// Create monitoring dag file
+		err := fileutil.WriteStringToFile(fullpath, "dags/")
+		if err != nil {
+			return err
+		}
+		dockerIgnoreCreate = true
+	}
 	lines, err := fileutil.Read(fullpath)
 	if err != nil {
 		return err
@@ -461,6 +475,14 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	if err != nil {
 		return err
 	}
+
+	defer func() {
+		// remove created docker ignore file
+		if dockerIgnoreCreate {
+			os.Remove(fullpath)
+		}
+	}()
+
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
 		f, err := os.Open(fullpath)
