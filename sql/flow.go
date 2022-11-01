@@ -28,7 +28,10 @@ const (
 	PythonVersion             = "3.9"
 )
 
-var dockerClientInit = NewDockerClient
+var (
+	dockerClientInit = NewDockerClient
+	ioCopy           = io.Copy
+)
 
 type DockerBinder struct {
 	cli *client.Client
@@ -144,7 +147,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	select {
 	case err := <-errCh:
 		if err != nil {
-			err = fmt.Errorf("docker client run failed %w", err)
+			err = fmt.Errorf("docker container wait failed %w", err)
 			return err
 		}
 	case <-statusCh:
@@ -156,7 +159,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return err
 	}
 
-	_, err = io.Copy(os.Stdout, cout)
+	_, err = ioCopy(os.Stdout, cout)
 
 	if err != nil {
 		err = fmt.Errorf("docker logs forwarding failed %w", err)
