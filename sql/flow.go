@@ -28,6 +28,8 @@ const (
 	PythonVersion             = "3.9"
 )
 
+var dockerClientInit = NewDockerClient
+
 type DockerBinder struct {
 	cli *client.Client
 }
@@ -75,7 +77,7 @@ func getContext(filePath string) io.Reader {
 
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
-	cli, err := NewDockerClient()
+	cli, err := dockerClientInit()
 	if err != nil {
 		err = fmt.Errorf("docker client initialization failed %w", err)
 		return err
@@ -138,15 +140,15 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return err
 	}
 
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			err = fmt.Errorf("docker client run failed %w", err)
-			return err
-		}
-	case <-statusCh:
-	}
+	// statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	// select {
+	// case err := <-errCh:
+	// 	if err != nil {
+	// 		err = fmt.Errorf("docker client run failed %w", err)
+	// 		return err
+	// 	}
+	// case <-statusCh:
+	// }
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
