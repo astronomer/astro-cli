@@ -439,12 +439,9 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
-	fileExist, err := fileutil.Exists(fullpath, nil)
-	if err != nil {
-		return err
-	}
+	fileExist, _ := fileutil.Exists(fullpath, nil)
 	if !fileExist {
-		// Create monitoring dag file
+		// Create a dockerignore file and add the dags folder entry
 		err := fileutil.WriteStringToFile(fullpath, "dags/")
 		if err != nil {
 			return err
