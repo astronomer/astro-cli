@@ -22,20 +22,11 @@ func TestCommonDockerUtil(t *testing.T) {
 		}, nil)
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		// containerWaitOkBodyChannel := make(chan container.ContainerWaitOKBody)
-		// errChannel := make(chan error, 1)
-		// go func() {
-		// 	res := container.ContainerWaitOKBody{StatusCode: 200, Error: nil}
-		// 	containerWaitOkBodyChannel <- res
-		// 	errChannel <- nil
-		// }()
-		// mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(containerWaitOkBodyChannel, errChannel)
-
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("Sample Log")), nil)
 
 		return mockDockerBinder, nil
 	}
 
-	CommonDockerUtil([]string{"flow", "version"}, nil, nil, nil)
+	CommonDockerUtil([]string{"flow", "test"}, nil, nil, nil)
 	mockDockerBinder.AssertExpectations(t)
 }
