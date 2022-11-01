@@ -154,7 +154,7 @@ func TestInspect(t *testing.T) {
 			},
 		},
 	}
-	t.Run("prints a deployment's info and configuration to stdout", func(t *testing.T) {
+	t.Run("prints a deployment in yaml format to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
@@ -165,6 +165,19 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), deploymentResponse[0].RuntimeRelease.Version)
 		mockClient.AssertExpectations(t)
 	})
+
+	t.Run("prints a deployment in json format to stdout", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
+		err := Inspect(workspaceID, "", deploymentID, "json", mockClient, out, "")
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), deploymentResponse[0].ReleaseName)
+		assert.Contains(t, out.String(), deploymentName)
+		assert.Contains(t, out.String(), deploymentResponse[0].RuntimeRelease.Version)
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("prints a deployment's specific field to stdout", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
@@ -192,6 +205,16 @@ func TestInspect(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return([]astro.Deployment{}, errGetDeployment).Once()
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "")
 		assert.ErrorIs(t, err, errGetDeployment)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("returns an error if requested field is not found in deployment", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "no-exist-information")
+		assert.ErrorIs(t, err, errKeyNotFound)
+		assert.Equal(t, "", out.String())
 		mockClient.AssertExpectations(t)
 	})
 
@@ -832,7 +855,8 @@ func TestGetSpecificField(t *testing.T) {
 				"astronomer_variables": additional["astronomer_variables"],
 			},
 		}
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.Workspace.ID, actual)
 	})
 	t.Run("returns a value if key is found in deployment.configuration", func(t *testing.T) {
@@ -846,7 +870,8 @@ func TestGetSpecificField(t *testing.T) {
 				"astronomer_variables": additional["astronomer_variables"],
 			},
 		}
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.DeploymentSpec.Scheduler.Replicas, actual)
 	})
 	t.Run("returns a value if key is alert_emails", func(t *testing.T) {
@@ -860,7 +885,8 @@ func TestGetSpecificField(t *testing.T) {
 				"astronomer_variables": additional["astronomer_variables"],
 			},
 		}
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.AlertEmails, actual)
 	})
 	t.Run("returns a value if key is astronomer_variables", func(t *testing.T) {
@@ -874,7 +900,8 @@ func TestGetSpecificField(t *testing.T) {
 				"astronomer_variables": additional["astronomer_variables"],
 			},
 		}
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
 		assert.Equal(t, getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), actual)
 	})
 	t.Run("returns a value if key is worker_queues", func(t *testing.T) {
@@ -888,7 +915,8 @@ func TestGetSpecificField(t *testing.T) {
 				"astronomer_variables": additional["astronomer_variables"],
 			},
 		}
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
 		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues), actual)
 	})
 	t.Run("returns a value if key is information", func(t *testing.T) {
@@ -902,10 +930,26 @@ func TestGetSpecificField(t *testing.T) {
 				"astronomer_variables": additional["astronomer_variables"],
 			},
 		}
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
 		assert.Equal(t, info, actual)
 	})
-	t.Run("returns nil if no value if found", func(t *testing.T) {
+	t.Run("returns value regardless of upper or lower case key", func(t *testing.T) {
+		requestedField := "Configuration.Cluster_ID"
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"information":          info,
+				"configuration":        config,
+				"alert_emails":         additional["alert_emails"],
+				"worker_queues":        additional["worker_queues"],
+				"astronomer_variables": additional["astronomer_variables"],
+			},
+		}
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.NoError(t, err)
+		assert.Equal(t, sourceDeployment.Cluster.ID, actual)
+	})
+	t.Run("returns error if no value if found", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"information":          info,
@@ -916,10 +960,11 @@ func TestGetSpecificField(t *testing.T) {
 			},
 		}
 		requestedField := "does-not-exist"
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.ErrorContains(t, err, "requested key "+requestedField+" not found in deployment")
 		assert.Equal(t, nil, actual)
 	})
-	t.Run("returns nil if incorrect field is requested", func(t *testing.T) {
+	t.Run("returns error if incorrect field is requested", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"information":          info,
@@ -930,7 +975,8 @@ func TestGetSpecificField(t *testing.T) {
 			},
 		}
 		requestedField := "configuration.does-not-exist"
-		actual := getSpecificField(printableDeployment, requestedField)
+		actual, err := getSpecificField(printableDeployment, requestedField)
+		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, nil, actual)
 	})
 }

@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -13,8 +14,9 @@ import (
 )
 
 var (
-	jsonMarshal = json.MarshalIndent
-	yamlMarshal = yaml.Marshal
+	jsonMarshal    = json.MarshalIndent
+	yamlMarshal    = yaml.Marshal
+	errKeyNotFound = errors.New("not found in deployment")
 )
 
 const (
@@ -47,7 +49,11 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
 	if requestedField != "" {
-		fmt.Fprintln(out, getSpecificField(printableDeployment, requestedField))
+		value, err := getSpecificField(printableDeployment, requestedField)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, value)
 	} else {
 		// print the entire deployment in outputFormat
 		infoToPrint, err = formatPrintableDeployment(outputFormat, printableDeployment)
@@ -153,12 +159,12 @@ func formatPrintableDeployment(outputFormat string, printableDeployment map[stri
 	return infoToPrint, nil
 }
 
-// getSpecificField is used to find the requestedField in a deployment
-// it splits requestedField at every "." and looks for the first 2 parts in the deployment
-// if it finds both parts of the requestedField, it returns the value
-// it returns nil if either part of the requestedField are not found
-func getSpecificField(deploymentMap map[string]interface{}, requestedField string) any {
-	keyParts := strings.Split(requestedField, ".")
+// getSpecificField is used to find the requestedField in a deployment.
+// it splits requestedField at every "." and looks for the first 2 parts in the deployment.
+// if it finds any part of the requestedField, it returns the value.
+// it returns errKeyNotFound if either part of the requestedField are not found.
+func getSpecificField(deploymentMap map[string]interface{}, requestedField string) (any, error) {
+	keyParts := strings.Split(strings.ToLower(requestedField), ".")
 	// iterate over the top level maps in a deployment like deployment.information
 	for _, elem := range deploymentMap {
 		// check if the first key in the requested field exists and create a subMap
@@ -168,15 +174,15 @@ func getSpecificField(deploymentMap map[string]interface{}, requestedField strin
 				value, ok := subMap.(map[string]interface{})[keyParts[1]]
 				if ok {
 					// we found the requested field so return its value
-					return value
+					return value, nil
 				}
 			} else {
 				// top level field was requested so we return it
-				return subMap
+				return subMap, nil
 			}
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
 }
 
 func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interface{}) map[string]interface{} {
