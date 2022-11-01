@@ -140,6 +140,16 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return err
 	}
 
+	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			err = fmt.Errorf("docker client run failed %w", err)
+			return err
+		}
+	case <-statusCh:
+	}
+
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
 		err = fmt.Errorf("docker container logs fetching failed %w", err)
