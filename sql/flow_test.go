@@ -54,7 +54,7 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
-	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
 	assert.NoError(t, err)
 	mockDockerBinder.AssertExpectations(t)
 }
