@@ -11,15 +11,17 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestCommonDockerUtil(t *testing.T) {
+func TestCommonDockerUtilSuccess(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
 	dockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(types.ImageBuildResponse{
 			Body: io.NopCloser(strings.NewReader("Image built")),
 		}, nil)
+
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(container.ContainerCreateCreatedBody{
 			ID: "123",
 		}, nil)
+
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		containerWaitOkBodyChannel := make(chan container.ContainerWaitOKBody)
@@ -29,7 +31,12 @@ func TestCommonDockerUtil(t *testing.T) {
 			containerWaitOkBodyChannel <- res
 			errChannel <- nil
 		}()
-		mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(<-containerWaitOkBodyChannel, <-errChannel)
+		// converting bidirectional channel to read only channels for ContainerWait to consume
+		var readOnlyStatusCh <-chan container.ContainerWaitOKBody
+		var readOnlyErrCh <-chan error
+		readOnlyStatusCh = containerWaitOkBodyChannel
+		readOnlyErrCh = errChannel
+		mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(readOnlyStatusCh, readOnlyErrCh)
 
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("Sample Log")), nil)
 
