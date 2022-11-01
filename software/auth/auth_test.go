@@ -104,6 +104,11 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id", Domain: "test-domain"}, workspace: &houston.Workspace{ID: "test-workspace-id"}, err: nil},
 			want: true,
 		},
+		{
+			name: "workspace present, unable to set workspace context ",
+			args: args{c: &config.Context{LastUsedWorkspace: "test-workspace-id"}, workspace: &houston.Workspace{ID: "test-workspace-id"}, err: nil},
+			want: false,
+		},
 	}
 
 	houstonMock := new(houstonMocks.ClientInterface)
