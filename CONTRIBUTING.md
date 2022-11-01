@@ -1,3 +1,6 @@
+# Contributing
+
+The Astro CLI is a command-line interface for data orchestration. It allows you to get started with Apache Airflow quickly and it can be used with all Astronomer products.
 
 ## Local development
 
@@ -46,7 +49,7 @@ local:
   houston: http://localhost:8871/v1
 ```
 
-### Run tests
+## Run tests
 
 Before you run tests, make sure you have running locally houston or Astro on http://localhost:8871/v1. This is a requirement for running some tests.
 
@@ -56,7 +59,7 @@ To run unit-tests run:
 make test
 ```
 
-### Generate mocks
+## Generate mocks
 
 Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks for Golang interfaces. See the [mockery installation guide](https://github.com/vektra/mockery#installation).
 
