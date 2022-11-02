@@ -111,9 +111,9 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 
-	t.Run("returns info and config in yaml format for a deployment", func(t *testing.T) {
+	t.Run("returns deployment in yaml format when a deployment name was provided", func(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
-		cmdArgs := []string{"inspect", "-d", "test-deployment-id"}
+		cmdArgs := []string{"inspect", "-n", "test-deployment-label"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, deploymentResponse[0].ReleaseName)
@@ -121,10 +121,28 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("returns deployment in yaml format when a deployment id was provided", func(t *testing.T) {
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		cmdArgs := []string{"inspect", "test-deployment-id"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, deploymentResponse[0].ReleaseName)
+		assert.Contains(t, resp, deploymentName)
+		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns a deployment's specific field", func(t *testing.T) {
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		cmdArgs := []string{"inspect", "-n", "test-deployment-label", "-k", "configuration.cluster_id"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, deploymentResponse[0].Cluster.ID)
+		mockClient.AssertExpectations(t)
+	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
-		cmdArgs := []string{"inspect", "-d", "doesnotexist"}
+		cmdArgs := []string{"inspect", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 		assert.NotContains(t, resp, expectedOut)
