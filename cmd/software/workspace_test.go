@@ -133,7 +133,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonClient = houstonMock
 		defer func() { houstonClient = currentClient }()
 
-		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
 		assert.NoError(t, err)
@@ -152,7 +152,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonClient = houstonMock
 		defer func() { houstonClient = currentClient }()
 
-		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
 		assert.NoError(t, err)
@@ -172,7 +172,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonClient = houstonMock
 		defer func() { houstonClient = currentClient }()
 
-		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
 		assert.NoError(t, err)
