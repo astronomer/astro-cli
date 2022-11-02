@@ -86,16 +86,15 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 
 func deploy(cmd *cobra.Command, args []string) error {
 	deploymentID := ""
-	ws := ""
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
 
-	if deploymentID == "" || forcePrompt {
+	if deploymentID == "" || forcePrompt || workspaceID == "" {
 		var err error
-		ws, err = coalesceWorkspace()
+		workspaceID, err = coalesceWorkspace()
 		if err != nil {
 			return errors.Wrap(err, "failed to find a valid workspace")
 		}
@@ -127,7 +126,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	deployInput := cloud.InputDeploy{
 		Path:           config.WorkingPath,
 		RuntimeID:      deploymentID,
-		WsID:           ws,
+		WsID:           workspaceID,
 		Pytest:         pytestFile,
 		EnvFile:        envFile,
 		ImageName:      imageName,
