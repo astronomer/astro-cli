@@ -87,7 +87,7 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 func deploy(cmd *cobra.Command, args []string) error {
 	deploymentID := ""
 
-	// Get release name from args, if passed
+	// Get deploymentId from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
@@ -100,7 +100,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Save release name in config if specified
+	// Save deploymentId in config if specified
 	if len(deploymentID) > 0 && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 		if err != nil {
