@@ -49,7 +49,7 @@ const (
 	parseAndPytest     = "parse-and-all-tests"
 	enableDagDeployMsg = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
 	dagDeployDisabled  = "dag deploy is not enabled for deployment"
-	invalidWorkspaceID = "Invalid --workspace-id %s was provided"
+	invalidWorkspaceID = "Invalid workspace id %s was provided through the --workspace-id flag\n"
 )
 
 var (
