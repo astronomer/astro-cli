@@ -59,6 +59,23 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 	mockDockerBinder.AssertExpectations(t)
 }
 
+func TestDockerClientInitFailure(t *testing.T) {
+	dockerClientInit = func() (DockerBind, error) {
+		return nil, errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
+	expectedErr := fmt.Errorf("docker client initialization failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+}
+
+func TestGetPypiVersionFailure(t *testing.T) {
+	getPypiVersion = func(projectURL string) (string, error) {
+		return "", errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
+	assert.ErrorIs(t, err, errMock)
+}
+
 func TestImageBuildFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
 	dockerClientInit = func() (DockerBind, error) {
@@ -66,7 +83,22 @@ func TestImageBuildFailure(t *testing.T) {
 		return mockDockerBinder, nil
 	}
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
-	expectedErr := fmt.Errorf("image building failed %w ", errMock)
+	expectedErr := fmt.Errorf("image building failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+	mockDockerBinder.AssertExpectations(t)
+}
+
+func TestImageBuildResponseReadFailure(t *testing.T) {
+	mockDockerBinder := new(mocks.DockerBind)
+	dockerClientInit = func() (DockerBind, error) {
+		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
+		return mockDockerBinder, nil
+	}
+	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+		return 0, errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
 }
@@ -139,8 +171,13 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
+	ioCopyCallCounter := 1
 	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
-		return 0, errMock
+		if ioCopyCallCounter == 2 {
+			return 0, errMock
+		}
+		ioCopyCallCounter++
+		return 0, nil
 	}
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker logs forwarding failed %w", errMock)

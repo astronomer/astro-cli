@@ -43,7 +43,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return err
 	}
 
-	astroSQLCliVersion, err := GetPypiVersion(astroSQLCliProjectURL)
+	astroSQLCliVersion, err := getPypiVersion(astroSQLCliProjectURL)
 	if err != nil {
 		return err
 	}
@@ -62,11 +62,11 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), &opts)
 	if err != nil {
-		err = fmt.Errorf("image building failed %w ", err)
+		err = fmt.Errorf("image building failed %w", err)
 		return err
 	}
 	buf := new(strings.Builder)
-	_, err = io.Copy(buf, body.Body)
+	_, err = ioCopy(buf, body.Body)
 	if err != nil {
 		err = fmt.Errorf("image build response read failed %w", err)
 		return err
