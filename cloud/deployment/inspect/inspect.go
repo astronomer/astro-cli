@@ -2,8 +2,10 @@ package inspect
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -12,20 +14,21 @@ import (
 )
 
 var (
-	jsonMarshal = json.MarshalIndent
-	yamlMarshal = yaml.Marshal
+	jsonMarshal    = json.MarshalIndent
+	yamlMarshal    = yaml.Marshal
+	errKeyNotFound = errors.New("not found in deployment")
 )
 
 const (
 	jsonFormat = "json"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string) error {
 	var (
-		requestedDeployment                                   astro.Deployment
-		err                                                   error
-		infoToPrint                                           []byte
-		deploymentInfoMap, deploymentConfigMap, additionalMap map[string]interface{}
+		requestedDeployment                                                        astro.Deployment
+		err                                                                        error
+		infoToPrint                                                                []byte
+		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
@@ -33,20 +36,32 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		return err
 	}
 
+	// create a map for deployment.information
 	deploymentInfoMap, err = getDeploymentInspectInfo(&requestedDeployment)
 	if err != nil {
 		return err
 	}
-
+	// create a map for deployment.configuration
 	deploymentConfigMap = getDeploymentConfig(&requestedDeployment)
-
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
 	additionalMap = getAdditional(&requestedDeployment)
-
-	infoToPrint, err = formatPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap, outputFormat)
-	if err != nil {
-		return err
+	// create a map for the entire deployment
+	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
+	// get specific field if requested
+	if requestedField != "" {
+		value, err := getSpecificField(printableDeployment, requestedField)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, value)
+	} else {
+		// print the entire deployment in outputFormat
+		infoToPrint, err = formatPrintableDeployment(outputFormat, printableDeployment)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, string(infoToPrint))
 	}
-	fmt.Fprintln(out, string(infoToPrint))
 	return nil
 }
 
@@ -124,21 +139,12 @@ func getVariablesMap(sourceDeploymentVars []astro.EnvironmentVariablesObject) []
 	return variablesMap
 }
 
-func formatPrintableDeployment(information, configuration, additional map[string]interface{}, outputFormat string) ([]byte, error) {
+func formatPrintableDeployment(outputFormat string, printableDeployment map[string]interface{}) ([]byte, error) {
 	var (
-		printableDeployment map[string]interface{}
-		infoToPrint         []byte
-		err                 error
+		infoToPrint []byte
+		err         error
 	)
-	printableDeployment = map[string]interface{}{
-		"deployment": map[string]interface{}{
-			"information":          information,
-			"configuration":        configuration,
-			"alert_emails":         additional["alert_emails"],
-			"worker_queues":        additional["worker_queues"],
-			"astronomer_variables": additional["astronomer_variables"],
-		},
-	}
+
 	switch outputFormat {
 	case jsonFormat:
 		if infoToPrint, err = jsonMarshal(printableDeployment, "", "    "); err != nil {
@@ -151,4 +157,43 @@ func formatPrintableDeployment(information, configuration, additional map[string
 		}
 	}
 	return infoToPrint, nil
+}
+
+// getSpecificField is used to find the requestedField in a deployment.
+// it splits requestedField at every "." and looks for the first 2 parts in the deployment.
+// if it finds any part of the requestedField, it returns the value.
+// it returns errKeyNotFound if either part of the requestedField are not found.
+func getSpecificField(deploymentMap map[string]interface{}, requestedField string) (any, error) {
+	keyParts := strings.Split(strings.ToLower(requestedField), ".")
+	// iterate over the top level maps in a deployment like deployment.information
+	for _, elem := range deploymentMap {
+		// check if the first key in the requested field exists and create a subMap
+		if subMap, exists := elem.(map[string]interface{})[keyParts[0]]; exists {
+			if len(keyParts) > 1 {
+				// check if the second key in the requested field exists
+				value, ok := subMap.(map[string]interface{})[keyParts[1]]
+				if ok {
+					// we found the requested field so return its value
+					return value, nil
+				}
+			} else {
+				// top level field was requested so we return it
+				return subMap, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("requested key %s %w", requestedField, errKeyNotFound)
+}
+
+func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interface{}) map[string]interface{} {
+	printableDeployment := map[string]interface{}{
+		"deployment": map[string]interface{}{
+			"information":          infoMap,
+			"configuration":        configMap,
+			"alert_emails":         additionalMap["alert_emails"],
+			"worker_queues":        additionalMap["worker_queues"],
+			"astronomer_variables": additionalMap["astronomer_variables"],
+		},
+	}
+	return printableDeployment
 }
