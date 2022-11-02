@@ -36,6 +36,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		ID:             "test-id",
 		ReleaseName:    "test-name",
 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+		Workspace:      astro.Workspace{ID: ws},
 		DeploymentSpec: astro.DeploymentSpec{
 			Webserver: astro.Webserver{URL: "test-url"},
 		},
@@ -45,7 +46,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "parse",
 		EnvFile:        "",
 		ImageName:      "",
@@ -58,7 +59,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(3)
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}}}, nil).Once()
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(4)
@@ -134,6 +135,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	mockDeplyResp := astro.Deployment{
 		ID:             "test-id",
 		ReleaseName:    "test-name",
+		Workspace:      astro.Workspace{ID: ws},
 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 		DeploymentSpec: astro.DeploymentSpec{
 			Webserver: astro.Webserver{URL: "test-url"},
@@ -144,7 +146,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "parse",
 		EnvFile:        "",
 		ImageName:      "",
@@ -157,7 +159,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	mockClient := new(astro_mocks.Client)
 
 	mockClient.On("GetDeployment", mock.Anything).Return(mockDeplyResp, nil).Times(5)
-	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", DagDeployEnabled: true}}, nil).Times(2)
+	mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Workspace: astro.Workspace{ID: ws}, DagDeployEnabled: true}}, nil).Times(2)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(7)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
@@ -254,7 +256,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	deployInput = InputDeploy{
 		Path:           "./testfiles1/",
 		RuntimeID:      "",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "parse",
 		EnvFile:        "",
 		ImageName:      "",
@@ -279,6 +281,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		{
 			ID:             "test-id",
 			ReleaseName:    "test-name",
+			Workspace:      astro.Workspace{ID: ws},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
@@ -289,6 +292,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		{
 			ID:             "test-id-2",
 			ReleaseName:    "test-name-2",
+			Workspace:      astro.Workspace{ID: ws},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
@@ -301,7 +305,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
 		ImageName:      "",
@@ -381,6 +385,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		{
 			ID:             "test-id",
 			ReleaseName:    "test-name",
+			Workspace:      astro.Workspace{ID: ws},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
@@ -391,6 +396,7 @@ func TestDagsDeployFailed(t *testing.T) {
 		{
 			ID:             "test-id-2",
 			ReleaseName:    "test-name-2",
+			Workspace:      astro.Workspace{ID: ws},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
@@ -403,7 +409,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
 		ImageName:      "",
@@ -454,7 +460,7 @@ func TestDagsDeployVR(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      runtimeID,
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
 		ImageName:      "",
@@ -503,7 +509,7 @@ func TestNoDagsDeploy(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "",
 		EnvFile:        "",
 		ImageName:      "",
@@ -526,7 +532,7 @@ func TestDeployFailure(t *testing.T) {
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
-		WsID:           "test-ws-id",
+		WsID:           ws,
 		Pytest:         "parse",
 		EnvFile:        "",
 		ImageName:      "",
@@ -544,6 +550,7 @@ func TestDeployFailure(t *testing.T) {
 		{
 			ID:             "test-id",
 			ReleaseName:    "test-name",
+			Workspace:      astro.Workspace{ID: ws},
 			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
 			DeploymentSpec: astro.DeploymentSpec{
 				Webserver: astro.Webserver{URL: "test-url"},
@@ -588,6 +595,13 @@ func TestDeployFailure(t *testing.T) {
 	deployInput.RuntimeID = ""
 	err = Deploy(deployInput, mockClient)
 	assert.ErrorIs(t, err, errDagsParseFailed)
+
+	mockClient.On("ListDeployments", org, "invalid-workspace").Return(mockDeplyResp, nil).Once()
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.RuntimeID = "test-id"
+	deployInput.WsID = "invalid-workspace"
+	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
