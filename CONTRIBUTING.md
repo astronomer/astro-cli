@@ -22,7 +22,7 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
 
     ```pre-commit run --all-files```
 
-4. Clone and Build:
+4. Clone and build:
 
     ```
     $ cd $GOPATH/src/github.com/astronomer/astro-cli

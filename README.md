@@ -8,18 +8,18 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
 
 ### Core commands
 
-  - `login`       Log in to the Astro CLI
-  - `logout`      Log out of the Astro CLI
-  - `dev init`    Initialize an Astro project in an empty local directory
-  - `dev start`   Build your Astro project into a Docker image and spin up a local Docker container for each Airflow component
-  - `dev stop`    Pause all Docker containers running your local Airflow environment
-  - `dev restart` Stop your Airflow environment, rebuild your Astro project into a Docker image, and restart your Airflow environment with the new Docker image
-  - `deploy`      Deploy code to a Deployment on Astro
-  - `deployment`  Manage your Deployments running on Astronomer
-  - `dev`         Run your Astro project locally
-  - `help`        Help about any Astro CLI command
-  - `version`     Show the running version of the Astro CLI
-  - `workspace`   Manage Astronomer Workspaces
+  - `login`         Log in to the Astro CLI
+  - `logout`        Log out of the Astro CLI
+  - `dev init`      Initialize an Astro project in an empty local directory
+  - `dev start`     Build your Astro project into a Docker image and spin up a local Docker container for each Airflow component
+  - `dev stop`      Pause all Docker containers running your local Airflow environment
+  - `dev restart`   Stop your Airflow environment, rebuild your Astro project into a Docker image, and restart your Airflow environment with the new Docker image
+  - `deploy`        Deploy code to a Deployment on Astro
+  - `deployment`    Manage your Deployments running on Astronomer
+  - `dev`           Run your Astro project locally
+  - `help`          Help about any Astro CLI command
+  - `version`       Show the running version of the Astro CLI
+  - `workspace`     Manage Astronomer Workspaces
 
 For a list of available Astro CLI commands, see the [Astro CLI command reference](https://docs.astronomer.io/astro/cli/reference).
 
