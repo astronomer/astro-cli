@@ -74,7 +74,7 @@ var (
 	openURL        = browser.OpenURL
 	timeoutNum     = 60
 	tickNum        = 500
-	startupTimeout = 1 * time.Minute
+	startupTimeout time.Duration
 	isM1           = util.IsM1
 )
 
@@ -144,7 +144,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool) error {
+func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
@@ -209,8 +209,14 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 		return err
 	}
 
-	// check if running darwin/M1 architecture
-	if isM1(runtime.GOOS, runtime.GOARCH) {
+	startupTimeout = waitTime
+	// check if user provided a waitTime
+	// default is 1 minute
+	if waitTime != 1*time.Minute {
+		startupTimeout = waitTime
+	} else if isM1(runtime.GOOS, runtime.GOARCH) {
+		// user did not provide a waitTime
+		// if running darwin/M1 architecture
 		// we wait for a longer startup time
 		startupTimeout = 5 * time.Minute
 	}
