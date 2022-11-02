@@ -136,6 +136,7 @@ func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.
 	var err error
 
 	if interactive {
+		// To identify if the user has access to more than one workspace by setting workspace page size to 2, if so, take the user to the workspace switch flow.
 		workspacePageSize := 2
 		workspaces, err = client.PaginatedListWorkspaces(workspacePageSize, 0)
 	} else {
