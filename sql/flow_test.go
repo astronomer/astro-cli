@@ -68,14 +68,6 @@ func TestDockerClientInitFailure(t *testing.T) {
 	assert.Equal(t, expectedErr, err)
 }
 
-func TestGetPypiVersionFailure(t *testing.T) {
-	getPypiVersion = func(projectURL string) (string, error) {
-		return "", errMock
-	}
-	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
-	assert.ErrorIs(t, err, errMock)
-}
-
 func TestImageBuildFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
 	dockerClientInit = func() (DockerBind, error) {
@@ -84,21 +76,6 @@ func TestImageBuildFailure(t *testing.T) {
 	}
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("image building failed %w", errMock)
-	assert.Equal(t, expectedErr, err)
-	mockDockerBinder.AssertExpectations(t)
-}
-
-func TestImageBuildResponseReadFailure(t *testing.T) {
-	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
-		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
-		return mockDockerBinder, nil
-	}
-	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
-		return 0, errMock
-	}
-	err := CommonDockerUtil(testCommand, nil, nil, nil)
-	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
 }
@@ -183,4 +160,27 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("docker logs forwarding failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
+}
+
+func TestImageBuildResponseReadFailure(t *testing.T) {
+	mockDockerBinder := new(mocks.DockerBind)
+	dockerClientInit = func() (DockerBind, error) {
+		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
+		return mockDockerBinder, nil
+	}
+	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+		return 0, errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+	mockDockerBinder.AssertExpectations(t)
+}
+
+func TestGetPypiVersionFailure(t *testing.T) {
+	getPypiVersion = func(projectURL string) (string, error) {
+		return "", errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	assert.ErrorIs(t, err, errMock)
 }
