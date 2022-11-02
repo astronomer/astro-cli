@@ -54,20 +54,24 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	return client.AuthenticateWithBasicAuth(username, password, ctx)
 }
 
-var switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.Context) bool {
 	if c.LastUsedWorkspace == "" {
 		return false
 	}
 
-	for idx := range workspaces {
-		if c.LastUsedWorkspace == workspaces[idx].ID {
-			if err := c.SetContextKey("workspace", workspaces[idx].ID); err != nil {
-				return false
-			}
-			return true
-		}
+	// validate workspace
+	workspace, err := client.ValidateWorkspaceID(c.LastUsedWorkspace)
+	if err != nil || workspace != nil && workspace.ID != c.LastUsedWorkspace {
+		log.Debugf("last used workspace id is not valid: %s", err.Error())
+		return false
 	}
-	return false
+
+	if err := c.SetContextKey("workspace", workspace.ID); err != nil {
+		log.Debugf("unable to set workspace context: %s", err.Error())
+		return false
+	}
+
+	return true
 }
 
 // oAuth handles oAuth with houston api
@@ -127,6 +131,21 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 	return nil
 }
 
+func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.Workspace, error) {
+	var workspaces []houston.Workspace
+	var err error
+
+	if interactive {
+		// To identify if the user has access to more than one workspace by setting workspace page size to 2, if so, take the user to the workspace switch flow.
+		workspacePageSize := 2
+		workspaces, err = client.PaginatedListWorkspaces(workspacePageSize, 0)
+	} else {
+		workspaces, err = client.ListWorkspaces()
+	}
+
+	return workspaces, err
+}
+
 // Login handles authentication to houston and registry
 func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
 	var token string
@@ -173,7 +192,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		return err
 	}
 
-	workspaces, err := client.ListWorkspaces()
+	workspaces, err := getWorkspaces(client, interactive)
 	if err != nil {
 		return err
 	}
@@ -194,7 +213,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in cluster
-		isSwitched := switchToLastUsedWorkspace(&c, workspaces)
+		isSwitched := switchToLastUsedWorkspace(client, &c)
 
 		if !isSwitched {
 			// show switch menu with available workspace IDs
