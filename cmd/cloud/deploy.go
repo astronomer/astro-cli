@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"strings"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -92,7 +93,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	if deploymentID == "" || forcePrompt || workspaceID == "" {
+	if (!strings.HasPrefix(deploymentID, "vr-")) && (deploymentID == "" || forcePrompt || workspaceID == "") {
 		var err error
 		workspaceID, err = coalesceWorkspace()
 		if err != nil {
