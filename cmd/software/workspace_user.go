@@ -152,7 +152,8 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 	}
 	configPageSize := config.CFG.PageSize.GetInt()
 
-	if config.CFG.Interactive.GetBool() || paginated {
+	// not calling paginated workspace roles if houston version is before 0.30.0, since that doesn't support pagination
+	if (config.CFG.Interactive.GetBool() || paginated) && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
 		if pageSize <= 0 && configPageSize > 0 {
 			pageSize = configPageSize
 		}

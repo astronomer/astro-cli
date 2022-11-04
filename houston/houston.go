@@ -37,6 +37,7 @@ type ClientInterface interface {
 	DeleteWorkspace(workspaceID string) (*Workspace, error)
 	GetWorkspace(workspaceID string) (*Workspace, error)
 	UpdateWorkspace(req UpdateWorkspaceRequest) (*Workspace, error)
+	ValidateWorkspaceID(workspaceID string) (*Workspace, error)
 	// workspace users and roles
 	AddWorkspaceUser(req AddWorkspaceUserRequest) (*Workspace, error)
 	DeleteWorkspaceUser(req DeleteWorkspaceUserRequest) (*Workspace, error)

@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"strings"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -62,42 +63,13 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
+	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
-	cmd.Flags().BoolVar(&parse, "parse", false, "Deploy code to Astro only if all DAGs in your Astro project parse correctly")
+	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	return cmd
 }
 
-func deploy(cmd *cobra.Command, args []string) error {
-	deploymentID := ""
-	ws := ""
-
-	// Get release name from args, if passed
-	if len(args) > 0 {
-		deploymentID = args[0]
-	}
-
-	if deploymentID == "" || forcePrompt {
-		var err error
-		ws, err = coalesceWorkspace()
-		if err != nil {
-			return errors.Wrap(err, "failed to find a valid workspace")
-		}
-	}
-
-	// Save release name in config if specified
-	if len(deploymentID) > 0 && saveDeployConfig {
-		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
-		if err != nil {
-			return nil
-		}
-	}
-
-	if git.HasUncommittedChanges() && !forceDeploy {
-		fmt.Println(registryUncommitedChangesMsg)
-		return nil
-	}
-
+func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 	if pytest && pytestFile == "" {
 		pytestFile = "all-tests"
 	}
@@ -110,21 +82,58 @@ func deploy(cmd *cobra.Command, args []string) error {
 		pytestFile = "parse-and-all-tests"
 	}
 
+	return pytestFile
+}
+
+func deploy(cmd *cobra.Command, args []string) error {
+	deploymentID := ""
+
+	// Get deploymentId from args, if passed
+	if len(args) > 0 {
+		deploymentID = args[0]
+	}
+
+	if (!strings.HasPrefix(deploymentID, "vr-")) && (deploymentID == "" || forcePrompt || workspaceID == "") {
+		var err error
+		workspaceID, err = coalesceWorkspace()
+		if err != nil {
+			return errors.Wrap(err, "failed to find a valid workspace")
+		}
+	}
+
+	// Save deploymentId in config if specified
+	if len(deploymentID) > 0 && saveDeployConfig {
+		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
+		if err != nil {
+			return nil
+		}
+	}
+
+	if git.HasUncommittedChanges() && !forceDeploy {
+		fmt.Println(registryUncommitedChangesMsg)
+		return nil
+	}
+
+	// case for astro deploy --dags whose default operation should be not running any tests
+	if dags && !parse && !pytest {
+		pytestFile = ""
+	} else {
+		pytestFile = deployTests(parse, pytest, forceDeploy, pytestFile)
+	}
+
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	deployInput := cloud.InputDeploy{
 		Path:           config.WorkingPath,
 		RuntimeID:      deploymentID,
-		WsID:           ws,
+		WsID:           workspaceID,
 		Pytest:         pytestFile,
 		EnvFile:        envFile,
 		ImageName:      imageName,
 		DeploymentName: deploymentName,
 		Prompt:         forcePrompt,
 		Dags:           dags,
-		ForceDeploy:    forceDeploy,
-		Parse:          parse,
 	}
 
 	return deployImage(deployInput, astroClient)

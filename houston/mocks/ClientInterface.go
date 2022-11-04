@@ -1240,6 +1240,29 @@ func (_m *ClientInterface) UpdateWorkspaceUserRole(req houston.UpdateWorkspaceUs
 	return r0, r1
 }
 
+// ValidateWorkspaceID provides a mock function with given fields: workspaceID
+func (_m *ClientInterface) ValidateWorkspaceID(workspaceID string) (*houston.Workspace, error) {
+	ret := _m.Called(workspaceID)
+
+	var r0 *houston.Workspace
+	if rf, ok := ret.Get(0).(func(string) *houston.Workspace); ok {
+		r0 = rf(workspaceID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Workspace)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(workspaceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewClientInterface interface {
 	mock.TestingT
 	Cleanup(func())

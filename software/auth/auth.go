@@ -54,20 +54,24 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	return houston.Call(client.AuthenticateWithBasicAuth)(houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
 }
 
-var switchToLastUsedWorkspace = func(c *config.Context, workspaces []houston.Workspace) bool {
+var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.Context) bool {
 	if c.LastUsedWorkspace == "" {
 		return false
 	}
 
-	for idx := range workspaces {
-		if c.LastUsedWorkspace == workspaces[idx].ID {
-			if err := c.SetContextKey("workspace", workspaces[idx].ID); err != nil {
-				return false
-			}
-			return true
-		}
+	// validate workspace
+	workspace, err := client.ValidateWorkspaceID(c.LastUsedWorkspace)
+	if err != nil || workspace != nil && workspace.ID != c.LastUsedWorkspace {
+		log.Debugf("last used workspace id is not valid: %s", err.Error())
+		return false
 	}
-	return false
+
+	if err := c.SetContextKey("workspace", workspace.ID); err != nil {
+		log.Debugf("unable to set workspace context: %s", err.Error())
+		return false
+	}
+
+	return true
 }
 
 // oAuth handles oAuth with houston api
@@ -127,12 +131,32 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 	return nil
 }
 
+func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.Workspace, error) {
+	var workspaces []houston.Workspace
+	var err error
+
+	if interactive {
+		// To identify if the user has access to more than one workspace by setting workspace page size to 2, if so, take the user to the workspace switch flow.
+		workspacePageSize := 2
+		workspaces, err = houston.Call(client.PaginatedListWorkspaces)(houston.PaginatedListWorkspaceRequest{PageSize: workspacePageSize, PageNumber: 0})
+	} else {
+		workspaces, err = houston.Call(client.ListWorkspaces)(nil)
+	}
+
+	return workspaces, err
+}
+
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
-	interactive := config.CFG.Interactive.GetBool()
-	pageSize := config.CFG.PageSize.GetInt()
+	var pageSize int
+	var interactive bool
+	// not going for pagination if houston version is before 0.30.0, since that doesn't support pagination
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		interactive = config.CFG.Interactive.GetBool()
+		pageSize = config.CFG.PageSize.GetInt()
+	}
 	if !(pageSize > 0 && pageSize < defaultPageSize) {
 		pageSize = defaultPageSize
 	}
@@ -173,7 +197,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		return err
 	}
 
-	workspaces, err := houston.Call(client.ListWorkspaces)(nil)
+	workspaces, err := getWorkspaces(client, interactive)
 	if err != nil {
 		return err
 	}
@@ -194,7 +218,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in cluster
-		isSwitched := switchToLastUsedWorkspace(&c, workspaces)
+		isSwitched := switchToLastUsedWorkspace(client, &c)
 
 		if !isSwitched {
 			// show switch menu with available workspace IDs

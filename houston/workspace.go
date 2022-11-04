@@ -126,6 +126,22 @@ var (
 			}
 		}
 	}`
+
+	ValidateWorkspaceIDGetRequest = `
+	query GetWorkspace(
+		$workspaceUuid: Uuid!
+	){
+		workspace(
+			workspaceUuid: $workspaceUuid
+		){
+			id
+			label
+			description
+			createdAt
+			updatedAt
+		}
+	}
+    `
 )
 
 // CreateWorkspace - create a workspace
@@ -191,6 +207,26 @@ func (h ClientImplementation) DeleteWorkspace(workspaceID string) (*Workspace, e
 func (h ClientImplementation) GetWorkspace(workspaceID string) (*Workspace, error) {
 	req := Request{
 		Query:     WorkspaceGetRequest,
+		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	workspace := res.Data.GetWorkspace
+	if workspace == nil {
+		return nil, ErrWorkspaceNotFound{workspaceID: workspaceID}
+	}
+
+	return workspace, nil
+}
+
+// ValidateWorkspaceID - get a workspace
+func (h ClientImplementation) ValidateWorkspaceID(workspaceID string) (*Workspace, error) {
+	req := Request{
+		Query:     ValidateWorkspaceIDGetRequest,
 		Variables: map[string]interface{}{"workspaceUuid": workspaceID},
 	}
 

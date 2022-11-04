@@ -20,6 +20,7 @@ const (
 	CloudStagePlatform    = "stage"
 	SoftwarePlatform      = "software"
 	Initial               = "initial"
+	SQLCLI                = "sql_cli"
 	ErrorReturningContext = "error"
 )
 
@@ -80,6 +81,10 @@ contexts:
 		testConfig = fmt.Sprintf(testConfig, "localhost", "localhost", "localhost")
 	case Initial:
 		testConfig = ""
+	case SQLCLI:
+		testConfig = `beta:
+  sql_cli: true
+`
 	case ErrorReturningContext:
 		// this is an error returning case
 		testConfig = fmt.Sprintf(testConfig, "error", "error", "error")

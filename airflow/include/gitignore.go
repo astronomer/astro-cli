@@ -6,6 +6,7 @@ import "strings"
 var Gitignore = strings.TrimSpace(`
 .git
 .env
+.DS_Store # macOS specific ignore
 airflow_settings.yaml
 astro
 `)

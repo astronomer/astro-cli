@@ -202,5 +202,10 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 		}
 	}
 
+	// overriding workspace pagesize if houston version is before 0.30.0, since that doesn't support pagination
+	if !houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		workspacePageSize = 0
+	}
+
 	return workspace.Switch(id, workspacePageSize, houstonClient, out)
 }
