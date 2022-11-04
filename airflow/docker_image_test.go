@@ -393,37 +393,3 @@ func TestDockerImageRunTest(t *testing.T) {
 
 	cmdExec = previousCmdExec
 }
-
-// func TestRunCommandCh(t *testing.T) {
-// 	t.Run("RunCommandCh success", func(t *testing.T) {
-// 		_, err := RunCommandCh(true, "\n", "echo", []string{"\"\ntesting\nTestRunCommandCh\""}...)
-// 		assert.NoError(t, err)
-// 	})
-// 	t.Run("RunCommandCh unsuccessful command", func(t *testing.T) {
-// 		_, err := RunCommandCh(true, "\n", "error-cmd", []string{}...)
-// 		assert.Contains(t, err.Error(), "error-cmd")
-// 	})
-// }
-
-// func TestParseOuputLine(t *testing.T) {
-// 	t.Run("case running task", func(t *testing.T) {
-// 		failedTask, _, _, tasks := parseOuputLine("Running task test-task", "", "", 0, 0, true)
-// 		assert.Equal(t, 1, tasks)
-// 		assert.Equal(t, failedTask, "test-task")
-// 	})
-// 	t.Run("case Time:  ", func(t *testing.T) {
-// 		_, time, _, _ := parseOuputLine("Time:  time-test", "", "", 0, 0, true)
-// 		assert.Equal(t, time, "time-test")
-// 	})
-// 	t.Run("case ran successfully!", func(t *testing.T) {
-// 		_, _, successfulRun, _ := parseOuputLine(" ran successfully!", "", "", 0, 0, true)
-// 		assert.Equal(t, successfulRun, 1)
-// 	})
-// 	t.Run("case default", func(t *testing.T) {
-// 		failedTask, time, successfulRun, tasks := parseOuputLine("", "", "", 0, 0, true)
-// 		assert.Equal(t, successfulRun, 0)
-// 		assert.Equal(t, time, "")
-// 		assert.Equal(t, tasks, 0)
-// 		assert.Equal(t, failedTask, "")
-// 	})
-// }
