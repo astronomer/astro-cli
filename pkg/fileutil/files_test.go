@@ -268,7 +268,7 @@ func TestGetFilesWithSpecificExtension(t *testing.T) {
 	}
 }
 
-func TestAddLineToFile(t *testing.T) { 
+func TestAddLineToFile(t *testing.T) {
 	filePath := "./test.py"
 	content := "testing"
 
@@ -297,7 +297,7 @@ func TestAddLineToFile(t *testing.T) {
 	}
 }
 
-func TestRemoveLineFromFile(t *testing.T) { 
+func TestRemoveLineFromFile(t *testing.T) {
 	filePath := "./test.py"
 	content := "testing\nremove this"
 
@@ -325,5 +325,3 @@ func TestRemoveLineFromFile(t *testing.T) {
 		})
 	}
 }
-
-
