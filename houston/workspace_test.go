@@ -334,6 +334,53 @@ func TestGetWorkspace(t *testing.T) {
 	})
 }
 
+func TestValidateWorkspaceID(t *testing.T) {
+	testUtil.InitTestConfig("software")
+
+	mockResponse := &Response{
+		Data: ResponseData{
+			GetWorkspace: &Workspace{
+				ID:          "workspace-id",
+				Label:       "label",
+				Description: "test description",
+				CreatedAt:   "2020-06-25T22:10:42.385Z",
+				UpdatedAt:   "2020-06-25T22:10:42.385Z",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockResponse)
+	assert.NoError(t, err)
+
+	t.Run("success", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		response, err := api.ValidateWorkspaceID("workspace-id")
+		assert.NoError(t, err)
+		assert.Equal(t, response, mockResponse.Data.GetWorkspace)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.ValidateWorkspaceID("workspace-id")
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}
+
 func TestUpdateWorkspace(t *testing.T) {
 	testUtil.InitTestConfig("software")
 
