@@ -18,6 +18,7 @@ const (
 	CloudDevPlatform      = "dev"
 	CloudPerfPlatform     = "perf"
 	CloudStagePlatform    = "stage"
+	CloudPrPreview        = "prpreview"
 	SoftwarePlatform      = "software"
 	Initial               = "initial"
 	SQLCLI                = "sql_cli"
@@ -85,6 +86,8 @@ contexts:
 		testConfig = `beta:
   sql_cli: true
 `
+	case CloudPrPreview:
+		testConfig = fmt.Sprintf(testConfig, "pr1234.cloud.asrtronomer-dev.io", strings.Replace("pr1234.cloud.astronomer-dev.io", ".", "_", -1), "pr1234.cloud.asrtronomer-dev.io")
 	case ErrorReturningContext:
 		// this is an error returning case
 		testConfig = fmt.Sprintf(testConfig, "error", "error", "error")

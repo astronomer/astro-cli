@@ -13,6 +13,7 @@ import (
 const (
 	CloudPlatform    = "cloud"
 	SoftwarePlatform = "software"
+	PrPreview        = "prprievew"
 
 	localhostDomain = "localhost"
 	astrohubDomain  = "astrohub"

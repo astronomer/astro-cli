@@ -439,8 +439,7 @@ func Logout(domain string, out io.Writer) {
 
 func formatDomain(domain string) string {
 	if strings.Contains(domain, "cloud") {
-		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
-		domain = splitDomain[1]
+		domain = strings.Replace(domain, "cloud.", "", 1)
 	} else if domain == "" {
 		domain = Domain
 	}
@@ -449,24 +448,29 @@ func formatDomain(domain string) string {
 }
 
 func ValidateDomain(domain string) (astro.AuthConfig, error) {
-	validDomainsList := []string{"astronomer-dev.io", "astronomer-stage.io", "astronomer-perf.io", "astronomer.io", "localhost"}
-	var authConfig astro.AuthConfig
+	var (
+		authConfig  astro.AuthConfig
+		prNum, addr string
+		validDomain bool
+	)
 
-	validDomain := false
-	for _, x := range validDomainsList {
-		if x == domain {
-			validDomain = true
-			break
-		}
+	if strings.Contains(domain, "pr") {
+		prNum, domain, _ = strings.Cut(domain, ".")
 	}
+	validDomain = context.IsCloudDomain(domain)
 	if !validDomain {
 		return authConfig, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
 			"Are you trying to authenticate to Astronomer Software? If so, please change your current context with 'astro context switch'")
 	}
 
-	var addr string
-	if domain == "localhost" {
+	// TODO refactor and dry this out to remove the nolint
+	if domain == "localhost" { // nolint
 		addr = fmt.Sprintf("http://%s:8871/auth-config", domain)
+	} else if prNum != "" {
+		addr = fmt.Sprintf(
+			"https://%s.api.%s/hub/auth-config",
+			prNum, domain,
+		)
 	} else {
 		addr = fmt.Sprintf(
 			"https://api.%s/hub/auth-config",

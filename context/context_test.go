@@ -60,6 +60,7 @@ func TestIsCloudContext(t *testing.T) {
 		{"software-domain", "dev.astrodev.com", config.SoftwarePlatform, false},
 		{"software-domain", "software.astronomer-test.io", config.SoftwarePlatform, false},
 		{"local-software", "localhost", config.SoftwarePlatform, false},
+		{"prpreview", "pr1234.cloud.astronomer-dev.io", config.PrPreview, true},
 	}
 
 	for _, tt := range tests {
@@ -111,4 +112,17 @@ func TestListContext(t *testing.T) {
 	err := ListContext(&cobra.Command{}, []string{}, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "localhost")
+}
+
+func TestIsCloudDomain(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPrPreview)
+	actual := IsCloudDomain("pr1234.cloud.astronomer.io")
+	assert.True(t, actual)
+
+	// TODO this makes the first find pass in viper.IsSet()
+	// SetContext("pr1234.cloud.astronomer.io")
+	// TODO this finds the context
+	Switch("pr1234.cloud.astronomer.io")
+	actual = IsCloudContext()
+	assert.True(t, actual)
 }
