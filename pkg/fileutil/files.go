@@ -174,80 +174,42 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 	return files
 }
 
-// This function adds airflow db init to the Dockerfile. Needed by astro run command
-func AddAirflowDB() {
-	f, err := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+func AddLineToFile(filePath, lineText, commentText string) error {
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 	if err != nil {
-		fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
+		return err
 	}
-	content, err := os.ReadFile("./Dockerfile")
+	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
+		return err
 	}
-	if !strings.Contains(string(content), "RUN airflow db init") {
-		_, err = f.WriteString("\nRUN airflow db init")
+	if !strings.Contains(string(content), lineText) {
+		_, err = f.WriteString("\n" + lineText + " " + commentText)
 		if err != nil {
-			fmt.Printf("Adding DB to image unsuccessful: %s\n", err.Error())
+			return err
 		}
 	}
 	f.Close()
+	return err
 }
 
 // This function removes airflow db init from the Dockerfile. Needed by astro run command
-func RmAirflowDB() {
-	f, err := os.OpenFile("./Dockerfile", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+func RemoveLineFromFile(filePath, lineText, commentText string) error {
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 	if err != nil {
-		fmt.Printf("Removing db from image unsuccessful: %s\n", err.Error())
+		return err
 	}
-	content, err := os.ReadFile("./Dockerfile")
+	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
+		return err
 	}
-	if strings.Contains(string(content), "RUN airflow db init") {
-		lastInd := strings.LastIndex(string(content), "\nRUN airflow db init")
-		err = WriteStringToFile("./Dockerfile", string(content)[:lastInd])
+	if strings.Contains(string(content), lineText) {
+		lastInd := strings.LastIndex(string(content), "\n"+lineText+" "+commentText)
+		err = WriteStringToFile(filePath, string(content)[:lastInd])
 		if err != nil {
-			fmt.Printf("Removing db from image unsuccessful: %s\n", err.Error())
+			return err
 		}
 	}
 	f.Close()
-}
-
-// This function adds astro-run-dag to requirments.txt. Needed for astro run command
-func AddAstroRunDAG() {
-	f, err := os.OpenFile("./requirements.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
-	if err != nil {
-		fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
-	}
-	content, err := os.ReadFile("./requirements.txt")
-	if err != nil {
-		fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
-	}
-	if !strings.Contains(string(content), "astro-run-dag") {
-		_, err = f.WriteString("\nastro-run-dag # This package is needed for the astro run command. It will be removed before a deploy")
-		if err != nil {
-			fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
-		}
-	}
-	f.Close()
-}
-
-// This function removes astro-run-dag from requirments.txt. Needed by astro run command
-func RmAstroRunDAG() {
-	f, err := os.OpenFile("./requirements.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
-	if err != nil {
-		fmt.Printf("Removing 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
-	}
-	content, err := os.ReadFile("./requirements.txt")
-	if err != nil {
-		fmt.Printf("reading file unsuccessful: %s\n", err.Error())
-	}
-	if strings.Contains(string(content), "astro-run-dag") {
-		lastInd := strings.LastIndex(string(content), "\nastro-run-dag # This package is needed for the astro run command. It will be removed before a deploy")
-		err = WriteStringToFile("./Dockerfile", string(content)[:lastInd])
-		if err != nil {
-			fmt.Printf("Removing 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
-		}
-	}
-	f.Close()
+	return err
 }

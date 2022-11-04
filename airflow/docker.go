@@ -169,7 +169,11 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	// Build this project image
 	if imageName == "" {
 		// add astro-run-dag package
-		fileutil.AddAstroRunDAG()
+		// add astro-run-dag
+		err = fileutil.AddLineToFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
+		if err != nil {
+			fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
+		}
 		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 		if err != nil {
 			return err
@@ -580,12 +584,22 @@ func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, 
 
 	fmt.Println("Building image... For a faster 'astro run' experince run this command while Airflow is running with 'astro dev start'\n ")
 	// add astro-run-dag
-	fileutil.AddAstroRunDAG()
+	err = fileutil.AddLineToFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
+	if err != nil {
+		fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
+	}
 	// add airflow db init
-	fileutil.AddAirflowDB()
+	err = fileutil.AddLineToFile("./Dockerfile", "RUN airflow db init", "")
+	if err != nil {
+		fmt.Printf("Adding line 'RUN airflow db init' to Dockerfile unsuccessful: %s\nYou may need to manually add this line for 'astro run' to work", err.Error())
+	}
+
 	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 	// remove airflow db init
-	fileutil.RmAirflowDB()
+	fileErr := fileutil.RemoveLineFromFile("./Dockerfile", "RUN airflow db init", "")
+	if fileErr != nil {
+		fmt.Printf("Removing line 'RUN airflow db init' from Dockerfile unsuccessful: %s\n", err.Error())
+	}
 	if err != nil {
 		return err
 	}

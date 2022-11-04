@@ -468,7 +468,10 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 		dagsIgnoreSet = true
 	}
 	// remove astro-run-dag from requirments.txt
-	fileutil.RmAstroRunDAG()
+	err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
+	if err != nil {
+		fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+	}
 	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 	if err != nil {
 		return err
@@ -530,7 +533,10 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 			}
 		} else {
 			// remove astro-run-dag from requirments.txt
-			fileutil.RmAstroRunDAG()
+			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
+			if err != nil {
+				fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+			}
 			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 			if err != nil {
 				return "", err
