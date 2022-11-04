@@ -1,4 +1,6 @@
 ---
+ignore:
+  - "sql/docker_interface.go"
 coverage:
   range: 85..100
   round: down

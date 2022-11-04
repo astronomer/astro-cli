@@ -20,7 +20,7 @@ test:
 	go test -count=1 -cover ./...
 	go test -coverprofile=coverage.txt -covermode=atomic ./...
 
-mock: mock_airflow mock_houston mock_astro mock_pkg
+mock: mock_airflow mock_houston mock_astro mock_pkg mock_sql_cli
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
@@ -38,6 +38,9 @@ mock_astro:
 
 mock_pkg:
 	mockery --filename=Azure.go --output=pkg/azure/mocks --dir=pkg/azure --outpkg=azure_mocks --name Azure
+
+mock_sql_cli:
+	mockery --filename="flow.go" --output="sql/mocks" --dir=sql/ --outpkg=mocks --name DockerBind
 
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)
