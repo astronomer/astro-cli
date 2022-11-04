@@ -42,7 +42,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build(options, true)
+		err = handler.Build(options)
 		assert.NoError(t, err)
 	})
 
@@ -53,7 +53,7 @@ func TestDockerImageBuild(t *testing.T) {
 			assert.Contains(t, args, "--no-cache")
 			return nil
 		}
-		err = handler.Build(options, false)
+		err = handler.Build(options)
 		assert.NoError(t, err)
 	})
 
@@ -61,7 +61,7 @@ func TestDockerImageBuild(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err = handler.Build(options, false)
+		err = handler.Build(options)
 		assert.Contains(t, err.Error(), errMock.Error())
 	})
 
@@ -73,7 +73,7 @@ func TestDockerImageBuild(t *testing.T) {
 			Output:          false,
 		}
 
-		err = handler.Build(options, false)
+		err = handler.Build(options)
 		assert.Error(t, err)
 	})
 
@@ -363,18 +363,10 @@ func TestDockerImageRunTest(t *testing.T) {
 	defer afero.NewOsFs().Remove(dockerIgnoreFile)
 
 	previousCmdExec := cmdExec
-	previousRunCommandCh := RunCommandCh
 
 	t.Run("run success without container", func(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
-		}
-
-		RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) {
-			return DagRunInfo{
-				time:        "time",
-				failedTasks: 0,
-			}, nil
 		}
 
 		err = handler.RunTest("", "./testfiles/airflow_settings.yaml", "", "", "", true)
@@ -386,13 +378,6 @@ func TestDockerImageRunTest(t *testing.T) {
 			return nil
 		}
 
-		RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) {
-			return DagRunInfo{
-				time:        "time",
-				failedTasks: 0,
-			}, nil
-		}
-
 		err = handler.RunTest("", "./testfiles/airflow_settings_invalid.yaml", "", "", "test-container", true)
 		assert.NoError(t, err)
 	})
@@ -402,51 +387,43 @@ func TestDockerImageRunTest(t *testing.T) {
 			return errExecMock
 		}
 
-		RunCommandCh = func(taskLogs bool, cutset, command string, flags ...string) (DagRunInfo, error) {
-			return DagRunInfo{
-				time:        "",
-				failedTasks: 1,
-			}, errExecMock
-		}
-
 		err = handler.RunTest("", "./testfiles/airflow_settings.yaml", "", "", "", true)
 		assert.Contains(t, err.Error(), errExecMock.Error())
 	})
 
 	cmdExec = previousCmdExec
-	RunCommandCh = previousRunCommandCh
 }
 
-func TestRunCommandCh(t *testing.T) {
-	t.Run("RunCommandCh success", func(t *testing.T) {
-		_, err := RunCommandCh(true, "\n", "echo", []string{"\"\ntesting\nTestRunCommandCh\""}...)
-		assert.NoError(t, err)
-	})
-	t.Run("RunCommandCh unsuccessful command", func(t *testing.T) {
-		_, err := RunCommandCh(true, "\n", "error-cmd", []string{}...)
-		assert.Contains(t, err.Error(), "error-cmd")
-	})
-}
+// func TestRunCommandCh(t *testing.T) {
+// 	t.Run("RunCommandCh success", func(t *testing.T) {
+// 		_, err := RunCommandCh(true, "\n", "echo", []string{"\"\ntesting\nTestRunCommandCh\""}...)
+// 		assert.NoError(t, err)
+// 	})
+// 	t.Run("RunCommandCh unsuccessful command", func(t *testing.T) {
+// 		_, err := RunCommandCh(true, "\n", "error-cmd", []string{}...)
+// 		assert.Contains(t, err.Error(), "error-cmd")
+// 	})
+// }
 
-func TestParseOuputLine(t *testing.T) {
-	t.Run("case running task", func(t *testing.T) {
-		failedTask, _, _, tasks := parseOuputLine("Running task test-task", "", "", 0, 0, true)
-		assert.Equal(t, 1, tasks)
-		assert.Equal(t, failedTask, "test-task")
-	})
-	t.Run("case Time:  ", func(t *testing.T) {
-		_, time, _, _ := parseOuputLine("Time:  time-test", "", "", 0, 0, true)
-		assert.Equal(t, time, "time-test")
-	})
-	t.Run("case ran successfully!", func(t *testing.T) {
-		_, _, successfulRun, _ := parseOuputLine(" ran successfully!", "", "", 0, 0, true)
-		assert.Equal(t, successfulRun, 1)
-	})
-	t.Run("case default", func(t *testing.T) {
-		failedTask, time, successfulRun, tasks := parseOuputLine("", "", "", 0, 0, true)
-		assert.Equal(t, successfulRun, 0)
-		assert.Equal(t, time, "")
-		assert.Equal(t, tasks, 0)
-		assert.Equal(t, failedTask, "")
-	})
-}
+// func TestParseOuputLine(t *testing.T) {
+// 	t.Run("case running task", func(t *testing.T) {
+// 		failedTask, _, _, tasks := parseOuputLine("Running task test-task", "", "", 0, 0, true)
+// 		assert.Equal(t, 1, tasks)
+// 		assert.Equal(t, failedTask, "test-task")
+// 	})
+// 	t.Run("case Time:  ", func(t *testing.T) {
+// 		_, time, _, _ := parseOuputLine("Time:  time-test", "", "", 0, 0, true)
+// 		assert.Equal(t, time, "time-test")
+// 	})
+// 	t.Run("case ran successfully!", func(t *testing.T) {
+// 		_, _, successfulRun, _ := parseOuputLine(" ran successfully!", "", "", 0, 0, true)
+// 		assert.Equal(t, successfulRun, 1)
+// 	})
+// 	t.Run("case default", func(t *testing.T) {
+// 		failedTask, time, successfulRun, tasks := parseOuputLine("", "", "", 0, 0, true)
+// 		assert.Equal(t, successfulRun, 0)
+// 		assert.Equal(t, time, "")
+// 		assert.Equal(t, tasks, 0)
+// 		assert.Equal(t, failedTask, "")
+// 	})
+// }

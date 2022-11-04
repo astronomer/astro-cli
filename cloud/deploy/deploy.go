@@ -456,8 +456,9 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 
 		dagsIgnoreSet = true
 	}
-
-	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport}, false)
+	// remove astro-run-dag from requirments.txt
+	fileutil.RmAstroRunDAG()
+	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 	if err != nil {
 		return err
 	}
@@ -509,7 +510,9 @@ func buildImage(c *config.Context, path, currentVersion, deployImage, imageName 
 				return "", err
 			}
 		} else {
-			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport}, false)
+			// remove astro-run-dag from requirments.txt
+			fileutil.RmAstroRunDAG()
+			err := imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 			if err != nil {
 				return "", err
 			}

@@ -223,7 +223,7 @@ func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Conte
 		TargetPlatforms: deployImagePlatformSupport,
 		Output:          true,
 	}
-	err = imageHandler.Build(buildConfig, false)
+	err = imageHandler.Build(buildConfig)
 	if err != nil {
 		return err
 	}

@@ -12,13 +12,13 @@ type ImageHandler struct {
 	mock.Mock
 }
 
-// Build provides a mock function with given fields: config, astroRun
-func (_m *ImageHandler) Build(config types.ImageBuildConfig, astroRun bool) error {
-	ret := _m.Called(config, astroRun)
+// Build provides a mock function with given fields: config
+func (_m *ImageHandler) Build(config types.ImageBuildConfig) error {
+	ret := _m.Called(config)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(types.ImageBuildConfig, bool) error); ok {
-		r0 = rf(config, astroRun)
+	if rf, ok := ret.Get(0).(func(types.ImageBuildConfig) error); ok {
+		r0 = rf(config)
 	} else {
 		r0 = ret.Error(0)
 	}
