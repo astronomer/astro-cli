@@ -10,10 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/sql/include"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type MountVolume struct {
@@ -28,45 +25,10 @@ const (
 	PythonVersion             = "3.9"
 )
 
-type DockerBinder struct {
-	cli *client.Client
-}
-
-type DockerBind interface {
-	ImageBuild(ctx context.Context, buildContext io.Reader, options *types.ImageBuildOptions) (types.ImageBuildResponse, error)
-	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error)
-	ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error
-	ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.ContainerWaitOKBody, <-chan error)
-	ContainerLogs(ctx context.Context, container string, options types.ContainerLogsOptions) (io.ReadCloser, error)
-}
-
-func (d DockerBinder) ImageBuild(ctx context.Context, buildContext io.Reader, options *types.ImageBuildOptions) (types.ImageBuildResponse, error) {
-	return d.cli.ImageBuild(ctx, buildContext, *options)
-}
-
-func (d DockerBinder) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error) {
-	return d.cli.ContainerCreate(ctx, config, hostConfig, networkingConfig, platform, containerName)
-}
-
-func (d DockerBinder) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
-	return d.cli.ContainerStart(ctx, containerID, options)
-}
-
-func (d DockerBinder) ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (body <-chan container.ContainerWaitOKBody, err <-chan error) {
-	return d.cli.ContainerWait(ctx, containerID, condition)
-}
-
-func (d DockerBinder) ContainerLogs(ctx context.Context, containerID string, options types.ContainerLogsOptions) (io.ReadCloser, error) {
-	return d.cli.ContainerLogs(ctx, containerID, options)
-}
-
-var newDockerClient = func() (DockerBind, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, err
-	}
-	return &DockerBinder{cli: cli}, nil
-}
+var (
+	DockerClientInit = NewDockerClient
+	ioCopy           = io.Copy
+)
 
 func getContext(filePath string) io.Reader {
 	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
@@ -75,13 +37,13 @@ func getContext(filePath string) io.Reader {
 
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
-	cli, err := newDockerClient()
+	cli, err := DockerClientInit()
 	if err != nil {
 		err = fmt.Errorf("docker client initialization failed %w", err)
 		return err
 	}
 
-	astroSQLCliVersion, err := GetPypiVersion(astroSQLCliProjectURL)
+	astroSQLCliVersion, err := getPypiVersion(astroSQLCliProjectURL)
 	if err != nil {
 		return err
 	}
@@ -100,11 +62,11 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), &opts)
 	if err != nil {
-		err = fmt.Errorf("image building failed %w ", err)
+		err = fmt.Errorf("image building failed %w", err)
 		return err
 	}
 	buf := new(strings.Builder)
-	_, err = io.Copy(buf, body.Body)
+	_, err = ioCopy(buf, body.Body)
 	if err != nil {
 		err = fmt.Errorf("image build response read failed %w", err)
 		return err
@@ -142,7 +104,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	select {
 	case err := <-errCh:
 		if err != nil {
-			err = fmt.Errorf("docker client run failed %w", err)
+			err = fmt.Errorf("docker container wait failed %w", err)
 			return err
 		}
 	case <-statusCh:
@@ -154,7 +116,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return err
 	}
 
-	_, err = io.Copy(os.Stdout, cout)
+	_, err = ioCopy(os.Stdout, cout)
 
 	if err != nil {
 		err = fmt.Errorf("docker logs forwarding failed %w", err)
