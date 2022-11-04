@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	dockerClientInit = NewDockerClient
+	DockerClientInit = NewDockerClient
 	ioCopy           = io.Copy
 )
 
@@ -37,7 +37,7 @@ func getContext(filePath string) io.Reader {
 
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
-	cli, err := dockerClientInit()
+	cli, err := DockerClientInit()
 	if err != nil {
 		err = fmt.Errorf("docker client initialization failed %w", err)
 		return err

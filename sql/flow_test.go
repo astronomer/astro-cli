@@ -46,7 +46,7 @@ func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.Containe
 
 func TestCommonDockerUtilSuccess(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -60,7 +60,7 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 }
 
 func TestDockerClientInitFailure(t *testing.T) {
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		return nil, errMock
 	}
 	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
@@ -68,9 +68,18 @@ func TestDockerClientInitFailure(t *testing.T) {
 	assert.Equal(t, expectedErr, err)
 }
 
+func TestGetPypiVersionFailure(t *testing.T) {
+	getPypiVersion = func(projectURL string) (string, error) {
+		return "", errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	assert.ErrorIs(t, err, errMock)
+	getPypiVersion = GetPypiVersion
+}
+
 func TestImageBuildFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, errMock)
 		return mockDockerBinder, nil
 	}
@@ -80,9 +89,25 @@ func TestImageBuildFailure(t *testing.T) {
 	mockDockerBinder.AssertExpectations(t)
 }
 
+func TestImageBuildResponseReadFailure(t *testing.T) {
+	mockDockerBinder := new(mocks.DockerBind)
+	DockerClientInit = func() (DockerBind, error) {
+		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
+		return mockDockerBinder, nil
+	}
+	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+		return 0, errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+	mockDockerBinder.AssertExpectations(t)
+	ioCopy = io.Copy
+}
+
 func TestContainerCreateFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, errMock)
 		return mockDockerBinder, nil
@@ -95,7 +120,7 @@ func TestContainerCreateFailure(t *testing.T) {
 
 func TestContainerStartFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
@@ -109,7 +134,7 @@ func TestContainerStartFailure(t *testing.T) {
 
 func TestContainerWaitFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -124,7 +149,7 @@ func TestContainerWaitFailure(t *testing.T) {
 
 func TestContainerLogsFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -140,7 +165,7 @@ func TestContainerLogsFailure(t *testing.T) {
 
 func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
+	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -160,27 +185,4 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("docker logs forwarding failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-}
-
-func TestImageBuildResponseReadFailure(t *testing.T) {
-	mockDockerBinder := new(mocks.DockerBind)
-	dockerClientInit = func() (DockerBind, error) {
-		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
-		return mockDockerBinder, nil
-	}
-	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
-		return 0, errMock
-	}
-	err := CommonDockerUtil(testCommand, nil, nil, nil)
-	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
-	assert.Equal(t, expectedErr, err)
-	mockDockerBinder.AssertExpectations(t)
-}
-
-func TestGetPypiVersionFailure(t *testing.T) {
-	getPypiVersion = func(projectURL string) (string, error) {
-		return "", errMock
-	}
-	err := CommonDockerUtil(testCommand, nil, nil, nil)
-	assert.ErrorIs(t, err, errMock)
 }
