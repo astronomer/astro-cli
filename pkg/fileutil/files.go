@@ -205,9 +205,11 @@ func RemoveLineFromFile(filePath, lineText, commentText string) error {
 	}
 	if strings.Contains(string(content), lineText) {
 		lastInd := strings.LastIndex(string(content), "\n"+lineText+" "+commentText)
-		err = WriteStringToFile(filePath, string(content)[:lastInd])
-		if err != nil {
-			return err
+		if lastInd != -1 {
+			err = WriteStringToFile(filePath, string(content)[:lastInd])
+			if err != nil {
+				return err
+			}
 		}
 	}
 	f.Close()

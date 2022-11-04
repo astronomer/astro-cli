@@ -299,7 +299,7 @@ func TestAddLineToFile(t *testing.T) {
 
 func TestRemoveLineFromFile(t *testing.T) { 
 	filePath := "./test.py"
-	content := "testing"
+	content := "testing\nremove this"
 
 	WriteStringToFile(filePath, content)
 	defer afero.NewOsFs().Remove(filePath)
@@ -315,7 +315,7 @@ func TestRemoveLineFromFile(t *testing.T) {
 	}{
 		{
 			name: "basic case",
-			args: args{filePath: filePath, lineText: "testing", commentText: ""},
+			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
 		},
 	}
 	for _, tt := range tests {
