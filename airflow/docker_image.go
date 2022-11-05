@@ -339,9 +339,9 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	fmt.Println("\nStarting a DAG run for " + dagID + "...")
 	fmt.Println("\nLoading DAGS...")
 
-	err = cmdExec(DockerCmd, stdout, stderr, args...)
-	if err != nil {
-		log.Debug(err)
+	cmdErr := cmdExec(DockerCmd, stdout, stderr, args...)
+	if cmdErr != nil {
+		log.Debug(cmdErr)
 	}
 
 	if err != nil {
@@ -358,7 +358,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	os.Remove("./connections.yaml")
 
 	fmt.Println("\nSee the output of this command for errors. To view task logs, use the --task-logs` flag.")
-	return err
+	return cmdErr
 }
 
 // Exec executes a docker command
