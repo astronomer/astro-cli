@@ -41,7 +41,7 @@ func printBuildingSteps(r io.Reader) error {
 	decoder := json.NewDecoder(r)
 	var prevStream string
 	var currStream string
-	var firstMessage bool = true
+	firstMessage := true
 	for {
 		var jsonMessage jsonmessage.JSONMessage
 		if err := decoder.Decode(&jsonMessage); err != nil {
