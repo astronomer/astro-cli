@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/jsonmessage"
 )
 
 type MountVolume struct {
@@ -33,6 +35,38 @@ var (
 func getContext(filePath string) io.Reader {
 	ctx, _ := archive.TarWithOptions(filePath, &archive.TarOptions{})
 	return ctx
+}
+
+func printBuildingSteps(r io.Reader) error {
+	decoder := json.NewDecoder(r)
+	var prevStream string
+	var currStream string
+	var firstMessage bool = true
+	for {
+		var jsonMessage jsonmessage.JSONMessage
+		if err := decoder.Decode(&jsonMessage); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if err := jsonMessage.Error; err != nil {
+			return err
+		}
+		if jsonMessage.Stream == "\n" {
+			continue
+		}
+		currStream = jsonMessage.Stream
+		if strings.HasPrefix(prevStream, "Step ") && strings.HasPrefix(currStream, " ---> Running in ") {
+			if firstMessage {
+				fmt.Println("Installing flow.. This might take some time.")
+				firstMessage = false
+			}
+			fmt.Println(prevStream)
+		}
+		prevStream = currStream
+	}
+	return nil
 }
 
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
@@ -65,6 +99,14 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		err = fmt.Errorf("image building failed %w", err)
 		return err
 	}
+
+	// We print the steps which are not cached
+	err = printBuildingSteps(body.Body)
+	if err != nil {
+		err = fmt.Errorf("retrieving logs failed %w", err)
+		return err
+	}
+
 	buf := new(strings.Builder)
 	_, err = ioCopy(buf, body.Body)
 	if err != nil {
