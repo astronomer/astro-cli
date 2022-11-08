@@ -15,7 +15,7 @@ type DeleteWorkspaceUserRequest struct {
 
 // UpdateWorkspaceUserRoleRequest - properties to update a user role in a workspace
 type UpdateWorkspaceUserRoleRequest struct {
-	WorkspaceID string `json:"workspaceId"`
+	WorkspaceID string `json:"workspaceUuid"`
 	Email       string `json:"email"`
 	Role        string `json:"role"`
 }
