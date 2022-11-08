@@ -1,6 +1,8 @@
 package sql
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/sql/mocks"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -54,9 +57,43 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
+	PrintBuildingSteps = func(r io.Reader) error {
+		return nil
+	}
 	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
 	assert.NoError(t, err)
 	mockDockerBinder.AssertExpectations(t)
+	PrintBuildingSteps = printBuildingSteps
+}
+
+func TestPrintBuildingSteps(t *testing.T) {
+	expectedOutput := `Installing flow.. This might take some time.
+Step 2/4 : ENV ASTRO_CLI Yes
+`
+	// Capture output from PrintBuildingSteps Println calls
+	actualOutput := ""
+	Println = func(a ...any) (n int, err error) {
+		for _, arg := range a {
+			actualOutput += fmt.Sprintln(arg)
+		}
+		return 0, nil
+	}
+
+	streams := []string{
+		"Step 2/4 : ENV ASTRO_CLI Yes",
+		" ---> Running in 0afb2e0c5ad7",
+	}
+	var allData []byte
+	for _, stream := range streams {
+		jsonMessage := jsonmessage.JSONMessage{Stream: stream}
+		data, err := json.Marshal(jsonMessage)
+		assert.NoError(t, err)
+		allData = append(allData, data...)
+	}
+	reader := bytes.NewReader(allData)
+	err := PrintBuildingSteps(reader)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOutput, actualOutput)
 }
 
 func TestDockerClientInitFailure(t *testing.T) {
@@ -87,6 +124,22 @@ func TestImageBuildFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("image building failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
+}
+
+func TestImageBuildResponsePrintBuildingStepsFailure(t *testing.T) {
+	mockDockerBinder := new(mocks.DockerBind)
+	DockerClientInit = func() (DockerBind, error) {
+		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
+		return mockDockerBinder, nil
+	}
+	PrintBuildingSteps = func(r io.Reader) error {
+		return errMock
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	expectedErr := fmt.Errorf("retrieving logs failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+	mockDockerBinder.AssertExpectations(t)
+	PrintBuildingSteps = printBuildingSteps
 }
 
 func TestImageBuildResponseReadFailure(t *testing.T) {

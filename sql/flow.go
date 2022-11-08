@@ -28,8 +28,10 @@ const (
 )
 
 var (
-	DockerClientInit = NewDockerClient
-	ioCopy           = io.Copy
+	DockerClientInit   = NewDockerClient
+	ioCopy             = io.Copy
+	PrintBuildingSteps = printBuildingSteps
+	Println            = fmt.Println
 )
 
 func getContext(filePath string) io.Reader {
@@ -59,10 +61,14 @@ func printBuildingSteps(r io.Reader) error {
 		currStream = jsonMessage.Stream
 		if strings.HasPrefix(prevStream, "Step ") && strings.HasPrefix(currStream, " ---> Running in ") {
 			if firstMessage {
-				fmt.Println("Installing flow.. This might take some time.")
+				if _, err := Println("Installing flow.. This might take some time."); err != nil {
+					return err
+				}
 				firstMessage = false
 			}
-			fmt.Println(prevStream)
+			if _, err := Println(prevStream); err != nil {
+				return err
+			}
 		}
 		prevStream = currStream
 	}
@@ -101,7 +107,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	}
 
 	// We print the steps which are not cached
-	err = printBuildingSteps(body.Body)
+	err = PrintBuildingSteps(body.Body)
 	if err != nil {
 		err = fmt.Errorf("retrieving logs failed %w", err)
 		return err
