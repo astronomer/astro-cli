@@ -54,6 +54,9 @@ func printBuildingSteps(r io.Reader) error {
 			continue
 		}
 		currStream = jsonMessage.Stream
+		// We only print steps which are actually running, e.g.
+		// Step 2/4 : ENV ASTRO_CLI Yes
+		//  ---> Running in 0afb2e0c5ad7
 		if strings.HasPrefix(prevStream, "Step ") && strings.HasPrefix(currStream, " ---> Running in ") {
 			if firstMessage {
 				if _, err := Println("Installing flow.. This might take some time."); err != nil {
