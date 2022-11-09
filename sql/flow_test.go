@@ -230,7 +230,7 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 	PrintBuildingSteps = func(r io.Reader) error {
 		return nil
 	}
-	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+	IoCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
 		return 0, errMock
 	}
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
@@ -238,5 +238,5 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
 	PrintBuildingSteps = printBuildingSteps
-	ioCopy = io.Copy
+	IoCopy = io.Copy
 }

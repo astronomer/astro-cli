@@ -24,7 +24,7 @@ const (
 
 var (
 	DockerClientInit   = NewDockerClient
-	ioCopy             = io.Copy
+	IoCopy             = io.Copy
 	PrintBuildingSteps = printBuildingSteps
 	Println            = fmt.Println
 )
@@ -151,7 +151,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
-	if _, err := ioCopy(os.Stdout, cout); err != nil {
+	if _, err := IoCopy(os.Stdout, cout); err != nil {
 		return fmt.Errorf("docker logs forwarding failed %w", err)
 	}
 
