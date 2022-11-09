@@ -28,23 +28,24 @@ type VersionRestrictions struct {
 
 // APIs availability based on the version they were added/removed in Houston
 var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
-	"GetTeam":                           {GTE: "0.30.0"},
-	"GetTeamUsers":                      {GTE: "0.30.0"},
-	"ListTeams":                         {GTE: "0.30.0"},
-	"CreateTeamSystemRoleBinding":       {GTE: "0.30.0"},
-	"DeleteTeamSystemRoleBinding":       {GTE: "0.30.0"},
-	"AddWorkspaceTeam":                  {GTE: "0.30.0"},
-	"DeleteWorkspaceTeam":               {GTE: "0.30.0"},
-	"ListWorkspaceTeamsAndRoles":        {GTE: "0.30.0"},
-	"UpdateWorkspaceTeamRole":           {GTE: "0.30.0"},
-	"GetWorkspaceTeamRole":              {GTE: "0.30.0"},
 	"WorkspacesPaginatedGetRequest":     {GTE: "0.30.0"},
 	"WorkspacePaginatedGetUsersRequest": {GTE: "0.30.0"},
 
-	"UpdateDeploymentImage": {GTE: "0.29.2"},
+	"UpdateDeploymentImage":       {GTE: "0.29.2"},
+	"CreateTeamSystemRoleBinding": {GTE: "0.29.2"},
+	"DeleteTeamSystemRoleBinding": {GTE: "0.29.2"},
 
 	"UpdateDeploymentRuntime": {GTE: "0.29.0"},
 	"GetRuntimeReleases":      {GTE: "0.29.0"},
+
+	"GetTeam":                    {GTE: "0.28.0"},
+	"GetTeamUsers":               {GTE: "0.28.0"},
+	"ListTeams":                  {GTE: "0.28.0"},
+	"AddWorkspaceTeam":           {GTE: "0.28.0"},
+	"DeleteWorkspaceTeam":        {GTE: "0.28.0"},
+	"ListWorkspaceTeamsAndRoles": {GTE: "0.28.0"},
+	"UpdateWorkspaceTeamRole":    {GTE: "0.28.0"},
+	"GetWorkspaceTeamRole":       {GTE: "0.28.0"},
 }
 
 func Call[fReq any, fResp any, fType func(any) (any, error)](houstonFunc func(fReq) (fResp, error)) func(fReq) (fResp, error) {
