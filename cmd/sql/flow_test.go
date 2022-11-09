@@ -132,6 +132,12 @@ func TestFlowGenerateCmd(t *testing.T) {
 
 	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir}...)
 	assert.NoError(t, err)
+
+	err = execFlowCmd([]string{"generate", "example_basic_transform", "--generate-tasks", "--project-dir", projectDir}...)
+	assert.NoError(t, err)
+
+	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--generate-tasks", "--project-dir", projectDir, "--verbose"}...)
+	assert.NoError(t, err)
 }
 
 func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
