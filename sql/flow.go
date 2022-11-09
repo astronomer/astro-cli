@@ -15,11 +15,6 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 )
 
-type MountVolume struct {
-	SourceDirectory string
-	TargetDirectory string
-}
-
 const (
 	SQLCliDockerfilePath      = ".Dockerfile.sql_cli"
 	SQLCLIDockerfileWriteMode = 0o600
@@ -77,10 +72,10 @@ func printBuildingSteps(r io.Reader) error {
 
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
+
 	cli, err := DockerClientInit()
 	if err != nil {
-		err = fmt.Errorf("docker client initialization failed %w", err)
-		return err
+		return fmt.Errorf("docker client initialization failed %w", err)
 	}
 
 	astroSQLCliVersion, err := getPypiVersion(astroSQLCliProjectURL)
@@ -89,86 +84,75 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	}
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
-	err = os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode)
-	if err != nil {
+	if err := os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)
 
-	opts := types.ImageBuildOptions{
-		Dockerfile: SQLCliDockerfilePath,
-		Tags:       []string{SQLCliDockerImageName},
+	body, err := cli.ImageBuild(
+		ctx,
+		getContext(SQLCliDockerfilePath),
+		&types.ImageBuildOptions{
+			Dockerfile: SQLCliDockerfilePath,
+			Tags:       []string{SQLCliDockerImageName},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("image building failed %w", err)
 	}
 
-	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), &opts)
-	if err != nil {
-		err = fmt.Errorf("image building failed %w", err)
-		return err
-	}
-
-	// We print the steps which are not cached
-	err = PrintBuildingSteps(body.Body)
-	if err != nil {
-		err = fmt.Errorf("retrieving logs failed %w", err)
-		return err
-	}
-
-	buf := new(strings.Builder)
-	_, err = ioCopy(buf, body.Body)
-	if err != nil {
-		err = fmt.Errorf("image build response read failed %w", err)
-		return err
+	if err := PrintBuildingSteps(body.Body); err != nil {
+		return fmt.Errorf("image build response read failed %w", err)
 	}
 
 	cmd = append(cmd, args...)
-
 	for key, value := range flags {
-		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
+		cmd = append(cmd, fmt.Sprintf("--%s %s", key, value))
 	}
 
 	binds := []string{}
-	for _, moundDir := range mountDirs {
-		binds = append(binds, []string{moundDir + ":" + moundDir}...)
+	for _, mountDir := range mountDirs {
+		binds = append(binds, fmt.Sprintf("%s:%s", mountDir, mountDir))
 	}
 
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: SQLCliDockerImageName,
-		Cmd:   cmd,
-		Tty:   true,
-	}, &container.HostConfig{
-		Binds: binds,
-	}, nil, nil, "")
+	resp, err := cli.ContainerCreate(
+		ctx,
+		&container.Config{
+			Image: SQLCliDockerImageName,
+			Cmd:   cmd,
+			Tty:   true,
+		},
+		&container.HostConfig{
+			Binds: binds,
+		},
+		nil,
+		nil,
+		"",
+	)
 	if err != nil {
-		err = fmt.Errorf("docker container creation failed %w", err)
-		return err
+		return fmt.Errorf("docker container creation failed %w", err)
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		err = fmt.Errorf("docker container start failed %w", err)
-		return err
+		return fmt.Errorf("docker container start failed %w", err)
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			err = fmt.Errorf("docker container wait failed %w", err)
-			return err
+			return fmt.Errorf("docker container wait failed %w", err)
 		}
 	case <-statusCh:
 	}
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
-		err = fmt.Errorf("docker container logs fetching failed %w", err)
-		return err
+		return fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
-	_, err = ioCopy(os.Stdout, cout)
-
-	if err != nil {
-		err = fmt.Errorf("docker logs forwarding failed %w", err)
-		return err
+	if _, err := ioCopy(os.Stdout, cout); err != nil {
+		return fmt.Errorf("docker logs forwarding failed %w", err)
 	}
 
 	return nil
