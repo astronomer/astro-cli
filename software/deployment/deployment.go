@@ -500,8 +500,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 }
 
 // RuntimeUpgradeCancel is to cancel an upgrade operation for a deployment
-// nolint:dupl
-func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
+func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	deployment, err := client.GetDeployment(id)
 	if err != nil {
 		return err

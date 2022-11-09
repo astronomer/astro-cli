@@ -56,8 +56,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newWebserverLogsCmd(out io.Writer) *cobra.Command {
+func newWebserverLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "webserver",
 		Aliases: []string{"web", "w"},
@@ -78,8 +77,7 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-// nolint:dupl
-func newSchedulerLogsCmd(out io.Writer) *cobra.Command {
+func newSchedulerLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "scheduler",
 		Aliases: []string{"sch", "s"},
@@ -100,8 +98,7 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-// nolint:dupl
-func newWorkersLogsCmd(out io.Writer) *cobra.Command {
+func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "workers",
 		Aliases: []string{"workers", "worker", "wrk"},
@@ -123,8 +120,7 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 	return cmd
 }
 
-// nolint:dupl
-func newTriggererLogsCmd(out io.Writer) *cobra.Command {
+func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "triggerer",
 		Aliases: []string{"triggerers", "triggerer", "trg"},

@@ -267,7 +267,7 @@ func newDeploymentAirflowRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upgrade",
@@ -303,8 +303,7 @@ func newDeploymentRuntimeRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command {
+func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"up"},

@@ -69,7 +69,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 
 	if !isProjectDir && !globalFlag {
 		c := "astro config " + cmd.Use + " " + args[0] + " -g"
-		return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Use, cmd.Use, c) // nolint
+		return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Use, cmd.Use, c) //nolint
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 }
 
 func configSet(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 { // nolint:gomnd
+	if len(args) != 2 { //nolint:gomnd
 		return errInvalidSetArgs
 	}
 

@@ -39,7 +39,7 @@ import (
 const (
 	componentName                  = "airflow"
 	dockerStateUp                  = "running"
-	defaultAirflowVersion          = uint64(0x2) // nolint:gomnd
+	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"

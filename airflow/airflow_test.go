@@ -1,7 +1,6 @@
 package airflow
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestInitDirs(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "temp")
+	tmpDir, err := os.MkdirTemp("", "temp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +28,7 @@ func TestInitDirs(t *testing.T) {
 }
 
 func TestInitDirsEmpty(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "temp")
+	tmpDir, err := os.MkdirTemp("", "temp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +39,7 @@ func TestInitDirsEmpty(t *testing.T) {
 }
 
 func TestInitFiles(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "temp")
+	tmpDir, err := os.MkdirTemp("", "temp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +59,7 @@ func TestInitFiles(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "temp")
+	tmpDir, err := os.MkdirTemp("", "temp")
 	if err != nil {
 		t.Fatal(err)
 	}

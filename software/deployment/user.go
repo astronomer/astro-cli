@@ -60,9 +60,8 @@ func UserList(deploymentID, email, userID, fullName string, client houston.Clien
 	return nil
 }
 
-// nolint:dupl
 // Add a user to a deployment with specified role
-func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
+func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	addUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
@@ -80,9 +79,8 @@ func Add(deploymentID, email, role string, client houston.ClientInterface, out i
 	return nil
 }
 
-// nolint:dupl
 // UpdateUser updates a user's deployment role
-func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
+func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	updateUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,

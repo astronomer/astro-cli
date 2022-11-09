@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:unparam
 func execOrganizationCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newOrganizationCmd(buf)
