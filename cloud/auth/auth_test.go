@@ -89,13 +89,27 @@ func Test_validateDomain(t *testing.T) {
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
 
 	t.Run("pr preview is a valid domain", func(t *testing.T) {
-		// TODO need to mock this as once this PR closes, test will fail
-		domain = "pr5723.astronomer-dev.io"
+		// mocking this as once a PR closes, test would fail
+		mockResponse := astro.AuthConfig{
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		}
+		jsonResponse, err := json.Marshal(mockResponse)
+		assert.NoError(t, err)
+		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		domain = "pr1234.astronomer-dev.io"
 		actual, err = ValidateDomain(domain)
 		assert.NoError(t, err)
-		assert.Equal(t, actual.ClientID, "GWCArPCS6pgFZbhnwx3WCDaJLBcvdFaV")
-		assert.Equal(t, actual.Audience, "astronomer-ee")
-		assert.Equal(t, actual.DomainURL, "https://astronomer-sandbox.us.auth0.com")
+		assert.Equal(t, actual.ClientID, mockResponse.ClientID)
+		assert.Equal(t, actual.Audience, mockResponse.Audience)
+		assert.Equal(t, actual.DomainURL, mockResponse.DomainURL)
 	})
 }
 
@@ -471,6 +485,21 @@ func TestLogin(t *testing.T) {
 	})
 	t.Run("can login to a pr preview environment successfully", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
+		// mocking this as once a PR closes, test would fail
+		mockAuthConfigResponse := astro.AuthConfig{
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		}
+		jsonResponse, err := json.Marshal(mockAuthConfigResponse)
+		assert.NoError(t, err)
+		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		orgChecker := func(domain string) (string, error) {
 			return "test-org-id", nil
@@ -490,7 +519,7 @@ func TestLogin(t *testing.T) {
 		mockClient.On("GetUserInfo").Return(mockSelfResp, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 
-		err := Login("pr5723.cloud.astronomer-dev.io", "", "", mockClient, os.Stdout, false)
+		err = Login("pr5723.cloud.astronomer-dev.io", "", "", mockClient, os.Stdout, false)
 		assert.NoError(t, err)
 	})
 
@@ -555,8 +584,11 @@ func TestLogin(t *testing.T) {
 			Label: "something-label",
 		}}, nil).Once()
 		// initialize the test authenticator
+		orgChecker := func(domain string) (string, error) {
+			return "test-org-id", nil
+		}
 		authenticator = Authenticator{
-			orgChecker:      orgLookup,
+			orgChecker:      orgChecker,
 			callbackHandler: func() (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 				return Result{
@@ -584,8 +616,11 @@ func TestLogin(t *testing.T) {
 			Label: "something-label",
 		}}, nil).Once()
 		// initialize the test authenticator
+		orgChecker := func(domain string) (string, error) {
+			return "test-org-id", nil
+		}
 		authenticator = Authenticator{
-			orgChecker:      orgLookup,
+			orgChecker:      orgChecker,
 			callbackHandler: func() (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 				return Result{
@@ -723,31 +758,4 @@ func Test_writeResultToContext(t *testing.T) {
 
 	// test after changes
 	assertConfigContents("Bearer new_token", "new_refresh_token", time.Now().Add(1234*time.Second), "test.user@astronomer.io")
-}
-
-func TestFormatDomain(t *testing.T) {
-	t.Run("removes cloud from cloud.astronomer.io", func(t *testing.T) {
-		actual := formatDomain("cloud.astronomer.io")
-		assert.Equal(t, "astronomer.io", actual)
-	})
-	t.Run("removes cloud from cloud.astronomer-dev.io", func(t *testing.T) {
-		actual := formatDomain("cloud.astronomer-dev.io")
-		assert.Equal(t, "astronomer-dev.io", actual)
-	})
-	t.Run("removes cloud from cloud.astronomer-stage.io", func(t *testing.T) {
-		actual := formatDomain("cloud.astronomer-stage.io")
-		assert.Equal(t, "astronomer-stage.io", actual)
-	})
-	t.Run("removes cloud from cloud.astronomer-perf.io", func(t *testing.T) {
-		actual := formatDomain("cloud.astronomer-perf.io")
-		assert.Equal(t, "astronomer-perf.io", actual)
-	})
-	t.Run("removes cloud from pr1234.cloud.astronomer-dev.io", func(t *testing.T) {
-		actual := formatDomain("pr1234.cloud.astronomer-dev.io")
-		assert.Equal(t, "pr1234.astronomer-dev.io", actual)
-	})
-	t.Run("sets default domain if one was not provided", func(t *testing.T) {
-		actual := formatDomain("")
-		assert.Equal(t, "astronomer.io", actual)
-	})
 }

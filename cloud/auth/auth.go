@@ -22,14 +22,15 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (
-	Domain      = "astronomer.io"
-	localDomain = "localhost"
+	authConfigEndpoint = "auth-config"
+	orgLookupEndpoint  = "organization-lookup"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -47,7 +48,6 @@ var (
 
 var (
 	err             error
-	splitNum        = 2
 	callbackChannel = make(chan string, 1)
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
@@ -61,20 +61,8 @@ var authenticator = Authenticator{
 }
 
 func orgLookup(domain string) (string, error) {
-	if strings.Contains(domain, "cloud") { // case when the domain has cloud as prefix, i.e. cloud.astronomer.io
-		splitDomain := strings.SplitN(domain, ".", splitNum)
-		domain = splitDomain[1]
-	}
-	var addr string
-	if domain == localDomain {
-		addr = "http://localhost:8871/organization-lookup"
-	} else {
-		addr = fmt.Sprintf(
-			"%s://api.%s/hub/organization-lookup",
-			config.CFG.CloudAPIProtocol.GetString(),
-			domain,
-		)
-	}
+	addr := domainutil.GetURLToEndpoint("https", domain, orgLookupEndpoint)
+
 	ctx := http_context.Background()
 	reqData, err := json.Marshal(orgLookupRequest{Email: userEmail})
 	if err != nil {
@@ -362,7 +350,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 // Login handles authentication to astronomer api and registry
 func Login(domain, orgID, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
-	domain = formatDomain(domain)
+	domain = domainutil.FormatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
 	if err != nil {
 		return err
@@ -386,7 +374,6 @@ func Login(domain, orgID, token string, client astro.Client, out io.Writer, shou
 		}
 	}
 
-	// If no domain specified
 	// Create context if it does not exist
 	if domain != "" {
 		// Switch context now that we ensured context exists
@@ -437,46 +424,21 @@ func Logout(domain string, out io.Writer) {
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
 }
 
-func formatDomain(domain string) string {
-	if strings.Contains(domain, "cloud") {
-		domain = strings.Replace(domain, "cloud.", "", 1)
-	} else if domain == "" {
-		domain = Domain
-	}
-
-	return domain
-}
-
 func ValidateDomain(domain string) (astro.AuthConfig, error) {
 	var (
 		authConfig  astro.AuthConfig
-		prNum, addr string
+		addr        string
 		validDomain bool
 	)
 
-	if strings.Contains(domain, "pr") {
-		prNum, domain, _ = strings.Cut(domain, ".")
-	}
 	validDomain = context.IsCloudDomain(domain)
 	if !validDomain {
 		return authConfig, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
 			"Are you trying to authenticate to Astronomer Software? If so, please change your current context with 'astro context switch'")
 	}
 
-	// TODO refactor and dry this out to remove the nolint
-	if domain == "localhost" { // nolint
-		addr = fmt.Sprintf("http://%s:8871/auth-config", domain)
-	} else if prNum != "" {
-		addr = fmt.Sprintf(
-			"https://%s.api.%s/hub/auth-config",
-			prNum, domain,
-		)
-	} else {
-		addr = fmt.Sprintf(
-			"https://api.%s/hub/auth-config",
-			domain,
-		)
-	}
+	addr = domainutil.GetURLToEndpoint("https", domain, authConfigEndpoint)
+
 	ctx := http_context.Background()
 	doOptions := &httputil.DoOptions{
 		Context: ctx,

@@ -41,40 +41,47 @@ func TestGetContextKeyInvalidContextConfig(t *testing.T) {
 }
 
 func TestIsCloudContext(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	tests := []struct {
-		name           string
-		contextDomain  string
-		localPlatform  string
-		expectedOutput bool
-	}{
-		{"cloud-domain", "cloud.astronomer.io", config.CloudPlatform, true},
-		{"cloud-domain", "astronomer.io", config.CloudPlatform, true},
-		{"cloud-dev-domain", "astronomer-dev.io", config.CloudPlatform, true},
-		{"cloud-dev-domain", "cloud.astronomer-dev.io", config.CloudPlatform, true},
-		{"cloud-stage-domain", "astronomer-stage.io", config.CloudPlatform, true},
-		{"cloud-stage-domain", "cloud.astronomer-stage.io", config.CloudPlatform, true},
-		{"cloud-perf-domain", "astronomer-perf.io", config.CloudPlatform, true},
-		{"cloud-perf-domain", "cloud.astronomer-perf.io", config.CloudPlatform, true},
-		{"local-cloud", "localhost", config.CloudPlatform, true},
-		{"software-domain", "dev.astrodev.com", config.SoftwarePlatform, false},
-		{"software-domain", "software.astronomer-test.io", config.SoftwarePlatform, false},
-		{"local-software", "localhost", config.SoftwarePlatform, false},
-		{"prpreview", "pr1234.cloud.astronomer-dev.io", config.PrPreview, true},
-	}
+	t.Run("validates cloud context based on domains", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		tests := []struct {
+			name           string
+			contextDomain  string
+			localPlatform  string
+			expectedOutput bool
+		}{
+			{"cloud-domain", "cloud.astronomer.io", config.CloudPlatform, true},
+			{"cloud-domain", "astronomer.io", config.CloudPlatform, true},
+			{"cloud-dev-domain", "astronomer-dev.io", config.CloudPlatform, true},
+			{"cloud-dev-domain", "cloud.astronomer-dev.io", config.CloudPlatform, true},
+			{"cloud-stage-domain", "astronomer-stage.io", config.CloudPlatform, true},
+			{"cloud-stage-domain", "cloud.astronomer-stage.io", config.CloudPlatform, true},
+			{"cloud-perf-domain", "astronomer-perf.io", config.CloudPlatform, true},
+			{"cloud-perf-domain", "cloud.astronomer-perf.io", config.CloudPlatform, true},
+			{"local-cloud", "localhost", config.CloudPlatform, true},
+			{"software-domain", "dev.astrodev.com", config.SoftwarePlatform, false},
+			{"software-domain", "software.astronomer-test.io", config.SoftwarePlatform, false},
+			{"local-software", "localhost", config.SoftwarePlatform, false},
+			{"prpreview", "pr1234.astronomer-dev.io", config.PrPreview, true},
+			{"prpreview", "pr1234.cloud.astronomer-dev.io", config.PrPreview, true},
+			{"prpreview", "pr12345.cloud.astronomer-dev.io", config.PrPreview, true},
+			{"prpreview", "pr12346.cloud.astronomer-dev.io", config.PrPreview, true},
+			{"prpreview", "pr123.cloud.astronomer-dev.io", config.PrPreview, false},
+		}
 
-	for _, tt := range tests {
-		SetContext(tt.contextDomain)
-		Switch(tt.contextDomain)
-		config.CFG.LocalPlatform.SetHomeString(tt.localPlatform)
+		for _, tt := range tests {
+			SetContext(tt.contextDomain)
+			Switch(tt.contextDomain)
+			config.CFG.LocalPlatform.SetHomeString(tt.localPlatform)
+			output := IsCloudContext()
+			assert.Equal(t, tt.expectedOutput, output, fmt.Sprintf("input: %+v", tt))
+		}
+	})
+	t.Run("returns true when no current context is set", func(t *testing.T) {
+		// Case when no current context is set
+		config.ResetCurrentContext()
 		output := IsCloudContext()
-		assert.Equal(t, tt.expectedOutput, output, fmt.Sprintf("input: %+v", tt))
-	}
-
-	// Case when no current context is set
-	config.ResetCurrentContext()
-	output := IsCloudContext()
-	assert.Equal(t, true, output)
+		assert.Equal(t, true, output)
+	})
 }
 
 func TestDelete(t *testing.T) {
@@ -115,14 +122,37 @@ func TestListContext(t *testing.T) {
 }
 
 func TestIsCloudDomain(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPrPreview)
-	actual := IsCloudDomain("pr1234.cloud.astronomer.io")
-	assert.True(t, actual)
-
-	// TODO this makes the first find pass in viper.IsSet()
-	// SetContext("pr1234.cloud.astronomer.io")
-	// TODO this finds the context
-	Switch("pr1234.cloud.astronomer.io")
-	actual = IsCloudContext()
-	assert.True(t, actual)
+	domainList := []string{
+		"astronomer.io",
+		"astronomer-dev.io",
+		"astronomer-stage.io",
+		"astronomer-perf.io",
+		"cloud.astronomer-dev.io",
+		"pr1234.cloud.astronomer-dev.io",
+		"pr1234.astronomer-dev.io",
+		"pr12345.astronomer-dev.io",
+		"pr123456.astronomer-dev.io",
+		"localhost",
+		"localhost123",
+	}
+	t.Run("returns true for valid domains", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		for _, domain := range domainList {
+			actual := IsCloudDomain(domain)
+			assert.True(t, actual, domain)
+		}
+	})
+	t.Run("returns false for invalid domains", func(t *testing.T) {
+		NotCloudList := []string{
+			"cloud.prastronomer-dev.io",
+			"pr1234567.astronomer-dev.io",
+			"drum.cloud.astronomer-dev.io",
+			"localbeast",
+		}
+		testUtil.InitTestConfig(testUtil.Initial)
+		for _, domain := range NotCloudList {
+			actual := IsCloudDomain(domain)
+			assert.False(t, actual, domain)
+		}
+	})
 }

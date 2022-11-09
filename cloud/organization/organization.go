@@ -13,6 +13,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -47,11 +48,10 @@ func newTableOut() *printutil.Table {
 // TODO use astro.go wrapper around REST client
 func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	var orgDomain string
-	if c.Domain == "localhost" {
-		orgDomain = config.CFG.LocalCore.GetString() + "/organizations"
-	} else {
-		orgDomain = "https://api." + c.Domain + "/v1alpha1/organizations"
-	}
+	withOutCloud := domainutil.FormatDomain(c.Domain)
+	// we use core api for this
+	orgDomain = domainutil.GetURLToEndpoint("https", withOutCloud, "v1alpha1/organizations")
+	orgDomain = domainutil.TransformToCoreAPIEndpoint(orgDomain)
 	authToken := c.Token
 	ctx := context.Background()
 	doOptions := &httputil.DoOptions{
