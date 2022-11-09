@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -77,17 +78,10 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 }
 
 func TestPrintBuildingSteps(t *testing.T) {
-	expectedOutput := `Installing flow.. This might take some time.
-Step 2/4 : ENV ASTRO_CLI Yes
-`
-	// Capture output from PrintBuildingSteps Println calls
-	actualOutput := ""
-	Println = func(a ...any) (n int, err error) {
-		for _, arg := range a {
-			actualOutput += fmt.Sprintln(arg)
-		}
-		return 0, nil
-	}
+	orgStdout := os.Stdout
+	defer func() { os.Stdout = orgStdout }()
+	r, w, _ := os.Pipe()
+	os.Stdout = w
 
 	streams := []string{
 		"Step 2/4 : ENV ASTRO_CLI Yes",
@@ -104,7 +98,13 @@ Step 2/4 : ENV ASTRO_CLI Yes
 	reader := bytes.NewReader(allData)
 	err := PrintBuildingSteps(reader)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedOutput, actualOutput)
+
+	w.Close()
+	out, _ := io.ReadAll(r)
+	expectedOutput := `Installing flow.. This might take some time.
+Step 2/4 : ENV ASTRO_CLI Yes
+`
+	assert.Equal(t, expectedOutput, string(out))
 }
 
 func TestDockerClientInitFailure(t *testing.T) {

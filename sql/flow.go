@@ -26,7 +26,6 @@ var (
 	DockerClientInit   = NewDockerClient
 	IoCopy             = io.Copy
 	PrintBuildingSteps = printBuildingSteps
-	Println            = fmt.Println
 )
 
 func getContext(filePath string) io.Reader {
@@ -59,14 +58,10 @@ func printBuildingSteps(r io.Reader) error {
 		//  ---> Running in 0afb2e0c5ad7
 		if strings.HasPrefix(prevStream, "Step ") && strings.HasPrefix(currStream, " ---> Running in ") {
 			if firstMessage {
-				if _, err := Println("Installing flow.. This might take some time."); err != nil {
-					return err
-				}
+				fmt.Println("Installing flow.. This might take some time.")
 				firstMessage = false
 			}
-			if _, err := Println(prevStream); err != nil {
-				return err
-			}
+			fmt.Println(prevStream)
 		}
 		prevStream = currStream
 	}
