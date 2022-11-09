@@ -241,12 +241,14 @@ var (
 				$deploymentId: Uuid!,
 				$payload: JSON!,
 				$cloudRole: String,
+				$executor: ExecutorType,
 				$dagDeployment: DagDeployment
 			){
 				updateDeployment(
 					deploymentUuid: $deploymentId,
 					payload: $payload,
 					cloudRole: $cloudRole,
+					executor: $executor,
 					dagDeployment: $dagDeployment
 				){
 					id
