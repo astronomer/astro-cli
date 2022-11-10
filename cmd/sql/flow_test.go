@@ -132,11 +132,23 @@ func TestFlowGenerateCmd(t *testing.T) {
 
 	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir}...)
 	assert.NoError(t, err)
+}
 
-	err = execFlowCmd([]string{"generate", "example_basic_transform", "--generate-tasks", "--project-dir", projectDir}...)
+func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--generate-tasks", "--project-dir", projectDir, "--verbose"}...)
+	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks"}...)
+	assert.NoError(t, err)
+}
+
+func TestFlowRunGenerateTasksCmd(t *testing.T) {
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
+	assert.NoError(t, err)
+
+	err = execFlowCmd([]string{"run", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks"}...)
 	assert.NoError(t, err)
 }
 
