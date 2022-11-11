@@ -99,6 +99,13 @@ func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 	}
 
 	appConfig = r.Data.GetAppConfig
+	if appConfig.Flags == (FeatureFlags{}) { // Case when CLI is connected to Houston 0.25.x flags in the response won't be part of featureFlags
+		appConfig.Flags.NfsMountDagDeployment = appConfig.NfsMountDagDeployment
+		appConfig.Flags.HardDeleteDeployment = appConfig.HardDeleteDeployment
+		appConfig.Flags.ManualNamespaceNames = appConfig.ManualNamespaceNames
+		appConfig.Flags.TriggererEnabled = appConfig.TriggererEnabled
+		appConfig.Flags.TriggererEnabled = appConfig.TriggererEnabled
+	}
 	return appConfig, nil
 }
 
