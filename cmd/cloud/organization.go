@@ -2,10 +2,12 @@ package cloud
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -89,10 +91,10 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "export",
 		Aliases: []string{"e"},
-		Short:   "Export your organization audit logs. Requires being an organization owner.",
-		Long:    "Export your organization audit logs. Requires being an organization owner.",
+		Short:   "Export your organization audit logs in GZIP. Requires being an organization owner.",
+		Long:    "Export your organization audit logs in GZIP. Requires being an organization owner.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return organizationExportAuditLogs(cmd, out)
+			return organizationExportAuditLogs(cmd)
 		},
 	}
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
@@ -121,19 +123,24 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	return orgSwitch(organizationNameOrID, astroClient, out, shouldDisplayLoginLink)
 }
 
-func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
+func organizationExportAuditLogs(cmd *cobra.Command) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	var outputFileName string
 	if auditLogsOutputFilePath != "" {
-		var filePerms fs.FileMode = 0o755
-		// In CLI mode we should not need to close f
-		f, err := os.OpenFile(auditLogsOutputFilePath, os.O_RDWR|os.O_CREATE, filePerms)
-		if err != nil {
-			return err
-		}
-		out = bufio.NewWriter(f)
+		outputFileName = auditLogsOutputFilePath
+	} else {
+		outputFileName = fmt.Sprintf("audit-logs-%s.gz", time.Now().Format("2006-01-02-150405"))
 	}
+
+	var filePerms fs.FileMode = 0o755
+	// In CLI mode we should not need to close f
+	f, err := os.OpenFile(outputFileName, os.O_RDWR|os.O_CREATE, filePerms)
+	if err != nil {
+		return err
+	}
+	out := bufio.NewWriter(f)
 
 	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
 }
