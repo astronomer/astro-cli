@@ -23,9 +23,9 @@ const (
 )
 
 var (
-	DockerClientInit   = NewDockerClient
-	IoCopy             = io.Copy
-	PrintBuildingSteps = printBuildingSteps
+	DockerClientInit = NewDockerClient
+	IoCopy           = io.Copy
+	DisplayMessages  = displayMessages
 )
 
 func getContext(filePath string) io.Reader {
@@ -33,11 +33,10 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func printBuildingSteps(r io.Reader) error {
+func displayMessages(r io.Reader) error {
 	decoder := json.NewDecoder(r)
-	var prevStream string
-	var currStream string
-	firstMessage := true
+	var prevMessage jsonmessage.JSONMessage
+	isFirstMessage := true
 	for {
 		var jsonMessage jsonmessage.JSONMessage
 		if err := decoder.Decode(&jsonMessage); err != nil {
@@ -46,24 +45,24 @@ func printBuildingSteps(r io.Reader) error {
 			}
 			return err
 		}
-		if err := jsonMessage.Error; err != nil {
-			return err
-		}
 		if jsonMessage.Stream == "\n" {
 			continue
 		}
-		currStream = jsonMessage.Stream
 		// We only print steps which are actually running, e.g.
 		// Step 2/4 : ENV ASTRO_CLI Yes
 		//  ---> Running in 0afb2e0c5ad7
-		if strings.HasPrefix(prevStream, "Step ") && strings.HasPrefix(currStream, " ---> Running in ") {
-			if firstMessage {
+		if strings.HasPrefix(prevMessage.Stream, "Step ") && strings.HasPrefix(jsonMessage.Stream, " ---> Running in ") {
+			if isFirstMessage {
 				fmt.Println("Installing flow.. This might take some time.")
-				firstMessage = false
+				isFirstMessage = false
 			}
-			fmt.Println(prevStream)
+			err := prevMessage.Display(os.Stdout, true)
+			fmt.Println()
+			if err != nil {
+				return err
+			}
 		}
-		prevStream = currStream
+		prevMessage = jsonMessage
 	}
 	return nil
 }
@@ -99,7 +98,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return fmt.Errorf("image building failed %w", err)
 	}
 
-	if err := PrintBuildingSteps(body.Body); err != nil {
+	if err := DisplayMessages(body.Body); err != nil {
 		return fmt.Errorf("image build response read failed %w", err)
 	}
 

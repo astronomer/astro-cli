@@ -26,10 +26,10 @@ var (
 	}
 	containerCreateCreatedBody = container.ContainerCreateCreatedBody{ID: "123"}
 	sampleLog                  = io.NopCloser(strings.NewReader("Sample log"))
-	mockPrintBuildingStepsNil  = func(r io.Reader) error {
+	mockDisplayMessagesNil     = func(r io.Reader) error {
 		return nil
 	}
-	mockPrintBuildingStepsErr = func(r io.Reader) error {
+	mockDisplayMessagesErr = func(r io.Reader) error {
 		return errMock
 	}
 	mockIoCopyErr = func(dst io.Writer, src io.Reader) (written int64, err error) {
@@ -70,14 +70,14 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsNil
+	DisplayMessages = mockDisplayMessagesNil
 	err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
 	assert.NoError(t, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 }
 
-func TestPrintBuildingSteps(t *testing.T) {
+func TestDisplayMessages(t *testing.T) {
 	orgStdout := os.Stdout
 	defer func() { os.Stdout = orgStdout }()
 	r, w, _ := os.Pipe()
@@ -96,7 +96,7 @@ func TestPrintBuildingSteps(t *testing.T) {
 		allData = append(allData, data...)
 	}
 	reader := bytes.NewReader(allData)
-	err := PrintBuildingSteps(reader)
+	err := DisplayMessages(reader)
 	assert.NoError(t, err)
 
 	w.Close()
@@ -135,18 +135,18 @@ func TestImageBuildFailure(t *testing.T) {
 	mockDockerBinder.AssertExpectations(t)
 }
 
-func TestImageBuildResponsePrintBuildingStepsFailure(t *testing.T) {
+func TestImageBuildResponseDisplayMessagesFailure(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
 	DockerClientInit = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsErr
+	DisplayMessages = mockDisplayMessagesErr
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 }
 
 func TestContainerCreateFailure(t *testing.T) {
@@ -156,12 +156,12 @@ func TestContainerCreateFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, errMock)
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsNil
+	DisplayMessages = mockDisplayMessagesNil
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker container creation failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 }
 
 func TestContainerStartFailure(t *testing.T) {
@@ -172,12 +172,12 @@ func TestContainerStartFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsNil
+	DisplayMessages = mockDisplayMessagesNil
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker container start failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 }
 
 func TestContainerWaitFailure(t *testing.T) {
@@ -189,12 +189,12 @@ func TestContainerWaitFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(getContainerWaitResponse(true))
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsNil
+	DisplayMessages = mockDisplayMessagesNil
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker container wait failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 }
 
 func TestContainerLogsFailure(t *testing.T) {
@@ -207,12 +207,12 @@ func TestContainerLogsFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, errMock)
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsNil
+	DisplayMessages = mockDisplayMessagesNil
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker container logs fetching failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 }
 
 func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
@@ -225,12 +225,12 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
-	PrintBuildingSteps = mockPrintBuildingStepsNil
+	DisplayMessages = mockDisplayMessagesNil
 	IoCopy = mockIoCopyErr
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker logs forwarding failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
-	PrintBuildingSteps = printBuildingSteps
+	DisplayMessages = displayMessages
 	IoCopy = io.Copy
 }

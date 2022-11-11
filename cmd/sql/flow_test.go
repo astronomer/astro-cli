@@ -57,7 +57,7 @@ func patchDockerClientInit() error {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
-	sql.PrintBuildingSteps = func(r io.Reader) error {
+	sql.DisplayMessages = func(r io.Reader) error {
 		return nil
 	}
 	sql.IoCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
