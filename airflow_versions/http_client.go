@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -33,7 +34,7 @@ type Request struct{}
 
 // DoWithClient (request) is a wrapper to more easily pass variables to a client.Do request
 func (r *Request) DoWithClient(api *Client) (*Response, error) {
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Headers: map[string]string{
 			"Accept": "application/json",
 		},
@@ -48,13 +49,14 @@ func (r *Request) Do() (*Response, error) {
 }
 
 // Do executes a query against the updates astronomer API, logging out any errors contained in the response object
-func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
+func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 	var response httputil.HTTPResponse
-	url := RuntimeReleaseURL
+	doOpts.Path = RuntimeReleaseURL
 	if c.useAstronomerCertified {
-		url = AirflowReleaseURL
+		doOpts.Path = AirflowReleaseURL
 	}
-	httpResponse, err := c.HTTPClient.Do("GET", url, &doOpts)
+	doOpts.Method = http.MethodGet
+	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +74,7 @@ func (c *Client) Do(doOpts httputil.DoOptions) (*Response, error) {
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to JSON decode %s response: %w", url, err)
+		return nil, fmt.Errorf("failed to JSON decode %s response: %w", doOpts.Path, err)
 	}
 
 	return &decode, nil

@@ -18,8 +18,7 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-// nolint:dupl
-func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error {
+func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	createServiceAccountRequest := &houston.CreateServiceAccountRequest{
 		DeploymentID: deploymentUUID,
 		Label:        label,
@@ -38,8 +37,7 @@ func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, cli
 	return tab.Print(out)
 }
 
-// nolint:dupl
-func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error {
+func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	request := &houston.CreateServiceAccountRequest{
 		WorkspaceID: workspaceUUID,
 		Label:       label,

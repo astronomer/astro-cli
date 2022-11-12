@@ -41,9 +41,8 @@ func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.W
 	return nil
 }
 
-// nolint:dupl
 // AddTeam adds a team to a deployment with specified role
-func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
+func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	_, err := houston.Call(client.AddDeploymentTeam)(houston.AddDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err
@@ -61,9 +60,8 @@ func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, 
 	return nil
 }
 
-// nolint:dupl
 // UpdateTeam updates a team's deployment role
-func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
+func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	_, err := houston.Call(client.UpdateDeploymentTeamRole)(houston.UpdateDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
 		return err

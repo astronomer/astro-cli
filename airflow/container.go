@@ -2,7 +2,7 @@ package airflow
 
 import (
 	"bytes"
-	"crypto/md5" // nolint:gosec
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"html/template"
 	"regexp"

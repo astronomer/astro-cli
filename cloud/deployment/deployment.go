@@ -175,7 +175,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	if organizationID == "" {
-		return fmt.Errorf(noWorkspaceMsg, workspaceID) // nolint:goerr113
+		return fmt.Errorf(noWorkspaceMsg, workspaceID) //nolint:goerr113
 	}
 	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Label)
 
@@ -239,7 +239,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	if waitForStatus {
 		err = healthPoll(d.ID, workspaceID, client)
 		if err != nil {
-			errOutput := createOutput(organizationID, workspaceID, &d)
+			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
 				return errOutput
 			}
@@ -247,7 +247,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
-	err = createOutput(organizationID, workspaceID, &d)
+	err = createOutput(workspaceID, &d)
 	if err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	return nil
 }
 
-func createOutput(organizationID, workspaceID string, d *astro.Deployment) error {
+func createOutput(workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	currentTag := d.DeploymentSpec.Image.Tag
