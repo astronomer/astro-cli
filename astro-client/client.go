@@ -66,7 +66,7 @@ func (c *HTTPClient) prepareRESTRequest(doOpts *httputil.DoOptions) error {
 		doOpts.Headers["authorization"] = cl.Token
 	}
 	doOpts.Path = cl.GetPublicRESTAPIURL() + doOpts.Path
-	doOpts.Headers["x-astro-client-identifier"] = "cli" // nolint: goconst
+	doOpts.Headers["x-astro-client-identifier"] = "cli" //nolint: goconst
 	doOpts.Headers["x-astro-client-version"] = version.CurrVersion
 	return nil
 }
@@ -99,7 +99,7 @@ func (c *HTTPClient) doPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
-	doOpts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
+	doOpts.Headers["apollographql-client-name"] = "cli" //nolint: goconst
 	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
 	doOpts.Method = http.MethodPost
 	doOpts.Path = cl.GetPublicGraphQLAPIURL()

@@ -19,8 +19,7 @@ var (
 )
 
 // Add a user to a workspace with specified role
-// nolint: dupl
-func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
+func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint: dupl
 	w, err := client.AddWorkspaceUser(workspaceID, email, role)
 	if err != nil {
 		return err
@@ -40,8 +39,7 @@ func Add(workspaceID, email, role string, client houston.ClientInterface, out io
 }
 
 // Remove a user from a workspace
-// nolint: dupl
-func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error {
+func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error { //nolint: dupl
 	w, err := client.DeleteWorkspaceUser(workspaceID, userID)
 	if err != nil {
 		return err

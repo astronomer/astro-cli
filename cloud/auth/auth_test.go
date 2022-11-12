@@ -194,7 +194,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 				Method: http.MethodGet,
 				Path:   "http://localhost:12345/callback?code=test",
 			}
-			_, err = httpClient.Do(opts) // nolint
+			_, err = httpClient.Do(opts) //nolint
 			assert.NoError(t, err)
 		}()
 		code, err := authorizeCallbackHandler()

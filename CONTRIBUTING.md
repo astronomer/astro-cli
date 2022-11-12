@@ -4,7 +4,7 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
 
 ## Local development
 
-1. Install `Go` 1.18 or later. See [Download and install Go](https://go.dev/doc/install).
+1. Install `Go` 1.19 or later. See [Download and install Go](https://go.dev/doc/install).
 
 2. Run the following command to install `golangci-lint` and run linter locally:
 

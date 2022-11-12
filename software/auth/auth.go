@@ -18,7 +18,7 @@ import (
 
 const (
 	houstonOAuthRedirect     = "Please visit the following URL, authenticate and paste token in next prompt\n"
-	inputOAuthToken          = "oAuth Token: " // nolint:gosec // false positive
+	inputOAuthToken          = "oAuth Token: " //nolint:gosec // false positive
 	inputUsername            = "Username (leave blank for oAuth): "
 	inputPassword            = "Password: "
 	cliChooseWorkspace       = "Please choose a workspace:"

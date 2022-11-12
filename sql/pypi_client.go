@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,7 +19,7 @@ var getPypiVersion = GetPypiVersion
 
 func GetPypiVersion(projectURL string) (string, error) {
 	httpClient := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, projectURL, http.NoBody)
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, projectURL, http.NoBody)
 	if err != nil {
 		err = fmt.Errorf("error creating HTTP request %w", err)
 		return "", err
