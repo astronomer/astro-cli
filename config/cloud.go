@@ -69,21 +69,37 @@ func (c *Context) GetCloudAPIURL() string {
 	)
 }
 
-// GetAPIURL returns full Astrohub API Url for the provided Context
-func (c *Context) GetPublicAPIURL() string {
-	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
-		return CFG.LocalPublicAstro.GetString()
-	}
-
+func (c *Context) GetAPIDomain() string {
 	domain := c.Domain
 	if strings.Contains(domain, cloudDomain) {
 		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
 		domain = splitDomain[1]
 	}
+	return domain
+}
+
+// GetPublicGraphQLAPIURL returns full Astrohub API Url for the provided Context
+func (c *Context) GetPublicGraphQLAPIURL() string {
+	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
+		return CFG.LocalPublicAstro.GetString()
+	}
 
 	return fmt.Sprintf(
 		"%s://api.%s/hub/graphql",
 		CFG.CloudAPIProtocol.GetString(),
-		domain,
+		c.GetAPIDomain(),
+	)
+}
+
+// GetPublicRESTAPIURL returns full core API Url for the provided Context
+func (c *Context) GetPublicRESTAPIURL() string {
+	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
+		return CFG.LocalCore.GetString()
+	}
+
+	return fmt.Sprintf(
+		"%s://api.%s/v1alpha1",
+		CFG.CloudAPIProtocol.GetString(),
+		c.GetAPIDomain(),
 	)
 }

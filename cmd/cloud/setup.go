@@ -156,7 +156,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 
 	client := &http.Client{}
 
-	r, err := http.NewRequestWithContext(http_context.Background(), "POST", addr, strings.NewReader(data.Encode())) // URL-encoded payload
+	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {
 		log.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
@@ -235,10 +235,12 @@ func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 		Data:    []byte(data.Encode()),
 		Context: http_context.Background(),
 		Headers: map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
 
 	// execute request
-	res, err := client.Do("POST", addr, doOptions)
+	res, err := client.Do(doOptions)
 	if err != nil {
 		log.Fatal(err)
 		return false, fmt.Errorf("cannot getaccess token with API keys: %w", err)

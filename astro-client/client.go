@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/astronomer/astro-cli/context"
@@ -45,50 +46,67 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Data: data,
 		Headers: map[string]string{
 			"Accept": "application/json",
 		},
 	}
 
-	return api.DoPublic(doOpts)
+	return api.doPublicGraphQLQuery(doOpts)
 }
 
-// Do (request) is a wrapper to more easily pass variables to a client.Do request
-func (r *Request) DoPublic() (*Response, error) {
-	return r.DoWithPublicClient(NewAstroClient(httputil.NewHTTPClient()))
+// Set the path and Authorization header for a REST request to core API
+func (c *HTTPClient) prepareRESTRequest(doOpts *httputil.DoOptions) error {
+	cl, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if cl.Token != "" {
+		doOpts.Headers["authorization"] = cl.Token
+	}
+	doOpts.Path = cl.GetPublicRESTAPIURL() + doOpts.Path
+	doOpts.Headers["x-astro-client-identifier"] = "cli" // nolint: goconst
+	doOpts.Headers["x-astro-client-version"] = version.CurrVersion
+	return nil
 }
 
-// Do executes a query against the Astrohub API, logging out any errors contained in the response object
-func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
+// DoPublicRESTQuery executes a query against core API
+func (c *HTTPClient) DoPublicRESTQuery(doOpts *httputil.DoOptions) (*httputil.HTTPResponse, error) {
+	err := c.prepareRESTRequest(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoPublic(doOpts)
+}
+
+// DoPublicRESTQuery executes a query against core API and returns a raw buffer to stream
+func (c *HTTPClient) DoPublicRESTStreamQuery(doOpts *httputil.DoOptions) (io.ReadCloser, error) {
+	err := c.prepareRESTRequest(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoPublicStream(doOpts)
+}
+
+// DoPublicGraphQLQuery executes a query against Astrohub GraphQL API, logging out any errors contained in the response object
+func (c *HTTPClient) doPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response, error) {
 	cl, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
-	// set headers
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
 	doOpts.Headers["apollographql-client-name"] = "cli" // nolint: goconst
 	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
+	doOpts.Method = http.MethodPost
+	doOpts.Path = cl.GetPublicGraphQLAPIURL()
 
-	var response httputil.HTTPResponse
-	httpResponse, err := c.HTTPClient.Do("POST", cl.GetPublicAPIURL(), &doOpts)
+	response, err := c.DoPublic(doOpts)
 	if err != nil {
-		return nil, err
-	}
-	defer httpResponse.Body.Close()
-
-	body, err := io.ReadAll(httpResponse.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	response = httputil.HTTPResponse{
-		Raw:  httpResponse,
-		Body: string(body),
+		return nil, fmt.Errorf("Error processing GraphQL request: %w", err)
 	}
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
@@ -105,4 +123,32 @@ func (c *HTTPClient) DoPublic(doOpts httputil.DoOptions) (*Response, error) {
 	}
 
 	return &decode, nil
+}
+
+func (c *HTTPClient) DoPublic(doOpts *httputil.DoOptions) (*httputil.HTTPResponse, error) {
+	httpResponse, err := c.HTTPClient.Do(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	defer httpResponse.Body.Close()
+
+	body, err := io.ReadAll(httpResponse.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &httputil.HTTPResponse{
+		Raw:  httpResponse,
+		Body: string(body),
+	}
+
+	return response, nil
+}
+
+func (c *HTTPClient) DoPublicStream(doOpts *httputil.DoOptions) (io.ReadCloser, error) {
+	httpResponse, err := c.HTTPClient.Do(doOpts)
+	if err != nil {
+		return nil, err
+	}
+	return httpResponse.Body, nil
 }
