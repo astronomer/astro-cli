@@ -27,7 +27,7 @@ func TestClientDo(t *testing.T) {
 		})
 
 		client := &Client{HTTPClient: httpClient, useAstronomerCertified: false}
-		resp, err := client.Do(httputil.DoOptions{})
+		resp, err := client.Do(&httputil.DoOptions{})
 		assert.NoError(t, err)
 		assert.Equal(t, mockResp, *resp)
 	})

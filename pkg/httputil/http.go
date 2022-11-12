@@ -27,6 +27,8 @@ type DoOptions struct {
 	Data    []byte
 	Context context.Context
 	Headers map[string]string
+	Method  string
+	Path    string
 }
 
 // NewHTTPClient returns a new HTTP Client
@@ -37,7 +39,7 @@ func NewHTTPClient() *HTTPClient {
 }
 
 // Do executes the given HTTP request and returns the HTTP Response
-func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Response, error) {
+func (c *HTTPClient) Do(doOptions *DoOptions) (*http.Response, error) {
 	var body io.Reader
 	if len(doOptions.Data) > 0 {
 		body = bytes.NewBuffer(doOptions.Data)
@@ -46,7 +48,7 @@ func (c *HTTPClient) Do(method, path string, doOptions *DoOptions) (*http.Respon
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, method, path, body)
+	req, err := http.NewRequestWithContext(ctx, doOptions.Method, doOptions.Path, body)
 	if err != nil {
 		return nil, err
 	}

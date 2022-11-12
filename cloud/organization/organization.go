@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -43,6 +44,7 @@ func newTableOut() *printutil.Table {
 	}
 }
 
+// TODO use astro.go wrapper around REST client
 func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	var orgDomain string
 	if c.Domain == "localhost" {
@@ -55,8 +57,10 @@ func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"authorization": authToken},
+		Path:    orgDomain,
+		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do("GET", orgDomain, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return []OrgRes{}, fmt.Errorf("could not retrieve organization list: %w", err)
 	}
@@ -175,5 +179,20 @@ func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDispla
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Write the audit logs to the provided io.Writer.
+func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
+	logStreamBuffer, err := client.GetOrganizationAuditLogs(orgName, earliest)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, logStreamBuffer)
+	if err != nil {
+		logStreamBuffer.Close()
+		return err
+	}
+	logStreamBuffer.Close()
 	return nil
 }

@@ -57,6 +57,12 @@ func patchDockerClientInit() error {
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
 		return mockDockerBinder, nil
 	}
+	sql.DisplayMessages = func(r io.Reader) error {
+		return nil
+	}
+	sql.IoCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+		return 0, nil
+	}
 	return nil
 }
 
@@ -87,24 +93,24 @@ func execFlowCmd(args ...string) error {
 }
 
 func TestFlowCmd(t *testing.T) {
-	err := execFlowCmd([]string{}...)
+	err := execFlowCmd()
 	assert.NoError(t, err)
 }
 
 func TestFlowVersionCmd(t *testing.T) {
-	err := execFlowCmd([]string{"version"}...)
+	err := execFlowCmd("version")
 	assert.NoError(t, err)
 }
 
 func TestFlowAboutCmd(t *testing.T) {
-	err := execFlowCmd([]string{"about"}...)
+	err := execFlowCmd("about")
 	assert.NoError(t, err)
 }
 
 func TestFlowInitCmd(t *testing.T) {
 	projectDir := t.TempDir()
 	defer chdir(t, projectDir)()
-	err := execFlowCmd([]string{"init"}...)
+	err := execFlowCmd("init")
 	assert.NoError(t, err)
 }
 
@@ -112,51 +118,69 @@ func TestFlowInitCmdWithFlags(t *testing.T) {
 	projectDir := t.TempDir()
 	AirflowHome := t.TempDir()
 	AirflowDagsFolder := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder}...)
+	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
 	assert.NoError(t, err)
 }
 
 func TestFlowValidateCmd(t *testing.T) {
 	projectDir := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir}...)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"validate", projectDir, "--connection", "sqlite_conn"}...)
+	err = execFlowCmd("validate", projectDir, "--connection", "sqlite_conn")
 	assert.NoError(t, err)
 }
 
 func TestFlowGenerateCmd(t *testing.T) {
 	projectDir := t.TempDir()
+	err := execFlowCmd("init", projectDir)
+	assert.NoError(t, err)
+
+	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir)
+	assert.NoError(t, err)
+}
+
+func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
+	projectDir := t.TempDir()
 	err := execFlowCmd([]string{"init", projectDir}...)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir}...)
+	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks"}...)
+	assert.NoError(t, err)
+}
+
+func TestFlowRunGenerateTasksCmd(t *testing.T) {
+	projectDir := t.TempDir()
+	err := execFlowCmd([]string{"init", projectDir}...)
+	assert.NoError(t, err)
+
+	err = execFlowCmd([]string{"run", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks"}...)
 	assert.NoError(t, err)
 }
 
 func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
 	projectDir := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir}...)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"generate", "--project-dir", projectDir}...)
+	err = execFlowCmd("generate", "--project-dir", projectDir)
 	assert.EqualError(t, err, "argument not set:workflow_name")
 }
 
 func TestFlowRunCmd(t *testing.T) {
 	projectDir := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir}...)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "example_templating", "--env", "dev", "--project-dir", projectDir, "--verbose"}...)
+	err = execFlowCmd("run", "example_templating", "--env", "dev", "--project-dir", projectDir, "--verbose")
 	assert.NoError(t, err)
 }
 
 func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 	projectDir := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir}...)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "--project-dir", projectDir}...)
+	err = execFlowCmd("run", "--project-dir", projectDir)
 	assert.EqualError(t, err, "argument not set:workflow_name")
 }

@@ -18,7 +18,7 @@ func (h ClientImplementation) AuthenticateWithBasicAuth(username, password strin
 	if err != nil {
 		return "", handleAPIErr(err)
 	}
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Data: reqData,
 		Headers: map[string]string{
 			"Accept": "application/json",
@@ -42,7 +42,7 @@ func (h ClientImplementation) GetAuthConfig(ctx *config.Context) (*AuthConfig, e
 	if err != nil {
 		return nil, handleAPIErr(err)
 	}
-	doOpts := httputil.DoOptions{
+	doOpts := &httputil.DoOptions{
 		Data: reqData,
 		Headers: map[string]string{
 			"Accept": "application/json",
