@@ -87,7 +87,7 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
+func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "export",
 		Aliases: []string{"e"},
