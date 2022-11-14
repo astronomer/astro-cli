@@ -301,8 +301,8 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		}
 		defer func() {
 			// delete files
-	                os.Remove("./variables.yaml")
-	                os.Remove("./connections.yaml")
+			os.Remove("./variables.yaml")
+			os.Remove("./connections.yaml")
 		}()
 		args = []string{
 			"run",
