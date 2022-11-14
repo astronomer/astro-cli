@@ -43,7 +43,7 @@ func TestCreateInvite(t *testing.T) {
 	errorBody, _ := json.Marshal(astrocore.Error{
 		Message: "failed to create invite: test-inv-error",
 	})
-	createInviteResponseError := astrocore.ListOrganizationsResponse{
+	createInviteResponseError := astrocore.CreateUserInviteResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
@@ -98,7 +98,7 @@ func TestCreateInvite(t *testing.T) {
 	t.Run("error path when writing output returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
 		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", testWriter{Error: errorInvite}, mockClient)
 		assert.EqualError(t, err, "failed to create invite: test-inv-error")
 	})

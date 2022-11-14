@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -31,14 +30,7 @@ func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 	if err != nil {
 		return nil
 	}
-	var serverUrl string
-	if currentCtx.Domain == "localhost" {
-		serverUrl = config.CFG.LocalCore.GetString()
-	} else {
-		// todo, we may need to put v1alpha1 to config later
-		serverUrl = "https://api." + currentCtx.Domain + "/v1alpha1"
-	}
-	cl, err := NewClientWithResponses(serverUrl, WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
+	cl, err := NewClientWithResponses(currentCtx.GetPublicRESTAPIURL(), WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
 	if err != nil {
 		return nil
 	}

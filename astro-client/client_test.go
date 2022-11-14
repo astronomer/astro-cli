@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewgqlClient(t *testing.T) {
+func TestNewAstroClient(t *testing.T) {
 	client := NewAstroClient(httputil.NewHTTPClient())
 	assert.NotNil(t, client, "Can't create new Astro client")
 }

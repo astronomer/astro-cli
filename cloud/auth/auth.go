@@ -315,7 +315,6 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 		return err
 	}
 	authOrgId := *selfResp.JSON200.OrganizationId
-
 	// fetch all orgs that the user can access
 	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
 	err = astrocore.NormalizeApiError(orgsResp.HTTPResponse, orgsResp.Body, err)

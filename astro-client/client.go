@@ -23,7 +23,7 @@ type HTTPClient struct {
 	*httputil.HTTPClient
 }
 
-// NewClient returns a new GQLClient with the logger and HTTP client setup.
+// NewAstroClient returns a new Client with the logger and HTTP client setup.
 func NewAstroClient(c *httputil.HTTPClient) *HTTPClient {
 	return &HTTPClient{
 		c,
