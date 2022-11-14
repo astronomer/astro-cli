@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	"time"
+	time "time"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -153,7 +153,7 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	return r0
 }
 
-// Run provides a mock function with given fields: dagID, settingsFile, startDate, noCache, taskLogs
+// RunDAG provides a mock function with given fields: dagID, settingsFile, startDate, noCache, taskLogs
 func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, noCache bool, taskLogs bool) error {
 	ret := _m.Called(dagID, settingsFile, noCache, taskLogs)
 
@@ -167,13 +167,13 @@ func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, noCache bo
 	return r0
 }
 
-// Start provides a mock function with given fields: imageName, settingsFile, noCache, noBrowser
-func (_m *ContainerHandler) Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error {
-	ret := _m.Called(imageName, settingsFile, noCache, noBrowser)
+// Start provides a mock function with given fields: imageName, settingsFile, noCache, noBrowser, waitTime
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, noCache bool, noBrowser bool, waitTime time.Duration) error {
+	ret := _m.Called(imageName, settingsFile, noCache, noBrowser, waitTime)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, bool, bool) error); ok {
-		r0 = rf(imageName, settingsFile, noCache, noBrowser)
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool, time.Duration) error); ok {
+		r0 = rf(imageName, settingsFile, noCache, noBrowser, waitTime)
 	} else {
 		r0 = ret.Error(0)
 	}

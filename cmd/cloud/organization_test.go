@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:unparam
 func execOrganizationCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newOrganizationCmd(buf)
@@ -48,4 +49,28 @@ func TestOrganizationSwitch(t *testing.T) {
 	cmdArgs := []string{"switch"}
 	_, err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
+}
+
+func TestOrganizationExportAuditLogs(t *testing.T) {
+	orgExportAuditLogs = func(client astro.Client, out io.Writer, orgName string, earliest int) error {
+		return nil
+	}
+
+	t.Run("Fails without organization name", func(t *testing.T) {
+		cmdArgs := []string{"audit-logs", "export"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.Contains(t, err.Error(), "required flag(s) \"organization-name\" not set")
+	})
+
+	t.Run("Without params", func(t *testing.T) {
+		cmdArgs := []string{"audit-logs", "export", "--organization-name", "Astronomer"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with auditLogsOutputFilePath param", func(t *testing.T) {
+		cmdArgs := []string{"audit-logs", "export", "--organization-name", "Astronomer", "--output-file", "test.json"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 }

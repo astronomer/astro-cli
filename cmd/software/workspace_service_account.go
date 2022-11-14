@@ -40,8 +40,7 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
+func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},

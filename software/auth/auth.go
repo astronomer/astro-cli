@@ -18,7 +18,7 @@ import (
 
 const (
 	houstonOAuthRedirect     = "Please visit the following URL, authenticate and paste token in next prompt\n"
-	inputOAuthToken          = "oAuth Token: " // nolint:gosec // false positive
+	inputOAuthToken          = "oAuth Token: " //nolint:gosec // false positive
 	inputUsername            = "Username (leave blank for oAuth): "
 	inputPassword            = "Password: "
 	cliChooseWorkspace       = "Please choose a workspace:"
@@ -51,7 +51,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 		password, _ = input.Password(inputPassword)
 	}
 
-	return client.AuthenticateWithBasicAuth(username, password, ctx)
+	return houston.Call(client.AuthenticateWithBasicAuth)(houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
 }
 
 var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.Context) bool {
@@ -92,7 +92,7 @@ func registryAuth(client houston.ClientInterface, out io.Writer) error {
 		return nil
 	}
 
-	appConfig, err := client.GetAppConfig()
+	appConfig, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return err
 	}
@@ -138,20 +138,25 @@ func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.
 	if interactive {
 		// To identify if the user has access to more than one workspace by setting workspace page size to 2, if so, take the user to the workspace switch flow.
 		workspacePageSize := 2
-		workspaces, err = client.PaginatedListWorkspaces(workspacePageSize, 0)
+		workspaces, err = houston.Call(client.PaginatedListWorkspaces)(houston.PaginatedListWorkspaceRequest{PageSize: workspacePageSize, PageNumber: 0})
 	} else {
-		workspaces, err = client.ListWorkspaces()
+		workspaces, err = houston.Call(client.ListWorkspaces)(nil)
 	}
 
 	return workspaces, err
 }
 
 // Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
+func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 	var token string
 	var err error
-	interactive := config.CFG.Interactive.GetBool()
-	pageSize := config.CFG.PageSize.GetInt()
+	var pageSize int
+	var interactive bool
+	// not going for pagination if houston version is before 0.30.0, since that doesn't support pagination
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		interactive = config.CFG.Interactive.GetBool()
+		pageSize = config.CFG.PageSize.GetInt()
+	}
 	if !(pageSize > 0 && pageSize < defaultPageSize) {
 		pageSize = defaultPageSize
 	}
@@ -162,7 +167,7 @@ func Login(domain string, oAuthOnly bool, username, password string, client hous
 		return err
 	}
 
-	authConfig, err := client.GetAuthConfig(ctx)
+	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
 	if err != nil {
 		return err
 	}

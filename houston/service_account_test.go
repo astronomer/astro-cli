@@ -145,7 +145,7 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.DeleteDeploymentServiceAccount("deployment-id", "sa-id")
+		response, err := api.DeleteDeploymentServiceAccount(DeleteServiceAccountRequest{"", "deployment-id", "sa-id"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.DeleteDeploymentServiceAccount)
 	})
@@ -160,7 +160,7 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.DeleteDeploymentServiceAccount("deployment-id", "sa-id")
+		_, err := api.DeleteDeploymentServiceAccount(DeleteServiceAccountRequest{"", "deployment-id", "sa-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -195,7 +195,7 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.DeleteWorkspaceServiceAccount("workspace-id", "sa-id")
+		response, err := api.DeleteWorkspaceServiceAccount(DeleteServiceAccountRequest{"workspace-id", "", "sa-id"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.DeleteWorkspaceServiceAccount)
 	})
@@ -210,7 +210,7 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.DeleteWorkspaceServiceAccount("workspace-id", "sa-id")
+		_, err := api.DeleteWorkspaceServiceAccount(DeleteServiceAccountRequest{"workspace-id", "", "sa-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

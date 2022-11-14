@@ -111,7 +111,7 @@ func TestBuildPushDockerImageSuccessWithTagWarning(t *testing.T) {
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
 
 	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false)
 	assert.NoError(t, err)
@@ -141,7 +141,7 @@ func TestBuildPushDockerImageSuccessWithImageRepoWarning(t *testing.T) {
 		AirflowImages: mockAirflowImageList,
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
 	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
 
 	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false)
@@ -172,9 +172,9 @@ func TestBuildPushDockerImageSuccessWithBYORegistry(t *testing.T) {
 		AirflowImages: mockAirflowImageList,
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil)
+	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil)
 	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
-	houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil)
+	houstonMock.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "test", Image: "test.registry.io:test-test", AirflowVersion: "1.10.12", RuntimeVersion: ""}).Return(nil, nil)
 
 	err := buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "test.registry.io", false, true)
 	assert.NoError(t, err)
@@ -198,13 +198,13 @@ func TestBuildPushDockerImageFailure(t *testing.T) {
 		AirflowImages: mockAirflowImageList,
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetDeploymentConfig").Return(nil, errMockHouston).Once()
+	houstonMock.On("GetDeploymentConfig", nil).Return(nil, errMockHouston).Once()
 	houstonMock.On("GetRuntimeReleases", "").Return(houston.RuntimeReleases{}, nil)
 	// houston GetDeploymentConfig call failure
 	err = buildPushDockerImage(houstonMock, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false)
 	assert.Error(t, err, errMockHouston)
 
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Twice()
+	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Twice()
 
 	mockImageHandler := new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
@@ -342,7 +342,7 @@ func TestAirflowSuccess(t *testing.T) {
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
-	houstonMock.On("GetDeploymentConfig").Return(mockedDeploymentConfig, nil).Once()
+	houstonMock.On("GetDeploymentConfig", nil).Return(mockedDeploymentConfig, nil).Once()
 	houstonMock.On("GetDeployment", mock.Anything).Return(&houston.Deployment{}, nil).Once()
 	houstonMock.On("GetRuntimeReleases", "").Return(mockRuntimeReleases, nil)
 

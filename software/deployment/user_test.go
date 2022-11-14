@@ -179,7 +179,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentUser", mockUserRole.Deployment.ID, mockUserRole.User.Username).Return(mockUserRole, nil)
+		api.On("DeleteDeploymentUser", houston.DeleteDeploymentUserRequest{DeploymentID: mockUserRole.Deployment.ID, Email: mockUserRole.User.Username}).Return(mockUserRole, nil)
 
 		buf := new(bytes.Buffer)
 		err := RemoveUser(mockUserRole.Deployment.ID, mockUserRole.User.Username, api, buf)
@@ -192,7 +192,7 @@ func TestDeleteUser(t *testing.T) {
 		email := "somebody@astronomer.com"
 
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentUser", deploymentID, email).Return(nil, errMock)
+		api.On("DeleteDeploymentUser", houston.DeleteDeploymentUserRequest{DeploymentID: deploymentID, Email: email}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := RemoveUser(deploymentID, email, api, buf)

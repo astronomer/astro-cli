@@ -127,7 +127,7 @@ func TestListTeams(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.ListTeams("", 1)
+		response, err := api.ListTeams(ListTeamsRequest{"", 1})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.ListTeams)
 	})
@@ -142,7 +142,7 @@ func TestListTeams(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.ListTeams("", 1)
+		_, err := api.ListTeams(ListTeamsRequest{"", 1})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -169,7 +169,7 @@ func TestCreateTeamSystemRoleBinding(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.CreateTeamSystemRoleBinding("test-id", SystemAdminRole)
+		response, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.CreateTeamSystemRoleBinding.Role)
 	})
@@ -184,7 +184,7 @@ func TestCreateTeamSystemRoleBinding(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.CreateTeamSystemRoleBinding("test-id", SystemAdminRole)
+		_, err := api.CreateTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -211,7 +211,7 @@ func TestDeleteTeamSystemRoleBinding(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.DeleteTeamSystemRoleBinding("test-id", SystemAdminRole)
+		response, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.DeleteTeamSystemRoleBinding.Role)
 	})
@@ -226,7 +226,7 @@ func TestDeleteTeamSystemRoleBinding(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.DeleteTeamSystemRoleBinding("test-id", SystemAdminRole)
+		_, err := api.DeleteTeamSystemRoleBinding(SystemRoleBindingRequest{"test-id", SystemAdminRole})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

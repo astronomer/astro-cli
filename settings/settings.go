@@ -358,7 +358,7 @@ func EnvExportConnections(id, envFile string) error {
 		defer f.Close()
 
 		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2) // nolint:gomnd
+			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:gomnd
 			if len(varSplit) > 1 {
 				fmt.Println("Exporting Connection: " + varSplit[0])
 				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
@@ -423,7 +423,7 @@ func ExportConnections(id string) error {
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] // nolint:gomnd
+	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1] //nolint:gomnd
 
 	var connections AirflowConnections
 

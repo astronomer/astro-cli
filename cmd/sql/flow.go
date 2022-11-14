@@ -15,6 +15,7 @@ var (
 	airflowHome       string
 	airflowDagsFolder string
 	projectDir        string
+	generateTasks     bool
 	verbose           bool
 )
 
@@ -161,6 +162,10 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if generateTasks {
+		args = append(args, "--generate-tasks")
+	}
+
 	return executeCmd(cmd, args, flags, mountDirs)
 }
 
@@ -176,6 +181,10 @@ func executeRun(cmd *cobra.Command, args []string) error {
 
 	if verbose {
 		args = append(args, "--verbose")
+	}
+
+	if generateTasks {
+		args = append(args, "--generate-tasks")
 	}
 
 	return executeCmd(cmd, args, flags, mountDirs)
@@ -244,6 +253,7 @@ func generateCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&projectDir, "project-dir", "p", ".", "")
+	cmd.Flags().BoolVarP(&generateTasks, "generate-tasks", "g", false, "")
 	return cmd
 }
 
@@ -256,6 +266,7 @@ func runCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVarP(&projectDir, "project-dir", "p", ".", "")
+	cmd.Flags().BoolVarP(&generateTasks, "generate-tasks", "g", false, "")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "")
 	return cmd
 }

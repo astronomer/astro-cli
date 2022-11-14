@@ -48,7 +48,7 @@ func TestCreateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.CreateWorkspace("label", "description")
+		response, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.CreateWorkspace)
 	})
@@ -63,7 +63,7 @@ func TestCreateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.CreateWorkspace("label", "description")
+		_, err := api.CreateWorkspace(CreateWorkspaceRequest{"label", "description"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -124,7 +124,7 @@ func TestListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.ListWorkspaces()
+		response, err := api.ListWorkspaces(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.GetWorkspaces)
 	})
@@ -139,7 +139,7 @@ func TestListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.ListWorkspaces()
+		_, err := api.ListWorkspaces(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -200,7 +200,7 @@ func TestPaginatedListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.PaginatedListWorkspaces(10, 0)
+		response, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.GetPaginatedWorkspaces)
 	})
@@ -215,7 +215,7 @@ func TestPaginatedListWorkspaces(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.PaginatedListWorkspaces(10, 0)
+		_, err := api.PaginatedListWorkspaces(PaginatedListWorkspaceRequest{10, 0})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -418,7 +418,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.UpdateWorkspace("workspace-id", map[string]string{})
+		response, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.UpdateWorkspace)
 	})
@@ -433,7 +433,7 @@ func TestUpdateWorkspace(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateWorkspace("workspace-id", map[string]string{})
+		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

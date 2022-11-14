@@ -33,7 +33,7 @@ func TestWorkspaceSAListCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("ListWorkspaceServiceAccounts", mockWorkspace.ID).Return([]houston.ServiceAccount{mockSA}, nil)
 	houstonClient = api
 
@@ -73,7 +73,7 @@ func TestWorkspaceSaDelete(t *testing.T) {
 	houstonClient = houstonMock
 	defer func() { houstonClient = currentClient }()
 	workspaceSARole = houston.WorkspaceAdminRole
-	houstonMock.On("DeleteWorkspaceServiceAccount", mock.Anything, saID).Return(&houston.ServiceAccount{}, nil).Once()
+	houstonMock.On("DeleteWorkspaceServiceAccount", mock.Anything).Return(&houston.ServiceAccount{}, nil).Once()
 
 	err := workspaceSaDelete(&cobra.Command{}, buf, []string{saID})
 	assert.NoError(t, err)
