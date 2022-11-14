@@ -583,7 +583,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile string, noCache, taskLogs boo
 		return errors.Wrap(err, composeStatusCheckErrMsg)
 	}
 	if len(psInfo) > 0 {
-		// Ensure project is not already running
+		// In case the project is already running, run the dag test directly on the scheduler container
 		for i := range psInfo {
 			if checkServiceState(psInfo[i].State, dockerStateUp) {
 				if strings.Contains(psInfo[i].Name, SchedulerDockerContainerName) {
@@ -608,13 +608,14 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile string, noCache, taskLogs boo
 	if err != nil {
 		fmt.Printf("Adding line 'RUN airflow db init' to Dockerfile unsuccessful: %s\nYou may need to manually add this line for 'astro run' to work", err.Error())
 	}
-
+	defer func() {
+		// remove airflow db init
+		fileErr := fileutil.RemoveLineFromFile("./Dockerfile", "RUN airflow db init", "")
+		if fileErr != nil {
+			fmt.Printf("Removing line 'RUN airflow db init' from Dockerfile unsuccessful: %s\n", err.Error())
+		}
+	}()
 	err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
-	// remove airflow db init
-	fileErr := fileutil.RemoveLineFromFile("./Dockerfile", "RUN airflow db init", "")
-	if fileErr != nil {
-		fmt.Printf("Removing line 'RUN airflow db init' from Dockerfile unsuccessful: %s\n", err.Error())
-	}
 	if err != nil {
 		return err
 	}
