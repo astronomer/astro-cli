@@ -103,7 +103,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		},
 	}
 	mockClient := new(astro_mocks.Client)
-	astroGQLClient = mockClient
+	astroClient = mockClient
 	t.Run("-h prints help", func(t *testing.T) {
 		cmdArgs := []string{"inspect", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)

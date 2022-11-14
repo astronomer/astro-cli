@@ -262,7 +262,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, astroGQLClient, out)
+	return deployment.List(ws, allDeployments, astroClient, out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -276,7 +276,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
-	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, astroGQLClient)
+	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, astroClient)
 }
 
 func deploymentCreate(cmd *cobra.Command, args []string) error {
@@ -302,7 +302,7 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, schedulerAU, schedulerReplicas, astroGQLClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string) error {
@@ -324,7 +324,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroGQLClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
@@ -341,7 +341,7 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroGQLClient)
+	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroClient)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -353,7 +353,7 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroGQLClient, out)
+	return deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroClient, out)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -367,7 +367,7 @@ func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroGQLClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, false, astroClient, out)
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -381,5 +381,5 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroGQLClient, out)
+	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroClient, out)
 }

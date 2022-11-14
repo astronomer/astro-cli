@@ -186,7 +186,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(gqlClient astro.Client, coreClient astrocore.CoreClient, args []string) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, args []string) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -284,7 +284,7 @@ func checkAPIKeys(gqlClient astro.Client, coreClient astrocore.CoreClient, args 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
 		// get workspace ID
-		deployments, err := gqlClient.ListDeployments(orgId, "")
+		deployments, err := astroClient.ListDeployments(orgId, "")
 		if err != nil {
 			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}

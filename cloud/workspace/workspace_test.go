@@ -82,7 +82,7 @@ func TestList(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	astroAPI := astro.NewGQLClient(client)
+	astroAPI := astro.NewAstroClient(client)
 
 	buf := new(bytes.Buffer)
 	err := List(astroAPI, buf)
@@ -105,7 +105,7 @@ func TestListError(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
-	astroAPI := astro.NewGQLClient(client)
+	astroAPI := astro.NewAstroClient(client)
 
 	buf := new(bytes.Buffer)
 	err := List(astroAPI, buf)

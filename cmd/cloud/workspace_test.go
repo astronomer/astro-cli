@@ -35,7 +35,7 @@ func TestWorkspaceList(t *testing.T) {
 
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Once()
-	astroGQLClient = mockClient
+	astroClient = mockClient
 
 	cmdArgs := []string{"list"}
 	resp, err := execWorkspaceCmd(cmdArgs...)
@@ -50,7 +50,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 
 	mockClient := new(astro_mocks.Client)
 	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Twice()
-	astroGQLClient = mockClient
+	astroClient = mockClient
 
 	// mock os.Stdin
 	input := []byte("1")

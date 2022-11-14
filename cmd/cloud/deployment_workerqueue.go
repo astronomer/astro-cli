@@ -100,7 +100,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		return err
 	}
 
-	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, true, astroGQLClient, out)
+	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, true, astroClient, out)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -110,5 +110,5 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroGQLClient, out)
+	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroClient, out)
 }

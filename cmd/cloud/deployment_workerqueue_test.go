@@ -39,7 +39,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 	expectedHelp := "Create a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
-	astroGQLClient = mockClient
+	astroClient = mockClient
 	deploymentRespDefaultQueue := []astro.Deployment{
 		{
 			ID:             "test-deployment-id",
@@ -269,7 +269,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 	expectedHelp := "Delete a worker queue from an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
-	astroGQLClient = mockClient
+	astroClient = mockClient
 
 	t.Run("-h prints worker-queue help", func(t *testing.T) {
 		cmdArgs := []string{"worker-queue", "delete", "-h"}
@@ -355,7 +355,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 	expectedHelp := "Update a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
-	astroGQLClient = mockClient
+	astroClient = mockClient
 
 	t.Run("-h prints worker-queue help", func(t *testing.T) {
 		cmdArgs := []string{"worker-queue", "update", "-h"}

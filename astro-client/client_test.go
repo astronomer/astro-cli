@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewgqlClient(t *testing.T) {
-	client := NewGQLClient(httputil.NewHTTPClient())
+	client := NewAstroClient(httputil.NewHTTPClient())
 	assert.NotNil(t, client, "Can't create new Astro client")
 }
 

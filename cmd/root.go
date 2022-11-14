@@ -40,7 +40,7 @@ func NewRootCmd() *cobra.Command {
 		softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
 	}
 
-	astroGQLClient := astro.NewGQLClient(httputil.NewHTTPClient())
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
@@ -77,7 +77,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroGQLClient, astroCoreClient, os.Stdout),
+		newLoginCommand(astroClient, astroCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(),
@@ -94,7 +94,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroGQLClient, astroCoreClient, os.Stdout)...,
+			cloudCmd.AddCmds(astroClient, astroCoreClient, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(

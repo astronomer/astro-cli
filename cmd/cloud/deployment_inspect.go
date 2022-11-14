@@ -37,5 +37,5 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
-	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, astroGQLClient, out, requestedField)
+	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, astroClient, out, requestedField)
 }

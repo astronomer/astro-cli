@@ -23,14 +23,14 @@ var (
 	softwareLogout = softwareAuth.Logout
 )
 
-func newLoginCommand(gqlClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) *cobra.Command {
+func newLoginCommand(astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [BASEDOMAIN]",
 		Short: "Log in to Astronomer",
 		Long:  "Authenticate to Astro or Astronomer Software",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, gqlClient, coreClient, out)
+			return login(cmd, args, astroClient, coreClient, out)
 		},
 	}
 
@@ -53,7 +53,7 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func login(cmd *cobra.Command, args []string, gqlClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -61,15 +61,15 @@ func login(cmd *cobra.Command, args []string, gqlClient astro.Client, coreClient
 		if !context.IsCloudDomain(args[0]) {
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
-		return cloudLogin(args[0], "", token, gqlClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(args[0], "", token, astroClient, coreClient, out, shouldDisplayLoginLink)
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(cloudAuth.Domain, "", token, gqlClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(cloudAuth.Domain, "", token, astroClient, coreClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
-		return cloudLogin(ctx.Domain, "", token, gqlClient, coreClient, out, shouldDisplayLoginLink)
+		return cloudLogin(ctx.Domain, "", token, astroClient, coreClient, out, shouldDisplayLoginLink)
 	}
 	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }

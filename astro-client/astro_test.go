@@ -57,9 +57,9 @@ func TestGetUserInfo(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		roleBindings, err := gqlClient.GetUserInfo()
+		roleBindings, err := astroClient.GetUserInfo()
 		assert.NoError(t, err)
 		assert.Equal(t, roleBindings, mockResponse.Data.SelfQuery)
 	})
@@ -72,9 +72,9 @@ func TestGetUserInfo(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.GetUserInfo()
+		_, err := astroClient.GetUserInfo()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 
@@ -86,8 +86,8 @@ func TestGetUserInfo(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
-		_, err := gqlClient.GetUserInfo()
+		astroClient := NewAstroClient(client)
+		_, err := astroClient.GetUserInfo()
 		assert.Contains(t, err.Error(), "something went wrong! Try again or contact Astronomer Support")
 	})
 }
@@ -117,9 +117,9 @@ func TestListWorkspaces(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		workspaces, err := gqlClient.ListWorkspaces("organization-id")
+		workspaces, err := astroClient.ListWorkspaces("organization-id")
 		assert.NoError(t, err)
 		assert.Equal(t, workspaces, mockResponse.Data.GetWorkspaces)
 	})
@@ -132,9 +132,9 @@ func TestListWorkspaces(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.ListWorkspaces("organization-id")
+		_, err := astroClient.ListWorkspaces("organization-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -163,9 +163,9 @@ func TestCreateDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deployment, err := gqlClient.CreateDeployment(&CreateDeploymentInput{})
+		deployment, err := astroClient.CreateDeployment(&CreateDeploymentInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, deployment, mockResponse.Data.CreateDeployment)
 	})
@@ -178,9 +178,9 @@ func TestCreateDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.CreateDeployment(&CreateDeploymentInput{})
+		_, err := astroClient.CreateDeployment(&CreateDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -209,9 +209,9 @@ func TestUpdateDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deployment, err := gqlClient.UpdateDeployment(&UpdateDeploymentInput{})
+		deployment, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, deployment, mockResponse.Data.UpdateDeployment)
 	})
@@ -224,9 +224,9 @@ func TestUpdateDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.UpdateDeployment(&UpdateDeploymentInput{})
+		_, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -258,9 +258,9 @@ func TestListDeployments(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deployments, err := gqlClient.ListDeployments(org, "")
+		deployments, err := astroClient.ListDeployments(org, "")
 		assert.NoError(t, err)
 		assert.Equal(t, deployments, mockResponse.Data.GetDeployments)
 	})
@@ -273,9 +273,9 @@ func TestListDeployments(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.ListDeployments(org, "")
+		_, err := astroClient.ListDeployments(org, "")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -307,9 +307,9 @@ func TestGetDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deployments, err := gqlClient.GetDeployment(deployment)
+		deployments, err := astroClient.GetDeployment(deployment)
 		assert.NoError(t, err)
 		assert.Equal(t, deployments, mockResponse.Data.GetDeployment)
 	})
@@ -322,9 +322,9 @@ func TestGetDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.GetDeployment(deployment)
+		_, err := astroClient.GetDeployment(deployment)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -353,9 +353,9 @@ func TestDeleteDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deployment, err := gqlClient.DeleteDeployment(DeleteDeploymentInput{})
+		deployment, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, deployment, mockResponse.Data.DeleteDeployment)
 	})
@@ -368,9 +368,9 @@ func TestDeleteDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.DeleteDeployment(DeleteDeploymentInput{})
+		_, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -403,9 +403,9 @@ func TestGetDeploymentHistory(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deploymentHistory, err := gqlClient.GetDeploymentHistory(map[string]interface{}{})
+		deploymentHistory, err := astroClient.GetDeploymentHistory(map[string]interface{}{})
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentHistory, mockResponse.Data.GetDeploymentHistory)
 	})
@@ -418,9 +418,9 @@ func TestGetDeploymentHistory(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.GetDeploymentHistory(map[string]interface{}{})
+		_, err := astroClient.GetDeploymentHistory(map[string]interface{}{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -454,9 +454,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		deploymentConfig, err := gqlClient.GetDeploymentConfig()
+		deploymentConfig, err := astroClient.GetDeploymentConfig()
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentConfig, mockResponse.Data.GetDeploymentConfig)
 	})
@@ -469,9 +469,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.GetDeploymentConfig()
+		_, err := astroClient.GetDeploymentConfig()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -500,9 +500,9 @@ func TestModifyDeploymentVariable(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		envVars, err := gqlClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
+		envVars, err := astroClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, envVars, mockResponse.Data.UpdateDeploymentVariables)
 	})
@@ -515,9 +515,9 @@ func TestModifyDeploymentVariable(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
+		_, err := astroClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -543,9 +543,9 @@ func TestInitiateDagDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		envVars, err := gqlClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
+		envVars, err := astroClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, envVars, mockResponse.Data.InitiateDagDeployment)
 	})
@@ -558,9 +558,9 @@ func TestInitiateDagDeployment(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
+		_, err := astroClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -593,9 +593,9 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		image, err := gqlClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
+		image, err := astroClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.ReportDagDeploymentStatus)
 	})
@@ -608,9 +608,9 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
+		_, err := astroClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -640,9 +640,9 @@ func TestCreateImage(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		image, err := gqlClient.CreateImage(CreateImageInput{})
+		image, err := astroClient.CreateImage(CreateImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.CreateImage)
 	})
@@ -655,9 +655,9 @@ func TestCreateImage(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.CreateImage(CreateImageInput{})
+		_, err := astroClient.CreateImage(CreateImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -687,9 +687,9 @@ func TestDeployImage(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		image, err := gqlClient.DeployImage(DeployImageInput{})
+		image, err := astroClient.DeployImage(DeployImageInput{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, mockResponse.Data.DeployImage)
 	})
@@ -702,9 +702,9 @@ func TestDeployImage(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.DeployImage(DeployImageInput{})
+		_, err := astroClient.DeployImage(DeployImageInput{})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -733,9 +733,9 @@ func TestListClusters(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		resp, err := gqlClient.ListClusters("test-org-id")
+		resp, err := astroClient.ListClusters("test-org-id")
 		assert.NoError(t, err)
 		assert.Equal(t, resp, mockResponse.Data.GetClusters)
 	})
@@ -748,9 +748,9 @@ func TestListClusters(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.ListClusters("test-org-id")
+		_, err := astroClient.ListClusters("test-org-id")
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -788,9 +788,9 @@ func TestCreateUserInvite(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		resp, err := gqlClient.CreateUserInvite(testInput)
+		resp, err := astroClient.CreateUserInvite(testInput)
 		assert.NoError(t, err)
 		assert.Equal(t, resp, mockResponse.Data.CreateUserInvite)
 	})
@@ -803,9 +803,9 @@ func TestCreateUserInvite(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.CreateUserInvite(testInputWithInvalidEmail)
+		_, err := astroClient.CreateUserInvite(testInputWithInvalidEmail)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -832,9 +832,9 @@ func TestGetWorkspace(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		workspace, err := gqlClient.GetWorkspace("test-workspace")
+		workspace, err := astroClient.GetWorkspace("test-workspace")
 		assert.NoError(t, err)
 		assert.Equal(t, workspace, expectedWorkspace.Data.GetWorkspace)
 	})
@@ -846,8 +846,8 @@ func TestGetWorkspace(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
-		_, err := gqlClient.GetWorkspace("test-workspace")
+		astroClient := NewAstroClient(client)
+		_, err := astroClient.GetWorkspace("test-workspace")
 		assert.Error(t, err, "API error")
 	})
 }
@@ -886,9 +886,9 @@ func TestWorkerQueueOptions(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		resp, err := gqlClient.GetWorkerQueueOptions()
+		resp, err := astroClient.GetWorkerQueueOptions()
 		assert.NoError(t, err)
 		assert.Equal(t, resp, mockResponse.Data.GetWorkerQueueOptions)
 	})
@@ -901,9 +901,9 @@ func TestWorkerQueueOptions(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.GetWorkerQueueOptions()
+		_, err := astroClient.GetWorkerQueueOptions()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -931,9 +931,9 @@ func TestGetOrganizations(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		resp, err := gqlClient.GetOrganizations()
+		resp, err := astroClient.GetOrganizations()
 		assert.NoError(t, err)
 		assert.Equal(t, resp, mockResponse.Data.GetOrganizations)
 	})
@@ -946,9 +946,9 @@ func TestGetOrganizations(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		gqlClient := NewGQLClient(client)
+		astroClient := NewAstroClient(client)
 
-		_, err := gqlClient.GetOrganizations()
+		_, err := astroClient.GetOrganizations()
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

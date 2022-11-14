@@ -3,7 +3,6 @@ package organization
 import (
 	"context"
 	"io"
-	"net/http"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -109,7 +108,7 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (s
 }
 
 // Switch switches organizations
-func Switch(orgNameOrID string, gqlClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -141,7 +140,7 @@ func Switch(orgNameOrID string, gqlClient astro.Client, coreClient astrocore.Cor
 	}
 
 	// log user into new organization
-	err = AuthLogin(c.Domain, id, "", gqlClient, coreClient, out, shouldDisplayLoginLink)
+	err = AuthLogin(c.Domain, id, "", astroClient, coreClient, out, shouldDisplayLoginLink)
 	if err != nil {
 		return err
 	}
