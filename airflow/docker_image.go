@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,13 +24,13 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/settings"
-	"errors"
 )
 
 const (
 	DockerCmd          = "docker"
 	EchoCmd            = "echo"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
+	astroRunContainer  = "astro-run"
 )
 
 var errGetImageLabel = errors.New("error getting image label")
@@ -279,7 +280,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 	// delete container
 	stdout := os.Stdout
 	stderr := os.Stderr
-	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-run")
+	err := cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
 	if err != nil {
 		log.Debug(err)
 	}
@@ -302,7 +303,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 			"run",
 			"-t",
 			"--name",
-			"astro-run",
+			astroRunContainer,
 			"-v",
 			config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
 			"-v",
@@ -345,7 +346,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 	}
 	if containerName == "" {
 		// delete container
-		err = cmdExec(DockerCmd, nil, nil, "rm", "astro-run")
+		err = cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
 		if err != nil {
 			log.Debug(err)
 		}
