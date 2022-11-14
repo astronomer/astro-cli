@@ -298,6 +298,11 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		if err != nil {
 			log.Debug(err)
 		}
+		defer func() {
+			// delete files
+	                os.Remove("./variables.yaml")
+	                os.Remove("./connections.yaml")
+		}()
 		args = []string{
 			"run",
 			"-t",
@@ -350,10 +355,6 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 			log.Debug(err)
 		}
 	}
-
-	// delete files
-	os.Remove("./variables.yaml")
-	os.Remove("./connections.yaml")
 
 	fmt.Println("\nSee the output of this command for errors. To view task logs, use the --task-logs` flag.")
 	return cmdErr
