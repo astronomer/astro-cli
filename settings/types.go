@@ -83,10 +83,10 @@ type ConnYAMLs []ConnYAML
 type ConnYAML struct {
 	ConnID   string      `mapstructure:"conn_id" yaml:"conn_id"`
 	ConnType string      `mapstructure:"conn_type" yaml:"conn_type"`
-	Host     string      `mapstructure:"host" yaml:"host"`
-	Schema   string      `mapstructure:"schema" yaml:"schema"`
-	Login    string      `mapstructure:"login" yaml:"login"`
-	Password string      `mapstructure:"password" yaml:"password"`
-	Port     int         `mapstructure:"port" yaml:"port"`
-	Extra    interface{} `mapstructure:"extra" yaml:"extra"`
+	Host     string      `yaml:"host"`
+	Schema   string      `yaml:"schema"`
+	Login    string      `yaml:"login"`
+	Password string      `yaml:"password"`
+	Port     int         `yaml:"port"`
+	Extra    interface{} `yaml:"extra"`
 }

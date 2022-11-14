@@ -1222,13 +1222,13 @@ func TestDockerComposeSettings(t *testing.T) {
 	})
 }
 
-func TestDockerComposeRunTest(t *testing.T) {
+func TestDockerComposeRunDAG(t *testing.T) {
 	testUtils.InitTestConfig(testUtils.LocalPlatform)
 	mockDockerCompose := DockerCompose{projectName: "test"}
 	t.Run("success with container", func(t *testing.T) {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("RunTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-scheduler-id", State: "running", Name: "test-scheduler"}}, nil).Once()
@@ -1236,7 +1236,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunTest("", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", noCache, false)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -1246,7 +1246,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 	t.Run("error with container", func(t *testing.T) {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
-		imageHandler.On("RunTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-scheduler-id", State: "running", Name: "test-scheduler"}}, nil).Once()
@@ -1254,7 +1254,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunTest("", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1265,7 +1265,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("RunTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
@@ -1273,7 +1273,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunTest("", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", noCache, false)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -1284,7 +1284,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		noCache := false
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("Build", airflowTypes.ImageBuildConfig{Path: mockDockerCompose.airflowHome, Output: true, NoCache: noCache}).Return(nil).Once()
-		imageHandler.On("RunTest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
+		imageHandler.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errMockDocker).Once()
 
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mockDockerCompose.projectName, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
@@ -1292,7 +1292,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunTest("", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1310,7 +1310,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunTest("", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1324,7 +1324,7 @@ func TestDockerComposeRunTest(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.RunTest("", "", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		composeMock.AssertExpectations(t)

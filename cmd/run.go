@@ -8,7 +8,6 @@ import (
 
 var (
 	dagID     string
-	startDate string
 	taskLogs  bool
 )
 
@@ -28,7 +27,6 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().BoolVarP(&taskLogs, "task-logs", "", false, "Show task logs while the DAG is running")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file export objects too")
-	cmd.Flags().StringVarP(&startDate, "start-date", "d", "", "The start date for the DAG this is the current date and time by default")
 
 	return cmd
 }
@@ -46,5 +44,5 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.RunTest(dagID, settingsFile, startDate, noCache, taskLogs)
+	return containerHandler.RunDAG(dagID, settingsFile, noCache, taskLogs)
 }

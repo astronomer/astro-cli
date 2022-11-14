@@ -153,13 +153,13 @@ func (_m *ContainerHandler) Run(args []string, user string) error {
 	return r0
 }
 
-// RunTest provides a mock function with given fields: dagID, settingsFile, startDate, noCache, taskLogs
-func (_m *ContainerHandler) RunTest(dagID string, settingsFile string, startDate string, noCache bool, taskLogs bool) error {
-	ret := _m.Called(dagID, settingsFile, startDate, noCache, taskLogs)
+// Run provides a mock function with given fields: dagID, settingsFile, startDate, noCache, taskLogs
+func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, noCache bool, taskLogs bool) error {
+	ret := _m.Called(dagID, settingsFile, noCache, taskLogs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, bool, bool) error); ok {
-		r0 = rf(dagID, settingsFile, startDate, noCache, taskLogs)
+	if rf, ok := ret.Get(0).(func(string, string, bool, bool) error); ok {
+		r0 = rf(dagID, settingsFile, noCache, taskLogs)
 	} else {
 		r0 = ret.Error(0)
 	}

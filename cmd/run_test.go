@@ -16,7 +16,7 @@ func TestRunCommand(t *testing.T) {
 	assert.Contains(t, output, "astro run", output)
 }
 
-func TestRunTest(t *testing.T) {
+func TestRun(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		cmd := newRunCommand()
@@ -25,7 +25,7 @@ func TestRunTest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("RunTest", "test-dag", "airflow_settings.yaml", "", false, true).Return(nil).Once()
+			mockContainerHandler.On("RunDAG", "test-dag", "airflow_settings.yaml", false, true).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
@@ -41,7 +41,7 @@ func TestRunTest(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("RunTest", "test-dag", "airflow_settings.yaml", "", false, true).Return(errMock).Once()
+			mockContainerHandler.On("RunDAG", "test-dag", "airflow_settings.yaml", false, true).Return(errMock).Once()
 			return mockContainerHandler, nil
 		}
 

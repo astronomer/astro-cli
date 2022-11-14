@@ -23,7 +23,7 @@ import (
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/settings"
-	"github.com/pkg/errors"
+	"errors"
 )
 
 const (
@@ -275,7 +275,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, containerName string, taskLogs bool) error {
+func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, taskLogs bool) error {
 	// delete container
 	stdout := os.Stdout
 	stderr := os.Stderr
@@ -294,7 +294,7 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	// docker exec
 	if containerName == "" {
 		// convert Settings file to variables and connection yaml
-		err = settings.FileToConnectionYAML(settingsFile)
+		err = settings.WriteAirflowSettingstoYAML(settingsFile)
 		if err != nil {
 			log.Debug(err)
 		}
@@ -343,14 +343,12 @@ func (d *DockerImage) RunTest(dagID, envFile, settingsFile, startDate, container
 	if cmdErr != nil {
 		log.Debug(cmdErr)
 	}
-
-	if err != nil {
-		log.Debug(err)
-	}
-	// delete container
-	err = cmdExec(DockerCmd, nil, nil, "rm", "astro-run")
-	if err != nil {
-		log.Debug(err)
+	if containerName == "" {
+		// delete container
+		err = cmdExec(DockerCmd, nil, nil, "rm", "astro-run")
+		if err != nil {
+			log.Debug(err)
+		}
 	}
 
 	// delete files

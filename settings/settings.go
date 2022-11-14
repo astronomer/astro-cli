@@ -591,7 +591,7 @@ func jsonString(conn *Connection) string {
 	return extraString
 }
 
-func FileToConnectionYAML(settingsFile string) error {
+func WriteAirflowSettingstoYAML(settingsFile string) error {
 	err := InitSettings(settingsFile)
 	if err != nil {
 		return err

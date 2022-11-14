@@ -574,20 +574,20 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	return "", err
 }
 
-func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, taskLogs bool) error {
+func (d *DockerCompose) RunDAG(dagID, settingsFile string, noCache, taskLogs bool) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
 	})
 	if err != nil {
-		return errors.Wrap(err, composeCreateErrMsg)
+		return errors.Wrap(err, composeStatusCheckErrMsg)
 	}
 	if len(psInfo) > 0 {
 		// Ensure project is not already running
 		for i := range psInfo {
 			if checkServiceState(psInfo[i].State, dockerStateUp) {
 				if strings.Contains(psInfo[i].Name, SchedulerDockerContainerName) {
-					err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile, startDate, psInfo[i].Name, taskLogs)
+					err = d.imageHandler.Run(dagID, d.envFile, settingsFile, psInfo[i].Name, taskLogs)
 					if err != nil {
 						return err
 					}
@@ -597,7 +597,7 @@ func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, 
 		}
 	}
 
-	fmt.Println("Building image... For a faster 'astro run' experince run this command while Airflow is running with 'astro dev start'\n ")
+	fmt.Println("Building image... For a faster 'astro run' experience run this command while Airflow is running with 'astro dev start'\n ")
 	// add astro-run-dag
 	err = fileutil.AddLineToFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
 	if err != nil {
@@ -619,7 +619,7 @@ func (d *DockerCompose) RunTest(dagID, settingsFile, startDate string, noCache, 
 		return err
 	}
 
-	err = d.imageHandler.RunTest(dagID, d.envFile, settingsFile, startDate, "", taskLogs)
+	err = d.imageHandler.Run(dagID, d.envFile, settingsFile, "", taskLogs)
 	if err != nil {
 		return err
 	}
