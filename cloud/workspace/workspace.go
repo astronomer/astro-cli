@@ -140,10 +140,10 @@ func Switch(id string, client astro.Client, out io.Writer) error {
 		return err
 	}
 
-	err = c.SetContextKey("organization", c.Organization)
-	if err != nil {
-		return err
-	}
+	// err = c.SetContextKey("organization", c.Organization)
+	// if err != nil {
+	// 	return err
+	// }
 
 	err = config.PrintCurrentCloudContext(out)
 	if err != nil {

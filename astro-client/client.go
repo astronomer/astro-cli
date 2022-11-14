@@ -22,8 +22,8 @@ type HTTPClient struct {
 	*httputil.HTTPClient
 }
 
-// NewAstroClient returns a new Client with the logger and HTTP client setup.
-func NewAstroClient(c *httputil.HTTPClient) *HTTPClient {
+// NewGQLClient returns a new GQLClient with the logger and HTTP client setup.
+func NewGQLClient(c *httputil.HTTPClient) *HTTPClient {
 	return &HTTPClient{
 		c,
 	}
@@ -57,7 +57,7 @@ func (r *Request) DoWithPublicClient(api *HTTPClient) (*Response, error) {
 
 // Do (request) is a wrapper to more easily pass variables to a client.Do request
 func (r *Request) DoPublic() (*Response, error) {
-	return r.DoWithPublicClient(NewAstroClient(httputil.NewHTTPClient()))
+	return r.DoWithPublicClient(NewGQLClient(httputil.NewHTTPClient()))
 }
 
 // Do executes a query against the Astrohub API, logging out any errors contained in the response object

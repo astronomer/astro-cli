@@ -38,13 +38,14 @@ type Contexts struct {
 
 // Context represents a single context
 type Context struct {
-	Domain            string `mapstructure:"domain"`
-	Organization      string `mapstructure:"organization"`
-	Workspace         string `mapstructure:"workspace"`
-	LastUsedWorkspace string `mapstructure:"last_used_workspace"`
-	Token             string `mapstructure:"token"`
-	RefreshToken      string `mapstructure:"refreshtoken"`
-	UserEmail         string `mapstructure:"user_email"`
+	Domain                string `mapstructure:"domain"`
+	Organization          string `mapstructure:"organization"`
+	OrganizationShortName string `mapstructure:"organization_short_name"`
+	Workspace             string `mapstructure:"workspace"`
+	LastUsedWorkspace     string `mapstructure:"last_used_workspace"`
+	Token                 string `mapstructure:"token"`
+	RefreshToken          string `mapstructure:"refreshtoken"`
+	UserEmail             string `mapstructure:"user_email"`
 }
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
@@ -126,13 +127,14 @@ func (c *Context) SetContext() error {
 	}
 
 	context := map[string]string{
-		"token":               c.Token,
-		"domain":              c.Domain,
-		"organization":        c.Organization,
-		"workspace":           c.Workspace,
-		"last_used_workspace": c.Workspace,
-		"refreshtoken":        c.RefreshToken,
-		"user_email":          c.UserEmail,
+		"token":                   c.Token,
+		"domain":                  c.Domain,
+		"organization":            c.Organization,
+		"organization_short_name": c.OrganizationShortName,
+		"workspace":               c.Workspace,
+		"last_used_workspace":     c.Workspace,
+		"refreshtoken":            c.RefreshToken,
+		"user_email":              c.UserEmail,
 	}
 
 	viperHome.Set("contexts"+"."+key, context)

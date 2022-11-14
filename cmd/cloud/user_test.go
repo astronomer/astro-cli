@@ -68,7 +68,7 @@ func TestUserInvite(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetWorkspace", mock.Anything).Return(mockWorkspace, nil).Once()
 		mockClient.On("CreateUserInvite", mock.Anything).Return(mockInvite, nil).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 
 		cmdArgs := []string{"invite", "some@email.com"}
 		resp, err := execUserCmd(cmdArgs...)
@@ -92,7 +92,7 @@ func TestUserInvite(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetWorkspace", mock.Anything).Return(mockWorkspace, nil).Once()
 		mockClient.On("CreateUserInvite", mock.Anything).Return(mockInvite, nil).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execUserCmd(cmdArgs...)
@@ -114,7 +114,7 @@ func TestUserInvite(t *testing.T) {
 		)
 		mockClient.On("CreateUserInvite", mock.Anything).Return(astro.UserInvite{},
 			errTest).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "invalid"}
 		_, err := execUserCmd(cmdArgs...)
 		assert.ErrorIs(t, err, user.ErrInvalidRole)
@@ -134,7 +134,7 @@ func TestUserInvite(t *testing.T) {
 		)
 		mockClient.On("CreateUserInvite", mock.Anything).Return(astro.UserInvite{},
 			errTest).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execUserCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to create invite: test-error")
@@ -144,7 +144,7 @@ func TestUserInvite(t *testing.T) {
 		mockClient.On("GetWorkspace", mock.Anything).Return(astro.Workspace{}, errWorkspace)
 		mockClient.On("CreateUserInvite", mock.Anything).Return(astro.UserInvite{},
 			nil).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execUserCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -154,7 +154,7 @@ func TestUserInvite(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("CreateUserInvite", mock.Anything).Return(astro.UserInvite{},
 			nil).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execUserCmd(cmdArgs...)
 		assert.Error(t, err)
@@ -189,7 +189,7 @@ func TestUserInvite(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetWorkspace", mock.Anything).Return(mockWorkspace, nil).Once()
 		mockClient.On("CreateUserInvite", mock.Anything).Return(mockInvite, nil).Once()
-		astroClient = mockClient
+		astroGQLClient = mockClient
 
 		cmdArgs := []string{"invite"}
 		resp, err := execUserCmd(cmdArgs...)

@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -297,25 +298,48 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 	return astro.Workspace{}, false, nil
 }
 
-// checkToken requests a users rolebindings and sets the workspace to make sure that token works
-// TODO check orgID is in the token
-func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
-	self, err := client.GetUserInfo()
+// check client status after a successfully login
+func checkUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+	// fetch self user base on token
+	// we set CreateIfNotExist to true so we always create astro user when a successfully login
+	createIfNotExist := true
+	selfResp, err := coreClient.GetSelfUserWithResponse(http_context.Background(), &astrocore.GetSelfUserParams{
+		CreateIfNotExist: &createIfNotExist,
+	})
+	err = astrocore.NormalizeApiError(selfResp.HTTPResponse, selfResp.Body, err)
 	if err != nil {
 		return err
 	}
-	organizationID := self.AuthenticatedOrganizationID
+	authOrgId := *selfResp.JSON200.OrganizationId
 
-	if organizationID != "" {
-		err = c.SetContextKey("organization", organizationID)
-		if err != nil {
-			return err
+	// fetch all orgs that the user can access
+	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
+	err = astrocore.NormalizeApiError(orgsResp.HTTPResponse, orgsResp.Body, err)
+	if err != nil {
+		return err
+	}
+	orgs := *orgsResp.JSON200
+	// default to first one in case something crazy happen lol
+	activeOrg := orgs[0]
+	for _, o := range orgs {
+		if o.Id == authOrgId {
+			activeOrg = o
+			break
 		}
 	}
-
-	workspaces, err := client.ListWorkspaces(organizationID)
+	err = c.SetContextKey("organization", activeOrg.Id)
 	if err != nil {
-		return errors.Wrap(err, "Invalid authentication token. Try to log in again with a new token or check your internet connection.\n\nDetails")
+		return err
+	}
+
+	err = c.SetContextKey("organization_short_name", activeOrg.ShortName)
+	if err != nil {
+		return err
+	}
+
+	workspaces, err := client.ListWorkspaces(activeOrg.Id)
+	if err != nil {
+		return err
 	}
 
 	if len(workspaces) == 1 {
@@ -356,7 +380,7 @@ func checkToken(c *config.Context, client astro.Client, out io.Writer) error {
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, orgID, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = formatDomain(domain)
 	authConfig, err := ValidateDomain(domain)
@@ -402,7 +426,7 @@ func Login(domain, orgID, token string, client astro.Client, out io.Writer, shou
 		return err
 	}
 
-	err = checkToken(&c, client, out)
+	err = checkUserSession(&c, client, coreClient, out)
 	if err != nil {
 		return err
 	}
