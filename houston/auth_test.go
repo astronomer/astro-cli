@@ -40,7 +40,7 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		token, err := api.AuthenticateWithBasicAuth("username", "password", &ctx)
+		token, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
 		assert.NoError(t, err)
 		assert.Equal(t, token, mockToken.Data.CreateToken.Token.Value)
 	})
@@ -55,7 +55,7 @@ func TestAuthenticateWithBasicAuth(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.AuthenticateWithBasicAuth("username", "password", &ctx)
+		_, err := api.AuthenticateWithBasicAuth(BasicAuthRequest{"username", "password", &ctx})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

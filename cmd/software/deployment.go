@@ -371,7 +371,6 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 			return err
 		}
 	}
-
 	req := &deployment.CreateDeploymentRequest{
 		Label:             deploymentCreateLabel,
 		WS:                ws,

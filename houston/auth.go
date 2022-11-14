@@ -7,11 +7,52 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
+// BasicAuthRequest - properties for basic authentication request
+type BasicAuthRequest struct {
+	Username string          `json:"identity"`
+	Password string          `json:"password"`
+	Ctx      *config.Context `json:"-"`
+}
+
+var (
+	AuthConfigGetRequest = `
+	query GetAuthConfig($redirect: String) {
+		authConfig(redirect: $redirect) {
+			localEnabled
+			publicSignup
+			initialSignup
+			providers {
+				name
+        		displayName
+				url
+      		}
+		}
+	}`
+
+	//nolint:gosec
+	TokenBasicCreateRequest = `
+	mutation createBasicToken($identity: String, $password: String!) {
+		createToken(identity: $identity, password: $password) {
+			user {
+				id
+				fullName
+				username
+				status
+				createdAt
+				updatedAt
+			}
+			token {
+				value
+			}
+		}
+	}`
+)
+
 // AuthenticateWithBasicAuth - authentiate to Houston using basic auth
-func (h ClientImplementation) AuthenticateWithBasicAuth(username, password string, ctx *config.Context) (string, error) {
+func (h ClientImplementation) AuthenticateWithBasicAuth(request BasicAuthRequest) (string, error) {
 	req := Request{
 		Query:     TokenBasicCreateRequest,
-		Variables: map[string]interface{}{"identity": username, "password": password},
+		Variables: request,
 	}
 
 	reqData, err := json.Marshal(req)
@@ -25,7 +66,7 @@ func (h ClientImplementation) AuthenticateWithBasicAuth(username, password strin
 		},
 	}
 
-	resp, err := h.client.DoWithContext(doOpts, ctx)
+	resp, err := h.client.DoWithContext(doOpts, request.Ctx)
 	if err != nil {
 		return "", handleAPIErr(err)
 	}

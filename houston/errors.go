@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+type ErrAPINotImplemented struct {
+	APIName string
+}
+
+func (e ErrAPINotImplemented) Error() string {
+	return fmt.Sprintf("%s GraphQL API not implemented for the given Houston version", e.APIName)
+}
+
 type ErrFieldsNotAvailable struct {
 	BaseError error
 }

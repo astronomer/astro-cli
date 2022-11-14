@@ -45,7 +45,7 @@ func newTableOut() *printutil.Table {
 
 // Create a workspace
 func Create(label, desc string, client houston.ClientInterface, out io.Writer) error {
-	w, err := client.CreateWorkspace(label, desc)
+	w, err := houston.Call(client.CreateWorkspace)(houston.CreateWorkspaceRequest{Label: label, Description: desc})
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func Create(label, desc string, client houston.ClientInterface, out io.Writer) e
 
 // List all workspaces
 func List(client houston.ClientInterface, out io.Writer) error {
-	ws, err := client.ListWorkspaces()
+	ws, err := houston.Call(client.ListWorkspaces)(nil)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func List(client houston.ClientInterface, out io.Writer) error {
 
 // Delete a workspace by id
 func Delete(id string, client houston.ClientInterface, out io.Writer) error {
-	_, err := client.DeleteWorkspace(id)
+	_, err := houston.Call(client.DeleteWorkspace)(id)
 	if err != nil {
 		return err
 	}
@@ -169,9 +169,9 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 	var err error
 
 	if pageSize > 0 {
-		ws, err = client.PaginatedListWorkspaces(pageSize, pageNumber)
+		ws, err = houston.Call(client.PaginatedListWorkspaces)(houston.PaginatedListWorkspaceRequest{PageSize: pageSize, PageNumber: pageNumber})
 	} else {
-		ws, err = client.ListWorkspaces()
+		ws, err = houston.Call(client.ListWorkspaces)(nil)
 	}
 	if err != nil {
 		return workspaceSelection{id: "", quit: false, err: err}
@@ -237,7 +237,7 @@ func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writ
 		id = workspaceSelection.id
 	}
 	// validate workspace
-	_, err := client.ValidateWorkspaceID(id)
+	_, err := houston.Call(client.ValidateWorkspaceID)(id)
 	if err != nil {
 		return fmt.Errorf("workspace id is not valid: %w", err)
 	}
@@ -260,7 +260,7 @@ func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writ
 // Update an astronomer workspace
 func Update(id string, client houston.ClientInterface, out io.Writer, args map[string]string) error {
 	// validate workspace
-	w, err := client.UpdateWorkspace(id, args)
+	w, err := houston.Call(client.UpdateWorkspace)(houston.UpdateWorkspaceRequest{WorkspaceID: id, Args: args})
 	if err != nil {
 		return err
 	}

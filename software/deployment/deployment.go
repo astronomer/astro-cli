@@ -85,7 +85,7 @@ func newTableOut() *printutil.Table {
 func checkManualReleaseNames(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkManualReleaseNames through appConfig from houston-api")
 
-	config, err := client.GetAppConfig()
+	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
 	}
@@ -97,7 +97,7 @@ func checkManualReleaseNames(client houston.ClientInterface) bool {
 func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking checkNFSMountDagDeployment through appConfig from houston-api")
 
-	config, err := client.GetAppConfig()
+	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
 	}
@@ -107,7 +107,7 @@ func CheckNFSMountDagDeployment(client houston.ClientInterface) bool {
 
 func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for hard delete deployment flag")
-	config, err := client.GetAppConfig()
+	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
 	}
@@ -116,7 +116,7 @@ func CheckHardDeleteDeployment(client houston.ClientInterface) bool {
 
 func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for pre created deployment flag")
-	config, err := client.GetAppConfig()
+	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
 	}
@@ -124,7 +124,7 @@ func CheckPreCreateNamespaceDeployment(client houston.ClientInterface) bool {
 }
 
 func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool {
-	config, err := client.GetAppConfig()
+	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
 	}
@@ -133,7 +133,7 @@ func CheckNamespaceFreeFormEntryDeployment(client houston.ClientInterface) bool 
 
 func CheckTriggererEnabled(client houston.ClientInterface) bool {
 	logrus.Debug("Checking for triggerer flag")
-	config, err := client.GetAppConfig()
+	config, err := houston.Call(client.GetAppConfig)(nil)
 	if err != nil {
 		return false
 	}
@@ -190,7 +190,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 
 	addTriggererReplicasArg(vars, client, req.AirflowVersion, req.TriggererReplicas)
 
-	d, err := client.CreateDeployment(vars)
+	d, err := houston.Call(client.CreateDeployment)(vars)
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 }
 
 func Delete(id string, hardDelete bool, client houston.ClientInterface, out io.Writer) error {
-	_, err := client.DeleteDeployment(id, hardDelete)
+	_, err := houston.Call(client.DeleteDeployment)(houston.DeleteDeploymentRequest{DeploymentID: id, HardDelete: hardDelete})
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 	logrus.Debug("checking namespaces available for platform")
 	tab.GetUserInput = true
 
-	names, err := client.GetAvailableNamespaces()
+	names, err := houston.Call(client.GetAvailableNamespaces)(nil)
 	if err != nil {
 		return "", err
 	}
@@ -304,7 +304,7 @@ func List(ws string, all bool, client houston.ClientInterface, out io.Writer) er
 		listDeploymentRequest.WorkspaceID = ws
 	}
 
-	deployments, err := client.ListDeployments(listDeploymentRequest)
+	deployments, err := houston.Call(client.ListDeployments)(listDeploymentRequest)
 	if err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		vars["triggererReplicas"] = triggererReplicas
 	}
 
-	d, err := client.UpdateDeployment(vars)
+	d, err := houston.Call(client.UpdateDeployment)(vars)
 	if err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 
 // Upgrade airflow deployment
 func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := client.GetDeployment(id)
+	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 
 	vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": desiredAirflowVersion}
 
-	d, err := client.UpdateDeploymentAirflow(vars)
+	d, err := houston.Call(client.UpdateDeploymentAirflow)(vars)
 	if err != nil {
 		return err
 	}
@@ -427,7 +427,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 
 // Upgrade airflow deployment
 func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := client.GetDeployment(id)
+	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
@@ -435,7 +435,7 @@ func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 	if deployment.DesiredAirflowVersion != deployment.AirflowVersion {
 		vars := map[string]interface{}{"deploymentId": id, "desiredAirflowVersion": deployment.AirflowVersion}
 
-		_, err := client.UpdateDeploymentAirflow(vars)
+		_, err := houston.Call(client.UpdateDeploymentAirflow)(vars)
 		if err != nil {
 			return err
 		}
@@ -452,7 +452,7 @@ func AirflowUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 
 // RuntimeUpgrade is to upgrade a deployment to newer runtime version
 func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := client.GetDeployment(id)
+	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
@@ -475,7 +475,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 
 	vars := map[string]interface{}{"deploymentUuid": id, "desiredRuntimeVersion": desiredRuntimeVersion}
 
-	d, err := client.UpdateDeploymentRuntime(vars)
+	d, err := houston.Call(client.UpdateDeploymentRuntime)(vars)
 	if err != nil {
 		return err
 	} else if d == nil {
@@ -501,7 +501,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 
 // RuntimeUpgradeCancel is to cancel an upgrade operation for a deployment
 func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
-	deployment, err := client.GetDeployment(id)
+	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
@@ -509,7 +509,7 @@ func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 	if deployment.DesiredRuntimeVersion != deployment.RuntimeVersion {
 		vars := map[string]interface{}{"deploymentUuid": id}
 
-		_, err := client.CancelUpdateDeploymentRuntime(vars)
+		_, err := houston.Call(client.CancelUpdateDeploymentRuntime)(vars)
 		if err != nil {
 			return err
 		}
@@ -526,7 +526,7 @@ func RuntimeUpgradeCancel(id string, client houston.ClientInterface, out io.Writ
 
 // RuntimeMigrate is to migrate a deployment from using airflow version to runtime version
 func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := client.GetDeployment(deploymentID)
+	deployment, err := houston.Call(client.GetDeployment)(deploymentID)
 	if err != nil {
 		return err
 	}
@@ -535,7 +535,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 		return errDeploymentAlreadyOnRuntime
 	}
 
-	runtimeReleases, err := client.GetRuntimeReleases(deployment.AirflowVersion)
+	runtimeReleases, err := houston.Call(client.GetRuntimeReleases)(deployment.AirflowVersion)
 	if err != nil {
 		return err
 	}
@@ -556,7 +556,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 	desiredRuntimeVersion := latestRuntimeRelease.String()
 
 	vars := map[string]interface{}{"deploymentUuid": deploymentID, "desiredRuntimeVersion": desiredRuntimeVersion}
-	resp, err := client.UpdateDeploymentRuntime(vars)
+	resp, err := houston.Call(client.UpdateDeploymentRuntime)(vars)
 	if err != nil {
 		return err
 	} else if resp == nil {
@@ -581,14 +581,14 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 
 // RuntimeMigrateCancel is to cancel migration operation for a deployment
 func RuntimeMigrateCancel(id string, client houston.ClientInterface, out io.Writer) error {
-	deployment, err := client.GetDeployment(id)
+	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return err
 	}
 
 	if deployment.RuntimeVersion == "" && deployment.DesiredRuntimeVersion != "" && deployment.AirflowVersion != "" {
 		vars := map[string]interface{}{"deploymentUuid": id}
-		_, err := client.CancelUpdateDeploymentRuntime(vars)
+		_, err := houston.Call(client.CancelUpdateDeploymentRuntime)(vars)
 		if err != nil {
 			return err
 		}
@@ -609,7 +609,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 		return "", err
 	}
 	// prepare list of AC airflow versions
-	config, err := client.GetDeploymentConfig()
+	config, err := houston.Call(client.GetDeploymentConfig)(nil)
 	if err != nil {
 		return "", err
 	}
@@ -654,7 +654,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion string, client ho
 	}
 
 	// prepare list of AC airflow versions
-	runtimeVersions, err := client.GetRuntimeReleases("")
+	runtimeVersions, err := houston.Call(client.GetRuntimeReleases)("")
 	if err != nil {
 		return "", err
 	}

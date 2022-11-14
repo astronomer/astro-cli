@@ -69,7 +69,7 @@ func TestList(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil)
 
 		err := List(mockClient, buf)
 		assert.NoError(t, err)
@@ -81,7 +81,7 @@ func TestList(t *testing.T) {
 	t.Run("listTeams error", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", ListTeamLimit).Return(houston.ListTeamsResp{}, errMockHouston)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, errMockHouston)
 
 		err := List(mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)
@@ -93,7 +93,7 @@ func TestPaginatedList(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) utils.PaginationOptions {
 			return utils.PaginationOptions{Quit: true}
 		}
@@ -107,8 +107,8 @@ func TestPaginatedList(t *testing.T) {
 	t.Run("with one recursion", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", 1).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-1", Name: "test-name-1"}}}, nil).Once()
-		mockClient.On("ListTeams", "test-id-1", 1).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-2", Name: "test-name-2"}}}, nil).Once()
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: 1}).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-1", Name: "test-name-1"}}}, nil).Once()
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "test-id-1", Take: 1}).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-2", Name: "test-name-2"}}}, nil).Once()
 
 		try := 0
 		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) utils.PaginationOptions {
@@ -129,7 +129,7 @@ func TestPaginatedList(t *testing.T) {
 	t.Run("list team error", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", "", ListTeamLimit).Return(houston.ListTeamsResp{}, errMockHouston).Once()
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, errMockHouston).Once()
 
 		err := PaginatedList(mockClient, buf, ListTeamLimit, 0, "")
 		assert.ErrorIs(t, err, errMockHouston)
@@ -141,7 +141,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("CreateTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return(houston.SystemAdminRole, nil).Once()
+		mockClient.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
 		err := Update("test-id", houston.SystemAdminRole, mockClient, buf)
 		assert.NoError(t, err)
@@ -154,7 +154,7 @@ func TestUpdate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
-		mockClient.On("DeleteTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return(houston.SystemAdminRole, nil).Once()
+		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
 		err := Update("test-id", houston.NoneRole, mockClient, buf)
 		assert.NoError(t, err)
@@ -173,7 +173,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("CreateTeamSystemRoleBinding error", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("CreateTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return("", errMockHouston).Once()
+		mockClient.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
 		err := Update("test-id", houston.SystemAdminRole, mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)
@@ -205,7 +205,7 @@ func TestUpdate(t *testing.T) {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
-		mockClient.On("DeleteTeamSystemRoleBinding", "test-id", houston.SystemAdminRole).Return("", errMockHouston).Once()
+		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
 		err := Update("test-id", houston.NoneRole, mockClient, buf)
 		assert.ErrorIs(t, err, errMockHouston)

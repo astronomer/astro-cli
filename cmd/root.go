@@ -1,12 +1,8 @@
 package cmd
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
-	"time"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
@@ -23,8 +19,9 @@ import (
 )
 
 var (
-	houstonClient houston.ClientInterface
-	verboseLevel  string
+	verboseLevel   string
+	houstonClient  houston.ClientInterface
+	houstonVersion string
 )
 
 const (
@@ -34,24 +31,19 @@ const (
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
-	httpClient := httputil.NewHTTPClient()
-	// configure http transport
-	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
-	// #nosec
-	httpClient.HTTPClient.Transport = &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout: time.Duration(dialTimeout) * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
-	}
+	var err error
+	httpClient := houston.NewHTTPClient()
 	houstonClient = houston.NewClient(httpClient)
+	houstonVersion, err = houstonClient.GetPlatformVersion(nil)
+	if err != nil {
+		softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
+	}
 
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
-	currCtx := context.IsCloudContext()
-	if !currCtx {
+	isCloudCtx := context.IsCloudContext()
+	if !isCloudCtx {
 		ctx = softwarePlatform
 	}
 
@@ -69,10 +61,10 @@ func NewRootCmd() *cobra.Command {
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if currCtx {
+			if isCloudCtx {
 				return cloudCmd.Setup(cmd, args, astroClient)
 			}
-			// Software PersistentPreRunE component
+			// common PersistentPreRunE component between software & cloud
 			// setting up log verbosity and dumping debug logs collected during CLI-initialization
 			if err := softwareCmd.SetUpLogs(os.Stdout, verboseLevel); err != nil {
 				return err
@@ -81,8 +73,6 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 			return nil
 		},
 	}
-
-	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(ctx))
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroClient, os.Stdout),
@@ -108,17 +98,21 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		rootCmd.AddCommand(
 			softwareCmd.AddCmds(houstonClient, os.Stdout)...,
 		)
+		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
+
+	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 
 	return rootCmd
 }
 
-func getResourcesHelpTemplate(ctx string) string {
+func getResourcesHelpTemplate(version, ctx string) string {
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
-Current Context: %s
+Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
+Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx))
+`, ansi.Bold(ctx), ctx, version, ansi.Bold(version))
 }

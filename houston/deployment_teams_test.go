@@ -41,7 +41,7 @@ func TestAddDeploymentTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.AddDeploymentTeam("deployment-id", "team-id", "role")
+		response, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.AddDeploymentTeam)
 	})
@@ -56,7 +56,7 @@ func TestAddDeploymentTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.AddDeploymentTeam("deployment-id", "team-id", "role")
+		_, err := api.AddDeploymentTeam(AddDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -91,7 +91,7 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.RemoveDeploymentTeam("deployment-id", "team-id")
+		response, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.RemoveDeploymentTeam)
 	})
@@ -106,7 +106,7 @@ func TestDeleteDeploymentTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.RemoveDeploymentTeam("deployment-id", "team-id")
+		_, err := api.RemoveDeploymentTeam(RemoveDeploymentTeamRequest{"deployment-id", "team-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -188,7 +188,7 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.UpdateDeploymentTeamRole("deployment-id", "team-id", DeploymentAdminRole)
+		response, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", DeploymentAdminRole})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.UpdateDeploymentTeam)
 	})
@@ -203,7 +203,7 @@ func TestUpdateDeploymentTeamAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateDeploymentTeamRole("deployment-id", "team-id", "role")
+		_, err := api.UpdateDeploymentTeamRole(UpdateDeploymentTeamRequest{"deployment-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

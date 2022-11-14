@@ -29,7 +29,7 @@ func UserList(deploymentID, email, userID, fullName string, client houston.Clien
 		FullName:     fullName,
 		DeploymentID: deploymentID,
 	}
-	deploymentUsers, err := client.ListDeploymentUsers(filters)
+	deploymentUsers, err := houston.Call(client.ListDeploymentUsers)(filters)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -67,7 +67,7 @@ func Add(deploymentID, email, role string, client houston.ClientInterface, out i
 		Role:         role,
 		DeploymentID: deploymentID,
 	}
-	d, err := client.AddDeploymentUser(addUserRequest)
+	d, err := houston.Call(client.AddDeploymentUser)(addUserRequest)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func UpdateUser(deploymentID, email, role string, client houston.ClientInterface
 		Role:         role,
 		DeploymentID: deploymentID,
 	}
-	d, err := client.UpdateDeploymentUser(updateUserRequest)
+	d, err := houston.Call(client.UpdateDeploymentUser)(updateUserRequest)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func UpdateUser(deploymentID, email, role string, client houston.ClientInterface
 
 // RemoveUser removes user access for a deployment
 func RemoveUser(deploymentID, email string, client houston.ClientInterface, out io.Writer) error {
-	d, err := client.DeleteDeploymentUser(deploymentID, email)
+	d, err := houston.Call(client.DeleteDeploymentUser)(houston.DeleteDeploymentUserRequest{DeploymentID: deploymentID, Email: email})
 	if err != nil {
 		return err
 	}

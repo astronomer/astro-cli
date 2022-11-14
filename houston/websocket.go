@@ -40,6 +40,25 @@ type WSResponse struct {
 	} `json:"payload"`
 }
 
+var DeploymentLogsSubscribeRequest = `
+    subscription log(
+		$deploymentId: Uuid!
+		$component: String
+		$timestamp: DateTime
+		$search: String
+    ){
+      	log(
+			deploymentUuid: $deploymentId
+			component: $component
+			timestamp: $timestamp
+			search: $search
+		){
+        	id
+        	createdAt: timestamp
+        	log: message
+    	}
+    }`
+
 func BuildDeploymentLogsSubscribeRequest(deploymentID, component, search string, timestamp time.Time) (string, error) {
 	payload := Request{
 		Query: DeploymentLogsSubscribeRequest,

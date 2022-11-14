@@ -12,7 +12,7 @@ import (
 func TestAddTeam(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("AddDeploymentTeam", "deployment-id", "team-id", "role").Return(&houston.RoleBinding{Deployment: houston.Deployment{ID: "deployment-id"}, Team: houston.Team{ID: "team-id"}, Role: "role"}, nil)
+		mock.On("AddDeploymentTeam", houston.AddDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role"}).Return(&houston.RoleBinding{Deployment: houston.Deployment{ID: "deployment-id"}, Team: houston.Team{ID: "team-id"}, Role: "role"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("deployment-id", "team-id", "role", mock, buf)
@@ -25,7 +25,7 @@ func TestAddTeam(t *testing.T) {
 
 	t.Run("houston failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("AddDeploymentTeam", "deployment-id", "team-id", "role").Return(nil, errMock)
+		mock.On("AddDeploymentTeam", houston.AddDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("deployment-id", "team-id", "role", mock, buf)
@@ -38,7 +38,7 @@ func TestAddTeam(t *testing.T) {
 func TestRemoveTeam(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("RemoveDeploymentTeam", "deployment-id", "team-id").Return(&houston.RoleBinding{Deployment: houston.Deployment{ID: "deployment-id"}, Team: houston.Team{ID: "team-id"}, Role: "role"}, nil)
+		mock.On("RemoveDeploymentTeam", houston.RemoveDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id"}).Return(&houston.RoleBinding{Deployment: houston.Deployment{ID: "deployment-id"}, Team: houston.Team{ID: "team-id"}, Role: "role"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("deployment-id", "team-id", mock, buf)
@@ -51,7 +51,7 @@ func TestRemoveTeam(t *testing.T) {
 
 	t.Run("houston failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("RemoveDeploymentTeam", "deployment-id", "team-id").Return(nil, errMock)
+		mock.On("RemoveDeploymentTeam", houston.RemoveDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("deployment-id", "team-id", mock, buf)
@@ -95,7 +95,7 @@ func TestListTeamRoles(t *testing.T) {
 func TestUpdateTeamRole(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("UpdateDeploymentTeamRole", "deployment-id", "team-id", "role-id").Return(&houston.RoleBinding{}, nil)
+		mock.On("UpdateDeploymentTeamRole", houston.UpdateDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role-id"}).Return(&houston.RoleBinding{}, nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("deployment-id", "team-id", "role-id", mock, buf)
@@ -108,7 +108,7 @@ func TestUpdateTeamRole(t *testing.T) {
 
 	t.Run("UpdateWorkspaceTeamRole failure", func(t *testing.T) {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("UpdateDeploymentTeamRole", "deployment-id", "team-id", "role-id").Return(nil, errMock)
+		mock.On("UpdateDeploymentTeamRole", houston.UpdateDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: "role-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("deployment-id", "team-id", "role-id", mock, buf)
