@@ -1,5 +1,88 @@
 package houston
 
+// AddDeploymentTeamRequest - properties to add a team to a deployment
+type AddDeploymentTeamRequest struct {
+	TeamID       string `json:"teamUuid"`
+	DeploymentID string `json:"deploymentUuid"`
+	Role         string `json:"role"`
+}
+
+// UpdateDeploymentTeamRequest - properties to update a team's role in a deployment
+type UpdateDeploymentTeamRequest struct {
+	TeamID       string `json:"teamUuid"`
+	DeploymentID string `json:"deploymentUuid"`
+	Role         string `json:"role"`
+}
+
+// RemoveDeploymentTeamRequest - properties to remove a team from a deployment
+type RemoveDeploymentTeamRequest struct {
+	TeamID       string `json:"teamUuid"`
+	DeploymentID string `json:"deploymentUuid"`
+}
+
+var (
+	DeploymentGetTeamsRequest = `
+	query deploymentTeams($deploymentUuid: Uuid!) {
+		deploymentTeams(deploymentUuid: $deploymentUuid) {
+			id
+			name
+			roleBindings {
+				role
+				workspace {
+					id
+					label
+				}
+				deployment {
+					id
+					label
+				}
+			}
+		}
+	}`
+
+	DeploymentTeamAddRequest = `
+	mutation deploymentAddTeamRole(
+		$teamUuid: Uuid!
+		$deploymentUuid: Uuid!
+		$role: Role! = WORKSPACE_VIEWER
+	){
+		deploymentAddTeamRole(
+			teamUuid: $teamUuid
+			deploymentUuid: $deploymentUuid
+			role: $role
+		){
+			id
+			role
+		}
+	}`
+
+	DeploymentTeamRemoveRequest = `
+	mutation deploymentRemoveTeamRole($deploymentUuid: Uuid!, $teamUuid: Uuid!) {
+		deploymentRemoveTeamRole(
+			deploymentUuid: $deploymentUuid
+			teamUuid: $teamUuid
+		){
+			id
+		}
+	}`
+
+	DeploymentTeamUpdateRequest = `
+	mutation deploymentUpdateTeamRole(
+		$deploymentUuid: Uuid!
+		$teamUuid: Uuid!
+		$role: Role!
+	){
+		deploymentUpdateTeamRole(
+			deploymentUuid: $deploymentUuid
+			teamUuid: $teamUuid
+			role: $role
+		){
+			id
+			role
+		}
+	}`
+)
+
 // ListTeamsInDeployment - list teams with deployment access
 func (h ClientImplementation) ListDeploymentTeamsAndRoles(deploymentID string) ([]Team, error) {
 	req := Request{
@@ -18,14 +101,10 @@ func (h ClientImplementation) ListDeploymentTeamsAndRoles(deploymentID string) (
 }
 
 // AddTeamToDeployment - Add a team to a deployment with specified role
-func (h ClientImplementation) AddDeploymentTeam(deploymentID, teamID, role string) (*RoleBinding, error) {
+func (h ClientImplementation) AddDeploymentTeam(request AddDeploymentTeamRequest) (*RoleBinding, error) {
 	req := Request{
-		Query: DeploymentTeamAddRequest,
-		Variables: map[string]interface{}{
-			"teamUuid":       teamID,
-			"deploymentUuid": deploymentID,
-			"role":           role,
-		},
+		Query:     DeploymentTeamAddRequest,
+		Variables: request,
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -37,14 +116,10 @@ func (h ClientImplementation) AddDeploymentTeam(deploymentID, teamID, role strin
 }
 
 // UpdateTeamInDeployment - update a team's role inside a deployment
-func (h ClientImplementation) UpdateDeploymentTeamRole(deploymentID, teamID, role string) (*RoleBinding, error) {
+func (h ClientImplementation) UpdateDeploymentTeamRole(request UpdateDeploymentTeamRequest) (*RoleBinding, error) {
 	req := Request{
-		Query: DeploymentTeamUpdateRequest,
-		Variables: map[string]interface{}{
-			"teamUuid":       teamID,
-			"deploymentUuid": deploymentID,
-			"role":           role,
-		},
+		Query:     DeploymentTeamUpdateRequest,
+		Variables: request,
 	}
 
 	r, err := req.DoWithClient(h.client)
@@ -56,13 +131,10 @@ func (h ClientImplementation) UpdateDeploymentTeamRole(deploymentID, teamID, rol
 }
 
 // RemoveDeploymentTeam - remove a team from a deployment
-func (h ClientImplementation) RemoveDeploymentTeam(deploymentID, teamID string) (*RoleBinding, error) {
+func (h ClientImplementation) RemoveDeploymentTeam(request RemoveDeploymentTeamRequest) (*RoleBinding, error) {
 	req := Request{
-		Query: DeploymentTeamRemoveRequest,
-		Variables: map[string]interface{}{
-			"teamUuid":       teamID,
-			"deploymentUuid": deploymentID,
-		},
+		Query:     DeploymentTeamRemoveRequest,
+		Variables: request,
 	}
 
 	r, err := req.DoWithClient(h.client)

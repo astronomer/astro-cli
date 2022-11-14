@@ -1,7 +1,13 @@
 package cloud
 
 import (
+	"bufio"
+	"fmt"
 	"io"
+	"io/fs"
+	"log"
+	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -9,10 +15,14 @@ import (
 )
 
 var (
-	shouldDisplayLoginLink bool
-
-	orgList   = organization.List
-	orgSwitch = organization.Switch
+	orgList                            = organization.List
+	orgSwitch                          = organization.Switch
+	orgExportAuditLogs                 = organization.ExportAuditLogs
+	orgName                            string
+	auditLogsOutputFilePath            string
+	auditLogsEarliestParam             int
+	auditLogsEarliestParamDefaultValue = 90
+	shouldDisplayLoginLink             bool
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -25,6 +35,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
+		newOrganizationAuditLogs(out),
 	)
 	return cmd
 }
@@ -58,6 +69,41 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "audit-logs",
+		Aliases: []string{"al"},
+		Short:   "Manage your organization audit logs.",
+		Long:    "Manage your organization audit logs.",
+	}
+	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
+	err := cmd.MarkPersistentFlagRequired("organization-name")
+	if err != nil {
+		log.Fatalf("Error marking organization-name flag as required in astro organization audit-logs command: %s", err.Error())
+	}
+	cmd.AddCommand(
+		newOrganizationExportAuditLogs(out),
+	)
+	return cmd
+}
+
+func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "export",
+		Aliases: []string{"e"},
+		Short:   "Export your organization audit logs in GZIP. Requires being an organization owner.",
+		Long:    "Export your organization audit logs in GZIP. Requires being an organization owner.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return organizationExportAuditLogs(cmd)
+		},
+	}
+	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
+	cmd.Flags().IntVarP(
+		&auditLogsEarliestParam, "earliest", "e", auditLogsEarliestParamDefaultValue,
+		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
+	return cmd
+}
+
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -75,4 +121,26 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	}
 
 	return orgSwitch(organizationNameOrID, astroGQLClient, astroCoreClient, out, shouldDisplayLoginLink)
+}
+
+func organizationExportAuditLogs(cmd *cobra.Command) error {
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	var outputFileName string
+	if auditLogsOutputFilePath != "" {
+		outputFileName = auditLogsOutputFilePath
+	} else {
+		outputFileName = fmt.Sprintf("audit-logs-%s.gz", time.Now().Format("2006-01-02-150405"))
+	}
+
+	var filePerms fs.FileMode = 0o755
+	// In CLI mode we should not need to close f
+	f, err := os.OpenFile(outputFileName, os.O_RDWR|os.O_CREATE, filePerms)
+	if err != nil {
+		return err
+	}
+	out := bufio.NewWriter(f)
+
+	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
 }

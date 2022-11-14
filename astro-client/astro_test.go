@@ -952,3 +952,59 @@ func TestGetOrganizations(t *testing.T) {
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
+
+func TestGetOrganizationAuditLogs(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("Can export organization audit logs", func(t *testing.T) {
+		mockResponse := "A lot of audit logs entries"
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(mockResponse))),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.GetOrganizationAuditLogs("test-org-id", 50)
+		assert.NoError(t, err)
+		output := new(bytes.Buffer)
+		io.Copy(output, resp)
+		assert.Equal(t, mockResponse, output.String())
+	})
+
+	t.Run("Permission denied", func(t *testing.T) {
+		errorMessage := "Invalid authorization token."
+		errorResponse, err := json.Marshal(map[string]string{"message": errorMessage})
+		assert.NoError(t, err)
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 401,
+				Body:       io.NopCloser(bytes.NewBuffer(errorResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err = astroClient.GetOrganizationAuditLogs("test-org-id", 50)
+		assert.Contains(t, err.Error(), errorMessage)
+	})
+
+	t.Run("Invalid earliest parameter", func(t *testing.T) {
+		errorMessage := "Invalid query parameter values: field earliest failed check on min;"
+		errorResponse, err := json.Marshal(map[string]string{"message": errorMessage})
+		assert.NoError(t, err)
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBuffer(errorResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err = astroClient.GetOrganizationAuditLogs("test-org-id", 50)
+		assert.Contains(t, err.Error(), errorMessage)
+	})
+}

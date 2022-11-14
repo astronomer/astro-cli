@@ -123,7 +123,7 @@ func TestDeleteUsingWorkspaceUUID(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteWorkspaceServiceAccount", workspaceUUID, mockSA.ID).Return(mockSA, nil)
+		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: workspaceUUID, ServiceAccountID: mockSA.ID}).Return(mockSA, nil)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
@@ -136,7 +136,7 @@ func TestDeleteUsingWorkspaceUUID(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteWorkspaceServiceAccount", workspaceUUID, mockSA.ID).Return(nil, errMock)
+		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: workspaceUUID, ServiceAccountID: mockSA.ID}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
@@ -155,7 +155,7 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentServiceAccount", deploymentUUID, mockSA.ID).Return(mockSA, nil)
+		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: deploymentUUID, ServiceAccountID: mockSA.ID}).Return(mockSA, nil)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)
@@ -167,7 +167,7 @@ func TestDeleteUsingDeploymentUUID(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentServiceAccount", deploymentUUID, mockSA.ID).Return(nil, errMock)
+		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: deploymentUUID, ServiceAccountID: mockSA.ID}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)

@@ -18,15 +18,14 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-// nolint:dupl
-func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error {
+func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	createServiceAccountRequest := &houston.CreateServiceAccountRequest{
 		DeploymentID: deploymentUUID,
 		Label:        label,
 		Category:     category,
 		Role:         role,
 	}
-	sa, err := client.CreateDeploymentServiceAccount(createServiceAccountRequest)
+	sa, err := houston.Call(client.CreateDeploymentServiceAccount)(createServiceAccountRequest)
 	if err != nil {
 		return err
 	}
@@ -38,15 +37,14 @@ func CreateUsingDeploymentUUID(deploymentUUID, label, category, role string, cli
 	return tab.Print(out)
 }
 
-// nolint:dupl
-func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error {
+func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl
 	request := &houston.CreateServiceAccountRequest{
 		WorkspaceID: workspaceUUID,
 		Label:       label,
 		Category:    category,
 		Role:        role,
 	}
-	sa, err := client.CreateWorkspaceServiceAccount(request)
+	sa, err := houston.Call(client.CreateWorkspaceServiceAccount)(request)
 	if err != nil {
 		return err
 	}
@@ -59,7 +57,7 @@ func CreateUsingWorkspaceUUID(workspaceUUID, label, category, role string, clien
 }
 
 func DeleteUsingWorkspaceUUID(serviceAccountID, workspaceID string, client houston.ClientInterface, out io.Writer) error {
-	sa, err := client.DeleteWorkspaceServiceAccount(workspaceID, serviceAccountID)
+	sa, err := houston.Call(client.DeleteWorkspaceServiceAccount)(houston.DeleteServiceAccountRequest{ServiceAccountID: serviceAccountID, WorkspaceID: workspaceID})
 	if err != nil {
 		return err
 	}
@@ -71,7 +69,7 @@ func DeleteUsingWorkspaceUUID(serviceAccountID, workspaceID string, client houst
 }
 
 func DeleteUsingDeploymentUUID(serviceAccountID, deploymentID string, client houston.ClientInterface, out io.Writer) error {
-	sa, err := client.DeleteDeploymentServiceAccount(deploymentID, serviceAccountID)
+	sa, err := houston.Call(client.DeleteDeploymentServiceAccount)(houston.DeleteServiceAccountRequest{DeploymentID: deploymentID, ServiceAccountID: serviceAccountID})
 	if err != nil {
 		return err
 	}
@@ -84,7 +82,7 @@ func DeleteUsingDeploymentUUID(serviceAccountID, deploymentID string, client hou
 
 // get all deployment service accounts
 func GetDeploymentServiceAccounts(id string, client houston.ClientInterface, out io.Writer) error {
-	sas, err := client.ListDeploymentServiceAccounts(id)
+	sas, err := houston.Call(client.ListDeploymentServiceAccounts)(id)
 	if err != nil {
 		return err
 	}
@@ -99,7 +97,7 @@ func GetDeploymentServiceAccounts(id string, client houston.ClientInterface, out
 
 // get all workspace service accounts
 func GetWorkspaceServiceAccounts(id string, client houston.ClientInterface, out io.Writer) error {
-	sas, err := client.ListWorkspaceServiceAccounts(id)
+	sas, err := houston.Call(client.ListWorkspaceServiceAccounts)(id)
 	if err != nil {
 		return err
 	}

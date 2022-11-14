@@ -14,14 +14,15 @@ import (
 )
 
 func TestAddCmds(t *testing.T) {
-	appConfig := &houston.AppConfig{
+	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags: houston.FeatureFlags{
 			TriggererEnabled: true,
 		},
 	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig").Return(appConfig, nil)
+	houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
@@ -32,14 +33,34 @@ func TestAddCmds(t *testing.T) {
 
 func TestAppConfigFailure(t *testing.T) {
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig").Return(nil, errMock)
+	houstonMock.On("GetAppConfig", nil).Return(nil, errMock)
+	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
 		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(t)
-	assert.Contains(t, initDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
+	assert.Contains(t, InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
+}
+
+func TestPlatformVersionFailure(t *testing.T) {
+	appConfig = &houston.AppConfig{
+		TriggererEnabled: true,
+		Flags: houston.FeatureFlags{
+			TriggererEnabled: true,
+		},
+	}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetAppConfig", nil).Return(appConfig, nil)
+	houstonMock.On("GetPlatformVersion", nil).Return("", errMock)
+	buf := new(bytes.Buffer)
+	cmds := AddCmds(houstonMock, buf)
+	for cmdIdx := range cmds {
+		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+	}
+	houstonMock.AssertExpectations(t)
+	assert.Contains(t, InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", errMock))
 }
 
 func TestSetupLogs(t *testing.T) {
@@ -65,9 +86,9 @@ func TestPrintDebugLogs(t *testing.T) {
 	err := SetUpLogs(buf, "debug")
 	assert.NoError(t, err)
 
-	initDebugLogs = []string{"test log line"}
+	InitDebugLogs = []string{"test log line"}
 
 	PrintDebugLogs()
-	assert.Nil(t, initDebugLogs)
+	assert.Nil(t, InitDebugLogs)
 	assert.Contains(t, buf.String(), "test log line")
 }

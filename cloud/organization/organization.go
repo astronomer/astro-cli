@@ -3,6 +3,7 @@ package organization
 import (
 	"context"
 	"io"
+	"net/http"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -144,5 +145,20 @@ func Switch(orgNameOrID string, gqlClient astro.Client, coreClient astrocore.Cor
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Write the audit logs to the provided io.Writer.
+func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
+	logStreamBuffer, err := client.GetOrganizationAuditLogs(orgName, earliest)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, logStreamBuffer)
+	if err != nil {
+		logStreamBuffer.Close()
+		return err
+	}
+	logStreamBuffer.Close()
 	return nil
 }

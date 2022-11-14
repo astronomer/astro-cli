@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,12 +12,8 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/jsonmessage"
 )
-
-type MountVolume struct {
-	SourceDirectory string
-	TargetDirectory string
-}
 
 const (
 	SQLCliDockerfilePath      = ".Dockerfile.sql_cli"
@@ -27,7 +24,8 @@ const (
 
 var (
 	DockerClientInit = NewDockerClient
-	ioCopy           = io.Copy
+	IoCopy           = io.Copy
+	DisplayMessages  = displayMessages
 )
 
 func getContext(filePath string) io.Reader {
@@ -35,12 +33,46 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
+func displayMessages(r io.Reader) error {
+	decoder := json.NewDecoder(r)
+	var prevMessage jsonmessage.JSONMessage
+	isFirstMessage := true
+	for {
+		var jsonMessage jsonmessage.JSONMessage
+		if err := decoder.Decode(&jsonMessage); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if jsonMessage.Stream == "\n" {
+			continue
+		}
+		// We only print steps which are actually running, e.g.
+		// Step 2/4 : ENV ASTRO_CLI Yes
+		//  ---> Running in 0afb2e0c5ad7
+		if strings.HasPrefix(prevMessage.Stream, "Step ") && strings.HasPrefix(jsonMessage.Stream, " ---> Running in ") {
+			if isFirstMessage {
+				fmt.Println("Installing flow.. This might take some time.")
+				isFirstMessage = false
+			}
+			err := prevMessage.Display(os.Stdout, true)
+			fmt.Println()
+			if err != nil {
+				return err
+			}
+		}
+		prevMessage = jsonMessage
+	}
+	return nil
+}
+
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) error {
 	ctx := context.Background()
+
 	cli, err := DockerClientInit()
 	if err != nil {
-		err = fmt.Errorf("docker client initialization failed %w", err)
-		return err
+		return fmt.Errorf("docker client initialization failed %w", err)
 	}
 
 	astroSQLCliVersion, err := getPypiVersion(astroSQLCliProjectURL)
@@ -49,78 +81,75 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	}
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
-	err = os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode)
-	if err != nil {
+	if err := os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)
 
-	opts := types.ImageBuildOptions{
-		Dockerfile: SQLCliDockerfilePath,
-		Tags:       []string{SQLCliDockerImageName},
+	body, err := cli.ImageBuild(
+		ctx,
+		getContext(SQLCliDockerfilePath),
+		&types.ImageBuildOptions{
+			Dockerfile: SQLCliDockerfilePath,
+			Tags:       []string{SQLCliDockerImageName},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("image building failed %w", err)
 	}
 
-	body, err := cli.ImageBuild(ctx, getContext(SQLCliDockerfilePath), &opts)
-	if err != nil {
-		err = fmt.Errorf("image building failed %w", err)
-		return err
-	}
-	buf := new(strings.Builder)
-	_, err = ioCopy(buf, body.Body)
-	if err != nil {
-		err = fmt.Errorf("image build response read failed %w", err)
-		return err
+	if err := DisplayMessages(body.Body); err != nil {
+		return fmt.Errorf("image build response read failed %w", err)
 	}
 
 	cmd = append(cmd, args...)
-
 	for key, value := range flags {
-		cmd = append(cmd, []string{fmt.Sprintf("--%s", key), value}...)
+		cmd = append(cmd, fmt.Sprintf("--%s %s", key, value))
 	}
 
 	binds := []string{}
-	for _, moundDir := range mountDirs {
-		binds = append(binds, []string{moundDir + ":" + moundDir}...)
+	for _, mountDir := range mountDirs {
+		binds = append(binds, fmt.Sprintf("%s:%s", mountDir, mountDir))
 	}
 
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: SQLCliDockerImageName,
-		Cmd:   cmd,
-		Tty:   true,
-	}, &container.HostConfig{
-		Binds: binds,
-	}, nil, nil, "")
+	resp, err := cli.ContainerCreate(
+		ctx,
+		&container.Config{
+			Image: SQLCliDockerImageName,
+			Cmd:   cmd,
+			Tty:   true,
+		},
+		&container.HostConfig{
+			Binds: binds,
+		},
+		nil,
+		nil,
+		"",
+	)
 	if err != nil {
-		err = fmt.Errorf("docker container creation failed %w", err)
-		return err
+		return fmt.Errorf("docker container creation failed %w", err)
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		err = fmt.Errorf("docker container start failed %w", err)
-		return err
+		return fmt.Errorf("docker container start failed %w", err)
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			err = fmt.Errorf("docker container wait failed %w", err)
-			return err
+			return fmt.Errorf("docker container wait failed %w", err)
 		}
 	case <-statusCh:
 	}
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
-		err = fmt.Errorf("docker container logs fetching failed %w", err)
-		return err
+		return fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
-	_, err = ioCopy(os.Stdout, cout)
-
-	if err != nil {
-		err = fmt.Errorf("docker logs forwarding failed %w", err)
-		return err
+	if _, err := IoCopy(os.Stdout, cout); err != nil {
+		return fmt.Errorf("docker logs forwarding failed %w", err)
 	}
 
 	return nil

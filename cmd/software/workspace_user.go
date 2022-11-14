@@ -91,8 +91,10 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 			return workspaceUserList(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
-	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
+		cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
+	}
 	return cmd
 }
 
@@ -135,7 +137,7 @@ func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	user, err := houstonClient.GetWorkspaceUserRole(ws, args[0])
+	user, err := houston.Call(houstonClient.GetWorkspaceUserRole)(houston.GetWorkspaceUserRoleRequest{WorkspaceID: ws, Email: args[0]})
 	if err != nil {
 		return err
 	}
@@ -150,7 +152,8 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 	}
 	configPageSize := config.CFG.PageSize.GetInt()
 
-	if config.CFG.Interactive.GetBool() || paginated {
+	// not calling paginated workspace roles if houston version is before 0.30.0, since that doesn't support pagination
+	if (config.CFG.Interactive.GetBool() || paginated) && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
 		if pageSize <= 0 && configPageSize > 0 {
 			pageSize = configPageSize
 		}

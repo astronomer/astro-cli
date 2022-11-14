@@ -39,7 +39,7 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 				Header:     make(http.Header),
 			}
 		})
-		doOpts := httputil.DoOptions{
+		doOpts := &httputil.DoOptions{
 			Headers: map[string]string{
 				"Accept": "application/json",
 			},
@@ -50,4 +50,10 @@ func TestErrAuthTokenRefreshFailed(t *testing.T) {
 		assert.Contains(t, err.Error(), ErrVerboseInaptPermissions.Error())
 		assert.Nil(t, resp)
 	})
+}
+
+func TestNewHTTPClient(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	client := NewHTTPClient()
+	assert.NotNil(t, client)
 }

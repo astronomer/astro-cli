@@ -59,7 +59,7 @@ func login(cmd *cobra.Command, args []string, gqlClient astro.Client, coreClient
 
 	if len(args) == 1 {
 		if !context.IsCloudDomain(args[0]) {
-			return softwareLogin(args[0], oAuth, "", "", houstonClient, out)
+			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
 		return cloudLogin(args[0], "", token, gqlClient, coreClient, out, shouldDisplayLoginLink)
 	}
@@ -71,7 +71,7 @@ func login(cmd *cobra.Command, args []string, gqlClient astro.Client, coreClient
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, "", token, gqlClient, coreClient, out, shouldDisplayLoginLink)
 	}
-	return softwareLogin(ctx.Domain, oAuth, "", "", houstonClient, out)
+	return softwareLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {

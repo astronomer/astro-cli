@@ -1,5 +1,14 @@
 package houston
 
+var GetRuntimeReleases = `
+	query runtimeReleases($airflowVersion: String) {
+		runtimeReleases(airflowVersion: $airflowVersion) {
+			version
+			airflowVersion
+			airflowDatabaseMigrations
+		}
+	}`
+
 func (h ClientImplementation) GetRuntimeReleases(airflowVersion string) (RuntimeReleases, error) {
 	vars := make(map[string]interface{})
 	if airflowVersion != "" {
