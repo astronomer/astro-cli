@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -17,6 +18,7 @@ var (
 	projectDir        string
 	generateTasks     bool
 	verbose           bool
+	debug             bool
 )
 
 func getAbsolutePath(path string) (string, error) {
@@ -46,17 +48,6 @@ func createProjectDir(projectDir string) (mountDir string, err error) {
 	return projectDir, nil
 }
 
-func buildCommonFlags() map[string]string {
-	flags := make(map[string]string)
-	if environment != "" {
-		flags["env"] = environment
-	}
-	if connection != "" {
-		flags["connection"] = connection
-	}
-	return flags
-}
-
 func getBaseMountDirs(projectDir string) ([]string, error) {
 	mountDir, err := createProjectDir(projectDir)
 	if err != nil {
@@ -67,7 +58,7 @@ func getBaseMountDirs(projectDir string) ([]string, error) {
 }
 
 func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder bool) (flags map[string]string, mountDirs []string, err error) {
-	flags = buildCommonFlags()
+	flags = make(map[string]string)
 	mountDirs, err = getBaseMountDirs(projectDir)
 	if err != nil {
 		return nil, nil, err
@@ -104,6 +95,9 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 
 func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, mountDirs []string) error {
 	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
+	if debug {
+		cmdString = slices.Insert(cmdString, 1, "--debug")
+	}
 	err := sql.CommonDockerUtil(cmdString, args, flags, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", cmdString, err)
@@ -149,6 +143,14 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 	projectDirAbsolute := mountDirs[0]
 	args = []string{projectDirAbsolute}
 
+	if environment != "" {
+		flags["env"] = environment
+	}
+
+	if verbose {
+		args = append(args, "--verbose")
+	}
+
 	return executeCmd(cmd, args, flags, mountDirs)
 }
 
@@ -166,6 +168,14 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 		args = append(args, "--generate-tasks")
 	}
 
+	if environment != "" {
+		flags["env"] = environment
+	}
+
+	if verbose {
+		args = append(args, "--verbose")
+	}
+
 	return executeCmd(cmd, args, flags, mountDirs)
 }
 
@@ -177,6 +187,10 @@ func executeRun(cmd *cobra.Command, args []string) error {
 	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false)
 	if err != nil {
 		return err
+	}
+
+	if environment != "" {
+		flags["env"] = environment
 	}
 
 	if verbose {
@@ -227,8 +241,8 @@ func initCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().StringVarP(&airflowHome, "airflow-home", "a", "", "")
-	cmd.Flags().StringVarP(&airflowDagsFolder, "airflow-dags-folder", "d", "", "")
+	cmd.Flags().StringVar(&airflowHome, "airflow-home", "", "")
+	cmd.Flags().StringVar(&airflowDagsFolder, "airflow-dags-folder", "", "")
 	return cmd
 }
 
@@ -240,7 +254,9 @@ func validateCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().StringVarP(&connection, "connection", "c", "", "")
+	cmd.Flags().StringVar(&environment, "env", "default", "")
+	cmd.Flags().StringVar(&connection, "connection", "", "")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	return cmd
 }
 
@@ -252,8 +268,10 @@ func generateCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().StringVarP(&projectDir, "project-dir", "p", ".", "")
-	cmd.Flags().BoolVarP(&generateTasks, "generate-tasks", "g", false, "")
+	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
+	cmd.Flags().StringVar(&environment, "env", "default", "")
+	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	return cmd
 }
 
@@ -265,9 +283,10 @@ func runCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().StringVarP(&projectDir, "project-dir", "p", ".", "")
-	cmd.Flags().BoolVarP(&generateTasks, "generate-tasks", "g", false, "")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "")
+	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
+	cmd.Flags().StringVar(&environment, "env", "default", "")
+	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	return cmd
 }
 
@@ -287,7 +306,7 @@ func NewFlowCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.PersistentFlags().StringVarP(&environment, "env", "e", "", "")
+	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "")
 	cmd.AddCommand(versionCommand())
 	cmd.AddCommand(aboutCommand())
 	cmd.AddCommand(initCommand())
