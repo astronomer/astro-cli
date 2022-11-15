@@ -27,14 +27,14 @@ func (t testWriter) Write(p []byte) (n int, err error) {
 
 func TestCreateInvite(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	inviteUserId := "user_cuid"
+	inviteUserID := "user_cuid"
 	createInviteResponseOK := astrocore.CreateUserInviteResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.Invite{
 			InviteId: "",
-			UserId:   &inviteUserId,
+			UserId:   &inviteUserID,
 		},
 	}
 	errorBody, _ := json.Marshal(astrocore.Error{

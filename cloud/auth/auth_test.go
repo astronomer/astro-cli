@@ -28,13 +28,13 @@ import (
 var (
 	errMock = errors.New("mock-error")
 
-	mockOrganizationId  = "test-org-id"
+	mockOrganizationID  = "test-org-id"
 	mockGetSelfResponse = astrocore.GetSelfUserResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.Self{
-			OrganizationId: &mockOrganizationId,
+			OrganizationId: &mockOrganizationID,
 			Username:       "test@astronomer.io",
 			FullName:       "jane",
 			Id:             "user-id",

@@ -128,7 +128,7 @@ func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
+	//nolint:gocritic
 	for ctxKey, ctx := range contexts.Contexts {
 		if ctx.Domain != "" {
 			domain = ctx.Domain

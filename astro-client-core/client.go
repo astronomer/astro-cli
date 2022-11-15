@@ -28,11 +28,11 @@ func requestEditor(httpContext http_context.Context, req *http.Request) error {
 		return nil
 	}
 	baseURL := currentCtx.GetPublicRESTAPIURL()
-	url, err := url.Parse(baseURL + req.URL.String())
+	requestURL, err := url.Parse(baseURL + req.URL.String())
 	if err != nil {
 		return fmt.Errorf("%w, %s", ErrorBaseURL, baseURL)
 	}
-	req.URL = url
+	req.URL = requestURL
 	req.Header.Add("authorization", currentCtx.Token)
 	return nil
 }

@@ -37,14 +37,14 @@ func TestUserRootCommand(t *testing.T) {
 }
 
 var (
-	inviteUserId           = "user_cuid"
+	inviteUserID           = "user_cuid"
 	createInviteResponseOK = astrocore.CreateUserInviteResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.Invite{
 			InviteId: "astro_invite_id",
-			UserId:   &inviteUserId,
+			UserId:   &inviteUserID,
 		},
 	}
 	errorBody, _ = json.Marshal(astrocore.Error{

@@ -163,6 +163,19 @@ func (c *Context) SetContextKey(key, value string) error {
 	return nil
 }
 
+// set organization id and short name in context config
+func (c *Context) SetOrganizationContext(orgID, orgShortName string) error {
+	err := c.SetContextKey("organization", orgID) // c.Organization
+	if err != nil {
+		return err
+	}
+	err = c.SetContextKey("organization_short_name", orgShortName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // SwitchContext sets the current config context to the one matching the provided Context struct
 func (c *Context) SwitchContext() error {
 	var err error

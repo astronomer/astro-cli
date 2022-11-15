@@ -300,13 +300,9 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetContextKey("organization", orgID) // c.Organization
+	err = c.SetOrganizationContext(orgID, orgShortName)
 	if err != nil {
-		fmt.Println("no organization set")
-	}
-	err = c.SetContextKey("organization_short_name", orgShortName)
-	if err != nil {
-		fmt.Println("no organization_short_name set")
+		fmt.Println("no organization context set")
 	}
 	return true, nil
 }

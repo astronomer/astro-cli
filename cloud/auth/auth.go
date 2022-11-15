@@ -330,12 +330,7 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 			break
 		}
 	}
-	err = c.SetContextKey("organization", activeOrg.Id)
-	if err != nil {
-		return err
-	}
-
-	err = c.SetContextKey("organization_short_name", activeOrg.ShortName)
+	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.ShortName)
 	if err != nil {
 		return err
 	}
