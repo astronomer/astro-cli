@@ -132,6 +132,10 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 }
 
 func TestDeployWithDagsDeploySuccess(t *testing.T) {
+	os.Mkdir("./testfiles/dags", os.ModePerm)
+	path := "./testfiles/dags/test.py"
+	fileutil.WriteStringToFile(path, "testing")
+
 	mockDeplyResp := astro.Deployment{
 		ID:             "test-id",
 		ReleaseName:    "test-name",
@@ -163,7 +167,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(7)
 	mockClient.On("CreateImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
 	mockClient.On("DeployImage", mock.Anything).Return(&astro.Image{}, nil).Times(7)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(7)
+	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(6)
 
 	azureUploader = func(sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
@@ -177,7 +181,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		Status:                   "SUCCEEDED",
 		Message:                  "DAGs uploaded successfully",
 	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(7)
+	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(6)
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {
@@ -506,6 +510,37 @@ func TestNoDagsDeploy(t *testing.T) {
 	config.CFG.ShowWarnings.SetHomeString("true")
 	mockClient := new(astro_mocks.Client)
 
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+	ctx.Token = "test testing"
+	err = ctx.SetContext()
+	assert.NoError(t, err)
+
+	mockDeplyResp := []astro.Deployment{
+		{
+			ID:             "test-id",
+			ReleaseName:    "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
+		},
+		{
+			ID:             "test-id-2",
+			ReleaseName:    "test-name-2",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
+		},
+	}
+
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+
 	deployInput := InputDeploy{
 		Path:           "./testfiles/",
 		RuntimeID:      "test-id",
@@ -517,7 +552,7 @@ func TestNoDagsDeploy(t *testing.T) {
 		Prompt:         true,
 		Dags:           true,
 	}
-	err := Deploy(deployInput, mockClient)
+	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
