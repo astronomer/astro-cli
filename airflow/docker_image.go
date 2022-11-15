@@ -357,7 +357,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		}
 	}
 
-	fmt.Println("\nSee the output of this command for errors. To view task logs, use the --task-logs` flag.")
+	fmt.Println("\nSee the output of this command for errors. To view task logs, use the '--task-logs' flag.")
 	return cmdErr
 }
 

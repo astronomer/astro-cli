@@ -176,14 +176,16 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 		if err != nil {
 			fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 		}
+		defer func() {
+		        // remove astro-run-dag from requirments.txt
+		        err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
+		        if err != nil {
+			        fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+		        }
+		}
 		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
 		if err != nil {
 			return err
-		}
-		// remove astro-run-dag from requirments.txt
-		err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
-		if err != nil {
-			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
 		}
 	} else {
 		// skip build if an imageName is passed

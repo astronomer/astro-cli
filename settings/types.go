@@ -63,7 +63,7 @@ type AirflowPools []struct {
 
 // types for creating variables and connections yaml files
 
-type VariablesYAML struct {
+type DAGRunVariables struct {
 	VarYAMLs `mapstructure:"connections" yaml:"variables"`
 }
 
@@ -74,7 +74,7 @@ type VarYAML struct {
 	Value string `mapstructure:"value" yaml:"value"`
 }
 
-type ConnectionsYAML struct {
+type DAGRunConnections struct {
 	ConnYAMLs `mapstructure:"connections" yaml:"connections"`
 }
 
