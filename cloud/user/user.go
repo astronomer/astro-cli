@@ -59,33 +59,6 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 	return nil
 }
 
-// // getOrganizationID derives the organizationID of the user creating an invite
-// // It gets the Invitor's current workspace and returns the workspace.OrganizationID
-// func getOrganizationID(client astro.Client) (string, error) {
-// 	var (
-// 		currentWorkspaceID string
-// 		invitorWorkspace   astro.Workspace
-// 		err                error
-// 		ctx                config.Context
-// 	)
-
-// 	// get invitor's current workspace ID
-// 	ctx, err = context.GetCurrentContext()
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	// get the invitor's workspace
-// 	currentWorkspaceID = ctx.Workspace
-// 	invitorWorkspace, err = client.GetWorkspace(currentWorkspaceID)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	// return the invitor's organizationID
-// 	return invitorWorkspace.OrganizationID, nil
-// }
-
 // IsRoleValid checks if the requested role is valid
 // If the role is valid, it returns nil
 // error errInvalidRole is returned if the role is not valid
