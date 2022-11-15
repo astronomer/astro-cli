@@ -79,7 +79,6 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	}
 
 	// run auth setup for any command that requires auth
-
 	apiKey, err := checkAPIKeys(client, coreClient, args)
 	if err != nil {
 		fmt.Println(err)
@@ -88,7 +87,15 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	if apiKey {
 		return nil
 	}
-	return checkToken(client, coreClient, os.Stdout)
+	err = checkToken(client, coreClient, os.Stdout)
+	if err != nil {
+		return err
+	}
+	err = migrateCloudConfig(coreClient)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {

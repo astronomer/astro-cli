@@ -17,7 +17,7 @@ build:
 	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
 core_api_gen:
-    oapi-codegen -include-tags=User,Organization,Invite -generate=types,client -package=astrocore ../astro/apps/core/docs/public/public_v1alpha1.yaml > ./astro-client-core/api.gen.go
+	oapi-codegen -include-tags=User,Organization,Invite -generate=types,client -package=astrocore ../astro/apps/core/docs/public/public_v1alpha1.yaml > ./astro-client-core/api.gen.go
 
 test:
 	go test -count=1 -cover ./...

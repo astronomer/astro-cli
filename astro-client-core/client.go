@@ -25,16 +25,16 @@ func requestEditor(httpContext http_context.Context, req *http.Request) error {
 }
 
 // create api client for astro core services
-func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
+func NewCoreClient(c *httputil.HTTPClient) (*ClientWithResponses, error) {
 	currentCtx, err := context.GetCurrentContext()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	cl, err := NewClientWithResponses(currentCtx.GetPublicRESTAPIURL(), WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return cl
+	return cl, nil
 }
 
 func NormalizeApiError(httpResp *http.Response, body []byte, err error) error {

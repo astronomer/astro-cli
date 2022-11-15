@@ -31,7 +31,7 @@ func newTableOut() *printutil.Table {
 	}
 }
 
-func listOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
+func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
 	resp, err := coreClient.ListOrganizationsWithResponse(context.Background())
 	err = astrocore.NormalizeApiError(resp.HTTPResponse, resp.Body, err)
 	if err != nil {
@@ -47,7 +47,7 @@ func List(out io.Writer, coreClient astrocore.CoreClient) error {
 	if err != nil {
 		return err
 	}
-	or, err := listOrganizations(coreClient)
+	or, err := ListOrganizations(coreClient)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -83,7 +83,7 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (s
 		return "", err
 	}
 
-	or, err := listOrganizations(coreClient)
+	or, err := ListOrganizations(coreClient)
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +122,7 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 			return err
 		}
 	} else {
-		or, err := listOrganizations(coreClient)
+		or, err := ListOrganizations(coreClient)
 		if err != nil {
 			return err
 		}

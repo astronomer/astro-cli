@@ -41,7 +41,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
-	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
+	astroCoreClient, _ := astrocore.NewCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
