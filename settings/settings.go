@@ -615,7 +615,7 @@ func WriteAirflowSettingstoYAML(settingsFile string) error {
 		connYAMLs = append(connYAMLs, newConnYAML)
 	}
 
-	connectionsYAML := ConnectionsYAML{
+	connectionsYAML := DAGRunConnections{
 		ConnYAMLs: connYAMLs,
 	}
 
@@ -641,7 +641,7 @@ func WriteAirflowSettingstoYAML(settingsFile string) error {
 		varYAMLs = append(varYAMLs, newVarYAML)
 	}
 
-	variablesYAML := VariablesYAML{
+	variablesYAML := DAGRunVariables{
 		VarYAMLs: varYAMLs,
 	}
 
