@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	dagID     string
-	taskLogs  bool
+	dagID    string
+	taskLogs bool
 )
 
 func newRunCommand() *cobra.Command {
