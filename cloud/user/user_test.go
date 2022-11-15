@@ -15,9 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	errorInvite = errors.New("test-inv-error")
-)
+var errorInvite = errors.New("test-inv-error")
 
 type testWriter struct {
 	Error error

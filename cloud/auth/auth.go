@@ -324,9 +324,9 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	orgs := *orgsResp.JSON200
 	// default to first one in case something crazy happen lol
 	activeOrg := orgs[0]
-	for _, o := range orgs {
-		if o.Id == authOrgID {
-			activeOrg = o
+	for i := range orgs {
+		if orgs[i].Id == authOrgID {
+			activeOrg = orgs[i]
 			break
 		}
 	}

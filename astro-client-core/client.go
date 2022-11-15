@@ -12,9 +12,9 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-var (
-	RequestError = errors.New("failed to perform request")
-)
+var ErrorRequest = errors.New("failed to perform request")
+
+var ErrorServer = errors.New("server error")
 
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
@@ -41,19 +41,19 @@ func NewCoreClient(c *httputil.HTTPClient) (*ClientWithResponses, error) {
 	return cl, nil
 }
 
-const HttpStatus200 = 200
+const HTTPStatus200 = 200
 
 func NormalizeAPIError(httpResp *http.Response, body []byte, err error) error {
 	if err != nil {
 		return err
 	}
-	if httpResp.StatusCode != HttpStatus200 {
+	if httpResp.StatusCode != HTTPStatus200 {
 		decode := Error{}
 		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
 		if err != nil {
-			return fmt.Errorf("%w, status %d", RequestError, httpResp.StatusCode)
+			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
 		}
-		return errors.New(decode.Message)
+		return fmt.Errorf("%w, %s", ErrorServer, decode.Message)
 	}
 	return nil
 }

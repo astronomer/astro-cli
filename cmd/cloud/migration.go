@@ -8,9 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 )
 
-var (
-	ErrorShortName = errors.New("cannot find organization shortname")
-)
+var ErrorShortName = errors.New("cannot find organization shortname")
 
 // migrate config
 func migrateCloudConfig(coreClient astrocore.CoreClient) error {
@@ -25,9 +23,9 @@ func migrateCloudConfig(coreClient astrocore.CoreClient) error {
 			return err
 		}
 		shortName := ""
-		for _, o := range orgs {
-			if o.Id == ctx.Organization {
-				shortName = o.ShortName
+		for i := range orgs {
+			if orgs[i].Id == ctx.Organization {
+				shortName = orgs[i].ShortName
 				break
 			}
 		}

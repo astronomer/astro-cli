@@ -15,6 +15,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 
@@ -277,21 +278,18 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	if err != nil {
 		return false, err
 	}
-
-	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body, err)
+	orgs, err := organization.ListOrganizations(coreClient)
 	if err != nil {
 		return false, err
 	}
-	orgs := *resp.JSON200
 	org := orgs[0]
-	orgId := org.Id
+	orgID := org.Id
 	orgShortName := org.ShortName
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
 		// get workspace ID
-		deployments, err := astroClient.ListDeployments(orgId, "")
+		deployments, err := astroClient.ListDeployments(orgID, "")
 		if err != nil {
 			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}
@@ -302,7 +300,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetContextKey("organization", orgId) // c.Organization
+	err = c.SetContextKey("organization", orgID) // c.Organization
 	if err != nil {
 		fmt.Println("no organization set")
 	}
