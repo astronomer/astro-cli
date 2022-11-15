@@ -181,6 +181,11 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 		if err != nil {
 			return err
 		}
+		// remove astro-run-dag from requirments.txt
+		err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
+		if err != nil {
+			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+		}
 	} else {
 		// skip build if an imageName is passed
 		err := d.imageHandler.TagLocalImage(imageName)
