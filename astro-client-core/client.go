@@ -7,14 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-var ErrorRequest = errors.New("failed to perform request")
-
-var ErrorServer = errors.New("server error")
+var (
+	ErrorRequest = errors.New("failed to perform request")
+	ErrorBaseURL = errors.New("invalid baseurl")
+	ErrorServer  = errors.New("server error")
+)
 
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
@@ -24,21 +27,21 @@ func requestEditor(httpContext http_context.Context, req *http.Request) error {
 	if err != nil {
 		return nil
 	}
+	baseURL := currentCtx.GetPublicRESTAPIURL()
+	url, err := url.Parse(baseURL + req.URL.String())
+	if err != nil {
+		return fmt.Errorf("%w, %s", ErrorBaseURL, baseURL)
+	}
+	req.URL = url
 	req.Header.Add("authorization", currentCtx.Token)
 	return nil
 }
 
 // create api client for astro core services
-func NewCoreClient(c *httputil.HTTPClient) (*ClientWithResponses, error) {
-	currentCtx, err := context.GetCurrentContext()
-	if err != nil {
-		return nil, err
-	}
-	cl, err := NewClientWithResponses(currentCtx.GetPublicRESTAPIURL(), WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
-	if err != nil {
-		return nil, err
-	}
-	return cl, nil
+func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
+	// we append base url in request editor, so set to an empty string here
+	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
+	return cl
 }
 
 const HTTPStatus200 = 200
