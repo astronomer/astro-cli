@@ -96,7 +96,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		_, err := getOrganizationSelection(buf, mockClient)
-		assert.Contains(t, err.Error(), "could not retrieve organization list:")
+		assert.Contains(t, err.Error(), "failed to fetch organizations")
 	})
 
 	t.Run("get organization selection select error", func(t *testing.T) {
