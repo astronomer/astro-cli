@@ -47,7 +47,7 @@ const (
 	catVarFile            = "cat tmp.var"
 	rmVarFile             = "rm tmp.var"
 	catConnFile           = "cat tmp.connections"
-	configReadErrorMsg    = "Error reading config in home dir: %s\n"
+	configReadErrorMsg    = "Error reading Airflow Settings file. Connections, Variables, and Pools were not loaded please check your Settings file syntax: %s\n"
 	noColorString         = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
 )
 

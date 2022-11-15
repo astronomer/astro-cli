@@ -81,8 +81,8 @@ type ConnectionsYAML struct {
 type ConnYAMLs []ConnYAML
 
 type ConnYAML struct {
-	ConnID   string      `mapstructure:"conn_id" yaml:"conn_id"`
-	ConnType string      `mapstructure:"conn_type" yaml:"conn_type"`
+	ConnID   string      `yaml:"conn_id"`
+	ConnType string      `yaml:"conn_type"`
 	Host     string      `yaml:"host"`
 	Schema   string      `yaml:"schema"`
 	Login    string      `yaml:"login"`

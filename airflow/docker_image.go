@@ -337,7 +337,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		"test-dag",
 		"./dags/",
 		dagID,
-		"/usr/local/airflow/connections.yaml",
+		"./connections.yaml",
 		"/usr/local/airflow/variables.yaml",
 	}
 	args = append(args, cmdArgs...)
