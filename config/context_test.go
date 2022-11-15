@@ -183,6 +183,16 @@ func TestSetContextKey(t *testing.T) {
 	assert.Equal(t, "test", outCtx.Token)
 }
 
+func TestSetOrganizationContext(t *testing.T) {
+	initTestConfig()
+	ctx := Context{Domain: "localhost"}
+	ctx.SetOrganizationContext("org1", "org_short_name_1")
+	outCtx, err := ctx.GetContext()
+	assert.NoError(t, err)
+	assert.Equal(t, "org1", outCtx.Organization)
+	assert.Equal(t, "org_short_name_1", outCtx.OrganizationShortName)
+}
+
 func TestExpiresIn(t *testing.T) {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}

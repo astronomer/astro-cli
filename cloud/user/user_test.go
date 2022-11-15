@@ -9,6 +9,7 @@ import (
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/stretchr/testify/mock"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -73,6 +74,20 @@ func TestCreateInvite(t *testing.T) {
 		assert.ErrorIs(t, err, ErrInvalidRole)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		err = CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.ErrorIs(t, err, ErrNoShortName)
+	})
+
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOutMessage := ""
