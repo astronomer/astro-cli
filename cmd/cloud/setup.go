@@ -279,7 +279,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	}
 
 	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
-	err = astrocore.NormalizeApiError(resp.HTTPResponse, resp.Body, err)
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body, err)
 	if err != nil {
 		return false, err
 	}

@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	ErrNoShortName  = errors.New("cannot retrieve organization short name from context")
 	ErrInvalidRole  = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidEmail = errors.New("no email provided for the invite. Retry with a valid email address")
 )
@@ -38,7 +39,7 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 		return err
 	}
 	if ctx.OrganizationShortName == "" {
-		return fmt.Errorf("cannot retrieve organization short name from context")
+		return ErrNoShortName
 	}
 	userInviteInput = astrocore.CreateUserInviteRequest{
 		InviteeEmail: email,
@@ -50,7 +51,7 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 		return err
 	}
 	resp, err := client.CreateUserInviteWithBodyWithResponse(http_context.Background(), ctx.OrganizationShortName, "application/json", bytes.NewReader(buf))
-	err = astrocore.NormalizeApiError(resp.HTTPResponse, resp.Body, err)
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body, err)
 	if err != nil {
 		return err
 	}

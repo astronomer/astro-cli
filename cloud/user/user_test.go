@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	errorWorkspace = errors.New("could not get workspace: test-ws-error")
-	errorInvite    = errors.New("test-inv-error")
+	errorInvite = errors.New("test-inv-error")
 )
 
 type testWriter struct {

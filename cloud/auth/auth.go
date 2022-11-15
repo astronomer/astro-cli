@@ -310,14 +310,14 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	selfResp, err := coreClient.GetSelfUserWithResponse(http_context.Background(), &astrocore.GetSelfUserParams{
 		CreateIfNotExist: &createIfNotExist,
 	})
-	err = astrocore.NormalizeApiError(selfResp.HTTPResponse, selfResp.Body, err)
+	err = astrocore.NormalizeAPIError(selfResp.HTTPResponse, selfResp.Body, err)
 	if err != nil {
 		return err
 	}
-	authOrgId := *selfResp.JSON200.OrganizationId
+	authOrgID := *selfResp.JSON200.OrganizationId
 	// fetch all orgs that the user can access
 	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
-	err = astrocore.NormalizeApiError(orgsResp.HTTPResponse, orgsResp.Body, err)
+	err = astrocore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body, err)
 	if err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	// default to first one in case something crazy happen lol
 	activeOrg := orgs[0]
 	for _, o := range orgs {
-		if o.Id == authOrgId {
+		if o.Id == authOrgID {
 			activeOrg = o
 			break
 		}
