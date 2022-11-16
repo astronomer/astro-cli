@@ -52,6 +52,10 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
+	// If the user is using flow commands no need to go through auth setup.
+	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
 
 	// help command does not need auth setup
 	if cmd.CalledAs() == "help" && cmd.Parent().Use == topLvlCmd {
@@ -152,7 +156,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 
 	client := &http.Client{}
 
-	r, err := http.NewRequestWithContext(http_context.Background(), "POST", addr, strings.NewReader(data.Encode())) // URL-encoded payload
+	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {
 		log.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
@@ -189,26 +193,28 @@ func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 		return false, nil
 	}
 	fmt.Println("Using an Astro API key")
-	// set context
-	domain := "astronomer.io"
-
-	if !context.Exists(domain) {
-		err := context.SetContext(domain)
-		if err != nil {
-			return false, err
-		}
-
-		// Switch context
-		err = context.Switch(domain)
-		if err != nil {
-			return false, err
-		}
-	}
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
-		return false, err
+		// set context
+		domain := "astronomer.io"
+		if !context.Exists(domain) {
+			err := context.SetContext(domain)
+			if err != nil {
+				return false, err
+			}
+
+			// Switch context
+			err = context.Switch(domain)
+			if err != nil {
+				return false, err
+			}
+		}
+		c, err = context.GetContext(domain) // get current context
+		if err != nil {
+			return false, err
+		}
 	}
 
 	authConfig, err := auth.ValidateDomain(c.Domain)
@@ -229,10 +235,12 @@ func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 		Data:    []byte(data.Encode()),
 		Context: http_context.Background(),
 		Headers: map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
 
 	// execute request
-	res, err := client.Do("POST", addr, doOptions)
+	res, err := client.Do(doOptions)
 	if err != nil {
 		log.Fatal(err)
 		return false, fmt.Errorf("cannot getaccess token with API keys: %w", err)

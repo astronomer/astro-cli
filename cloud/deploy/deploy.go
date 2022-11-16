@@ -49,6 +49,7 @@ const (
 	parseAndPytest     = "parse-and-all-tests"
 	enableDagDeployMsg = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
 	dagDeployDisabled  = "dag deploy is not enabled for deployment"
+	invalidWorkspaceID = "Invalid workspace id %s was provided through the --workspace-id flag\n"
 )
 
 var (
@@ -249,21 +250,22 @@ func Deploy(deployInput *InputDeploy, client astro.Client) error { //nolint
 		return err
 	}
 
+	if deployInput.WsID != deployInfo.workspaceID {
+		fmt.Printf(invalidWorkspaceID, deployInput.WsID)
+		return nil
+	}
+
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
 	if deployInput.Dags {
-		if !deployInfo.dagDeployEnabled {
-			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
-		}
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
 			if !i {
-				fmt.Println("Canceling dag deploy...")
+				fmt.Println("Canceling deploy...")
 				return nil
 			}
 		}
-
 		if deployInput.Pytest != "" {
 			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 			if err != nil {
@@ -274,6 +276,10 @@ func Deploy(deployInput *InputDeploy, client astro.Client) error { //nolint
 			if err != nil {
 				return err
 			}
+		}
+
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
@@ -294,7 +300,46 @@ func Deploy(deployInput *InputDeploy, client astro.Client) error { //nolint
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 {
 			fmt.Println("No DAGs found. Skipping DAG deploy.")
 		}
-		err := deployImage(&c, deployInput, deployInfo, client)
+
+		// Build our image
+		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
+		if err != nil {
+			return err
+		}
+
+		err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+		if err != nil {
+			return err
+		}
+
+		// Create the image
+		imageCreateInput := astro.CreateImageInput{
+			Tag:          version,
+			DeploymentID: deployInfo.deploymentID,
+		}
+		imageCreateRes, err := client.CreateImage(imageCreateInput)
+		if err != nil {
+			return err
+		}
+
+		nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
+		registry := getRegistryURL(domain)
+		repository := registry + "/" + deployInfo.organizationID + "/" + deployInfo.deploymentID
+		// TODO: Resolve the edge case where two people push the same nextTag at the same time
+		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
+
+		token := c.Token
+		// Splitting out the Bearer part from the token
+		splittedToken := strings.Split(token, " ")[1]
+
+		imageHandler := airflowImageHandler(deployInfo.deployImage)
+		err = imageHandler.Push(registry, registryUsername, splittedToken, remoteImage)
+		if err != nil {
+			return err
+		}
+
+		// Deploy the image
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
@@ -458,8 +503,19 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
 	// flag to determine if we are setting the dags folder in dockerignore
 	dagsIgnoreSet := false
+	// flag to determine if dockerignore file was created on runtime
+	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	fileExist, _ := fileutil.Exists(fullpath, nil)
+	if !fileExist {
+		// Create a dockerignore file and add the dags folder entry
+		err := fileutil.WriteStringToFile(fullpath, "dags/")
+		if err != nil {
+			return err
+		}
+		dockerIgnoreCreate = true
+	}
 	lines, err := fileutil.Read(fullpath)
 	if err != nil {
 		return err
@@ -484,6 +540,14 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	if err != nil {
 		return err
 	}
+
+	defer func() {
+		// remove created docker ignore file
+		if dockerIgnoreCreate {
+			os.Remove(fullpath)
+		}
+	}()
+
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
 		f, err := os.Open(fullpath)

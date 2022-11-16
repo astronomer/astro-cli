@@ -42,8 +42,7 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
+func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},

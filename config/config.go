@@ -75,6 +75,7 @@ var (
 		SkipParse:            newCfg("skip_parse", "false"),
 		Interactive:          newCfg("interactive", "false"),
 		PageSize:             newCfg("page_size", "20"),
+		SQLCLI:               newCfg("beta.sql_cli", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory

@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -43,6 +45,7 @@ var (
 	pools                  bool
 	envExport              bool
 	noBrowser              bool
+	waitTime               time.Duration
 	RunExample             = `
 # Create default admin user.
 astro dev run users create -r Admin -u admin -e admin@example.com -f admin -l user -p admin
@@ -128,16 +131,25 @@ func newAirflowInitCmd() *cobra.Command {
 		RunE: airflowInit,
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
-	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+	var err error
+	var avoidACFlag bool
 
-	if !context.IsCloudContext() {
+	// In case user is connected to Astronomer Platform and is connected to older version of platform
+	if context.IsCloudContext() || houstonVersion == "" || (!context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.29.0"})) {
+		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Specify a version of Astro Runtime that you want to create an Astro project with. If not specified, the latest is assumed. You can change this version in your Dockerfile at any time.")
+	} else { // default to using AC flag, since runtime is not available for these cases
+		useAstronomerCertified = true
+		avoidACFlag = true
+	}
+
+	if !context.IsCloudContext() && !avoidACFlag {
 		cmd.Example = initSoftwareExample
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 	}
 
-	_, err := context.GetCurrentContext()
-	if err != nil { // Case when user is not logged in to any platform
+	_, err = context.GetCurrentContext()
+	if err != nil && !avoidACFlag { // Case when user is not logged in to any platform
 		cmd.Flags().BoolVarP(&useAstronomerCertified, "use-astronomer-certified", "", false, "If specified, initializes a project using Astronomer Certified Airflow image instead of Astro Runtime.")
 		_ = cmd.Flags().MarkHidden("use-astronomer-certified")
 	}
@@ -162,6 +174,8 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
+	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
+
 	return cmd
 }
 
@@ -492,7 +506,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser)
+	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser, waitTime)
 }
 
 // airflowRun
@@ -602,7 +616,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// don't startup browser on restart
 	noBrowser = true
 
-	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser)
+	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser, waitTime)
 }
 
 // run pytest on an airflow project

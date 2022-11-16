@@ -109,7 +109,7 @@ func TestDeleteDeployment(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		deployment, err := api.DeleteDeployment("deployment-id", false)
+		deployment, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
 		assert.NoError(t, err)
 		assert.Equal(t, deployment, mockDeployment.Data.DeleteDeployment)
 	})
@@ -124,7 +124,7 @@ func TestDeleteDeployment(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.DeleteDeployment("deployment-id", false)
+		_, err := api.DeleteDeployment(DeleteDeploymentRequest{"deployment-id", false})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -400,7 +400,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		deploymentConfig, err := api.GetDeploymentConfig()
+		deploymentConfig, err := api.GetDeploymentConfig(nil)
 		assert.NoError(t, err)
 		assert.Equal(t, *deploymentConfig, mockDeploymentConfig.Data.DeploymentConfig)
 	})
@@ -415,7 +415,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetDeploymentConfig()
+		_, err := api.GetDeploymentConfig(nil)
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -601,7 +601,7 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		assert.NoError(t, err)
 	})
 
@@ -615,7 +615,7 @@ func TestUpdateDeploymentImage(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
+		_, err := api.UpdateDeploymentImage(UpdateDeploymentImageRequest{ReleaseName: mockDeployment.Data.UpdateDeploymentImage.ReleaseName, AirflowVersion: mockDeployment.Data.UpdateDeploymentImage.AirflowVersion})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

@@ -83,7 +83,7 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -113,7 +113,7 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 	appConfig = &houston.AppConfig{TriggererEnabled: false}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -145,7 +145,7 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 		},
 	}
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -177,7 +177,7 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(2)
 
 	myTests := []struct {
@@ -210,7 +210,7 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil).Times(5)
 
 	myTests := []struct {
@@ -244,7 +244,7 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -275,7 +275,7 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Twice()
 
 	myTests := []struct {
@@ -309,7 +309,7 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil).Times(8)
 
 	myTests := []struct {
@@ -350,7 +350,7 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 	api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 	myTests := []struct {
@@ -387,7 +387,7 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentAirflow", mockUpdateRequest).Return(&mockDeploymentResponse, nil)
 
@@ -419,7 +419,7 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 	mockDeploymentUpdated.DesiredAirflowVersion = mockDeploymentUpdated.AirflowVersion
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
 	api.On("GetDeployment", mockDeploymentResponse.ID).Return(&mockDeploymentResponse, nil)
 	api.On("UpdateDeploymentAirflow", expectedUpdateRequest).Return(&mockDeploymentUpdated, nil)
 
@@ -439,8 +439,8 @@ func TestDeploymentDelete(t *testing.T) {
 	expectedOut := `Successfully deleted deployment`
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("DeleteDeployment", mockDeployment.ID, false).Return(mockDeployment, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(mockDeployment, nil)
 
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", mockDeployment.ID)
@@ -471,7 +471,7 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
 
 	// mock os.Stdin
 	input := []byte("n")
@@ -505,8 +505,8 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(appConfig, nil)
-	api.On("DeleteDeployment", mockDeployment.ID, true).Return(mockDeployment, nil)
+	api.On("GetAppConfig", nil).Return(appConfig, nil)
+	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
 
 	// mock os.Stdin
 	input := []byte("y")

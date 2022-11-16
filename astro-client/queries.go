@@ -57,9 +57,6 @@ var (
 				image {
 					tag
 				}
-				workers {
-					au
-				}
 				scheduler {
 					au
 					replicas
@@ -101,9 +98,6 @@ var (
 			deploymentSpec {
 				image {
 					tag
-				}
-				workers {
-					au
 				}
 				scheduler {
 					au

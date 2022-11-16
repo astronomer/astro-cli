@@ -38,7 +38,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.AddWorkspaceTeam("workspace-id", "team-id", "role")
+		response, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.AddWorkspaceTeam)
 	})
@@ -53,7 +53,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.AddWorkspaceTeam("workspace-id", "team-id", "role")
+		_, err := api.AddWorkspaceTeam(AddWorkspaceTeamRequest{"workspace-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -85,7 +85,7 @@ func TestDeleteWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.DeleteWorkspaceTeam("workspace-id", "user-id")
+		response, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.RemoveWorkspaceTeam)
 	})
@@ -100,7 +100,7 @@ func TestDeleteWorkspaceTeam(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.DeleteWorkspaceTeam("workspace-id", "user-id")
+		_, err := api.DeleteWorkspaceTeam(DeleteWorkspaceTeamRequest{"workspace-id", "user-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -173,7 +173,7 @@ func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.UpdateWorkspaceTeamRole("workspace-id", "team-id", WorkspaceAdminRole)
+		response, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", WorkspaceAdminRole})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.WorkspaceUpdateTeamRole)
 	})
@@ -188,7 +188,7 @@ func TestUpdateWorkspaceTeamAndRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.UpdateWorkspaceTeamRole("workspace-id", "team-id", "role")
+		_, err := api.UpdateWorkspaceTeamRole(UpdateWorkspaceTeamRoleRequest{"workspace-id", "team-id", "role"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }
@@ -210,7 +210,7 @@ func TestGetWorkspaceTeamRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.GetWorkspaceTeamRole("workspace-id", "team-id")
+		response, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, response)
 	})
@@ -225,7 +225,7 @@ func TestGetWorkspaceTeamRole(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.GetWorkspaceTeamRole("workspace-id", "team-id")
+		_, err := api.GetWorkspaceTeamRole(GetWorkspaceTeamRoleRequest{"workspace-id", "team-id"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

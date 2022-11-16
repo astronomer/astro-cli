@@ -109,7 +109,7 @@ func TestListError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := List(astroAPI, buf)
-	assert.EqualError(t, err, "Cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: API error (500): Internal Server Error")
+	assert.EqualError(t, err, "Cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: Error processing GraphQL request: API error (500): Internal Server Error")
 }
 
 func TestGetWorkspaceSelection(t *testing.T) {

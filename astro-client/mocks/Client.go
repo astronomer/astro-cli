@@ -3,7 +3,10 @@
 package astro_mocks
 
 import (
+	io "io"
+
 	astro "github.com/astronomer/astro-cli/astro-client"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -177,6 +180,29 @@ func (_m *Client) GetDeploymentHistory(vars map[string]interface{}) (astro.Deplo
 	var r1 error
 	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
 		r1 = rf(vars)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetOrganizationAuditLogs provides a mock function with given fields: orgName, earliest
+func (_m *Client) GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error) {
+	ret := _m.Called(orgName, earliest)
+
+	var r0 io.ReadCloser
+	if rf, ok := ret.Get(0).(func(string, int) io.ReadCloser); ok {
+		r0 = rf(orgName, earliest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, int) error); ok {
+		r1 = rf(orgName, earliest)
 	} else {
 		r1 = ret.Error(1)
 	}
