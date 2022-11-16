@@ -68,6 +68,7 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(getContainerWaitResponse(false))
 		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
+		mockDockerBinder.On("ContainerRemove", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockDockerBinder, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
@@ -233,4 +234,24 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 	mockDockerBinder.AssertExpectations(t)
 	DisplayMessages = displayMessages
 	IoCopy = io.Copy
+}
+
+func TestContainerRemoveFailure(t *testing.T) {
+	mockDockerBinder := new(mocks.DockerBind)
+	DockerClientInit = func() (DockerBind, error) {
+		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
+		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
+		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(getContainerWaitResponse(false))
+		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
+		mockDockerBinder.On("ContainerRemove", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
+		return mockDockerBinder, nil
+	}
+	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
+		return 0, nil
+	}
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	expectedErr := fmt.Errorf("docker remove failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+	mockDockerBinder.AssertExpectations(t)
 }

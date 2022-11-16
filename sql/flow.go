@@ -152,5 +152,9 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return fmt.Errorf("docker logs forwarding failed %w", err)
 	}
 
+	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
+		return fmt.Errorf("docker remove failed %w", err)
+	}
+
 	return nil
 }
