@@ -21,29 +21,29 @@ var (
 	errMarshal       = errors.New("test error")
 )
 
-type deploymentInfo struct {
+type deploymentMetadata struct {
 	DeploymentID   string    `mapstructure:"deployment_id"`
 	WorkspaceID    string    `mapstructure:"workspace_id"`
 	ClusterID      string    `mapstructure:"cluster_id"`
-	AirflowVersion string    `mapstructure:"airflow_version"`
 	ReleaseName    string    `mapstructure:"release_name"`
+	AirflowVersion string    `mapstructure:"airflow_version"`
+	Status         string    `mapstructure:"status"`
+	CreatedAt      time.Time `mapstructure:"created_at"`
+	UpdatedAt      time.Time `mapstructure:"updated_at"`
 	DeploymentURL  string    `mapstructure:"deployment_url"`
 	WebserverURL   string    `mapstructure:"webserver_url"`
-	UpdatedAt      time.Time `mapstructure:"updated_at"`
-	CreatedAt      time.Time `mapstructure:"created_at"`
-	Status         string    `mapstructure:"status"`
 }
 
 type deploymentConfig struct {
-	Name              string                   `mapstructure:"name"`
-	Description       string                   `mapstructure:"description"`
-	ClusterID         string                   `mapstructure:"cluster_id"` // this is also in deploymentInfo
-	RunTimeVersion    string                   `mapstructure:"runtime_version"`
-	SchedulerAU       int                      `mapstructure:"scheduler_au"`
-	SchedulerReplicas int                      `mapstructure:"scheduler_replicas"`
-	AlertEmails       []string                 `mapstructure:"alert_emails"`
-	WorkerQueues      []map[string]interface{} `mapstructure:"worker_queues"`
-	AstroVariables    []map[string]interface{} `mapstructure:"astronomer_variables"`
+	Name           string                   `mapstructure:"name"`
+	Description    string                   `mapstructure:"description"`
+	RunTimeVersion string                   `mapstructure:"runtime_version"`
+	SchedulerAU    int                      `mapstructure:"scheduler_au"`
+	SchedulerCount int                      `mapstructure:"scheduler_count"`
+	ClusterID      string                   `mapstructure:"cluster_id"` // this is also in deploymentMetadata
+	AlertEmails    []string                 `mapstructure:"alert_emails"`
+	WorkerQueues   []map[string]interface{} `mapstructure:"worker_queues"`
+	AstroVariables []map[string]interface{} `mapstructure:"environment_variables"`
 }
 
 func errReturningYAMLMarshal(v interface{}) ([]byte, error) {
@@ -298,11 +298,11 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 	}
 
 	t.Run("returns deployment Info for the requested cloud deployment", func(t *testing.T) {
-		var actualDeploymentInfo deploymentInfo
+		var actualDeploymentInfo deploymentMetadata
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
-		expectedDeploymentInfo := deploymentInfo{
+		expectedDeploymentMetadata := deploymentMetadata{
 			DeploymentID:   sourceDeployment.ID,
 			WorkspaceID:    sourceDeployment.Workspace.ID,
 			ClusterID:      sourceDeployment.Cluster.ID,
@@ -318,41 +318,41 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		assert.NoError(t, err)
 		err = mapstructure.Decode(rawDeploymentInfo, &actualDeploymentInfo)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentInfo, actualDeploymentInfo)
+		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
 	})
 	t.Run("returns deployment Info for the requested local deployment", func(t *testing.T) {
-		var actualDeploymentInfo deploymentInfo
+		var actualDeploymentInfo deploymentMetadata
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
-		expectedDeploymentInfo := deploymentInfo{
+		expectedDeploymentMetadata := deploymentMetadata{
 			DeploymentID:   sourceDeployment.ID,
 			WorkspaceID:    sourceDeployment.Workspace.ID,
 			ClusterID:      sourceDeployment.Cluster.ID,
-			AirflowVersion: sourceDeployment.RuntimeRelease.AirflowVersion,
 			ReleaseName:    sourceDeployment.ReleaseName,
-			DeploymentURL:  expectedCloudDomainURL,
-			WebserverURL:   sourceDeployment.DeploymentSpec.Webserver.URL,
+			AirflowVersion: sourceDeployment.RuntimeRelease.AirflowVersion,
+			Status:         sourceDeployment.Status,
 			CreatedAt:      sourceDeployment.CreatedAt,
 			UpdatedAt:      sourceDeployment.UpdatedAt,
-			Status:         sourceDeployment.Status,
+			DeploymentURL:  expectedCloudDomainURL,
+			WebserverURL:   sourceDeployment.DeploymentSpec.Webserver.URL,
 		}
 		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
 		assert.NoError(t, err)
 		err = mapstructure.Decode(rawDeploymentInfo, &actualDeploymentInfo)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentInfo, actualDeploymentInfo)
+		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
 	})
 	t.Run("returns error if getting context fails", func(t *testing.T) {
-		var actualDeploymentInfo deploymentInfo
+		var actualDeploymentInfo deploymentMetadata
 		// get an error from GetCurrentContext()
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
-		expectedDeploymentInfo := deploymentInfo{}
+		expectedDeploymentMetadata := deploymentMetadata{}
 		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		err = mapstructure.Decode(rawDeploymentInfo, &actualDeploymentInfo)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentInfo, actualDeploymentInfo)
+		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
 	})
 }
 
@@ -432,15 +432,15 @@ func TestGetDeploymentConfig(t *testing.T) {
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedDeploymentConfig := deploymentConfig{
-			Name:              sourceDeployment.Label,
-			Description:       sourceDeployment.Description,
-			ClusterID:         sourceDeployment.Cluster.ID,
-			RunTimeVersion:    sourceDeployment.RuntimeRelease.Version,
-			SchedulerAU:       sourceDeployment.DeploymentSpec.Scheduler.AU,
-			SchedulerReplicas: sourceDeployment.DeploymentSpec.Scheduler.Replicas,
-			AlertEmails:       nil,
-			WorkerQueues:      nil,
-			AstroVariables:    nil,
+			Name:           sourceDeployment.Label,
+			Description:    sourceDeployment.Description,
+			ClusterID:      sourceDeployment.Cluster.ID,
+			RunTimeVersion: sourceDeployment.RuntimeRelease.Version,
+			SchedulerAU:    sourceDeployment.DeploymentSpec.Scheduler.AU,
+			SchedulerCount: sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+			AlertEmails:    nil,
+			WorkerQueues:   nil,
+			AstroVariables: nil,
 		}
 		rawDeploymentConfig := getDeploymentConfig(&sourceDeployment)
 		err := mapstructure.Decode(rawDeploymentConfig, &actualDeploymentConfig)
@@ -528,11 +528,11 @@ func TestGetPrintableDeployment(t *testing.T) {
 		additional := getAdditional(&sourceDeployment)
 		expectedDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actualDeployment := getPrintableDeployment(info, config, additional)
@@ -578,13 +578,13 @@ func TestGetAdditional(t *testing.T) {
 					Key:       "foo",
 					Value:     "bar",
 					IsSecret:  false,
-					UpdatedAt: "NOW",
+					UpdatedAt: time.Now().String(),
 				},
 				{
 					Key:       "bar",
 					Value:     "baz",
 					IsSecret:  true,
-					UpdatedAt: "NOW+1",
+					UpdatedAt: time.Now().String(),
 				},
 			},
 		},
@@ -616,15 +616,15 @@ func TestGetAdditional(t *testing.T) {
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedDeploymentConfig := deploymentConfig{
-			Name:              "",
-			Description:       "",
-			ClusterID:         "",
-			RunTimeVersion:    "",
-			SchedulerAU:       0,
-			SchedulerReplicas: 0,
-			AlertEmails:       sourceDeployment.AlertEmails,
-			WorkerQueues:      getQMap(sourceDeployment.WorkerQueues),
-			AstroVariables:    getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects),
+			Name:           "",
+			Description:    "",
+			ClusterID:      "",
+			RunTimeVersion: "",
+			SchedulerAU:    0,
+			SchedulerCount: 0,
+			AlertEmails:    sourceDeployment.AlertEmails,
+			WorkerQueues:   getQMap(sourceDeployment.WorkerQueues),
+			AstroVariables: getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects),
 		}
 		rawDeploymentConfig := getAdditional(&sourceDeployment)
 		err := mapstructure.Decode(rawDeploymentConfig, &actualDeploymentConfig)
@@ -712,7 +712,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInspectInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
-		expectedPrintableDeployment = []byte("\n    information:\n")
+		expectedPrintableDeployment = []byte("\n    metadata:\n")
 		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
 		assert.NoError(t, err)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
@@ -722,14 +722,14 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 		expectedPrintableDeployment = []byte("\n    worker_queues:\n")
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n    astronomer_variables:\n")
+		expectedPrintableDeployment = []byte("\n    environment_variables:\n")
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInspectInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
-		expectedPrintableDeployment = []byte(",\n        \"information\":")
+		expectedPrintableDeployment = []byte(",\n        \"metadata\":")
 		actualPrintableDeployment, err := formatPrintableDeployment("json", getPrintableDeployment(info, config, additional))
 		assert.NoError(t, err)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
@@ -739,7 +739,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 		expectedPrintableDeployment = []byte("\n        \"worker_queues\": ")
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n        \"astronomer_variables\": ")
+		expectedPrintableDeployment = []byte("\n        \"environment_variables\": ")
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
 	t.Run("returns an error if marshaling yaml fails", func(t *testing.T) {
@@ -845,14 +845,14 @@ func TestGetSpecificField(t *testing.T) {
 	config := getDeploymentConfig(&sourceDeployment)
 	additional := getAdditional(&sourceDeployment)
 	t.Run("returns a value if key is found in deployment.information", func(t *testing.T) {
-		requestedField := "information.workspace_id"
+		requestedField := "metadata.workspace_id"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
@@ -860,14 +860,14 @@ func TestGetSpecificField(t *testing.T) {
 		assert.Equal(t, sourceDeployment.Workspace.ID, actual)
 	})
 	t.Run("returns a value if key is found in deployment.configuration", func(t *testing.T) {
-		requestedField := "configuration.scheduler_replicas"
+		requestedField := "configuration.scheduler_count"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
@@ -878,26 +878,26 @@ func TestGetSpecificField(t *testing.T) {
 		requestedField := "alert_emails"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.AlertEmails, actual)
 	})
-	t.Run("returns a value if key is astronomer_variables", func(t *testing.T) {
-		requestedField := "astronomer_variables"
+	t.Run("returns a value if key is environment_variables", func(t *testing.T) {
+		requestedField := "environment_variables"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
@@ -908,26 +908,26 @@ func TestGetSpecificField(t *testing.T) {
 		requestedField := "worker_queues"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
 		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues), actual)
 	})
-	t.Run("returns a value if key is information", func(t *testing.T) {
-		requestedField := "information"
+	t.Run("returns a value if key is metadata", func(t *testing.T) {
+		requestedField := "metadata"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
@@ -938,11 +938,11 @@ func TestGetSpecificField(t *testing.T) {
 		requestedField := "Configuration.Cluster_ID"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
 			},
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
@@ -952,11 +952,11 @@ func TestGetSpecificField(t *testing.T) {
 	t.Run("returns error if no value if found", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["astronomer_variables"],
 			},
 		}
 		requestedField := "does-not-exist"
@@ -967,11 +967,11 @@ func TestGetSpecificField(t *testing.T) {
 	t.Run("returns error if incorrect field is requested", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
-				"information":          info,
-				"configuration":        config,
-				"alert_emails":         additional["alert_emails"],
-				"worker_queues":        additional["worker_queues"],
-				"astronomer_variables": additional["astronomer_variables"],
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["astronomer_variables"],
 			},
 		}
 		requestedField := "configuration.does-not-exist"

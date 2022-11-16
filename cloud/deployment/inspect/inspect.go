@@ -91,20 +91,20 @@ func getDeploymentInspectInfo(sourceDeployment *astro.Deployment) (map[string]in
 
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
 	return map[string]interface{}{
-		"name":               sourceDeployment.Label,
-		"description":        sourceDeployment.Description,
-		"cluster_id":         sourceDeployment.Cluster.ID,
-		"runtime_version":    sourceDeployment.RuntimeRelease.Version,
-		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
-		"scheduler_replicas": sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+		"name":            sourceDeployment.Label,
+		"description":     sourceDeployment.Description,
+		"cluster_id":      sourceDeployment.Cluster.ID,
+		"runtime_version": sourceDeployment.RuntimeRelease.Version,
+		"scheduler_au":    sourceDeployment.DeploymentSpec.Scheduler.AU,
+		"scheduler_count": sourceDeployment.DeploymentSpec.Scheduler.Replicas,
 	}
 }
 
 func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	return map[string]interface{}{
-		"alert_emails":         sourceDeployment.AlertEmails,
-		"worker_queues":        getQMap(sourceDeployment.WorkerQueues),
-		"astronomer_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
+		"alert_emails":          sourceDeployment.AlertEmails,
+		"worker_queues":         getQMap(sourceDeployment.WorkerQueues),
+		"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 	}
 }
 
@@ -188,11 +188,11 @@ func getSpecificField(deploymentMap map[string]interface{}, requestedField strin
 func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interface{}) map[string]interface{} {
 	printableDeployment := map[string]interface{}{
 		"deployment": map[string]interface{}{
-			"information":          infoMap,
-			"configuration":        configMap,
-			"alert_emails":         additionalMap["alert_emails"],
-			"worker_queues":        additionalMap["worker_queues"],
-			"astronomer_variables": additionalMap["astronomer_variables"],
+			"metadata":              infoMap,
+			"configuration":         configMap,
+			"alert_emails":          additionalMap["alert_emails"],
+			"worker_queues":         additionalMap["worker_queues"],
+			"environment_variables": additionalMap["environment_variables"],
 		},
 	}
 	return printableDeployment
