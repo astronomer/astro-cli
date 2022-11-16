@@ -32,6 +32,9 @@ var (
 	mockDisplayMessagesErr = func(r io.Reader) error {
 		return errMock
 	}
+	mockIoCopyNil = func(dst io.Writer, src io.Reader) (written int64, err error) {
+		return 0, nil
+	}
 	mockIoCopyErr = func(dst io.Writer, src io.Reader) (written int64, err error) {
 		return 0, errMock
 	}
@@ -247,11 +250,12 @@ func TestContainerRemoveFailure(t *testing.T) {
 		mockDockerBinder.On("ContainerRemove", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
 		return mockDockerBinder, nil
 	}
-	ioCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
-		return 0, nil
-	}
+	IoCopy = mockIoCopyNil
+	DisplayMessages = mockDisplayMessagesNil
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	expectedErr := fmt.Errorf("docker remove failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 	mockDockerBinder.AssertExpectations(t)
+	DisplayMessages = displayMessages
+	IoCopy = io.Copy
 }
