@@ -72,5 +72,4 @@ func TestMigrateOrgShortName(t *testing.T) {
 		err = migrateCloudConfig(mockClient)
 		assert.Contains(t, err.Error(), "cannot find organization shortname")
 	})
-
 }
