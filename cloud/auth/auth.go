@@ -314,10 +314,10 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	if err != nil {
 		return err
 	}
-	activeOrgId := c.Organization
+	activeOrgID := c.Organization
 	// OrganizationId is optional, it may not returned by getSelf api
 	if selfResp.JSON200.OrganizationId != nil {
-		activeOrgId = *selfResp.JSON200.OrganizationId
+		activeOrgID = *selfResp.JSON200.OrganizationId
 	}
 	// fetch all orgs that the user can access
 	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
@@ -329,7 +329,7 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	// default to first one in case something crazy happen lol
 	activeOrg := orgs[0]
 	for i := range orgs {
-		if orgs[i].Id == activeOrgId {
+		if orgs[i].Id == activeOrgID {
 			activeOrg = orgs[i]
 			break
 		}
