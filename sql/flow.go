@@ -104,7 +104,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	cmd = append(cmd, args...)
 	for key, value := range flags {
-		cmd = append(cmd, fmt.Sprintf("--%s %s", key, value))
+		cmd = append(cmd, fmt.Sprintf("--%s", key), value)
 	}
 
 	binds := []string{}
