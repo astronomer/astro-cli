@@ -128,7 +128,7 @@ func TestFlowValidateCmd(t *testing.T) {
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd("validate", projectDir, "--connection", "sqlite_conn")
+	err = execFlowCmd("validate", projectDir, "--connection", "sqlite_conn", "--verbose")
 	assert.NoError(t, err)
 }
 
@@ -137,25 +137,25 @@ func TestFlowGenerateCmd(t *testing.T) {
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir)
+	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--verbose")
 	assert.NoError(t, err)
 }
 
 func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
 	projectDir := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir}...)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"generate", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks"}...)
+	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks")
 	assert.NoError(t, err)
 }
 
 func TestFlowRunGenerateTasksCmd(t *testing.T) {
 	projectDir := t.TempDir()
-	err := execFlowCmd([]string{"init", projectDir}...)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd([]string{"run", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks"}...)
+	err = execFlowCmd("run", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks")
 	assert.NoError(t, err)
 }
 
@@ -174,6 +174,15 @@ func TestFlowRunCmd(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = execFlowCmd("run", "example_templating", "--env", "dev", "--project-dir", projectDir, "--verbose")
+	assert.NoError(t, err)
+}
+
+func TestDebugFlowRunCmd(t *testing.T) {
+	projectDir := t.TempDir()
+	err := execFlowCmd("init", projectDir)
+	assert.NoError(t, err)
+
+	err = execFlowCmd("--debug", "run", "example_templating", "--env", "dev", "--project-dir", projectDir)
 	assert.NoError(t, err)
 }
 
