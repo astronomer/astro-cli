@@ -87,7 +87,7 @@ contexts:
   sql_cli: true
 `
 	case CloudPrPreview:
-		testConfig = fmt.Sprintf(testConfig, "pr1234.cloud.asrtronomer-dev.io", strings.Replace("pr1234.cloud.astronomer-dev.io", ".", "_", -1), "pr1234.cloud.asrtronomer-dev.io")
+		testConfig = fmt.Sprintf(testConfig, "pr1234.astronomer-dev.io", strings.Replace("pr1234.astronomer-dev.io", ".", "_", -1), "pr1234.astronomer-dev.io")
 	case ErrorReturningContext:
 		// this is an error returning case
 		testConfig = fmt.Sprintf(testConfig, "error", "error", "error")

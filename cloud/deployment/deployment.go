@@ -13,6 +13,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -266,13 +267,10 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
-	c, err := config.GetCurrentContext()
+	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
 		return err
 	}
-
-	deploymentURL := "cloud." + c.Domain + "/" + workspaceID + "/deployments/" + d.ID + "/analytics"
-
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully created Deployment: %s", ansi.Bold(d.Label)) +
 		"\n Deployment can be accessed at the following URLs \n" +
 		fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
@@ -706,6 +704,12 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	deploymentURL = "cloud." + ctx.Domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	switch ctx.Domain {
+	case domainutil.LocalDomain:
+		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	default:
+		_, domain := domainutil.GetPRSubDomain(ctx.Domain)
+		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	}
 	return deploymentURL, nil
 }

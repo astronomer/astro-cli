@@ -27,7 +27,7 @@ func isPrPreviewDomain(domain string) bool {
 	return PRPreviewDomainRegex.MatchString(domain)
 }
 
-func getPRSubDomain(domain string) (prSubDomain, restOfDomain string) {
+func GetPRSubDomain(domain string) (prSubDomain, restOfDomain string) {
 	if isPrPreviewDomain(domain) {
 		prSubDomain, domain, _ = strings.Cut(domain, ".")
 	}
@@ -43,7 +43,7 @@ func GetURLToEndpoint(protocol, domain, endpoint string) string {
 		return addr
 	default:
 		if isPrPreviewDomain(domain) {
-			prSubDomain, domain = getPRSubDomain(domain)
+			prSubDomain, domain = GetPRSubDomain(domain)
 			addr = fmt.Sprintf("%s://%s.api.%s/hub/%s", protocol, prSubDomain, domain, endpoint)
 			return addr
 		}

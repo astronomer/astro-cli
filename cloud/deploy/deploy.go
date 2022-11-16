@@ -205,8 +205,10 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		return nil
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
-
+	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
+	if err != nil {
+		return err
+	}
 	if deployInput.Dags {
 		if deployInput.Pytest != "" {
 			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)

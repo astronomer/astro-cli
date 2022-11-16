@@ -92,14 +92,14 @@ func TestIsPrPreviewDomain(t *testing.T) {
 func TestGetPRSubDomain(t *testing.T) {
 	t.Run("returns pr subdomain for a valid PR preview domain", func(t *testing.T) {
 		for i, domainToCheck := range listOfPRURLs {
-			actualPR, actualDomain := getPRSubDomain(domainToCheck)
+			actualPR, actualDomain := GetPRSubDomain(domainToCheck)
 			assert.Equal(t, "astronomer-dev.io", actualDomain)
 			assert.Equal(t, listOfPRs[i], actualPR)
 		}
 	})
 	t.Run("returns empty pr subdomain for domains that are not a PR Preview domain", func(t *testing.T) {
 		for _, domainToCheck := range listOfURLs {
-			actualPRDomain, actualDomain := getPRSubDomain(domainToCheck)
+			actualPRDomain, actualDomain := GetPRSubDomain(domainToCheck)
 			assert.Equal(t, domainToCheck, actualDomain)
 			assert.Equal(t, "", actualPRDomain)
 		}
