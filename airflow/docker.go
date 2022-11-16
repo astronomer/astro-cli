@@ -76,6 +76,8 @@ var (
 	tickNum        = 500
 	startupTimeout time.Duration
 	isM1           = util.IsM1
+
+	composeOverrideFilename = "docker-compose.override.yml"
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -671,6 +673,17 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage str
 		Content:  []byte(yaml),
 	})
 
+	composeBytes, err := os.ReadFile(composeOverrideFilename)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, errors.Wrapf(err, "Failed to open the compose file: %s", composeOverrideFilename)
+	}
+	if err == nil {
+		configs = append(configs, types.ConfigFile{
+			Filename: "docker-compose.override.yml",
+			Content:  composeBytes,
+		})
+	}
+
 	var loadOptions []func(*loader.Options)
 
 	nameLoadOpt := func(opts *loader.Options) {
@@ -687,7 +700,6 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage str
 		ConfigFiles: configs,
 		WorkingDir:  airflowHome,
 	}, loadOptions...)
-
 	return project, err
 }
 
