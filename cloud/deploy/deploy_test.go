@@ -380,6 +380,61 @@ func TestDagsDeploySuccess(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestNoDagsDeploy(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("true")
+	mockClient := new(astro_mocks.Client)
+
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+	ctx.Token = "test testing"
+	err = ctx.SetContext()
+	assert.NoError(t, err)
+
+	mockDeplyResp := []astro.Deployment{
+		{
+			ID:             "test-id",
+			ReleaseName:    "test-name",
+			Workspace:      astro.Workspace{ID: ws},
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
+		},
+		{
+			ID:             "test-id-2",
+			ReleaseName:    "test-name-2",
+			Workspace:      astro.Workspace{ID: ws},
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{
+				Webserver: astro.Webserver{URL: "test-url"},
+			},
+			CreatedAt:        time.Now(),
+			DagDeployEnabled: true,
+		},
+	}
+
+	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
+
+	deployInput := InputDeploy{
+		Path:           "./testfiles/",
+		RuntimeID:      "test-id",
+		WsID:           ws,
+		Pytest:         "",
+		EnvFile:        "",
+		ImageName:      "",
+		DeploymentName: "",
+		Prompt:         true,
+		Dags:           true,
+	}
+	err = Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
+
+	mockClient.AssertExpectations(t)
+}
+
 func TestDagsDeployFailed(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")
@@ -523,57 +578,6 @@ func TestNoDagsDeployVR(t *testing.T) {
 	}
 
 	err := Deploy(deployInput, mockClient)
-	assert.NoError(t, err)
-}
-
-func TestNoDagsDeploy(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	config.CFG.ShowWarnings.SetHomeString("true")
-	mockClient := new(astro_mocks.Client)
-
-	ctx, err := config.GetCurrentContext()
-	assert.NoError(t, err)
-	ctx.Token = "test testing"
-	err = ctx.SetContext()
-	assert.NoError(t, err)
-
-	mockDeplyResp := []astro.Deployment{
-		{
-			ID:             "test-id",
-			ReleaseName:    "test-name",
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-		{
-			ID:             "test-id-2",
-			ReleaseName:    "test-name-2",
-			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec: astro.DeploymentSpec{
-				Webserver: astro.Webserver{URL: "test-url"},
-			},
-			CreatedAt:        time.Now(),
-			DagDeployEnabled: true,
-		},
-	}
-
-	mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(mockDeplyResp, nil).Times(1)
-
-	deployInput := InputDeploy{
-		Path:           "./testfiles/",
-		RuntimeID:      "test-id",
-		WsID:           ws,
-		Pytest:         "",
-		EnvFile:        "",
-		ImageName:      "",
-		DeploymentName: "",
-		Prompt:         true,
-		Dags:           true,
-	}
-	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
