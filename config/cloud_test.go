@@ -93,8 +93,42 @@ func TestContextGetPublicAPIURL(t *testing.T) {
 			c := &Context{
 				Domain: tt.fields.Domain,
 			}
-			if got := c.GetPublicAPIURL(); got != tt.want {
+			if got := c.GetPublicGraphQLAPIURL(); got != tt.want {
 				t.Errorf("Context.GetPublicAPIURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestContextGetPublicRESTAPIURL(t *testing.T) {
+	initTestConfig()
+	CFG.CloudAPIProtocol.SetHomeString("https")
+	type fields struct {
+		Domain string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{
+			name:   "basic localhost case",
+			fields: fields{Domain: "localhost"},
+			want:   "http://localhost:8888/v1alpha1",
+		},
+		{
+			name:   "basic cloud case",
+			fields: fields{Domain: "cloud.astro.io"},
+			want:   "https://api.astro.io/v1alpha1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Context{
+				Domain: tt.fields.Domain,
+			}
+			if got := c.GetPublicRESTAPIURL(); got != tt.want {
+				t.Errorf("Context.GetPublicRESTAPIURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}

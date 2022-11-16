@@ -34,9 +34,9 @@ func TestWorkspaceUserRemove(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("GetWorkspaceUserRole", mockWorkspace.ID, mockUser.Username).Return(mockUser, nil)
-	api.On("DeleteWorkspaceUser", mockWorkspace.ID, mockUser.ID).Return(mockWorkspace, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: mockWorkspace.ID, Email: mockUser.Username}).Return(mockUser, nil)
+	api.On("DeleteWorkspaceUser", houston.DeleteWorkspaceUserRequest{WorkspaceID: mockWorkspace.ID, UserID: mockUser.ID}).Return(mockWorkspace, nil)
 	houstonClient = api
 
 	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
@@ -70,7 +70,7 @@ func TestNewWorkspaceUserListCmd(t *testing.T) {
 func TestWorkspaceUserAdd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	houstonMock := new(mocks.ClientInterface)
-	houstonMock.On("AddWorkspaceUser", mock.Anything, mock.Anything, mock.Anything).Return(&houston.Workspace{}, nil).Once()
+	houstonMock.On("AddWorkspaceUser", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 	currentClient := houstonClient
 	houstonClient = houstonMock
 	defer func() { houstonClient = currentClient }()
@@ -82,7 +82,7 @@ func TestWorkspaceUserAdd(t *testing.T) {
 	assert.NoError(t, err)
 
 	// houston error case
-	houstonMock.On("AddWorkspaceUser", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMockHouston).Once()
+	houstonMock.On("AddWorkspaceUser", mock.Anything).Return(nil, errMockHouston).Once()
 	err = workspaceUserAdd(&cobra.Command{}, buf)
 	assert.ErrorIs(t, err, errMockHouston)
 
@@ -107,8 +107,8 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 		},
 	}
 	houstonMock := new(mocks.ClientInterface)
-	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything, mockEmail, mock.Anything).Return("updated", nil).Once()
-	houstonMock.On("GetWorkspaceUserRole", mock.Anything, mockEmail).Return(mockRoles, nil)
+	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything).Return("updated", nil).Once()
+	houstonMock.On("GetWorkspaceUserRole", mock.Anything).Return(mockRoles, nil)
 	currentClient := houstonClient
 	houstonClient = houstonMock
 	defer func() { houstonClient = currentClient }()
@@ -120,7 +120,7 @@ func TestWorkspaceUserUpdate(t *testing.T) {
 	assert.NoError(t, err)
 
 	// houston error case
-	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything, mockEmail, mock.Anything).Return("", errMockHouston).Once()
+	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything).Return("", errMockHouston).Once()
 	err = workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
 	assert.ErrorIs(t, err, errMockHouston)
 
@@ -190,7 +190,7 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 		}
 
 		houstonMock := new(mocks.ClientInterface)
-		houstonMock.On("ListWorkspacePaginatedUserAndRoles", mock.Anything, mock.Anything, mock.Anything).Return(mockResponse, nil)
+		houstonMock.On("ListWorkspacePaginatedUserAndRoles", mock.Anything).Return(mockResponse, nil)
 
 		currentClient := houstonClient
 		houstonClient = houstonMock
@@ -243,7 +243,7 @@ func TestWorkspaceUserListPaginated(t *testing.T) {
 		}
 
 		houstonMock := new(mocks.ClientInterface)
-		houstonMock.On("ListWorkspacePaginatedUserAndRoles", mock.Anything, mock.Anything, mock.Anything).Return(mockResponse, nil)
+		houstonMock.On("ListWorkspacePaginatedUserAndRoles", mock.Anything).Return(mockResponse, nil)
 
 		currentClient := houstonClient
 		houstonClient = houstonMock

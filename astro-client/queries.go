@@ -46,6 +46,8 @@ var (
 				maxWorkerCount
 			}
 			createdAt
+			updatedAt
+			alertEmails
 			status
 			runtimeRelease {
 				version
@@ -54,9 +56,6 @@ var (
 			deploymentSpec {
 				image {
 					tag
-				}
-				workers {
-					au
 				}
 				scheduler {
 					au
@@ -99,9 +98,6 @@ var (
 			deploymentSpec {
 				image {
 					tag
-				}
-				workers {
-					au
 				}
 				scheduler {
 					au

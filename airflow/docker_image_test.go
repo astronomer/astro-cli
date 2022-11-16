@@ -321,7 +321,7 @@ func TestUseBash(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, []string{"\"pass\"", "push"}, args[0])
+			assert.Contains(t, []string{"-c", "push", "rmi"}, args[0])
 			return nil
 		}
 		err := useBash(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
@@ -339,7 +339,7 @@ func TestUseBash(t *testing.T) {
 
 	t.Run("login exec failure", func(t *testing.T) {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, cmd, "echo")
+			assert.Contains(t, cmd, "bash")
 			return errMockDocker
 		}
 		err := useBash(&types.AuthConfig{Username: "testing"}, "test")

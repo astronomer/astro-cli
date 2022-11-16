@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestDeployImage(t *testing.T) {
 		return nil
 	}
 
-	deployImage = func(path, deploymentID, wsID, pytest, envFile, imageName, deploymentName, dagDeploy string, prompt, dags bool, client astro.Client) error {
+	deployImage = func(deployInput cloud.InputDeploy, client astro.Client) error {
 		return nil
 	}
 
@@ -34,5 +35,29 @@ func TestDeployImage(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--pytest"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"-f", "test-deployment-id", "--parse"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"-f", "test-deployment-id", "--parse", "--pytest"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"test-deployment-id", "--parse", "--pytest"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"test-deployment-id", "--dags"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--pytest"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse", "--pytest"}...)
+	assert.NoError(t, err)
+
+	err = execDeployCmd([]string{"vr-Id"}...)
 	assert.NoError(t, err)
 }

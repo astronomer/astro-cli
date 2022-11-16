@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"strings"
 
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -17,6 +18,7 @@ var (
 	forcePrompt      bool
 	saveDeployConfig bool
 	pytest           bool
+	parse            bool
 	dags             bool
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
@@ -37,13 +39,10 @@ var (
 	envFile        string
 	imageName      string
 	deploymentName string
-	dagDeploy      string
 )
 
 const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
-	dagDeployEnabled             = "enable"
-	dagDeployDisabled            = "disable"
 )
 
 func newDeployCmd() *cobra.Command {
@@ -64,30 +63,45 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "To enable or disable dag deploy for the Deployment")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "To push dags to your airflow deployment")
+	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
+	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	return cmd
+}
+
+func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
+	if pytest && pytestFile == "" {
+		pytestFile = "all-tests"
+	}
+
+	if !parse && !pytest && !forceDeploy || parse && !pytest && !forceDeploy || parse && !pytest && forceDeploy {
+		pytestFile = "parse"
+	}
+
+	if parse && pytest {
+		pytestFile = "parse-and-all-tests"
+	}
+
+	return pytestFile
 }
 
 func deploy(cmd *cobra.Command, args []string) error {
 	deploymentID := ""
-	ws := ""
 
-	// Get release name from args, if passed
+	// Get deploymentId from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
 
-	if deploymentID == "" || forcePrompt {
+	if (!strings.HasPrefix(deploymentID, "vr-")) && (deploymentID == "" || forcePrompt || workspaceID == "") {
 		var err error
-		ws, err = coalesceWorkspace()
+		workspaceID, err = coalesceWorkspace()
 		if err != nil {
 			return errors.Wrap(err, "failed to find a valid workspace")
 		}
 	}
 
-	// Save release name in config if specified
+	// Save deploymentId in config if specified
 	if len(deploymentID) > 0 && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 		if err != nil {
@@ -100,19 +114,27 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if pytest && pytestFile == "" {
-		pytestFile = "all-tests"
+	// case for astro deploy --dags whose default operation should be not running any tests
+	if dags && !parse && !pytest {
+		pytestFile = ""
+	} else {
+		pytestFile = deployTests(parse, pytest, forceDeploy, pytestFile)
 	}
 
-	if !pytest && !forceDeploy {
-		pytestFile = "parse"
-	}
-
-	if dagDeploy != "" && !(dagDeploy == dagDeployEnabled || dagDeploy == dagDeployDisabled) {
-		return errors.New("Invalid --dag-deploy value. Possible values are (enable, disable)")
-	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployImage(config.WorkingPath, deploymentID, ws, pytestFile, envFile, imageName, deploymentName, dagDeploy, forcePrompt, dags, astroClient)
+	deployInput := cloud.InputDeploy{
+		Path:           config.WorkingPath,
+		RuntimeID:      deploymentID,
+		WsID:           workspaceID,
+		Pytest:         pytestFile,
+		EnvFile:        envFile,
+		ImageName:      imageName,
+		DeploymentName: deploymentName,
+		Prompt:         forcePrompt,
+		Dags:           dags,
+	}
+
+	return deployImage(deployInput, astroClient)
 }

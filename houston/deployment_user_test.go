@@ -206,7 +206,7 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		response, err := api.DeleteDeploymentUser("deployment-id", "email")
+		response, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
 		assert.NoError(t, err)
 		assert.Equal(t, response, mockResponse.Data.DeleteDeploymentUser)
 	})
@@ -221,7 +221,7 @@ func TestDeleteDeploymentUser(t *testing.T) {
 		})
 		api := NewClient(client)
 
-		_, err := api.DeleteDeploymentUser("deployment-id", "email")
+		_, err := api.DeleteDeploymentUser(DeleteDeploymentUserRequest{"deployment-id", "email"})
 		assert.Contains(t, err.Error(), "Internal Server Error")
 	})
 }

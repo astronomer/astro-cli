@@ -43,15 +43,16 @@ const (
 	warningInvaildImageNameMsg = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidImageTagMsg  = "WARNING! You are about to push an image using the '%s' runtime tag. This is not supported.\nConsider using one of the following supported tags: %s"
 
-	message            = "Dags uploaded successfully"
+	message            = "DAGs uploaded successfully"
 	action             = "UPLOAD"
 	allTests           = "all-tests"
-	enableDagDeployMsg = "Dag Deploy is not enabled for deployment. Run 'astro deployment update %s --dag-deploy enable' to enable dags deploy"
+	parseAndPytest     = "parse-and-all-tests"
+	enableDagDeployMsg = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys."
 	dagDeployDisabled  = "dag deploy is not enabled for deployment"
+	invalidWorkspaceID = "Invalid workspace id %s was provided through the --workspace-id flag\n"
 )
 
 var (
-	splitNum   = 2
 	pytestFile string
 	dockerfile = "Dockerfile"
 
@@ -76,18 +77,36 @@ type deploymentInfo struct {
 	dagDeployEnabled bool
 }
 
-func deployDags(path, runtimeID string, client astro.Client) error {
-	dagDeployment, err := deployment.Initiate(runtimeID, client)
-	if err != nil {
-		return err
+type InputDeploy struct {
+	Path           string
+	RuntimeID      string
+	WsID           string
+	Pytest         string
+	EnvFile        string
+	ImageName      string
+	DeploymentName string
+	Prompt         bool
+	Dags           bool
+}
+
+func getRegistryURL(domain string) string {
+	var registry string
+	if domain == "localhost" {
+		registry = config.CFG.LocalRegistry.GetString()
+	} else {
+		registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
 	}
 
+	return registry
+}
+
+func deployDags(path, runtimeID string, client astro.Client) error {
 	// Check the dags directory
-	dagsPath := path + "/dags"
+	dagsPath := filepath.Join(path, "dags")
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
-	err = fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
+	err := fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
 	if err != nil {
 		return err
 	}
@@ -98,7 +117,12 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 		return err
 	}
 
-	dagsFilePath := path + "/dags.tar"
+	dagDeployment, err := deployment.Initiate(runtimeID, client)
+	if err != nil {
+		return err
+	}
+
+	dagsFilePath := filepath.Join(path, "dags.tar")
 	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
 		return err
@@ -137,7 +161,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 }
 
 // Deploy pushes a new docker image
-func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, dagDeploy string, prompt, dags bool, client astro.Client) error { //nolint: gocognit, gocyclo
+func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	// Get cloud domain
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -149,25 +173,21 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 		return errors.New("no domain set, re-authenticate")
 	}
 
-	if strings.Contains(domain, "cloud") {
-		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
-		domain = splitDomain[1]
-	}
+	dagsPath := filepath.Join(deployInput.Path, "dags")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	dagFiles := fileutil.GetFilesWithSpecificExtension(path+"/dags", ".py")
-	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+	// Deploy dags if deployInput runtimeId is virtual runtime
+	if strings.HasPrefix(deployInput.RuntimeID, "vr-") {
+		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
 
-		if !i {
-			fmt.Println("Canceling deploy...")
-			return nil
+			if !i {
+				fmt.Println("Canceling deploy...")
+				return nil
+			}
 		}
-	}
-
-	// Deploy dags if input id is virtual runtime
-	if strings.HasPrefix(runtimeID, "vr-") {
-		fmt.Println("Initiating DAGs Deployment for: " + runtimeID)
-		err = deployDags(path, runtimeID, client)
+		fmt.Println("Initiating DAG deploy for: " + deployInput.RuntimeID)
+		err = deployDags(deployInput.Path, deployInput.RuntimeID, client)
 		if err != nil {
 			return err
 		}
@@ -176,74 +196,45 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 		return nil
 	}
 
-	if dagDeploy != "" {
-		currentDeployment, err := deployment.GetDeployment(wsID, runtimeID, deploymentName, client)
-		if err != nil {
-			return err
-		}
-
-		runtimeID = currentDeployment.ID
-		scheduler := astro.Scheduler{}
-		scheduler.AU = currentDeployment.DeploymentSpec.Scheduler.AU
-		scheduler.Replicas = currentDeployment.DeploymentSpec.Scheduler.Replicas
-		spec := astro.DeploymentCreateSpec{
-			Executor:  "CeleryExecutor",
-			Scheduler: scheduler,
-		}
-
-		deploymentUpdate := &astro.UpdateDeploymentInput{
-			ID:             currentDeployment.ID,
-			Label:          currentDeployment.Label,
-			Description:    currentDeployment.Description,
-			ClusterID:      currentDeployment.Cluster.ID,
-			DeploymentSpec: spec,
-		}
-		if dagDeploy == "enable" {
-			fmt.Println("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled." +
-				"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..")
-			deploymentUpdate.DagDeployEnabled = true
-		} else if dagDeploy == "disable" {
-			if config.CFG.ShowWarnings.GetBool() {
-				i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
-					"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
-					"\nAre you sure you want to continue?")
-				if !i {
-					fmt.Println("Canceling deploy...")
-					return nil
-				}
-			}
-			deploymentUpdate.DagDeployEnabled = false
-		}
-
-		// update deployment
-		_, err = client.UpdateDeployment(deploymentUpdate)
-		if err != nil {
-			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-		}
-	}
-
-	deployInfo, err := getDeploymentInfo(runtimeID, wsID, deploymentName, prompt, domain, client)
+	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client)
 	if err != nil {
 		return err
 	}
 
+	if deployInput.WsID != deployInfo.workspaceID {
+		fmt.Printf(invalidWorkspaceID, deployInput.WsID)
+		return nil
+	}
+
 	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
 
-	if dags {
-		if pytest == allTests {
-			version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, deployInfo.dagDeployEnabled, client)
+	if deployInput.Dags {
+		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+
+			if !i {
+				fmt.Println("Canceling deploy...")
+				return nil
+			}
+		}
+		if deployInput.Pytest != "" {
+			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 			if err != nil {
 				return err
 			}
 
-			err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
 			if err != nil {
 				return err
 			}
 		}
 
-		fmt.Println("Initiating DAGs Deployment for: " + deployInfo.deploymentID)
-		err = deployDags(path, deployInfo.deploymentID, client)
+		if !deployInfo.dagDeployEnabled {
+			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
+		}
+
+		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
+		err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -253,17 +244,21 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 		}
 
 		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
-			"\n\nDeployment can be accessed at the following URLs: \n" +
-			fmt.Sprintf("\nDeployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-			fmt.Sprintf("\nAirflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
+			"\n\n Access your Deployment: \n" +
+			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
+			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 {
+			fmt.Println("No DAGs found. Skipping DAG deploy.")
+		}
+
 		// Build our image
-		version, err := buildImage(&c, path, deployInfo.currentVersion, deployInfo.deployImage, imageName, deployInfo.dagDeployEnabled, client)
+		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
 
-		err = parseDAG(pytest, version, envFile, deployInfo.deployImage, deployInfo.namespace)
+		err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
 		if err != nil {
 			return err
 		}
@@ -279,12 +274,7 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 		}
 
 		nextTag := "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
-		var registry string
-		if domain == "localhost" {
-			registry = config.CFG.LocalRegistry.GetString()
-		} else {
-			registry = "images." + strings.Split(domain, ".")[0] + ".cloud"
-		}
+		registry := getRegistryURL(domain)
 		repository := registry + "/" + deployInfo.organizationID + "/" + deployInfo.deploymentID
 		// TODO: Resolve the edge case where two people push the same nextTag at the same time
 		remoteImage := fmt.Sprintf("%s:%s", repository, nextTag)
@@ -299,28 +289,23 @@ func Deploy(path, runtimeID, wsID, pytest, envFile, imageName, deploymentName, d
 			return err
 		}
 
-		dagDeployEnabled := false
-		if imageName == "" && deployInfo.dagDeployEnabled {
-			dagDeployEnabled = true
-		}
-
 		// Deploy the image
-		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, dagDeployEnabled, client)
+		err = imageDeploy(imageCreateRes.ID, deployInfo.deploymentID, repository, nextTag, deployInfo.dagDeployEnabled, client)
 		if err != nil {
 			return err
 		}
 
-		if dagDeployEnabled {
-			err = deployDags(path, deployInfo.deploymentID, client)
+		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
+			err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
 		}
 
 		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
-			"\n\n Deployment can be accessed at the following URLs: \n" +
-			fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
-			fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(deployInfo.webserverURL)))
+			"\n\n Access your Deployment: \n" +
+			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
+			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	}
 
 	return nil
@@ -365,7 +350,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 	return deployInfo, nil
 }
 
-func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
+func parseOrPytestDAG(pytest, version, envFile, deployImage, namespace string) error {
 	dagParseVersionCheck := versions.GreaterThanOrEqualTo(version, dagParseAllowedVersion)
 	if !dagParseVersionCheck {
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
@@ -377,22 +362,30 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 		return err
 	}
 
-	// parse dags
-	if pytest == parse && dagParseVersionCheck {
-		if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
-			fmt.Println("Testing image...")
-			err := containerHandler.Parse("", deployImage)
-			if err != nil {
-				fmt.Println(err)
-				return errDagsParseFailed
-			}
-		} else {
-			fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
+	switch {
+	case pytest == parse && dagParseVersionCheck:
+		// parse dags
+		fmt.Println("Testing image...")
+		err := parseDAGs(deployImage, containerHandler)
+		if err != nil {
+			return err
 		}
+	case pytest != "" && pytest != parse && pytest != parseAndPytest:
 		// check pytests
-	} else if pytest != "" && pytest != parse {
 		fmt.Println("Testing image...")
 		err := checkPytest(pytest, deployImage, containerHandler)
+		if err != nil {
+			return err
+		}
+	case pytest == parseAndPytest:
+		// parse dags and check pytests
+		fmt.Println("Testing image...")
+		err := parseDAGs(deployImage, containerHandler)
+		if err != nil {
+			return err
+		}
+
+		err = checkPytest(pytest, deployImage, containerHandler)
 		if err != nil {
 			return err
 		}
@@ -400,9 +393,23 @@ func parseDAG(pytest, version, envFile, deployImage, namespace string) error {
 	return nil
 }
 
+func parseDAGs(deployImage string, containerHandler airflow.ContainerHandler) error {
+	if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
+		err := containerHandler.Parse("", deployImage)
+		if err != nil {
+			fmt.Println(err)
+			return errDagsParseFailed
+		}
+	} else {
+		fmt.Println("Skiping parsing dags due to skip parse being set to true in either the config.yaml or local environment variables")
+	}
+
+	return nil
+}
+
 // Validate code with pytest
 func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerHandler) error {
-	if pytest != allTests {
+	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
 	pytestArgs := []string{pytestFile}
@@ -447,8 +454,19 @@ func getImageName(cloudDomain, deploymentID string, client astro.Client) (deploy
 func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error {
 	// flag to determine if we are setting the dags folder in dockerignore
 	dagsIgnoreSet := false
+	// flag to determine if dockerignore file was created on runtime
+	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	fileExist, _ := fileutil.Exists(fullpath, nil)
+	if !fileExist {
+		// Create a dockerignore file and add the dags folder entry
+		err := fileutil.WriteStringToFile(fullpath, "dags/")
+		if err != nil {
+			return err
+		}
+		dockerIgnoreCreate = true
+	}
 	lines, err := fileutil.Read(fullpath)
 	if err != nil {
 		return err
@@ -473,6 +491,14 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	if err != nil {
 		return err
 	}
+
+	defer func() {
+		// remove created docker ignore file
+		if dockerIgnoreCreate {
+			os.Remove(fullpath)
+		}
+	}()
+
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
 		f, err := os.Open(fullpath)
@@ -508,7 +534,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	return nil
 }
 
-func buildImage(c *config.Context, path, currentVersion, deployImage, imageName string, dagDeployEnabled bool, client astro.Client) (version string, err error) {
+func buildImage(path, currentVersion, deployImage, imageName string, dagDeployEnabled bool, client astro.Client) (version string, err error) {
 	imageHandler := airflowImageHandler(deployImage)
 
 	if imageName == "" {

@@ -200,32 +200,6 @@ func (c *Context) DeleteContext() error {
 	return nil
 }
 
-func (c *Context) SetSystemAdmin(value bool) error {
-	cKey, err := c.GetContextKey()
-	if err != nil {
-		return err
-	}
-
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, "isSystemAdmin")
-	viperHome.Set(cfgPath, value)
-	err = saveConfig(viperHome, HomeConfigFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Context) GetSystemAdmin() (bool, error) {
-	cKey, err := c.GetContextKey()
-	if err != nil {
-		return false, err
-	}
-
-	cfgPath := fmt.Sprintf("contexts.%s.%s", cKey, "isSystemAdmin")
-	return viperHome.GetBool(cfgPath), nil
-}
-
 func (c *Context) SetExpiresIn(value int64) error {
 	cKey, err := c.GetContextKey()
 	if err != nil {

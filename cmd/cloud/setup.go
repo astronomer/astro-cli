@@ -52,6 +52,10 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
+	// If the user is using flow commands no need to go through auth setup.
+	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
 
 	// help command does not need auth setup
 	if cmd.CalledAs() == "help" && cmd.Parent().Use == topLvlCmd {
@@ -75,7 +79,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 
 	// run auth setup for any command that requires auth
 
-	apiKey, err := checkAPIKeys(client)
+	apiKey, err := checkAPIKeys(client, args)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
@@ -152,7 +156,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 
 	client := &http.Client{}
 
-	r, err := http.NewRequestWithContext(http_context.Background(), "POST", addr, strings.NewReader(data.Encode())) // URL-encoded payload
+	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {
 		log.Fatal(err)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
@@ -181,7 +185,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -189,26 +193,28 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 		return false, nil
 	}
 	fmt.Println("Using an Astro API key")
-	// set context
-	domain := "astronomer.io"
-
-	if !context.Exists(domain) {
-		err := context.SetContext(domain)
-		if err != nil {
-			return false, err
-		}
-
-		// Switch context
-		err = context.Switch(domain)
-		if err != nil {
-			return false, err
-		}
-	}
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
-		return false, err
+		// set context
+		domain := "astronomer.io"
+		if !context.Exists(domain) {
+			err := context.SetContext(domain)
+			if err != nil {
+				return false, err
+			}
+
+			// Switch context
+			err = context.Switch(domain)
+			if err != nil {
+				return false, err
+			}
+		}
+		c, err = context.GetContext(domain) // get current context
+		if err != nil {
+			return false, err
+		}
 	}
 
 	authConfig, err := auth.ValidateDomain(c.Domain)
@@ -229,10 +235,12 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 		Data:    []byte(data.Encode()),
 		Context: http_context.Background(),
 		Headers: map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
 
 	// execute request
-	res, err := client.Do("POST", addr, doOptions)
+	res, err := client.Do(doOptions)
 	if err != nil {
 		log.Fatal(err)
 		return false, fmt.Errorf("cannot getaccess token with API keys: %w", err)
@@ -262,27 +270,25 @@ func checkAPIKeys(astroClient astro.Client) (bool, error) {
 		return false, err
 	}
 
-	err = c.SetSystemAdmin(false)
-	if err != nil {
-		fmt.Println("admin settings incorrectly set you may experince permissions issues")
-	}
-
 	organizations, err := astroClient.GetOrganizations()
 	if err != nil {
 		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 	organizationID := organizations[0].ID
 
-	// get workspace ID
-	deployments, err := astroClient.ListDeployments(organizationID, "")
-	if err != nil {
-		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
-	workspaceID = deployments[0].Workspace.ID
+	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
+	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
+		// get workspace ID
+		deployments, err := astroClient.ListDeployments(organizationID, "")
+		if err != nil {
+			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		}
+		workspaceID = deployments[0].Workspace.ID
 
-	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
-	if err != nil {
-		fmt.Println("no workspace set")
+		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+		if err != nil {
+			fmt.Println("no workspace set")
+		}
 	}
 	err = c.SetContextKey("organization", organizationID) // c.Organization
 	if err != nil {

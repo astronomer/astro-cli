@@ -29,7 +29,7 @@ var (
 		User: astro.User{
 			RoleBindings: []astro.RoleBinding{
 				{
-					Role: "SYSTEM_ADMIN",
+					Role: "WORKSPACE_ADMIN",
 				},
 			},
 		},
@@ -190,7 +190,11 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		go func() {
 			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
 
-			_, err = httpClient.Do("GET", "http://localhost:12345/callback?code=test", &httputil.DoOptions{}) //nolint
+			opts := &httputil.DoOptions{
+				Method: http.MethodGet,
+				Path:   "http://localhost:12345/callback?code=test",
+			}
+			_, err = httpClient.Do(opts) //nolint
 			assert.NoError(t, err)
 		}()
 		code, err := authorizeCallbackHandler()
@@ -580,28 +584,24 @@ func TestLogout(t *testing.T) {
 	})
 
 	t.Run("success_with_email", func(t *testing.T) {
-		assertions := func(expIsSystemAdmin bool, expUserEmail string, expToken string) {
+		assertions := func(expUserEmail string, expToken string) {
 			contexts, err := config.GetContexts()
 			assert.NoError(t, err)
 			context := contexts.Contexts["localhost"]
 
-			isSystemAdmin, err := context.GetSystemAdmin()
 			assert.NoError(t, err)
-			assert.Equal(t, expIsSystemAdmin, isSystemAdmin)
 			assert.Equal(t, expUserEmail, context.UserEmail)
 			assert.Equal(t, expToken, context.Token)
 		}
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		err = c.SetSystemAdmin(true)
-		assert.NoError(t, err)
 		err = c.SetContextKey("user_email", "test.user@astronomer.io")
 		assert.NoError(t, err)
 		err = c.SetContextKey("token", "Bearer some-token")
 		assert.NoError(t, err)
 		// test before
-		assertions(true, "test.user@astronomer.io", "Bearer some-token")
+		assertions("test.user@astronomer.io", "Bearer some-token")
 
 		// log out
 		c, err = config.GetCurrentContext()
@@ -609,7 +609,7 @@ func TestLogout(t *testing.T) {
 		Logout(c.Domain, os.Stdout)
 
 		// test after logout
-		assertions(false, "", "")
+		assertions("", "")
 	})
 }
 

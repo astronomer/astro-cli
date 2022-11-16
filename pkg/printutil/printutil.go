@@ -169,7 +169,7 @@ func strSliceToInterSlice(ss []string) []interface{} {
 //
 // If the altPadding slice length is equivalent to the Values slice length,
 // then it should compare the length of the incoming value being evaluated
-//  to see if it longer than the value already stored in it's place in
+// to see if it longer than the value already stored in it's place in
 // altPadding. If it is, replace it's value with the length of the
 // incoming value.
 //

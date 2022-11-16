@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -43,6 +44,7 @@ func newTableOut() *printutil.Table {
 	}
 }
 
+// TODO use astro.go wrapper around REST client
 func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	var orgDomain string
 	if c.Domain == "localhost" {
@@ -55,11 +57,14 @@ func listOrganizations(c *config.Context) ([]OrgRes, error) {
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"authorization": authToken},
+		Path:    orgDomain,
+		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do("GET", orgDomain, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return []OrgRes{}, fmt.Errorf("could not retrieve organization list: %w", err)
 	}
+	defer res.Body.Close()
 	var orgResponse []OrgRes
 	err = json.NewDecoder(res.Body).Decode(&orgResponse)
 	if err != nil {
@@ -138,7 +143,7 @@ func getOrganizationSelection(out io.Writer) (string, error) {
 }
 
 // Switch switches organizations
-func Switch(orgName string, client astro.Client, out io.Writer) error {
+func Switch(orgNameOrID string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -146,7 +151,7 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 	}
 	// get auth id
 	var id string
-	if orgName == "" {
+	if orgNameOrID == "" {
 		id, err = getOrganizationSelection(out)
 		if err != nil {
 			return err
@@ -157,7 +162,10 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 			return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}
 		for i := range or {
-			if or[i].Name == orgName {
+			if or[i].Name == orgNameOrID {
+				id = or[i].AuthServiceID
+			}
+			if or[i].ID == orgNameOrID {
 				id = or[i].AuthServiceID
 			}
 		}
@@ -167,9 +175,24 @@ func Switch(orgName string, client astro.Client, out io.Writer) error {
 	}
 
 	// log user into new organization
-	err = AuthLogin(c.Domain, id, "", client, out, false)
+	err = AuthLogin(c.Domain, id, "", client, out, shouldDisplayLoginLink)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Write the audit logs to the provided io.Writer.
+func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earliest int) error {
+	logStreamBuffer, err := client.GetOrganizationAuditLogs(orgName, earliest)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, logStreamBuffer)
+	if err != nil {
+		logStreamBuffer.Close()
+		return err
+	}
+	logStreamBuffer.Close()
 	return nil
 }
