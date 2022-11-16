@@ -20,7 +20,6 @@ func TestRun(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
 		cmd := newRunCommand()
-		cmd.Flag("task-logs").Value.Set("true")
 		args := []string{"test-dag"}
 
 		mockContainerHandler := new(mocks.ContainerHandler)
@@ -36,7 +35,6 @@ func TestRun(t *testing.T) {
 
 	t.Run("failure", func(t *testing.T) {
 		cmd := newRunCommand()
-		cmd.Flag("task-logs").Value.Set("true")
 		args := []string{"test-dag"}
 
 		mockContainerHandler := new(mocks.ContainerHandler)
