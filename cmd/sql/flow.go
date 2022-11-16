@@ -147,6 +147,10 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 		flags["env"] = environment
 	}
 
+	if connection != "" {
+		flags["connection"] = connection
+	}
+
 	if verbose {
 		args = append(args, "--verbose")
 	}
