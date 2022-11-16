@@ -504,8 +504,29 @@ func TestDagsDeployVR(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestNoDagsDeployVR(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.CFG.ShowWarnings.SetHomeString("true")
+	mockClient := new(astro_mocks.Client)
+	runtimeID := "vr-test-id"
+
+	deployInput := InputDeploy{
+		Path:           "./testfiles/",
+		RuntimeID:      runtimeID,
+		WsID:           ws,
+		Pytest:         "",
+		EnvFile:        "",
+		ImageName:      "",
+		DeploymentName: "",
+		Prompt:         false,
+		Dags:           false,
+	}
+
+	err := Deploy(deployInput, mockClient)
+	assert.NoError(t, err)
+}
+
 func TestNoDagsDeploy(t *testing.T) {
-	defer testUtil.MockUserInput(t, "n")()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("true")
 	mockClient := new(astro_mocks.Client)
