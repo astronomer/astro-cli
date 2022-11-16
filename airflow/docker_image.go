@@ -277,9 +277,9 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 }
 
 func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, taskLogs bool) error {
-	// delete container
 	stdout := os.Stdout
 	stderr := os.Stderr
+	// delete container
 	err := cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
 	if err != nil {
 		log.Debug(err)
@@ -357,7 +357,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		}
 	}
 
-	fmt.Println("\nSee the output of this command for errors. To view task logs, use the '--task-logs' flag.")
+	fmt.Println("\nSee the output of this command for errors.") // add back later "To view task logs, use the '--task-logs' flag."
 	return cmdErr
 }
 
