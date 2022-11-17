@@ -47,6 +47,36 @@ func (_m *ClientWithResponsesInterface) CreateUserInviteWithBodyWithResponse(ctx
 	return r0, r1
 }
 
+// CreateUserInviteWithResponse provides a mock function with given fields: ctx, orgShortNameId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateUserInviteWithResponse(ctx context.Context, orgShortNameId string, body astrocore.CreateUserInviteRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateUserInviteResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateUserInviteResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateUserInviteRequest, ...astrocore.RequestEditorFn) *astrocore.CreateUserInviteResponse); ok {
+		r0 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateUserInviteResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.CreateUserInviteRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteOrgUserWithResponse provides a mock function with given fields: ctx, orgShortNameId, userId, reqEditors
 func (_m *ClientWithResponsesInterface) DeleteOrgUserWithResponse(ctx context.Context, orgShortNameId string, userId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteOrgUserResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -130,6 +160,36 @@ func (_m *ClientWithResponsesInterface) DeleteWorkspaceUserWithResponse(ctx cont
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, workspaceId, userId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManagedDomainWithResponse provides a mock function with given fields: ctx, orgShortNameId, domainId, reqEditors
+func (_m *ClientWithResponsesInterface) GetManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetManagedDomainResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, domainId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.GetManagedDomainResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.GetManagedDomainResponse); ok {
+		r0 = rf(ctx, orgShortNameId, domainId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.GetManagedDomainResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, domainId, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -407,6 +467,36 @@ func (_m *ClientWithResponsesInterface) MutateOrgUserRoleWithBodyWithResponse(ct
 	return r0, r1
 }
 
+// MutateOrgUserRoleWithResponse provides a mock function with given fields: ctx, orgShortNameId, userId, body, reqEditors
+func (_m *ClientWithResponsesInterface) MutateOrgUserRoleWithResponse(ctx context.Context, orgShortNameId string, userId string, body astrocore.MutateOrgUserRoleRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.MutateOrgUserRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, userId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.MutateOrgUserRoleResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.MutateOrgUserRoleRequest, ...astrocore.RequestEditorFn) *astrocore.MutateOrgUserRoleResponse); ok {
+		r0 = rf(ctx, orgShortNameId, userId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.MutateOrgUserRoleResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.MutateOrgUserRoleRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, userId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // MutateWorkspaceUserRoleWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, userId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) MutateWorkspaceUserRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, userId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.MutateWorkspaceUserRoleResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -437,6 +527,36 @@ func (_m *ClientWithResponsesInterface) MutateWorkspaceUserRoleWithBodyWithRespo
 	return r0, r1
 }
 
+// MutateWorkspaceUserRoleWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, userId, body, reqEditors
+func (_m *ClientWithResponsesInterface) MutateWorkspaceUserRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, userId string, body astrocore.MutateWorkspaceUserRoleRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.MutateWorkspaceUserRoleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, workspaceId, userId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.MutateWorkspaceUserRoleResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrocore.MutateWorkspaceUserRoleRequest, ...astrocore.RequestEditorFn) *astrocore.MutateWorkspaceUserRoleResponse); ok {
+		r0 = rf(ctx, orgShortNameId, workspaceId, userId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.MutateWorkspaceUserRoleResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrocore.MutateWorkspaceUserRoleRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, workspaceId, userId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdateOrganizationWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) UpdateOrganizationWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateOrganizationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -460,6 +580,36 @@ func (_m *ClientWithResponsesInterface) UpdateOrganizationWithBodyWithResponse(c
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateOrganizationWithResponse provides a mock function with given fields: ctx, orgShortNameId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateOrganizationWithResponse(ctx context.Context, orgShortNameId string, body astrocore.UpdateOrganizationRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateOrganizationResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateOrganizationResponse
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.UpdateOrganizationRequest, ...astrocore.RequestEditorFn) *astrocore.UpdateOrganizationResponse); ok {
+		r0 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateOrganizationResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.UpdateOrganizationRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}

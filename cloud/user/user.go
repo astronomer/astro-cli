@@ -1,9 +1,7 @@
 package user
 
 import (
-	"bytes"
 	http_context "context"
-	"encoding/json"
 	"fmt"
 	"io"
 
@@ -45,12 +43,7 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 		InviteeEmail: email,
 		Role:         role,
 	}
-	// fixme, this is a core api bug that openapi spec does not specify content-type
-	buf, err := json.Marshal(userInviteInput)
-	if err != nil {
-		return err
-	}
-	resp, err := client.CreateUserInviteWithBodyWithResponse(http_context.Background(), ctx.OrganizationShortName, "application/json", bytes.NewReader(buf))
+	resp, err := client.CreateUserInviteWithResponse(http_context.Background(), ctx.OrganizationShortName, userInviteInput)
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body, err)
 	if err != nil {
 		return err

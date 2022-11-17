@@ -72,7 +72,7 @@ func TestUserInvite(t *testing.T) {
 	t.Run("valid email with no role creates an invite", func(t *testing.T) {
 		expectedOut := "invite for some@email.com with role ORGANIZATION_MEMBER created"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com"}
 		resp, err := execUserCmd(cmdArgs...)
@@ -83,7 +83,7 @@ func TestUserInvite(t *testing.T) {
 	t.Run("valid email with valid role creates an invite", func(t *testing.T) {
 		expectedOut := "invite for some@email.com with role ORGANIZATION_MEMBER created"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execUserCmd(cmdArgs...)
@@ -92,7 +92,7 @@ func TestUserInvite(t *testing.T) {
 	})
 	t.Run("valid email with invalid role returns an error and no invite gets created", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "invalid"}
 		_, err := execUserCmd(cmdArgs...)
@@ -100,7 +100,7 @@ func TestUserInvite(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and no invite gets created", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execUserCmd(cmdArgs...)
@@ -110,7 +110,7 @@ func TestUserInvite(t *testing.T) {
 	t.Run("any context errors from api are returned and no invite gets created", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execUserCmd(cmdArgs...)
@@ -132,7 +132,7 @@ func TestUserInvite(t *testing.T) {
 
 		expectedOut := "invite for test-email-input with role ORGANIZATION_MEMBER created"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithBodyWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		astroCoreClient = mockClient
 
 		cmdArgs := []string{"invite"}

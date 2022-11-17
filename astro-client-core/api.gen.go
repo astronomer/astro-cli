@@ -96,6 +96,15 @@ type Invite struct {
 	UserId         *string `json:"userId,omitempty"`
 }
 
+// ManagedDomain defines model for ManagedDomain.
+type ManagedDomain struct {
+	CreatedAt      time.Time `json:"createdAt"`
+	Id             string    `json:"id"`
+	Name           string    `json:"name"`
+	OrganizationId string    `json:"organizationId"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
 // MutateOrgUserRoleRequest defines model for MutateOrgUserRoleRequest.
 type MutateOrgUserRoleRequest struct {
 	Role string `json:"role"`
@@ -271,6 +280,18 @@ type GetSelfUserParams struct {
 	CreateIfNotExist *bool `form:"createIfNotExist,omitempty" json:"createIfNotExist,omitempty"`
 }
 
+// UpdateOrganizationJSONRequestBody defines body for UpdateOrganization for application/json ContentType.
+type UpdateOrganizationJSONRequestBody = UpdateOrganizationRequest
+
+// CreateUserInviteJSONRequestBody defines body for CreateUserInvite for application/json ContentType.
+type CreateUserInviteJSONRequestBody = CreateUserInviteRequest
+
+// MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
+type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
+
+// MutateWorkspaceUserRoleJSONRequestBody defines body for MutateWorkspaceUserRole for application/json ContentType.
+type MutateWorkspaceUserRoleJSONRequestBody = MutateWorkspaceUserRoleRequest
+
 // UpdateSelfUserInviteJSONRequestBody defines body for UpdateSelfUserInvite for application/json ContentType.
 type UpdateSelfUserInviteJSONRequestBody = UpdateInviteRequest
 
@@ -359,11 +380,18 @@ type ClientInterface interface {
 	// UpdateOrganization request with any body
 	UpdateOrganizationWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	UpdateOrganization(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetManagedDomain request
+	GetManagedDomain(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateUserInvite request with any body
 	CreateUserInviteWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateUserInvite(ctx context.Context, orgShortNameId string, body CreateUserInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteUserInvite request
 	DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -380,6 +408,8 @@ type ClientInterface interface {
 	// MutateOrgUserRole request with any body
 	MutateOrgUserRoleWithBody(ctx context.Context, orgShortNameId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	MutateOrgUserRole(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListWorkspaceUsers request
 	ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -388,6 +418,8 @@ type ClientInterface interface {
 
 	// MutateWorkspaceUserRole request with any body
 	MutateWorkspaceUserRoleWithBody(ctx context.Context, orgShortNameId string, workspaceId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MutateWorkspaceUserRole(ctx context.Context, orgShortNameId string, workspaceId string, userId string, body MutateWorkspaceUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSelfUser request
 	GetSelfUser(ctx context.Context, params *GetSelfUserParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -446,6 +478,18 @@ func (c *Client) UpdateOrganizationWithBody(ctx context.Context, orgShortNameId 
 	return c.Client.Do(req)
 }
 
+func (c *Client) UpdateOrganization(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateOrganizationRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetOrganizationAuditLogsRequest(c.Server, orgShortNameId, params)
 	if err != nil {
@@ -458,8 +502,32 @@ func (c *Client) GetOrganizationAuditLogs(ctx context.Context, orgShortNameId st
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetManagedDomain(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetManagedDomainRequest(c.Server, orgShortNameId, domainId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) CreateUserInviteWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateUserInviteRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateUserInvite(ctx context.Context, orgShortNameId string, body CreateUserInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateUserInviteRequest(c.Server, orgShortNameId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -530,6 +598,18 @@ func (c *Client) MutateOrgUserRoleWithBody(ctx context.Context, orgShortNameId s
 	return c.Client.Do(req)
 }
 
+func (c *Client) MutateOrgUserRole(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateOrgUserRoleRequest(c.Server, orgShortNameId, userId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWorkspaceUsersRequest(c.Server, orgShortNameId, workspaceId, params)
 	if err != nil {
@@ -556,6 +636,18 @@ func (c *Client) DeleteWorkspaceUser(ctx context.Context, orgShortNameId string,
 
 func (c *Client) MutateWorkspaceUserRoleWithBody(ctx context.Context, orgShortNameId string, workspaceId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMutateWorkspaceUserRoleRequestWithBody(c.Server, orgShortNameId, workspaceId, userId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateWorkspaceUserRole(ctx context.Context, orgShortNameId string, workspaceId string, userId string, body MutateWorkspaceUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateWorkspaceUserRoleRequest(c.Server, orgShortNameId, workspaceId, userId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -706,6 +798,17 @@ func NewGetOrganizationRequest(server string, orgShortNameId string) (*http.Requ
 	return req, nil
 }
 
+// NewUpdateOrganizationRequest calls the generic UpdateOrganization builder with application/json body
+func NewUpdateOrganizationRequest(server string, orgShortNameId string, body UpdateOrganizationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateOrganizationRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
 // NewUpdateOrganizationRequestWithBody generates requests for UpdateOrganization with any type of body
 func NewUpdateOrganizationRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -794,6 +897,58 @@ func NewGetOrganizationAuditLogsRequest(server string, orgShortNameId string, pa
 	}
 
 	return req, nil
+}
+
+// NewGetManagedDomainRequest generates requests for GetManagedDomain
+func NewGetManagedDomainRequest(server string, orgShortNameId string, domainId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "domainId", runtime.ParamLocationPath, domainId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/domains/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateUserInviteRequest calls the generic CreateUserInvite builder with application/json body
+func NewCreateUserInviteRequest(server string, orgShortNameId string, body CreateUserInviteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateUserInviteRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
 }
 
 // NewCreateUserInviteRequestWithBody generates requests for CreateUserInvite with any type of body
@@ -1073,6 +1228,17 @@ func NewGetUserRequest(server string, orgShortNameId string, userId string) (*ht
 	return req, nil
 }
 
+// NewMutateOrgUserRoleRequest calls the generic MutateOrgUserRole builder with application/json body
+func NewMutateOrgUserRoleRequest(server string, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateOrgUserRoleRequestWithBody(server, orgShortNameId, userId, "application/json", bodyReader)
+}
+
 // NewMutateOrgUserRoleRequestWithBody generates requests for MutateOrgUserRole with any type of body
 func NewMutateOrgUserRoleRequestWithBody(server string, orgShortNameId string, userId string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -1271,6 +1437,17 @@ func NewDeleteWorkspaceUserRequest(server string, orgShortNameId string, workspa
 	}
 
 	return req, nil
+}
+
+// NewMutateWorkspaceUserRoleRequest calls the generic MutateWorkspaceUserRole builder with application/json body
+func NewMutateWorkspaceUserRoleRequest(server string, orgShortNameId string, workspaceId string, userId string, body MutateWorkspaceUserRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateWorkspaceUserRoleRequestWithBody(server, orgShortNameId, workspaceId, userId, "application/json", bodyReader)
 }
 
 // NewMutateWorkspaceUserRoleRequestWithBody generates requests for MutateWorkspaceUserRole with any type of body
@@ -1472,11 +1649,18 @@ type ClientWithResponsesInterface interface {
 	// UpdateOrganization request with any body
 	UpdateOrganizationWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOrganizationResponse, error)
 
+	UpdateOrganizationWithResponse(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationResponse, error)
+
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogsWithResponse(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error)
 
+	// GetManagedDomain request
+	GetManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*GetManagedDomainResponse, error)
+
 	// CreateUserInvite request with any body
 	CreateUserInviteWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error)
+
+	CreateUserInviteWithResponse(ctx context.Context, orgShortNameId string, body CreateUserInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error)
 
 	// DeleteUserInvite request
 	DeleteUserInviteWithResponse(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*DeleteUserInviteResponse, error)
@@ -1493,6 +1677,8 @@ type ClientWithResponsesInterface interface {
 	// MutateOrgUserRole request with any body
 	MutateOrgUserRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
 
+	MutateOrgUserRoleWithResponse(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
+
 	// ListWorkspaceUsers request
 	ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error)
 
@@ -1501,6 +1687,8 @@ type ClientWithResponsesInterface interface {
 
 	// MutateWorkspaceUserRole request with any body
 	MutateWorkspaceUserRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateWorkspaceUserRoleResponse, error)
+
+	MutateWorkspaceUserRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, userId string, body MutateWorkspaceUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateWorkspaceUserRoleResponse, error)
 
 	// GetSelfUser request
 	GetSelfUserWithResponse(ctx context.Context, params *GetSelfUserParams, reqEditors ...RequestEditorFn) (*GetSelfUserResponse, error)
@@ -1515,6 +1703,7 @@ type ListOrganizationAuthIdsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]string
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -1540,6 +1729,7 @@ type ListOrganizationsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]Organization
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -1565,6 +1755,7 @@ type GetOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Organization
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -1590,6 +1781,7 @@ type UpdateOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Organization
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1616,6 +1808,7 @@ type GetOrganizationAuditLogsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]int
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -1637,10 +1830,38 @@ func (r GetOrganizationAuditLogsResponse) StatusCode() int {
 	return 0
 }
 
+type GetManagedDomainResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ManagedDomain
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetManagedDomainResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetManagedDomainResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type CreateUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Invite
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1666,6 +1887,7 @@ func (r CreateUserInviteResponse) StatusCode() int {
 type DeleteUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1692,6 +1914,7 @@ type ListOrgUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *UsersPaginated
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -1717,6 +1940,7 @@ type DeleteOrgUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *User
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1743,6 +1967,7 @@ type GetUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *User
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1769,6 +1994,7 @@ type MutateOrgUserRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *UserRole
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1795,6 +2021,7 @@ type ListWorkspaceUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *UsersPaginated
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON500      *Error
@@ -1820,6 +2047,7 @@ type DeleteWorkspaceUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *User
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1846,6 +2074,7 @@ type MutateWorkspaceUserRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *UserRole
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1872,6 +2101,7 @@ type GetSelfUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Self
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1898,6 +2128,7 @@ type UpdateSelfUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Invite
+	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
 	JSON404      *Error
@@ -1956,6 +2187,14 @@ func (c *ClientWithResponses) UpdateOrganizationWithBodyWithResponse(ctx context
 	return ParseUpdateOrganizationResponse(rsp)
 }
 
+func (c *ClientWithResponses) UpdateOrganizationWithResponse(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationResponse, error) {
+	rsp, err := c.UpdateOrganization(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateOrganizationResponse(rsp)
+}
+
 // GetOrganizationAuditLogsWithResponse request returning *GetOrganizationAuditLogsResponse
 func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error) {
 	rsp, err := c.GetOrganizationAuditLogs(ctx, orgShortNameId, params, reqEditors...)
@@ -1965,9 +2204,26 @@ func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.C
 	return ParseGetOrganizationAuditLogsResponse(rsp)
 }
 
+// GetManagedDomainWithResponse request returning *GetManagedDomainResponse
+func (c *ClientWithResponses) GetManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*GetManagedDomainResponse, error) {
+	rsp, err := c.GetManagedDomain(ctx, orgShortNameId, domainId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetManagedDomainResponse(rsp)
+}
+
 // CreateUserInviteWithBodyWithResponse request with arbitrary body returning *CreateUserInviteResponse
 func (c *ClientWithResponses) CreateUserInviteWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error) {
 	rsp, err := c.CreateUserInviteWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateUserInviteResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateUserInviteWithResponse(ctx context.Context, orgShortNameId string, body CreateUserInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error) {
+	rsp, err := c.CreateUserInvite(ctx, orgShortNameId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2019,6 +2275,14 @@ func (c *ClientWithResponses) MutateOrgUserRoleWithBodyWithResponse(ctx context.
 	return ParseMutateOrgUserRoleResponse(rsp)
 }
 
+func (c *ClientWithResponses) MutateOrgUserRoleWithResponse(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error) {
+	rsp, err := c.MutateOrgUserRole(ctx, orgShortNameId, userId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateOrgUserRoleResponse(rsp)
+}
+
 // ListWorkspaceUsersWithResponse request returning *ListWorkspaceUsersResponse
 func (c *ClientWithResponses) ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error) {
 	rsp, err := c.ListWorkspaceUsers(ctx, orgShortNameId, workspaceId, params, reqEditors...)
@@ -2040,6 +2304,14 @@ func (c *ClientWithResponses) DeleteWorkspaceUserWithResponse(ctx context.Contex
 // MutateWorkspaceUserRoleWithBodyWithResponse request with arbitrary body returning *MutateWorkspaceUserRoleResponse
 func (c *ClientWithResponses) MutateWorkspaceUserRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateWorkspaceUserRoleResponse, error) {
 	rsp, err := c.MutateWorkspaceUserRoleWithBody(ctx, orgShortNameId, workspaceId, userId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateWorkspaceUserRoleResponse(rsp)
+}
+
+func (c *ClientWithResponses) MutateWorkspaceUserRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, userId string, body MutateWorkspaceUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateWorkspaceUserRoleResponse, error) {
+	rsp, err := c.MutateWorkspaceUserRole(ctx, orgShortNameId, workspaceId, userId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2093,6 +2365,13 @@ func ParseListOrganizationAuthIdsResponse(rsp *http.Response) (*ListOrganization
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2139,6 +2418,13 @@ func ParseListOrganizationsResponse(rsp *http.Response) (*ListOrganizationsRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -2187,6 +2473,13 @@ func ParseGetOrganizationResponse(rsp *http.Response) (*GetOrganizationResponse,
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2233,6 +2526,13 @@ func ParseUpdateOrganizationResponse(rsp *http.Response) (*UpdateOrganizationRes
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -2288,6 +2588,13 @@ func ParseGetOrganizationAuditLogsResponse(rsp *http.Response) (*GetOrganization
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2301,6 +2608,67 @@ func ParseGetOrganizationAuditLogsResponse(rsp *http.Response) (*GetOrganization
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetManagedDomainResponse parses an HTTP response from a GetManagedDomainWithResponse call
+func ParseGetManagedDomainResponse(rsp *http.Response) (*GetManagedDomainResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetManagedDomainResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ManagedDomain
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -2334,6 +2702,13 @@ func ParseCreateUserInviteResponse(rsp *http.Response) (*CreateUserInviteRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -2382,6 +2757,13 @@ func ParseDeleteUserInviteResponse(rsp *http.Response) (*DeleteUserInviteRespons
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2436,6 +2818,13 @@ func ParseListOrgUsersResponse(rsp *http.Response) (*ListOrgUsersResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2482,6 +2871,13 @@ func ParseDeleteOrgUserResponse(rsp *http.Response) (*DeleteOrgUserResponse, err
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -2537,6 +2933,13 @@ func ParseGetUserResponse(rsp *http.Response) (*GetUserResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2590,6 +2993,13 @@ func ParseMutateOrgUserRoleResponse(rsp *http.Response) (*MutateOrgUserRoleRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -2645,6 +3055,13 @@ func ParseListWorkspaceUsersResponse(rsp *http.Response) (*ListWorkspaceUsersRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2691,6 +3108,13 @@ func ParseDeleteWorkspaceUserResponse(rsp *http.Response) (*DeleteWorkspaceUserR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -2746,6 +3170,13 @@ func ParseMutateWorkspaceUserRoleResponse(rsp *http.Response) (*MutateWorkspaceU
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2800,6 +3231,13 @@ func ParseGetSelfUserResponse(rsp *http.Response) (*GetSelfUserResponse, error) 
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2853,6 +3291,13 @@ func ParseUpdateSelfUserInviteResponse(rsp *http.Response) (*UpdateSelfUserInvit
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
