@@ -66,7 +66,7 @@ var (
 
 var (
 	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
-	envFileMissing     = errors.New("Env file path is incorrect")                                                                                    //nolint:revive
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
 type deploymentInfo struct {
@@ -253,7 +253,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 	} else {
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
 		if !envFileExists {
-			return envFileMissing
+			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 {
