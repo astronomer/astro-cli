@@ -443,11 +443,6 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		// mockContainerHandler := new(mocks.ContainerHandler)
-		// containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		// 	mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false, 1*time.Minute).Return(nil).Once()
-		// 	return mockContainerHandler, nil
-		// }
 		config.CFG.PostgresPort.SetHomeString("0")
 
 		err := airflowStart(cmd, args)
@@ -458,11 +453,6 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		// mockContainerHandler := new(mocks.ContainerHandler)
-		// containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-		// 	mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false, 1*time.Minute).Return(nil).Once()
-		// 	return mockContainerHandler, nil
-		// }
 		config.CFG.PostgresPort.SetHomeString("5432")
 		config.CFG.WebserverPort.SetHomeString("0")
 
@@ -1189,5 +1179,4 @@ func TestPrepareDefaultAirflowImageTag(t *testing.T) {
 }
 
 func TestCheckPort(t *testing.T) {
-
 }
