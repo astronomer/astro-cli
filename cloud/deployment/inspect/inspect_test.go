@@ -323,7 +323,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 	t.Run("returns deployment Info for the requested local deployment", func(t *testing.T) {
 		var actualDeploymentInfo deploymentInfo
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedCloudDomainURL := "cloud.localhost/" + sourceDeployment.Workspace.ID +
+		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentInfo := deploymentInfo{
 			DeploymentID:   sourceDeployment.ID,

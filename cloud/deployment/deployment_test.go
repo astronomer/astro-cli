@@ -970,9 +970,16 @@ func TestGetDeploymentURL(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
+	t.Run("returns deploymentURL for pr preview environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPrPreview)
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
 	t.Run("returns deploymentURL for local environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedURL := "cloud.localhost/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
