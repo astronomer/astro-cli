@@ -2,12 +2,26 @@ package fileutil
 
 import (
 	"os"
+	"io/fs"
 	"path/filepath"
 	"testing"
 
 	"github.com/spf13/afero"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
+
+var errMock = errors.New("mock error")
+
+type FileMode = fs.FileMode
+
+func openFileError(name string, flag int, perm FileMode) (*os.File, error) {
+	return nil, errMock
+}
+
+func readFileError(name string) ([]byte, error) {
+	return nil, errMock
+}
 
 func TestExists(t *testing.T) {
 	filePath := "test.yaml"
@@ -294,6 +308,19 @@ func TestAddLineToFile(t *testing.T) {
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
 			assert.NoError(t, err)
 		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = openFileError
+			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.ErrorIs(t, err, errMock)
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = readFileError
+			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.ErrorIs(t, err, errMock)
+		})
 	}
 }
 
@@ -322,6 +349,19 @@ func TestRemoveLineFromFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
 			assert.NoError(t, err)
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = openFileError
+			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.ErrorIs(t, err, errMock)
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = readFileError
+			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.ErrorIs(t, err, errMock)
 		})
 	}
 }

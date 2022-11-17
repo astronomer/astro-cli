@@ -14,7 +14,11 @@ import (
 	"github.com/spf13/afero"
 )
 
-var perm os.FileMode = 0o777
+var (
+	perm os.FileMode = 0o777
+	openFile = os.OpenFile
+	readFile = os.ReadFile
+)
 
 // Exists returns a boolean indicating if the given path already exists
 func Exists(path string, fs afero.Fs) (bool, error) {
@@ -175,11 +179,11 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 }
 
 func AddLineToFile(filePath, lineText, commentText string) error {
-	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 	if err != nil {
 		return err
 	}
-	content, err := os.ReadFile(filePath)
+	content, err := readFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -195,11 +199,11 @@ func AddLineToFile(filePath, lineText, commentText string) error {
 
 // This function removes airflow db init from the Dockerfile. Needed by astro run command
 func RemoveLineFromFile(filePath, lineText, commentText string) error {
-	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
+	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm) //nolint:gomnd
 	if err != nil {
 		return err
 	}
-	content, err := os.ReadFile(filePath)
+	content, err := readFile(filePath)
 	if err != nil {
 		return err
 	}
