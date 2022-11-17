@@ -430,7 +430,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New(ansi.Red("X") + " errors detected in your local DAGs are listed above")
 		}
-		return errors.Wrap(err, ansi.Red("X") + " something went wrong while parsing your DAGs")
+		return errors.Wrap(err, ansi.Red("X")+" something went wrong while parsing your DAGs")
 	}
 	fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your local DAGs ")
 	return err
