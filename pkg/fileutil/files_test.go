@@ -320,14 +320,14 @@ func TestAddLineToFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			openFile = openFileError
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.ErrorIs(t, err, errMock)
+			assert.Contains(t, err.Error(), errMock.Error())
 		})
 
 		t.Run(tt.name, func(t *testing.T) {
 			openFile = os.OpenFile
 			readFile = readFileError
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.ErrorIs(t, err, errMock)
+			assert.Contains(t, err.Error(), errMock.Error())
 		})
 	}
 }
