@@ -313,6 +313,8 @@ func TestAddLineToFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = os.ReadFile
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
 			assert.NoError(t, err)
 		})
@@ -363,6 +365,7 @@ func TestRemoveLineFromFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
 			readFile = os.ReadFile
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
 			assert.NoError(t, err)
