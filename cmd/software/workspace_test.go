@@ -11,7 +11,6 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 var mockWorkspace = &houston.Workspace{
@@ -49,8 +48,8 @@ func TestWorkspaceList(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(&houston.AppConfig{}, nil)
-	api.On("ListWorkspaces").Return(mockWorkspaces, nil)
+	api.On("GetAppConfig", nil).Return(&houston.AppConfig{}, nil)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaces, nil)
 
 	houstonClient = api
 
@@ -72,7 +71,7 @@ func TestWorkspaceCreate(t *testing.T) {
 	defer func() { houstonClient = currentClient }()
 	workspaceCreateLabel = "test"
 
-	houstonMock.On("CreateWorkspace", workspaceCreateLabel, mock.Anything).Return(&houston.Workspace{ID: "test", Label: workspaceCreateLabel}, nil).Once()
+	houstonMock.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: workspaceCreateLabel, Description: "N/A"}).Return(&houston.Workspace{ID: "test", Label: workspaceCreateLabel}, nil).Once()
 	err = workspaceCreate(&cobra.Command{}, buf)
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), workspaceCreateLabel)
@@ -113,7 +112,7 @@ func TestWorkspaceUpdate(t *testing.T) {
 	workspaceUpdateLabel = "test"
 	workspaceUpdateDescription = "test"
 
-	houstonMock.On("UpdateWorkspace", wsID, map[string]string{"label": workspaceUpdateLabel, "description": workspaceUpdateDescription}).Return(&houston.Workspace{ID: wsID, Label: workspaceUpdateLabel}, nil).Once()
+	houstonMock.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: wsID, Args: map[string]string{"label": workspaceUpdateLabel, "description": workspaceUpdateDescription}}).Return(&houston.Workspace{ID: wsID, Label: workspaceUpdateLabel}, nil).Once()
 	err = workspaceUpdate(&cobra.Command{}, buf, []string{wsID})
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), wsID)
@@ -133,7 +132,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonClient = houstonMock
 		defer func() { houstonClient = currentClient }()
 
-		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
 		assert.NoError(t, err)
@@ -152,7 +151,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonClient = houstonMock
 		defer func() { houstonClient = currentClient }()
 
-		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
 		assert.NoError(t, err)
@@ -172,7 +171,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 		houstonClient = houstonMock
 		defer func() { houstonClient = currentClient }()
 
-		houstonMock.On("GetWorkspace", wsID).Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
 		err := workspaceSwitch(&cobra.Command{}, buf, []string{wsID})
 		assert.NoError(t, err)

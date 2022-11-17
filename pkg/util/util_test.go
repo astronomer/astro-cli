@@ -2,6 +2,8 @@ package util
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCoerce(t *testing.T) {
@@ -213,4 +215,16 @@ func TestCheckEnvBool(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsM1(t *testing.T) {
+	t.Run("returns true if running on arm architecture", func(t *testing.T) {
+		assert.True(t, IsM1("darwin", "arm64"))
+	})
+	t.Run("returns false if not running on arm architecture", func(t *testing.T) {
+		assert.False(t, IsM1("darwin", "x86_64"))
+	})
+	t.Run("returns false if running on windows", func(t *testing.T) {
+		assert.False(t, IsM1("windows", "amd64"))
+	})
 }

@@ -67,8 +67,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
+func newDeploymentUserAddCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "add",
 		Short:   "Add a user to a deployment",
@@ -88,8 +87,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
+func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "remove [email]",
 		Short:   "Remove a user from a deployment",
@@ -105,8 +103,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
-func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
+func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command { //nolint:dupl
 	cmd := &cobra.Command{
 		Use:     "update [email]",
 		Short:   "Update a user's role for a deployment",

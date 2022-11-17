@@ -2,11 +2,12 @@ package airflow
 
 import (
 	"bytes"
-	"crypto/md5" // nolint:gosec
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"html/template"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
@@ -18,7 +19,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile string, noCache bool, noBrowser bool) error
+	Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error
 	Stop() error
 	PS() error
 	Kill() error

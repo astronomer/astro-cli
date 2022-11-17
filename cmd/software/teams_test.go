@@ -74,7 +74,7 @@ func TestNewTeamListCmd(t *testing.T) {
 	}
 
 	api := new(mocks.ClientInterface)
-	api.On("ListTeams", "", teams.ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{team}}, nil)
+	api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{team}}, nil)
 	houstonClient = api
 
 	output, err := execTeamCmd("list")
@@ -88,7 +88,7 @@ func TestNewTeamUpdateCmd(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("CreateTeamSystemRoleBinding", "team-id", houston.SystemAdminRole).Return(houston.SystemAdminRole, nil)
+	api.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "team-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil)
 	houstonClient = api
 
 	output, err := execTeamCmd("update", "team-id", "--role", houston.SystemAdminRole)
@@ -103,7 +103,7 @@ func TestListTeam(t *testing.T) {
 
 	t.Run("success with page size more than the threshold", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("ListTeams", "", teams.ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		houstonClient = api
 		defer testUtil.MockUserInput(t, "q")()
 
@@ -115,7 +115,7 @@ func TestListTeam(t *testing.T) {
 
 	t.Run("success with negative page size", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("ListTeams", "", teams.ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		houstonClient = api
 		defer testUtil.MockUserInput(t, "q")()
 
@@ -127,7 +127,7 @@ func TestListTeam(t *testing.T) {
 
 	t.Run("success without pagination", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
-		api.On("ListTeams", "", teams.ListTeamLimit).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
+		api.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: teams.ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		houstonClient = api
 
 		output, err := execTeamCmd("list")

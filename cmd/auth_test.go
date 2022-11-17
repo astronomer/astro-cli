@@ -31,7 +31,7 @@ func TestLogin(t *testing.T) {
 		return nil
 	}
 
-	softwareLogin = func(domain string, oAuthOnly bool, username, password string, client houston.ClientInterface, out io.Writer) error {
+	softwareLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 		assert.Equal(t, softwareDomain, domain)
 		return nil
 	}

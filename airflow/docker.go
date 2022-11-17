@@ -39,7 +39,7 @@ import (
 const (
 	componentName                  = "airflow"
 	dockerStateUp                  = "running"
-	defaultAirflowVersion          = uint64(0x2) // nolint:gomnd
+	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
 	pytestDirectory                = "tests"
@@ -65,14 +65,17 @@ var (
 	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
+	errWebServerUnHealthy    = errors.New("webserver failed to start")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
 	envExportSettings = settings.EnvExport
 
-	openURL    = browser.OpenURL
-	timeoutNum = 60
-	tickNum    = 500
+	openURL        = browser.OpenURL
+	timeoutNum     = 60
+	tickNum        = 500
+	startupTimeout time.Duration
+	isM1           = util.IsM1
 )
 
 // ComposeConfig is input data to docker compose yaml template
@@ -141,7 +144,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 }
 
 // Start starts a local airflow development cluster
-func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool) error {
+func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
@@ -206,7 +209,19 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 		return err
 	}
 
-	err = checkWebserverHealth(settingsFile, project, d.composeService, airflowDockerVersion, noBrowser)
+	startupTimeout = waitTime
+	// check if user provided a waitTime
+	// default is 1 minute
+	if waitTime != 1*time.Minute {
+		startupTimeout = waitTime
+	} else if isM1(runtime.GOOS, runtime.GOARCH) {
+		// user did not provide a waitTime
+		// if running darwin/M1 architecture
+		// we wait for a longer startup time
+		startupTimeout = 5 * time.Minute
+	}
+
+	err = checkWebserverHealth(settingsFile, project, d.composeService, airflowDockerVersion, noBrowser, startupTimeout)
 	if err != nil {
 		return err
 	}
@@ -606,9 +621,11 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage str
 	return project, err
 }
 
-var checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+var checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	// check if webserver is healthy for user
-	err := composeService.Events(context.Background(), project.Name, api.EventsOptions{
+	err := composeService.Events(ctx, project.Name, api.EventsOptions{
 		Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
 			marshal, err := json.Marshal(map[string]interface{}{
 				"action": event.Status,
@@ -657,11 +674,18 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 				}
 				return errComposeProjectRunning
 			}
+
 			return nil
 		},
 	})
-	if err != nil && !errors.Is(err, errComposeProjectRunning) {
-		return err
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			fmt.Println("\nProject is not running. Run 'astro dev logs --webserver | --scheduler' for details.")
+			return fmt.Errorf("%w: timed out after %s", errWebServerUnHealthy, timeout)
+		}
+		if !errors.Is(err, errComposeProjectRunning) {
+			return err
+		}
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/software/workspace"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -105,8 +106,11 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 			return workspaceSwitch(cmd, out, args)
 		},
 	}
-	cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated workspace list")
-	cmd.Flags().IntVarP(&workspacePageSize, "page-size", "s", 0, "Page size of the workspace list if paginated is set to true")
+
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated workspace list")
+		cmd.Flags().IntVarP(&workspacePageSize, "page-size", "s", 0, "Page size of the workspace list if paginated is set to true")
+	}
 	return cmd
 }
 
@@ -196,6 +200,11 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 			logrus.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
 			workspacePageSize = defaultPageSize
 		}
+	}
+
+	// overriding workspace pagesize if houston version is before 0.30.0, since that doesn't support pagination
+	if !houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+		workspacePageSize = 0
 	}
 
 	return workspace.Switch(id, workspacePageSize, houstonClient, out)

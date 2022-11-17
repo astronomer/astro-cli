@@ -84,8 +84,10 @@ func orgLookup(domain string) (string, error) {
 		Data:    reqData,
 		Context: ctx,
 		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
-	res, err := httpClient.Do("POST", addr, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return "", err
 	}
@@ -118,8 +120,10 @@ func requestToken(authConfig astro.AuthConfig, verifier, code string) (Result, e
 		Data:    []byte(data.Encode()),
 		Context: ctx,
 		Headers: map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
+		Path:    addr,
+		Method:  http.MethodPost,
 	}
-	res, err := httpClient.Do("POST", addr, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return Result{}, fmt.Errorf("could not retrieve token: %w", err)
 	}
@@ -143,7 +147,7 @@ func requestToken(authConfig astro.AuthConfig, verifier, code string) (Result, e
 
 func authorizeCallbackHandler() (string, error) {
 	m := http.NewServeMux()
-	s := http.Server{Addr: "localhost:12345", Handler: m}
+	s := http.Server{Addr: "localhost:12345", Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if errorCode, ok := req.URL.Query()["error"]; ok {
@@ -223,7 +227,7 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:gomnd
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 	r.Read(token)
 	verifier := util.Base64URLEncode(token)
 	hash32 := sha256.Sum256([]byte(verifier)) // Sum256 returns a [32]byte
@@ -378,7 +382,7 @@ func Login(domain, orgID, token string, client astro.Client, out io.Writer, shou
 		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
 		res = Result{
 			AccessToken: token,
-			ExpiresIn:   86400, // nolint:gomnd
+			ExpiresIn:   86400, //nolint:gomnd
 		}
 	}
 
@@ -473,8 +477,10 @@ func ValidateDomain(domain string) (astro.AuthConfig, error) {
 	doOptions := &httputil.DoOptions{
 		Context: ctx,
 		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
+		Path:    addr,
+		Method:  http.MethodGet,
 	}
-	res, err := httpClient.Do("GET", addr, doOptions)
+	res, err := httpClient.Do(doOptions)
 	if err != nil {
 		return authConfig, err
 	}

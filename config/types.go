@@ -36,6 +36,7 @@ type cfgs struct {
 	SkipParse            cfg
 	Interactive          cfg
 	PageSize             cfg
+	SQLCLI               cfg
 }
 
 // Creates a new cfg struct

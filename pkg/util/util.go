@@ -76,3 +76,13 @@ func CheckEnvBool(envBool string) bool {
 	}
 	return false
 }
+
+// IsM1 returns true if running on M1 architecture
+// returns false if not running on M1 architecture
+// We use this to setup longerHealthCheck
+func IsM1(myOS, myArch string) bool {
+	if myOS == "darwin" {
+		return strings.Contains(myArch, "arm")
+	}
+	return false
+}

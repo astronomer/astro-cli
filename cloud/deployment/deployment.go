@@ -175,7 +175,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	if organizationID == "" {
-		return fmt.Errorf(noWorkspaceMsg, workspaceID) // nolint:goerr113
+		return fmt.Errorf(noWorkspaceMsg, workspaceID) //nolint:goerr113
 	}
 	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Label)
 
@@ -239,7 +239,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	if waitForStatus {
 		err = healthPoll(d.ID, workspaceID, client)
 		if err != nil {
-			errOutput := createOutput(organizationID, workspaceID, &d)
+			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
 				return errOutput
 			}
@@ -247,7 +247,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
-	err = createOutput(organizationID, workspaceID, &d)
+	err = createOutput(workspaceID, &d)
 	if err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	return nil
 }
 
-func createOutput(organizationID, workspaceID string, d *astro.Deployment) error {
+func createOutput(workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	currentTag := d.DeploymentSpec.Image.Tag
@@ -462,8 +462,8 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	}
 
 	if dagDeploy == "enable" {
-		fmt.Println("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled." +
-			"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..")
+		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted and new tasks will continue to be scheduled." +
+			"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..\n\n")
 		deploymentUpdate.DagDeployEnabled = true
 	} else if dagDeploy == "disable" {
 		if config.CFG.ShowWarnings.GetBool() {

@@ -125,7 +125,7 @@ func newDeploymentCreateCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "To enable dag deploy for the Deployment")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
@@ -147,7 +147,7 @@ func newDeploymentUpdateCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "To enable dag deploy for the Deployment.")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the deployment")
 	return cmd
 }
 
@@ -199,7 +199,7 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [key1=val1 key2=val2]",
@@ -224,7 +224,7 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nolint:dupl
+//nolint:dupl
 func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [key1=update_val1 key2=update_val2]",

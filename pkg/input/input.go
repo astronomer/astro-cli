@@ -32,7 +32,7 @@ func Confirm(promptText string) (bool, error) {
 // Password requests a users passord, does not print out what they entered, and returns it
 func Password(promptText string) (string, error) {
 	fmt.Print(promptText)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin)) // nolint: unconvert
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin)) //nolint: unconvert
 	if err != nil {
 		return "", err
 	}

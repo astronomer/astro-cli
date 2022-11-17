@@ -39,8 +39,8 @@ Successfully added cl0evnxfl0120dxxu1s4nbnk7 to airflow
 `
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("AddWorkspaceTeam", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID, mockWorkspaceTeamRole.Role).Return(mockWorkspace, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockWorkspaceTeamRole.Team.ID, Role: mockWorkspaceTeamRole.Role}).Return(mockWorkspace, nil)
 	houstonClient = api
 
 	output, err := execWorkspaceCmd(
@@ -60,8 +60,8 @@ func TestWorkspaceTeamRm(t *testing.T) {
 	mockTeamID := "ckc0eir8e01gj07608ajmvia1"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("DeleteWorkspaceTeam", mockWorkspace.ID, mockTeamID).Return(mockWorkspace, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockTeamID}).Return(mockWorkspace, nil)
 	houstonClient = api
 
 	expected := ` NAME                          WORKSPACE ID                                      TEAM ID                                           
@@ -80,9 +80,9 @@ func TestWorkspaceTeamUpdateCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
-	api.On("GetAppConfig").Return(mockAppConfig, nil)
-	api.On("GetWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID).Return(mockWorkspaceTeam, nil)
-	api.On("UpdateWorkspaceTeamRole", mockWorkspace.ID, mockWorkspaceTeamRole.Team.ID, mockWorkspaceTeamRole.Role).Return(mockWorkspace.Label, nil)
+	api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+	api.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockWorkspaceTeamRole.Team.ID}).Return(mockWorkspaceTeam, nil)
+	api.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockWorkspaceTeamRole.Team.ID, Role: mockWorkspaceTeamRole.Role}).Return(mockWorkspace.Label, nil)
 	houstonClient = api
 
 	_, err := execWorkspaceCmd(
