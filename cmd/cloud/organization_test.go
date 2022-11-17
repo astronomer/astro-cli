@@ -80,10 +80,8 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 	files, _ := os.ReadDir(currentDir)
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), "audit-logs-") {
-			func() {
-				defer os.Remove(file.Name())
-			}
+			os.Remove(file.Name())
 		}
 	}
-	defer os.Remove("test.json")
+	os.Remove("test.json")
 }
