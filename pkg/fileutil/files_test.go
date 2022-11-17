@@ -1,7 +1,7 @@
 package fileutil
 
 import (
-	"io/fs"
+	f "io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +13,7 @@ import (
 
 var errMock = errors.New("mock error")
 
-type FileMode = fs.FileMode
+type FileMode = f.FileMode
 
 func openFileError(name string, flag int, perm FileMode) (*os.File, error) {
 	return nil, errMock
