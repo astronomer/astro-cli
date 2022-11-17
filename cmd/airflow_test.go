@@ -11,8 +11,8 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
-	"github.com/astronomer/astro-cli/config"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -449,7 +449,7 @@ func TestAirflowStart(t *testing.T) {
 		// 	return mockContainerHandler, nil
 		// }
 		config.CFG.PostgresPort.SetHomeString("0")
-		
+
 		err := airflowStart(cmd, args)
 		assert.Contains(t, err, "is already in use.")
 	})
@@ -465,7 +465,7 @@ func TestAirflowStart(t *testing.T) {
 		// }
 		config.CFG.PostgresPort.SetHomeString("5432")
 		config.CFG.WebserverPort.SetHomeString("0")
-		
+
 		err := airflowStart(cmd, args)
 		assert.Contains(t, err, "is already in use.")
 	})
