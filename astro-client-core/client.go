@@ -16,7 +16,7 @@ import (
 var (
 	ErrorRequest = errors.New("failed to perform request")
 	ErrorBaseURL = errors.New("invalid baseurl")
-	ErrorServer  = errors.New("server error")
+	ErrorServer  = errors.New("")
 )
 
 // a shorter alias
@@ -56,7 +56,7 @@ func NormalizeAPIError(httpResp *http.Response, body []byte, err error) error {
 		if err != nil {
 			return fmt.Errorf("%w, status %d", ErrorRequest, httpResp.StatusCode)
 		}
-		return fmt.Errorf("%w, %s", ErrorServer, decode.Message)
+		return errors.New(decode.Message) //nolint:goerr113
 	}
 	return nil
 }
