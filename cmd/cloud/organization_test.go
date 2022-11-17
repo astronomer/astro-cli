@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -74,4 +75,14 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
+
+	// Delete audit logs exports
+	currentDir, _ := os.Getwd()
+	files, _ := os.ReadDir(currentDir)
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), "audit-logs-") {
+			os.Remove(file.Name())
+		}
+	}
+	os.Remove("test.json")
 }

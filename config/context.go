@@ -17,8 +17,6 @@ var (
 	errNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
 )
 
-var splitNum = 2
-
 const (
 	contextsKey = "contexts"
 )

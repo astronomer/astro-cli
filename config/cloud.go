@@ -1,11 +1,14 @@
 package config
 
 import (
-	"fmt"
 	"io"
-	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+)
+
+const (
+	graphqlEndpoint = "graphql"
 )
 
 // PrintCloudContext prints current context to stdOut
@@ -50,45 +53,13 @@ func PrintCurrentCloudContext(out io.Writer) error {
 	return nil
 }
 
-// GetCloudAPIURL returns full Astronomer API Url for the provided Context
-func (c *Context) GetCloudAPIURL() string {
-	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
-		return CFG.LocalAstro.GetString()
-	}
-
-	domain := c.Domain
-	if strings.Contains(domain, cloudDomain) {
-		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
-		domain = splitDomain[1]
-	}
-
-	return fmt.Sprintf(
-		"%s://api.%s/hub/v1",
-		CFG.CloudAPIProtocol.GetString(),
-		domain,
-	)
-}
-
-func (c *Context) GetAPIDomain() string {
-	domain := c.Domain
-	if strings.Contains(domain, cloudDomain) {
-		splitDomain := strings.SplitN(domain, ".", splitNum) // This splits out 'cloud' from the domain string
-		domain = splitDomain[1]
-	}
-	return domain
-}
-
 // GetPublicGraphQLAPIURL returns full Astrohub API Url for the provided Context
 func (c *Context) GetPublicGraphQLAPIURL() string {
 	if c.Domain == localhostDomain || c.Domain == astrohubDomain {
 		return CFG.LocalPublicAstro.GetString()
 	}
-
-	return fmt.Sprintf(
-		"%s://api.%s/hub/graphql",
-		CFG.CloudAPIProtocol.GetString(),
-		c.GetAPIDomain(),
-	)
+	domain := domainutil.FormatDomain(c.Domain)
+	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, graphqlEndpoint)
 }
 
 // GetPublicRESTAPIURL returns full core API Url for the provided Context
@@ -97,9 +68,7 @@ func (c *Context) GetPublicRESTAPIURL() string {
 		return CFG.LocalCore.GetString()
 	}
 
-	return fmt.Sprintf(
-		"%s://api.%s/v1alpha1",
-		CFG.CloudAPIProtocol.GetString(),
-		c.GetAPIDomain(),
-	)
+	domain := domainutil.FormatDomain(c.Domain)
+	addr := domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domain, "v1alpha1")
+	return domainutil.TransformToCoreAPIEndpoint(addr)
 }

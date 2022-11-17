@@ -112,6 +112,30 @@ func Test_validateDomain(t *testing.T) {
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
+
+	t.Run("pr preview is a valid domain", func(t *testing.T) {
+		// mocking this as once a PR closes, test would fail
+		mockResponse := astro.AuthConfig{
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		}
+		jsonResponse, err := json.Marshal(mockResponse)
+		assert.NoError(t, err)
+		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		domain = "pr1234.astronomer-dev.io"
+		actual, err = ValidateDomain(domain)
+		assert.NoError(t, err)
+		assert.Equal(t, actual.ClientID, mockResponse.ClientID)
+		assert.Equal(t, actual.Audience, mockResponse.Audience)
+		assert.Equal(t, actual.DomainURL, mockResponse.DomainURL)
+	})
 }
 
 func TestOrgLookup(t *testing.T) {
@@ -500,6 +524,47 @@ func TestLogin(t *testing.T) {
 		err := Login("astronomer.io", "", "", mockClient, mockCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
 	})
+	t.Run("can login to a pr preview environment successfully", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPrPreview)
+		// mocking this as once a PR closes, test would fail
+		mockAuthConfigResponse := astro.AuthConfig{
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		}
+		jsonResponse, err := json.Marshal(mockAuthConfigResponse)
+		assert.NoError(t, err)
+		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
+		orgChecker := func(domain string) (string, error) {
+			return "test-org-id", nil
+		}
+		callbackHandler := func() (string, error) {
+			return "test-code", nil
+		}
+		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
+			return mockResponse, nil
+		}
+		openURL = func(url string) error {
+			return nil
+		}
+		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
+
+		err = Login("pr5723.cloud.astronomer-dev.io", "", "", mockClient, mockCoreClient, os.Stdout, false)
+		assert.NoError(t, err)
+	})
 
 	t.Run("oauth token success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
@@ -567,8 +632,11 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
+		orgChecker := func(domain string) (string, error) {
+			return "test-org-id", nil
+		}
 		authenticator = Authenticator{
-			orgChecker:      orgLookup,
+			orgChecker:      orgChecker,
 			callbackHandler: func() (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 				return Result{
@@ -598,8 +666,11 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
+		orgChecker := func(domain string) (string, error) {
+			return "test-org-id", nil
+		}
 		authenticator = Authenticator{
-			orgChecker:      orgLookup,
+			orgChecker:      orgChecker,
 			callbackHandler: func() (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 				return Result{

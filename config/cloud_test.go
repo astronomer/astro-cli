@@ -33,42 +33,7 @@ contexts:
 	InitConfig(fs)
 }
 
-func TestContextGetCloudAPIURL(t *testing.T) {
-	initTestConfig()
-	CFG.LocalAstro.SetHomeString("http://localhost/v1")
-	CFG.CloudAPIProtocol.SetHomeString("https")
-	type fields struct {
-		Domain string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   string
-	}{
-		{
-			name:   "basic localhost case",
-			fields: fields{Domain: "localhost"},
-			want:   "http://localhost/v1",
-		},
-		{
-			name:   "basic cloud case",
-			fields: fields{Domain: "cloud.astro.io"},
-			want:   "https://api.astro.io/hub/v1",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := &Context{
-				Domain: tt.fields.Domain,
-			}
-			if got := c.GetCloudAPIURL(); got != tt.want {
-				t.Errorf("Context.GetCloudAPIURL() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestContextGetPublicAPIURL(t *testing.T) {
+func TestContextGetPublicGraphQLAPIURL(t *testing.T) {
 	initTestConfig()
 	CFG.CloudAPIProtocol.SetHomeString("https")
 	type fields struct {
@@ -96,7 +61,7 @@ func TestContextGetPublicAPIURL(t *testing.T) {
 				Domain: tt.fields.Domain,
 			}
 			if got := c.GetPublicGraphQLAPIURL(); got != tt.want {
-				t.Errorf("Context.GetPublicAPIURL() = %v, want %v", got, tt.want)
+				t.Errorf("Context.GetPublicGraphQLAPIURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}
