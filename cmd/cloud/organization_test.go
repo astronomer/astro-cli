@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -67,7 +68,7 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 		cmdArgs := []string{"audit-logs", "export", "--organization-name", "Astronomer"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
-		files, err := filepath.Glob("audit-logs-*")
+		files, err := filepath.Glob(fmt.Sprintf("%s-*", auditLogsDefaultFileNamePrefix))
 		assert.NoError(t, err)
 		for _, f := range files {
 			err = os.Remove(f)
