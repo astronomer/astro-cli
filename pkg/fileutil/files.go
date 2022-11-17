@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	perm os.FileMode = 0o777
-	openFile = os.OpenFile
-	readFile = os.ReadFile
+	perm     os.FileMode = 0o777
+	openFile             = os.OpenFile
+	readFile             = os.ReadFile
 )
 
 // Exists returns a boolean indicating if the given path already exists
