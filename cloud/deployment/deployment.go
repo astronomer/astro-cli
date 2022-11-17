@@ -462,10 +462,18 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	}
 
 	if dagDeploy == "enable" {
+		if currentDeployment.DagDeployEnabled {
+			fmt.Println("\nDAG-only deploys is already enabled for this deployment.")
+			return nil
+		}
 		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted and new tasks will continue to be scheduled." +
 			"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..\n\n")
 		deploymentUpdate.DagDeployEnabled = true
 	} else if dagDeploy == "disable" {
+		if !currentDeployment.DagDeployEnabled {
+			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
+			return nil
+		}
 		if config.CFG.ShowWarnings.GetBool() {
 			i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
 				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
