@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -66,11 +67,19 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 		cmdArgs := []string{"audit-logs", "export", "--organization-name", "Astronomer"}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
+		files, err := filepath.Glob("audit-logs-*")
+		assert.NoError(t, err)
+		for _, f := range files {
+			err = os.Remove(f)
+			assert.NoError(t, err)
+		}
 	})
 
 	t.Run("with auditLogsOutputFilePath param", func(t *testing.T) {
 		cmdArgs := []string{"audit-logs", "export", "--organization-name", "Astronomer", "--output-file", "test.json"}
 		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		err = os.Remove("test.json")
 		assert.NoError(t, err)
 	})
 }

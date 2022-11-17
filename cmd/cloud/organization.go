@@ -22,6 +22,7 @@ var (
 	auditLogsOutputFilePath            string
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 90
+	auditLogsDefaultFileNamePrefix     = "audit-logs"
 	shouldDisplayLoginLink             bool
 )
 
@@ -131,7 +132,7 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 	if auditLogsOutputFilePath != "" {
 		outputFileName = auditLogsOutputFilePath
 	} else {
-		outputFileName = fmt.Sprintf("audit-logs-%s.gz", time.Now().Format("2006-01-02-150405"))
+		outputFileName = fmt.Sprintf("%s-%s.gz", auditLogsDefaultFileNamePrefix, time.Now().Format("2006-01-02-150405"))
 	}
 
 	var filePerms fs.FileMode = 0o755
