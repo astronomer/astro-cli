@@ -417,7 +417,7 @@ func checkPytest(pytest, deployImage string, containerHandler airflow.ContainerH
 	exitCode, err := containerHandler.Pytest(pytestArgs, "", deployImage)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New(ansi.Red("X") + " at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
+			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 		}
 		return errors.Wrap(err, "Something went wrong while Pytesting your local DAGs,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
 	}

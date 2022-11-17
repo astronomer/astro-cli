@@ -404,7 +404,7 @@ func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImage
 	if strings.Contains(exitCode, "0") { // if the error code is 0 the pytests passed
 		return "", nil
 	}
-	return exitCode, errors.New(ansi.Red("X") + " something went wrong while Pytesting your DAGs")
+	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
 }
 
 func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
@@ -428,9 +428,9 @@ func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
 	exitCode, err := d.Pytest(pytestArgs, customImageName, deployImageName)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
-			return errors.New(ansi.Red("X") + " errors detected in your local DAGs are listed above")
+			return errors.New("errors detected in your local DAGs are listed above")
 		}
-		return errors.Wrap(err, ansi.Red("X")+" something went wrong while parsing your DAGs")
+		return errors.Wrap(err, "something went wrong while parsing your DAGs")
 	}
 	fmt.Println("\n" + ansi.Green("✔") + " no errors detected in your local DAGs ")
 	return err
