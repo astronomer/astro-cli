@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
+	"github.com/astronomer/astro-cli/config"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
@@ -436,6 +437,37 @@ func TestAirflowStart(t *testing.T) {
 
 		err := airflowStart(cmd, args)
 		assert.ErrorIs(t, err, errMock)
+	})
+
+	t.Run("postgres port in use", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{"test-env-file"}
+
+		// mockContainerHandler := new(mocks.ContainerHandler)
+		// containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+		// 	mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false, 1*time.Minute).Return(nil).Once()
+		// 	return mockContainerHandler, nil
+		// }
+		config.CFG.PostgresPort.SetHomeString("0")
+		
+		err := airflowStart(cmd, args)
+		assert.Contains(t, err, "is already in use.")
+	})
+
+	t.Run("postgres port in use", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{"test-env-file"}
+
+		// mockContainerHandler := new(mocks.ContainerHandler)
+		// containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+		// 	mockContainerHandler.On("Start", "", "airflow_settings.yaml", false, false, 1*time.Minute).Return(nil).Once()
+		// 	return mockContainerHandler, nil
+		// }
+		config.CFG.PostgresPort.SetHomeString("5432")
+		config.CFG.WebserverPort.SetHomeString("0")
+		
+		err := airflowStart(cmd, args)
+		assert.Contains(t, err, "is already in use.")
 	})
 }
 
@@ -1154,4 +1186,8 @@ func TestPrepareDefaultAirflowImageTag(t *testing.T) {
 		resp := prepareDefaultAirflowImageTag("", nil)
 		assert.Equal(t, airflowversions.DefaultRuntimeVersion, resp)
 	})
+}
+
+func TestCheckPort(t *testing.T) {
+
 }
