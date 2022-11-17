@@ -443,10 +443,10 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		config.CFG.PostgresPort.SetHomeString("0")
+		config.CFG.PostgresPort.SetHomeString("1023")
 
 		err := airflowStart(cmd, args)
-		assert.Contains(t, err.Error(), "mock error")
+		assert.Contains(t, err.Error(), "is already in use.")
 	})
 
 	t.Run("postgres port in use", func(t *testing.T) {
@@ -454,10 +454,10 @@ func TestAirflowStart(t *testing.T) {
 		args := []string{"test-env-file"}
 
 		config.CFG.PostgresPort.SetHomeString("5432")
-		config.CFG.WebserverPort.SetHomeString("0")
+		config.CFG.WebserverPort.SetHomeString("1023")
 
 		err := airflowStart(cmd, args)
-		assert.Contains(t, err.Error(), "mock error")
+		assert.Contains(t, err.Error(), "is already in use.")
 	})
 }
 
