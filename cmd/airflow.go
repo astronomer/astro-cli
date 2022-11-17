@@ -91,6 +91,7 @@ astro dev init --airflow-version 2.2.3
 	pytestDir = "/tests"
 
 	airflowUpgradeCheckCmd = []string{"bash", "-c", "pip install --no-deps 'apache-airflow-upgrade-check'; python -c 'from packaging.version import Version\nfrom airflow import __version__\nif Version(__version__) < Version(\"1.10.14\"):\n  print(\"Please upgrade your image to Airflow 1.10.14 first, then try again.\");exit(1)\nelse:\n  from airflow.upgrade.checker import __main__;__main__()'"}
+	checkPortFunc = checkPort
 )
 
 func newDevRootCmd() *cobra.Command {
@@ -502,11 +503,11 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		envFile = args[0]
 	}
 	// check if ports are allocated
-	err := checkPort(config.CFG.PostgresPort.GetString())
+	err := checkPortFunc(config.CFG.PostgresPort.GetString())
 	if err != nil {
 		return errors.Wrap(err, "the Postgres port "+config.CFG.PostgresPort.GetString()+" is already in use. Either Airflow is already running in this Astro project, another Astro project, or another service is using this port")
 	}
-	err = checkPort(config.CFG.WebserverPort.GetString())
+	err = checkPortFunc(config.CFG.WebserverPort.GetString())
 	if err != nil {
 		return errors.Wrap(err, "the Webserver port "+config.CFG.WebserverPort.GetString()+" is already in use. Either Airflow is already running in the Astro project, another Astro project, or another service is using this port")
 	}

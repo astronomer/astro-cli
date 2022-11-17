@@ -12,11 +12,21 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
-	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
+
+func checkPortError(port string) error {
+	return errMock
+}
+
+func checkPortErrorWebserver(port string) error {
+	if port == "8080" {
+		return errMock
+	}
+	return nil
+}
 
 var errMock = errors.New("mock error")
 
@@ -443,21 +453,20 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		config.CFG.PostgresPort.SetHomeString("1023")
+		checkPortFunc = checkPortError
 
 		err := airflowStart(cmd, args)
-		assert.Contains(t, err.Error(), "is already in use.")
+		assert.ErrorIs(t, err, errMock)
 	})
 
 	t.Run("postgres port in use", func(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		config.CFG.PostgresPort.SetHomeString("5432")
-		config.CFG.WebserverPort.SetHomeString("1023")
+		checkPortFunc = checkPortErrorWebserver
 
 		err := airflowStart(cmd, args)
-		assert.Contains(t, err.Error(), "is already in use.")
+		assert.ErrorIs(t, err, errMock)
 	})
 }
 
