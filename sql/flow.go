@@ -80,7 +80,12 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return err
 	}
 
-	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
+	baseImage, err := getBaseDockerImageURI(astroSQLCliConfigURL)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion))
 	if err := os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
