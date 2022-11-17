@@ -302,6 +302,14 @@ func TestAddLineToFile(t *testing.T) {
 			name: "basic case",
 			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
 		},
+		{
+			name: "fail open file",
+			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
+		},
+		{
+			name: "fail read file",
+			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -342,6 +350,14 @@ func TestRemoveLineFromFile(t *testing.T) {
 	}{
 		{
 			name: "basic case",
+			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
+		},
+		{
+			name: "fail open file",
+			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
+		},
+		{
+			name: "fail read file",
 			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
 		},
 	}
