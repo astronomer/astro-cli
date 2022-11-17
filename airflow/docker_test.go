@@ -1392,3 +1392,44 @@ func TestStartDocker(t *testing.T) {
 		assert.Contains(t, err.Error(), "timed out waiting for docker")
 	})
 }
+
+func TestCreateDockerProject(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	configYaml := testUtils.NewTestConfig(testUtils.LocalPlatform)
+	err := afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	assert.NoError(t, err)
+	config.InitConfig(fs)
+	t.Run("case when project doesnot have docker-compose.override.yml", func(t *testing.T) {
+		prj, err := createDockerProject("test", "", "", "test-image:latest", map[string]string{})
+		assert.NoError(t, err)
+		postgresService := types.ServiceConfig{}
+		serviceFound := false
+		for _, service := range prj.Services {
+			if service.Name == "webserver" {
+				postgresService = service
+				serviceFound = true
+				break
+			}
+		}
+		assert.True(t, serviceFound)
+		assert.Equal(t, "test-image:latest", postgresService.Image)
+	})
+
+	t.Run("case when project has docker-compose.override.yml", func(t *testing.T) {
+		composeOverrideFilename = "./testfiles/docker-compose.override.yml"
+		prj, err := createDockerProject("test", "", "", "test-image:latest", map[string]string{})
+		assert.NoError(t, err)
+		postgresService := types.ServiceConfig{}
+		serviceFound := false
+		for _, service := range prj.Services {
+			if service.Name == "postgres" {
+				postgresService = service
+				serviceFound = true
+				break
+			}
+		}
+		assert.True(t, serviceFound)
+		assert.Equal(t, "postgres", postgresService.Name)
+		assert.Equal(t, 5433, int(postgresService.Ports[len(prj.Services[0].Ports)-1].Published))
+	})
+}

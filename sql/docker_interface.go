@@ -21,6 +21,7 @@ type DockerBind interface {
 	ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error
 	ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.ContainerWaitOKBody, <-chan error)
 	ContainerLogs(ctx context.Context, container string, options types.ContainerLogsOptions) (io.ReadCloser, error)
+	ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error
 }
 
 func (d DockerBinder) ImageBuild(ctx context.Context, buildContext io.Reader, options *types.ImageBuildOptions) (types.ImageBuildResponse, error) {
@@ -41,6 +42,10 @@ func (d DockerBinder) ContainerWait(ctx context.Context, containerID string, con
 
 func (d DockerBinder) ContainerLogs(ctx context.Context, containerID string, options types.ContainerLogsOptions) (io.ReadCloser, error) {
 	return d.cli.ContainerLogs(ctx, containerID, options)
+}
+
+func (d DockerBinder) ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error {
+	return d.cli.ContainerRemove(ctx, containerID, options)
 }
 
 func NewDockerClient() (DockerBind, error) {
