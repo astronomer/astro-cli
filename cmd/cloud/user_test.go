@@ -104,7 +104,7 @@ func TestUserInvite(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		_, err := execUserCmd(cmdArgs...)
-		assert.EqualError(t, err, "server error, failed to create invite: test-error")
+		assert.EqualError(t, err, "failed to create invite: test-error")
 	})
 
 	t.Run("any context errors from api are returned and no invite gets created", func(t *testing.T) {

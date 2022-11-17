@@ -58,7 +58,7 @@ func TestCreateInvite(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 	t.Run("error path when CreateUserInviteWithResponse returns an error", func(t *testing.T) {
-		expectedOutMessage := "server error, failed to create invite: test-inv-error"
+		expectedOutMessage := "failed to create invite: test-inv-error"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
@@ -112,7 +112,7 @@ func TestCreateInvite(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
 		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", testWriter{Error: errorInvite}, mockClient)
-		assert.EqualError(t, err, "server error, failed to create invite: test-inv-error")
+		assert.EqualError(t, err, "failed to create invite: test-inv-error")
 	})
 }
 
