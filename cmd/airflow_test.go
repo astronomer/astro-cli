@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"net"
+
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
@@ -17,15 +19,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func checkPortError(port string) error {
-	return errMock
+func listenError(network, address string) (net.Listener, error) {
+	return nil, errMock
 }
 
-func checkPortErrorWebserver(port string) error {
-	if port == "8080" {
-		return errMock
+func listenErrorWebserver(network, address string) (net.Listener, error) {
+	if address == "localhost:8080" {
+		return nil, errMock
 	}
-	return nil
+	return nil, nil
 }
 
 var errMock = errors.New("mock error")
@@ -453,7 +455,7 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		checkPortFunc = checkPortError
+		listen = listenError
 
 		err := airflowStart(cmd, args)
 		assert.ErrorIs(t, err, errMock)
@@ -463,7 +465,7 @@ func TestAirflowStart(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
-		checkPortFunc = checkPortErrorWebserver
+		listen = listenErrorWebserver
 
 		err := airflowStart(cmd, args)
 		assert.ErrorIs(t, err, errMock)
