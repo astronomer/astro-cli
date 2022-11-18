@@ -585,6 +585,12 @@ func TestNoDagsDeployVR(t *testing.T) {
 }
 
 func TestDeployFailure(t *testing.T) {
+	os.Mkdir("./testfiles/dags", os.ModePerm)
+	path := "./testfiles/dags/test.py"
+	fileutil.WriteStringToFile(path, "testing")
+
+	defer os.RemoveAll("./testfiles/dags/")
+
 	// no context set failure
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
