@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"testing"
 	"time"
 	"net"
 	"context"
-
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
