@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 	"net"
+	"context"
 
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -27,7 +28,8 @@ func listenErrorWebserver(network, address string) (net.Listener, error) {
 	if address == "localhost:8080" {
 		return nil, errMock
 	}
-	return nil, nil
+	var lc net.ListenConfig
+	return lc.Listen(context.Background(), network, address)
 }
 
 var errMock = errors.New("mock error")
@@ -461,7 +463,7 @@ func TestAirflowStart(t *testing.T) {
 		assert.ErrorIs(t, err, errMock)
 	})
 
-	t.Run("postgres port in use", func(t *testing.T) {
+	t.Run("webserver port in use", func(t *testing.T) {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
