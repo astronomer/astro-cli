@@ -268,9 +268,13 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			return err
 		}
 
-		err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
-		if err != nil {
-			return err
+		if len(dagFiles) > 0 {
+			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+			if err != nil {
+				return err
+			}
+		} else {
+			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
 		// Create the image
