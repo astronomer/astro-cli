@@ -2,11 +2,12 @@ package inspect
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
+	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
@@ -21,37 +22,20 @@ var (
 	errMarshal       = errors.New("test error")
 )
 
-type deploymentMetadata struct {
-	DeploymentID   string    `mapstructure:"deployment_id"`
-	WorkspaceID    string    `mapstructure:"workspace_id"`
-	ClusterID      string    `mapstructure:"cluster_id"`
-	ReleaseName    string    `mapstructure:"release_name"`
-	AirflowVersion string    `mapstructure:"airflow_version"`
-	Status         string    `mapstructure:"status"`
-	CreatedAt      time.Time `mapstructure:"created_at"`
-	UpdatedAt      time.Time `mapstructure:"updated_at"`
-	DeploymentURL  string    `mapstructure:"deployment_url"`
-	WebserverURL   string    `mapstructure:"webserver_url"`
-}
-
-type deploymentConfig struct {
-	Name           string                   `mapstructure:"name"`
-	Description    string                   `mapstructure:"description"`
-	RunTimeVersion string                   `mapstructure:"runtime_version"`
-	SchedulerAU    int                      `mapstructure:"scheduler_au"`
-	SchedulerCount int                      `mapstructure:"scheduler_count"`
-	ClusterID      string                   `mapstructure:"cluster_id"` // this is also in deploymentMetadata
-	AlertEmails    []string                 `mapstructure:"alert_emails"`
-	WorkerQueues   []map[string]interface{} `mapstructure:"worker_queues"`
-	AstroVariables []map[string]interface{} `mapstructure:"environment_variables"`
-}
-
 func errReturningYAMLMarshal(v interface{}) ([]byte, error) {
 	return []byte{}, errMarshal
 }
 
 func errReturningJSONMarshal(v interface{}, prefix, indent string) ([]byte, error) {
 	return []byte{}, errMarshal
+}
+
+func errorReturningDecode(input, output interface{}) error {
+	return errMarshal
+}
+
+func restoreDecode(replace func(input, output interface{}) error) {
+	decodeToStruct = replace
 }
 
 func restoreJSONMarshal(replace func(v interface{}, prefix, indent string) ([]byte, error)) {
@@ -316,7 +300,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		}
 		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
 		assert.NoError(t, err)
-		err = mapstructure.Decode(rawDeploymentInfo, &actualDeploymentInfo)
+		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentInfo)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
 	})
@@ -339,7 +323,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		}
 		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
 		assert.NoError(t, err)
-		err = mapstructure.Decode(rawDeploymentInfo, &actualDeploymentInfo)
+		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentInfo)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
 	})
@@ -350,7 +334,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		expectedDeploymentMetadata := deploymentMetadata{}
 		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		err = mapstructure.Decode(rawDeploymentInfo, &actualDeploymentInfo)
+		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentInfo)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
 	})
@@ -438,12 +422,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 			RunTimeVersion: sourceDeployment.RuntimeRelease.Version,
 			SchedulerAU:    sourceDeployment.DeploymentSpec.Scheduler.AU,
 			SchedulerCount: sourceDeployment.DeploymentSpec.Scheduler.Replicas,
-			AlertEmails:    nil,
-			WorkerQueues:   nil,
-			AstroVariables: nil,
 		}
 		rawDeploymentConfig := getDeploymentConfig(&sourceDeployment)
-		err := mapstructure.Decode(rawDeploymentConfig, &actualDeploymentConfig)
+		err := decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
 	})
@@ -613,23 +594,20 @@ func TestGetAdditional(t *testing.T) {
 	}
 
 	t.Run("returns alert emails, queues and variables for the requested deployment", func(t *testing.T) {
-		var actualDeploymentConfig deploymentConfig
+		var expectedAdditional, actualAdditional orderedPieces
+
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		expectedDeploymentConfig := deploymentConfig{
-			Name:           "",
-			Description:    "",
-			ClusterID:      "",
-			RunTimeVersion: "",
-			SchedulerAU:    0,
-			SchedulerCount: 0,
-			AlertEmails:    sourceDeployment.AlertEmails,
-			WorkerQueues:   getQMap(sourceDeployment.WorkerQueues),
-			AstroVariables: getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects),
+		rawExpected := map[string]interface{}{
+			"alert_emails":          sourceDeployment.AlertEmails,
+			"worker_queues":         getQMap(sourceDeployment.WorkerQueues),
+			"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
-		rawDeploymentConfig := getAdditional(&sourceDeployment)
-		err := mapstructure.Decode(rawDeploymentConfig, &actualDeploymentConfig)
+		rawAdditional := getAdditional(&sourceDeployment)
+		err := decodeToStruct(rawAdditional, &actualAdditional)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentConfig, actualDeploymentConfig)
+		err = decodeToStruct(rawExpected, &expectedAdditional)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedAdditional, actualAdditional)
 	})
 }
 
@@ -712,34 +690,184 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		info, _ := getDeploymentInspectInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
-		expectedPrintableDeployment = []byte("\n    metadata:\n")
-		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
+
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
+			},
+		}
+		expectedDeployment := `deployment:
+    environment_variables:
+        - is_secret: false
+          key: foo
+          updated_at: NOW
+          value: bar
+        - is_secret: true
+          key: bar
+          updated_at: NOW+1
+          value: baz
+    configuration:
+        name: test-deployment-label
+        description: description
+        runtime_version: 6.0.0
+        scheduler_au: 5
+        scheduler_count: 3
+        cluster_id: cluster-id
+    worker_queues:
+        - name: default
+          id: test-wq-id
+          is_default: true
+          max_worker_count: 130
+          min_worker_count: 12
+          worker_concurrency: 110
+          node_pool_id: test-pool-id
+        - name: test-queue-1
+          id: test-wq-id-1
+          is_default: false
+          max_worker_count: 175
+          min_worker_count: 8
+          worker_concurrency: 150
+          node_pool_id: test-pool-id-1
+    metadata:
+        deployment_id: test-deployment-id
+        workspace_id: test-ws-id
+        cluster_id: cluster-id
+        release_name: great-release-name
+        airflow_version: 2.4.0
+        status: UNHEALTHY
+        created_at: 2022-11-17T13:25:55.275697-08:00
+        updated_at: 2022-11-17T13:25:55.275697-08:00
+        deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+        webserver_url: some-url
+    alert_emails:
+        - email1
+        - email2
+`
+		var orderedAndTaggedDeployment, unorderedDeployment formattedDeployment
+		actualPrintableDeployment, err := formatPrintableDeployment("", printableDeployment)
 		assert.NoError(t, err)
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n    configuration:\n")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n    alert_emails:\n")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n    worker_queues:\n")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n    environment_variables:\n")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
+		// testing we get valid yaml
+		err = yaml.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
+		assert.NoError(t, err)
+		// update time and create time are not equal here so can not do equality check
+		assert.NotEqual(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
+
+		unordered, err := yaml.Marshal(printableDeployment)
+		assert.NoError(t, err)
+		err = yaml.Unmarshal(unordered, &unorderedDeployment)
+		assert.NoError(t, err)
+		// testing the structs are equal regardless of order
+		assert.Equal(t, orderedAndTaggedDeployment, unorderedDeployment, "structs should match")
+		// testing the order is not equal
+		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
 	})
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
 		info, _ := getDeploymentInspectInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
-		expectedPrintableDeployment = []byte(",\n        \"metadata\":")
-		actualPrintableDeployment, err := formatPrintableDeployment("json", getPrintableDeployment(info, config, additional))
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
+			},
+		}
+		expectedDeployment := `{
+    "deployment": {
+        "environment_variables": [
+            {
+                "is_secret": false,
+                "key": "foo",
+                "updated_at": "NOW",
+                "value": "bar"
+            },
+            {
+                "is_secret": true,
+                "key": "bar",
+                "updated_at": "NOW+1",
+                "value": "baz"
+            }
+        ],
+        "configuration": {
+            "name": "test-deployment-label",
+            "description": "description",
+            "runtime_version": "6.0.0",
+            "scheduler_au": 5,
+            "scheduler_count": 3,
+            "cluster_id": "cluster-id"
+        },
+        "worker_queues": [
+            {
+                "name": "default",
+                "id": "test-wq-id",
+                "is_default": true,
+                "max_worker_count": 130,
+                "min_worker_count": 12,
+                "worker_concurrency": 110,
+                "node_pool_id": "test-pool-id"
+            },
+            {
+                "name": "test-queue-1",
+                "id": "test-wq-id-1",
+                "is_default": false,
+                "max_worker_count": 175,
+                "min_worker_count": 8,
+                "worker_concurrency": 150,
+                "node_pool_id": "test-pool-id-1"
+            }
+        ],
+        "metadata": {
+            "deployment_id": "test-deployment-id",
+            "workspace_id": "test-ws-id",
+            "cluster_id": "cluster-id",
+            "release_name": "great-release-name",
+            "airflow_version": "2.4.0",
+            "status": "UNHEALTHY",
+            "created_at": "2022-11-17T12:26:45.362983-08:00",
+            "updated_at": "2022-11-17T12:26:45.362983-08:00",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "webserver_url": "some-url"
+        },
+        "alert_emails": [
+            "email1",
+            "email2"
+        ]
+    }
+}`
+		var orderedAndTaggedDeployment, unorderedDeployment formattedDeployment
+		actualPrintableDeployment, err := formatPrintableDeployment("json", printableDeployment)
 		assert.NoError(t, err)
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n        \"configuration\": ")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n        \"alert_emails\": ")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n        \"worker_queues\": ")
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-		expectedPrintableDeployment = []byte("\n        \"environment_variables\": ")
+		// testing we get valid json
+		err = json.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
+		assert.NoError(t, err)
+		// update time and create time are not equal here so can not do equality check
+		assert.NotEqual(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
+
+		unordered, err := json.MarshalIndent(printableDeployment, "", "    ")
+		assert.NoError(t, err)
+		err = json.Unmarshal(unordered, &unorderedDeployment)
+		assert.NoError(t, err)
+		// testing the structs are equal regardless of order
+		assert.Equal(t, orderedAndTaggedDeployment, unorderedDeployment, "structs should match")
+		// testing the order is not equal
+		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
+	})
+	t.Run("returns an error if decoding to struct fails", func(t *testing.T) {
+		originalDecode := decodeToStruct
+		decodeToStruct = errorReturningDecode
+		defer restoreDecode(originalDecode)
+		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		config := getDeploymentConfig(&sourceDeployment)
+		additional := getAdditional(&sourceDeployment)
+		expectedPrintableDeployment = []byte{}
+		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
+		assert.ErrorIs(t, err, errMarshal)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
 	t.Run("returns an error if marshaling yaml fails", func(t *testing.T) {
@@ -844,7 +972,7 @@ func TestGetSpecificField(t *testing.T) {
 	info, _ := getDeploymentInspectInfo(&sourceDeployment)
 	config := getDeploymentConfig(&sourceDeployment)
 	additional := getAdditional(&sourceDeployment)
-	t.Run("returns a value if key is found in deployment.information", func(t *testing.T) {
+	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
 		requestedField := "metadata.workspace_id"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
@@ -949,7 +1077,7 @@ func TestGetSpecificField(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, sourceDeployment.Cluster.ID, actual)
 	})
-	t.Run("returns error if no value if found", func(t *testing.T) {
+	t.Run("returns error if no value is found", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,

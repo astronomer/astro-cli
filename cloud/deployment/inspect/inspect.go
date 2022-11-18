@@ -6,16 +6,70 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 )
 
+type deploymentMetadata struct {
+	DeploymentID   string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID    string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID      string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName    string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	Status         string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt      time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt      time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL  string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL   string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+}
+
+type deploymentConfig struct {
+	Name           string `mapstructure:"name" yaml:"name" json:"name"`
+	Description    string `mapstructure:"description" yaml:"description" json:"description"`
+	RunTimeVersion string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
+	SchedulerAU    int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
+	SchedulerCount int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
+	ClusterID      string `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"` // this is also in deploymentMetadata
+}
+
+type workerq struct {
+	Name              string `mapstructure:"name" yaml:"name" json:"name"`
+	ID                string `mapstructure:"id" yaml:"id" json:"id"`
+	IsDefault         bool   `mapstructure:"is_default" yaml:"is_default" json:"is_default"`
+	MaxWorkerCount    int    `mapstructure:"max_worker_count" yaml:"max_worker_count" json:"max_worker_count"`
+	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
+	WorkerConcurrency int    `mapstructure:"worker_concurrency" yaml:"worker_concurrency" json:"worker_concurrency"`
+	NodePoolID        string `mapstructure:"node_pool_id" yaml:"node_pool_id" json:"node_pool_id"`
+}
+
+type environmentVariable struct {
+	IsSecret  bool   `mapstructure:"is_secret" yaml:"is_secret" json:"is_secret"`
+	Key       string `mapstructure:"key" yaml:"key" json:"key"`
+	UpdatedAt string `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	Value     string `mapstructure:"value" yaml:"value" json:"value"`
+}
+
+type orderedPieces struct {
+	EnvVars       []environmentVariable `mapstructure:"environment_variables" yaml:"environment_variables" json:"environment_variables"`
+	Configuration deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
+	WorkerQs      []workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
+	Metadata      deploymentMetadata    `mapstructure:"metadata" yaml:"metadata" json:"metadata"`
+	AlertEmails   []string              `mapstructure:"alert_emails" yaml:"alert_emails" json:"alert_emails"`
+}
+
+type formattedDeployment struct {
+	Deployment orderedPieces `mapstructure:"deployment" yaml:"deployment" json:"deployment"`
+}
+
 var (
 	jsonMarshal    = json.MarshalIndent
 	yamlMarshal    = yaml.Marshal
+	decodeToStruct = mapstructure.Decode
 	errKeyNotFound = errors.New("not found in deployment")
 )
 
@@ -141,18 +195,24 @@ func getVariablesMap(sourceDeploymentVars []astro.EnvironmentVariablesObject) []
 
 func formatPrintableDeployment(outputFormat string, printableDeployment map[string]interface{}) ([]byte, error) {
 	var (
-		infoToPrint []byte
-		err         error
+		infoToPrint     []byte
+		err             error
+		formatWithOrder formattedDeployment
 	)
 
+	// use mapstructure to decode to a struct
+	err = decodeToStruct(printableDeployment, &formatWithOrder)
+	if err != nil {
+		return []byte{}, err
+	}
 	switch outputFormat {
 	case jsonFormat:
-		if infoToPrint, err = jsonMarshal(printableDeployment, "", "    "); err != nil {
+		if infoToPrint, err = jsonMarshal(formatWithOrder, "", "    "); err != nil {
 			return []byte{}, err
 		}
 	default:
 		// always yaml by default
-		if infoToPrint, err = yamlMarshal(printableDeployment); err != nil {
+		if infoToPrint, err = yamlMarshal(formatWithOrder); err != nil {
 			return []byte{}, err
 		}
 	}
