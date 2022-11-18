@@ -16,16 +16,17 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID   string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID    string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID      string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName    string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	Status         string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt      time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt      time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL  string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL   string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	DeploymentID     string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID      string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID        string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName      string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion   string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	DagDeployEnabled bool      `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	Status           string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt        time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt        time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL    string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL     string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
 }
 
 type deploymentConfig struct {
@@ -91,7 +92,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	}
 
 	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInspectInfo(&requestedDeployment)
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment)
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	return nil
 }
 
-func getDeploymentInspectInfo(sourceDeployment *astro.Deployment) (map[string]interface{}, error) {
+func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface{}, error) {
 	var (
 		deploymentURL string
 		err           error
@@ -130,16 +131,17 @@ func getDeploymentInspectInfo(sourceDeployment *astro.Deployment) (map[string]in
 		return nil, err
 	}
 	return map[string]interface{}{
-		"deployment_id":   sourceDeployment.ID,
-		"workspace_id":    sourceDeployment.Workspace.ID,
-		"cluster_id":      sourceDeployment.Cluster.ID,
-		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
-		"release_name":    sourceDeployment.ReleaseName,
-		"deployment_url":  deploymentURL,
-		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,
-		"created_at":      sourceDeployment.CreatedAt,
-		"updated_at":      sourceDeployment.UpdatedAt,
-		"status":          sourceDeployment.Status,
+		"deployment_id":      sourceDeployment.ID,
+		"workspace_id":       sourceDeployment.Workspace.ID,
+		"cluster_id":         sourceDeployment.Cluster.ID,
+		"airflow_version":    sourceDeployment.RuntimeRelease.AirflowVersion,
+		"release_name":       sourceDeployment.ReleaseName,
+		"deployment_url":     deploymentURL,
+		"webserver_url":      sourceDeployment.DeploymentSpec.Webserver.URL,
+		"created_at":         sourceDeployment.CreatedAt,
+		"updated_at":         sourceDeployment.UpdatedAt,
+		"status":             sourceDeployment.Status,
+		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
 	}, nil
 }
 

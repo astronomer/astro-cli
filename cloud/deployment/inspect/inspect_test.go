@@ -247,7 +247,8 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 				},
 			},
 		},
-		RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
+		DagDeployEnabled: true,
+		RuntimeRelease:   astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
 		DeploymentSpec: astro.DeploymentSpec{
 			Executor: "CeleryExecutor",
 			Scheduler: astro.Scheduler{
@@ -281,62 +282,64 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		Status:    "HEALTHY",
 	}
 
-	t.Run("returns deployment Info for the requested cloud deployment", func(t *testing.T) {
-		var actualDeploymentInfo deploymentMetadata
+	t.Run("returns deployment metadata for the requested cloud deployment", func(t *testing.T) {
+		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentMetadata := deploymentMetadata{
-			DeploymentID:   sourceDeployment.ID,
-			WorkspaceID:    sourceDeployment.Workspace.ID,
-			ClusterID:      sourceDeployment.Cluster.ID,
-			AirflowVersion: sourceDeployment.RuntimeRelease.AirflowVersion,
-			ReleaseName:    sourceDeployment.ReleaseName,
-			DeploymentURL:  expectedCloudDomainURL,
-			WebserverURL:   sourceDeployment.DeploymentSpec.Webserver.URL,
-			CreatedAt:      sourceDeployment.CreatedAt,
-			UpdatedAt:      sourceDeployment.UpdatedAt,
-			Status:         sourceDeployment.Status,
+			DeploymentID:     sourceDeployment.ID,
+			WorkspaceID:      sourceDeployment.Workspace.ID,
+			ClusterID:        sourceDeployment.Cluster.ID,
+			AirflowVersion:   sourceDeployment.RuntimeRelease.AirflowVersion,
+			ReleaseName:      sourceDeployment.ReleaseName,
+			DeploymentURL:    expectedCloudDomainURL,
+			WebserverURL:     sourceDeployment.DeploymentSpec.Webserver.URL,
+			CreatedAt:        sourceDeployment.CreatedAt,
+			UpdatedAt:        sourceDeployment.UpdatedAt,
+			Status:           sourceDeployment.Status,
+			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
 		}
-		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
+		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.NoError(t, err)
-		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentInfo)
+		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
+		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
 	})
-	t.Run("returns deployment Info for the requested local deployment", func(t *testing.T) {
-		var actualDeploymentInfo deploymentMetadata
+	t.Run("returns deployment metadata for the requested local deployment", func(t *testing.T) {
+		var actualDeploymentMeta deploymentMetadata
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentMetadata := deploymentMetadata{
-			DeploymentID:   sourceDeployment.ID,
-			WorkspaceID:    sourceDeployment.Workspace.ID,
-			ClusterID:      sourceDeployment.Cluster.ID,
-			ReleaseName:    sourceDeployment.ReleaseName,
-			AirflowVersion: sourceDeployment.RuntimeRelease.AirflowVersion,
-			Status:         sourceDeployment.Status,
-			CreatedAt:      sourceDeployment.CreatedAt,
-			UpdatedAt:      sourceDeployment.UpdatedAt,
-			DeploymentURL:  expectedCloudDomainURL,
-			WebserverURL:   sourceDeployment.DeploymentSpec.Webserver.URL,
+			DeploymentID:     sourceDeployment.ID,
+			WorkspaceID:      sourceDeployment.Workspace.ID,
+			ClusterID:        sourceDeployment.Cluster.ID,
+			ReleaseName:      sourceDeployment.ReleaseName,
+			AirflowVersion:   sourceDeployment.RuntimeRelease.AirflowVersion,
+			Status:           sourceDeployment.Status,
+			CreatedAt:        sourceDeployment.CreatedAt,
+			UpdatedAt:        sourceDeployment.UpdatedAt,
+			DeploymentURL:    expectedCloudDomainURL,
+			WebserverURL:     sourceDeployment.DeploymentSpec.Webserver.URL,
+			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
 		}
-		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
+		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.NoError(t, err)
-		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentInfo)
+		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
+		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
 	})
 	t.Run("returns error if getting context fails", func(t *testing.T) {
-		var actualDeploymentInfo deploymentMetadata
+		var actualDeploymentMeta deploymentMetadata
 		// get an error from GetCurrentContext()
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		expectedDeploymentMetadata := deploymentMetadata{}
-		rawDeploymentInfo, err := getDeploymentInspectInfo(&sourceDeployment)
+		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
-		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentInfo)
+		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentInfo)
+		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
 	})
 }
 
@@ -504,7 +507,7 @@ func TestGetPrintableDeployment(t *testing.T) {
 		Status:    "UNHEALTHY",
 	}
 	t.Run("returns a deployment map", func(t *testing.T) {
-		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedDeployment := map[string]interface{}{
@@ -637,7 +640,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				},
 			},
 		},
-		RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
+		DagDeployEnabled: true,
+		RuntimeRelease:   astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
 		DeploymentSpec: astro.DeploymentSpec{
 			Executor: "CeleryExecutor",
 			Scheduler: astro.Scheduler{
@@ -687,7 +691,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 	var expectedPrintableDeployment []byte
 
 	t.Run("returns a yaml formatted printable deployment", func(t *testing.T) {
-		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 
@@ -738,6 +742,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         cluster_id: cluster-id
         release_name: great-release-name
         airflow_version: 2.4.0
+        dag_deploy_enabled: true
         status: UNHEALTHY
         created_at: 2022-11-17T13:25:55.275697-08:00
         updated_at: 2022-11-17T13:25:55.275697-08:00
@@ -766,7 +771,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
 	})
 	t.Run("returns a json formatted printable deployment", func(t *testing.T) {
-		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		printableDeployment := map[string]interface{}{
@@ -828,6 +833,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "cluster_id": "cluster-id",
             "release_name": "great-release-name",
             "airflow_version": "2.4.0",
+            "dag_deploy_enabled": true,
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
@@ -862,7 +868,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		originalDecode := decodeToStruct
 		decodeToStruct = errorReturningDecode
 		defer restoreDecode(originalDecode)
-		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte{}
@@ -874,7 +880,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		originalMarshal := yamlMarshal
 		yamlMarshal = errReturningYAMLMarshal
 		defer restoreYAMLMarshal(originalMarshal)
-		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte{}
@@ -886,7 +892,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		originalMarshal := jsonMarshal
 		jsonMarshal = errReturningJSONMarshal
 		defer restoreJSONMarshal(originalMarshal)
-		info, _ := getDeploymentInspectInfo(&sourceDeployment)
+		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
 		expectedPrintableDeployment = []byte{}
@@ -969,7 +975,7 @@ func TestGetSpecificField(t *testing.T) {
 		Status:    "UNHEALTHY",
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	info, _ := getDeploymentInspectInfo(&sourceDeployment)
+	info, _ := getDeploymentInfo(&sourceDeployment)
 	config := getDeploymentConfig(&sourceDeployment)
 	additional := getAdditional(&sourceDeployment)
 	t.Run("returns a value if key is found in deployment.metadata", func(t *testing.T) {
