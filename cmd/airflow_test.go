@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"context"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
