@@ -303,7 +303,7 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 		return err
 	}
 	activeOrgID := c.Organization
-	// OrganizationId is optional, it may not returned by getSelf api
+	// OrganizationId is optional, it may not be returned by getSelf api
 	if selfResp.JSON200.OrganizationId != nil {
 		activeOrgID = *selfResp.JSON200.OrganizationId
 	}
