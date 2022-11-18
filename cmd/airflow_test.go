@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"net"
 	"context"
 
 	"github.com/astronomer/astro-cli/airflow"
