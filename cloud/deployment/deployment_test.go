@@ -743,8 +743,52 @@ func TestUpdate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("do not update deployment to enable dag deploy if already enabled", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		deploymentResp = astro.Deployment{
+			ID:               "test-id",
+			DagDeployEnabled: true,
+		}
+
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		err := Update("test-id", "", ws, "", "", "enable", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("update deployment to disable dag deploy", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
+		deploymentResp = astro.Deployment{
+			ID:               "test-id",
+			RuntimeRelease:   astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec:   astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+			DagDeployEnabled: true,
+			Cluster: astro.Cluster{
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-node-pool-id",
+						IsDefault:        true,
+						NodeInstanceType: "test-default-node-pool",
+						CreatedAt:        time.Time{},
+					},
+				},
+			},
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					ID:         "test-queue-id",
+					Name:       "default",
+					IsDefault:  true,
+					NodePoolID: "test-default-node-pool",
+				},
+				{
+					Name:       "test-queue",
+					IsDefault:  false,
+					NodePoolID: "test-node-pool-id",
+				},
+			},
+		}
+
 		deploymentUpdateInput := astro.UpdateDeploymentInput{
 			ID:               "test-id",
 			ClusterID:        "",
@@ -767,6 +811,20 @@ func TestUpdate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "n")()
 		err = Update("test-id", "", ws, "", "", "disable", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("do not update deployment to disable dag deploy if already disabled", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		deploymentResp = astro.Deployment{
+			ID:               "test-id",
+			DagDeployEnabled: false,
+		}
+
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		err := Update("test-id", "", ws, "", "", "disable", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -912,9 +970,16 @@ func TestGetDeploymentURL(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)
 	})
+	t.Run("returns deploymentURL for pr preview environment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPrPreview)
+		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
+		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedURL, actualURL)
+	})
 	t.Run("returns deploymentURL for local environment", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedURL := "cloud.localhost/workspace-id/deployments/deployment-id/analytics"
+		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedURL, actualURL)

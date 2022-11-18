@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/spf13/cobra"
@@ -16,8 +17,7 @@ var (
 	// CloudDomainRegex is used to differentiate cloud domain from software domain
 	// See https://github.com/astronomer/astrohub-cli/issues/7 for regexp rationale
 	// This will need to be handled as part of the permanent solution to issue #432
-	CloudDomainRegex = regexp.MustCompile(`(cloud\.|^)astronomer(?:(-dev|-stage|-perf))?\.io`)
-
+	CloudDomainRegex     = regexp.MustCompile(`(?:(pr\d{4,6})\.|^)(?:cloud\.|)astronomer(?:-(dev|stage|perf))?\.io$`)
 	contextDeleteWarnMsg = "Are you sure you want to delete currently used context: %s"
 	cancelCtxDeleteMsg   = "Canceling context delete..."
 	failCtxDeleteMsg     = "Error deleting context %s: "
@@ -29,12 +29,6 @@ var tab = printutil.Table{
 	Header:       []string{"NAME"},
 	ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
 }
-
-const (
-	DevCloudDomain   = "astronomer-dev.io"
-	StageCloudDomain = "astronomer-stage.io"
-	PerfCloudDomain  = "astronomer-perf.io"
-)
 
 // ContextExists checks to see if context exist in config
 func Exists(domain string) bool {
@@ -166,10 +160,10 @@ func IsCloudContext() bool {
 
 // IsCloudDomain returns whether the given domain is related to cloud platform or not
 func IsCloudDomain(domain string) bool {
-	if domain == DevCloudDomain ||
-		domain == StageCloudDomain ||
-		domain == PerfCloudDomain ||
-		CloudDomainRegex.MatchString(domain) {
+	if CloudDomainRegex.MatchString(domain) {
+		return true
+	}
+	if domainutil.PRPreviewDomainRegex.MatchString(domain) {
 		return true
 	}
 

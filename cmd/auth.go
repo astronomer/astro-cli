@@ -3,6 +3,8 @@ package cmd
 import (
 	"io"
 
+	"github.com/astronomer/astro-cli/pkg/domainutil"
+
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/context"
@@ -66,7 +68,7 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.W
 	ctx, err := context.GetCurrentContext()
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
-		return cloudLogin(cloudAuth.Domain, "", token, astroClient, out, shouldDisplayLoginLink)
+		return cloudLogin(domainutil.DefaultDomain, "", token, astroClient, out, shouldDisplayLoginLink)
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, "", token, astroClient, out, shouldDisplayLoginLink)
 	}

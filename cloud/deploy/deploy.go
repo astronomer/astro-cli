@@ -64,7 +64,10 @@ var (
 	azureUploader        = azure.Upload
 )
 
-var errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+var (
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+)
 
 type deploymentInfo struct {
 	deploymentID     string
@@ -173,18 +176,19 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		return errors.New("no domain set, re-authenticate")
 	}
 
-	dagFiles := fileutil.GetFilesWithSpecificExtension(deployInput.Path+"/dags", ".py")
-	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
-
-		if !i {
-			fmt.Println("Canceling deploy...")
-			return nil
-		}
-	}
+	dagsPath := filepath.Join(deployInput.Path, "dags")
+	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
 	// Deploy dags if deployInput runtimeId is virtual runtime
 	if strings.HasPrefix(deployInput.RuntimeID, "vr-") {
+		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+
+			if !i {
+				fmt.Println("Canceling deploy...")
+				return nil
+			}
+		}
 		fmt.Println("Initiating DAG deploy for: " + deployInput.RuntimeID)
 		err = deployDags(deployInput.Path, deployInput.RuntimeID, client)
 		if err != nil {
@@ -205,9 +209,19 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		return nil
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
-
+	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
+	if err != nil {
+		return err
+	}
 	if deployInput.Dags {
+		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
+			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+
+			if !i {
+				fmt.Println("Canceling deploy...")
+				return nil
+			}
+		}
 		if deployInput.Pytest != "" {
 			version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 			if err != nil {
@@ -239,6 +253,15 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
+		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
+		if !envFileExists {
+			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
+		}
+
+		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 {
+			fmt.Println("No DAGs found. Skipping DAG deploy.")
+		}
+
 		// Build our image
 		version, err := buildImage(deployInput.Path, deployInfo.currentVersion, deployInfo.deployImage, deployInput.ImageName, deployInfo.dagDeployEnabled, client)
 		if err != nil {
@@ -282,7 +305,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			return err
 		}
 
-		if deployInfo.dagDeployEnabled {
+		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
 			err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
