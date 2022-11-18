@@ -292,7 +292,7 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 
 // check client status after a successfully login
 func checkUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
-	// fetch self user base on token
+	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
 	selfResp, err := coreClient.GetSelfUserWithResponse(http_context.Background(), &astrocore.GetSelfUserParams{
