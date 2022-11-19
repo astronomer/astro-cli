@@ -16,6 +16,8 @@ var PRPreviewDomainRegex = regexp.MustCompile(`^(pr\d{4,6}).astronomer-dev\.io$`
 func FormatDomain(domain string) string {
 	if strings.Contains(domain, "cloud") {
 		domain = strings.Replace(domain, "cloud.", "", 1)
+		domain = strings.Replace(domain, "https://", "", 1)
+		domain = strings.TrimRight(domain, "/") // removes trailing / if present
 	} else if domain == "" {
 		domain = DefaultDomain
 	}
