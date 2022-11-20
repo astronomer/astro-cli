@@ -52,16 +52,36 @@ func TestFormatDomain(t *testing.T) {
 		actual := FormatDomain("cloud.astronomer-dev.io")
 		assert.Equal(t, "astronomer-dev.io", actual)
 	})
+	t.Run("removes https://cloud from cloud.astronomer-dev.io", func(t *testing.T) {
+		actual := FormatDomain("https://cloud.astronomer-dev.io")
+		assert.Equal(t, "astronomer-dev.io", actual)
+	})
+	t.Run("removes trailing / from cloud.astronomer-dev.io", func(t *testing.T) {
+		actual := FormatDomain("https://cloud.astronomer-dev.io/")
+		assert.Equal(t, "astronomer-dev.io", actual)
+	})
 	t.Run("removes cloud from cloud.astronomer-stage.io", func(t *testing.T) {
 		actual := FormatDomain("cloud.astronomer-stage.io")
+		assert.Equal(t, "astronomer-stage.io", actual)
+	})
+	t.Run("removes https://cloud from cloud.astronomer-stage.io", func(t *testing.T) {
+		actual := FormatDomain("https://cloud.astronomer-stage.io")
 		assert.Equal(t, "astronomer-stage.io", actual)
 	})
 	t.Run("removes cloud from cloud.astronomer-perf.io", func(t *testing.T) {
 		actual := FormatDomain("cloud.astronomer-perf.io")
 		assert.Equal(t, "astronomer-perf.io", actual)
 	})
+	t.Run("removes https://cloud from cloud.astronomer-perf.io", func(t *testing.T) {
+		actual := FormatDomain("https://cloud.astronomer-perf.io")
+		assert.Equal(t, "astronomer-perf.io", actual)
+	})
 	t.Run("removes cloud from pr1234.cloud.astronomer-dev.io", func(t *testing.T) {
 		actual := FormatDomain("pr1234.cloud.astronomer-dev.io")
+		assert.Equal(t, "pr1234.astronomer-dev.io", actual)
+	})
+	t.Run("removes https://cloud from pr1234.cloud.astronomer-dev.io", func(t *testing.T) {
+		actual := FormatDomain("https://pr1234.cloud.astronomer-dev.io")
 		assert.Equal(t, "pr1234.astronomer-dev.io", actual)
 	})
 	t.Run("sets default domain if one was not provided", func(t *testing.T) {
