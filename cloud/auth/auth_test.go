@@ -59,6 +59,12 @@ var (
 			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1"},
 		},
 	}
+	mockOrganizationsResponseEmpty = astrocore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &[]astrocore.Organization{},
+	}
 )
 
 func Test_validateDomain(t *testing.T) {
@@ -420,6 +426,17 @@ func TestCheckUserSession(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("no organization found", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponseEmpty, nil).Once()
+		ctx := config.Context{Domain: "test-domain"}
+		buf := new(bytes.Buffer)
+		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		assert.Contains(t, err.Error(), "Please contact your Astro Organization Owner to be invited to the organization")
+	})
+
 	t.Run("self user failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -467,6 +484,7 @@ func TestCheckUserSession(t *testing.T) {
 		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("success with workspace switch", func(t *testing.T) {
@@ -481,6 +499,7 @@ func TestCheckUserSession(t *testing.T) {
 		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("success but with workspace switch failure", func(t *testing.T) {
@@ -495,6 +514,7 @@ func TestCheckUserSession(t *testing.T) {
 		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
@@ -523,6 +543,8 @@ func TestLogin(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		err := Login("astronomer.io", "", "", mockClient, mockCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("can login to a pr preview environment successfully", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
@@ -564,6 +586,8 @@ func TestLogin(t *testing.T) {
 
 		err = Login("pr5723.cloud.astronomer-dev.io", "", "", mockClient, mockCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("oauth token success", func(t *testing.T) {
@@ -575,6 +599,8 @@ func TestLogin(t *testing.T) {
 
 		err := Login("astronomer.io", "", "OAuth Token", mockClient, mockCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("invalid domain", func(t *testing.T) {
@@ -614,9 +640,10 @@ func TestLogin(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfErrorResponse, nil).Once()
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		err := Login("", "", "", mockClient, mockCoreClient, os.Stdout, false)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("initial login with empty config file", func(t *testing.T) {
@@ -651,6 +678,8 @@ func TestLogin(t *testing.T) {
 		// do the test
 		err = Login("astronomer.io", "", "", mockClient, mockCoreClient, os.Stdout, true)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("domain doesn't match current context", func(t *testing.T) {
@@ -691,6 +720,8 @@ func TestLogin(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, domainContext.Token, "Bearer access_token")
 		assert.Equal(t, currentContext.Token, "token")
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 

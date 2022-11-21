@@ -51,6 +51,7 @@ func TestList(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("organization list error", func(t *testing.T) {
@@ -59,6 +60,7 @@ func TestList(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		assert.Contains(t, err.Error(), "failed to fetch organizations")
+		mockClient.AssertExpectations(t)
 	})
 }
 
@@ -88,6 +90,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 		buf := new(bytes.Buffer)
 		_, err = getOrganizationSelection(buf, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("get organization selection list error", func(t *testing.T) {
@@ -97,6 +100,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 		buf := new(bytes.Buffer)
 		_, err := getOrganizationSelection(buf, mockClient)
 		assert.Contains(t, err.Error(), "failed to fetch organizations")
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("get organization selection select error", func(t *testing.T) {
@@ -122,6 +126,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 		buf := new(bytes.Buffer)
 		_, err = getOrganizationSelection(buf, mockClient)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
+		mockClient.AssertExpectations(t)
 	})
 }
 
@@ -140,6 +145,7 @@ func TestSwitch(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
 		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("successful switch without name", func(t *testing.T) {
@@ -168,6 +174,7 @@ func TestSwitch(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err = Switch("", mockClient, mockCoreClient, buf, false)
 		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch wrong name", func(t *testing.T) {
@@ -181,6 +188,7 @@ func TestSwitch(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := Switch("name-wrong", mockClient, mockCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationName)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch bad selection", func(t *testing.T) {
@@ -210,6 +218,7 @@ func TestSwitch(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err = Switch("", mockClient, mockCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch bad login", func(t *testing.T) {
@@ -224,5 +233,6 @@ func TestSwitch(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockClient, mockCoreClient, buf, false)
 		assert.ErrorIs(t, err, mockError)
+		mockCoreClient.AssertExpectations(t)
 	})
 }

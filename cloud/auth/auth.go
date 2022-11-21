@@ -42,9 +42,9 @@ const (
 )
 
 var (
-	httpClient = httputil.NewHTTPClient()
-
-	openURL = browser.OpenURL
+	httpClient          = httputil.NewHTTPClient()
+	openURL             = browser.OpenURL
+	ErrorNoOrganization = errors.New("no Organization found. Please contact your Astro Organization Owner to be invited to the organization")
 )
 
 var (
@@ -314,6 +314,9 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 		return err
 	}
 	orgs := *orgsResp.JSON200
+	if len(orgs) == 0 {
+		return ErrorNoOrganization
+	}
 	// default to first one in case something crazy happen lol
 	activeOrg := orgs[0]
 	for i := range orgs {
