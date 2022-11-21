@@ -185,12 +185,22 @@ func TestSetContextKey(t *testing.T) {
 
 func TestSetOrganizationContext(t *testing.T) {
 	initTestConfig()
-	ctx := Context{Domain: "localhost"}
-	ctx.SetOrganizationContext("org1", "org_short_name_1")
-	outCtx, err := ctx.GetContext()
-	assert.NoError(t, err)
-	assert.Equal(t, "org1", outCtx.Organization)
-	assert.Equal(t, "org_short_name_1", outCtx.OrganizationShortName)
+	t.Run("set organization context", func(t *testing.T) {
+		ctx := Context{Domain: "localhost"}
+		ctx.SetOrganizationContext("org1", "org_short_name_1")
+		outCtx, err := ctx.GetContext()
+		assert.NoError(t, err)
+		assert.Equal(t, "org1", outCtx.Organization)
+		assert.Equal(t, "org_short_name_1", outCtx.OrganizationShortName)
+	})
+
+	t.Run("set organization context error", func(t *testing.T) {
+		ctx := Context{Domain: ""}
+		assert.NoError(t, err)
+		err = ctx.SetOrganizationContext("org1", "org_short_name_1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "context config invalid, no domain specified")
+	})
 }
 
 func TestExpiresIn(t *testing.T) {
