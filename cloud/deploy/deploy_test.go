@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
