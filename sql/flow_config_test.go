@@ -12,6 +12,18 @@ func TestGetPypiVersionInvalidHostFailure(t *testing.T) {
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
+func TestGetPypiVersionInvalidJSONFailure(t *testing.T) {
+	_, err := GetPypiVersion("https://pypi.org")
+	expectedErrContains := "error parsing response for project version invalid character '<' looking for beginning of value"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
+func TestGetPypiVersionInvalidHTTPRequestFailure(t *testing.T) {
+	_, err := GetPypiVersion("gs://pyconuk-workshop/")
+	expectedErrContains := "error getting latest release version for project url gs://pyconuk-workshop/"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
 func TestGetBaseDockerImageURIInvalidURLFailure(t *testing.T) {
 	_, err := GetBaseDockerImageURI("http://efgh")
 	expectedErrContains := "error retrieving the latest configuration http://efgh,  Get \"http://efgh\": dial tcp: lookup efgh"
@@ -23,5 +35,11 @@ func TestGetBaseDockerImageURIInvalidURLFailure(t *testing.T) {
 func TestGetBaseDockerImageURIInvalidJSONFailure(t *testing.T) {
 	_, err := GetBaseDockerImageURI("https://github.com/astronomer/astro-sdk/blob/main/README.md")
 	expectedErrContains := "error parsing the base docker image from the configuration file: invalid character '<' looking for beginning of value"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
+func TestGetBaseDockerImageURIInvalidHTTPRequestFailure(t *testing.T) {
+	_, err := GetBaseDockerImageURI("gs://pyconuk-workshop/")
+	expectedErrContains := "error retrieving the latest configuration gs://pyconuk-workshop/"
 	assert.ErrorContains(t, err, expectedErrContains)
 }
