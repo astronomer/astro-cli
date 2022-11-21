@@ -13,6 +13,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -266,13 +267,10 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 
 	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
-	c, err := config.GetCurrentContext()
+	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
 		return err
 	}
-
-	deploymentURL := "cloud." + c.Domain + "/" + workspaceID + "/deployments/" + d.ID + "/analytics"
-
 	tab.SuccessMsg = fmt.Sprintf("\n Successfully created Deployment: %s", ansi.Bold(d.Label)) +
 		"\n Deployment can be accessed at the following URLs \n" +
 		fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
@@ -462,10 +460,19 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	}
 
 	if dagDeploy == "enable" {
-		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks will not be interrupted and new tasks will continue to be scheduled." +
-			"\nRun `astro deploy --dags` after this command to push new changes. It may take a few minutes for the Airflow UI to update..\n\n")
+		if currentDeployment.DagDeployEnabled {
+			fmt.Println("\nDAG-only deploys is already enabled for this deployment.")
+			return nil
+		}
+
+		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
+			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
 		deploymentUpdate.DagDeployEnabled = true
 	} else if dagDeploy == "disable" {
+		if !currentDeployment.DagDeployEnabled {
+			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
+			return nil
+		}
 		if config.CFG.ShowWarnings.GetBool() {
 			i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
 				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
@@ -706,6 +713,12 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	deploymentURL = "cloud." + ctx.Domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	switch ctx.Domain {
+	case domainutil.LocalDomain:
+		deploymentURL = ctx.Domain + ":5000/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	default:
+		_, domain := domainutil.GetPRSubDomain(ctx.Domain)
+		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
+	}
 	return deploymentURL, nil
 }

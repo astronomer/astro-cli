@@ -64,7 +64,10 @@ var (
 	azureUploader        = azure.Upload
 )
 
-var errDagsParseFailed = errors.New("your DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+var (
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
+)
 
 type deploymentInfo struct {
 	deploymentID     string
@@ -206,8 +209,10 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		return nil
 	}
 
-	deploymentURL := "cloud." + domain + "/" + deployInfo.workspaceID + "/deployments/" + deployInfo.deploymentID + "/analytics"
-
+	deploymentURL, err := deployment.GetDeploymentURL(deployInfo.deploymentID, deployInfo.workspaceID)
+	if err != nil {
+		return err
+	}
 	if deployInput.Dags {
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
 			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
@@ -248,6 +253,11 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
+		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
+		if !envFileExists {
+			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
+		}
+
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 {
 			fmt.Println("No DAGs found. Skipping DAG deploy.")
 		}
@@ -258,9 +268,13 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			return err
 		}
 
-		err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
-		if err != nil {
-			return err
+		if len(dagFiles) > 0 {
+			err = parseOrPytestDAG(deployInput.Pytest, version, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace)
+			if err != nil {
+				return err
+			}
+		} else {
+			fmt.Println("No DAGs found. Skipping testing...")
 		}
 
 		// Create the image

@@ -48,7 +48,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		RuntimeID:      "",
 		WsID:           ws,
 		Pytest:         "parse",
-		EnvFile:        "",
+		EnvFile:        "./testfiles/.env",
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
@@ -152,7 +152,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		RuntimeID:      "",
 		WsID:           ws,
 		Pytest:         "parse",
-		EnvFile:        "",
+		EnvFile:        "./testfiles/.env",
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
@@ -257,12 +257,13 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 
 	os.Mkdir("./testfiles1/", os.ModePerm)
 	fileutil.WriteStringToFile("./testfiles1/Dockerfile", "FROM quay.io/astronomer/astro-runtime:4.2.5")
+	fileutil.WriteStringToFile("./testfiles1/.env", "")
 	deployInput = InputDeploy{
 		Path:           "./testfiles1/",
 		RuntimeID:      "",
 		WsID:           ws,
 		Pytest:         "parse",
-		EnvFile:        "",
+		EnvFile:        "./testfiles/.env",
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
@@ -584,6 +585,12 @@ func TestNoDagsDeployVR(t *testing.T) {
 }
 
 func TestDeployFailure(t *testing.T) {
+	os.Mkdir("./testfiles/dags", os.ModePerm)
+	path := "./testfiles/dags/test.py"
+	fileutil.WriteStringToFile(path, "testing")
+
+	defer os.RemoveAll("./testfiles/dags/")
+
 	// no context set failure
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := config.ResetCurrentContext()
@@ -594,7 +601,7 @@ func TestDeployFailure(t *testing.T) {
 		RuntimeID:      "test-id",
 		WsID:           ws,
 		Pytest:         "parse",
-		EnvFile:        "",
+		EnvFile:        "./testfiles/.env",
 		ImageName:      "",
 		DeploymentName: "",
 		Prompt:         true,
@@ -619,7 +626,7 @@ func TestDeployFailure(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Once()
+	mockClient.On("ListDeployments", org, ws).Return(mockDeplyResp, nil).Times(2)
 	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 	mockImageHandler := new(mocks.ImageHandler)
@@ -662,6 +669,12 @@ func TestDeployFailure(t *testing.T) {
 	deployInput.WsID = "invalid-workspace"
 	err = Deploy(deployInput, mockClient)
 	assert.NoError(t, err)
+
+	defer testUtil.MockUserInput(t, "y")()
+	deployInput.WsID = ws
+	deployInput.EnvFile = "invalid-path"
+	err = Deploy(deployInput, mockClient)
+	assert.ErrorIs(t, err, envFileMissing)
 
 	mockClient.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
