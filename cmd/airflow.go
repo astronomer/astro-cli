@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -659,7 +660,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println("\nAll Pytests passed!")
+	fmt.Println("\n" + ansi.Green("✔") + " All Pytests passed!")
 	return err
 }
 
