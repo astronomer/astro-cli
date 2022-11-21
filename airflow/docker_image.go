@@ -339,7 +339,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 	fmt.Println("\nLoading DAGS...")
 
 	cmdErr := cmdExec(DockerCmd, stdout, stderr, args...)
-	fmt.Println("\nSee the output of this command for errors.")// add back later "To view task logs, use the '--task-logs' flag."
+	fmt.Println("\nSee the output of this command for errors.") // add back later "To view task logs, use the '--task-logs' flag."
 	if cmdErr != nil {
 		log.Debug(cmdErr)
 		fmt.Println("If you are having an issue with loading your Settings File make sure both the 'variables' and 'connections' fields exist and that there are no yaml syntax errors")
