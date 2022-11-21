@@ -331,7 +331,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 	args = append(args, cmdArgs...)
 
 	fmt.Println("\nStarting a DAG run for " + dagID + "...")
-	fmt.Println("\nLoading DAGS...")
+	fmt.Println("\nLoading DAGs...")
 
 	cmdErr := cmdExec(DockerCmd, stdout, stderr, args...)
 	fmt.Println("\nSee the output of this command for errors.") // add back later "To view task logs, use the '--task-logs' flag."
