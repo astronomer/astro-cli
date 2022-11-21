@@ -13,10 +13,13 @@ import (
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+var errorLogin = errors.New("failed to login")
 
 func TestSetup(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -272,5 +275,36 @@ func TestCheckAPIKeys(t *testing.T) {
 		// run CheckAPIKeys
 		_, err = checkAPIKeys(mockClient, mockCoreClient, []string{})
 		assert.NoError(t, err)
+	})
+}
+
+func TestCheckToken(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("test check token", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+		authLogin = func(domain, id, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+		// run checkToken
+		err := checkToken(mockClient, mockCoreClient, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("trigger login when no token is found", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+
+		authLogin = func(domain, id, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return errorLogin
+		}
+
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("token", "")
+		// run checkToken
+		err = checkToken(mockClient, mockCoreClient, nil)
+		assert.Contains(t, err.Error(), "failed to login")
 	})
 }
