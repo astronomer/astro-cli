@@ -47,7 +47,7 @@ const (
 	catVarFile            = "cat tmp.var"
 	rmVarFile             = "rm tmp.var"
 	catConnFile           = "cat tmp.connections"
-	configReadErrorMsg    = "Error reading config in home dir: %s\n"
+	configReadErrorMsg    = "Error reading Airflow Settings file. Connections, Variables, and Pools were not loaded please check your Settings file syntax: %s\n"
 	noColorString         = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
 )
 
@@ -589,4 +589,71 @@ func jsonString(conn *Connection) string {
 		extraString = "{" + extraString + "}"
 	}
 	return extraString
+}
+
+func WriteAirflowSettingstoYAML(settingsFile string) error {
+	err := InitSettings(settingsFile)
+	if err != nil {
+		return err
+	}
+
+	// Connections from settings file to connection YAML file
+	connYAMLs := ConnYAMLs{}
+	connections := settings.Airflow.Connections
+	for i := range connections {
+		newConnYAML := ConnYAML{
+			ConnID:   connections[i].ConnID,
+			ConnType: connections[i].ConnType,
+			Host:     connections[i].ConnHost,
+			Schema:   connections[i].ConnSchema,
+			Login:    connections[i].ConnLogin,
+			Password: connections[i].ConnPassword,
+			Port:     connections[i].ConnPort,
+			Extra:    connections[i].ConnExtra,
+		}
+
+		connYAMLs = append(connYAMLs, newConnYAML)
+	}
+
+	connectionsYAML := DAGRunConnections{
+		ConnYAMLs: connYAMLs,
+	}
+
+	out, err := yaml.Marshal(connectionsYAML)
+	if err != nil {
+		fmt.Printf("Error creating connections from settings file: %s\n", err.Error())
+	}
+
+	err = fileutil.WriteStringToFile("./connections.yaml", string(out))
+	if err != nil {
+		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
+	}
+
+	// Variables from settings file to variables YAML file
+	varYAMLs := VarYAMLs{}
+	variables := settings.Airflow.Variables
+	for _, variable := range variables {
+		newVarYAML := VarYAML{
+			Key:   variable.VariableName,
+			Value: variable.VariableValue,
+		}
+
+		varYAMLs = append(varYAMLs, newVarYAML)
+	}
+
+	variablesYAML := DAGRunVariables{
+		VarYAMLs: varYAMLs,
+	}
+
+	out, err = yaml.Marshal(variablesYAML)
+	if err != nil {
+		fmt.Printf("Error creating variabels from settings file: %s\n", err.Error())
+	}
+
+	err = fileutil.WriteStringToFile("./variables.yaml", string(out))
+	if err != nil {
+		fmt.Printf("Error creating connections from settings file:: %s\n", err.Error())
+	}
+
+	return nil
 }

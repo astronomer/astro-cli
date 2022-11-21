@@ -1,13 +1,27 @@
 package fileutil
 
 import (
+	f "io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
+
+var errMock = errors.New("mock error")
+
+type FileMode = f.FileMode
+
+func openFileError(name string, flag int, perm FileMode) (*os.File, error) {
+	return nil, errMock
+}
+
+func readFileError(name string) ([]byte, error) {
+	return nil, errMock
+}
 
 func TestExists(t *testing.T) {
 	filePath := "test.yaml"
@@ -264,6 +278,110 @@ func TestGetFilesWithSpecificExtension(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			files := GetFilesWithSpecificExtension(tt.args.folderPath, tt.args.ext)
 			assert.Equal(t, expectedFiles, files)
+		})
+	}
+}
+
+func TestAddLineToFile(t *testing.T) {
+	filePath := "./test.py"
+	content := "testing"
+
+	WriteStringToFile(filePath, content)
+	defer afero.NewOsFs().Remove(filePath)
+
+	type args struct {
+		filePath    string
+		lineText    string
+		commentText string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "basic case",
+			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
+		},
+		{
+			name: "fail open file",
+			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
+		},
+		{
+			name: "fail read file",
+			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = os.ReadFile
+			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.NoError(t, err)
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = openFileError
+			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.Contains(t, err.Error(), errMock.Error())
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = readFileError
+			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.Contains(t, err.Error(), errMock.Error())
+		})
+	}
+}
+
+func TestRemoveLineFromFile(t *testing.T) {
+	filePath := "./test.py"
+	content := "testing\nremove this"
+
+	WriteStringToFile(filePath, content)
+	defer afero.NewOsFs().Remove(filePath)
+
+	type args struct {
+		filePath    string
+		lineText    string
+		commentText string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "basic case",
+			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
+		},
+		{
+			name: "fail open file",
+			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
+		},
+		{
+			name: "fail read file",
+			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = os.ReadFile
+			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.NoError(t, err)
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = openFileError
+			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.ErrorIs(t, err, errMock)
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			openFile = os.OpenFile
+			readFile = readFileError
+			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
+			assert.ErrorIs(t, err, errMock)
 		})
 	}
 }
