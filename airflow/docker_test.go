@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
+
 	testUtils "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
@@ -917,7 +918,7 @@ func TestDockerComposeParse(t *testing.T) {
 		mockDockerCompose.imageHandler = imageHandler
 
 		err := mockDockerCompose.Parse("", "test")
-		assert.Contains(t, err.Error(), "errors detected in your local DAGs are listed above")
+		assert.Contains(t, err.Error(), "See above for errors detected in your DAGs")
 		composeMock.AssertExpectations(t)
 		imageHandler.AssertExpectations(t)
 	})
