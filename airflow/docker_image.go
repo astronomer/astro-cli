@@ -23,7 +23,6 @@ import (
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/settings"
 )
 
 const (
@@ -292,18 +291,13 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 			containerName,
 		}
 	}
+	// check if settings file exists
+	settingsFileExist, err := util.Exists("./" + settingsFile)
+	if err != nil {
+		log.Debug(err)
+	}
 	// docker exec
 	if containerName == "" {
-		// convert Settings file to variables and connection yaml
-		err = settings.WriteAirflowSettingstoYAML(settingsFile)
-		if err != nil {
-			log.Debug(err)
-		}
-		defer func() {
-			// delete files
-			os.Remove("./variables.yaml")
-			os.Remove("./connections.yaml")
-		}()
 		args = []string{
 			"run",
 			"-t",
@@ -312,15 +306,13 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 			"-v",
 			config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
 			"-v",
-			config.WorkingPath + "/" + settingsFile + ":/usr/local/" + settingsFile,
-			"-v",
 			config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
 			"-v",
 			config.WorkingPath + "/include:/usr/local/airflow/include:z",
-			"-v",
-			config.WorkingPath + "/variables.yaml:/usr/local/airflow/variables.yaml:z",
-			"-v",
-			config.WorkingPath + "/connections.yaml:/usr/local/airflow/connections.yaml:z",
+		}
+		// if settings file exists append it to args
+		if settingsFileExist {
+			args = append(args, []string{"-v", config.WorkingPath + "/" + settingsFile + ":/usr/local/airflow/" + settingsFile}...)
 		}
 		// if env file exists append it to args
 		fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
@@ -333,12 +325,13 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		args = append(args, []string{d.imageName}...)
 	}
 	cmdArgs := []string{
-		"flow",
-		"test-dag",
+		"run_dag",
 		"./dags/",
 		dagID,
-		"./connections.yaml",
-		"/usr/local/airflow/variables.yaml",
+	}
+	// settings file exists append it to args
+	if settingsFileExist {
+		cmdArgs = append(cmdArgs, []string{"./" + settingsFile}...)
 	}
 	args = append(args, cmdArgs...)
 
@@ -346,8 +339,10 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 	fmt.Println("\nLoading DAGS...")
 
 	cmdErr := cmdExec(DockerCmd, stdout, stderr, args...)
+	fmt.Println("\nSee the output of this command for errors.")// add back later "To view task logs, use the '--task-logs' flag."
 	if cmdErr != nil {
 		log.Debug(cmdErr)
+		fmt.Println("If you are having an issue with loading your Settings File make sure both the 'variables' and 'connections' fields exist and that there are no yaml syntax errors")
 	}
 	if containerName == "" {
 		// delete container
@@ -356,8 +351,6 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 			log.Debug(err)
 		}
 	}
-
-	fmt.Println("\nSee the output of this command for errors.") // add back later "To view task logs, use the '--task-logs' flag."
 	return cmdErr
 }
 

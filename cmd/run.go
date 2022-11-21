@@ -25,6 +25,8 @@ func newRunCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
+
 	return cmd
 }
 
