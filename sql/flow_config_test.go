@@ -14,7 +14,9 @@ func TestGetPypiVersionInvalidHostFailure(t *testing.T) {
 
 func TestGetBaseDockerImageURIInvalidURLFailure(t *testing.T) {
 	_, err := GetBaseDockerImageURI("http://efgh")
-	expectedErrContains := "error retrieving the latest configuration http://efgh,  Get \"http://efgh\": dial tcp: lookup efgh: no such host. Using the default"
+	expectedErrContains := "error retrieving the latest configuration http://efgh,  Get \"http://efgh\": dial tcp: lookup efgh"
+	assert.ErrorContains(t, err, expectedErrContains)
+	expectedErrContains = "no such host. Using the default"
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
