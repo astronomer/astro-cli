@@ -50,9 +50,13 @@ func TestCreateInvite(t *testing.T) {
 	}
 	t.Run("happy path", func(t *testing.T) {
 		expectedOutMessage := "invite for test-email@test.com with role ORGANIZATION_MEMBER created\n"
+		createInviteRequest := astrocore.CreateUserInviteRequest{
+			InviteeEmail: "test-email@test.com",
+			Role:         "ORGANIZATION_MEMBER",
+		}
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, createInviteRequest).Return(&createInviteResponseOK, nil).Once()
 		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
@@ -61,7 +65,11 @@ func TestCreateInvite(t *testing.T) {
 		expectedOutMessage := "failed to create invite: test-inv-error"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
+		createInviteRequest := astrocore.CreateUserInviteRequest{
+			InviteeEmail: "test-email@test.com",
+			Role:         "ORGANIZATION_MEMBER",
+		}
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, createInviteRequest).Return(&createInviteResponseError, nil).Once()
 		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.EqualError(t, err, expectedOutMessage)
 	})
