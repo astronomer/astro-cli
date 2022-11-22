@@ -688,7 +688,7 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// image build failure
 	airflowImageHandler = func(image string) airflow.ImageHandler {
-		mockImageHandler.On("Build", mock.Anything).Return(errMock).Once()
+		mockImageHandler.On("Build", mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
 	_, err := buildImage("./testfiles/", "4.2.5", "", "", false, nil)

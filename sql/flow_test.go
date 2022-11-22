@@ -41,6 +41,9 @@ var (
 	mockGetPypiVersionErr = func(projectURL string) (string, error) {
 		return "", errMock
 	}
+	mockBaseDockerImageURIErr = func(astroSQLCLIConfigURL string) (string, error) {
+		return "", errMock
+	}
 )
 
 func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
@@ -125,6 +128,13 @@ func TestGetPypiVersionFailure(t *testing.T) {
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	assert.ErrorIs(t, err, errMock)
 	getPypiVersion = GetPypiVersion
+}
+
+func TestGetBaseDockerImageURI(t *testing.T) {
+	getBaseDockerImageURI = mockBaseDockerImageURIErr
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	assert.ErrorIs(t, err, errMock)
+	getBaseDockerImageURI = GetBaseDockerImageURI
 }
 
 func TestImageBuildFailure(t *testing.T) {

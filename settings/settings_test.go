@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -326,5 +327,22 @@ func TestJsonString(t *testing.T) {
 		conn := Connection{ConnExtra: ""}
 		res := jsonString(&conn)
 		assert.Equal(t, "", res)
+	})
+}
+
+func TestWriteAirflowSettingstoYAML(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		err := WriteAirflowSettingstoYAML("airflow_settings.yaml")
+		assert.NoError(t, err)
+		os.Remove("./connections.yaml")
+		os.Remove("./variables.yaml")
+	})
+
+	t.Run("invalid setttings file", func(t *testing.T) {
+		err := WriteAirflowSettingstoYAML("airflow_settings_invalid.yaml")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decode file")
+		os.Remove("./connections.yaml")
+		os.Remove("./variables.yaml")
 	})
 }

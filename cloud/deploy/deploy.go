@@ -500,7 +500,6 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 
 		dagsIgnoreSet = true
 	}
-
 	err = imageHandler.Build(types.ImageBuildConfig{Path: path, Output: true, TargetPlatforms: deployImagePlatformSupport})
 	if err != nil {
 		return err

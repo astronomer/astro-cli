@@ -26,6 +26,7 @@ type ContainerHandler interface {
 	Logs(follow bool, containerNames ...string) error
 	Run(args []string, user string) error
 	Bash(container string) error
+	RunDAG(dagID, settingsFile string, noCache, taskLogs bool) error
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
 	Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error)
@@ -44,6 +45,7 @@ type ImageHandler interface {
 	GetLabel(labelName string) (string, error)
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
+	Run(dagID, envFile, settingsFile, containerName string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config types.ImageBuildConfig) (string, error)
 }
 
