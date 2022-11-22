@@ -50,6 +50,9 @@ func displayMessages(r io.Reader) error {
 		if jsonMessage.Stream == "\n" {
 			continue
 		}
+		if jsonMessage.Error != nil {
+			return jsonMessage.Error
+		}
 		// We only print steps which are actually running, e.g.
 		// Step 2/4 : ENV ASTRO_CLI Yes
 		//  ---> Running in 0afb2e0c5ad7
