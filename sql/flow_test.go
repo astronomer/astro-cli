@@ -114,6 +114,16 @@ Step 2/4 : ENV ASTRO_CLI Yes
 	assert.Equal(t, expectedOutput, string(out))
 }
 
+func TestDisplayMessagesHasError(t *testing.T) {
+	jsonMessage := jsonmessage.JSONMessage{Error: &jsonmessage.JSONError{Message: "An error has occured."}}
+	data, err := json.Marshal(jsonMessage)
+	assert.NoError(t, err)
+
+	reader := bytes.NewReader(data)
+	err = DisplayMessages(reader)
+	assert.Error(t, err)
+}
+
 func TestDockerClientInitFailure(t *testing.T) {
 	DockerClientInit = func() (DockerBind, error) {
 		return nil, errMock
