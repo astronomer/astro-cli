@@ -272,7 +272,7 @@ func generateCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
+	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", true, "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
@@ -287,7 +287,7 @@ func runCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.SetHelpFunc(executeHelp)
-	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
+	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", true, "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
