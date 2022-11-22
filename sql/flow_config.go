@@ -62,7 +62,7 @@ func GetBaseDockerImageURI(configURL string) (string, error) {
 	var resp configResponse
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		return defaultDockerImageURI, fmt.Errorf("error parsing the base docker image from the configuration file: %w", err)
+		return defaultDockerImageURI, fmt.Errorf("error parsing the base docker image from the configuration file: %w. Using the default", err)
 	}
 
 	return resp.BaseDockerImage, nil
