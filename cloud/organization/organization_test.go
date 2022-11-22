@@ -148,8 +148,10 @@ func TestSwitch(t *testing.T) {
 
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-
-		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
+			return astro.AuthConfig{}, nil
+		}
+		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -177,8 +179,10 @@ func TestSwitch(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-
-		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
+			return astro.AuthConfig{}, nil
+		}
+		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -191,8 +195,10 @@ func TestSwitch(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-
-		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
+			return astro.AuthConfig{}, nil
+		}
+		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -221,8 +227,10 @@ func TestSwitch(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-
-		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
+			return astro.AuthConfig{}, nil
+		}
+		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -236,8 +244,10 @@ func TestSwitch(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-
-		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
+			return astro.AuthConfig{}, nil
+		}
+		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return mockError
 		}
 		buf := new(bytes.Buffer)

@@ -2,7 +2,6 @@ package organization
 
 import (
 	http_context "context"
-	"fmt"
 	"io"
 	"strconv"
 
@@ -20,6 +19,9 @@ import (
 var (
 	errInvalidOrganizationKey  = errors.New("invalid organization selection")
 	errInvalidOrganizationName = errors.New("invalid organization name")
+	Login                      = auth.Login
+	CheckUserSession           = auth.CheckUserSession
+	FetchDomainAuthConfig      = auth.FetchDomainAuthConfig
 )
 
 func newTableOut() *printutil.Table {
@@ -111,41 +113,35 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*
 }
 
 func SwitchWithLogin(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-	return auth.Login(domain, targetOrg.AuthServiceId, "", astroClient, coreClient, out, shouldDisplayLoginLink)
+	return Login(domain, targetOrg.AuthServiceId, "", astroClient, coreClient, out, shouldDisplayLoginLink)
 }
 
-func SwitchWithContext(domain string, targetOrg *astrocore.Organization, authConfig *astro.AuthConfig, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func SwitchWithContext(domain string, targetOrg *astrocore.Organization, authConfig astro.AuthConfig, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	fmt.Println("c1", c)
 	// reset org context
 	err = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
 	if err != nil {
 		return err
 	}
+	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
+	err = c.SetContextKey("token", c.Token)
+	if err != nil {
+		return err
+	}
+	err = c.SetContextKey("refreshtoken", c.RefreshToken)
+	if err != nil {
+		return err
+	}
+	err = c.SetContextKey("user_email", c.UserEmail)
+	if err != nil {
+		return err
+	}
 	c, _ = context.GetCurrentContext()
-	fmt.Println("c2", c)
-
-	// err = c.SetContextKey("token", c.Token)
-	// if err != nil {
-	// 	return err
-	// }
-	// err = c.SetContextKey("refreshtoken", c.RefreshToken)
-	// if err != nil {
-	// 	return err
-	// }
-	// err = c.SetContextKey("user_email", c.UserEmail)
-	// if err != nil {
-	// 	return err
-	// }
-	// c.Organization = targetOrg.Id
-	// c.OrganizationShortName = targetOrg.ShortName
-
-	// i am expect this return the latest config
-	return nil
-	// return auth.CheckUserSession(&c, authConfig, astroClient, coreClient, out)
+	// call check user session which will trigger workspace switcher flow
+	return CheckUserSession(&c, authConfig, astroClient, coreClient, out)
 }
 
 // Switch switches organizations
@@ -157,7 +153,7 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 	}
 
 	// get target org
-	var targetOrg *astrocore.Organization = nil
+	var targetOrg *astrocore.Organization
 	if orgNameOrID == "" {
 		targetOrg, err = getOrganizationSelection(out, coreClient)
 		if err != nil {
@@ -181,12 +177,11 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 		return errInvalidOrganizationName
 	}
 	// fetch auth config
-	authConfig, err := auth.FetchAuthConfig(c.Domain)
+	authConfig, err := FetchDomainAuthConfig(c.Domain)
 	if err != nil {
 		return err
 	}
-	fmt.Println("authConfig.AuthFlow", authConfig.AuthFlow)
-	if authConfig.AuthFlow == "IDENTITY_FIRST" {
+	if authConfig.AuthFlow == auth.AuthFlowIdentityFirst {
 		return SwitchWithContext(c.Domain, targetOrg, authConfig, astroClient, coreClient, out)
 	}
 	return SwitchWithLogin(c.Domain, targetOrg, astroClient, coreClient, out, shouldDisplayLoginLink)
