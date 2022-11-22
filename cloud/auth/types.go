@@ -8,7 +8,7 @@ import (
 // higher order functions to facilate writing unit test cases
 type (
 	OrgLookup                func(domain string) (string, error)
-	RequestToken             func(authConfig astro.AuthConfig, verifier, code string) (Result, error)
+	RequestToken             func(authConfig *astro.AuthConfig, verifier, code string) (Result, error)
 	AuthorizeCallbackHandler func() (string, error)
 )
 

@@ -115,7 +115,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 
 		return nil
 	} else if isExpired(expireTime, accessTokenExpThreshold) {
-		authConfig, err := auth.ValidateDomain(c.Domain)
+		authConfig, err := auth.FetchAuthConfig(c.Domain)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func isExpired(t time.Time, threshold time.Duration) bool {
 
 // Refresh gets a new access token from the provided refresh token,
 // The request is used the default client_id and endpoint for device authentication.
-func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, error) {
+func refresh(refreshToken string, authConfig *astro.AuthConfig) (TokenResponse, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -226,7 +226,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 		}
 	}
 
-	authConfig, err := auth.ValidateDomain(c.Domain)
+	authConfig, err := auth.FetchAuthConfig(c.Domain)
 	if err != nil {
 		return false, err
 	}

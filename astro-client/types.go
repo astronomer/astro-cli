@@ -47,6 +47,7 @@ type AuthConfig struct {
 	ClientID  string `json:"clientId"`
 	Audience  string `json:"audience"`
 	DomainURL string `json:"domainUrl"`
+	AuthFlow  string `json:"authFlow"` // authFlow is either ORG_FIRST or IDENTITY_FIRST
 }
 
 type AuthUser struct {

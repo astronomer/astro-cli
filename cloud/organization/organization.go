@@ -1,7 +1,8 @@
 package organization
 
 import (
-	"context"
+	http_context "context"
+	"fmt"
 	"io"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
@@ -18,7 +20,6 @@ import (
 var (
 	errInvalidOrganizationKey  = errors.New("invalid organization selection")
 	errInvalidOrganizationName = errors.New("invalid organization name")
-	AuthLogin                  = auth.Login
 )
 
 func newTableOut() *printutil.Table {
@@ -31,7 +32,7 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
-	resp, err := coreClient.ListOrganizationsWithResponse(context.Background())
+	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +72,7 @@ func List(out io.Writer, coreClient astrocore.CoreClient) error {
 	return nil
 }
 
-func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (string, error) {
+func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*astrocore.Organization, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -82,12 +83,12 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (s
 	var c config.Context
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	or, err := ListOrganizations(coreClient)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	deployMap := map[string]astrocore.Organization{}
@@ -103,23 +104,62 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (s
 	choice := input.Text("\n> ")
 	selected, ok := deployMap[choice]
 	if !ok {
-		return "", errInvalidOrganizationKey
+		return nil, errInvalidOrganizationKey
 	}
 
-	return selected.AuthServiceId, nil
+	return &selected, nil
+}
+
+func SwitchWithLogin(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+	return auth.Login(domain, targetOrg.AuthServiceId, "", astroClient, coreClient, out, shouldDisplayLoginLink)
+}
+
+func SwitchWithContext(domain string, targetOrg *astrocore.Organization, authConfig *astro.AuthConfig, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+	c, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	fmt.Println("c1", c)
+	// reset org context
+	err = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
+	if err != nil {
+		return err
+	}
+	c, _ = context.GetCurrentContext()
+	fmt.Println("c2", c)
+
+	// err = c.SetContextKey("token", c.Token)
+	// if err != nil {
+	// 	return err
+	// }
+	// err = c.SetContextKey("refreshtoken", c.RefreshToken)
+	// if err != nil {
+	// 	return err
+	// }
+	// err = c.SetContextKey("user_email", c.UserEmail)
+	// if err != nil {
+	// 	return err
+	// }
+	// c.Organization = targetOrg.Id
+	// c.OrganizationShortName = targetOrg.ShortName
+
+	// i am expect this return the latest config
+	return nil
+	// return auth.CheckUserSession(&c, authConfig, astroClient, coreClient, out)
 }
 
 // Switch switches organizations
 func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	// get current context
-	c, err := config.GetCurrentContext()
+	c, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	// get auth id
-	var id string
+
+	// get target org
+	var targetOrg *astrocore.Organization = nil
 	if orgNameOrID == "" {
-		id, err = getOrganizationSelection(out, coreClient)
+		targetOrg, err = getOrganizationSelection(out, coreClient)
 		if err != nil {
 			return err
 		}
@@ -130,23 +170,26 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 		}
 		for i := range or {
 			if or[i].Name == orgNameOrID {
-				id = or[i].AuthServiceId
+				targetOrg = &or[i]
 			}
 			if or[i].Id == orgNameOrID {
-				id = or[i].AuthServiceId
+				targetOrg = &or[i]
 			}
 		}
-		if id == "" {
-			return errInvalidOrganizationName
-		}
 	}
-
-	// log user into new organization
-	err = AuthLogin(c.Domain, id, "", astroClient, coreClient, out, shouldDisplayLoginLink)
+	if targetOrg == nil {
+		return errInvalidOrganizationName
+	}
+	// fetch auth config
+	authConfig, err := auth.FetchAuthConfig(c.Domain)
 	if err != nil {
 		return err
 	}
-	return nil
+	fmt.Println("authConfig.AuthFlow", authConfig.AuthFlow)
+	if authConfig.AuthFlow == "IDENTITY_FIRST" {
+		return SwitchWithContext(c.Domain, targetOrg, authConfig, astroClient, coreClient, out)
+	}
+	return SwitchWithLogin(c.Domain, targetOrg, astroClient, coreClient, out, shouldDisplayLoginLink)
 }
 
 // Write the audit logs to the provided io.Writer.
