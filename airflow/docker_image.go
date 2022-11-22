@@ -22,12 +22,14 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
+	"github.com/astronomer/astro-cli/config"
 )
 
 const (
 	DockerCmd          = "docker"
 	EchoCmd            = "echo"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
+	astroRunContainer  = "astro-run"
 )
 
 var errGetImageLabel = errors.New("error getting image label")
@@ -40,29 +42,27 @@ func DockerImageInit(image string) *DockerImage {
 	return &DockerImage{imageName: image}
 }
 
-func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
-	// Change to location of Dockerfile
-	err := os.Chdir(config.Path)
+func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
+	err := os.Chdir(buildConfig.Path)
 	if err != nil {
 		return err
 	}
-
 	args := []string{
 		"build",
 		"-t",
 		d.imageName,
 		".",
 	}
-	if config.NoCache {
+	if buildConfig.NoCache {
 		args = append(args, "--no-cache")
 	}
 
-	if len(config.TargetPlatforms) > 0 {
-		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(config.TargetPlatforms, ",")))
+	if len(buildConfig.TargetPlatforms) > 0 {
+		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
 	}
 	// Build image
 	var stdout, stderr io.Writer
-	if config.Output {
+	if buildConfig.Output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -73,18 +73,17 @@ func (d *DockerImage) Build(config airflowTypes.ImageBuildConfig) error {
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
-
-	return nil
+	return err
 }
 
-func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, config airflowTypes.ImageBuildConfig) (string, error) {
+func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	// delete container
 	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-pytest")
 	if err != nil {
 		log.Debug(err)
 	}
 	// Change to location of Dockerfile
-	err = os.Chdir(config.Path)
+	err = os.Chdir(buildConfig.Path)
 	if err != nil {
 		return "", err
 	}
@@ -115,7 +114,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 	args = append(args, pytestArgs...)
 	// run pytest image
 	var stdout, stderr io.Writer
-	if config.Output {
+	if buildConfig.Output {
 		stdout = os.Stdout
 		stderr = os.Stderr
 	} else {
@@ -269,6 +268,85 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
 	}
 	return nil
+}
+
+func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, taskLogs bool) error {
+	stdout := os.Stdout
+	stderr := os.Stderr
+	// delete container
+	err := cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
+	if err != nil {
+		log.Debug(err)
+	}
+	var args []string
+	if containerName != "" {
+		args = []string{
+			"exec",
+			"-t",
+			containerName,
+		}
+	}
+	// check if settings file exists
+	settingsFileExist, err := util.Exists("./" + settingsFile)
+	if err != nil {
+		log.Debug(err)
+	}
+	// docker exec
+	if containerName == "" {
+		args = []string{
+			"run",
+			"-t",
+			"--name",
+			astroRunContainer,
+			"-v",
+			config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
+			"-v",
+			config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
+			"-v",
+			config.WorkingPath + "/include:/usr/local/airflow/include:z",
+		}
+		// if settings file exists append it to args
+		if settingsFileExist {
+			args = append(args, []string{"-v", config.WorkingPath + "/" + settingsFile + ":/usr/local/airflow/" + settingsFile}...)
+		}
+		// if env file exists append it to args
+		fileExist, err := util.Exists(config.WorkingPath + "/" + envFile)
+		if err != nil {
+			log.Debug(err)
+		}
+		if fileExist {
+			args = append(args, []string{"--env-file", envFile}...)
+		}
+		args = append(args, []string{d.imageName}...)
+	}
+	cmdArgs := []string{
+		"run_dag",
+		"./dags/",
+		dagID,
+	}
+	// settings file exists append it to args
+	if settingsFileExist {
+		cmdArgs = append(cmdArgs, []string{"./" + settingsFile}...)
+	}
+	args = append(args, cmdArgs...)
+
+	fmt.Println("\nStarting a DAG run for " + dagID + "...")
+	fmt.Println("\nLoading DAGs...")
+
+	cmdErr := cmdExec(DockerCmd, stdout, stderr, args...)
+	fmt.Println("\nSee the output of this command for errors.") // add back later "To view task logs, use the '--task-logs' flag."
+	if cmdErr != nil {
+		log.Debug(cmdErr)
+		fmt.Println("If you are having an issue with loading your Settings File make sure both the 'variables' and 'connections' fields exist and that there are no yaml syntax errors")
+	}
+	if containerName == "" {
+		// delete container
+		err = cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
+		if err != nil {
+			log.Debug(err)
+		}
+	}
+	return cmdErr
 }
 
 // Exec executes a docker command

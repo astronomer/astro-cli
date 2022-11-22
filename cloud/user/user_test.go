@@ -16,7 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var errorInvite = errors.New("test-inv-error")
+var (
+	errorNetwork = errors.New("network error")
+	errorInvite  = errors.New("test-inv-error")
+)
 
 type testWriter struct {
 	Error error
@@ -61,6 +64,19 @@ func TestCreateInvite(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
+
+	t.Run("error path when CreateUserInviteWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		createInviteRequest := astrocore.CreateUserInviteRequest{
+			InviteeEmail: "test-email@test.com",
+			Role:         "ORGANIZATION_MEMBER",
+		}
+		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, createInviteRequest).Return(nil, errorNetwork).Once()
+		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
 	t.Run("error path when CreateUserInviteWithResponse returns an error", func(t *testing.T) {
 		expectedOutMessage := "failed to create invite: test-inv-error"
 		out := new(bytes.Buffer)

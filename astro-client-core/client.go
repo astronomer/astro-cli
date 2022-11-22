@@ -2,7 +2,7 @@ package astrocore
 
 import (
 	"bytes"
-	http_context "context"
+	httpContext "context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,15 +14,15 @@ import (
 )
 
 var (
-	ErrorRequest = errors.New("failed to perform request")
-	ErrorBaseURL = errors.New("invalid baseurl")
-	ErrorServer  = errors.New("")
+	ErrorRequest  = errors.New("failed to perform request")
+	ErrorBaseURL  = errors.New("invalid baseurl")
+	HTTPStatus200 = 200
 )
 
 // a shorter alias
 type CoreClient = ClientWithResponsesInterface
 
-func requestEditor(httpContext http_context.Context, req *http.Request) error {
+func requestEditor(ctx httpContext.Context, req *http.Request) error {
 	currentCtx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil
@@ -43,8 +43,6 @@ func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 	cl, _ := NewClientWithResponses("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(requestEditor))
 	return cl
 }
-
-const HTTPStatus200 = 200
 
 func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 	if httpResp.StatusCode != HTTPStatus200 {

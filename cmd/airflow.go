@@ -173,7 +173,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to start airflow with")
-	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings or env file to import airflow objects from")
+	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
 

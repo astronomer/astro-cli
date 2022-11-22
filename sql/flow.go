@@ -16,6 +16,8 @@ import (
 )
 
 const (
+	astroSQLCLIProjectURL     = "https://pypi.org/pypi/astro-sql-cli/json"
+	astroSQLCLIConfigURL      = "https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json"
 	SQLCliDockerfilePath      = ".Dockerfile.sql_cli"
 	SQLCLIDockerfileWriteMode = 0o600
 	SQLCliDockerImageName     = "sql_cli"
@@ -48,6 +50,9 @@ func displayMessages(r io.Reader) error {
 		if jsonMessage.Stream == "\n" {
 			continue
 		}
+		if jsonMessage.Error != nil {
+			return jsonMessage.Error
+		}
 		// We only print steps which are actually running, e.g.
 		// Step 2/4 : ENV ASTRO_CLI Yes
 		//  ---> Running in 0afb2e0c5ad7
@@ -75,12 +80,17 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return fmt.Errorf("docker client initialization failed %w", err)
 	}
 
-	astroSQLCliVersion, err := getPypiVersion(astroSQLCliProjectURL)
+	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
 	if err != nil {
 		return err
 	}
 
-	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, PythonVersion, astroSQLCliVersion))
+	baseImage, err := getBaseDockerImageURI(astroSQLCLIConfigURL)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion))
 	if err := os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}

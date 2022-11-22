@@ -60,3 +60,33 @@ type AirflowPools []struct {
 	PoolSlot        string `yaml:"slots"`
 	PoolDescription string `yaml:"description"`
 }
+
+// types for creating variables and connections yaml files
+
+type DAGRunVariables struct {
+	VarYAMLs `mapstructure:"connections" yaml:"variables"`
+}
+
+type VarYAMLs []VarYAML
+
+type VarYAML struct {
+	Key   string `mapstructure:"key" yaml:"key"`
+	Value string `mapstructure:"value" yaml:"value"`
+}
+
+type DAGRunConnections struct {
+	ConnYAMLs `mapstructure:"connections" yaml:"connections"`
+}
+
+type ConnYAMLs []ConnYAML
+
+type ConnYAML struct {
+	ConnID   string      `yaml:"conn_id"`
+	ConnType string      `yaml:"conn_type"`
+	Host     string      `yaml:"host"`
+	Schema   string      `yaml:"schema"`
+	Login    string      `yaml:"login"`
+	Password string      `yaml:"password"`
+	Port     int         `yaml:"port"`
+	Extra    interface{} `yaml:"extra"`
+}

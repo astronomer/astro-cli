@@ -33,6 +33,7 @@ func TestDockerImageBuild(t *testing.T) {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
+		Output:          true,
 	}
 
 	previousCmdExec := cmdExec
@@ -47,6 +48,7 @@ func TestDockerImageBuild(t *testing.T) {
 
 	t.Run("build --no-cache", func(t *testing.T) {
 		options.NoCache = true
+		options.Output = false
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			assert.Contains(t, args, "--no-cache")
 			return nil
@@ -68,6 +70,7 @@ func TestDockerImageBuild(t *testing.T) {
 			Path:            "incorrect-path",
 			TargetPlatforms: []string{"linux/amd64"},
 			NoCache:         false,
+			Output:          false,
 		}
 
 		err = handler.Build(options)
@@ -93,6 +96,7 @@ func TestDockerImagePytest(t *testing.T) {
 		Path:            cwd,
 		TargetPlatforms: []string{"linux/amd64"},
 		NoCache:         false,
+		Output:          true,
 	}
 
 	previousCmdExec := cmdExec
@@ -105,15 +109,14 @@ func TestDockerImagePytest(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("pytest success", func(t *testing.T) {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return nil
-		}
-		_, err = handler.Pytest("", "", "", []string{}, options)
-		assert.NoError(t, err)
-	})
-
 	t.Run("pytest error", func(t *testing.T) {
+		options = airflowTypes.ImageBuildConfig{
+			Path:            cwd,
+			TargetPlatforms: []string{"linux/amd64"},
+			NoCache:         false,
+			Output:          false,
+		}
+
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
@@ -345,4 +348,48 @@ func TestUseBash(t *testing.T) {
 		err := useBash(&types.AuthConfig{Username: "testing"}, "test")
 		assert.ErrorIs(t, err, errMockDocker)
 	})
+}
+
+func TestDockerImageRun(t *testing.T) {
+	handler := DockerImage{
+		imageName: "testing",
+	}
+
+	cwd, err := os.Getwd()
+	assert.NoError(t, err)
+
+	dockerIgnoreFile := cwd + "/.dockerignore"
+	fileutil.WriteStringToFile(dockerIgnoreFile, "")
+	defer afero.NewOsFs().Remove(dockerIgnoreFile)
+
+	previousCmdExec := cmdExec
+
+	t.Run("run success without container", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", true)
+		assert.NoError(t, err)
+	})
+
+	t.Run("run success with container", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
+		err = handler.Run("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", true)
+		assert.NoError(t, err)
+	})
+
+	t.Run("run error without container", func(t *testing.T) {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return errExecMock
+		}
+
+		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", true)
+		assert.Contains(t, err.Error(), errExecMock.Error())
+	})
+
+	cmdExec = previousCmdExec
 }
