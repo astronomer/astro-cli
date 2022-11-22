@@ -170,6 +170,8 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 
 	if generateTasks {
 		args = append(args, "--generate-tasks")
+	} else {
+		args = append(args, "--no-generate-tasks")
 	}
 
 	if environment != "" {
@@ -203,6 +205,8 @@ func executeRun(cmd *cobra.Command, args []string) error {
 
 	if generateTasks {
 		args = append(args, "--generate-tasks")
+	} else {
+		args = append(args, "--no-generate-tasks")
 	}
 
 	return executeCmd(cmd, args, flags, mountDirs)
