@@ -65,7 +65,7 @@ var (
 		},
 		JSON200: &[]astrocore.Organization{},
 	}
-	mockNetworkError = errors.New("network error")
+	errNetwork = errors.New("network error")
 )
 
 func Test_validateDomain(t *testing.T) {
@@ -442,7 +442,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(nil, mockNetworkError).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(nil, errNetwork).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
 		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
@@ -452,7 +452,7 @@ func TestCheckUserSession(t *testing.T) {
 	t.Run("self user network error", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(nil, mockNetworkError).Once()
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
 		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
