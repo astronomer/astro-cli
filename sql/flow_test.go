@@ -115,7 +115,7 @@ Step 2/4 : ENV ASTRO_CLI Yes
 }
 
 func TestDisplayMessagesHasError(t *testing.T) {
-	jsonMessage := jsonmessage.JSONMessage{Error: &jsonmessage.JSONError{Message: "An error has occured."}}
+	jsonMessage := jsonmessage.JSONMessage{Error: &jsonmessage.JSONError{Message: "An error has occurred."}}
 	data, err := json.Marshal(jsonMessage)
 	assert.NoError(t, err)
 
