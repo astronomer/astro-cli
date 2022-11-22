@@ -1,7 +1,7 @@
 package user
 
 import (
-	http_context "context"
+	httpContext "context"
 	"fmt"
 	"io"
 
@@ -43,7 +43,7 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 		InviteeEmail: email,
 		Role:         role,
 	}
-	resp, err := client.CreateUserInviteWithResponse(http_context.Background(), ctx.OrganizationShortName, userInviteInput)
+	resp, err := client.CreateUserInviteWithResponse(httpContext.Background(), ctx.OrganizationShortName, userInviteInput)
 	if err != nil {
 		return err
 	}
