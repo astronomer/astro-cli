@@ -38,6 +38,7 @@ var (
 		Body:    errorBody,
 		JSON200: nil,
 	}
+	mockNetworkError = errors.New("network error")
 )
 
 func TestList(t *testing.T) {
@@ -51,6 +52,15 @@ func TestList(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("organization network error", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(nil, mockNetworkError).Once()
+		buf := new(bytes.Buffer)
+		err := List(buf, mockClient)
+		assert.Contains(t, err.Error(), "network error")
 		mockClient.AssertExpectations(t)
 	})
 
