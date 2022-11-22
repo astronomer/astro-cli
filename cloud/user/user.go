@@ -44,7 +44,10 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 		Role:         role,
 	}
 	resp, err := client.CreateUserInviteWithResponse(http_context.Background(), ctx.OrganizationShortName, userInviteInput)
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body, err)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return err
 	}

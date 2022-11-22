@@ -110,6 +110,11 @@ type MutateOrgUserRoleRequest struct {
 	Role string `json:"role"`
 }
 
+// MutateOrganizationRequest defines model for MutateOrganizationRequest.
+type MutateOrganizationRequest struct {
+	Name string `json:"name"`
+}
+
 // MutateWorkspaceUserRoleRequest defines model for MutateWorkspaceUserRoleRequest.
 type MutateWorkspaceUserRoleRequest struct {
 	Role string `json:"role"`
@@ -117,14 +122,15 @@ type MutateWorkspaceUserRoleRequest struct {
 
 // Organization defines model for Organization.
 type Organization struct {
-	AuthServiceId string                  `json:"authServiceId"`
-	CreatedAt     time.Time               `json:"createdAt"`
-	Domains       []string                `json:"domains"`
-	Id            string                  `json:"id"`
-	Name          string                  `json:"name"`
-	ProductPlan   OrganizationProductPlan `json:"productPlan"`
-	ShortName     string                  `json:"shortName"`
-	UpdatedAt     time.Time               `json:"updatedAt"`
+	AuthServiceId  string                  `json:"authServiceId"`
+	CreatedAt      time.Time               `json:"createdAt"`
+	Domains        []string                `json:"domains"`
+	Id             string                  `json:"id"`
+	ManagedDomains []string                `json:"managedDomains"`
+	Name           string                  `json:"name"`
+	ProductPlan    OrganizationProductPlan `json:"productPlan"`
+	ShortName      string                  `json:"shortName"`
+	UpdatedAt      time.Time               `json:"updatedAt"`
 }
 
 // OrganizationProductPlan defines model for Organization.ProductPlan.
@@ -160,11 +166,6 @@ type UpdateInviteRequest struct {
 
 // UpdateInviteRequestInviteStatus defines model for UpdateInviteRequest.InviteStatus.
 type UpdateInviteRequestInviteStatus string
-
-// UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
-type UpdateOrganizationRequest struct {
-	Name string `json:"name"`
-}
 
 // User defines model for User.
 type User struct {
@@ -280,8 +281,11 @@ type GetSelfUserParams struct {
 	CreateIfNotExist *bool `form:"createIfNotExist,omitempty" json:"createIfNotExist,omitempty"`
 }
 
+// CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
+type CreateOrganizationJSONRequestBody = MutateOrganizationRequest
+
 // UpdateOrganizationJSONRequestBody defines body for UpdateOrganization for application/json ContentType.
-type UpdateOrganizationJSONRequestBody = UpdateOrganizationRequest
+type UpdateOrganizationJSONRequestBody = MutateOrganizationRequest
 
 // CreateUserInviteJSONRequestBody defines body for CreateUserInvite for application/json ContentType.
 type CreateUserInviteJSONRequestBody = CreateUserInviteRequest
@@ -374,6 +378,11 @@ type ClientInterface interface {
 	// ListOrganizations request
 	ListOrganizations(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateOrganization request with any body
+	CreateOrganizationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateOrganization(ctx context.Context, body CreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetOrganization request
 	GetOrganization(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -384,6 +393,9 @@ type ClientInterface interface {
 
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListManagedDomains request
+	ListManagedDomains(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetManagedDomain request
 	GetManagedDomain(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -454,6 +466,30 @@ func (c *Client) ListOrganizations(ctx context.Context, reqEditors ...RequestEdi
 	return c.Client.Do(req)
 }
 
+func (c *Client) CreateOrganizationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateOrganizationRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateOrganization(ctx context.Context, body CreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateOrganizationRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetOrganization(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetOrganizationRequest(c.Server, orgShortNameId)
 	if err != nil {
@@ -492,6 +528,18 @@ func (c *Client) UpdateOrganization(ctx context.Context, orgShortNameId string, 
 
 func (c *Client) GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetOrganizationAuditLogsRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListManagedDomains(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListManagedDomainsRequest(c.Server, orgShortNameId)
 	if err != nil {
 		return nil, err
 	}
@@ -764,6 +812,46 @@ func NewListOrganizationsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewCreateOrganizationRequest calls the generic CreateOrganization builder with application/json body
+func NewCreateOrganizationRequest(server string, body CreateOrganizationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateOrganizationRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateOrganizationRequestWithBody generates requests for CreateOrganization with any type of body
+func NewCreateOrganizationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetOrganizationRequest generates requests for GetOrganization
 func NewGetOrganizationRequest(server string, orgShortNameId string) (*http.Request, error) {
 	var err error
@@ -890,6 +978,40 @@ func NewGetOrganizationAuditLogsRequest(server string, orgShortNameId string, pa
 	}
 
 	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListManagedDomainsRequest generates requests for ListManagedDomains
+func NewListManagedDomainsRequest(server string, orgShortNameId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/domains", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -1643,6 +1765,11 @@ type ClientWithResponsesInterface interface {
 	// ListOrganizations request
 	ListOrganizationsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationsResponse, error)
 
+	// CreateOrganization request with any body
+	CreateOrganizationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrganizationResponse, error)
+
+	CreateOrganizationWithResponse(ctx context.Context, body CreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationResponse, error)
+
 	// GetOrganization request
 	GetOrganizationWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetOrganizationResponse, error)
 
@@ -1653,6 +1780,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogsWithResponse(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error)
+
+	// ListManagedDomains request
+	ListManagedDomainsWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*ListManagedDomainsResponse, error)
 
 	// GetManagedDomain request
 	GetManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*GetManagedDomainResponse, error)
@@ -1751,6 +1881,33 @@ func (r ListOrganizationsResponse) StatusCode() int {
 	return 0
 }
 
+type CreateOrganizationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Organization
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateOrganizationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateOrganizationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1758,6 +1915,7 @@ type GetOrganizationResponse struct {
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
+	JSON404      *Error
 	JSON500      *Error
 }
 
@@ -1824,6 +1982,33 @@ func (r GetOrganizationAuditLogsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetOrganizationAuditLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListManagedDomainsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]ManagedDomain
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListManagedDomainsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListManagedDomainsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2169,6 +2354,23 @@ func (c *ClientWithResponses) ListOrganizationsWithResponse(ctx context.Context,
 	return ParseListOrganizationsResponse(rsp)
 }
 
+// CreateOrganizationWithBodyWithResponse request with arbitrary body returning *CreateOrganizationResponse
+func (c *ClientWithResponses) CreateOrganizationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrganizationResponse, error) {
+	rsp, err := c.CreateOrganizationWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateOrganizationResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateOrganizationWithResponse(ctx context.Context, body CreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationResponse, error) {
+	rsp, err := c.CreateOrganization(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateOrganizationResponse(rsp)
+}
+
 // GetOrganizationWithResponse request returning *GetOrganizationResponse
 func (c *ClientWithResponses) GetOrganizationWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetOrganizationResponse, error) {
 	rsp, err := c.GetOrganization(ctx, orgShortNameId, reqEditors...)
@@ -2202,6 +2404,15 @@ func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseGetOrganizationAuditLogsResponse(rsp)
+}
+
+// ListManagedDomainsWithResponse request returning *ListManagedDomainsResponse
+func (c *ClientWithResponses) ListManagedDomainsWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*ListManagedDomainsResponse, error) {
+	rsp, err := c.ListManagedDomains(ctx, orgShortNameId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListManagedDomainsResponse(rsp)
 }
 
 // GetManagedDomainWithResponse request returning *GetManagedDomainResponse
@@ -2452,6 +2663,67 @@ func ParseListOrganizationsResponse(rsp *http.Response) (*ListOrganizationsRespo
 	return response, nil
 }
 
+// ParseCreateOrganizationResponse parses an HTTP response from a CreateOrganizationWithResponse call
+func ParseCreateOrganizationResponse(rsp *http.Response) (*CreateOrganizationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateOrganizationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Organization
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetOrganizationResponse parses an HTTP response from a GetOrganizationWithResponse call
 func ParseGetOrganizationResponse(rsp *http.Response) (*GetOrganizationResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -2493,6 +2765,13 @@ func ParseGetOrganizationResponse(rsp *http.Response) (*GetOrganizationResponse,
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -2608,6 +2887,67 @@ func ParseGetOrganizationAuditLogsResponse(rsp *http.Response) (*GetOrganization
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListManagedDomainsResponse parses an HTTP response from a ListManagedDomainsWithResponse call
+func ParseListManagedDomainsResponse(rsp *http.Response) (*ListManagedDomainsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListManagedDomainsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ManagedDomain
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

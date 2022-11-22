@@ -23,6 +23,7 @@ core_api_gen:
 	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
     endif
 	oapi-codegen -include-tags=User,Organization,Invite -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
+	make mock_astro_core
 
 test:
 	go test -count=1 -cover ./...

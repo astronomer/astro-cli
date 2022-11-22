@@ -32,7 +32,10 @@ func newTableOut() *printutil.Table {
 
 func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
 	resp, err := coreClient.ListOrganizationsWithResponse(context.Background())
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body, err)
+	if err != nil {
+		return nil, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
 		return nil, err
 	}

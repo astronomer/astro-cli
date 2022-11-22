@@ -46,10 +46,7 @@ func NewCoreClient(c *httputil.HTTPClient) *ClientWithResponses {
 
 const HTTPStatus200 = 200
 
-func NormalizeAPIError(httpResp *http.Response, body []byte, err error) error {
-	if err != nil {
-		return err
-	}
+func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 	if httpResp.StatusCode != HTTPStatus200 {
 		decode := Error{}
 		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)

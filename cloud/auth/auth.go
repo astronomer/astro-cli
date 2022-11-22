@@ -298,7 +298,10 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	selfResp, err := coreClient.GetSelfUserWithResponse(http_context.Background(), &astrocore.GetSelfUserParams{
 		CreateIfNotExist: &createIfNotExist,
 	})
-	err = astrocore.NormalizeAPIError(selfResp.HTTPResponse, selfResp.Body, err)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(selfResp.HTTPResponse, selfResp.Body)
 	if err != nil {
 		return err
 	}
@@ -309,7 +312,10 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 	}
 	// fetch all orgs that the user can access
 	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
-	err = astrocore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body, err)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(orgsResp.HTTPResponse, orgsResp.Body)
 	if err != nil {
 		return err
 	}
