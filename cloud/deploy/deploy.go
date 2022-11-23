@@ -254,7 +254,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
-		if !envFileExists {
+		if !envFileExists && deployInput.EnvFile != ".env" {
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
 		}
 
