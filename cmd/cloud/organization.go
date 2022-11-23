@@ -38,7 +38,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationSwitchCmd(out),
 	)
 	if config.CFG.AuditLogs.GetBool() {
-		cmd.AddCommand(newOrganizationAuditLogs(out),)
+		cmd.AddCommand(newOrganizationAuditLogs(out))
 	}
 	return cmd
 }

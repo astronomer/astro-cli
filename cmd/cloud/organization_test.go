@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
-	"github.com/astronomer/astro-cli/config"
 )
 
 //nolint:unparam
