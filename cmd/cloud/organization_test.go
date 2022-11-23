@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -53,6 +54,8 @@ func TestOrganizationSwitch(t *testing.T) {
 }
 
 func TestOrganizationExportAuditLogs(t *testing.T) {
+	// turn on audit logs
+	config.CFG.AuditLogs.SetHomeString("true")
 	orgExportAuditLogs = func(client astro.Client, out io.Writer, orgName string, earliest int) error {
 		return nil
 	}
