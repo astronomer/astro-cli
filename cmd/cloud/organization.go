@@ -35,7 +35,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
-		newOrganizationAuditLogs(out),
+		// add back once audit logs is released newOrganizationAuditLogs(out),
 	)
 	return cmd
 }
