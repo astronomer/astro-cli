@@ -53,5 +53,5 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.CreateInvite(email, role, out, astroClient)
+	return user.CreateInvite(email, role, out, astroCoreClient)
 }

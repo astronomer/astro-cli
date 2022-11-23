@@ -3,79 +3,83 @@ package organization
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var (
-	errMock      = errors.New("mock error")
-	mockResponse = []OrgRes{
-		{
-			AuthServiceID: "auth-service-id",
-			Name:          "name",
+	mockOKResponse = astrocore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
 		},
-		{
-			AuthServiceID: "auth-service-id-2",
-			Name:          "name-2",
+		JSON200: &[]astrocore.Organization{
+			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1"},
+			{AuthServiceId: "auth-service-id", Id: "org2", Name: "org2"},
 		},
 	}
+	errorBody, _ = json.Marshal(astrocore.Error{
+		Message: "failed to fetch organizations",
+	})
+	mockErrorResponse = astrocore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBody,
+		JSON200: nil,
+	}
+	errNetwork = errors.New("network error")
 )
 
 func TestList(t *testing.T) {
 	// initialize empty config
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("organization list success", func(t *testing.T) {
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := List(buf)
+		err := List(buf, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("organization network error", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(nil, errNetwork).Once()
+		buf := new(bytes.Buffer)
+		err := List(buf, mockClient)
+		assert.Contains(t, err.Error(), "network error")
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("organization list error", func(t *testing.T) {
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{}
-		})
-
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockErrorResponse, nil).Once()
 		buf := new(bytes.Buffer)
-		err := List(buf)
-		assert.Contains(t, err.Error(), "could not retrieve organization list:")
+		err := List(buf, mockClient)
+		assert.Contains(t, err.Error(), "failed to fetch organizations")
+		mockClient.AssertExpectations(t)
 	})
 }
 
 func TestGetOrganizationSelection(t *testing.T) {
 	// initialize empty config
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("get organiation selection success", func(t *testing.T) {
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -94,28 +98,24 @@ func TestGetOrganizationSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		_, err = getOrganizationSelection(buf)
+		_, err = getOrganizationSelection(buf, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("get organization selection list error", func(t *testing.T) {
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{}
-		})
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockErrorResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		_, err := getOrganizationSelection(buf)
-		assert.Contains(t, err.Error(), "could not retrieve organization list:")
+		_, err := getOrganizationSelection(buf, mockClient)
+		assert.Contains(t, err.Error(), "failed to fetch organizations")
+		mockClient.AssertExpectations(t)
 	})
 
 	t.Run("get organization selection select error", func(t *testing.T) {
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("3")
@@ -134,46 +134,34 @@ func TestGetOrganizationSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		_, err = getOrganizationSelection(buf)
+		_, err = getOrganizationSelection(buf, mockClient)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
+		mockClient.AssertExpectations(t)
 	})
 }
 
 func TestSwitch(t *testing.T) {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
 	t.Run("successful switch with name", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockGQLClient := new(astro_mocks.Client)
 
-		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+
+		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name", mockClient, buf, false)
+		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
 		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("successful switch without name", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
@@ -190,41 +178,33 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, buf, false)
+		err = Switch("", mockClient, mockCoreClient, buf, false)
 		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch wrong name", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 
-		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name-wrong", mockClient, buf, false)
+		err := Switch("name-wrong", mockClient, mockCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationName)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch bad selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("3")
@@ -242,29 +222,27 @@ func TestSwitch(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err = Switch("", mockClient, buf, false)
+		err = Switch("", mockClient, mockCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
+		mockCoreClient.AssertExpectations(t)
 	})
 
 	t.Run("failed switch bad login", func(t *testing.T) {
+		mockError := errors.New("mock error")
 		mockClient := new(astro_mocks.Client)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
 
-		AuthLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
-			return errMock
+		AuthLogin = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return mockError
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name", mockClient, buf, false)
-		assert.ErrorIs(t, err, errMock)
+		err := Switch("org1", mockClient, mockCoreClient, buf, false)
+		assert.ErrorIs(t, err, mockError)
+		mockCoreClient.AssertExpectations(t)
 	})
 }

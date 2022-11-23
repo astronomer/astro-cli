@@ -13,7 +13,9 @@ import (
 	"time"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/auth"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 
@@ -42,7 +44,7 @@ type TokenResponse struct {
 	ErrorDescription string  `json:"error_description,omitempty"`
 }
 
-func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
+func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -78,8 +80,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	}
 
 	// run auth setup for any command that requires auth
-
-	apiKey, err := checkAPIKeys(client, args)
+	apiKey, err := checkAPIKeys(client, coreClient, args)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
@@ -87,10 +88,18 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client) error {
 	if apiKey {
 		return nil
 	}
-	return checkToken(client, os.Stdout)
+	err = checkToken(client, coreClient, os.Stdout)
+	if err != nil {
+		return err
+	}
+	err = migrateCloudConfig(coreClient)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func checkToken(client astro.Client, out io.Writer) error {
+func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		return err
@@ -99,7 +108,7 @@ func checkToken(client astro.Client, out io.Writer) error {
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
-		err := authLogin(c.Domain, "", "", client, out, false)
+		err := authLogin(c.Domain, "", "", client, coreClient, out, false)
 		if err != nil {
 			return err
 		}
@@ -113,7 +122,7 @@ func checkToken(client astro.Client, out io.Writer) error {
 		res, err := refresh(c.RefreshToken, authConfig)
 		if err != nil {
 			// guide the user through the login process if refresh doesn't work
-			err := authLogin(c.Domain, "", "", client, out, false)
+			err := authLogin(c.Domain, "", "", client, coreClient, out, false)
 			if err != nil {
 				return err
 			}
@@ -185,7 +194,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, args []string) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -269,17 +278,18 @@ func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
-	organizations, err := astroClient.GetOrganizations()
+	orgs, err := organization.ListOrganizations(coreClient)
 	if err != nil {
-		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return false, err
 	}
-	organizationID := organizations[0].ID
+	org := orgs[0]
+	orgID := org.Id
+	orgShortName := org.ShortName
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
 		// get workspace ID
-		deployments, err := astroClient.ListDeployments(organizationID, "")
+		deployments, err := astroClient.ListDeployments(orgID, "")
 		if err != nil {
 			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}
@@ -290,10 +300,9 @@ func checkAPIKeys(astroClient astro.Client, args []string) (bool, error) {
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetContextKey("organization", organizationID) // c.Organization
+	err = c.SetOrganizationContext(orgID, orgShortName)
 	if err != nil {
-		fmt.Println("no organization set")
+		fmt.Println("no organization context set")
 	}
-
 	return true, nil
 }

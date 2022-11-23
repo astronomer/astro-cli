@@ -36,13 +36,14 @@ type Contexts struct {
 
 // Context represents a single context
 type Context struct {
-	Domain            string `mapstructure:"domain"`
-	Organization      string `mapstructure:"organization"`
-	Workspace         string `mapstructure:"workspace"`
-	LastUsedWorkspace string `mapstructure:"last_used_workspace"`
-	Token             string `mapstructure:"token"`
-	RefreshToken      string `mapstructure:"refreshtoken"`
-	UserEmail         string `mapstructure:"user_email"`
+	Domain                string `mapstructure:"domain"`
+	Organization          string `mapstructure:"organization"`
+	OrganizationShortName string `mapstructure:"organization_short_name"`
+	Workspace             string `mapstructure:"workspace"`
+	LastUsedWorkspace     string `mapstructure:"last_used_workspace"`
+	Token                 string `mapstructure:"token"`
+	RefreshToken          string `mapstructure:"refreshtoken"`
+	UserEmail             string `mapstructure:"user_email"`
 }
 
 // GetCurrentContext looks up current context and gets corresponding Context struct
@@ -124,13 +125,14 @@ func (c *Context) SetContext() error {
 	}
 
 	context := map[string]string{
-		"token":               c.Token,
-		"domain":              c.Domain,
-		"organization":        c.Organization,
-		"workspace":           c.Workspace,
-		"last_used_workspace": c.Workspace,
-		"refreshtoken":        c.RefreshToken,
-		"user_email":          c.UserEmail,
+		"token":                   c.Token,
+		"domain":                  c.Domain,
+		"organization":            c.Organization,
+		"organization_short_name": c.OrganizationShortName,
+		"workspace":               c.Workspace,
+		"last_used_workspace":     c.Workspace,
+		"refreshtoken":            c.RefreshToken,
+		"user_email":              c.UserEmail,
 	}
 
 	viperHome.Set("contexts"+"."+key, context)
@@ -156,6 +158,19 @@ func (c *Context) SetContextKey(key, value string) error {
 		return err
 	}
 
+	return nil
+}
+
+// set organization id and short name in context config
+func (c *Context) SetOrganizationContext(orgID, orgShortName string) error {
+	err := c.SetContextKey("organization", orgID) // c.Organization
+	if err != nil {
+		return err
+	}
+	err = c.SetContextKey("organization_short_name", orgShortName)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

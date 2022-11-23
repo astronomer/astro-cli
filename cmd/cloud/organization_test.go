@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,7 @@ func TestOrganizationRootCommand(t *testing.T) {
 }
 
 func TestOrganizationList(t *testing.T) {
-	orgList = func(out io.Writer) error {
+	orgList = func(out io.Writer, coreClient astrocore.CoreClient) error {
 		return nil
 	}
 
@@ -44,7 +45,7 @@ func TestOrganizationList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
-	orgSwitch = func(orgName string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+	orgSwitch = func(orgName string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		return nil
 	}
 

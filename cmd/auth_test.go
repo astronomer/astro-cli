@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -26,7 +27,7 @@ func TestLogin(t *testing.T) {
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
-	cloudLogin = func(domain, id, token string, client astro.Client, out io.Writer, shouldDisplayLoginLink bool) error {
+	cloudLogin = func(domain, id, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		assert.Equal(t, cloudDomain, domain)
 		return nil
 	}
@@ -37,22 +38,22 @@ func TestLogin(t *testing.T) {
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{cloudDomain}, nil, buf)
+	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, buf)
 
 	// software login success
-	login(&cobra.Command{}, []string{softwareDomain}, nil, buf)
+	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
 
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	login(&cobra.Command{}, []string{}, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, buf)
 
 	// no domain, software login
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	login(&cobra.Command{}, []string{}, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, buf)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	login(&cobra.Command{}, []string{}, nil, buf)
+	login(&cobra.Command{}, []string{}, nil, nil, buf)
 }
 
 func TestLogout(t *testing.T) {

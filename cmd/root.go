@@ -5,6 +5,7 @@ import (
 	"os"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
 	"github.com/astronomer/astro-cli/cmd/sql"
@@ -40,6 +41,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+	astroCoreClient := astrocore.NewCoreClient(httputil.NewHTTPClient())
 
 	ctx := cloudPlatform
 	isCloudCtx := context.IsCloudContext()
@@ -62,7 +64,7 @@ func NewRootCmd() *cobra.Command {
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if isCloudCtx {
-				return cloudCmd.Setup(cmd, args, astroClient)
+				return cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
 			}
 			// common PersistentPreRunE component between software & cloud
 			// setting up log verbosity and dumping debug logs collected during CLI-initialization
@@ -75,7 +77,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	}
 
 	rootCmd.AddCommand(
-		newLoginCommand(astroClient, os.Stdout),
+		newLoginCommand(astroClient, astroCoreClient, os.Stdout),
 		newLogoutCommand(os.Stdout),
 		newVersionCommand(),
 		newDevRootCmd(),
@@ -93,7 +95,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			cloudCmd.AddCmds(astroClient, os.Stdout)...,
+			cloudCmd.AddCmds(astroClient, astroCoreClient, os.Stdout)...,
 		)
 	} else { // Include all the commands to be exposed for software users
 		rootCmd.AddCommand(

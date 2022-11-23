@@ -152,7 +152,6 @@ func TestGetWorkspaceSelection(t *testing.T) {
 	t.Run("list workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
-
 		buf := new(bytes.Buffer)
 		_, err := getWorkspaceSelection(mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
