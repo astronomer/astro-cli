@@ -17,6 +17,7 @@ var (
 	airflowDagsFolder string
 	projectDir        string
 	generateTasks     bool
+	noGenerateTasks   bool
 	verbose           bool
 	debug             bool
 )
@@ -170,7 +171,8 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 
 	if generateTasks {
 		args = append(args, "--generate-tasks")
-	} else {
+	}
+	if noGenerateTasks {
 		args = append(args, "--no-generate-tasks")
 	}
 
@@ -205,7 +207,8 @@ func executeRun(cmd *cobra.Command, args []string) error {
 
 	if generateTasks {
 		args = append(args, "--generate-tasks")
-	} else {
+	}
+	if noGenerateTasks {
 		args = append(args, "--no-generate-tasks")
 	}
 
@@ -268,6 +271,7 @@ func validateCommand() *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func generateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "generate",
@@ -277,12 +281,15 @@ func generateCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", true, "")
+	cmd.Flags().BoolVar(&noGenerateTasks, "no-generate-tasks", false, "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
+	cmd.MarkFlagsMutuallyExclusive("generate-tasks", "no-generate-tasks")
 	return cmd
 }
 
+//nolint:dupl
 func runCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "run",
@@ -292,9 +299,11 @@ func runCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", true, "")
+	cmd.Flags().BoolVar(&noGenerateTasks, "no-generate-tasks", false, "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
+	cmd.MarkFlagsMutuallyExclusive("generate-tasks", "no-generate-tasks")
 	return cmd
 }
 
