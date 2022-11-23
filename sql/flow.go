@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"strings"
 
 	"github.com/astronomer/astro-cli/sql/include"
@@ -58,7 +59,7 @@ func displayMessages(r io.Reader) error {
 		//  ---> Running in 0afb2e0c5ad7
 		if strings.HasPrefix(prevMessage.Stream, "Step ") && strings.HasPrefix(jsonMessage.Stream, " ---> Running in ") {
 			if isFirstMessage {
-				fmt.Println("Installing flow.. This might take some time.")
+				fmt.Println("Installing flow... This might take some time.")
 				isFirstMessage = false
 			}
 			err := prevMessage.Display(os.Stdout, true)
@@ -122,12 +123,14 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		binds = append(binds, fmt.Sprintf("%s:%s", mountDir, mountDir))
 	}
 
+	currentUser, _ := user.Current()
 	resp, err := cli.ContainerCreate(
 		ctx,
 		&container.Config{
 			Image: SQLCliDockerImageName,
 			Cmd:   cmd,
 			Tty:   true,
+			User:  currentUser.Uid,
 		},
 		&container.HostConfig{
 			Binds: binds,

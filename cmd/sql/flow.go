@@ -41,6 +41,7 @@ func createProjectDir(projectDir string) (mountDir string, err error) {
 	}
 
 	err = os.MkdirAll(projectDir, os.ModePerm)
+
 	if err != nil {
 		err = fmt.Errorf("error creating project directory %s: %w", projectDir, err)
 		return "", err
