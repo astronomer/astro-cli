@@ -10,6 +10,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/astronomer/astro-cli/config"
 )
 
 //nolint:unparam
@@ -53,6 +54,8 @@ func TestOrganizationSwitch(t *testing.T) {
 }
 
 func TestOrganizationExportAuditLogs(t *testing.T) {
+	// turn on audit logs
+	config.CFG.AuditLogs.SetHomeString("true")
 	orgExportAuditLogs = func(client astro.Client, out io.Writer, orgName string, earliest int) error {
 		return nil
 	}
