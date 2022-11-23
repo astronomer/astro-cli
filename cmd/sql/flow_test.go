@@ -137,7 +137,7 @@ func TestFlowGenerateCmd(t *testing.T) {
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--no-generate-tasks", "--generate-tasks", "--verbose")
+	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--no-generate-tasks", "--verbose")
 	assert.NoError(t, err)
 }
 
