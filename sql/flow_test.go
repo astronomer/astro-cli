@@ -41,6 +41,9 @@ var (
 	mockGetPypiVersionErr = func(projectURL string) (string, error) {
 		return "", errMock
 	}
+	mockBaseDockerImageURIErr = func(astroSQLCLIConfigURL string) (string, error) {
+		return "", errMock
+	}
 )
 
 func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
@@ -111,6 +114,16 @@ Step 2/4 : ENV ASTRO_CLI Yes
 	assert.Equal(t, expectedOutput, string(out))
 }
 
+func TestDisplayMessagesHasError(t *testing.T) {
+	jsonMessage := jsonmessage.JSONMessage{Error: &jsonmessage.JSONError{Message: "An error has occurred."}}
+	data, err := json.Marshal(jsonMessage)
+	assert.NoError(t, err)
+
+	reader := bytes.NewReader(data)
+	err = DisplayMessages(reader)
+	assert.Error(t, err)
+}
+
 func TestDockerClientInitFailure(t *testing.T) {
 	DockerClientInit = func() (DockerBind, error) {
 		return nil, errMock
@@ -125,6 +138,13 @@ func TestGetPypiVersionFailure(t *testing.T) {
 	err := CommonDockerUtil(testCommand, nil, nil, nil)
 	assert.ErrorIs(t, err, errMock)
 	getPypiVersion = GetPypiVersion
+}
+
+func TestGetBaseDockerImageURI(t *testing.T) {
+	getBaseDockerImageURI = mockBaseDockerImageURIErr
+	err := CommonDockerUtil(testCommand, nil, nil, nil)
+	assert.ErrorIs(t, err, errMock)
+	getBaseDockerImageURI = GetBaseDockerImageURI
 }
 
 func TestImageBuildFailure(t *testing.T) {
