@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/config"
 )
 
 var (
@@ -35,8 +36,10 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
-		newOrganizationAuditLogs(out),
 	)
+	if config.CFG.AuditLogs.GetBool() {
+		cmd.AddCommand(newOrganizationAuditLogs(out))
+	}
 	return cmd
 }
 
