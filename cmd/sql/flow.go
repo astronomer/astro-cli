@@ -20,6 +20,7 @@ var (
 	noGenerateTasks   bool
 	verbose           bool
 	debug             bool
+	osExit            = os.Exit
 )
 
 func getAbsolutePath(path string) (string, error) {
@@ -105,7 +106,7 @@ func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, moun
 		return fmt.Errorf("error running %v: %w", cmdString, err)
 	}
 	if exitCode != 0 {
-		os.Exit(exitCode)
+		osExit(exitCode)
 	}
 
 	return nil
@@ -225,7 +226,7 @@ func executeHelp(cmd *cobra.Command, cmdString []string) {
 		panic(fmt.Errorf("error running %v: %w", cmdString, err))
 	}
 	if exitCode != 0 {
-		os.Exit(exitCode)
+		osExit(exitCode)
 	}
 }
 
