@@ -29,6 +29,7 @@ var (
 	DockerClientInit = NewDockerClient
 	IoCopy           = io.Copy
 	DisplayMessages  = displayMessages
+	OsWriteFile      = os.WriteFile
 )
 
 func getContext(filePath string) io.Reader {
@@ -95,7 +96,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	currentUser, _ := user.Current()
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Uid, currentUser.Username))
-	if err := os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
+	if err := OsWriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return statusCode, fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)

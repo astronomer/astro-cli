@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -43,6 +44,9 @@ var (
 	}
 	mockBaseDockerImageURIErr = func(astroSQLCLIConfigURL string) (string, error) {
 		return "", errMock
+	}
+	mockOsWriteFileErr = func(name string, data []byte, perm fs.FileMode) error {
+		return errMock
 	}
 )
 
@@ -145,6 +149,13 @@ func TestGetBaseDockerImageURI(t *testing.T) {
 	_, err := CommonDockerUtil(testCommand, nil, nil, nil)
 	assert.ErrorIs(t, err, errMock)
 	getBaseDockerImageURI = GetBaseDockerImageURI
+}
+
+func TestOsWriteFile(t *testing.T) {
+	OsWriteFile = mockOsWriteFileErr
+	_, err := CommonDockerUtil(testCommand, nil, nil, nil)
+	assert.ErrorIs(t, err, errMock)
+	OsWriteFile = os.WriteFile
 }
 
 func TestImageBuildFailure(t *testing.T) {
