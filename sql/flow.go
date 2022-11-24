@@ -91,7 +91,9 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		fmt.Println(err)
 	}
 
-	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion))
+	currentUser, _ := user.Current()
+
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Uid, currentUser.Username))
 	if err := os.WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return fmt.Errorf("error writing dockerfile %w", err)
 	}
@@ -123,14 +125,13 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		binds = append(binds, fmt.Sprintf("%s:%s", mountDir, mountDir))
 	}
 
-	currentUser, _ := user.Current()
 	resp, err := cli.ContainerCreate(
 		ctx,
 		&container.Config{
 			Image: SQLCliDockerImageName,
 			Cmd:   cmd,
 			Tty:   true,
-			User:  currentUser.Uid,
+			User:  fmt.Sprintf("%s:%s", currentUser.Uid, currentUser.Gid),
 		},
 		&container.HostConfig{
 			Binds: binds,
