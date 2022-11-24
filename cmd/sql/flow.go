@@ -100,9 +100,12 @@ func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, moun
 	if debug {
 		cmdString = slices.Insert(cmdString, 1, "--debug")
 	}
-	err := sql.CommonDockerUtil(cmdString, args, flags, mountDirs)
+	exitCode, err := sql.CommonDockerUtil(cmdString, args, flags, mountDirs)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", cmdString, err)
+	}
+	if exitCode != 0 {
+		os.Exit(exitCode)
 	}
 
 	return nil
@@ -217,9 +220,12 @@ func executeRun(cmd *cobra.Command, args []string) error {
 }
 
 func executeHelp(cmd *cobra.Command, cmdString []string) {
-	err := sql.CommonDockerUtil(cmdString, nil, nil, nil)
+	exitCode, err := sql.CommonDockerUtil(cmdString, nil, nil, nil)
 	if err != nil {
 		panic(fmt.Errorf("error running %v: %w", cmdString, err))
+	}
+	if exitCode != 0 {
+		os.Exit(exitCode)
 	}
 }
 

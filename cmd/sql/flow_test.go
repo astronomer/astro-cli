@@ -34,7 +34,7 @@ func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.Containe
 			errChannel <- errMock
 			return
 		}
-		res := container.ContainerWaitOKBody{StatusCode: 200, Error: nil}
+		res := container.ContainerWaitOKBody{StatusCode: 0}
 		containerWaitOkBodyChannel <- res
 		errChannel <- nil
 		close(containerWaitOkBodyChannel)
