@@ -212,7 +212,7 @@ func TestFlowCmdOsExit(t *testing.T) {
 	osExit = func(code int) {
 		assert.Equal(t, code, int(statusCode))
 	}
-	err := execFlowCmd()
+	err := execFlowCmd("version")
 	assert.NoError(t, err)
 	osExit = os.Exit
 }
@@ -223,7 +223,7 @@ func TestFlowHelpCmdOsExit(t *testing.T) {
 	osExit = func(code int) {
 		assert.Equal(t, code, int(statusCode))
 	}
-	err := execFlowCmd("--help")
+	err := execFlowCmd()
 	assert.NoError(t, err)
 	osExit = os.Exit
 }
@@ -236,5 +236,5 @@ func TestFlowCmdError(t *testing.T) {
 
 func TestFlowHelpCmdError(t *testing.T) {
 	patchDockerClientInit(0, errMock)
-	assert.PanicsWithError(t, "error running [--help]: docker client initialization failed mock error", func() { execFlowCmd("--help") })
+	assert.PanicsWithError(t, "error running [flow --help]: docker client initialization failed mock error", func() { execFlowCmd() })
 }
