@@ -1,6 +1,30 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.8.2] - 2022-11-23
+
+### Bug Fixes
+- Fixed an issue where users where facing permission issue with `astro flow` commands on Linux machines.
+
+## [1.8.1] - 2022-11-23
+
+### Bug Fixes
+- Fixed an issue where you could not use `astro deploy` if you did not have an `.env` file in your Astro project.
+
+## [1.8.0] - 2022-11-23
+
+### New Features
+- New Command `astro run` to Run DAGs. User can now compile and run a DAG with only the command line. `astro run` will run your DAGs within a Docker container built from your local `Dockerfile` containing your DAGs, DAG utility files, python requirements, and env vars from your .env file. This command will simplify the process of testing and debugging DAGs locally for many users. The command will automatically load Connections and Variables located in the Airflow Settings file. More information on astro run will be available in docs soon.
+- With CLI 1.8.0 onwards, latest CLI version would be compatible with all active Software platform version. CLI would be able to figure out the Software platform version during astro login and adjust its commands & feature flags so that they are compatible with the connected Software platform.
+
+### Additional improvements
+- If you run `astro deploy` with an empty `dag` folder the pushing of DAGs will be skipped and only your projects image will be updated. This enables you to manage your deployments DAGs and image in separate repos.
+- There are some minor improvements to the `deployment inspect` command. Specifically a `dag-deploy-enabled` field was added and the fields are now ordered by importance rather than alphabetical order.
+
+### Bug Fixes
+- Fixed an issue where changes specified in the `docker-compose.override.yaml` file were not successfully applying to users projects.
+- Fixed an issue where `astro login` didn’t recognize some valid domains.
+
 ## [1.0.0] - 2022-05-23
 
 ### New Features
