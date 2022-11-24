@@ -149,12 +149,14 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	var statusCode int
 	select {
 	case err := <-errCh:
 		if err != nil {
 			return fmt.Errorf("docker container wait failed %w", err)
 		}
-	case <-statusCh:
+	case status := <-statusCh:
+		statusCode = int(status.StatusCode)
 	}
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
@@ -168,6 +170,10 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
 		return fmt.Errorf("docker remove failed %w", err)
+	}
+
+	if statusCode != 0 {
+		os.Exit(statusCode)
 	}
 
 	return nil
