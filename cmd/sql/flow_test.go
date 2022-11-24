@@ -207,21 +207,21 @@ func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 }
 
 func TestFlowCmdOsExit(t *testing.T) {
-	var exitCode int64 = 1
-	patchDockerClientInit(exitCode, nil)
+	var statusCode int64 = 1
+	patchDockerClientInit(statusCode, nil)
 	osExit = func(code int) {
-		assert.Equal(t, code, exitCode)
+		assert.Equal(t, code, int(statusCode))
 	}
 	err := execFlowCmd()
 	assert.NoError(t, err)
 	osExit = os.Exit
 }
 
-func TestFlowCmdHelpOsExit(t *testing.T) {
-	var exitCode int64 = 1
-	patchDockerClientInit(exitCode, nil)
+func TestFlowHelpCmdOsExit(t *testing.T) {
+	var statusCode int64 = 1
+	patchDockerClientInit(statusCode, nil)
 	osExit = func(code int) {
-		assert.Equal(t, code, exitCode)
+		assert.Equal(t, code, int(statusCode))
 	}
 	err := execFlowCmd("--help")
 	assert.NoError(t, err)
@@ -234,7 +234,7 @@ func TestFlowCmdError(t *testing.T) {
 	assert.EqualError(t, err, "error running [flow version]: docker client initialization failed mock error")
 }
 
-func TestFlowCmdHelpError(t *testing.T) {
+func TestFlowHelpCmdError(t *testing.T) {
 	patchDockerClientInit(0, errMock)
 	assert.PanicsWithError(t, "error running [--help]: docker client initialization failed mock error", func() { execFlowCmd("--help") })
 }
