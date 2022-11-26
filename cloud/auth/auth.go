@@ -500,7 +500,6 @@ func FetchDomainAuthConfig(domain string) (astro.AuthConfig, error) {
 		if unMarshalErr != nil {
 			return authConfig, fmt.Errorf("cannot decode response: %w", unMarshalErr)
 		}
-		// authConfig.AuthFlow = AuthFlowIdentityFirst // for testing
 		return authConfig, nil
 	}
 
