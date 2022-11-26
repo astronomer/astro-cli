@@ -338,7 +338,6 @@ func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client ast
 			break
 		}
 	}
-
 	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.ShortName)
 	if err != nil {
 		return err

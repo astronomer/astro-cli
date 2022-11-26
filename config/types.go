@@ -37,6 +37,7 @@ type cfgs struct {
 	Interactive          cfg
 	PageSize             cfg
 	SQLCLI               cfg
+	AuditLogs            cfg
 }
 
 // Creates a new cfg struct

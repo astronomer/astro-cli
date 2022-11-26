@@ -17,6 +17,7 @@ var (
 	airflowDagsFolder string
 	projectDir        string
 	generateTasks     bool
+	noGenerateTasks   bool
 	verbose           bool
 	debug             bool
 )
@@ -40,6 +41,7 @@ func createProjectDir(projectDir string) (mountDir string, err error) {
 	}
 
 	err = os.MkdirAll(projectDir, os.ModePerm)
+
 	if err != nil {
 		err = fmt.Errorf("error creating project directory %s: %w", projectDir, err)
 		return "", err
@@ -171,6 +173,9 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 	if generateTasks {
 		args = append(args, "--generate-tasks")
 	}
+	if noGenerateTasks {
+		args = append(args, "--no-generate-tasks")
+	}
 
 	if environment != "" {
 		flags["env"] = environment
@@ -203,6 +208,9 @@ func executeRun(cmd *cobra.Command, args []string) error {
 
 	if generateTasks {
 		args = append(args, "--generate-tasks")
+	}
+	if noGenerateTasks {
+		args = append(args, "--no-generate-tasks")
 	}
 
 	return executeCmd(cmd, args, flags, mountDirs)
@@ -264,6 +272,7 @@ func validateCommand() *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func generateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "generate",
@@ -273,12 +282,15 @@ func generateCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
+	cmd.Flags().BoolVar(&noGenerateTasks, "no-generate-tasks", false, "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
+	cmd.MarkFlagsMutuallyExclusive("generate-tasks", "no-generate-tasks")
 	return cmd
 }
 
+//nolint:dupl
 func runCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "run",
@@ -288,9 +300,11 @@ func runCommand() *cobra.Command {
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
+	cmd.Flags().BoolVar(&noGenerateTasks, "no-generate-tasks", false, "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
+	cmd.MarkFlagsMutuallyExclusive("generate-tasks", "no-generate-tasks")
 	return cmd
 }
 

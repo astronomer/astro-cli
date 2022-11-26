@@ -611,6 +611,7 @@ func TestCheckUserSession(t *testing.T) {
 		err := CheckUserSession(&ctx, mockIdentityFirstAuthConfig, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 

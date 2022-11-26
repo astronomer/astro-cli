@@ -108,7 +108,7 @@ func TestDisplayMessages(t *testing.T) {
 
 	w.Close()
 	out, _ := io.ReadAll(r)
-	expectedOutput := `Installing flow.. This might take some time.
+	expectedOutput := `Installing flow... This might take some time.
 Step 2/4 : ENV ASTRO_CLI Yes
 `
 	assert.Equal(t, expectedOutput, string(out))
