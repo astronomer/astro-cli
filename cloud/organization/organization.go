@@ -117,28 +117,13 @@ func SwitchWithLogin(domain string, targetOrg *astrocore.Organization, astroClie
 }
 
 func SwitchWithContext(domain string, targetOrg *astrocore.Organization, authConfig astro.AuthConfig, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
-	c, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
+	c, _ := context.GetCurrentContext()
 	// reset org context
-	err = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
-	if err != nil {
-		return err
-	}
+	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
 	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
-	err = c.SetContextKey("token", c.Token)
-	if err != nil {
-		return err
-	}
-	err = c.SetContextKey("refreshtoken", c.RefreshToken)
-	if err != nil {
-		return err
-	}
-	err = c.SetContextKey("user_email", c.UserEmail)
-	if err != nil {
-		return err
-	}
+	_ = c.SetContextKey("token", c.Token)
+	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
+	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
 	return CheckUserSession(&c, authConfig, astroClient, coreClient, out)
