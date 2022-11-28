@@ -26,10 +26,10 @@ const (
 )
 
 var (
-	DockerClientInit = NewDockerClient
-	IoCopy           = io.Copy
-	DisplayMessages  = displayMessages
-	OsWriteFile      = os.WriteFile
+	Docker          = NewDockerBind
+	Io              = NewIoBind
+	DisplayMessages = displayMessages
+	Os              = NewOsBind
 )
 
 func getContext(filePath string) io.Reader {
@@ -78,7 +78,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	var statusCode int
 	ctx := context.Background()
 
-	cli, err := DockerClientInit()
+	cli, err := Docker()
 	if err != nil {
 		return statusCode, fmt.Errorf("docker client initialization failed %w", err)
 	}
@@ -96,7 +96,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 	currentUser, _ := user.Current()
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Uid, currentUser.Username))
-	if err := OsWriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
+	if err := Os().WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return statusCode, fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)
@@ -165,7 +165,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return statusCode, fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
-	if _, err := IoCopy(os.Stdout, cout); err != nil {
+	if _, err := Io().Copy(os.Stdout, cout); err != nil {
 		return statusCode, fmt.Errorf("docker logs forwarding failed %w", err)
 	}
 
