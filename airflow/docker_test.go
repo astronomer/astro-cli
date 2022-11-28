@@ -158,7 +158,7 @@ services:
 			return false
 		}
 		isM1 = mockM1Checker
-		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", map[string]string{})
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "", map[string]string{})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedCfg, cfg)
 	})
@@ -294,7 +294,7 @@ services:
 			return false
 		}
 		isM1 = mockM1Checker
-		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedCfg, cfg)
 	})
@@ -1510,7 +1510,7 @@ func TestCreateDockerProject(t *testing.T) {
 	assert.NoError(t, err)
 	config.InitConfig(fs)
 	t.Run("case when project doesnot have docker-compose.override.yml", func(t *testing.T) {
-		prj, err := createDockerProject("test", "", "", "test-image:latest", map[string]string{})
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", map[string]string{})
 		assert.NoError(t, err)
 		postgresService := types.ServiceConfig{}
 		serviceFound := false
@@ -1527,7 +1527,7 @@ func TestCreateDockerProject(t *testing.T) {
 
 	t.Run("case when project has docker-compose.override.yml", func(t *testing.T) {
 		composeOverrideFilename = "./testfiles/docker-compose.override.yml"
-		prj, err := createDockerProject("test", "", "", "test-image:latest", map[string]string{})
+		prj, err := createDockerProject("test", "", "", "test-image:latest", "", map[string]string{})
 		assert.NoError(t, err)
 		postgresService := types.ServiceConfig{}
 		serviceFound := false
