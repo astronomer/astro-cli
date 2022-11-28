@@ -23,6 +23,12 @@ Please paste terminal or playground output in a code block here
 Run the command `astro version` to get the cli version
 -->
 
+**This CLI bug is related to which Astronomer Platform?**
+
+- [ ] Astro
+- [ ] Software
+- [ ] None/Unknown
+
 **What Operating System is the above CLI installed on?**
 
 **🪜 Steps To Reproduce**
