@@ -108,6 +108,9 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+
+	  - airflow_home/airflow_settings.yaml:/usr/local/airflow/airflow_settings.yaml:z
+
       - airflow_logs:/usr/local/airflow/logs
     
 
@@ -158,7 +161,7 @@ services:
 			return false
 		}
 		isM1 = mockM1Checker
-		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "", map[string]string{})
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedCfg, cfg)
 	})
@@ -217,6 +220,9 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+
+	  - airflow_home/airflow_settings.yaml:/usr/local/airflow/airflow_settings.yaml:z
+
       - airflow_logs:/usr/local/airflow/logs
     
 
@@ -294,7 +300,7 @@ services:
 			return false
 		}
 		isM1 = mockM1Checker
-		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
+		cfg, err := generateConfig("test-project-name", "airflow_home", ".env", "", "airflow_settings.yaml", map[string]string{runtimeVersionLabelName: triggererAllowedRuntimeVersion})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedCfg, cfg)
 	})
