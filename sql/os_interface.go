@@ -4,8 +4,7 @@ import (
 	"os"
 )
 
-type OsBinder struct {
-}
+type OsBinder struct{}
 
 type OsBind interface {
 	Exit(code int)

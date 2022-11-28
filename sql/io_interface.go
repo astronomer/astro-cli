@@ -4,8 +4,7 @@ import (
 	"io"
 )
 
-type IoBinder struct {
-}
+type IoBinder struct{}
 
 type IoBind interface {
 	Copy(dst io.Writer, src io.Reader) (written int64, err error)
