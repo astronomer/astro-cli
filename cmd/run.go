@@ -8,6 +8,7 @@ import (
 
 var (
 	dagID    string
+	dagFile  string
 	taskLogs bool
 )
 
@@ -15,7 +16,7 @@ func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run DAG-ID",
 		Short: "Run a local DAG with python by running its tasks sequentially",
-		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code",
+		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code. It will parse all the files in your dags folder if the --dag-file flag is not used. Use the --dag-file flag to only parse the DAG file where your DAG is defined.",
 		Args:  cobra.ExactArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -26,6 +27,7 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
+	cmd.Flags().StringVarP(&dagFile, "dag-file", "d", "", "DAG file where your DAG is located. Use this flag to parse ")
 
 	return cmd
 }
@@ -43,5 +45,5 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.RunDAG(dagID, settingsFile, noCache, taskLogs)
+	return containerHandler.RunDAG(dagID, settingsFile, dagFile, noCache, taskLogs)
 }
