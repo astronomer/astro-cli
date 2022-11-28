@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow/include"
-	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/client"
-	log "github.com/sirupsen/logrus"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 type ContainerHandler interface {
@@ -151,7 +151,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		AirflowEnvFile:       envFile,
 		MountLabel:           "z",
 		SettingsFile:         settingsFile,
-		SettingsFileExist:   settingsFileExist,
+		SettingsFileExist:    settingsFileExist,
 		TriggererEnabled:     triggererEnabled,
 	}
 
