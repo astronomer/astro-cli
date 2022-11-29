@@ -58,6 +58,9 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:{{ .MountLabel }}
+{{if .SettingsFileExist}}
+      - {{ .AirflowHome }}/{{ .SettingsFile }}:/usr/local/airflow/{{ .SettingsFile }}:{{ .MountLabel }}
+{{end}}
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 

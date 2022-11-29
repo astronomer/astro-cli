@@ -93,6 +93,8 @@ type ComposeConfig struct {
 	AirflowUser          string
 	AirflowWebserverPort string
 	MountLabel           string
+	SettingsFile         string
+	SettingsFileExist    bool
 	TriggererEnabled     bool
 }
 
@@ -178,16 +180,14 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 		if err != nil {
 			fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 		}
-		defer func() {
-			// remove astro-run-dag from requirments.txt
-			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
-			if err != nil {
-				fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
-			}
-		}()
-		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		// remove astro-run-dag from requirments.txt
+		err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
 		if err != nil {
-			return err
+			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+		}
+		if imageBuildErr != nil {
+			return imageBuildErr
 		}
 	} else {
 		// skip build if an imageName is passed
@@ -203,7 +203,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", imageLabels)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -250,7 +250,7 @@ func (d *DockerCompose) Stop() error {
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", imageLabels)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -659,9 +659,9 @@ func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 }
 
 // createProject creates project with yaml config as context
-var createDockerProject = func(projectName, airflowHome, envFile, buildImage string, imageLabels map[string]string) (*types.Project, error) {
+var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (*types.Project, error) {
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, imageLabels)
+	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create project")
 	}
