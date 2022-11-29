@@ -213,23 +213,29 @@ func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 func TestFlowCmdOsExit(t *testing.T) {
 	var statusCode int64 = 1
 	patchDockerClientInit(t, statusCode, nil)
-	osExit = func(code int) {
-		assert.Equal(t, code, int(statusCode))
+	mockOs := mocks.NewOsBind(t)
+	sql.Os = func() sql.OsBind {
+		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockOs.On("Exit", int(statusCode))
+		return mockOs
 	}
 	err := execFlowCmd("version")
 	assert.NoError(t, err)
-	osExit = os.Exit
+	sql.Os = sql.NewOsBind
 }
 
 func TestFlowHelpCmdOsExit(t *testing.T) {
 	var statusCode int64 = 1
 	patchDockerClientInit(t, statusCode, nil)
-	osExit = func(code int) {
-		assert.Equal(t, code, int(statusCode))
+	mockOs := mocks.NewOsBind(t)
+	sql.Os = func() sql.OsBind {
+		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockOs.On("Exit", int(statusCode))
+		return mockOs
 	}
 	err := execFlowCmd()
 	assert.NoError(t, err)
-	osExit = os.Exit
+	sql.Os = sql.NewOsBind
 }
 
 func TestFlowCmdError(t *testing.T) {

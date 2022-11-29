@@ -71,10 +71,16 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 		mockDocker.On("ContainerRemove", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return mockDocker, nil
 	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() OsBind {
+		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		return mockOs
+	}
 	DisplayMessages = mockDisplayMessagesNil
 	_, err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"})
 	assert.NoError(t, err)
 	DisplayMessages = displayMessages
+	Os = NewOsBind
 }
 
 func TestDisplayMessages(t *testing.T) {
@@ -140,7 +146,7 @@ func TestGetBaseDockerImageURI(t *testing.T) {
 	getBaseDockerImageURI = GetBaseDockerImageURI
 }
 
-func TestOsWriteFile(t *testing.T) {
+func TestOsWriteFileErr(t *testing.T) {
 	mockOs := mocks.NewOsBind(t)
 	Os = func() OsBind {
 		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
