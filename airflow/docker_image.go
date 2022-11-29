@@ -339,7 +339,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		log.Debug(cmdErr)
 		fmt.Println("\nSee the output of this command for errors.")
 		fmt.Println("If you are having an issue with loading your Settings File make sure both the 'variables' and 'connections' fields exist and that there are no yaml syntax errors.")
-		fmt.Println("if you are getting a missing `airflow_settings.yaml` or `astro-run-dag` error try restarting airflow with `astro dev restart`.")
+		fmt.Println("If you are getting a missing `airflow_settings.yaml` or `astro-run-dag` error try restarting airflow with `astro dev restart`.")
 	}
 	if containerName == "" {
 		// delete container
