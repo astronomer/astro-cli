@@ -27,7 +27,7 @@ type UpdateDeploymentImageRequest struct {
 // DeleteDeploymentRequest - properties to delete a deployment
 type DeleteDeploymentRequest struct {
 	DeploymentID string `json:"deploymentId"`
-	HardDelete   bool   `json:"delpoymentHardDelete"`
+	HardDelete   bool   `json:"deploymentHardDelete"`
 }
 
 var (
