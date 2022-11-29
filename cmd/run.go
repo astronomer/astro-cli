@@ -15,7 +15,7 @@ func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run DAG-ID",
 		Short: "Run a local DAG with python by running its tasks sequentially",
-		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code. It will parse all the files in your dags folder. Remove files you do not wish to be parsed.",		
+		Long:  "Run a local DAG by running its tasks sequentially. This command will spin up a docker airflow environment and execute your DAG code. It will parse all the files in your dags folder. Remove files you do not wish to be parsed.",
 		Args:  cobra.ExactArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
