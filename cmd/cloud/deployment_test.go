@@ -136,17 +136,23 @@ func TestDeploymentCreate(t *testing.T) {
 		}
 	})
 
-	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
+	t.Run("creates a deployment when dag-deploy is disabled", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 
-	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
+	t.Run("creates a deployment when dag deploy is enabled", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 
-	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.Error(t, err)
+	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
 
 	mockClient.AssertExpectations(t)
 }

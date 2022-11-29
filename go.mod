@@ -35,6 +35,7 @@ require (
 	github.com/deepmap/oapi-codegen v1.12.2
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
+	github.com/ghodss/yaml v1.0.0
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
