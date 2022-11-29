@@ -455,7 +455,6 @@ func ExportConnections(id string) error {
 			ConnLogin:    connections[i].ConnLogin,
 			ConnPassword: connections[i].ConnPassword,
 			ConnPort:     port,
-			ConnURI:      connections[i].ConnURI,
 			ConnExtra:    connections[i].ConnExtra,
 		}
 
