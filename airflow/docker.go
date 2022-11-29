@@ -187,7 +187,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
 		}
 		if imageBuildErr != nil {
-			return err
+			return imageBuildErr
 		}
 	} else {
 		// skip build if an imageName is passed
