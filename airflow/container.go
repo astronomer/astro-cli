@@ -13,9 +13,11 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 type ContainerHandler interface {
@@ -99,7 +101,7 @@ func normalizeName(s string) string {
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile, buildImage string, imageLabels map[string]string) (string, error) {
+func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (string, error) {
 	var tmpl *template.Template
 	var err error
 	tmpl, err = template.New("yml").Parse(include.Composeyml)
@@ -132,6 +134,11 @@ func generateConfig(projectName, airflowHome, envFile, buildImage string, imageL
 		airflowImage = buildImage
 	}
 
+	settingsFileExist, err := util.Exists("./" + settingsFile)
+	if err != nil {
+		log.Debug(err)
+	}
+
 	cfg := ComposeConfig{
 		PostgresUser:         config.CFG.PostgresUser.GetString(),
 		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
@@ -143,6 +150,8 @@ func generateConfig(projectName, airflowHome, envFile, buildImage string, imageL
 		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
 		AirflowEnvFile:       envFile,
 		MountLabel:           "z",
+		SettingsFile:         settingsFile,
+		SettingsFileExist:    settingsFileExist,
 		TriggererEnabled:     triggererEnabled,
 	}
 
