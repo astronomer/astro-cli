@@ -1,13 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
-
-	"github.com/astronomer/astro-cli/pkg/domainutil"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	cloudAuth "github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	softwareAuth "github.com/astronomer/astro-cli/software/auth"
 
 	"github.com/spf13/cobra"
@@ -59,7 +60,20 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, out io.W
 	cmd.SilenceUsage = true
 
 	if len(args) == 1 {
+		// check if user provided a valid cloud domain
 		if !context.IsCloudDomain(args[0]) {
+			// get the domain from context as an extra check
+			ctx, _ := context.GetCurrentContext()
+			if context.IsCloudDomain(ctx.Domain) {
+				// print an error if context domain is a valid cloud domain
+				fmt.Fprintf(out, "Error: %s is an invalid domain to login into Astro.\n", args[0])
+				// give the user an option to login to software
+				y, _ := input.Confirm("Are you trying to authenticate to Astronomer Software?")
+				if !y {
+					fmt.Println("Canceling login...")
+					return nil
+				}
+			}
 			return softwareLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
 		}
 		return cloudLogin(args[0], "", token, astroClient, out, shouldDisplayLoginLink)
