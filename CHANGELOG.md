@@ -1,6 +1,16 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.8.3] - 2022-11-30
+
+### Bug Fixes
+- Fixed an issue to improve login flow when the domain is not a valid cloud domain.
+- Removed astro-run-dag from requirements.txt to make astro run faster.
+- Removed con_uri from object export to make the command compatible with astro run.
+- Fixed an issue with astro run missing settings file issue.
+- Fixed typo for hard delete field in delete deployment mutation.
+- Fixed an issue on flow run command.
+
 ## [1.8.2] - 2022-11-23
 
 ### Bug Fixes
