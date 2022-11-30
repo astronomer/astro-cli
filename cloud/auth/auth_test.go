@@ -40,6 +40,16 @@ var (
 			Id:             "user-id",
 		},
 	}
+	mockGetSelfResponseNoOrg = astrocore.GetSelfUserResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.Self{
+			Username: "test@astronomer.io",
+			FullName: "jane",
+			Id:       "user-id",
+		},
+	}
 	mockGetSelfErrorBody, _ = json.Marshal(astrocore.Error{
 		Message: "failed to fetch self user",
 	})
@@ -56,6 +66,7 @@ var (
 		},
 		JSON200: &[]astrocore.Organization{
 			{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org"},
+			{AuthServiceId: "auth-service-id", Id: "test-org-id-2", Name: "test-org-2"},
 			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1"},
 		},
 	}
@@ -68,54 +79,54 @@ var (
 	errNetwork = errors.New("network error")
 )
 
-func Test_validateDomain(t *testing.T) {
+func Test_FetchDomainAuthConfig(t *testing.T) {
 	domain := "astronomer.io"
-	actual, err := ValidateDomain(domain)
+	actual, err := FetchDomainAuthConfig(domain)
 	assert.NoError(t, err)
 	assert.Equal(t, actual.ClientID, "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9")
 	assert.Equal(t, actual.Audience, "astronomer-ee")
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer.io/")
 
 	domain = "gcp0001.us-east4.astronomer.io" // Gen1 CLI domain
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer.io"
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
 
 	domain = "astronomer-dev.io"
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.NoError(t, err)
 	assert.Equal(t, actual.ClientID, "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG")
 	assert.Equal(t, actual.Audience, "astronomer-ee")
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-dev.io/")
 
 	domain = "fail.astronomer-dev.io"
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
 
 	domain = "astronomer-stage.io"
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.NoError(t, err)
 	assert.Equal(t, actual.ClientID, "jsarDat3BeDXZ1monEAeqJPOvRvterpm")
 	assert.Equal(t, actual.Audience, "astronomer-ee")
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-stage.io/")
 
 	domain = "fail.astronomer-stage.io"
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer-perf.io"
-	actual, err = ValidateDomain(domain)
+	actual, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
 		"Are you trying to authenticate to Astronomer Software? If so, change your current context with 'astro context switch'. ")
@@ -137,7 +148,7 @@ func Test_validateDomain(t *testing.T) {
 			}
 		})
 		domain = "pr1234.astronomer-dev.io"
-		actual, err = ValidateDomain(domain)
+		actual, err = FetchDomainAuthConfig(domain)
 		assert.NoError(t, err)
 		assert.Equal(t, actual.ClientID, mockResponse.ClientID)
 		assert.Equal(t, actual.Audience, mockResponse.Audience)
@@ -375,6 +386,30 @@ func TestAuthDeviceLogin(t *testing.T) {
 		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true, "test-domain", "")
 		assert.ErrorIs(t, err, errMock)
 	})
+
+	t.Run("do not call org lookup in identity first flow", func(t *testing.T) {
+		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
+		orgChecker := func(domain string) (string, error) {
+			return "", errMock
+		}
+		callbackHandler := func() (string, error) {
+			return "test-code", nil
+		}
+		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
+			return mockResponse, nil
+		}
+		openURL = func(url string) error {
+			return nil
+		}
+		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{
+			AuthFlow: "IDENTITY_FIRST",
+		}, false, "test-domain", "")
+		assert.NoError(t, err)
+		assert.Equal(t, mockResponse, resp)
+	})
 }
 
 func TestSwitchToLastUsedWorkspace(t *testing.T) {
@@ -413,6 +448,17 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 }
 
 func TestCheckUserSession(t *testing.T) {
+	mockAuthConfig := astro.AuthConfig{
+		ClientID:  "client-id",
+		Audience:  "audience",
+		DomainURL: "https://myURL.com/",
+	}
+	mockIdentityFirstAuthConfig := astro.AuthConfig{
+		ClientID:  "client-id",
+		Audience:  "audience",
+		DomainURL: "https://myURL.com/",
+		AuthFlow:  "IDENTITY_FIRST",
+	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
@@ -422,7 +468,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -434,7 +480,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponseEmpty, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.Contains(t, err.Error(), "Please contact your Astro Organization Owner to be invited to the organization")
 	})
 
@@ -445,7 +491,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(nil, errNetwork).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.Contains(t, err.Error(), "network error")
 	})
 
@@ -455,7 +501,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.Contains(t, err.Error(), "network error")
 	})
 
@@ -465,7 +511,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfErrorResponse, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.Contains(t, err.Error(), "failed to fetch self user")
 	})
 
@@ -476,7 +522,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		ctx := config.Context{}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.ErrorIs(t, err, config.ErrCtxConfigErr)
 		mockClient.AssertExpectations(t)
 	})
@@ -489,7 +535,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -503,7 +549,7 @@ func TestCheckUserSession(t *testing.T) {
 
 		ctx := config.Context{Domain: "test-domain", LastUsedWorkspace: "test-id-1", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
@@ -518,7 +564,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
@@ -533,7 +579,36 @@ func TestCheckUserSession(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
-		err := checkUserSession(&ctx, mockClient, mockCoreClient, buf)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("success with org first auth flow", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
+		// the org return from getSelf "test-org-id" takes precedence over the context org  "test-org-id-2"
+		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id-2"}
+		buf := new(bytes.Buffer)
+		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("success with identity first auth flow", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListWorkspaces", "test-org-id-2").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
+		// context org  "test-org-id-2" takes precedence over the getSelf org "test-org-id"
+		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id-2"}
+		buf := new(bytes.Buffer)
+		err := CheckUserSession(&ctx, mockIdentityFirstAuthConfig, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
