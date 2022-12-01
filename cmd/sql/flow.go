@@ -105,7 +105,7 @@ func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, moun
 		return fmt.Errorf("error running %v: %w", cmdString, err)
 	}
 	if exitCode != 0 {
-		sql.Os().Exit(exitCode)
+		return sql.DockerNonZeroExitCodeError(exitCode)
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func executeHelp(cmd *cobra.Command, cmdString []string) {
 		panic(fmt.Errorf("error running %v: %w", cmdString, err))
 	}
 	if exitCode != 0 {
-		sql.Os().Exit(exitCode)
+		panic(sql.DockerNonZeroExitCodeError(exitCode))
 	}
 }
 

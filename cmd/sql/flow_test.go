@@ -101,6 +101,28 @@ func TestFlowCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowCmdError(t *testing.T) {
+	patchDockerClientInit(t, 0, errMock)
+	err := execFlowCmd("version")
+	assert.EqualError(t, err, "error running [flow version]: docker client initialization failed mock error")
+}
+
+func TestFlowCmdHelpError(t *testing.T) {
+	patchDockerClientInit(t, 0, errMock)
+	assert.PanicsWithError(t, "error running [flow --help]: docker client initialization failed mock error", func() { execFlowCmd() })
+}
+
+func TestFlowCmdDockerCommandError(t *testing.T) {
+	patchDockerClientInit(t, 1, nil)
+	err := execFlowCmd("version")
+	assert.EqualError(t, err, "docker command has returned a non-zero exit code:1")
+}
+
+func TestFlowCmdDockerCommandHelpError(t *testing.T) {
+	patchDockerClientInit(t, 1, nil)
+	assert.PanicsWithError(t, "docker command has returned a non-zero exit code:1", func() { execFlowCmd() })
+}
+
 func TestFlowVersionCmd(t *testing.T) {
 	patchDockerClientInit(t, 0, nil)
 	err := execFlowCmd("version")
@@ -208,43 +230,4 @@ func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 
 	err = execFlowCmd("run", "--project-dir", projectDir)
 	assert.EqualError(t, err, "argument not set:workflow_name")
-}
-
-func TestFlowCmdOsExit(t *testing.T) {
-	var statusCode int64 = 1
-	patchDockerClientInit(t, statusCode, nil)
-	mockOs := mocks.NewOsBind(t)
-	sql.Os = func() sql.OsBind {
-		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockOs.On("Exit", int(statusCode))
-		return mockOs
-	}
-	err := execFlowCmd("version")
-	assert.NoError(t, err)
-	sql.Os = sql.NewOsBind
-}
-
-func TestFlowHelpCmdOsExit(t *testing.T) {
-	var statusCode int64 = 1
-	patchDockerClientInit(t, statusCode, nil)
-	mockOs := mocks.NewOsBind(t)
-	sql.Os = func() sql.OsBind {
-		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockOs.On("Exit", int(statusCode))
-		return mockOs
-	}
-	err := execFlowCmd()
-	assert.NoError(t, err)
-	sql.Os = sql.NewOsBind
-}
-
-func TestFlowCmdError(t *testing.T) {
-	patchDockerClientInit(t, 0, errMock)
-	err := execFlowCmd("version")
-	assert.EqualError(t, err, "error running [flow version]: docker client initialization failed mock error")
-}
-
-func TestFlowHelpCmdError(t *testing.T) {
-	patchDockerClientInit(t, 0, errMock)
-	assert.PanicsWithError(t, "error running [flow --help]: docker client initialization failed mock error", func() { execFlowCmd() })
 }
