@@ -752,7 +752,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         - email1
         - email2
 `
-		var orderedAndTaggedDeployment, unorderedDeployment formattedDeployment
+		var orderedAndTaggedDeployment, unorderedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid yaml
@@ -846,7 +846,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         ]
     }
 }`
-		var orderedAndTaggedDeployment, unorderedDeployment formattedDeployment
+		var orderedAndTaggedDeployment, unorderedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("json", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid json

@@ -63,7 +63,7 @@ type orderedPieces struct {
 	AlertEmails   []string              `mapstructure:"alert_emails" yaml:"alert_emails" json:"alert_emails"`
 }
 
-type formattedDeployment struct {
+type FormattedDeployment struct {
 	Deployment orderedPieces `mapstructure:"deployment" yaml:"deployment" json:"deployment"`
 }
 
@@ -199,7 +199,7 @@ func formatPrintableDeployment(outputFormat string, printableDeployment map[stri
 	var (
 		infoToPrint     []byte
 		err             error
-		formatWithOrder formattedDeployment
+		formatWithOrder FormattedDeployment
 	)
 
 	// use mapstructure to decode to a struct
