@@ -14,6 +14,6 @@ func ArgNotSetError(argument string) error {
 	return fmt.Errorf("%w:%s", errArgNotSetError, argument)
 }
 
-func DockerNonZeroExitCodeError(statusCode int) error {
+func DockerNonZeroExitCodeError(statusCode int64) error {
 	return fmt.Errorf("%w:%d", errDockerNonZeroExitCodeError, statusCode)
 }

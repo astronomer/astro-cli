@@ -74,8 +74,8 @@ func displayMessages(r io.Reader) error {
 	return nil
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) (int, error) {
-	var statusCode int
+func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) (int64, error) {
+	var statusCode int64
 	ctx := context.Background()
 
 	cli, err := Docker()
@@ -157,7 +157,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 			return statusCode, fmt.Errorf("docker container wait failed %w", err)
 		}
 	case status := <-statusCh:
-		statusCode = int(status.StatusCode)
+		statusCode = status.StatusCode
 	}
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
