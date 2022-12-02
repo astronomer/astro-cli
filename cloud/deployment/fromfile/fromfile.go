@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	errEmptyFile    = errors.New("has no content")
-	errCreateFailed = errors.New("failed to create deployment with input")
+	errEmptyFile     = errors.New("has no content")
+	errCreateFailed  = errors.New("failed to create deployment with input")
+	errRequiredField = errors.New("missing required field")
 )
 
 // TODO we need an io.Writer to create happy path output
@@ -38,10 +39,14 @@ func Create(inputFile string, client astro.Client) error {
 	if err != nil {
 		return err
 	}
+	// validate required fields
+	err = checkRequiredFields(&formattedDeployment)
+	if err != nil {
+		return err
+	}
 	// transform formattedDeployment to DeploymentCreateInput
 	createInput = getCreateInput(&formattedDeployment)
 
-	// TODO validate required fields
 	// TODO should we check if deployment exists before creating it?
 
 	// create the deployment
@@ -72,4 +77,16 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment) astro.Creat
 		},
 	}
 	return createInput
+}
+
+// checkRequiredFields ensures all required fields are present in a inspect.FormattedDeployment.
+// It returns errRequiredField if required fields are missing and nil if not.
+func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error {
+	if deploymentFromFile.Deployment.Configuration.Name == "" {
+		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.name")
+	}
+	if deploymentFromFile.Deployment.Configuration.ClusterID == "" {
+		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_id")
+	}
+	return nil
 }

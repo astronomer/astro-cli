@@ -196,6 +196,59 @@ deployment:
 		err = Create("deployment.yaml", nil)
 		assert.ErrorContains(t, err, "error unmarshaling JSON:")
 	})
+	t.Run("returns an error if required fields are missing", func(t *testing.T) {
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name:
+    description: description
+    runtime_version: 6.0.0
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_id: cluster-id
+  worker_queues:
+    - name: default
+      id: test-wq-id
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 110
+      node_pool_id: test-pool-id
+    - name: test-queue-1
+      id: test-wq-id-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 150
+      node_pool_id: test-pool-id-1
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    dag_deploy_enabled: true
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+`
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		err = Create("deployment.yaml", nil)
+		assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
+	})
 	t.Run("returns an error from the api if create deployment fails", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		filePath = "./deployment.yaml"
@@ -303,5 +356,30 @@ func TestGetCreateInput(t *testing.T) {
 		}
 		actual = getCreateInput(&deploymentFromFile)
 		assert.Equal(t, expectedDeploymentInput, actual)
+	})
+}
+
+func TestCheckRequiredFields(t *testing.T) {
+	var (
+		err   error
+		input inspect.FormattedDeployment
+	)
+	input.Deployment.Configuration.Description = "test-description"
+	t.Run("returns an error if name is missing", func(t *testing.T) {
+		err = checkRequiredFields(&input)
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
+	})
+	t.Run("returns an error if cluster_id is missing", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		err = checkRequiredFields(&input)
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.configuration.cluster_id")
+	})
+	t.Run("returns nil if there are no missing fields", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterID = "test-cluster-id"
+		err = checkRequiredFields(&input)
+		assert.NoError(t, err)
 	})
 }
