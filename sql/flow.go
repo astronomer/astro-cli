@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -74,18 +75,19 @@ func displayMessages(r io.Reader) error {
 	return nil
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) (int64, error) {
+func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string, returnStdout bool) (int64, string, error) {
 	var statusCode int64
+
 	ctx := context.Background()
 
 	cli, err := Docker()
 	if err != nil {
-		return statusCode, fmt.Errorf("docker client initialization failed %w", err)
+		return statusCode, "", fmt.Errorf("docker client initialization failed %w", err)
 	}
 
 	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
 	if err != nil {
-		return statusCode, err
+		return statusCode, "", err
 	}
 
 	baseImage, err := getBaseDockerImageURI(astroSQLCLIConfigURL)
@@ -97,7 +99,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Uid, currentUser.Username))
 	if err := Os().WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
-		return statusCode, fmt.Errorf("error writing dockerfile %w", err)
+		return statusCode, "", fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)
 
@@ -110,11 +112,11 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		},
 	)
 	if err != nil {
-		return statusCode, fmt.Errorf("image building failed %w", err)
+		return statusCode, "", fmt.Errorf("image building failed %w", err)
 	}
 
 	if err := DisplayMessages(body.Body); err != nil {
-		return statusCode, fmt.Errorf("image build response read failed %w", err)
+		return statusCode, "", fmt.Errorf("image build response read failed %w", err)
 	}
 
 	cmd = append(cmd, args...)
@@ -143,18 +145,18 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		"",
 	)
 	if err != nil {
-		return statusCode, fmt.Errorf("docker container creation failed %w", err)
+		return statusCode, "", fmt.Errorf("docker container creation failed %w", err)
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return statusCode, fmt.Errorf("docker container start failed %w", err)
+		return statusCode, "", fmt.Errorf("docker container start failed %w", err)
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return statusCode, fmt.Errorf("docker container wait failed %w", err)
+			return statusCode, "", fmt.Errorf("docker container wait failed %w", err)
 		}
 	case status := <-statusCh:
 		statusCode = status.StatusCode
@@ -162,16 +164,34 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
-		return statusCode, fmt.Errorf("docker container logs fetching failed %w", err)
+
+		return statusCode, "", fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
-	if _, err := Io().Copy(os.Stdout, cout); err != nil {
-		return statusCode, fmt.Errorf("docker logs forwarding failed %w", err)
+	outputLogs := ""
+	if returnStdout {
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		if _, err := Io().Copy(os.Stdout, cout); err != nil {
+			return statusCode, "", fmt.Errorf("docker logs forwarding failed %w", err)
+		}
+		w.Close()
+		var buf bytes.Buffer
+		if _, err := Io().Copy(&buf, r); err != nil {
+			return statusCode, "", fmt.Errorf("copy logs to variable for returning them failed %w", err)
+		}
+		outputLogs = buf.String()
+		os.Stdout = rescueStdout
+	} else {
+		if _, err := Io().Copy(os.Stdout, cout); err != nil {
+			return statusCode, "", fmt.Errorf("docker logs forwarding failed %w", err)
+		}
 	}
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
-		return statusCode, fmt.Errorf("docker remove failed %w", err)
+		return statusCode, "", fmt.Errorf("docker remove failed %w", err)
 	}
 
-	return statusCode, nil
+	return statusCode, outputLogs, nil
 }

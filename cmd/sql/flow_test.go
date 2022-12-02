@@ -152,6 +152,20 @@ func TestFlowInitCmdWithFlags(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowConfigCmd(t *testing.T) {
+	projectDir := t.TempDir()
+	AirflowHome := t.TempDir()
+	AirflowDagsFolder := t.TempDir()
+	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
+	assert.NoError(t, err)
+
+	err = execFlowCmd("config", "--project-dir", projectDir, "--key", "airflow_home")
+	assert.NoError(t, err)
+
+	err = execFlowCmd("config", "--project-dir", projectDir)
+	assert.EqualError(t, err, "required flag(s) \"key\" not set")
+}
+
 func TestFlowValidateCmd(t *testing.T) {
 	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
