@@ -8,10 +8,10 @@ import (
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
-	"github.com/stretchr/testify/mock"
-
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
@@ -25,6 +25,7 @@ func TestCreate(t *testing.T) {
 	)
 
 	t.Run("reads the yaml file and creates a deployment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockClient := new(astro_mocks.Client)
 		filePath = "./deployment.yaml"
 		data = `
@@ -76,12 +77,14 @@ deployment:
 
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
+		mockClient.On("ListDeployments", "test-org-id", "ck05r3bor07h40d02y2hw4n4v").Return([]astro.Deployment{}, nil)
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 		err = Create("deployment.yaml", mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("reads the json file and creates a deployment", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockClient := new(astro_mocks.Client)
 		filePath = "./deployment.yaml"
 		data = `{
@@ -150,6 +153,7 @@ deployment:
 
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
+		mockClient.On("ListDeployments", "test-org-id", "ck05r3bor07h40d02y2hw4n4v").Return([]astro.Deployment{}, nil)
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 		err = Create("deployment.yaml", mockClient)
 		assert.NoError(t, err)
@@ -249,7 +253,191 @@ deployment:
 		err = Create("deployment.yaml", nil)
 		assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
 	})
+	t.Run("returns an error if getting context fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
+		mockClient := new(astro_mocks.Client)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_id: cluster-id
+  worker_queues:
+    - name: default
+      id: test-wq-id
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 110
+      node_pool_id: test-pool-id
+    - name: test-queue-1
+      id: test-wq-id-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 150
+      node_pool_id: test-pool-id-1
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    dag_deploy_enabled: true
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+`
+
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		err = Create("deployment.yaml", mockClient)
+		assert.ErrorContains(t, err, "no context set")
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if listing deployment fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astro_mocks.Client)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_id: cluster-id
+  worker_queues:
+    - name: default
+      id: test-wq-id
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 110
+      node_pool_id: test-pool-id
+    - name: test-queue-1
+      id: test-wq-id-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 150
+      node_pool_id: test-pool-id-1
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    dag_deploy_enabled: true
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+`
+
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockClient.On("ListDeployments", "test-org-id", "ck05r3bor07h40d02y2hw4n4v").Return([]astro.Deployment{}, errTest)
+		err = Create("deployment.yaml", mockClient)
+		assert.ErrorIs(t, err, errTest)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run(" returns an error if deployment already exists", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		existingDeployments := []astro.Deployment{
+			{
+				Label:       "test-deployment-label",
+				Description: "deployment-1",
+			},
+			{
+				Label:       "d-2",
+				Description: "deployment-2",
+			},
+		}
+		mockClient := new(astro_mocks.Client)
+		filePath = "./deployment.yaml"
+		data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_id: cluster-id
+  worker_queues:
+    - name: default
+      id: test-wq-id
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 110
+      node_pool_id: test-pool-id
+    - name: test-queue-1
+      id: test-wq-id-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 150
+      node_pool_id: test-pool-id-1
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    dag_deploy_enabled: true
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+`
+
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockClient.On("ListDeployments", "test-org-id", "ck05r3bor07h40d02y2hw4n4v").Return(existingDeployments, nil)
+		err = Create("deployment.yaml", mockClient)
+		assert.ErrorContains(t, err, "deployment: test-deployment-label already exists: use deployment update --from-file deployment.yaml instead")
+		mockClient.AssertExpectations(t)
+	})
 	t.Run("returns an error from the api if create deployment fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockClient := new(astro_mocks.Client)
 		filePath = "./deployment.yaml"
 		data = `{
@@ -318,6 +506,7 @@ deployment:
 
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
+		mockClient.On("ListDeployments", "test-org-id", "ck05r3bor07h40d02y2hw4n4v").Return([]astro.Deployment{}, nil)
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, errTest)
 		err = Create("deployment.yaml", mockClient)
 		assert.ErrorIs(t, err, errCreateFailed)
@@ -381,5 +570,38 @@ func TestCheckRequiredFields(t *testing.T) {
 		input.Deployment.Configuration.ClusterID = "test-cluster-id"
 		err = checkRequiredFields(&input)
 		assert.NoError(t, err)
+	})
+}
+
+func TestDeploymentExists(t *testing.T) {
+	var (
+		existingDeployments []astro.Deployment
+		deploymentToCreate  astro.CreateDeploymentInput
+		actual              bool
+	)
+	existingDeployments = []astro.Deployment{
+		{
+			ID:          "test-d-1",
+			Label:       "test-deployment-1",
+			Description: "deployment 1",
+		},
+		{
+			ID:          "test-d-2",
+			Label:       "test-deployment-2",
+			Description: "deployment 2",
+		},
+	}
+	deploymentToCreate = astro.CreateDeploymentInput{
+		Label:       "test-deployment-2",
+		Description: "deployment 2",
+	}
+	t.Run("returns true if deployment already exists", func(t *testing.T) {
+		actual = deploymentExists(existingDeployments, &deploymentToCreate)
+		assert.True(t, actual)
+	})
+	t.Run("returns false if deployment does not exist", func(t *testing.T) {
+		deploymentToCreate.Label = "test-d-2"
+		actual = deploymentExists(existingDeployments, &deploymentToCreate)
+		assert.False(t, actual)
 	})
 }
