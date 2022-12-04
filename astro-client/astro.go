@@ -305,6 +305,8 @@ func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (io.
 		Headers: make(map[string]string),
 		Path:    fmt.Sprintf("/organizations/%s/audit-logs?earliest=%d", orgShortName, earliest),
 	}
+	// For this command only disable decompression.
+	c.HTTPClient.HTTPClient.Transport = &http.Transport{DisableCompression: true}
 	streamBuffer, err := c.DoPublicRESTStreamQuery(doOpts)
 	if err != nil {
 		return nil, err
