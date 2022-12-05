@@ -48,7 +48,7 @@ func (d DockerBinder) ContainerRemove(ctx context.Context, containerID string, o
 	return d.cli.ContainerRemove(ctx, containerID, options)
 }
 
-func NewDockerClient() (DockerBind, error) {
+func NewDockerBind() (DockerBind, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
