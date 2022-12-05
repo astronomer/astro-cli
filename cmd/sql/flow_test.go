@@ -22,11 +22,9 @@ var (
 	}
 	containerCreateCreatedBody = container.ContainerCreateCreatedBody{ID: "123"}
 	sampleLog                  = io.NopCloser(strings.NewReader("Sample log"))
-	mockDockerBinder           = new(mocks.DockerBind)
-	_                          = patchDockerClientInit()
 )
 
-func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
+func getContainerWaitResponse(raiseError bool, statusCode int64) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
 	containerWaitOkBodyChannel := make(chan container.ContainerWaitOKBody)
 	errChannel := make(chan error, 1)
 	go func() {
@@ -34,7 +32,7 @@ func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.Containe
 			errChannel <- errMock
 			return
 		}
-		res := container.ContainerWaitOKBody{StatusCode: 200, Error: nil}
+		res := container.ContainerWaitOKBody{StatusCode: statusCode}
 		containerWaitOkBodyChannel <- res
 		errChannel <- nil
 		close(containerWaitOkBodyChannel)
@@ -48,23 +46,27 @@ func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.Containe
 	return readOnlyStatusCh, readOnlyErrCh
 }
 
-func patchDockerClientInit() error {
-	sql.DockerClientInit = func() (sql.DockerBind, error) {
-		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
-		mockDockerBinder.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
-		mockDockerBinder.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		mockDockerBinder.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(getContainerWaitResponse(false))
-		mockDockerBinder.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
-		mockDockerBinder.On("ContainerRemove", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		return mockDockerBinder, nil
+func patchDockerClientInit(t *testing.T, statusCode int64, err error) {
+	mockDocker := mocks.NewDockerBind(t)
+	sql.Docker = func() (sql.DockerBind, error) {
+		if err == nil {
+			mockDocker.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
+			mockDocker.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(containerCreateCreatedBody, nil)
+			mockDocker.On("ContainerStart", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mockDocker.On("ContainerWait", mock.Anything, mock.Anything, mock.Anything).Return(getContainerWaitResponse(false, statusCode))
+			mockDocker.On("ContainerLogs", mock.Anything, mock.Anything, mock.Anything).Return(sampleLog, nil)
+			mockDocker.On("ContainerRemove", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		}
+		return mockDocker, err
 	}
 	sql.DisplayMessages = func(r io.Reader) error {
 		return nil
 	}
-	sql.IoCopy = func(dst io.Writer, src io.Reader) (written int64, err error) {
-		return 0, nil
+	mockIo := mocks.NewIoBind(t)
+	sql.Io = func() sql.IoBind {
+		mockIo.On("Copy", mock.Anything, mock.Anything).Return(int64(0), nil)
+		return mockIo
 	}
-	return nil
 }
 
 // chdir changes the current working directory to the named directory and
@@ -94,21 +96,47 @@ func execFlowCmd(args ...string) error {
 }
 
 func TestFlowCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	err := execFlowCmd()
 	assert.NoError(t, err)
 }
 
+func TestFlowCmdError(t *testing.T) {
+	patchDockerClientInit(t, 0, errMock)
+	err := execFlowCmd("version")
+	assert.EqualError(t, err, "error running [flow version]: docker client initialization failed mock error")
+}
+
+func TestFlowCmdHelpError(t *testing.T) {
+	patchDockerClientInit(t, 0, errMock)
+	assert.PanicsWithError(t, "error running [flow --help]: docker client initialization failed mock error", func() { execFlowCmd() })
+}
+
+func TestFlowCmdDockerCommandError(t *testing.T) {
+	patchDockerClientInit(t, 1, nil)
+	err := execFlowCmd("version")
+	assert.EqualError(t, err, "docker command has returned a non-zero exit code:1")
+}
+
+func TestFlowCmdDockerCommandHelpError(t *testing.T) {
+	patchDockerClientInit(t, 1, nil)
+	assert.PanicsWithError(t, "docker command has returned a non-zero exit code:1", func() { execFlowCmd() })
+}
+
 func TestFlowVersionCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	err := execFlowCmd("version")
 	assert.NoError(t, err)
 }
 
 func TestFlowAboutCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	err := execFlowCmd("about")
 	assert.NoError(t, err)
 }
 
 func TestFlowInitCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	defer chdir(t, projectDir)()
 	err := execFlowCmd("init")
@@ -116,6 +144,7 @@ func TestFlowInitCmd(t *testing.T) {
 }
 
 func TestFlowInitCmdWithFlags(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	AirflowHome := t.TempDir()
 	AirflowDagsFolder := t.TempDir()
@@ -124,6 +153,7 @@ func TestFlowInitCmdWithFlags(t *testing.T) {
 }
 
 func TestFlowValidateCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -133,6 +163,7 @@ func TestFlowValidateCmd(t *testing.T) {
 }
 
 func TestFlowGenerateCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -142,6 +173,7 @@ func TestFlowGenerateCmd(t *testing.T) {
 }
 
 func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -151,6 +183,7 @@ func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
 }
 
 func TestFlowRunGenerateTasksCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -160,6 +193,7 @@ func TestFlowRunGenerateTasksCmd(t *testing.T) {
 }
 
 func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -169,6 +203,7 @@ func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
 }
 
 func TestFlowRunCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -178,6 +213,7 @@ func TestFlowRunCmd(t *testing.T) {
 }
 
 func TestDebugFlowRunCmd(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -187,6 +223,7 @@ func TestDebugFlowRunCmd(t *testing.T) {
 }
 
 func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
+	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
