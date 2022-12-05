@@ -75,9 +75,26 @@ func displayMessages(r io.Reader) error {
 	return nil
 }
 
+func captureStdout(sourceOutput io.ReadCloser) (string, error) {
+	outputLogs := ""
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	if _, err := io.Copy(os.Stdout, sourceOutput); err != nil {
+		return "", fmt.Errorf("error writing source output to Stdout %w", err)
+	}
+	w.Close()
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		return "", fmt.Errorf("copying captured log to buffer failed %w", err)
+	}
+	outputLogs = buf.String()
+	os.Stdout = rescueStdout
+	return outputLogs, nil
+}
+
 func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string, returnStdout bool) (int64, string, error) {
 	var statusCode int64
-
 	ctx := context.Background()
 
 	cli, err := Docker()
@@ -170,19 +187,10 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	outputLogs := ""
 	if returnStdout {
-		rescueStdout := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-		if _, err := Io().Copy(os.Stdout, cout); err != nil {
-			return statusCode, "", fmt.Errorf("docker logs forwarding failed %w", err)
+		outputLogs, err = captureStdout(cout)
+		if err != nil {
+			return statusCode, "", err
 		}
-		w.Close()
-		var buf bytes.Buffer
-		if _, err := Io().Copy(&buf, r); err != nil {
-			return statusCode, "", fmt.Errorf("copy logs to variable for returning them failed %w", err)
-		}
-		outputLogs = buf.String()
-		os.Stdout = rescueStdout
 	} else {
 		if _, err := Io().Copy(os.Stdout, cout); err != nil {
 			return statusCode, "", fmt.Errorf("docker logs forwarding failed %w", err)
