@@ -93,7 +93,7 @@ func captureStdout(sourceOutput io.ReadCloser) (string, error) {
 	return outputLogs, nil
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string, returnStdout bool) (int64, string, error) {
+func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string, returnStdout bool) (exitCode int64, output string, err error) {
 	var statusCode int64
 	ctx := context.Background()
 
@@ -181,7 +181,6 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
-
 		return statusCode, "", fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
