@@ -16,26 +16,27 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID     string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID      string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID        string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName      string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion   string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	DagDeployEnabled bool      `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
-	Status           string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt        time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt        time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL    string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL     string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	DeploymentID   string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID    string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID      string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName    string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	Status         string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt      time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt      time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL  string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL   string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
 }
 
 type deploymentConfig struct {
-	Name           string `mapstructure:"name" yaml:"name" json:"name"`
-	Description    string `mapstructure:"description" yaml:"description" json:"description"`
-	RunTimeVersion string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	SchedulerAU    int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
-	SchedulerCount int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
-	ClusterID      string `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"` // this is also in deploymentMetadata
+	Name             string `mapstructure:"name" yaml:"name" json:"name"`
+	Description      string `mapstructure:"description" yaml:"description" json:"description"`
+	RunTimeVersion   string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
+	DagDeployEnabled bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	SchedulerAU      int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
+	SchedulerCount   int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
+	ClusterName      string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
+	WorkspaceName    string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
 }
 
 type workerq struct {
@@ -131,28 +132,29 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		return nil, err
 	}
 	return map[string]interface{}{
-		"deployment_id":      sourceDeployment.ID,
-		"workspace_id":       sourceDeployment.Workspace.ID,
-		"cluster_id":         sourceDeployment.Cluster.ID,
-		"airflow_version":    sourceDeployment.RuntimeRelease.AirflowVersion,
-		"release_name":       sourceDeployment.ReleaseName,
-		"deployment_url":     deploymentURL,
-		"webserver_url":      sourceDeployment.DeploymentSpec.Webserver.URL,
-		"created_at":         sourceDeployment.CreatedAt,
-		"updated_at":         sourceDeployment.UpdatedAt,
-		"status":             sourceDeployment.Status,
-		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
+		"deployment_id":   sourceDeployment.ID,
+		"workspace_id":    sourceDeployment.Workspace.ID,
+		"cluster_id":      sourceDeployment.Cluster.ID,
+		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
+		"release_name":    sourceDeployment.ReleaseName,
+		"deployment_url":  deploymentURL,
+		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,
+		"created_at":      sourceDeployment.CreatedAt,
+		"updated_at":      sourceDeployment.UpdatedAt,
+		"status":          sourceDeployment.Status,
 	}, nil
 }
 
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
 	return map[string]interface{}{
-		"name":            sourceDeployment.Label,
-		"description":     sourceDeployment.Description,
-		"cluster_id":      sourceDeployment.Cluster.ID,
-		"runtime_version": sourceDeployment.RuntimeRelease.Version,
-		"scheduler_au":    sourceDeployment.DeploymentSpec.Scheduler.AU,
-		"scheduler_count": sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+		"name":               sourceDeployment.Label,
+		"description":        sourceDeployment.Description,
+		"workspace_name":     sourceDeployment.Workspace.Label,
+		"cluster_name":       sourceDeployment.Cluster.Name,
+		"runtime_version":    sourceDeployment.RuntimeRelease.Version,
+		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
+		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
+		"scheduler_count":    sourceDeployment.DeploymentSpec.Scheduler.Replicas,
 	}
 }
 
