@@ -74,7 +74,11 @@ func TestCommonDockerUtilWithReturnValue(t *testing.T) {
 	DisplayMessages = mockDisplayMessagesNil
 	_, output, err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, true)
 	assert.NoError(t, err)
-	assert.Equal(t, "Sample log", output)
+
+	outputString, err := ConvertReadCloserToString(output)
+	assert.NoError(t, err)
+	assert.Equal(t, "Sample log", outputString)
+
 	mockDockerBinder.AssertExpectations(t)
 	DisplayMessages = displayMessages
 }
