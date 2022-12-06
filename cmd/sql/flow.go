@@ -21,7 +21,6 @@ var (
 	noGenerateTasks   bool
 	verbose           bool
 	debug             bool
-	key               string
 )
 
 func getAbsolutePath(path string) (string, error) {
@@ -81,8 +80,8 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 		configFlags := make(map[string]string)
 		configFlags["project-dir"] = projectDir
 
-		configFlags["key"] = "airflow_home"
-		exitCode, output, err := sql.CommonDockerUtil(configCommandString, nil, configFlags, mountDirs, true)
+		args := []string{"airflow_home"}
+		exitCode, output, err := sql.CommonDockerUtil(configCommandString, args, configFlags, mountDirs, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error running %v: %w", configCommandString, err)
 		}
@@ -95,8 +94,8 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 		}
 		mountDirs = append(mountDirs, strings.TrimSpace(airflowHomeAbs))
 
-		configFlags["key"] = "airflow_dags_folder"
-		exitCode, output, err = sql.CommonDockerUtil([]string{"flow", "config"}, nil, configFlags, mountDirs, true)
+		args = []string{"airflow_dags_folder"}
+		exitCode, output, err = sql.CommonDockerUtil([]string{"flow", "config"}, args, configFlags, mountDirs, true)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error running %v: %w", configCommandString, err)
 		}
@@ -172,6 +171,10 @@ func executeInit(cmd *cobra.Command, args []string) error {
 }
 
 func executeConfig(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return sql.ArgNotSetError("key")
+	}
+
 	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, false)
 	if err != nil {
 		return err
@@ -180,8 +183,6 @@ func executeConfig(cmd *cobra.Command, args []string) error {
 	if environment != "" {
 		flags["env"] = environment
 	}
-
-	flags["key"] = key
 
 	return executeCmd(cmd, args, flags, mountDirs)
 }
@@ -325,8 +326,6 @@ func configCommand() *cobra.Command {
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().StringVar(&environment, "env", "default", "")
-	cmd.Flags().StringVar(&key, "key", "", "")
-	cmd.MarkFlagRequired("key") //nolint:errcheck
 	return cmd
 }
 

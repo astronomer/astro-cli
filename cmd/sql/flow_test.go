@@ -159,11 +159,11 @@ func TestFlowConfigCmd(t *testing.T) {
 	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
 	assert.NoError(t, err)
 
-	err = execFlowCmd("config", "--project-dir", projectDir, "--key", "airflow_home")
+	err = execFlowCmd("config", "--project-dir", projectDir, "airflow_home")
 	assert.NoError(t, err)
 
 	err = execFlowCmd("config", "--project-dir", projectDir)
-	assert.EqualError(t, err, "required flag(s) \"key\" not set")
+	assert.EqualError(t, err, "argument not set:key")
 }
 
 func TestFlowValidateCmd(t *testing.T) {
