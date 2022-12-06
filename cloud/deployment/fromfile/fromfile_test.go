@@ -98,12 +98,27 @@ deployment:
 			},
 		}
 		orgID = "test-org-id"
+		mockEnvVarResponse := []astro.EnvironmentVariablesObject{
+			{
+				IsSecret:  false,
+				Key:       "foo",
+				Value:     "bar",
+				UpdatedAt: "NOW",
+			},
+			{
+				IsSecret:  true,
+				Key:       "bar",
+				Value:     "baz",
+				UpdatedAt: "NOW+1",
+			},
+		}
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 		mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil)
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
+		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 		err = Create("deployment.yaml", mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -197,12 +212,27 @@ deployment:
 			},
 		}
 		orgID = "test-org-id"
+		mockEnvVarResponse := []astro.EnvironmentVariablesObject{
+			{
+				IsSecret:  false,
+				Key:       "foo",
+				Value:     "bar",
+				UpdatedAt: "NOW",
+			},
+			{
+				IsSecret:  true,
+				Key:       "bar",
+				Value:     "baz",
+				UpdatedAt: "NOW+1",
+			},
+		}
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 		mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil)
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
+		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 		err = Create("deployment.yaml", mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -1079,6 +1109,138 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		assert.ErrorIs(t, err, errNotFound)
 		assert.ErrorContains(t, err, "workspace_name: test-workspace does not exist in organization: test-org-id")
 		assert.Equal(t, "", actualWorkspaceID)
+		mockClient.AssertExpectations(t)
+	})
+}
+
+func TestHasEnvVars(t *testing.T) {
+	t.Run("returns true if there are env vars in the deployment", func(t *testing.T) {
+		var deploymentFromFile inspect.FormattedDeployment
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+		}
+		deploymentFromFile.Deployment.EnvVars = list
+		actual := hasEnvVars(&deploymentFromFile)
+		assert.True(t, actual)
+	})
+	t.Run("returns false if there are no env vars in the deployment", func(t *testing.T) {
+		var deploymentFromFile inspect.FormattedDeployment
+		actual := hasEnvVars(&deploymentFromFile)
+		assert.False(t, actual)
+	})
+}
+
+func TestCreateEnvVars(t *testing.T) {
+	var (
+		expectedEnvVarsInput astro.EnvironmentVariablesInput
+		actualEnvVars        []astro.EnvironmentVariablesObject
+		deploymentFromFile   inspect.FormattedDeployment
+		err                  error
+	)
+	t.Run("creates env vars if they were requested in a formatted deployment", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		deploymentFromFile = inspect.FormattedDeployment{}
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+		}
+		expectedList := []astro.EnvironmentVariable{
+			{
+				IsSecret: false,
+				Key:      "key-1",
+				Value:    "val-1",
+			},
+			{
+				IsSecret: true,
+				Key:      "key-2",
+				Value:    "val-2",
+			},
+		}
+		mockResponse := []astro.EnvironmentVariablesObject{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				Value:     "val-1",
+				UpdatedAt: "now",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				Value:     "val-2",
+				UpdatedAt: "now",
+			},
+		}
+		deploymentFromFile.Deployment.EnvVars = list
+		expectedEnvVarsInput = astro.EnvironmentVariablesInput{
+			DeploymentID:         "test-deployment-id",
+			EnvironmentVariables: expectedList,
+		}
+		mockClient.On("ModifyDeploymentVariable", expectedEnvVarsInput).Return(mockResponse, nil)
+		actualEnvVars, err = createEnvVars(&deploymentFromFile, "test-deployment-id", mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, mockResponse, actualEnvVars)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns api error if modifyDeploymentVariable fails", func(t *testing.T) {
+		var mockResponse []astro.EnvironmentVariablesObject
+		mockClient := new(astro_mocks.Client)
+		deploymentFromFile = inspect.FormattedDeployment{}
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+		}
+		expectedList := []astro.EnvironmentVariable{
+			{
+				IsSecret: false,
+				Key:      "key-1",
+				Value:    "val-1",
+			},
+			{
+				IsSecret: true,
+				Key:      "key-2",
+				Value:    "val-2",
+			},
+		}
+		deploymentFromFile.Deployment.EnvVars = list
+		expectedEnvVarsInput = astro.EnvironmentVariablesInput{
+			DeploymentID:         "test-deployment-id",
+			EnvironmentVariables: expectedList,
+		}
+		mockClient.On("ModifyDeploymentVariable", expectedEnvVarsInput).Return(mockResponse, errTest)
+		actualEnvVars, err = createEnvVars(&deploymentFromFile, "test-deployment-id", mockClient)
+		assert.ErrorIs(t, err, errTest)
+		assert.Equal(t, mockResponse, actualEnvVars)
 		mockClient.AssertExpectations(t)
 	})
 }

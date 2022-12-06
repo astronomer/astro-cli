@@ -49,7 +49,7 @@ type workerq struct {
 	NodePoolID        string `mapstructure:"node_pool_id" yaml:"node_pool_id" json:"node_pool_id"`
 }
 
-type environmentVariable struct {
+type EnvironmentVariable struct {
 	IsSecret  bool   `mapstructure:"is_secret" yaml:"is_secret" json:"is_secret"`
 	Key       string `mapstructure:"key" yaml:"key" json:"key"`
 	UpdatedAt string `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
@@ -57,7 +57,7 @@ type environmentVariable struct {
 }
 
 type orderedPieces struct {
-	EnvVars       []environmentVariable `mapstructure:"environment_variables" yaml:"environment_variables" json:"environment_variables"`
+	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables" yaml:"environment_variables" json:"environment_variables"`
 	Configuration deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
 	WorkerQs      []workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
 	Metadata      deploymentMetadata    `mapstructure:"metadata" yaml:"metadata" json:"metadata"`

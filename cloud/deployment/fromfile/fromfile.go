@@ -29,6 +29,7 @@ func Create(inputFile string, client astro.Client) error {
 		formattedDeployment             inspect.FormattedDeployment
 		createInput                     astro.CreateDeploymentInput
 		existingDeployments             []astro.Deployment
+		createdDeployment               astro.Deployment
 	)
 
 	// get file contents as []byte
@@ -78,9 +79,16 @@ func Create(inputFile string, client astro.Client) error {
 	// transform formattedDeployment to DeploymentCreateInput
 	createInput = getCreateInput(&formattedDeployment, clusterID, workspaceID)
 	// create the deployment
-	_, err = client.CreateDeployment(&createInput)
+	createdDeployment, err = client.CreateDeployment(&createInput)
 	if err != nil {
 		return fmt.Errorf("%s: %w %+v", err.Error(), errCreateFailed, createInput)
+	}
+	// create environment variables
+	if hasEnvVars(&formattedDeployment) {
+		_, err = createEnvVars(&formattedDeployment, createdDeployment.ID, client)
+		if err != nil {
+			return err
+		}
 	}
 	// TODO add happy path output by calling inspect
 	return nil
@@ -88,7 +96,8 @@ func Create(inputFile string, client astro.Client) error {
 
 // getCreateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput
 func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID string) astro.CreateDeploymentInput {
-	// TODO add env Vars and **Alert Emails
+	// TODO add WorkerQs and Alert Emails using updateDeploymentAlerts mutation
+
 	createInput := astro.CreateDeploymentInput{
 		WorkspaceID:           workspaceID,
 		ClusterID:             clusterID,
@@ -107,7 +116,7 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, 
 	return createInput
 }
 
-// checkRequiredFields ensures all required fields are present in a inspect.FormattedDeployment.
+// checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.
 // It returns errRequiredField if required fields are missing and nil if not.
 func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error {
 	if deploymentFromFile.Deployment.Configuration.Name == "" {
@@ -173,4 +182,57 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astro.C
 	}
 	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
 	return "", err
+}
+
+// createEnvVars takes a deploymentFromFile and deploymentID as its arguments.
+// If environment variables were requested in the deploymentFromFile, it creates them.
+// It returns an error if it fails to modify the environment variables for a deployment.
+func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) ([]astro.EnvironmentVariablesObject, error) {
+	var (
+		updateEnvVarsInput astro.EnvironmentVariablesInput
+		listOfVars         []astro.EnvironmentVariable
+		envVarObjects      []astro.EnvironmentVariablesObject
+		err                error
+	)
+	requestedVars := deploymentFromFile.Deployment.EnvVars
+	listOfVars = make([]astro.EnvironmentVariable, len(requestedVars))
+	for i, envVar := range requestedVars {
+		listOfVars[i].Key = envVar.Key
+		listOfVars[i].IsSecret = envVar.IsSecret
+		listOfVars[i].Value = envVar.Value
+	}
+	updateEnvVarsInput = astro.EnvironmentVariablesInput{
+		DeploymentID:         deploymentID,
+		EnvironmentVariables: listOfVars,
+	}
+	envVarObjects, err = client.ModifyDeploymentVariable(updateEnvVarsInput)
+	if err != nil {
+		return envVarObjects, err
+	}
+	return envVarObjects, nil
+}
+
+func createWorkerQueues(deploymentFromFile *inspect.FormattedDeployment) []astro.WorkerQueue {
+	var (
+		qList []astro.WorkerQueue
+	)
+	requestedQueues := deploymentFromFile.Deployment.WorkerQs
+	if len(requestedQueues) > 0 {
+		qList = make([]astro.WorkerQueue, len(requestedQueues))
+		for i, queue := range requestedQueues {
+			qList[i].Name = queue.Name
+			qList[i].IsDefault = queue.IsDefault
+			qList[i].MinWorkerCount = queue.MinWorkerCount
+			qList[i].MaxWorkerCount = queue.MaxWorkerCount
+			qList[i].WorkerConcurrency = queue.WorkerConcurrency
+			qList[i].NodePoolID = queue.NodePoolID
+		}
+	}
+	return qList
+}
+
+// hasEnvVars returns true if environment variables exist in deploymentFromFile.
+// it returns false if they don't.
+func hasEnvVars(deploymentFromFile *inspect.FormattedDeployment) bool {
+	return len(deploymentFromFile.Deployment.EnvVars) > 0
 }
