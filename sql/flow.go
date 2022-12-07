@@ -74,7 +74,7 @@ func displayMessages(r io.Reader) error {
 	return nil
 }
 
-func ConvertReadCloserToString(readCloser io.ReadCloser) (string, error) {
+var ConvertReadCloserToString = func(readCloser io.ReadCloser) (string, error) {
 	buf := new(strings.Builder)
 	_, err := Io().Copy(buf, readCloser)
 	if err != nil {
@@ -83,7 +83,7 @@ func ConvertReadCloserToString(readCloser io.ReadCloser) (string, error) {
 	return buf.String(), nil
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+var CommonDockerUtil = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
 	var statusCode int64
 	var cout io.ReadCloser
 
@@ -94,7 +94,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		return statusCode, cout, fmt.Errorf("docker client initialization failed %w", err)
 	}
 
-	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
+	astroSQLCliVersion, err := "0.2.2a3", nil
 	if err != nil {
 		return statusCode, cout, err
 	}

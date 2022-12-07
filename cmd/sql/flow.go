@@ -23,6 +23,11 @@ var (
 	debug             bool
 )
 
+var (
+	configCommandString = []string{"flow", "config"}
+	globalConfigKeys    = []string{"airflow_home", "airflow_dags_folder"}
+)
+
 func getAbsolutePath(path string) (string, error) {
 	if !filepath.IsAbs(path) || path == "" || path == "." {
 		currentDir, err := os.Getwd()
@@ -60,6 +65,23 @@ func getBaseMountDirs(projectDir string) ([]string, error) {
 	return mountDirs, nil
 }
 
+var appendConfigKeyMountDir = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
+	args := []string{configKey}
+	exitCode, output, err := sql.CommonDockerUtil(configCommandString, args, configFlags, mountDirs, true)
+	if err != nil {
+		return mountDirs, fmt.Errorf("error running %v: %w", configCommandString, err)
+	}
+	if exitCode != 0 {
+		return mountDirs, sql.DockerNonZeroExitCodeError(exitCode)
+	}
+	configKeyDir, err := sql.ConvertReadCloserToString(output)
+	if err != nil {
+		return mountDirs, err
+	}
+	mountDirs = append(mountDirs, strings.TrimSpace(configKeyDir))
+	return mountDirs, err
+}
+
 func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder, mountGlobalDirs bool) (flags map[string]string, mountDirs []string, err error) {
 	flags = make(map[string]string)
 	mountDirs, err = getBaseMountDirs(projectDir)
@@ -76,37 +98,14 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 	}
 
 	if mountGlobalDirs {
-		configCommandString := []string{"flow", "config"}
 		configFlags := make(map[string]string)
 		configFlags["project-dir"] = projectDir
-
-		args := []string{"airflow_home"}
-		exitCode, output, err := sql.CommonDockerUtil(configCommandString, args, configFlags, mountDirs, true)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error running %v: %w", configCommandString, err)
+		for _, globalConfigKey := range globalConfigKeys {
+			mountDirs, err = appendConfigKeyMountDir(globalConfigKey, configFlags, mountDirs)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
-		if exitCode != 0 {
-			return nil, nil, sql.DockerNonZeroExitCodeError(exitCode)
-		}
-		airflowHomeAbs, err := sql.ConvertReadCloserToString(output)
-		if err != nil {
-			return nil, nil, err
-		}
-		mountDirs = append(mountDirs, strings.TrimSpace(airflowHomeAbs))
-
-		args = []string{"airflow_dags_folder"}
-		exitCode, output, err = sql.CommonDockerUtil([]string{"flow", "config"}, args, configFlags, mountDirs, true)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error running %v: %w", configCommandString, err)
-		}
-		if exitCode != 0 {
-			return nil, nil, sql.DockerNonZeroExitCodeError(exitCode)
-		}
-		airflowDagsFolderAbs, err := sql.ConvertReadCloserToString(output)
-		if err != nil {
-			return nil, nil, err
-		}
-		mountDirs = append(mountDirs, strings.TrimSpace(airflowDagsFolderAbs))
 	}
 
 	if setAirflowHome && airflowHome != "" {
