@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/astronomer/astro-cli/config"
-
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
+	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/ghodss/yaml"
 )
 
@@ -30,6 +30,7 @@ func Create(inputFile string, client astro.Client) error {
 		createInput                     astro.CreateDeploymentInput
 		existingDeployments             []astro.Deployment
 		createdDeployment               astro.Deployment
+		nodePools                       []astro.NodePool
 	)
 
 	// get file contents as []byte
@@ -42,6 +43,7 @@ func Create(inputFile string, client astro.Client) error {
 		return fmt.Errorf("%s %w", inputFile, errEmptyFile)
 	}
 	// unmarshal to a formattedDeployment
+	// TODO make this a var so we can test it
 	err = yaml.Unmarshal(dataBytes, &formattedDeployment)
 	if err != nil {
 		return err
@@ -60,8 +62,8 @@ func Create(inputFile string, client astro.Client) error {
 	if err != nil {
 		return err
 	}
-	// map cluster name to id
-	clusterID, err = getClusterIDFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, client)
+	// map cluster name to id and collect node pools for cluster
+	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, client)
 	if err != nil {
 		return err
 	}
@@ -76,8 +78,13 @@ func Create(inputFile string, client astro.Client) error {
 		return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
 			errCannotUpdateExistingDeployment, errHelp)
 	}
+	// this deployment does not exist so create it
+
 	// transform formattedDeployment to DeploymentCreateInput
-	createInput = getCreateInput(&formattedDeployment, clusterID, workspaceID)
+	createInput, err = getCreateInput(&formattedDeployment, clusterID, workspaceID, nodePools, client)
+	if err != nil {
+		return err
+	}
 	// create the deployment
 	createdDeployment, err = client.CreateDeployment(&createInput)
 	if err != nil {
@@ -94,10 +101,44 @@ func Create(inputFile string, client astro.Client) error {
 	return nil
 }
 
-// getCreateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput
-func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID string) astro.CreateDeploymentInput {
-	// TODO add WorkerQs and Alert Emails using updateDeploymentAlerts mutation
+// getCreateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput.
+// If worker-queues were requested, it gets node pool id work the workers and validates queue options.
+// If no queue options were specified, it sets default values.
+// It returns an error if getting default options fail.
+// It returns an error if worker-queue options are not valid.
+// It returns an error if node pool id could not be found for the worker type.
+func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID string, nodePools []astro.NodePool, client astro.Client) (astro.CreateDeploymentInput, error) {
+	var (
+		defaultOptions astro.WorkerQueueDefaultOptions
+		listQueues     []astro.WorkerQueue
+		err            error
+	)
 
+	// TODO add Alert Emails using updateDeploymentAlerts mutation
+	// Add worker queues if they were requested
+	if hasQueues(deploymentFromFile) {
+		// get defaults for min-count, max-count and concurrency from API
+		defaultOptions, err = workerqueue.GetWorkerQueueDefaultOptions(client)
+		if err != nil {
+			return astro.CreateDeploymentInput{}, err
+		}
+		// transform inspect.WorkerQ to []astro.WorkerQueue
+		listQueues, err = getQueues(deploymentFromFile, nodePools)
+		if err != nil {
+			return astro.CreateDeploymentInput{}, err
+		}
+		for i, q := range listQueues {
+			// set default values if none were specified
+			a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &q, defaultOptions)
+			// check if queue is valid
+			err = workerqueue.IsWorkerQueueInputValid(a, defaultOptions)
+			if err != nil {
+				return astro.CreateDeploymentInput{}, err
+			}
+			// add it to the list of queues to be created
+			listQueues[i] = *a
+		}
+	}
 	createInput := astro.CreateDeploymentInput{
 		WorkspaceID:           workspaceID,
 		ClusterID:             clusterID,
@@ -112,8 +153,9 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, 
 				Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
 			},
 		},
+		WorkerQueues: listQueues,
 	}
-	return createInput
+	return createInput, nil
 }
 
 // checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.
@@ -125,6 +167,7 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error 
 	if deploymentFromFile.Deployment.Configuration.ClusterName == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_name")
 	}
+	// TODO check queue name, isDefault and worker type
 	return nil
 }
 
@@ -142,25 +185,25 @@ func deploymentExists(existingDeployments []astro.Deployment, deploymentNameToCr
 	return false
 }
 
-// getClusterIDFromName takes clusterName and organizationID as its arguments.
-// It returns the clusterID if the cluster is found in the organization.
+// getClusterInfoFromName takes clusterName and organizationID as its arguments.
+// It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
-func getClusterIDFromName(clusterName, organizationID string, client astro.Client) (string, error) {
+func getClusterInfoFromName(clusterName, organizationID string, client astro.Client) (string, []astro.NodePool, error) {
 	var (
 		existingClusters []astro.Cluster
 		err              error
 	)
 	existingClusters, err = client.ListClusters(organizationID)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	for _, cluster := range existingClusters {
 		if cluster.Name == clusterName {
-			return cluster.ID, nil
+			return cluster.ID, cluster.NodePools, nil
 		}
 	}
 	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, organizationID)
-	return "", err
+	return "", nil, err
 }
 
 // getWorkspaceIDFromName takes workspaceName and organizationID as its arguments.
@@ -181,6 +224,20 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astro.C
 		}
 	}
 	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
+	return "", err
+}
+
+func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []astro.NodePool) (string, error) {
+	var (
+		pool astro.NodePool
+		err  error
+	)
+	for _, pool = range nodePools {
+		if pool.NodeInstanceType == workerType {
+			return pool.ID, nil
+		}
+	}
+	err = fmt.Errorf("worker_type: %s %w in cluster: %s", workerType, errNotFound, clusterName)
 	return "", err
 }
 
@@ -212,27 +269,40 @@ func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID
 	return envVarObjects, nil
 }
 
-func createWorkerQueues(deploymentFromFile *inspect.FormattedDeployment) []astro.WorkerQueue {
+// getQueues takes a deploymentFromFile as its arguments.
+// It returns a list of worker queues to be created.
+func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astro.NodePool) ([]astro.WorkerQueue, error) {
 	var (
-		qList []astro.WorkerQueue
+		qList      []astro.WorkerQueue
+		nodePoolID string
+		err        error
 	)
 	requestedQueues := deploymentFromFile.Deployment.WorkerQs
-	if len(requestedQueues) > 0 {
-		qList = make([]astro.WorkerQueue, len(requestedQueues))
-		for i, queue := range requestedQueues {
-			qList[i].Name = queue.Name
-			qList[i].IsDefault = queue.IsDefault
-			qList[i].MinWorkerCount = queue.MinWorkerCount
-			qList[i].MaxWorkerCount = queue.MaxWorkerCount
-			qList[i].WorkerConcurrency = queue.WorkerConcurrency
-			qList[i].NodePoolID = queue.NodePoolID
+	qList = make([]astro.WorkerQueue, len(requestedQueues))
+	for i, queue := range requestedQueues {
+		qList[i].Name = queue.Name
+		qList[i].IsDefault = queue.IsDefault
+		qList[i].MinWorkerCount = queue.MinWorkerCount
+		qList[i].MaxWorkerCount = queue.MaxWorkerCount
+		qList[i].WorkerConcurrency = queue.WorkerConcurrency
+		// map worker type to node pool id
+		nodePoolID, err = getNodePoolIDFromWorkerType(queue.WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
+		if err != nil {
+			return nil, err
 		}
+		qList[i].NodePoolID = nodePoolID
 	}
-	return qList
+	return qList, nil
 }
 
 // hasEnvVars returns true if environment variables exist in deploymentFromFile.
 // it returns false if they don't.
 func hasEnvVars(deploymentFromFile *inspect.FormattedDeployment) bool {
 	return len(deploymentFromFile.Deployment.EnvVars) > 0
+}
+
+// hasQueues returns true if worker queues exist in deploymentFromFile.
+// it returns false if they don't.
+func hasQueues(deploymentFromFile *inspect.FormattedDeployment) bool {
+	return len(deploymentFromFile.Deployment.WorkerQs) > 0
 }

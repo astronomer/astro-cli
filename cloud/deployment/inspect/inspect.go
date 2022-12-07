@@ -39,14 +39,14 @@ type deploymentConfig struct {
 	WorkspaceName    string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
 }
 
-type workerq struct {
+type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
 	ID                string `mapstructure:"id" yaml:"id" json:"id"`
 	IsDefault         bool   `mapstructure:"is_default" yaml:"is_default" json:"is_default"`
 	MaxWorkerCount    int    `mapstructure:"max_worker_count" yaml:"max_worker_count" json:"max_worker_count"`
 	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
 	WorkerConcurrency int    `mapstructure:"worker_concurrency" yaml:"worker_concurrency" json:"worker_concurrency"`
-	NodePoolID        string `mapstructure:"node_pool_id" yaml:"node_pool_id" json:"node_pool_id"`
+	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
 }
 
 type EnvironmentVariable struct {
@@ -59,7 +59,7 @@ type EnvironmentVariable struct {
 type orderedPieces struct {
 	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables" yaml:"environment_variables" json:"environment_variables"`
 	Configuration deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
-	WorkerQs      []workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
+	WorkerQs      []Workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
 	Metadata      deploymentMetadata    `mapstructure:"metadata" yaml:"metadata" json:"metadata"`
 	AlertEmails   []string              `mapstructure:"alert_emails" yaml:"alert_emails" json:"alert_emails"`
 }

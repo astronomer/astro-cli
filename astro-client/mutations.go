@@ -51,6 +51,17 @@ var (
 				version
 				airflowVersion
 			}
+			workerQueues {
+				id
+				name
+				isDefault
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
+				nodePoolId
+				podCpu
+				podRam
+			}
 			deploymentSpec {
 				image {
 					tag

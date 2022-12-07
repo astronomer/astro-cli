@@ -271,6 +271,7 @@ type CreateDeploymentInput struct {
 	RuntimeReleaseVersion string               `json:"runtimeReleaseVersion"`
 	DagDeployEnabled      bool                 `json:"dagDeployEnabled"`
 	DeploymentSpec        DeploymentCreateSpec `json:"deploymentSpec"`
+	WorkerQueues          []WorkerQueue        `json:"workerQueues"`
 }
 
 type DeploymentCreateSpec struct {

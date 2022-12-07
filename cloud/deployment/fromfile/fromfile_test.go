@@ -20,10 +20,11 @@ var errTest = errors.New("test error")
 
 func TestCreate(t *testing.T) {
 	var (
-		err                   error
-		filePath, data, orgID string
-		existingClusters      []astro.Cluster
-		existingWorkspaces    []astro.Workspace
+		err                           error
+		filePath, data, orgID         string
+		existingClusters              []astro.Cluster
+		existingWorkspaces            []astro.Workspace
+		mockWorkerQueueDefaultOptions astro.WorkerQueueDefaultOptions
 	)
 
 	t.Run("reads the yaml file and creates a deployment", func(t *testing.T) {
@@ -52,19 +53,17 @@ deployment:
     workspace_name: test-workspace
   worker_queues:
     - name: default
-      id: test-wq-id
       is_default: true
       max_worker_count: 130
       min_worker_count: 12
-      worker_concurrency: 110
-      node_pool_id: test-pool-id
+      worker_concurrency: 180
+      worker_type: test-worker-1
     - name: test-queue-1
-      id: test-wq-id-1
       is_default: false
       max_worker_count: 175
       min_worker_count: 8
-      worker_concurrency: 150
-      node_pool_id: test-pool-id-1
+      worker_concurrency: 176
+      worker_type: test-worker-2
   metadata:
     deployment_id: test-deployment-id
     workspace_id: test-ws-id
@@ -81,6 +80,18 @@ deployment:
 			{
 				ID:   "test-cluster-id",
 				Name: "test-cluster",
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-1",
+					},
+					{
+						ID:               "test-pool-id-2",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-2",
+					},
+				},
 			},
 			{
 				ID:   "test-cluster-id-1",
@@ -112,11 +123,29 @@ deployment:
 				UpdatedAt: "NOW+1",
 			},
 		}
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 		mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 		err = Create("deployment.yaml", mockClient)
@@ -156,21 +185,19 @@ deployment:
         "worker_queues": [
             {
                 "name": "default",
-                "id": "test-wq-id",
                 "is_default": true,
                 "max_worker_count": 130,
                 "min_worker_count": 12,
-                "worker_concurrency": 110,
-                "node_pool_id": "test-pool-id"
+                "worker_concurrency": 180,
+                "worker_type": "test-worker-1"
             },
             {
                 "name": "test-queue-1",
-                "id": "test-wq-id-1",
                 "is_default": false,
                 "max_worker_count": 175,
                 "min_worker_count": 8,
-                "worker_concurrency": 150,
-                "node_pool_id": "test-pool-id-1"
+                "worker_concurrency": 176,
+                "worker_type": "test-worker-2"
             }
         ],
         "metadata": {
@@ -195,6 +222,18 @@ deployment:
 			{
 				ID:   "test-cluster-id",
 				Name: "test-cluster",
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-1",
+					},
+					{
+						ID:               "test-pool-id-2",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-2",
+					},
+				},
 			},
 			{
 				ID:   "test-cluster-id-1",
@@ -226,11 +265,29 @@ deployment:
 				UpdatedAt: "NOW+1",
 			},
 		}
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 		mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 		err = Create("deployment.yaml", mockClient)
@@ -827,6 +884,133 @@ deployment:
 		assert.ErrorContains(t, err, "deployment: test-deployment-label already exists: use deployment update --from-file deployment.yaml instead")
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("returns an error if creating deployment input fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astro_mocks.Client)
+		filePath = "./deployment.yaml"
+		data = `{
+    "deployment": {
+        "environment_variables": [
+            {
+                "is_secret": false,
+                "key": "foo",
+                "updated_at": "NOW",
+                "value": "bar"
+            },
+            {
+                "is_secret": true,
+                "key": "bar",
+                "updated_at": "NOW+1",
+                "value": "baz"
+            }
+        ],
+        "configuration": {
+            "name": "test-deployment-label",
+            "description": "description",
+            "runtime_version": "6.0.0",
+            "dag_deploy_enabled": true,
+            "scheduler_au": 5,
+            "scheduler_count": 3,
+            "cluster_name": "test-cluster",
+            "workspace_name": "test-workspace"
+        },
+        "worker_queues": [
+            {
+                "name": "default",
+                "is_default": true,
+                "max_worker_count": 130,
+                "min_worker_count": 12,
+                "worker_concurrency": 180,
+                "worker_type": "test-worker-1"
+            },
+            {
+                "name": "test-queue-1",
+                "is_default": false,
+                "max_worker_count": 130,
+                "min_worker_count": 8,
+                "worker_concurrency": 150,
+                "worker_type": "test-worker-2"
+            }
+        ],
+        "metadata": {
+            "deployment_id": "test-deployment-id",
+            "workspace_id": "test-ws-id",
+            "cluster_id": "cluster-id",
+            "release_name": "great-release-name",
+            "airflow_version": "2.4.0",
+            "status": "UNHEALTHY",
+            "created_at": "2022-11-17T12:26:45.362983-08:00",
+            "updated_at": "2022-11-17T12:26:45.362983-08:00",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "webserver_url": "some-url"
+        },
+        "alert_emails": [
+            "email1",
+            "email2"
+        ]
+    }
+}`
+		existingClusters = []astro.Cluster{
+			{
+				ID:   "test-cluster-id",
+				Name: "test-cluster",
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-1",
+					},
+					{
+						ID:               "test-pool-id-2",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-2",
+					},
+				},
+			},
+			{
+				ID:   "test-cluster-id-1",
+				Name: "test-cluster-1",
+			},
+		}
+		existingWorkspaces = []astro.Workspace{
+			{
+				ID:    "test-workspace-id",
+				Label: "test-workspace",
+			},
+			{
+				ID:    "test-workspace-id-1",
+				Label: "test-workspace-1",
+			},
+		}
+		orgID = "test-org-id"
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
+		fileutil.WriteStringToFile(filePath, data)
+		defer afero.NewOsFs().Remove(filePath)
+		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
+		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+		mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		err = Create("deployment.yaml", mockClient)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "worker queue option is invalid: worker concurrency")
+		mockClient.AssertExpectations(t)
+	})
 	t.Run("returns an error from the api if create deployment fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockClient := new(astro_mocks.Client)
@@ -860,21 +1044,19 @@ deployment:
         "worker_queues": [
             {
                 "name": "default",
-                "id": "test-wq-id",
                 "is_default": true,
                 "max_worker_count": 130,
                 "min_worker_count": 12,
-                "worker_concurrency": 110,
-                "node_pool_id": "test-pool-id"
+                "worker_concurrency": 180,
+                "worker_type": "test-worker-1"
             },
             {
                 "name": "test-queue-1",
-                "id": "test-wq-id-1",
                 "is_default": false,
-                "max_worker_count": 175,
+                "max_worker_count": 130,
                 "min_worker_count": 8,
-                "worker_concurrency": 150,
-                "node_pool_id": "test-pool-id-1"
+                "worker_concurrency": 176,
+                "worker_type": "test-worker-2"
             }
         ],
         "metadata": {
@@ -899,6 +1081,18 @@ deployment:
 			{
 				ID:   "test-cluster-id",
 				Name: "test-cluster",
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-1",
+					},
+					{
+						ID:               "test-pool-id-2",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-2",
+					},
+				},
 			},
 			{
 				ID:   "test-cluster-id-1",
@@ -916,11 +1110,29 @@ deployment:
 			},
 		}
 		orgID = "test-org-id"
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 		mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, errTest)
 		err = Create("deployment.yaml", mockClient)
 		assert.ErrorIs(t, err, errCreateFailed)
@@ -930,12 +1142,17 @@ deployment:
 }
 
 func TestGetCreateInput(t *testing.T) {
-	t.Run("transforms formattedDeployment to CreateDeploymentInput", func(t *testing.T) {
-		var (
-			expectedDeploymentInput, actual astro.CreateDeploymentInput
-			deploymentFromFile              inspect.FormattedDeployment
-			clusterID, workspaceID          string
-		)
+	var (
+		expectedDeploymentInput, actual astro.CreateDeploymentInput
+		deploymentFromFile              inspect.FormattedDeployment
+		qList                           []inspect.Workerq
+		existingPools                   []astro.NodePool
+		expectedQList                   []astro.WorkerQueue
+		clusterID, workspaceID          string
+		err                             error
+		mockWorkerQueueDefaultOptions   astro.WorkerQueueDefaultOptions
+	)
+	t.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func(t *testing.T) {
 		clusterID = "test-cluster-id"
 		workspaceID = "test-workspace-id"
 		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -959,9 +1176,337 @@ func TestGetCreateInput(t *testing.T) {
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
 				},
 			},
+			WorkerQueues: nil,
 		}
-		actual = getCreateInput(&deploymentFromFile, clusterID, workspaceID)
+		mockClient := new(astro_mocks.Client)
+		actual, err = getCreateInput(&deploymentFromFile, clusterID, workspaceID, nil, mockClient)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentInput, actual)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns correct deployment input when multiple queues are requested", func(t *testing.T) {
+		clusterID = "test-cluster-id"
+		workspaceID = "test-workspace-id"
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
+		deploymentFromFile.Deployment.Configuration.Description = "test-description"
+		deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+		qList = []inspect.Workerq{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				WorkerType:        "test-worker-1",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				WorkerType:        "test-worker-2",
+			},
+		}
+		deploymentFromFile.Deployment.WorkerQs = qList
+		existingPools = []astro.NodePool{
+			{
+				ID:               "test-pool-id",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				ID:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		expectedQList = []astro.WorkerQueue{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				NodePoolID:        "test-pool-id",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				NodePoolID:        "test-pool-id-2",
+			},
+		}
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
+
+		expectedDeploymentInput = astro.CreateDeploymentInput{
+			WorkspaceID:           workspaceID,
+			ClusterID:             clusterID,
+			Label:                 deploymentFromFile.Deployment.Configuration.Name,
+			Description:           deploymentFromFile.Deployment.Configuration.Description,
+			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor: "CeleryExecutor",
+				Scheduler: astro.Scheduler{
+					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+				},
+			},
+			WorkerQueues: expectedQList,
+		}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		actual, err = getCreateInput(&deploymentFromFile, clusterID, workspaceID, existingPools, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDeploymentInput, actual)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("sets default queue options if none were requested", func(t *testing.T) {
+		clusterID = "test-cluster-id"
+		workspaceID = "test-workspace-id"
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
+		deploymentFromFile.Deployment.Configuration.Description = "test-description"
+		deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+		qList = []inspect.Workerq{
+			{
+				Name:       "default",
+				IsDefault:  true,
+				WorkerType: "test-worker-1",
+			},
+			{
+				Name:       "test-q-2",
+				IsDefault:  false,
+				WorkerType: "test-worker-2",
+			},
+		}
+		deploymentFromFile.Deployment.WorkerQs = qList
+		existingPools = []astro.NodePool{
+			{
+				ID:               "test-pool-id",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				ID:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		expectedQList = []astro.WorkerQueue{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    125,
+				MinWorkerCount:    5,
+				WorkerConcurrency: 180,
+				NodePoolID:        "test-pool-id",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    125,
+				MinWorkerCount:    5,
+				WorkerConcurrency: 180,
+				NodePoolID:        "test-pool-id-2",
+			},
+		}
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
+
+		expectedDeploymentInput = astro.CreateDeploymentInput{
+			WorkspaceID:           workspaceID,
+			ClusterID:             clusterID,
+			Label:                 deploymentFromFile.Deployment.Configuration.Name,
+			Description:           deploymentFromFile.Deployment.Configuration.Description,
+			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor: "CeleryExecutor",
+				Scheduler: astro.Scheduler{
+					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+				},
+			},
+			WorkerQueues: expectedQList,
+		}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		actual, err = getCreateInput(&deploymentFromFile, clusterID, workspaceID, existingPools, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDeploymentInput, actual)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns error if worker type does not match existing pools", func(t *testing.T) {
+		clusterID = "test-cluster-id"
+		workspaceID = "test-workspace-id"
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
+		deploymentFromFile.Deployment.Configuration.Description = "test-description"
+		deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+		qList = []inspect.Workerq{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				WorkerType:        "test-worker-1",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				WorkerType:        "test-worker-8",
+			},
+		}
+		deploymentFromFile.Deployment.WorkerQs = qList
+		existingPools = []astro.NodePool{
+			{
+				ID:               "test-pool-id",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				ID:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
+
+		expectedDeploymentInput = astro.CreateDeploymentInput{}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		actual, err = getCreateInput(&deploymentFromFile, clusterID, workspaceID, existingPools, mockClient)
+		assert.ErrorContains(t, err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
+		assert.Equal(t, expectedDeploymentInput, actual)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns error if queue options are invalid", func(t *testing.T) {
+		clusterID = "test-cluster-id"
+		workspaceID = "test-workspace-id"
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
+		deploymentFromFile.Deployment.Configuration.Description = "test-description"
+		deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+		deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+		deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+		qList = []inspect.Workerq{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    30,
+				WorkerConcurrency: 200,
+				WorkerType:        "test-worker-1",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 200,
+				WorkerType:        "test-worker-2",
+			},
+		}
+		deploymentFromFile.Deployment.WorkerQs = qList
+		existingPools = []astro.NodePool{
+			{
+				ID:               "test-pool-id",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				ID:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
+
+		expectedDeploymentInput = astro.CreateDeploymentInput{}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		actual, err = getCreateInput(&deploymentFromFile, clusterID, workspaceID, existingPools, mockClient)
+		assert.ErrorContains(t, err, "worker queue option is invalid: min worker count")
+		assert.Equal(t, expectedDeploymentInput, actual)
+		mockClient.AssertExpectations(t)
 	})
 }
 
@@ -1020,21 +1565,35 @@ func TestDeploymentExists(t *testing.T) {
 	})
 }
 
-func TestGetClusterIDFromName(t *testing.T) {
+func TestGetClusterFromName(t *testing.T) {
 	var (
 		clusterName, expectedClusterID, actualClusterID, orgID string
+		existingPools, actualNodePools                         []astro.NodePool
 		err                                                    error
 	)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	expectedClusterID = "test-cluster-id"
 	clusterName = "test-cluster"
+	existingPools = []astro.NodePool{
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-1",
+		},
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-2",
+		},
+	}
 	orgID = "test-org-id"
 	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		existingClusters := []astro.Cluster{
 			{
-				ID:   "test-cluster-id",
-				Name: "test-cluster",
+				ID:        "test-cluster-id",
+				Name:      "test-cluster",
+				NodePools: existingPools,
 			},
 			{
 				ID:   "test-cluster-id-1",
@@ -1042,7 +1601,7 @@ func TestGetClusterIDFromName(t *testing.T) {
 			},
 		}
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
-		actualClusterID, err = getClusterIDFromName(clusterName, orgID, mockClient)
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedClusterID, actualClusterID)
 		mockClient.AssertExpectations(t)
@@ -1050,18 +1609,20 @@ func TestGetClusterIDFromName(t *testing.T) {
 	t.Run("returns error from api if listing cluster fails", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errTest)
-		actualClusterID, err = getClusterIDFromName(clusterName, orgID, mockClient)
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
 		assert.ErrorIs(t, err, errTest)
 		assert.Equal(t, "", actualClusterID)
+		assert.Equal(t, []astro.NodePool(nil), actualNodePools)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if cluster does not exist in organization", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, nil)
-		actualClusterID, err = getClusterIDFromName(clusterName, orgID, mockClient)
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
 		assert.ErrorIs(t, err, errNotFound)
 		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization: test-org-id")
 		assert.Equal(t, "", actualClusterID)
+		assert.Equal(t, []astro.NodePool(nil), actualNodePools)
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -1110,6 +1671,42 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 		assert.ErrorContains(t, err, "workspace_name: test-workspace does not exist in organization: test-org-id")
 		assert.Equal(t, "", actualWorkspaceID)
 		mockClient.AssertExpectations(t)
+	})
+}
+
+func TestGetNodePoolIDFromName(t *testing.T) {
+	var (
+		workerType, expectedPoolID, actualPoolID, clusterID string
+		existingPools                                       []astro.NodePool
+		err                                                 error
+	)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	expectedPoolID = "test-pool-id"
+	workerType = "worker-1"
+	clusterID = "test-cluster-id"
+	existingPools = []astro.NodePool{
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-1",
+		},
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-2",
+		},
+	}
+	t.Run("returns a nodepool id from cluster for pool with matching worker type", func(t *testing.T) {
+		actualPoolID, err = getNodePoolIDFromWorkerType(workerType, clusterID, existingPools)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedPoolID, actualPoolID)
+	})
+	t.Run("returns an error if no pool with matching worker type exists in the cluster", func(t *testing.T) {
+		workerType = "worker-3"
+		actualPoolID, err = getNodePoolIDFromWorkerType(workerType, clusterID, existingPools)
+		assert.ErrorIs(t, err, errNotFound)
+		assert.ErrorContains(t, err, "worker_type: worker-3 does not exist in cluster: test-cluster")
+		assert.Equal(t, "", actualPoolID)
 	})
 }
 
@@ -1242,5 +1839,139 @@ func TestCreateEnvVars(t *testing.T) {
 		assert.ErrorIs(t, err, errTest)
 		assert.Equal(t, mockResponse, actualEnvVars)
 		mockClient.AssertExpectations(t)
+	})
+}
+
+func TestHasQueues(t *testing.T) {
+	t.Run("returns true if there are worker queues in the deployment", func(t *testing.T) {
+		var deploymentFromFile inspect.FormattedDeployment
+		qList := []inspect.Workerq{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				WorkerType:        "test-worker-1",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				WorkerType:        "test-worker-2",
+			},
+		}
+		deploymentFromFile.Deployment.WorkerQs = qList
+		actual := hasQueues(&deploymentFromFile)
+		assert.True(t, actual)
+	})
+	t.Run("returns false if there are no worker queues in the deployment", func(t *testing.T) {
+		var deploymentFromFile inspect.FormattedDeployment
+		actual := hasQueues(&deploymentFromFile)
+		assert.False(t, actual)
+	})
+}
+
+func TestGetQueues(t *testing.T) {
+	var (
+		deploymentFromFile inspect.FormattedDeployment
+		actualWQList       []astro.WorkerQueue
+		existingPools      []astro.NodePool
+		err                error
+	)
+	t.Run("returns list of queues for the requested deployment", func(t *testing.T) {
+		expectedWQList := []astro.WorkerQueue{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				NodePoolID:        "test-pool-id",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				NodePoolID:        "test-pool-id-2",
+			},
+		}
+		qList := []inspect.Workerq{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				WorkerType:        "test-worker-1",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				WorkerType:        "test-worker-2",
+			},
+		}
+		existingPools = []astro.NodePool{
+			{
+				ID:               "test-pool-id",
+				IsDefault:        true,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				ID:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		deploymentFromFile = inspect.FormattedDeployment{}
+		deploymentFromFile.Deployment.WorkerQs = qList
+		actualWQList, err = getQueues(&deploymentFromFile, existingPools)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedWQList, actualWQList)
+	})
+	t.Run("returns an error if unable to determine nodepool id", func(t *testing.T) {
+		qList := []inspect.Workerq{
+			{
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				WorkerType:        "test-worker-1",
+			},
+			{
+				Name:              "test-q-2",
+				IsDefault:         false,
+				MaxWorkerCount:    16,
+				MinWorkerCount:    3,
+				WorkerConcurrency: 20,
+				WorkerType:        "test-worker-4",
+			},
+		}
+		existingPools = []astro.NodePool{
+			{
+				ID:               "test-pool-id",
+				IsDefault:        true,
+				NodeInstanceType: "test-worker-1",
+			},
+			{
+				ID:               "test-pool-id-2",
+				IsDefault:        false,
+				NodeInstanceType: "test-worker-2",
+			},
+		}
+		deploymentFromFile = inspect.FormattedDeployment{}
+		deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+		deploymentFromFile.Deployment.WorkerQs = qList
+		actualWQList, err = getQueues(&deploymentFromFile, existingPools)
+		assert.ErrorContains(t, err, "worker_type: test-worker-4 does not exist in cluster: test-cluster")
+		assert.Equal(t, []astro.WorkerQueue(nil), actualWQList)
 	})
 }
