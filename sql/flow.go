@@ -76,7 +76,7 @@ func displayMessages(r io.Reader) error {
 
 func ConvertReadCloserToString(readCloser io.ReadCloser) (string, error) {
 	buf := new(strings.Builder)
-	_, err := io.Copy(buf, readCloser)
+	_, err := Io().Copy(buf, readCloser)
 	if err != nil {
 		return "", fmt.Errorf("converting readcloser output to string failed %w", err)
 	}

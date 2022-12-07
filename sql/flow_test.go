@@ -312,3 +312,15 @@ func TestContainerRemoveFailure(t *testing.T) {
 	DisplayMessages = displayMessages
 	Io = NewIoBind
 }
+
+func TestConvertReadCloserToStringFailure(t *testing.T) {
+	mockIo := mocks.NewIoBind(t)
+	Io = func() IoBind {
+		mockIo.On("Copy", mock.Anything, mock.Anything).Return(int64(0), errMock)
+		return mockIo
+	}
+	_, err := ConvertReadCloserToString(io.NopCloser(strings.NewReader("Hello, world!")))
+	expectedErr := fmt.Errorf("converting readcloser output to string failed %w", errMock)
+	assert.Equal(t, expectedErr, err)
+	Io = NewIoBind
+}
