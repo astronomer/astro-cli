@@ -94,7 +94,7 @@ var CommonDockerUtil = func(cmd, args []string, flags map[string]string, mountDi
 		return statusCode, cout, fmt.Errorf("docker client initialization failed %w", err)
 	}
 
-	astroSQLCliVersion, err := "0.2.2a3", nil
+	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
 	if err != nil {
 		return statusCode, cout, err
 	}
