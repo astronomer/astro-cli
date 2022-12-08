@@ -147,4 +147,11 @@ var (
 		}
 	}
   `
+	UpdateDeploymentAlerts = `
+	mutation updateDeploymentAlerts($input: UpdateDeploymentAlertsInput!) {
+		updateDeploymentAlerts(input: $input) {
+			alertEmails
+		}
+	}
+  `
 )

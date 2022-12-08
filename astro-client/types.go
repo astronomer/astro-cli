@@ -29,6 +29,7 @@ type ResponseData struct {
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
 	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
 	GetOrganizations          []Organization               `json:"organizations,omitempty"`
+	DeploymentAlerts          DeploymentAlerts             `json:"alertEmails,omitempty"`
 }
 
 type Self struct {
@@ -346,4 +347,13 @@ type NodePool struct {
 	IsDefault        bool      `json:"isDefault"`
 	NodeInstanceType string    `json:"nodeInstanceType"`
 	CreatedAt        time.Time `json:"createdAt"`
+}
+
+type UpdateDeploymentAlertsInput struct {
+	DeploymentID string   `json:"deploymentId"`
+	AlertEmails  []string `json:"alertEmails"`
+}
+
+type DeploymentAlerts struct {
+	AlertEmails []string `json:"alertEmails"`
 }
