@@ -74,18 +74,29 @@ func displayMessages(r io.Reader) error {
 	return nil
 }
 
-func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []string) (int64, error) {
+var ConvertReadCloserToString = func(readCloser io.ReadCloser) (string, error) {
+	buf := new(strings.Builder)
+	_, err := Io().Copy(buf, readCloser)
+	if err != nil {
+		return "", fmt.Errorf("converting readcloser output to string failed %w", err)
+	}
+	return buf.String(), nil
+}
+
+var CommonDockerUtil = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
 	var statusCode int64
+	var cout io.ReadCloser
+
 	ctx := context.Background()
 
 	cli, err := Docker()
 	if err != nil {
-		return statusCode, fmt.Errorf("docker client initialization failed %w", err)
+		return statusCode, cout, fmt.Errorf("docker client initialization failed %w", err)
 	}
 
 	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
 	if err != nil {
-		return statusCode, err
+		return statusCode, cout, err
 	}
 
 	baseImage, err := getBaseDockerImageURI(astroSQLCLIConfigURL)
@@ -97,7 +108,7 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Uid, currentUser.Username))
 	if err := Os().WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
-		return statusCode, fmt.Errorf("error writing dockerfile %w", err)
+		return statusCode, cout, fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)
 
@@ -110,11 +121,11 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		},
 	)
 	if err != nil {
-		return statusCode, fmt.Errorf("image building failed %w", err)
+		return statusCode, cout, fmt.Errorf("image building failed %w", err)
 	}
 
 	if err := DisplayMessages(body.Body); err != nil {
-		return statusCode, fmt.Errorf("image build response read failed %w", err)
+		return statusCode, cout, fmt.Errorf("image build response read failed %w", err)
 	}
 
 	cmd = append(cmd, args...)
@@ -143,35 +154,37 @@ func CommonDockerUtil(cmd, args []string, flags map[string]string, mountDirs []s
 		"",
 	)
 	if err != nil {
-		return statusCode, fmt.Errorf("docker container creation failed %w", err)
+		return statusCode, cout, fmt.Errorf("docker container creation failed %w", err)
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return statusCode, fmt.Errorf("docker container start failed %w", err)
+		return statusCode, cout, fmt.Errorf("docker container start failed %w", err)
 	}
 
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return statusCode, fmt.Errorf("docker container wait failed %w", err)
+			return statusCode, cout, fmt.Errorf("docker container wait failed %w", err)
 		}
 	case status := <-statusCh:
 		statusCode = status.StatusCode
 	}
 
-	cout, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+	cout, err = cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
-		return statusCode, fmt.Errorf("docker container logs fetching failed %w", err)
+		return statusCode, cout, fmt.Errorf("docker container logs fetching failed %w", err)
 	}
 
-	if _, err := Io().Copy(os.Stdout, cout); err != nil {
-		return statusCode, fmt.Errorf("docker logs forwarding failed %w", err)
+	if !returnOutput {
+		if _, err := Io().Copy(os.Stdout, cout); err != nil {
+			return statusCode, cout, fmt.Errorf("docker logs forwarding failed %w", err)
+		}
 	}
 
 	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{}); err != nil {
-		return statusCode, fmt.Errorf("docker remove failed %w", err)
+		return statusCode, cout, fmt.Errorf("docker remove failed %w", err)
 	}
 
-	return statusCode, nil
+	return statusCode, cout, nil
 }
