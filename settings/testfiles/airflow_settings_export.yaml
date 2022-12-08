@@ -7,7 +7,7 @@ airflow:
     conn_login: username
     conn_password: password
     conn_port: 5432
-    conn_uri: postgres://username:password@example.db.example.com:5432/schema
+    conn_uri: ""
     conn_extra: {}
   pools:
   - pool_name: pool_name
