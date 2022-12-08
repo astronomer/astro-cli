@@ -2,6 +2,7 @@ package sql
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -152,6 +153,20 @@ func TestFlowInitCmdWithFlags(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowConfigCmd(t *testing.T) {
+	projectDir := t.TempDir()
+	AirflowHome := t.TempDir()
+	AirflowDagsFolder := t.TempDir()
+	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
+	assert.NoError(t, err)
+
+	err = execFlowCmd("config", "--project-dir", projectDir, "airflow_home")
+	assert.NoError(t, err)
+
+	err = execFlowCmd("config", "--project-dir", projectDir)
+	assert.EqualError(t, err, "argument not set:key")
+}
+
 func TestFlowValidateCmd(t *testing.T) {
 	patchDockerClientInit(t, 0, nil)
 	projectDir := t.TempDir()
@@ -230,4 +245,55 @@ func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 
 	err = execFlowCmd("run", "--project-dir", projectDir)
 	assert.EqualError(t, err, "argument not set:workflow_name")
+}
+
+func mockCommonDockerUtilReturnSuccess(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+	return 0, output, nil
+}
+
+func mockCommonDockerUtilReturnErrMock(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+	return 0, output, errMock
+}
+
+func mockCommonDockerUtilReturnNonZeroExitCode(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+	return 1, output, nil
+}
+
+func mockConvertReadCloserToStringReturnErrMock(readCloser io.ReadCloser) (string, error) {
+	return "", errMock
+}
+
+func TestAppendConfigKeyMountDirFailures(t *testing.T) {
+	originalDockerUtil := sql.CommonDockerUtil
+	originalConvertReadCloserToString := sql.ConvertReadCloserToString
+
+	sql.CommonDockerUtil = mockCommonDockerUtilReturnErrMock
+	_, err := appendConfigKeyMountDir("", nil, nil)
+	expectedErr := fmt.Errorf("error running %v: %w", configCommandString, errMock)
+	assert.Equal(t, expectedErr, err)
+
+	sql.CommonDockerUtil = mockCommonDockerUtilReturnNonZeroExitCode
+	_, err = appendConfigKeyMountDir("", nil, nil)
+	expectedErr = sql.DockerNonZeroExitCodeError(1)
+	assert.Equal(t, expectedErr, err)
+
+	sql.CommonDockerUtil = mockCommonDockerUtilReturnSuccess
+	sql.ConvertReadCloserToString = mockConvertReadCloserToStringReturnErrMock
+	_, err = appendConfigKeyMountDir("", nil, nil)
+	assert.EqualError(t, err, "mock error")
+
+	sql.CommonDockerUtil = originalDockerUtil
+	sql.ConvertReadCloserToString = originalConvertReadCloserToString
+}
+
+func TestBuildFlagsAndMountDirsFailures(t *testing.T) {
+	originalAppendConfigKeyMountDir := appendConfigKeyMountDir
+
+	appendConfigKeyMountDir = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
+		return nil, errMock
+	}
+	_, _, err := buildFlagsAndMountDirs("", false, false, false, true)
+	assert.EqualError(t, err, "mock error")
+
+	appendConfigKeyMountDir = originalAppendConfigKeyMountDir
 }
