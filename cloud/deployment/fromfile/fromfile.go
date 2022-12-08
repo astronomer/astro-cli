@@ -1,8 +1,10 @@
 package fromfile
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/astronomer/astro-cli/astro-client"
@@ -20,17 +22,24 @@ var (
 	errNotFound                       = errors.New("does not exist")
 )
 
-// TODO we need an io.Writer to create happy path output
-func Create(inputFile string, client astro.Client) error {
+const (
+	jsonFormat = "json"
+)
+
+// Create takes a file and creates a deployment with the confiuration specified in the file.
+// inputFile can be in yaml or json format
+// It returns an error if any required information is missing or incorrectly specified.
+func Create(inputFile string, client astro.Client, out io.Writer) error {
 	var (
-		err                             error
-		errHelp, clusterID, workspaceID string
-		dataBytes                       []byte
-		formattedDeployment             inspect.FormattedDeployment
-		createInput                     astro.CreateDeploymentInput
-		existingDeployments             []astro.Deployment
-		createdDeployment               astro.Deployment
-		nodePools                       []astro.NodePool
+		err                                           error
+		errHelp, clusterID, workspaceID, outputFormat string
+		dataBytes                                     []byte
+		formattedDeployment                           inspect.FormattedDeployment
+		createInput                                   astro.CreateDeploymentInput
+		existingDeployments                           []astro.Deployment
+		createdDeployment                             astro.Deployment
+		nodePools                                     []astro.NodePool
+		jsonOutput                                    bool
 	)
 
 	// get file contents as []byte
@@ -42,8 +51,9 @@ func Create(inputFile string, client astro.Client) error {
 	if len(dataBytes) == 0 {
 		return fmt.Errorf("%s %w", inputFile, errEmptyFile)
 	}
+	// set outputFormat if json
+	jsonOutput = isJSON(dataBytes)
 	// unmarshal to a formattedDeployment
-	// TODO make this a var so we can test it
 	err = yaml.Unmarshal(dataBytes, &formattedDeployment)
 	if err != nil {
 		return err
@@ -105,7 +115,10 @@ func Create(inputFile string, client astro.Client) error {
 		}
 	}
 	// TODO add happy path output by calling inspect
-	return nil
+	if jsonOutput {
+		outputFormat = jsonFormat
+	}
+	return inspect.Inspect(workspaceID, "", createdDeployment.ID, outputFormat, client, out, "")
 }
 
 // getCreateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput.
@@ -121,7 +134,6 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, 
 		err            error
 	)
 
-	// TODO add Alert Emails using updateDeploymentAlerts mutation
 	// Add worker queues if they were requested
 	if hasQueues(deploymentFromFile) {
 		// get defaults for min-count, max-count and concurrency from API
@@ -134,9 +146,9 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, 
 		if err != nil {
 			return astro.CreateDeploymentInput{}, err
 		}
-		for i, q := range listQueues {
+		for i := range listQueues {
 			// set default values if none were specified
-			a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &q, defaultOptions)
+			a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &listQueues[i], defaultOptions)
 			// check if queue is valid
 			err = workerqueue.IsWorkerQueueInputValid(a, defaultOptions)
 			if err != nil {
@@ -174,7 +186,23 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error 
 	if deploymentFromFile.Deployment.Configuration.ClusterName == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_name")
 	}
-	// TODO check queue name, isDefault and worker type
+	// if worker queues were requested check queue name, isDefault and worker type
+	if hasQueues(deploymentFromFile) {
+		for i, queue := range deploymentFromFile.Deployment.WorkerQs {
+			if queue.Name == "" {
+				missingField := fmt.Sprintf("deployment.worker_queues[%d].name", i)
+				return fmt.Errorf("%w: %s", errRequiredField, missingField)
+			}
+			if queue.IsDefault && queue.Name != "default" {
+				missingField := fmt.Sprintf("deployment.worker_queues[%d].name = default", i)
+				return fmt.Errorf("%w: %s", errRequiredField, missingField)
+			}
+			if queue.WorkerType == "" {
+				missingField := fmt.Sprintf("deployment.worker_queues[%d].worker_type", i)
+				return fmt.Errorf("%w: %s", errRequiredField, missingField)
+			}
+		}
+	}
 	return nil
 }
 
@@ -182,9 +210,8 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error 
 // It returns true if deploymentToCreate exists.
 // It returns false if deploymentToCreate does not exist.
 func deploymentExists(existingDeployments []astro.Deployment, deploymentNameToCreate string) bool {
-	// TODO use pointers to make it more efficient
-	for _, deployment := range existingDeployments {
-		if deployment.Label == deploymentNameToCreate {
+	for i := range existingDeployments {
+		if existingDeployments[i].Label == deploymentNameToCreate {
 			// deployment exists
 			return true
 		}
@@ -225,9 +252,9 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astro.C
 	if err != nil {
 		return "", err
 	}
-	for _, workspace := range existingWorkspaces {
-		if workspace.Label == workspaceName {
-			return workspace.ID, nil
+	for i := range existingWorkspaces {
+		if existingWorkspaces[i].Label == workspaceName {
+			return existingWorkspaces[i].ID, nil
 		}
 	}
 	err = fmt.Errorf("workspace_name: %s %w in organization: %s", workspaceName, errNotFound, organizationID)
@@ -343,4 +370,11 @@ func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deployme
 		return astro.DeploymentAlerts{}, err
 	}
 	return alerts, nil
+}
+
+// isJSON returns true if data is in JSON format.
+// It returns false if not.
+func isJSON(data []byte) bool {
+	var js interface{}
+	return json.Unmarshal(data, &js) == nil
 }
