@@ -159,14 +159,15 @@ func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interfac
 }
 
 func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
+	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools)
 	return map[string]interface{}{
 		"alert_emails":          sourceDeployment.AlertEmails,
-		"worker_queues":         getQMap(sourceDeployment.WorkerQueues),
+		"worker_queues":         qList,
 		"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 	}
 }
 
-func getQMap(sourceDeploymentQs []astro.WorkerQueue) []map[string]interface{} {
+func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool) []map[string]interface{} {
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs {
 		newQ := map[string]interface{}{
@@ -176,7 +177,8 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue) []map[string]interface{} {
 			"max_worker_count":   queue.MaxWorkerCount,
 			"min_worker_count":   queue.MinWorkerCount,
 			"worker_concurrency": queue.WorkerConcurrency,
-			"node_pool_id":       queue.NodePoolID,
+			// map worker type to node pool id
+			"worker_type": getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools),
 		}
 		queueMap = append(queueMap, newQ)
 	}
@@ -260,4 +262,16 @@ func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interfa
 		},
 	}
 	return printableDeployment
+}
+
+// getNodePoolIDFromWorkerType takes maps the workerType to a node pool id in nodePools.
+// It returns an error if the worker type does not exist in any node pool in nodePools.
+func getWorkerTypeFromNodePoolID(poolID string, nodePools []astro.NodePool) string {
+	var pool astro.NodePool
+	for _, pool = range nodePools {
+		if pool.ID == poolID {
+			return pool.NodeInstanceType
+		}
+	}
+	return ""
 }

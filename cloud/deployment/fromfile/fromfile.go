@@ -261,8 +261,8 @@ func getWorkspaceIDFromName(workspaceName, organizationID string, client astro.C
 	return "", err
 }
 
-// getNodePoolIDFromWorkerType takes maps the workerType to a node pool id in nodePools.
-// It returns an error if the worker type does not exist in any node pool in nodePools.
+// getNodePoolIDFromWorkerType maps the node pool id in nodePools to a worker type.
+// It returns an error if the node pool id does not exist in any node pool in nodePools.
 func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []astro.NodePool) (string, error) {
 	var (
 		pool astro.NodePool

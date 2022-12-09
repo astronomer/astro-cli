@@ -601,11 +601,11 @@ func TestGetAdditional(t *testing.T) {
 
 	t.Run("returns alert emails, queues and variables for the requested deployment", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
-
+		qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools)
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.AlertEmails,
-			"worker_queues":         getQMap(sourceDeployment.WorkerQueues),
+			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
 		rawAdditional := getAdditional(&sourceDeployment)
@@ -1055,7 +1055,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues), actual)
+		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"
@@ -1116,5 +1116,36 @@ func TestGetSpecificField(t *testing.T) {
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, nil, actual)
+	})
+}
+
+func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
+	var (
+		expectedWorkerType, poolID, actualWorkerType string
+		existingPools                                []astro.NodePool
+	)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	expectedWorkerType = "worker-1"
+	poolID = "test-pool-id"
+	existingPools = []astro.NodePool{
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-1",
+		},
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-2",
+		},
+	}
+	t.Run("returns a worker type from cluster for pool with matching nodepool id", func(t *testing.T) {
+		actualWorkerType = getWorkerTypeFromNodePoolID(poolID, existingPools)
+		assert.Equal(t, expectedWorkerType, actualWorkerType)
+	})
+	t.Run("returns an empty worker type if no pool with matching node pool id exists in the cluster", func(t *testing.T) {
+		poolID = "test-pool-id-1"
+		actualWorkerType = getWorkerTypeFromNodePoolID(poolID, existingPools)
+		assert.Equal(t, "", actualWorkerType)
 	})
 }
