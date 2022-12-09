@@ -85,6 +85,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newConfigRootCmd(os.Stdout),
 		newAuthCommand(),
 		newRunCommand(),
+		newSoftwareRootCmd(),
 	)
 
 	if config.CFG.SQLCLI.GetBool() {
