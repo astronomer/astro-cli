@@ -8,5 +8,6 @@ var Gitignore = strings.TrimSpace(`
 .env
 .DS_Store # macOS specific ignore
 airflow_settings.yaml
+__pycache__/
 astro
 `)
