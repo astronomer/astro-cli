@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.8.4] - 2022-12-12
+
+### Bug Fixes
+- Fixed an issue to gitignore pycache
+- Fixed SQL CONN deprecation warnings
+- Adding config command and call config command to mount airflow dirs
+- Fixed and issue to respect non-zero exit codes from docker command in flow command
+
 ## [1.8.3] - 2022-11-30
 
 ### Bug Fixes
