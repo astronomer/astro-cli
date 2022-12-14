@@ -8,6 +8,10 @@ global:
   baseDomain: {{ .BaseDomain }}  # Base domain for all subdomains exposed through ingress
   tlsSecret: astronomer-tls  # Name of secret containing TLS certificate
   nginxEnabled: {{ not .DisableNginx }}
+  {{if and .NamespacePools.Enabled (not .NamespacePools.Create) -}}
+  manualNamespaceNamesEnabled: true
+  clusterRoles: false
+  {{end -}}
   defaultDenyNetworkPolicy: false
 {{if .PrivateCA}}
   # Enable privateCaCerts only if your enterprise security team
@@ -41,6 +45,22 @@ global:
     enabled: true
     repository: {{ .PrivateRegistryRepo }}
 {{end}}
+{{if .NamespacePools.Create}}
+  features:
+    namespacePools:
+      # if this is false, everything in this section can be ignored. default should be false
+      enabled: {{ .NamespacePools.Enabled }}
+      namespaces:
+        # automatically creates namespace, role and rolebinding for commander if set to true
+        create: {{ .NamespacePools.Create }}
+        {{if .NamespacePools.Names -}}
+        # this needs to be populated (something other than null) if global.features.namespacePools.enabled is true
+        names:
+          {{range .NamespacePools.Names -}}
+          - {{ . }}
+          {{end -}}
+        {{end -}}
+{{end}}
 {{if not .DisableNginx}}
 nginx:
   loadBalancerIP: ~  # IP address the nginx ingress should bind to
@@ -57,11 +77,14 @@ nginx:
   {{end -}}
 {{end}}
 astronomer:
-  {{if .Airgapped -}}
   commander:
     airGapped:
-      enabled: true
-  {{end -}}
+      enabled: {{ .Airgapped }}
+    {{if and .NamespacePools.Enabled (not .NamespacePools.Create) -}}
+    env:
+      - name: "COMMANDER_MANUAL_NAMESPACE_NAMES"
+        value: true
+{{end}}
   houston:
     {{if .Airgapped -}}
     updateCheck: # There is a 2nd check for Astronomer platform updates but this is deprecated and not actively used. Therefore disable
@@ -101,23 +124,72 @@ astronomer:
               pgbouncerExporter:
                 repository: {{ .PrivateRegistryRepo }}/ap-pgbouncer-exporter
         {{end -}}
+        {{if and .NamespacePools.Enabled (not .NamespacePools.Create) -}}
+        # Enable manual namespace names
+        manualNamespaceNames: true
+        # Pre-created namespace names
+        preCreatedNamespaces:
+          {{range .NamespacePools.Names -}}
+          - name: {{ . }}
+        {{end -}}
+        # Allows users to immediately reuse a pre-created namespace by hard deleting the associated Deployment
+        # If set to false, you'll need to wait until a cron job runs before the Deployment record is deleted and the namespace is added back to the pool
+        hardDeleteDeployment: true
+        {{end -}}
         manualReleaseNames: {{ .EnableManualReleaseNames }}  # Allows you to set your release names
       email:
         enabled: {{ .EnableEmail }}
         reply: {{ .EmailNoReply }}  # Emails will be sent from this address
       auth:
         github:
-          enabled: true  # Lets users authenticate with Github
+          enabled: {{ eq .AuthProvider "github" }}  # Lets users authenticate with Github
         local:
-          enabled: false  # Disables logging in with just a username and password
+          enabled: {{ eq .AuthProvider "local" }}  # Disables logging in with just a username and password
         openidConnect:
+          {{if eq .AuthProvider "oauth" -}}
+          flow: "code"
+          {{end -}}
+          {{if or (eq .AuthProvider "oidc") (eq .AuthProvider "oauth") -}}
+          {{ .AuthProviderName }}:
+            enabled: true
+            client_id: {{ .AuthClientId }}
+            discoveryUrl: {{ .AuthDiscoveryUrl }}
+          {{end -}}
           google:
-            enabled: true  # Lets users authenticate with Google
-    {{if .EnableEmail -}}
+            enabled: {{ eq .AuthProvider "google" }}  # Lets users authenticate with Google
+    {{if .Secrets -}}
     secret:
-    # Reference to the Kubernetes secret for SMTP credentials. Can be removed if email is not used.
-    - envName: "EMAIL__SMTP_URL"
-      secretName: "astronomer-smtp"
-      secretKey: "connection"
+    {{range .Secrets -}}
+    - envName: {{ .EnvName }}
+      secretName: {{ .SecretName }}
+      secretKey: {{ .SecretKey }}
+    {{end -}}
+  {{end}}
+  {{if .EnableRegistryBackend -}}
+  registry:
+    {{ .RegistryBackendProvider }}:
+      enabled: true
+      {{if eq .RegistryBackendProvider "gcs" -}}
+      bucket: {{ .RegistryBackendBucket }}
+      {{else if eq .RegistryBackendProvider "s3" -}}
+      bucket: {{ .RegistryBackendBucket }}
+      {{if .RegistryBackendS3AccessKeyId -}}
+      accesskey: {{ .RegistryBackendS3AccessKeyId }}
+      secretkey: {{ .RegistryBackendS3SecretAccessKey }}
+      {{end -}}
+      region: {{ .RegistryBackendS3Region }}
+      {{if .RegistryBackendS3RegionEndpoint -}}
+      regionendpoint: {{ .RegistryBackendS3RegionEndpoint }}
+      {{end -}}
+      {{if .RegistryBackendS3EnableEncrypt -}}
+      encrypt: {{ .RegistryBackendS3EnableEncrypt }}
+      keyid: {{ .RegistryBackendS3KmsKey }}
+      {{end -}}
+      {{else -}}
+      accountname: {{ .RegistryBackendAzureAccountName }}
+      accountkey: {{ .RegistryBackendAzureAccountKey }}
+      container: {{ .RegistryBackendAzureContainer }}
+      realm: core.windows.net
+      {{end -}}
 {{end}}
 `)

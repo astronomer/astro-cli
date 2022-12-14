@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/software"
 	"github.com/spf13/cobra"
 )
@@ -56,10 +55,6 @@ func newSoftwareInitCmd() *cobra.Command {
 }
 
 func softwareInit(cmd *cobra.Command, args []string) error {
-	if environment == "" {
-		environment = input.Text("Enter the environment you are installing Astronomer in: (aws, azure, gcloud, other) ")
-	}
-
 	if err := software.Init(environment, airgapped); err != nil {
 		return err
 	}
