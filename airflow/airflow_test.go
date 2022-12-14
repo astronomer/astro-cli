@@ -65,7 +65,7 @@ func TestInit(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	err = Init(tmpDir, "astro-runtime", "test")
+	err = Init(tmpDir, "astro-runtime", "test", false)
 	assert.NoError(t, err)
 
 	expectedFiles := []string{

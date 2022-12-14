@@ -25,6 +25,7 @@ import (
 
 var (
 	useAstronomerCertified bool
+	includeCosmos          bool
 	projectName            string
 	runtimeVersion         string
 	airflowVersion         string
@@ -133,6 +134,7 @@ func newAirflowInitCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&projectName, "name", "n", "", "Name of Astro project")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Version of Airflow you want to create an Astro project with. If not specified, latest is assumed. You can change this version in your Dockerfile at any time.")
+	cmd.Flags().BoolVar(&includeCosmos, "include-cosmos-dbt", false, "If included, create your Astro project with Astro Cosmos for dbt setup. If not specified, don't include Astro Cosmos is assumed.")
 	var err error
 	var avoidACFlag bool
 
@@ -478,7 +480,7 @@ func airflowInit(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	// Execute method
-	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag)
+	err = airflow.Init(config.WorkingPath, defaultImageName, defaultImageTag, includeCosmos)
 	if err != nil {
 		return err
 	}

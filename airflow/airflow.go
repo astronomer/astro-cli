@@ -2,11 +2,13 @@ package airflow
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
 	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/hashicorp/go-getter"
 	"github.com/pkg/errors"
 )
 
@@ -58,10 +60,24 @@ func initFiles(root string, files map[string]string) error {
 	return nil
 }
 
+func initCosmosFiles(path string) error {
+	client := getter.GitGetter{}
+
+	url, err := url.Parse("https://github.com/astronomer/airflow-dbt-blog.git")
+	if err != nil {
+		return errors.Wrapf(err, "Error parsing url: %v", err)
+	}
+	if err := client.Get(path, url); err != nil {
+		return errors.Wrapf(err, "Error getting path %s: %v", path, err)
+	}
+
+	return nil
+}
+
 // Init will scaffold out a new airflow project
-func Init(path, airflowImageName, airflowImageTag string) error {
+func Init(path, airflowImageName, airflowImageTag string, includeCosmos bool) error {
 	// List of directories to create
-	dirs := []string{"dags", "plugins", "include"}
+	dirs := []string{"dags", "plugins", "include", "dbt"}
 
 	// Map of files to create
 	files := map[string]string{
@@ -87,6 +103,13 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 	// Initialize files
 	if err := initFiles(path, files); err != nil {
 		return errors.Wrap(err, "failed to create project files")
+	}
+
+	if includeCosmos {
+		// Initialize Cosmos dbt files
+		if err := initCosmosFiles(path + "/cosmos"); err != nil {
+			return errors.Wrap(err, "failed to create Cosmos dbt files")
+		}
 	}
 
 	return nil
