@@ -1,9 +1,3 @@
-package include
-
-import "strings"
-
-// Readme is the .README template
-var Readme = strings.TrimSpace(`
 Overview
 ========
 
@@ -50,4 +44,3 @@ Contact
 =======
 
 The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support team: https://support.astronomer.io/
-`)

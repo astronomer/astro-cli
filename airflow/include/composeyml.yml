@@ -1,9 +1,3 @@
-package include
-
-import "strings"
-
-// Composeyml is the docker-compose template
-var Composeyml = strings.TrimSpace(`
 version: '3.1'
 
 networks:
@@ -137,4 +131,3 @@ services:
       - airflow_logs:/usr/local/airflow/logs
     {{ .AirflowEnvFile }}
 {{end}}
-`)

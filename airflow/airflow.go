@@ -1,6 +1,7 @@
 package airflow
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,11 +73,11 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"requirements.txt":                     "",
 		".env":                                 "",
 		"airflow_settings.yaml":                include.Settingsyml,
-		"dags/example_dag_basic.py":            include.Exampledagbasic,
-		"dags/example_dag_advanced.py":         include.Exampledagadvanced,
+		"dags/example_dag_basic.py":            include.ExampleDagBasic,
+		"dags/example_dag_advanced.py":         include.ExampleDagAdvanced,
 		"README.md":                            include.Readme,
-		"tests/dags/test_dag_integrity.py":     include.Dagintegritytest,
-		".astro/test_dag_integrity_default.py": include.Dagintegritytestdefault,
+		"tests/dags/test_dag_integrity.py":     include.DagIntegrityTest,
+		".astro/test_dag_integrity_default.py": include.DagIntegrityTestDefault,
 	}
 
 	// Initailize directories
