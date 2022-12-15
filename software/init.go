@@ -93,15 +93,16 @@ func Init(environment string, airgapped bool) error {
 		cfg.Auth.ProviderName, _ = prompt.GetInput(prompt.Content{Label: "What is the name of the authentication provider (i.e. microsoft, okta, etc.)"}, false, nil)
 		cfg.Auth.ClientId, _ = prompt.GetInput(prompt.Content{Label: fmt.Sprintf("What is the %s client ID", cfg.Auth.Provider)}, false, nil)
 		cfg.Auth.DiscoveryUrl, _ = prompt.GetInput(prompt.Content{Label: fmt.Sprintf("What is the %s discovery URL", cfg.Auth.Provider)}, false, nil)
+
+		if cfg.Auth.Provider == "oauth" {
+			clientSecretName, _ := prompt.GetInput(prompt.Content{Label: "What is the oauth client secret Kubernetes secret name"}, false, nil)
+			cfg.Secrets = append(cfg.Secrets, types.KubernetesEnvironmentSecret{EnvName: fmt.Sprintf("AUTH__OPENID_CONNECT__%s__CLIENT_SECRET", strings.ToUpper(cfg.Auth.ProviderName)), SecretName: clientSecretName, SecretKey: "client_secret"})
+		}
+
 		if cfg.Auth.IdpGroupImportEnabled, _ = prompt.GetConfirm(prompt.Content{Label: "Enable IdP group import"}); cfg.Auth.IdpGroupImportEnabled {
 			cfg.Auth.GroupsClaimName, _ = prompt.GetInput(prompt.Content{Label: "What is the groups claim name (leave blank if 'groups')"}, false, nil)
 			cfg.Auth.DisableUserManagement, _ = prompt.GetConfirm(prompt.Content{Label: "Disable user management and only allow Team invites"})
 		}
-	}
-
-	if cfg.Auth.Provider == "oauth" {
-		clientSecretName, _ := prompt.GetInput(prompt.Content{Label: "What is the oauth client secret Kubernetes secret name"}, false, nil)
-		cfg.Secrets = append(cfg.Secrets, types.KubernetesEnvironmentSecret{EnvName: fmt.Sprintf("AUTH__OPENID_CONNECT__%s__CLIENT_SECRET", strings.ToUpper(cfg.Auth.ProviderName)), SecretName: clientSecretName, SecretKey: "client_secret"})
 	}
 
 	if airgapped {
@@ -136,7 +137,7 @@ func Init(environment string, airgapped bool) error {
 
 	if cfg.NamespacePools.Enabled, _ = prompt.GetConfirm(prompt.Content{Label: "Enable namespace pools configuration"}); cfg.NamespacePools.Enabled {
 		cfg.NamespacePools.Create, _ = prompt.GetConfirm(prompt.Content{Label: "Create namespaces if they do not exist"})
-		for name, _ := prompt.GetInput(prompt.Content{Label: "Enter a namespace name"}, false, nil); name != ""; name, _ = prompt.GetInput(prompt.Content{Label: "Enter a namespace name"}, false, nil) {
+		for name, _ := prompt.GetInput(prompt.Content{Label: "Enter a namespace name (leave blank to stop)"}, false, nil); name != ""; name, _ = prompt.GetInput(prompt.Content{Label: "Enter a namespace name (leave blank to stop)"}, false, nil) {
 			cfg.NamespacePools.Names = append(cfg.NamespacePools.Names, name)
 		}
 	}
