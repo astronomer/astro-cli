@@ -96,6 +96,7 @@ type ComposeConfig struct {
 	SettingsFile         string
 	SettingsFileExist    bool
 	TriggererEnabled     bool
+	ProjectName          string
 }
 
 type DockerCompose struct {

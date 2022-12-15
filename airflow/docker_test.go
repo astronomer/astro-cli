@@ -62,7 +62,9 @@ x-common-env-vars: &common-env-vars
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
   AIRFLOW__WEBSERVER__RBAC: "True"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
   ASTRONOMER_ENVIRONMENT: local
 
 networks:
@@ -170,7 +172,9 @@ x-common-env-vars: &common-env-vars
   AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
   AIRFLOW__CORE__LOAD_EXAMPLES: "False"
   AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
   AIRFLOW__WEBSERVER__RBAC: "True"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
   ASTRONOMER_ENVIRONMENT: local
 
 networks:
