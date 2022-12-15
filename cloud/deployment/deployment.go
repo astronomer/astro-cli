@@ -45,7 +45,6 @@ var (
 	timeoutNum           = 180
 )
 
-
 func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
