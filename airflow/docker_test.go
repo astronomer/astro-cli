@@ -54,7 +54,16 @@ func TestGenerateConfig(t *testing.T) {
 	assert.NoError(t, err)
 	config.InitConfig(fs)
 	t.Run("returns config with default healthcheck", func(t *testing.T) {
-		expectedCfg := `version: '3.1'
+		expectedCfg := `version: '3.4'
+
+x-common-env-vars: &common-env-vars
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__WEBSERVER__RBAC: "True"
+  ASTRONOMER_ENVIRONMENT: local
 
 networks:
   airflow:
@@ -97,13 +106,7 @@ services:
       io.astronomer.docker.component: "airflow-scheduler"
     depends_on:
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:ro
       - airflow_home/plugins:/usr/local/airflow/plugins:z
@@ -133,14 +136,7 @@ services:
     depends_on:
       - scheduler
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      AIRFLOW__WEBSERVER__RBAC: "True"
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     ports:
       - 127.0.0.1:8080:8080
     volumes:
@@ -166,7 +162,16 @@ services:
 		assert.Equal(t, expectedCfg, cfg)
 	})
 	t.Run("returns config with triggerer enabled", func(t *testing.T) {
-		expectedCfg := `version: '3.1'
+		expectedCfg := `version: '3.4'
+
+x-common-env-vars: &common-env-vars
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__WEBSERVER__RBAC: "True"
+  ASTRONOMER_ENVIRONMENT: local
 
 networks:
   airflow:
@@ -209,13 +214,7 @@ services:
       io.astronomer.docker.component: "airflow-scheduler"
     depends_on:
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:ro
       - airflow_home/plugins:/usr/local/airflow/plugins:z
@@ -245,14 +244,7 @@ services:
     depends_on:
       - scheduler
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      AIRFLOW__WEBSERVER__RBAC: "True"
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     ports:
       - 127.0.0.1:8080:8080
     volumes:
@@ -283,13 +275,7 @@ services:
       io.astronomer.docker.component: "airflow-triggerer"
     depends_on:
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      AIRFLOW__WEBSERVER__RBAC: "True"
+    environment: *common-env-vars
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
