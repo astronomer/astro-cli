@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -104,7 +103,7 @@ func normalizeName(s string) string {
 func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (string, error) {
 	var tmpl *template.Template
 	var err error
-	tmpl, err = template.New("yml").Parse(include.Composeyml)
+	tmpl, err = template.New("yml").Parse(Composeyml)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to generate config")
 	}
