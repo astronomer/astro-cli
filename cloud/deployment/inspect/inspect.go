@@ -41,7 +41,6 @@ type deploymentConfig struct {
 
 type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
-	ID                string `mapstructure:"id" yaml:"id" json:"id"`
 	IsDefault         bool   `mapstructure:"is_default" yaml:"is_default" json:"is_default"`
 	MaxWorkerCount    int    `mapstructure:"max_worker_count" yaml:"max_worker_count" json:"max_worker_count"`
 	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
@@ -171,7 +170,6 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.Nod
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs {
 		newQ := map[string]interface{}{
-			"id":                 queue.ID,
 			"name":               queue.Name,
 			"is_default":         queue.IsDefault,
 			"max_worker_count":   queue.MaxWorkerCount,

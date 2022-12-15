@@ -114,7 +114,6 @@ func Create(inputFile string, client astro.Client, out io.Writer) error {
 			return err
 		}
 	}
-	// TODO add happy path output by calling inspect
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
@@ -122,7 +121,7 @@ func Create(inputFile string, client astro.Client, out io.Writer) error {
 }
 
 // getCreateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput.
-// If worker-queues were requested, it gets node pool id work the workers and validates queue options.
+// If worker-queues were requested, it gets node pool id from the worker type and validates queue options.
 // If no queue options were specified, it sets default values.
 // It returns an error if getting default options fail.
 // It returns an error if worker-queue options are not valid.
