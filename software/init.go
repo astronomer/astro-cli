@@ -51,16 +51,16 @@ func Init(environment string, airgapped bool) error {
 			ErrorMsg: "Please provide an environment",
 			Label:    "What environment is Astronomer being installed in",
 		}
-		envItems := []string{"aws", "gcloud", "azure", "other"}
+		envItems := []string{"aws", "google", "azure", "other"}
 		if environment, err = prompt.GetSelect(envContent, envItems); err != nil {
 			return errors.Wrap(err, envContent.ErrorMsg)
 		}
 	}
 	cfg.Environment = types.EnvironmentConfig{
-		Airgapped:     airgapped,
-		IsAws:         environment == "aws",
-		IsAzure:       environment == "azure",
-		IsGoogleCloud: environment == "gcloud",
+		Airgapped: airgapped,
+		IsAws:     environment == "aws",
+		IsAzure:   environment == "azure",
+		IsGoogle:  environment == "google",
 	}
 
 	cfg.BaseDomain, _ = prompt.GetInput(prompt.Content{Label: "What is the base domain for Astronomer"}, false, nil)

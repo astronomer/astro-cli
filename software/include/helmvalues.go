@@ -149,7 +149,7 @@ astronomer:
       deployments:
       {{- if .Environment.IsAws}}
         serviceAccountAnnotationKey: eks.amazonaws.com/role-arn  # Flag to enable using IAM roles (don't enter a specific role)
-      {{- else if .Environment.IsGoogleCloud}}
+      {{- else if .Environment.IsGoogle}}
         serviceAccountAnnotationKey: iam.gke.io/gcp-service-account  # Flag to enable using IAM roles (don't enter a specific role)
       {{- end}}
       {{- if .Environment.Airgapped}}

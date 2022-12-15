@@ -42,10 +42,10 @@ type EmailConfig struct {
 }
 
 type EnvironmentConfig struct {
-	Airgapped     bool
-	IsAws         bool
-	IsAzure       bool
-	IsGoogleCloud bool
+	Airgapped bool
+	IsAws     bool
+	IsAzure   bool
+	IsGoogle  bool
 }
 
 type ExternalElasticsearchConfig struct {

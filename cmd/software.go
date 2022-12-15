@@ -48,7 +48,7 @@ func newSoftwareInitCmd() *cobra.Command {
 		},
 		RunE: softwareInit,
 	}
-	cmd.Flags().StringVarP(&environment, "environment", "e", "", "Environment to install in (aws, azure, gcloud, other)")
+	cmd.Flags().StringVarP(&environment, "environment", "e", "", "Environment to install in (aws, azure, google, other)")
 	cmd.Flags().BoolVarP(&airgapped, "airgapped", "", false, "Whether environment is airgapped or not")
 
 	return cmd
