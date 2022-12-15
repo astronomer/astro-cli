@@ -1,62 +1,28 @@
 global:
   baseDomain:   # Base domain for all subdomains exposed through ingress
   tlsSecret: astronomer-tls  # Name of secret containing TLS certificate
-  nginxEnabled: true
   defaultDenyNetworkPolicy: false
-  helmRepo: "helm/astro"
-  # Enables using SSL connections to
-  # encrypt client/server communication
-  # between databases and the Astronomer platform.
-  # If your database enforces SSL for connections,
-  # change this value to true
-  ssl:
-    enabled: true
-    mode: "prefer"
-  privateRegistry:
-    enabled: true
-    repository: docker/astronomer
 
 nginx:
   loadBalancerIP: ~  # IP address the nginx ingress should bind to
   privateLoadBalancer: false  # Set to 'true' when deploying to a private EKS cluster
   # Dict of arbitrary annotations to add to the nginx ingress.
   # For full configuration options, see https://docs.nginx.com/nginx-ingress-controller/configuration/ingress-resources/advanced-configuration-with-annotations/
-  ingressAnnotations: {}
+  ingressAnnotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb  # Change to 'elb' if your node group is private and doesn't utilize a NAT gateway
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: 
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: ssl
 
 astronomer:
   commander:
     airGapped:
       enabled: false # disable if using self hosted helm repository or not airgapped
   houston:
-    updateCheck: # There is a 2nd check for Astronomer platform updates but this is deprecated and not actively used. Therefore disable
-      enabled: false
-    updateAirflowCheck: # Configure URL for Airflow updates check
-      url: http://astronomer-releases.astronomer.svc.cluster.local/astronomer-certified
-    updateRuntimeCheck: # Configure URL for Airflow updates check
-      url: http://astronomer-releases.astronomer.svc.cluster.local/astronomer-runtime
     config:
       publicSignups: false  # Users need to be invited to have access to Astronomer. Set to true otherwise
       emailConfirmation: false  # Users get an email verification before accessing Astronomer
       deployments:
-        helm:
-          runtimeImages:
-            airflow:
-              repository: docker/astronomer/astro-runtime
-            flower:
-              repository: docker/astronomer/astro-runtime
-          airflow:
-            defaultAirflowRepository: docker/astronomer/ap-airflow
-            images:
-              airflow:
-                repository: docker/astronomer/ap-airflow
-              statsd:
-                repository: docker/astronomer/ap-statsd-exporter
-              redis:
-                repository: docker/astronomer/ap-redis
-              pgbouncer:
-                repository: docker/astronomer/ap-pgbouncer
-              pgbouncerExporter:
-                repository: docker/astronomer/ap-pgbouncer-exporter
+        serviceAccountAnnotationKey: eks.amazonaws.com/role-arn  # Flag to enable using IAM roles (don't enter a specific role)
         manualReleaseNames: false  # Allows you to set your release names
       email:
         enabled: false
@@ -65,8 +31,12 @@ astronomer:
         github:
           enabled: false  # Lets users authenticate with Github
         local:
-          enabled: true  # Disables logging in with just a username and password
+          enabled: false  # Disables logging in with just a username and password
         openidConnect:
+          m:
+            enabled: true
+            client_id: 
+            discoveryUrl: 
           google:
             enabled: false  # Lets users authenticate with Google
   registry:

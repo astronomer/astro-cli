@@ -7,12 +7,39 @@ var Helmvalues = strings.TrimSpace(`
 global:
   baseDomain: {{ .BaseDomain }}  # Base domain for all subdomains exposed through ingress
   tlsSecret: astronomer-tls  # Name of secret containing TLS certificate
-  nginxEnabled: {{ not .ThirdPartyIngress.Enabled }}
+  defaultDenyNetworkPolicy: false
+{{- if .ThirdPartyIngress.Enabled}}
+  nginxEnabled: false
+{{- end}}
+{{- if .Logging.ExternalElasticsearch.Enabled}}
+  fluentdEnabled: true
+  customLogging:
+    enabled: true
+    scheme: https
+    # host endpoint copied from elasticsearch console with https
+    # and port number removed.
+    host: {{ .Logging.ExternalElasticsearch.HostUrl}}
+    port: "9243"
+  {{- if not (eq .Logging.ExternalElasticsearch.SecretCredentials "")}}
+    # encoded credentials
+    secret: "{{ .Logging.ExternalElasticsearch.SecretCredentials }}"
+  {{- else}}
+    # kubernetes secret containing credentials
+    # Example command: ` + "`kubectl create secret generic elasticcreds --from-literal elastic=<username>:<password> --namespace=<your-platform-namespace>`" + `
+    secretName: elasticcreds
+  {{- end}}
+{{- else if .Logging.SidecarLoggingEnabled}}
+  fluentdEnabled: false
+  loggingSidecar:
+    enabled: true
+    name: sidecar-log-consumer
+    # needed to prevent zombie deployment worker pods when using KubernetesExecutor
+    terminationEndpoint: http://localhost:8000/quitquitquit
+{{- end}}
 {{- if and .NamespacePools.Enabled (not .NamespacePools.Create)}}
   manualNamespaceNamesEnabled: true
   clusterRoles: false
 {{- end}}
-  defaultDenyNetworkPolicy: false
 {{- if not (eq .SelfHostedHelmRepo "")}}
   helmRepo: "{{ .SelfHostedHelmRepo }}"
 {{- end}}
@@ -183,6 +210,10 @@ astronomer:
       {{- if not (eq .Email.SmtpUrl "")}}
         smtpUrl: "{{ .Email.SmtpUrl }}"
       {{- end}}
+    {{- if .Auth.DisableUserManagement}}
+      userManagement:
+        enabled: false
+    {{- end}}
       auth:
         github:
           enabled: {{ eq .Auth.Provider "github" }}  # Lets users authenticate with Github
@@ -193,10 +224,16 @@ astronomer:
           flow: "code"
         {{- end}}
         {{- if or (eq .Auth.Provider "oidc") (eq .Auth.Provider "oauth")}}
+        {{- if .Auth.IdpGroupImportEnabled}}
+          idpGroupsImportEnabled: true
+        {{- end}}
           {{ .Auth.ProviderName }}:
             enabled: true
             client_id: {{ .Auth.ClientId }}
             discoveryUrl: {{ .Auth.DiscoveryUrl }}
+          {{- if not (eq .Auth.GroupsClaimName "")}}
+            claimsMapping: {{ .Auth.GroupsClaimName }}
+          {{- end}}
         {{- end}}
           google:
             enabled: {{ eq .Auth.Provider "google" }}  # Lets users authenticate with Google
@@ -270,4 +307,17 @@ astronomer:
               - name: astronomer-houston
                 port: 8871
 {{- end}}
+{{if .Logging.S3Logs.Enabled}}
+fluentd:
+  s3:
+    enabled: true
+    role_arn: {{ .Logging.S3Logs.RoleArn }}
+    role_session_name: astronomer-logs
+    s3_bucket: {{ .Logging.S3Logs.S3Bucket }}
+    s3_region: {{ .Logging.S3Logs.S3Region }}
+{{end}}
+{{- if .Logging.ExternalElasticsearch.Enabled}}
+tags:
+  logging: false
+{{end}}
 `)

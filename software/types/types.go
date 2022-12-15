@@ -6,6 +6,7 @@ type ValuesConfig struct {
 	BaseDomain                string
 	Email                     EmailConfig
 	Environment               EnvironmentConfig
+	Logging                   LoggingConfig
 	ManualReleaseNamesEnabled bool
 	NamespacePools            NamespacePoolsConfig
 	PrivateCA                 bool
@@ -18,11 +19,14 @@ type ValuesConfig struct {
 }
 
 type AuthConfig struct {
-	ClientId         string
-	ClientSecretName string
-	DiscoveryUrl     string
-	Provider         string
-	ProviderName     string
+	ClientId              string
+	ClientSecretName      string
+	DiscoveryUrl          string
+	Provider              string
+	ProviderName          string
+	IdpGroupImportEnabled bool
+	GroupsClaimName       string
+	DisableUserManagement bool
 }
 
 type CustomImageRepoConfig struct {
@@ -44,10 +48,22 @@ type EnvironmentConfig struct {
 	IsGoogleCloud bool
 }
 
+type ExternalElasticsearchConfig struct {
+	Enabled           bool
+	HostUrl           string
+	SecretCredentials string
+}
+
 type KubernetesEnvironmentSecret struct {
 	EnvName    string
 	SecretName string
 	SecretKey  string
+}
+
+type LoggingConfig struct {
+	S3Logs                S3LogsConfig
+	ExternalElasticsearch ExternalElasticsearchConfig
+	SidecarLoggingEnabled bool
 }
 
 type NamespacePoolsConfig struct {
@@ -75,6 +91,13 @@ type RegistryBackendConfig struct {
 	S3Region          string
 	S3RegionEndpoint  string
 	S3SecretAccessKey string
+}
+
+type S3LogsConfig struct {
+	Enabled  bool
+	RoleArn  string
+	S3Bucket string
+	S3Region string
 }
 
 type ThirdPartyIngressConfig struct {
