@@ -73,6 +73,7 @@ var (
 			}
 			workspace {
 				id
+				label
 				organizationId
 			}
 		}
@@ -115,6 +116,7 @@ var (
 			}
 			workspace {
 				id
+				label
 				organizationId
 			}
 		}
