@@ -272,6 +272,11 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
 	})
+	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
+		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorIs(t, err, errFlag)
+	})
 	mockClient.AssertExpectations(t)
 }
 

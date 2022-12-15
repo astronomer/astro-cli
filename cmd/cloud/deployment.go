@@ -61,6 +61,7 @@ var (
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 	httpClient = httputil.NewHTTPClient()
+	errFlag    = errors.New("--deployment-file can not be used with other arguments")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -297,6 +298,12 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 
 	// request is to create from a file
 	if inputFile != "" {
+		requestedFlags := cmd.Flags().NFlag()
+		if requestedFlags > 1 {
+			// other flags were requested
+			return errFlag
+		}
+
 		return fromfile.Create(inputFile, astroClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
