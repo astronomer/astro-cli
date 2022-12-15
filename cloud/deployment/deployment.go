@@ -82,10 +82,6 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	// Build rows
 	for i := range deployments {
 		d := deployments[i]
-		currentTag := d.DeploymentSpec.Image.Tag
-		if currentTag == "" {
-			currentTag = "?"
-		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		if all {
 			tab.AddRow([]string{d.Label, d.Workspace.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
