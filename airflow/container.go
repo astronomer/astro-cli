@@ -153,6 +153,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		SettingsFile:         settingsFile,
 		SettingsFileExist:    settingsFileExist,
 		TriggererEnabled:     triggererEnabled,
+		ProjectName:          projectName,
 	}
 
 	buff := new(bytes.Buffer)
