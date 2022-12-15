@@ -22,9 +22,6 @@ RUN id -u %s &>/dev/null || useradd --uid %s --create-home %s
 # https://github.com/astronomer/astro-sdk/issues/1219
 RUN chmod -R 777 /usr/local/airflow
 
-
-# override Runtime ENTRYPOINT in a way it's cached (empty ENTRYPOINT [] isn't)
-ENTRYPOINT ["/usr/bin/env"]
-
-
+ENTRYPOINT ["flow"]
+CMD ["--help"]
 `)

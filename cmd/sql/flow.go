@@ -8,7 +8,6 @@ import (
 
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -24,7 +23,7 @@ var (
 )
 
 var (
-	configCommandString = []string{"flow", "config"}
+	configCommandString = []string{"config"}
 	globalConfigKeys    = []string{"airflow_home", "airflow_dags_folder"}
 )
 
@@ -130,9 +129,9 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 }
 
 func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, mountDirs []string) error {
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
+	cmdString := []string{cmd.Name()}
 	if debug {
-		cmdString = slices.Insert(cmdString, 1, "--debug")
+		cmdString = []string{"--debug", cmd.Name()}
 	}
 	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, args, flags, mountDirs, false)
 	if err != nil {
@@ -388,10 +387,8 @@ func NewFlowCommand() *cobra.Command {
 		Use:               "flow",
 		Short:             "Run flow commands",
 		PersistentPreRunE: login,
-		Run: func(cmd *cobra.Command, args []string) {
-			executeHelp(cmd, []string{cmd.Name(), "--help"})
-		},
-		SilenceUsage: true,
+		Run:               executeHelp,
+		SilenceUsage:      true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "")
