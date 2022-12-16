@@ -4,6 +4,7 @@ extends: default
 
 ignore: |
   vendor
+  airflow/include/composeyml.yml
 
 rules:
   braces:
