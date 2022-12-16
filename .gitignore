@@ -16,3 +16,4 @@ packages.txt
 requirements.txt
 testbin/golangci-lint
 vendor/github.com/theupdateframework/notary/Dockerfile
+astro_values.yaml
