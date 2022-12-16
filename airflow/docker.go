@@ -13,7 +13,6 @@ import (
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
-	"github.com/astronomer/astro-cli/airflow/include"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -122,7 +121,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	}
 
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
-	composeFile := include.Composeyml
+	composeFile := Composeyml
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {

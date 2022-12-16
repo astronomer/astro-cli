@@ -1,9 +1,3 @@
-package include
-
-import "strings"
-
-// Exampledagbasic created with astro dev init
-var Exampledagbasic = strings.TrimSpace(`
 import json
 from datetime import datetime, timedelta
 
@@ -76,4 +70,3 @@ def example_dag_basic():
     load(order_summary["total_order_value"])
 
 example_dag_basic = example_dag_basic()
-`)

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -109,7 +108,7 @@ func deployDags(path, runtimeID string, client astro.Client) error {
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
-	err := fileutil.WriteStringToFile(monitoringDagPath, include.MonitoringDag)
+	err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
 	if err != nil {
 		return err
 	}

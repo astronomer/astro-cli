@@ -1,9 +1,3 @@
-package include
-
-import "strings"
-
-// Exampledagadvanced created with astro dev init
-var Exampledagadvanced = strings.TrimSpace(`
 from datetime import datetime, timedelta
 from typing import Dict
 
@@ -204,4 +198,3 @@ def example_dag_advanced():
     # going_to_the_beach >> inviting_friends
 
 dag = example_dag_advanced()
-`)

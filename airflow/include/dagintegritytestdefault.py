@@ -1,9 +1,4 @@
-package include
 
-import "strings"
-
-// Dagintegritytestdefault created with astro dev init
-var Dagintegritytestdefault = strings.TrimSpace(`
 """Test the validity of all DAGs. **USED BY DEV PARSE COMMAND DO NOT EDIT**"""
 from contextlib import contextmanager
 import logging
@@ -96,4 +91,3 @@ def test_file_imports(rel_path,rv):
 	if rel_path and rv : #Make sure our no op test doesn't raise an error
 		raise Exception(f"{rel_path} failed to import with message \n {rv}")
 
-`)

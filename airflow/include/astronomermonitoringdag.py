@@ -1,8 +1,3 @@
-package include
-
-import "strings"
-
-var MonitoringDag = strings.TrimSpace(`
 """A Monitoring DAG used by Astronomer to alert users via Control Plane when tasks aren't executing"""
 
 import os
@@ -30,4 +25,3 @@ with DAG(
         priority_weight=2 ** 31 - 1,
         do_xcom_push=False,
     )
-`)
