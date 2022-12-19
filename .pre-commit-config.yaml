@@ -22,6 +22,7 @@ repos:
       - id: check-toml
       - id: check-xml
       - id: check-yaml
+        exclude: 'airflow/include/composeyml.yml'
         args: ['--allow-multiple-documents']
       - id: detect-private-key
       - id: end-of-file-fixer
