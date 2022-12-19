@@ -28,7 +28,7 @@ const (
 var (
 	Docker          = NewDockerBind
 	Io              = NewIoBind
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 	Os              = NewOsBind
 )
 
@@ -37,7 +37,7 @@ func getContext(filePath string) io.Reader {
 	return ctx
 }
 
-func displayMessages(r io.Reader) error {
+func OriginalDisplayMessages(r io.Reader) error {
 	decoder := json.NewDecoder(r)
 	var prevMessage jsonmessage.JSONMessage
 	isFirstMessage := true
@@ -83,7 +83,7 @@ var ConvertReadCloserToString = func(readCloser io.ReadCloser) (string, error) {
 	return buf.String(), nil
 }
 
-var CommonDockerUtil = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+var ExecuteCmdInDocker = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
 	var statusCode int64
 	var cout io.ReadCloser
 
