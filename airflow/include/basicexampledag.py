@@ -1,7 +1,10 @@
 import json
 from datetime import datetime, timedelta
 
-from airflow.decorators import dag, task # DAG and task decorators for interfacing with the TaskFlow API
+from airflow.decorators import (
+    dag,
+    task,
+)  # DAG and task decorators for interfacing with the TaskFlow API
 
 
 @dag(
@@ -16,9 +19,10 @@ from airflow.decorators import dag, task # DAG and task decorators for interfaci
     # run will be for the next 30 mins, per the schedule_interval
     catchup=False,
     default_args={
-        "retries": 2, # If a task fails, it will retry 2 times.
+        "retries": 2,  # If a task fails, it will retry 2 times.
     },
-    tags=['example']) # If set, this tag is shown in the DAG view of the Airflow UI
+    tags=["example"],
+)  # If set, this tag is shown in the DAG view of the Airflow UI
 def example_dag_basic():
     """
     ### Basic ETL Dag
@@ -41,7 +45,9 @@ def example_dag_basic():
         order_data_dict = json.loads(data_string)
         return order_data_dict
 
-    @task(multiple_outputs=True) # multiple_outputs=True unrolls dictionaries into separate XCom values
+    @task(
+        multiple_outputs=True
+    )  # multiple_outputs=True unrolls dictionaries into separate XCom values
     def transform(order_data_dict: dict):
         """
         #### Transform task
@@ -68,5 +74,6 @@ def example_dag_basic():
     order_data = extract()
     order_summary = transform(order_data)
     load(order_summary["total_order_value"])
+
 
 example_dag_basic = example_dag_basic()

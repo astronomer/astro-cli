@@ -81,5 +81,3 @@ def test_dag_retries(dag_id, dag, fileloc):
     assert (
         dag.default_args.get("retries", None) >= 2
     ), f"{dag_id} in {fileloc} does not have retries not set to 2."
-
-

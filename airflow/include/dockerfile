@@ -1,2 +1,1 @@
 FROM quay.io/astronomer/%s:%s
-

@@ -5,17 +5,30 @@ from typing import Dict
 # To use an operator in your DAG, you first have to import it.
 # To learn more about operators, see: https://registry.astronomer.io/.
 
-from airflow.decorators import dag, task # DAG and task decorators for interfacing with the TaskFlow API
-from airflow.models.baseoperator import chain # A function that sets sequential dependencies between tasks including lists of tasks.
+from airflow.decorators import (
+    dag,
+    task,
+)  # DAG and task decorators for interfacing with the TaskFlow API
+from airflow.models.baseoperator import (
+    chain,
+)  # A function that sets sequential dependencies between tasks including lists of tasks.
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.email import EmailOperator
 from airflow.operators.python import BranchPythonOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
-from airflow.utils.edgemodifier import Label # Used to label node edges in the Airflow UI
-from airflow.utils.task_group import TaskGroup # Used to group tasks together in the Graph view of the Airflow UI
-from airflow.utils.trigger_rule import TriggerRule # Used to change how an Operator is triggered
-from airflow.utils.weekday import WeekDay # Used to determine what day of the week it is
+from airflow.utils.edgemodifier import (
+    Label,
+)  # Used to label node edges in the Airflow UI
+from airflow.utils.task_group import (
+    TaskGroup,
+)  # Used to group tasks together in the Graph view of the Airflow UI
+from airflow.utils.trigger_rule import (
+    TriggerRule,
+)  # Used to change how an Operator is triggered
+from airflow.utils.weekday import (
+    WeekDay,
+)  # Used to determine what day of the week it is
 
 
 """
@@ -72,7 +85,9 @@ DAY_ACTIVITY_MAPPING = {
 }
 
 
-@task(multiple_outputs=True) # multiple_outputs=True unrolls dictionaries into separate XCom values
+@task(
+    multiple_outputs=True
+)  # multiple_outputs=True unrolls dictionaries into separate XCom values
 def _going_to_the_beach() -> Dict:
     return {
         "subject": "Beach day!",
@@ -105,16 +120,18 @@ def _get_activity(day_name) -> str:
     schedule_interval="@daily",
     # Default settings applied to all tasks within the DAG; can be overwritten at the task level.
     default_args={
-        "owner": "community", # This defines the value of the "owner" column in the DAG view of the Airflow UI
-        "retries": 2, # If a task fails, it will retry 2 times.
-        "retry_delay": timedelta(minutes=3), # A task that fails will wait 3 minutes to retry.
+        "owner": "community",  # This defines the value of the "owner" column in the DAG view of the Airflow UI
+        "retries": 2,  # If a task fails, it will retry 2 times.
+        "retry_delay": timedelta(
+            minutes=3
+        ),  # A task that fails will wait 3 minutes to retry.
     },
-    default_view="graph", # This defines the default view for this DAG in the Airflow UI
+    default_view="graph",  # This defines the default view for this DAG in the Airflow UI
     # When catchup=False, your DAG will only run for the latest schedule interval. In this case, this means
     # that tasks will not be run between June 11, 2021 and 1 day ago. When turned on, this DAG's first run
     # will be for today, per the @daily schedule interval
     catchup=False,
-    tags=["example"], # If set, this tag is shown in the DAG view of the Airflow UI
+    tags=["example"],  # If set, this tag is shown in the DAG view of the Airflow UI
 )
 def example_dag_advanced():
     # DummyOperator placeholder for first task
@@ -125,14 +142,14 @@ def example_dag_advanced():
     # This task checks which day of the week it is
     check_day_of_week = BranchDayOfWeekOperator(
         task_id="check_day_of_week",
-        week_day={WeekDay.SATURDAY, WeekDay.SUNDAY}, # This checks day of week
-        follow_task_ids_if_true="weekend", # Next task if criteria is met
-        follow_task_ids_if_false="weekday", # Next task if criteria is not met
-        use_task_execution_day=True, # If True, uses task’s execution day to compare with is_today
+        week_day={WeekDay.SATURDAY, WeekDay.SUNDAY},  # This checks day of week
+        follow_task_ids_if_true="weekend",  # Next task if criteria is met
+        follow_task_ids_if_false="weekday",  # Next task if criteria is not met
+        use_task_execution_day=True,  # If True, uses task’s execution day to compare with is_today
     )
 
-    weekend = DummyOperator(task_id="weekend") # "weekend" placeholder task
-    weekday = DummyOperator(task_id="weekday") # "weekday" placeholder task
+    weekend = DummyOperator(task_id="weekend")  # "weekend" placeholder task
+    weekday = DummyOperator(task_id="weekday")  # "weekday" placeholder task
 
     # Templated value for determining the name of the day of week based on the start date of the DAG Run
     day_name = "{{ dag_run.start_date.strftime('%A').lower() }}"
@@ -142,7 +159,7 @@ def example_dag_advanced():
     with TaskGroup("weekday_activities") as weekday_activities:
         which_weekday_activity_day = BranchPythonOperator(
             task_id="which_weekday_activity_day",
-            python_callable=_get_activity, # Python function called when task executes
+            python_callable=_get_activity,  # Python function called when task executes
             op_args=[day_name],
         )
 
@@ -154,7 +171,7 @@ def example_dag_advanced():
                 # This task prints the weekday activity to bash
                 do_activity = BashOperator(
                     task_id=activity.replace(" ", "_"),
-                    bash_command=f"echo It's {day.capitalize()} and I'm busy with {activity}.", # This is the bash command to run
+                    bash_command=f"echo It's {day.capitalize()} and I'm busy with {activity}.",  # This is the bash command to run
                 )
 
                 # Declaring task dependencies within the "TaskGroup" via the classic bitshift operator.
@@ -165,7 +182,7 @@ def example_dag_advanced():
     with TaskGroup("weekend_activities") as weekend_activities:
         which_weekend_activity_day = BranchPythonOperator(
             task_id="which_weekend_activity_day",
-            python_callable=_get_activity, # Python function called when task executes
+            python_callable=_get_activity,  # Python function called when task executes
             op_args=[day_name],
         )
 
@@ -174,27 +191,40 @@ def example_dag_advanced():
         sunday = Label(label="sunday")
 
         # This task prints the Sunday activity to bash
-        sleeping_in = BashOperator(task_id="sleeping_in", bash_command="sleep $[ ( $RANDOM % 30 )  + 1 ]s")
+        sleeping_in = BashOperator(
+            task_id="sleeping_in", bash_command="sleep $[ ( $RANDOM % 30 )  + 1 ]s"
+        )
 
-        going_to_the_beach = _going_to_the_beach() # Calling the taskflow function
+        going_to_the_beach = _going_to_the_beach()  # Calling the taskflow function
 
         # Because the "_going_to_the_beach()" function has "multiple_outputs" enabled, each dict key is
         # accessible as their own "XCom" key.
         inviting_friends = EmailOperator(
             task_id="inviting_friends",
-            to="friends@community.com", # Email to send email to
-            subject=going_to_the_beach["subject"], # Email subject
-            html_content=going_to_the_beach["body"], # Eamil body content
+            to="friends@community.com",  # Email to send email to
+            subject=going_to_the_beach["subject"],  # Email subject
+            html_content=going_to_the_beach["body"],  # Eamil body content
         )
 
         # Using "chain()" here for list-to-list dependencies which are not supported by the bitshift
         # operator and to simplify the notation for the desired dependency structure.
-        chain(which_weekend_activity_day, [saturday, sunday], [going_to_the_beach, sleeping_in])
+        chain(
+            which_weekend_activity_day,
+            [saturday, sunday],
+            [going_to_the_beach, sleeping_in],
+        )
 
     # High-level dependencies between tasks
-    chain(begin, check_day_of_week, [weekday, weekend], [weekday_activities, weekend_activities], end)
+    chain(
+        begin,
+        check_day_of_week,
+        [weekday, weekend],
+        [weekday_activities, weekend_activities],
+        end,
+    )
 
     # Task dependency created by XComArgs:
     # going_to_the_beach >> inviting_friends
+
 
 dag = example_dag_advanced()
