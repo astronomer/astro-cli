@@ -279,24 +279,6 @@ func deploymentFromName(existingDeployments []astro.Deployment, deploymentName s
 	return astro.Deployment{}
 }
 
-// queuesFromDeployment takes existingDeployment as its argument.
-// It returns the existing worker queues from the existingDeployment.
-func queuesFromDeployment(existingDeployment *astro.Deployment) []astro.WorkerQueue {
-	return existingDeployment.WorkerQueues
-}
-
-// alertEmailsFromDeployment takes existingDeployment as its argument.
-// It returns the existing alert emails from the existingDeployment.
-func alertEmailsFromDeployment(existingDeployment *astro.Deployment) astro.DeploymentAlerts {
-	return astro.DeploymentAlerts{AlertEmails: existingDeployment.AlertEmails}
-}
-
-// envVarsFromDeployment takes existingDeployment as its argument.
-// It returns the existing environment variables from the existingDeployment.
-func envVarsFromDeployment(existingDeployment *astro.Deployment) []astro.EnvironmentVariablesObject {
-	return existingDeployment.DeploymentSpec.EnvironmentVariablesObjects
-}
-
 // getClusterInfoFromName takes clusterName and organizationID as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
@@ -356,7 +338,7 @@ func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []ast
 }
 
 // createEnvVars takes a deploymentFromFile, deploymentID and a client as its arguments.
-// It updates the deployment identified by deploymentID with environment variables.
+// It updates the deployment identified by deploymentID with requested environment variables.
 // It returns an error if it fails to modify the environment variables for a deployment.
 func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) ([]astro.EnvironmentVariablesObject, error) {
 	var (
@@ -450,7 +432,7 @@ func hasAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
 }
 
 // createAlertEmails takes a deploymentFromFile and deploymentID and a client as its arguments.
-// It creates alert emails for the deplyment identified by deploymentID.
+// It creates or updates alert emails for the deployment identified by deploymentID.
 // It returns an error if it fails to update the alert emails for a deployment.
 func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) (astro.DeploymentAlerts, error) {
 	var (

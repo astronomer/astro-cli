@@ -527,6 +527,247 @@ deployment:
 			assert.ErrorIs(t, err, errTest)
 			mockClient.AssertExpectations(t)
 		})
+		t.Run("does not update environment variables if input is empty", func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			mockClient := new(astro_mocks.Client)
+			out := new(bytes.Buffer)
+			filePath = "./deployment.yaml"
+			data = `{
+    "deployment": {
+        "environment_variables": [],
+        "configuration": {
+            "name": "test-deployment-label",
+            "description": "description",
+            "runtime_version": "6.0.0",
+            "dag_deploy_enabled": true,
+            "scheduler_au": 5,
+            "scheduler_count": 3,
+            "cluster_name": "test-cluster",
+            "workspace_name": "test-workspace"
+        },
+        "worker_queues": [
+            {
+                "name": "default",
+                "is_default": true,
+                "max_worker_count": 130,
+                "min_worker_count": 12,
+                "worker_concurrency": 180,
+                "worker_type": "test-worker-1"
+            },
+            {
+                "name": "test-queue-1",
+                "is_default": false,
+                "max_worker_count": 130,
+                "min_worker_count": 8,
+                "worker_concurrency": 176,
+                "worker_type": "test-worker-2"
+            }
+        ],
+        "metadata": {
+            "deployment_id": "test-deployment-id",
+            "workspace_id": "test-ws-id",
+            "cluster_id": "cluster-id",
+            "release_name": "great-release-name",
+            "airflow_version": "2.4.0",
+            "status": "UNHEALTHY",
+            "created_at": "2022-11-17T12:26:45.362983-08:00",
+            "updated_at": "2022-11-17T12:26:45.362983-08:00",
+            "deployment_url": "cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics",
+            "webserver_url": "some-url"
+        },
+        "alert_emails": [
+            "test1@test.com",
+            "test2@test.com"
+        ]
+    }
+}`
+			existingClusters = []astro.Cluster{
+				{
+					ID:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							ID:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
+				{
+					ID:   "test-cluster-id-1",
+					Name: "test-cluster-1",
+				},
+			}
+			existingWorkspaces = []astro.Workspace{
+				{
+					ID:    "test-workspace-id",
+					Label: "test-workspace",
+				},
+				{
+					ID:    "test-workspace-id-1",
+					Label: "test-workspace-1",
+				},
+			}
+			createdDeployment = astro.Deployment{
+				ID:    "test-deployment-id",
+				Label: "test-deployment-label",
+			}
+			orgID = "test-org-id"
+			mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+				MinWorkerCount: astro.WorkerQueueOption{
+					Floor:   1,
+					Ceiling: 20,
+					Default: 5,
+				},
+				MaxWorkerCount: astro.WorkerQueueOption{
+					Floor:   16,
+					Ceiling: 200,
+					Default: 125,
+				},
+				WorkerConcurrency: astro.WorkerQueueOption{
+					Floor:   175,
+					Ceiling: 275,
+					Default: 180,
+				},
+			}
+			fileutil.WriteStringToFile(filePath, data)
+			defer afero.NewOsFs().Remove(filePath)
+			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
+			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil).Once()
+			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
+			mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, nil)
+			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
+			assert.NoError(t, err)
+			assert.NotNil(t, out)
+			mockClient.AssertExpectations(t)
+		})
+		t.Run("does not update alert emails if input is empty", func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			mockClient := new(astro_mocks.Client)
+			out := new(bytes.Buffer)
+			filePath = "./deployment.yaml"
+			data = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    dag_deploy_enabled: true
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 180
+      worker_type: test-worker-1
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 176
+      worker_type: test-worker-2
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+  alert_emails: []
+`
+			existingClusters = []astro.Cluster{
+				{
+					ID:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							ID:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
+				{
+					ID:   "test-cluster-id-1",
+					Name: "test-cluster-1",
+				},
+			}
+			existingWorkspaces = []astro.Workspace{
+				{
+					ID:    "test-workspace-id",
+					Label: "test-workspace",
+				},
+				{
+					ID:    "test-workspace-id-1",
+					Label: "test-workspace-1",
+				},
+			}
+			createdDeployment = astro.Deployment{
+				ID:    "test-deployment-id",
+				Label: "test-deployment-label",
+			}
+			orgID = "test-org-id"
+			mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
+				MinWorkerCount: astro.WorkerQueueOption{
+					Floor:   1,
+					Ceiling: 20,
+					Default: 5,
+				},
+				MaxWorkerCount: astro.WorkerQueueOption{
+					Floor:   16,
+					Ceiling: 200,
+					Default: 125,
+				},
+				WorkerConcurrency: astro.WorkerQueueOption{
+					Floor:   175,
+					Ceiling: 275,
+					Default: 180,
+				},
+			}
+			fileutil.WriteStringToFile(filePath, data)
+			defer afero.NewOsFs().Remove(filePath)
+			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
+			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{}, nil).Once()
+			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
+			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
+			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
+			assert.NoError(t, err)
+			assert.NotNil(t, out)
+			mockClient.AssertExpectations(t)
+		})
 		t.Run("returns an error from the api if creating environment variables fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
@@ -3353,15 +3594,38 @@ func TestHasAlertEmails(t *testing.T) {
 
 func TestCreateAlertEmails(t *testing.T) {
 	var (
-		deploymentFromFile inspect.FormattedDeployment
-		expectedInput      astro.UpdateDeploymentAlertsInput
-		expected, actual   astro.DeploymentAlerts
-		emails             []string
-		deploymentID       string
-		err                error
+		deploymentFromFile     inspect.FormattedDeployment
+		expectedInput          astro.UpdateDeploymentAlertsInput
+		expected, actual       astro.DeploymentAlerts
+		existingEmails, emails []string
+		deploymentID           string
+		err                    error
 	)
-	t.Run("updates alert emails for a deployment", func(t *testing.T) {
+	t.Run("updates alert emails for a deployment when no alert emails exist", func(t *testing.T) {
 		emails = []string{"test1@email.com", "test2@email.com"}
+		deploymentFromFile.Deployment.AlertEmails = emails
+		expected = astro.DeploymentAlerts{AlertEmails: emails}
+		deploymentID = "test-deployment-id"
+		expectedInput = astro.UpdateDeploymentAlertsInput{
+			DeploymentID: deploymentID,
+			AlertEmails:  emails,
+		}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("UpdateAlertEmails", expectedInput).Return(expected, nil)
+		actual, err = createAlertEmails(&deploymentFromFile, deploymentID, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expected, actual)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("updates alert emails for a deployment with new and existing alert emails", func(t *testing.T) {
+		existingEmails = []string{
+			"test1@email.com",
+			"test2@email.com", // this is getting deleted
+		}
+		emails = []string{
+			existingEmails[0],
+			"test3@email.com", // this is getting added
+		}
 		deploymentFromFile.Deployment.AlertEmails = emails
 		expected = astro.DeploymentAlerts{AlertEmails: emails}
 		deploymentID = "test-deployment-id"
@@ -3444,108 +3708,5 @@ func TestDeploymentFromName(t *testing.T) {
 		expectedeployment = astro.Deployment{}
 		actual = deploymentFromName(existingDeployments, deploymentToCreate)
 		assert.Equal(t, expectedeployment, actual)
-	})
-}
-
-func TestQueuesFromDeployment(t *testing.T) {
-	var (
-		existingDeployment     astro.Deployment
-		actual, expectedQueues []astro.WorkerQueue
-	)
-	existingDeployment = astro.Deployment{
-		ID:          "test-d-1",
-		Label:       "test-deployment-1",
-		Description: "deployment 1",
-	}
-	expectedQueues = []astro.WorkerQueue(nil)
-	t.Run("returns queues from the deployment", func(t *testing.T) {
-		expectedQueues = []astro.WorkerQueue{
-			{
-				ID:                "q-1",
-				Name:              "test-q",
-				IsDefault:         true,
-				MaxWorkerCount:    10,
-				MinWorkerCount:    1,
-				WorkerConcurrency: 16,
-				NodePoolID:        "test-worker",
-			},
-			{
-				ID:                "q-2",
-				Name:              "test-q-1",
-				IsDefault:         false,
-				MaxWorkerCount:    15,
-				MinWorkerCount:    2,
-				WorkerConcurrency: 18,
-				NodePoolID:        "test-worker",
-			},
-		}
-		existingDeployment.WorkerQueues = expectedQueues
-		actual = queuesFromDeployment(&existingDeployment)
-		assert.Equal(t, expectedQueues, actual)
-	})
-	t.Run("returns empty list of queues if no queues exist", func(t *testing.T) {
-		actual = queuesFromDeployment(&existingDeployment)
-		assert.Equal(t, expectedQueues, actual)
-	})
-}
-
-func TestAlertEmailsFromDeployment(t *testing.T) {
-	var (
-		existingDeployment          astro.Deployment
-		actual, expectedAlertEmails astro.DeploymentAlerts
-	)
-	existingDeployment = astro.Deployment{
-		ID:          "test-d-1",
-		Label:       "test-deployment-1",
-		Description: "deployment 1",
-	}
-	expectedAlertEmails = astro.DeploymentAlerts{}
-	t.Run("returns alert emails from the deployment", func(t *testing.T) {
-		expectedAlertEmails = astro.DeploymentAlerts{
-			AlertEmails: []string{"test1@test.com", "test2@test.com", "test3@test.com"},
-		}
-		existingDeployment.AlertEmails = expectedAlertEmails.AlertEmails
-		actual = alertEmailsFromDeployment(&existingDeployment)
-		assert.Equal(t, expectedAlertEmails, actual)
-	})
-	t.Run("returns empty list of alert emails if none exist", func(t *testing.T) {
-		actual = alertEmailsFromDeployment(&existingDeployment)
-		assert.Equal(t, expectedAlertEmails, actual)
-	})
-}
-
-func TestEnvVarsFromDeployment(t *testing.T) {
-	var (
-		existingDeployment      astro.Deployment
-		actual, expectedEnvVars []astro.EnvironmentVariablesObject
-	)
-	existingDeployment = astro.Deployment{
-		ID:          "test-d-1",
-		Label:       "test-deployment-1",
-		Description: "deployment 1",
-	}
-	expectedEnvVars = []astro.EnvironmentVariablesObject(nil)
-	t.Run("returns the env vars from the deployment", func(t *testing.T) {
-		expectedEnvVars = []astro.EnvironmentVariablesObject{
-			{
-				Key:       "foo",
-				Value:     "bar",
-				IsSecret:  true,
-				UpdatedAt: "now",
-			},
-			{
-				Key:       "beer",
-				Value:     "awesome",
-				IsSecret:  false,
-				UpdatedAt: "now+1",
-			},
-		}
-		existingDeployment.DeploymentSpec.EnvironmentVariablesObjects = expectedEnvVars
-		actual = envVarsFromDeployment(&existingDeployment)
-		assert.Equal(t, expectedEnvVars, actual)
-	})
-	t.Run("returns empty list of env vars if none exist", func(t *testing.T) {
-		actual = envVarsFromDeployment(&existingDeployment)
-		assert.Equal(t, expectedEnvVars, actual)
 	})
 }
