@@ -27,7 +27,7 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
-	cmd.Flags().StringVarP(&dagFile, "dag-file", "d", "", "DAG file where your DAG is located. Use this flag to parse ")
+	cmd.Flags().StringVarP(&dagFile, "dag-file", "d", "", "DAG file where your DAG is located(optional). Use this flag to parse only the DAG file that has the DAG you want to run. You may get parsing errors related to other DAGs if you don't specify a DAG file")
 
 	return cmd
 }
