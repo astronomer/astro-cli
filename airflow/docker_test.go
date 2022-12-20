@@ -1236,7 +1236,7 @@ func TestDockerComposeRunDAG(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", noCache, false)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -1254,7 +1254,7 @@ func TestDockerComposeRunDAG(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1273,7 +1273,7 @@ func TestDockerComposeRunDAG(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", noCache, false)
 		assert.NoError(t, err)
 
 		imageHandler.AssertExpectations(t)
@@ -1292,7 +1292,7 @@ func TestDockerComposeRunDAG(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1310,7 +1310,7 @@ func TestDockerComposeRunDAG(t *testing.T) {
 		mockDockerCompose.composeService = composeMock
 		mockDockerCompose.imageHandler = imageHandler
 
-		err := mockDockerCompose.RunDAG("", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		imageHandler.AssertExpectations(t)
@@ -1324,7 +1324,7 @@ func TestDockerComposeRunDAG(t *testing.T) {
 
 		mockDockerCompose.composeService = composeMock
 
-		err := mockDockerCompose.RunDAG("", "", noCache, false)
+		err := mockDockerCompose.RunDAG("", "", "", noCache, false)
 		assert.ErrorIs(t, err, errMockDocker)
 
 		composeMock.AssertExpectations(t)
