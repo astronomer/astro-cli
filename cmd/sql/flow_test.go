@@ -21,8 +21,23 @@ var (
 	imageBuildResponse = types.ImageBuildResponse{
 		Body: io.NopCloser(strings.NewReader("Image built")),
 	}
-	containerCreateCreatedBody = container.ContainerCreateCreatedBody{ID: "123"}
-	sampleLog                  = io.NopCloser(strings.NewReader("Sample log"))
+	containerCreateCreatedBody          = container.ContainerCreateCreatedBody{ID: "123"}
+	sampleLog                           = io.NopCloser(strings.NewReader("Sample log"))
+	mockExecuteCmdInDockerReturnSuccess = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+		return 0, output, nil
+	}
+	mockExecuteCmdInDockerReturnErr = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+		return 0, output, errMock
+	}
+	mockExecuteCmdInDockerReturnNonZeroExitCode = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+		return 1, output, nil
+	}
+	mockConvertReadCloserToStringReturnErr = func(readCloser io.ReadCloser) (string, error) {
+		return "", errMock
+	}
+	mockAppendConfigKeyMountDirErr = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
+		return nil, errMock
+	}
 )
 
 func getContainerWaitResponse(raiseError bool, statusCode int64) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
@@ -47,7 +62,9 @@ func getContainerWaitResponse(raiseError bool, statusCode int64) (bodyCh <-chan 
 	return readOnlyStatusCh, readOnlyErrCh
 }
 
-func patchDockerClientInit(t *testing.T, statusCode int64, err error) {
+// patches ExecuteCmdInDocker and
+// returns a function that, when called, restores the original values.
+func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 	mockDocker := mocks.NewDockerBind(t)
 	sql.Docker = func() (sql.DockerBind, error) {
 		if err == nil {
@@ -67,6 +84,12 @@ func patchDockerClientInit(t *testing.T, statusCode int64, err error) {
 	sql.Io = func() sql.IoBind {
 		mockIo.On("Copy", mock.Anything, mock.Anything).Return(int64(0), nil)
 		return mockIo
+	}
+
+	return func() {
+		sql.Docker = sql.NewDockerBind
+		sql.Io = sql.NewIoBind
+		sql.DisplayMessages = sql.OriginalDisplayMessages
 	}
 }
 
@@ -97,47 +120,47 @@ func execFlowCmd(args ...string) error {
 }
 
 func TestFlowCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd()
 	assert.NoError(t, err)
 }
 
 func TestFlowCmdError(t *testing.T) {
-	patchDockerClientInit(t, 0, errMock)
+	defer patchExecuteCmdInDocker(t, 0, errMock)()
 	err := execFlowCmd("version")
 	assert.EqualError(t, err, "error running [flow version]: docker client initialization failed mock error")
 }
 
 func TestFlowCmdHelpError(t *testing.T) {
-	patchDockerClientInit(t, 0, errMock)
+	defer patchExecuteCmdInDocker(t, 0, errMock)()
 	assert.PanicsWithError(t, "error running [flow --help]: docker client initialization failed mock error", func() { execFlowCmd() })
 }
 
 func TestFlowCmdDockerCommandError(t *testing.T) {
-	patchDockerClientInit(t, 1, nil)
+	defer patchExecuteCmdInDocker(t, 1, nil)()
 	err := execFlowCmd("version")
 	assert.EqualError(t, err, "docker command has returned a non-zero exit code:1")
 }
 
 func TestFlowCmdDockerCommandHelpError(t *testing.T) {
-	patchDockerClientInit(t, 1, nil)
+	defer patchExecuteCmdInDocker(t, 1, nil)()
 	assert.PanicsWithError(t, "docker command has returned a non-zero exit code:1", func() { execFlowCmd() })
 }
 
 func TestFlowVersionCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd("version")
 	assert.NoError(t, err)
 }
 
 func TestFlowAboutCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd("about")
 	assert.NoError(t, err)
 }
 
 func TestFlowInitCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	defer chdir(t, projectDir)()
 	err := execFlowCmd("init")
@@ -145,7 +168,7 @@ func TestFlowInitCmd(t *testing.T) {
 }
 
 func TestFlowInitCmdWithFlags(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	AirflowHome := t.TempDir()
 	AirflowDagsFolder := t.TempDir()
@@ -154,6 +177,7 @@ func TestFlowInitCmdWithFlags(t *testing.T) {
 }
 
 func TestFlowConfigCmd(t *testing.T) {
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	AirflowHome := t.TempDir()
 	AirflowDagsFolder := t.TempDir()
@@ -162,13 +186,22 @@ func TestFlowConfigCmd(t *testing.T) {
 
 	err = execFlowCmd("config", "--project-dir", projectDir, "airflow_home")
 	assert.NoError(t, err)
+}
+
+func TestFlowConfigCmdArgumentNotSetError(t *testing.T) {
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	projectDir := t.TempDir()
+	AirflowHome := t.TempDir()
+	AirflowDagsFolder := t.TempDir()
+	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
+	assert.NoError(t, err)
 
 	err = execFlowCmd("config", "--project-dir", projectDir)
 	assert.EqualError(t, err, "argument not set:key")
 }
 
 func TestFlowValidateCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -178,7 +211,7 @@ func TestFlowValidateCmd(t *testing.T) {
 }
 
 func TestFlowGenerateCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -188,7 +221,7 @@ func TestFlowGenerateCmd(t *testing.T) {
 }
 
 func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -198,7 +231,7 @@ func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
 }
 
 func TestFlowRunGenerateTasksCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -208,7 +241,7 @@ func TestFlowRunGenerateTasksCmd(t *testing.T) {
 }
 
 func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -218,7 +251,7 @@ func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
 }
 
 func TestFlowRunCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -228,7 +261,7 @@ func TestFlowRunCmd(t *testing.T) {
 }
 
 func TestDebugFlowRunCmd(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -238,7 +271,7 @@ func TestDebugFlowRunCmd(t *testing.T) {
 }
 
 func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
-	patchDockerClientInit(t, 0, nil)
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
 	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
@@ -247,51 +280,49 @@ func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
 	assert.EqualError(t, err, "argument not set:workflow_name")
 }
 
-func mockCommonDockerUtilReturnSuccess(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-	return 0, output, nil
-}
-
-func mockCommonDockerUtilReturnErrMock(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-	return 0, output, errMock
-}
-
-func mockCommonDockerUtilReturnNonZeroExitCode(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-	return 1, output, nil
-}
-
-func mockConvertReadCloserToStringReturnErrMock(readCloser io.ReadCloser) (string, error) {
-	return "", errMock
-}
-
-func TestAppendConfigKeyMountDirFailures(t *testing.T) {
-	originalDockerUtil := sql.CommonDockerUtil
+func TestAppendConfigKeyMountDirInvalidCommand(t *testing.T) {
+	originalDockerUtil := sql.ExecuteCmdInDocker
 	originalConvertReadCloserToString := sql.ConvertReadCloserToString
 
-	sql.CommonDockerUtil = mockCommonDockerUtilReturnErrMock
+	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnErr
 	_, err := appendConfigKeyMountDir("", nil, nil)
 	expectedErr := fmt.Errorf("error running %v: %w", configCommandString, errMock)
 	assert.Equal(t, expectedErr, err)
 
-	sql.CommonDockerUtil = mockCommonDockerUtilReturnNonZeroExitCode
-	_, err = appendConfigKeyMountDir("", nil, nil)
-	expectedErr = sql.DockerNonZeroExitCodeError(1)
+	sql.ExecuteCmdInDocker = originalDockerUtil
+	sql.ConvertReadCloserToString = originalConvertReadCloserToString
+}
+
+func TestAppendConfigKeyMountDirDockerNonZeroExitCodeError(t *testing.T) {
+	originalDockerUtil := sql.ExecuteCmdInDocker
+	originalConvertReadCloserToString := sql.ConvertReadCloserToString
+
+	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnNonZeroExitCode
+	_, err := appendConfigKeyMountDir("", nil, nil)
+	expectedErr := sql.DockerNonZeroExitCodeError(1)
 	assert.Equal(t, expectedErr, err)
 
-	sql.CommonDockerUtil = mockCommonDockerUtilReturnSuccess
-	sql.ConvertReadCloserToString = mockConvertReadCloserToStringReturnErrMock
-	_, err = appendConfigKeyMountDir("", nil, nil)
+	sql.ExecuteCmdInDocker = originalDockerUtil
+	sql.ConvertReadCloserToString = originalConvertReadCloserToString
+}
+
+func TestAppendConfigKeyMountDirReadError(t *testing.T) {
+	originalDockerUtil := sql.ExecuteCmdInDocker
+	originalConvertReadCloserToString := sql.ConvertReadCloserToString
+
+	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnSuccess
+	sql.ConvertReadCloserToString = mockConvertReadCloserToStringReturnErr
+	_, err := appendConfigKeyMountDir("", nil, nil)
 	assert.EqualError(t, err, "mock error")
 
-	sql.CommonDockerUtil = originalDockerUtil
+	sql.ExecuteCmdInDocker = originalDockerUtil
 	sql.ConvertReadCloserToString = originalConvertReadCloserToString
 }
 
 func TestBuildFlagsAndMountDirsFailures(t *testing.T) {
 	originalAppendConfigKeyMountDir := appendConfigKeyMountDir
 
-	appendConfigKeyMountDir = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
-		return nil, errMock
-	}
+	appendConfigKeyMountDir = mockAppendConfigKeyMountDirErr
 	_, _, err := buildFlagsAndMountDirs("", false, false, false, true)
 	assert.EqualError(t, err, "mock error")
 

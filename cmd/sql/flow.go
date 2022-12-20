@@ -67,7 +67,7 @@ func getBaseMountDirs(projectDir string) ([]string, error) {
 
 var appendConfigKeyMountDir = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
 	args := []string{configKey}
-	exitCode, output, err := sql.CommonDockerUtil(configCommandString, args, configFlags, mountDirs, true)
+	exitCode, output, err := sql.ExecuteCmdInDocker(configCommandString, args, configFlags, mountDirs, true)
 	if err != nil {
 		return mountDirs, fmt.Errorf("error running %v: %w", configCommandString, err)
 	}
@@ -79,7 +79,7 @@ var appendConfigKeyMountDir = func(configKey string, configFlags map[string]stri
 		return mountDirs, err
 	}
 	mountDirs = append(mountDirs, strings.TrimSpace(configKeyDir))
-	return mountDirs, err
+	return mountDirs, nil
 }
 
 func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder, mountGlobalDirs bool) (flags map[string]string, mountDirs []string, err error) {
@@ -134,7 +134,7 @@ func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, moun
 	if debug {
 		cmdString = slices.Insert(cmdString, 1, "--debug")
 	}
-	exitCode, _, err := sql.CommonDockerUtil(cmdString, args, flags, mountDirs, false)
+	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, args, flags, mountDirs, false)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", cmdString, err)
 	}
@@ -271,7 +271,7 @@ func executeRun(cmd *cobra.Command, args []string) error {
 }
 
 func executeHelp(cmd *cobra.Command, cmdString []string) {
-	exitCode, _, err := sql.CommonDockerUtil(cmdString, nil, nil, nil, false)
+	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, nil, nil, nil, false)
 	if err != nil {
 		panic(fmt.Errorf("error running %v: %w", cmdString, err))
 	}
