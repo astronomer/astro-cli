@@ -64,7 +64,6 @@ var (
 	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
-	errWebServerUnHealthy    = errors.New("webserver has not become healthy yet")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
@@ -762,8 +761,8 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Println("\nProject is not yet running. The project is still attempting to start up. Run 'astro dev logs --webserver | --scheduler' for details.")
-			return fmt.Errorf("%w: the health check timed out after %s. Use the --wait flag to increase the time out", errWebServerUnHealthy, timeout)
+			fmt.Printf("\n")
+			return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout) //nolint:goerr113
 		}
 		if !errors.Is(err, errComposeProjectRunning) {
 			return err
