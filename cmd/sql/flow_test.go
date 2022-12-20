@@ -128,12 +128,12 @@ func TestFlowCmd(t *testing.T) {
 func TestFlowCmdError(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, errMock)()
 	err := execFlowCmd("version")
-	assert.EqualError(t, err, "error running [flow version]: docker client initialization failed mock error")
+	assert.EqualError(t, err, "error running [version]: docker client initialization failed mock error")
 }
 
 func TestFlowCmdHelpError(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, errMock)()
-	assert.PanicsWithError(t, "error running [flow --help]: docker client initialization failed mock error", func() { execFlowCmd() })
+	assert.PanicsWithError(t, "error running []: docker client initialization failed mock error", func() { execFlowCmd() })
 }
 
 func TestFlowCmdDockerCommandError(t *testing.T) {
