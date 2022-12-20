@@ -41,6 +41,8 @@ type Client interface {
 	// Organizations
 	GetOrganizations() ([]Organization, error)
 	GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error)
+	// Alert Emails
+	UpdateAlertEmails(input UpdateDeploymentAlertsInput) (DeploymentAlerts, error)
 }
 
 func (c *HTTPClient) GetUserInfo() (*Self, error) {
@@ -310,4 +312,18 @@ func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (io.
 		return nil, err
 	}
 	return streamBuffer, nil
+}
+
+// UpdateAlertEmails updates alert emails for a deployment
+func (c *HTTPClient) UpdateAlertEmails(input UpdateDeploymentAlertsInput) (DeploymentAlerts, error) {
+	req := Request{
+		Query:     UpdateDeploymentAlerts,
+		Variables: map[string]interface{}{"input": input},
+	}
+
+	resp, err := req.DoWithPublicClient(c)
+	if err != nil {
+		return DeploymentAlerts{}, err
+	}
+	return resp.Data.DeploymentAlerts, nil
 }

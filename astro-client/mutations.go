@@ -51,6 +51,17 @@ var (
 				version
 				airflowVersion
 			}
+			workerQueues {
+				id
+				name
+				isDefault
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
+				nodePoolId
+				podCpu
+				podRam
+			}
 			deploymentSpec {
 				image {
 					tag
@@ -133,6 +144,13 @@ var (
 			createdAt
 			initiatorId
 			initiatorType
+		}
+	}
+  `
+	UpdateDeploymentAlerts = `
+	mutation updateDeploymentAlerts($input: UpdateDeploymentAlertsInput!) {
+		updateDeploymentAlerts(input: $input) {
+			alertEmails
 		}
 	}
   `

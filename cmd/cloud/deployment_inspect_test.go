@@ -133,7 +133,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 	})
 	t.Run("returns a deployment's specific field", func(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
-		cmdArgs := []string{"inspect", "-n", "test-deployment-label", "-k", "configuration.cluster_id"}
+		cmdArgs := []string{"inspect", "-n", "test-deployment-label", "-k", "metadata.cluster_id"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, deploymentResponse[0].Cluster.ID)

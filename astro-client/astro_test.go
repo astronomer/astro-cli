@@ -1008,3 +1008,53 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 		assert.Contains(t, err.Error(), errorMessage)
 	})
 }
+
+func TestUpdateAlertEmails(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("updates a deployments alert emails", func(t *testing.T) {
+		emails := []string{"test1@email.com", "test2@meail.com"}
+		mockResponse := &Response{
+			Data: ResponseData{
+				DeploymentAlerts: DeploymentAlerts{AlertEmails: emails},
+			},
+			Errors: nil,
+		}
+		input := UpdateDeploymentAlertsInput{
+			DeploymentID: "test-deployment-id",
+			AlertEmails:  emails,
+		}
+		jsonResponse, err := json.Marshal(mockResponse)
+		assert.NoError(t, err)
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		resp, err := astroClient.UpdateAlertEmails(input)
+		assert.NoError(t, err)
+		assert.Equal(t, resp, mockResponse.Data.DeploymentAlerts)
+	})
+	t.Run("returns api error", func(t *testing.T) {
+		emails := []string{"test1@email.com", "test2@meail.com"}
+		input := UpdateDeploymentAlertsInput{
+			DeploymentID: "test-deployment-id",
+			AlertEmails:  emails,
+		}
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		astroClient := NewAstroClient(client)
+
+		_, err := astroClient.UpdateAlertEmails(input)
+		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+}

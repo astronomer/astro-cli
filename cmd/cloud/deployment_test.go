@@ -11,8 +11,10 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -136,18 +138,145 @@ func TestDeploymentCreate(t *testing.T) {
 		}
 	})
 
-	cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
+	t.Run("creates a deployment when dag-deploy is disabled", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 
-	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
+	t.Run("creates a deployment when dag deploy is enabled", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 
-	cmdArgs = []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.Error(t, err)
+	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
 
+	t.Run("creates a deployment from file", func(t *testing.T) {
+		orgID := "test-org-id"
+		filePath := "./test-deployment.yaml"
+		data := `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    dag_deploy_enabled: true
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 180
+      worker_type: test-worker-1
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 176
+      worker_type: test-worker-2
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id/analytics
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+		clusters := []astro.Cluster{
+			{
+				ID:   "test-cluster-id",
+				Name: "test-cluster",
+				NodePools: []astro.NodePool{
+					{
+						ID:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-1",
+					},
+					{
+						ID:               "test-pool-id-2",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-2",
+					},
+				},
+			},
+		}
+		createdDeployment := astro.Deployment{
+			ID:    "test-deployment-id",
+			Label: "test-deployment-label",
+		}
+		mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
+			MinWorkerCount: astro.WorkerQueueOption{
+				Floor:   1,
+				Ceiling: 20,
+				Default: 5,
+			},
+			MaxWorkerCount: astro.WorkerQueueOption{
+				Floor:   16,
+				Ceiling: 200,
+				Default: 125,
+			},
+			WorkerConcurrency: astro.WorkerQueueOption{
+				Floor:   175,
+				Ceiling: 275,
+				Default: 180,
+			},
+		}
+		mockClient = new(astro_mocks.Client)
+		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-workspace"}}, nil)
+		mockClient.On("ListClusters", orgID).Return(clusters, nil)
+		mockClient.On("ListDeployments", orgID, ws).Return([]astro.Deployment{}, nil).Once()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
+		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
+		mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, nil)
+		mockClient.On("ListDeployments", orgID, ws).Return([]astro.Deployment{createdDeployment}, nil)
+		origClient := astroClient
+		astroClient = mockClient
+		fileutil.WriteStringToFile(filePath, data)
+		defer func() {
+			astroClient = origClient
+			afero.NewOsFs().Remove(filePath)
+		}()
+		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if creating a deployment from file fails", func(t *testing.T) {
+		cmdArgs := []string{"create", "--deployment-file", "test-file-name.json"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
+	})
+	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
+		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorIs(t, err, errFlag)
+	})
 	mockClient.AssertExpectations(t)
 }
 
