@@ -166,9 +166,9 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "configuration.cluster_id")
+		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "configuration.cluster_name")
 		assert.NoError(t, err)
-		assert.Contains(t, out.String(), deploymentResponse[0].Cluster.ID)
+		assert.Contains(t, out.String(), deploymentResponse[0].Cluster.Name)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -288,17 +288,16 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		expectedCloudDomainURL := "cloud.astronomer.io/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentMetadata := deploymentMetadata{
-			DeploymentID:     sourceDeployment.ID,
-			WorkspaceID:      sourceDeployment.Workspace.ID,
-			ClusterID:        sourceDeployment.Cluster.ID,
-			AirflowVersion:   sourceDeployment.RuntimeRelease.AirflowVersion,
-			ReleaseName:      sourceDeployment.ReleaseName,
-			DeploymentURL:    expectedCloudDomainURL,
-			WebserverURL:     sourceDeployment.DeploymentSpec.Webserver.URL,
-			CreatedAt:        sourceDeployment.CreatedAt,
-			UpdatedAt:        sourceDeployment.UpdatedAt,
-			Status:           sourceDeployment.Status,
-			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
+			DeploymentID:   sourceDeployment.ID,
+			WorkspaceID:    sourceDeployment.Workspace.ID,
+			ClusterID:      sourceDeployment.Cluster.ID,
+			AirflowVersion: sourceDeployment.RuntimeRelease.AirflowVersion,
+			ReleaseName:    sourceDeployment.ReleaseName,
+			DeploymentURL:  expectedCloudDomainURL,
+			WebserverURL:   sourceDeployment.DeploymentSpec.Webserver.URL,
+			CreatedAt:      sourceDeployment.CreatedAt,
+			UpdatedAt:      sourceDeployment.UpdatedAt,
+			Status:         sourceDeployment.Status,
 		}
 		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.NoError(t, err)
@@ -312,17 +311,16 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		expectedCloudDomainURL := "localhost:5000/" + sourceDeployment.Workspace.ID +
 			"/deployments/" + sourceDeployment.ID + "/analytics"
 		expectedDeploymentMetadata := deploymentMetadata{
-			DeploymentID:     sourceDeployment.ID,
-			WorkspaceID:      sourceDeployment.Workspace.ID,
-			ClusterID:        sourceDeployment.Cluster.ID,
-			ReleaseName:      sourceDeployment.ReleaseName,
-			AirflowVersion:   sourceDeployment.RuntimeRelease.AirflowVersion,
-			Status:           sourceDeployment.Status,
-			CreatedAt:        sourceDeployment.CreatedAt,
-			UpdatedAt:        sourceDeployment.UpdatedAt,
-			DeploymentURL:    expectedCloudDomainURL,
-			WebserverURL:     sourceDeployment.DeploymentSpec.Webserver.URL,
-			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
+			DeploymentID:   sourceDeployment.ID,
+			WorkspaceID:    sourceDeployment.Workspace.ID,
+			ClusterID:      sourceDeployment.Cluster.ID,
+			ReleaseName:    sourceDeployment.ReleaseName,
+			AirflowVersion: sourceDeployment.RuntimeRelease.AirflowVersion,
+			Status:         sourceDeployment.Status,
+			CreatedAt:      sourceDeployment.CreatedAt,
+			UpdatedAt:      sourceDeployment.UpdatedAt,
+			DeploymentURL:  expectedCloudDomainURL,
+			WebserverURL:   sourceDeployment.DeploymentSpec.Webserver.URL,
 		}
 		rawDeploymentInfo, err := getDeploymentInfo(&sourceDeployment)
 		assert.NoError(t, err)
@@ -348,11 +346,12 @@ func TestGetDeploymentConfig(t *testing.T) {
 		ID:          "test-deployment-id",
 		Label:       "test-deployment-label",
 		Description: "description",
-		Workspace:   astro.Workspace{ID: "test-ws-id"},
+		Workspace:   astro.Workspace{ID: "test-ws-id", Label: "test-ws"},
 		ReleaseName: "great-release-name",
 		AlertEmails: []string{"email1", "email2"},
 		Cluster: astro.Cluster{
-			ID: "cluster-id",
+			ID:   "cluster-id",
+			Name: "test-cluster",
 			NodePools: []astro.NodePool{
 				{
 					ID:               "test-pool-id",
@@ -411,20 +410,23 @@ func TestGetDeploymentConfig(t *testing.T) {
 				NodePoolID:        "test-pool-id-1",
 			},
 		},
-		UpdatedAt: time.Now(),
-		Status:    "UNHEALTHY",
+		UpdatedAt:        time.Now(),
+		Status:           "UNHEALTHY",
+		DagDeployEnabled: true,
 	}
 
 	t.Run("returns deployment config for the requested cloud deployment", func(t *testing.T) {
 		var actualDeploymentConfig deploymentConfig
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedDeploymentConfig := deploymentConfig{
-			Name:           sourceDeployment.Label,
-			Description:    sourceDeployment.Description,
-			ClusterID:      sourceDeployment.Cluster.ID,
-			RunTimeVersion: sourceDeployment.RuntimeRelease.Version,
-			SchedulerAU:    sourceDeployment.DeploymentSpec.Scheduler.AU,
-			SchedulerCount: sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+			Name:             sourceDeployment.Label,
+			Description:      sourceDeployment.Description,
+			WorkspaceName:    sourceDeployment.Workspace.Label,
+			ClusterName:      sourceDeployment.Cluster.Name,
+			RunTimeVersion:   sourceDeployment.RuntimeRelease.Version,
+			SchedulerAU:      sourceDeployment.DeploymentSpec.Scheduler.AU,
+			SchedulerCount:   sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
 		}
 		rawDeploymentConfig := getDeploymentConfig(&sourceDeployment)
 		err := decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
@@ -439,11 +441,12 @@ func TestGetPrintableDeployment(t *testing.T) {
 		ID:          "test-deployment-id",
 		Label:       "test-deployment-label",
 		Description: "description",
-		Workspace:   astro.Workspace{ID: "test-ws-id"},
+		Workspace:   astro.Workspace{ID: "test-ws-id", Label: "test-ws"},
 		ReleaseName: "great-release-name",
 		AlertEmails: []string{"email1", "email2"},
 		Cluster: astro.Cluster{
-			ID: "cluster-id",
+			ID:   "cluster-id",
+			Name: "test-cluster",
 			NodePools: []astro.NodePool{
 				{
 					ID:               "test-pool-id",
@@ -598,11 +601,11 @@ func TestGetAdditional(t *testing.T) {
 
 	t.Run("returns alert emails, queues and variables for the requested deployment", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
-
+		qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools)
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.AlertEmails,
-			"worker_queues":         getQMap(sourceDeployment.WorkerQueues),
+			"worker_queues":         qList,
 			"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 		}
 		rawAdditional := getAdditional(&sourceDeployment)
@@ -752,7 +755,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         - email1
         - email2
 `
-		var orderedAndTaggedDeployment, unorderedDeployment formattedDeployment
+		var orderedAndTaggedDeployment, unorderedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid yaml
@@ -846,7 +849,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         ]
     }
 }`
-		var orderedAndTaggedDeployment, unorderedDeployment formattedDeployment
+		var orderedAndTaggedDeployment, unorderedDeployment FormattedDeployment
 		actualPrintableDeployment, err := formatPrintableDeployment("json", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid json
@@ -907,11 +910,12 @@ func TestGetSpecificField(t *testing.T) {
 		ID:          "test-deployment-id",
 		Label:       "test-deployment-label",
 		Description: "description",
-		Workspace:   astro.Workspace{ID: "test-ws-id"},
+		Workspace:   astro.Workspace{ID: "test-ws-id", Label: "test-workspace"},
 		ReleaseName: "great-release-name",
 		AlertEmails: []string{"email1", "email2"},
 		Cluster: astro.Cluster{
-			ID: "cluster-id",
+			ID:   "cluster-id",
+			Name: "test-cluster",
 			NodePools: []astro.NodePool{
 				{
 					ID:               "test-pool-id",
@@ -1051,7 +1055,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues), actual)
+		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"
@@ -1069,7 +1073,7 @@ func TestGetSpecificField(t *testing.T) {
 		assert.Equal(t, info, actual)
 	})
 	t.Run("returns value regardless of upper or lower case key", func(t *testing.T) {
-		requestedField := "Configuration.Cluster_ID"
+		requestedField := "Configuration.Cluster_NAME"
 		printableDeployment := map[string]interface{}{
 			"deployment": map[string]interface{}{
 				"metadata":              info,
@@ -1081,7 +1085,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, sourceDeployment.Cluster.ID, actual)
+		assert.Equal(t, sourceDeployment.Cluster.Name, actual)
 	})
 	t.Run("returns error if no value is found", func(t *testing.T) {
 		printableDeployment := map[string]interface{}{
@@ -1112,5 +1116,36 @@ func TestGetSpecificField(t *testing.T) {
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, nil, actual)
+	})
+}
+
+func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
+	var (
+		expectedWorkerType, poolID, actualWorkerType string
+		existingPools                                []astro.NodePool
+	)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	expectedWorkerType = "worker-1"
+	poolID = "test-pool-id"
+	existingPools = []astro.NodePool{
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-1",
+		},
+		{
+			ID:               "test-pool-id",
+			IsDefault:        false,
+			NodeInstanceType: "worker-2",
+		},
+	}
+	t.Run("returns a worker type from cluster for pool with matching nodepool id", func(t *testing.T) {
+		actualWorkerType = getWorkerTypeFromNodePoolID(poolID, existingPools)
+		assert.Equal(t, expectedWorkerType, actualWorkerType)
+	})
+	t.Run("returns an empty worker type if no pool with matching node pool id exists in the cluster", func(t *testing.T) {
+		poolID = "test-pool-id-1"
+		actualWorkerType = getWorkerTypeFromNodePoolID(poolID, existingPools)
+		assert.Equal(t, "", actualWorkerType)
 	})
 }

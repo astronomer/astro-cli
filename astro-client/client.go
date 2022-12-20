@@ -99,6 +99,11 @@ func (c *HTTPClient) doPublicGraphQLQuery(doOpts *httputil.DoOptions) (*Response
 	if cl.Token != "" {
 		doOpts.Headers["authorization"] = cl.Token
 	}
+
+	if cl.Organization != "" {
+		doOpts.Headers["astro-current-org-id"] = cl.Organization
+	}
+
 	doOpts.Headers["apollographql-client-name"] = "cli" //nolint: goconst
 	doOpts.Headers["apollographql-client-version"] = version.CurrVersion
 	doOpts.Method = http.MethodPost

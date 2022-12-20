@@ -35,10 +35,10 @@ require (
 	github.com/deepmap/oapi-codegen v1.12.2
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
+	github.com/ghodss/yaml v1.0.0
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
-	golang.org/x/exp v0.0.0-20221114172223-0cf76af32a3a
 	golang.org/x/mod v0.6.0
 	golang.org/x/term v0.1.0
 	gopkg.in/yaml.v2 v2.4.0

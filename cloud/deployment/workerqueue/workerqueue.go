@@ -49,7 +49,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	// get defaults for min-count, max-count and concurrency from API
 	defaultOptions, err = GetWorkerQueueDefaultOptions(client)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errWorkerQueueDefaultOptions, err.Error())
+		return err
 	}
 
 	// get the node poolID to use
@@ -63,7 +63,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		IsDefault:  false, // cannot create a default queue
 		NodePoolID: nodePoolID,
 	}
-	queueToCreateOrUpdate = setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
+	queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
 
 	err = IsWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
 	if err != nil {
@@ -123,9 +123,9 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	return nil
 }
 
-// setWorkerQueueValues sets values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency
+// SetWorkerQueueValues sets values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency
 // Default values are used if the user did not request any
-func setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
+func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
 	if wQueueMin != 0 {
 		// use the value from the user input
 		workerQueueToCreate.MinWorkerCount = wQueueMin
@@ -160,7 +160,7 @@ func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefault
 	)
 	workerQueueDefaultOptions, err = client.GetWorkerQueueOptions()
 	if err != nil {
-		return astro.WorkerQueueDefaultOptions{}, err
+		return astro.WorkerQueueDefaultOptions{}, fmt.Errorf("%w: %s", errWorkerQueueDefaultOptions, err.Error())
 	}
 	return workerQueueDefaultOptions, nil
 }

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
-	"github.com/astronomer/astro-cli/airflow/include"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
@@ -65,7 +64,6 @@ var (
 	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
-	errWebServerUnHealthy    = errors.New("webserver failed to start")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
@@ -96,6 +94,7 @@ type ComposeConfig struct {
 	SettingsFile         string
 	SettingsFileExist    bool
 	TriggererEnabled     bool
+	ProjectName          string
 }
 
 type DockerCompose struct {
@@ -121,7 +120,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 	}
 
 	imageHandler := DockerImageInit(ImageName(imageName, "latest"))
-	composeFile := include.Composeyml
+	composeFile := Composeyml
 
 	dockerCli, err := command.NewDockerCli()
 	if err != nil {
@@ -180,16 +179,14 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 		if err != nil {
 			fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
 		}
-		defer func() {
-			// remove astro-run-dag from requirments.txt
-			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
-			if err != nil {
-				fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
-			}
-		}()
-		err = d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		imageBuildErr := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
+		// remove astro-run-dag from requirments.txt
+		err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
 		if err != nil {
-			return err
+			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+		}
+		if imageBuildErr != nil {
+			return imageBuildErr
 		}
 	} else {
 		// skip build if an imageName is passed
@@ -764,8 +761,8 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Println("\nProject is not running. Run 'astro dev logs --webserver | --scheduler' for details.")
-			return fmt.Errorf("%w: timed out after %s", errWebServerUnHealthy, timeout)
+			fmt.Printf("\n")
+			return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout) //nolint:goerr113
 		}
 		if !errors.Is(err, errComposeProjectRunning) {
 			return err

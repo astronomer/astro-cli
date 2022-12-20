@@ -461,7 +461,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 
 	if dagDeploy == "enable" {
 		if currentDeployment.DagDeployEnabled {
-			fmt.Println("\nDAG-only deploys is already enabled for this deployment.")
+			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
 			return nil
 		}
 
@@ -499,7 +499,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	if d.ID == "" {

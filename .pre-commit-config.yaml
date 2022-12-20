@@ -9,11 +9,11 @@ repos:
         language: system
         entry: 'gofmt -w -s'
   - repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 22.12.0
     hooks:
       - id: black
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v4.4.0
     hooks:
       - id: check-case-conflict
       - id: check-executables-have-shebangs
@@ -22,6 +22,7 @@ repos:
       - id: check-toml
       - id: check-xml
       - id: check-yaml
+        exclude: 'airflow/include/composeyml.yml'
         args: ['--allow-multiple-documents']
       - id: detect-private-key
       - id: end-of-file-fixer

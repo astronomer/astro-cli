@@ -115,7 +115,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 
 		return nil
 	} else if isExpired(expireTime, accessTokenExpThreshold) {
-		authConfig, err := auth.ValidateDomain(c.Domain)
+		authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
 		if err != nil {
 			return err
 		}
@@ -226,7 +226,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 		}
 	}
 
-	authConfig, err := auth.ValidateDomain(c.Domain)
+	authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
 	if err != nil {
 		return false, err
 	}

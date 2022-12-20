@@ -29,6 +29,7 @@ type ResponseData struct {
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
 	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
 	GetOrganizations          []Organization               `json:"organizations,omitempty"`
+	DeploymentAlerts          DeploymentAlerts             `json:"alertEmails,omitempty"`
 }
 
 type Self struct {
@@ -47,6 +48,7 @@ type AuthConfig struct {
 	ClientID  string `json:"clientId"`
 	Audience  string `json:"audience"`
 	DomainURL string `json:"domainUrl"`
+	AuthFlow  string `json:"authFlow"` // authFlow is either ORG_FIRST or IDENTITY_FIRST
 }
 
 type AuthUser struct {
@@ -270,6 +272,7 @@ type CreateDeploymentInput struct {
 	RuntimeReleaseVersion string               `json:"runtimeReleaseVersion"`
 	DagDeployEnabled      bool                 `json:"dagDeployEnabled"`
 	DeploymentSpec        DeploymentCreateSpec `json:"deploymentSpec"`
+	WorkerQueues          []WorkerQueue        `json:"workerQueues"`
 }
 
 type DeploymentCreateSpec struct {
@@ -344,4 +347,13 @@ type NodePool struct {
 	IsDefault        bool      `json:"isDefault"`
 	NodeInstanceType string    `json:"nodeInstanceType"`
 	CreatedAt        time.Time `json:"createdAt"`
+}
+
+type UpdateDeploymentAlertsInput struct {
+	DeploymentID string   `json:"deploymentId"`
+	AlertEmails  []string `json:"alertEmails"`
+}
+
+type DeploymentAlerts struct {
+	AlertEmails []string `json:"alertEmails"`
 }

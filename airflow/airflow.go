@@ -1,16 +1,51 @@
 package airflow
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/astronomer/astro-cli/airflow/include"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/pkg/errors"
 )
 
 var perm os.FileMode = 0o777
+
+var (
+	//go:embed include/advancedexampledag.py
+	ExampleDagAdvanced string
+
+	//go:embed include/astronomermonitoringdag.py
+	MonitoringDag string
+
+	//go:embed include/basicexampledag.py
+	ExampleDagBasic string
+
+	//go:embed include/composeyml.yml
+	Composeyml string
+
+	//go:embed include/dagintegritytest.py
+	DagIntegrityTest string
+
+	//go:embed include/dagintegritytestdefault.py
+	DagIntegrityTestDefault string
+
+	//go:embed include/dockerfile
+	Dockerfile string
+
+	//go:embed include/dockerignore
+	Dockerignore string
+
+	//go:embed include/gitignore
+	Gitignore string
+
+	//go:embed include/readme
+	Readme string
+
+	//go:embed include/settingsyml.yml
+	Settingsyml string
+)
 
 func initDirs(root string, dirs []string) error {
 	// Create the dirs
@@ -65,18 +100,18 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 
 	// Map of files to create
 	files := map[string]string{
-		".dockerignore":                        include.Dockerignore,
-		"Dockerfile":                           fmt.Sprintf(include.Dockerfile, airflowImageName, airflowImageTag),
-		".gitignore":                           include.Gitignore,
+		".dockerignore":                        Dockerignore,
+		"Dockerfile":                           fmt.Sprintf(Dockerfile, airflowImageName, airflowImageTag),
+		".gitignore":                           Gitignore,
 		"packages.txt":                         "",
 		"requirements.txt":                     "",
 		".env":                                 "",
-		"airflow_settings.yaml":                include.Settingsyml,
-		"dags/example_dag_basic.py":            include.Exampledagbasic,
-		"dags/example_dag_advanced.py":         include.Exampledagadvanced,
-		"README.md":                            include.Readme,
-		"tests/dags/test_dag_integrity.py":     include.Dagintegritytest,
-		".astro/test_dag_integrity_default.py": include.Dagintegritytestdefault,
+		"airflow_settings.yaml":                Settingsyml,
+		"dags/example_dag_basic.py":            ExampleDagBasic,
+		"dags/example_dag_advanced.py":         ExampleDagAdvanced,
+		"README.md":                            Readme,
+		"tests/dags/test_dag_integrity.py":     DagIntegrityTest,
+		".astro/test_dag_integrity_default.py": DagIntegrityTestDefault,
 	}
 
 	// Initailize directories

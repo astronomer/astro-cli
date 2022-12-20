@@ -30,6 +30,9 @@ import (
 )
 
 const (
+	AuthFlowCurrent       = "ORG_FIRST"
+	AuthFlowIdentityFirst = "IDENTITY_FIRST"
+
 	authConfigEndpoint = "auth-config"
 	orgLookupEndpoint  = "organization-lookup"
 
@@ -196,7 +199,7 @@ func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
 	return userEmail, err
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain, orgID string) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain, auth0OrgID string) (Result, error) { //nolint:gocritic
 	// try to get UserEmail from config first
 	userEmail, err := getUserEmail(c)
 	if err != nil {
@@ -207,8 +210,8 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 		userEmail = input.Text("Please enter your account email: ")
 	}
 
-	if orgID == "" {
-		orgID, err = a.orgChecker(domain)
+	if (auth0OrgID == "") && authConfig.AuthFlow != AuthFlowIdentityFirst {
+		auth0OrgID, err = a.orgChecker(domain)
 		if err != nil {
 			log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
 		}
@@ -226,15 +229,18 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 	var res Result
 
 	authorizeURL := fmt.Sprintf(
-		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&organization=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
+		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
 		authConfig.DomainURL,
 		authConfig.Audience,
 		authConfig.ClientID,
 		redirectURI,
 		userEmail,
-		orgID,
 		challenge,
 	)
+	// trigger organization specific login only when auth0OrgID is provided
+	if auth0OrgID != "" {
+		authorizeURL = fmt.Sprintf("%s&organization=%s", authorizeURL, auth0OrgID)
+	}
 
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
 
@@ -291,7 +297,7 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 }
 
 // check client status after a successfully login
-func checkUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
@@ -306,8 +312,9 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 		return err
 	}
 	activeOrgID := c.Organization
-	// OrganizationId is optional, it may not be returned by getSelf api
-	if selfResp.JSON200.OrganizationId != nil {
+	// we only set activeOrgID base on auth org in org first auth flow
+	if authConfig.AuthFlow != AuthFlowIdentityFirst && selfResp.JSON200.OrganizationId != nil {
+		// OrganizationId is optional, it may not be returned by getSelf api
 		activeOrgID = *selfResp.JSON200.OrganizationId
 	}
 	// fetch all orgs that the user can access
@@ -382,7 +389,7 @@ func checkUserSession(c *config.Context, client astro.Client, coreClient astroco
 func Login(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
-	authConfig, err := ValidateDomain(domain)
+	authConfig, err := FetchDomainAuthConfig(domain)
 	if err != nil {
 		return err
 	}
@@ -424,7 +431,7 @@ func Login(domain, orgID, token string, client astro.Client, coreClient astrocor
 		return err
 	}
 
-	err = checkUserSession(&c, client, coreClient, out)
+	err = CheckUserSession(&c, authConfig, client, coreClient, out)
 	if err != nil {
 		return err
 	}
@@ -455,7 +462,7 @@ func Logout(domain string, out io.Writer) {
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")
 }
 
-func ValidateDomain(domain string) (astro.AuthConfig, error) {
+func FetchDomainAuthConfig(domain string) (astro.AuthConfig, error) {
 	var (
 		authConfig  astro.AuthConfig
 		addr        string
@@ -493,8 +500,8 @@ func ValidateDomain(domain string) (astro.AuthConfig, error) {
 		if unMarshalErr != nil {
 			return authConfig, fmt.Errorf("cannot decode response: %w", unMarshalErr)
 		}
-
 		return authConfig, nil
 	}
+
 	return authConfig, errors.New("something went wrong! Try again or contact Astronomer Support")
 }

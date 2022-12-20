@@ -41,6 +41,7 @@ func TestLogin(t *testing.T) {
 	login(&cobra.Command{}, []string{cloudDomain}, nil, nil, buf)
 
 	// software login success
+	testUtil.InitTestConfig(testUtil.Initial)
 	login(&cobra.Command{}, []string{softwareDomain}, nil, nil, buf)
 
 	// no domain, cloud login
@@ -54,6 +55,18 @@ func TestLogin(t *testing.T) {
 	// no domain, no current context set
 	config.ResetCurrentContext()
 	login(&cobra.Command{}, []string{}, nil, nil, buf)
+
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	defer testUtil.MockUserInput(t, "n")()
+	login(&cobra.Command{}, []string{"fail.astronomer.io"}, nil, nil, buf)
+	assert.Contains(t, buf.String(), "fail.astronomer.io is an invalid domain to login into Astro.\n")
+
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	softwareDomain = "software.astronomer.io"
+	buf = new(bytes.Buffer)
+	defer testUtil.MockUserInput(t, "y")()
+	login(&cobra.Command{}, []string{"software.astronomer.io"}, nil, nil, buf)
+	assert.Contains(t, buf.String(), "software.astronomer.io is an invalid domain to login into Astro.\n")
 }
 
 func TestLogout(t *testing.T) {

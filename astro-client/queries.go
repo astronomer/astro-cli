@@ -22,9 +22,6 @@ var (
 			dagDeployEnabled
 			cluster {
 				id
-			}
-			cluster {
-				id
 				name
 				cloudProvider
 				nodePools {
@@ -74,6 +71,7 @@ var (
 			workspace {
 				id
 				organizationId
+				label
 			}
 		}
 	}
@@ -87,6 +85,13 @@ var (
 			releaseName
 			cluster {
 				id
+				name
+				nodePools {
+					id
+					isDefault
+					nodeInstanceType
+					maxNodeCount
+				}
 			}
 			createdAt
 			status
@@ -115,7 +120,17 @@ var (
 			}
 			workspace {
 				id
+				label
 				organizationId
+			}
+			workerQueues {
+				id
+				name
+				isDefault
+				nodePoolId
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
 			}
 		}
 	}`
@@ -161,6 +176,12 @@ var (
 			id
 			name
 			cloudProvider
+			nodePools {
+				id
+				isDefault
+				maxNodeCount
+				nodeInstanceType
+			}
 		}
 	}
 	`

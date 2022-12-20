@@ -7,6 +7,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -40,6 +41,7 @@ var (
 	variableValue                 string
 	useEnvFile                    bool
 	makeSecret                    bool
+	inputFile                     string
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -59,6 +61,7 @@ var (
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
 	httpClient = httputil.NewHTTPClient()
+	errFlag    = errors.New("--deployment-file can not be used with other arguments")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -72,7 +75,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
 		newDeploymentDeleteCmd(),
-		newDeploymentCreateCmd(),
+		newDeploymentCreateCmd(out),
 		newDeploymentLogsCmd(),
 		newDeploymentUpdateCmd(),
 		newDeploymentVariableRootCmd(out),
@@ -112,13 +115,15 @@ func newDeploymentLogsCmd() *cobra.Command {
 	return cmd
 }
 
-func newDeploymentCreateCmd() *cobra.Command {
+func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astro Deployment",
 		Long:    "Create a new Astro Deployment. All flags are optional",
-		RunE:    deploymentCreate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentCreate(cmd, args, out)
+		},
 	}
 	cmd.Flags().StringVarP(&label, "name", "n", "", "The Deployment's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace to create the Deployment in")
@@ -126,6 +131,7 @@ func newDeploymentCreateCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
+	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
@@ -279,7 +285,7 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	return deployment.Logs(deploymentID, ws, deploymentName, warnLogs, errorLogs, infoLogs, logCount, astroClient)
 }
 
-func deploymentCreate(cmd *cobra.Command, args []string) error {
+func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -290,6 +296,16 @@ func deploymentCreate(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	// request is to create from a file
+	if inputFile != "" {
+		requestedFlags := cmd.Flags().NFlag()
+		if requestedFlags > 1 {
+			// other flags were requested
+			return errFlag
+		}
+
+		return fromfile.Create(inputFile, astroClient, out)
+	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
 	}

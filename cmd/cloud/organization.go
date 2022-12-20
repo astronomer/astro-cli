@@ -134,7 +134,7 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 	if auditLogsOutputFilePath != "" {
 		outputFileName = auditLogsOutputFilePath
 	} else {
-		outputFileName = fmt.Sprintf("audit-logs-%s.gz", time.Now().Format("2006-01-02-150405"))
+		outputFileName = fmt.Sprintf("audit-logs-%s.ndjson.gz", time.Now().Format("2006-01-02-150405"))
 	}
 
 	var filePerms fs.FileMode = 0o755

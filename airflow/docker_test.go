@@ -54,7 +54,18 @@ func TestGenerateConfig(t *testing.T) {
 	assert.NoError(t, err)
 	config.InitConfig(fs)
 	t.Run("returns config with default healthcheck", func(t *testing.T) {
-		expectedCfg := `version: '3.1'
+		expectedCfg := `version: '3.4'
+
+x-common-env-vars: &common-env-vars
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
+  AIRFLOW__WEBSERVER__RBAC: "True"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  ASTRONOMER_ENVIRONMENT: local
 
 networks:
   airflow:
@@ -97,12 +108,7 @@ services:
       io.astronomer.docker.component: "airflow-scheduler"
     depends_on:
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:ro
       - airflow_home/plugins:/usr/local/airflow/plugins:z
@@ -132,13 +138,7 @@ services:
     depends_on:
       - scheduler
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      AIRFLOW__WEBSERVER__RBAC: "True"
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     ports:
       - 127.0.0.1:8080:8080
     volumes:
@@ -154,6 +154,7 @@ services:
       start_period: 5s
       timeout: 60s
     
+
 `
 		mockM1Checker := func(myOS, myArch string) bool {
 			return false
@@ -164,7 +165,18 @@ services:
 		assert.Equal(t, expectedCfg, cfg)
 	})
 	t.Run("returns config with triggerer enabled", func(t *testing.T) {
-		expectedCfg := `version: '3.1'
+		expectedCfg := `version: '3.4'
+
+x-common-env-vars: &common-env-vars
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
+  AIRFLOW__WEBSERVER__SECRET_KEY: "test-project-name"
+  AIRFLOW__WEBSERVER__RBAC: "True"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "True"
+  ASTRONOMER_ENVIRONMENT: local
 
 networks:
   airflow:
@@ -207,12 +219,7 @@ services:
       io.astronomer.docker.component: "airflow-scheduler"
     depends_on:
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:ro
       - airflow_home/plugins:/usr/local/airflow/plugins:z
@@ -242,13 +249,7 @@ services:
     depends_on:
       - scheduler
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      AIRFLOW__WEBSERVER__RBAC: "True"
-      ASTRONOMER_ENVIRONMENT: local
+    environment: *common-env-vars
     ports:
       - 127.0.0.1:8080:8080
     volumes:
@@ -279,18 +280,14 @@ services:
       io.astronomer.docker.component: "airflow-triggerer"
     depends_on:
       - postgres
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql://postgres:postgres@postgres:5432
-      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      AIRFLOW__CORE__FERNET_KEY: "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-      AIRFLOW__WEBSERVER__RBAC: "True"
+    environment: *common-env-vars
     volumes:
       - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
     
+
 `
 		mockM1Checker := func(myOS, myArch string) bool {
 			return false
@@ -1429,8 +1426,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		isM1 = mockIsM1
 
 		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		assert.ErrorIs(t, err, errWebServerUnHealthy)
-		assert.ErrorContains(t, err, "webserver failed to start: timed out after 1s")
+		assert.ErrorContains(t, err, "The webserver health check timed out after 1s")
 	})
 	t.Run("timeout waiting for webserver to get to healthy with long timeout", func(t *testing.T) {
 		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
@@ -1458,8 +1454,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		isM1 = mockIsM1
 
 		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		assert.ErrorIs(t, err, errWebServerUnHealthy)
-		assert.ErrorContains(t, err, "webserver failed to start: timed out after 1s")
+		assert.ErrorContains(t, err, "The webserver health check timed out after 1s")
 	})
 }
 
