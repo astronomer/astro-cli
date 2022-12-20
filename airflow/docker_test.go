@@ -154,6 +154,7 @@ services:
       start_period: 5s
       timeout: 60s
     
+
 `
 		mockM1Checker := func(myOS, myArch string) bool {
 			return false
@@ -286,6 +287,7 @@ services:
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
     
+
 `
 		mockM1Checker := func(myOS, myArch string) bool {
 			return false
