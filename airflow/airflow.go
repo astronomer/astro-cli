@@ -109,6 +109,7 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"airflow_settings.yaml":                Settingsyml,
 		"dags/example_dag_basic.py":            ExampleDagBasic,
 		"dags/example_dag_advanced.py":         ExampleDagAdvanced,
+		"dags/.airflowignore":                  "",
 		"README.md":                            Readme,
 		"tests/dags/test_dag_integrity.py":     DagIntegrityTest,
 		".astro/test_dag_integrity_default.py": DagIntegrityTestDefault,
