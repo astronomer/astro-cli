@@ -60,7 +60,7 @@ func getContainerWaitResponse(raiseError bool) (bodyCh <-chan container.Containe
 	return readOnlyStatusCh, readOnlyErrCh
 }
 
-func TestCommonDockerUtilWithReturnValue(t *testing.T) {
+func TestExecuteCmdInDockerWithReturnValue(t *testing.T) {
 	mockDockerBinder := new(mocks.DockerBind)
 	Docker = func() (DockerBind, error) {
 		mockDockerBinder.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
@@ -72,7 +72,7 @@ func TestCommonDockerUtilWithReturnValue(t *testing.T) {
 		return mockDockerBinder, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	_, output, err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, true)
+	_, output, err := ExecuteCmdInDocker(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, true)
 	assert.NoError(t, err)
 
 	outputString, err := ConvertReadCloserToString(output)
@@ -80,10 +80,10 @@ func TestCommonDockerUtilWithReturnValue(t *testing.T) {
 	assert.Equal(t, "Sample log", outputString)
 
 	mockDockerBinder.AssertExpectations(t)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 }
 
-func TestCommonDockerUtilSuccess(t *testing.T) {
+func TestExecuteCmdInDockerSuccess(t *testing.T) {
 	mockDocker := mocks.NewDockerBind(t)
 	Docker = func() (DockerBind, error) {
 		mockDocker.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
@@ -100,9 +100,9 @@ func TestCommonDockerUtilSuccess(t *testing.T) {
 		return mockOs
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	_, _, err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, false)
 	assert.NoError(t, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 	Os = NewOsBind
 }
 
@@ -150,21 +150,21 @@ func TestDockerClientInitFailure(t *testing.T) {
 	Docker = func() (DockerBind, error) {
 		return nil, errMock
 	}
-	_, _, err := CommonDockerUtil(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, map[string]string{"flag": "value"}, []string{"mountDirectory"}, false)
 	expectedErr := fmt.Errorf("docker client initialization failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 }
 
 func TestGetPypiVersionFailure(t *testing.T) {
 	getPypiVersion = mockGetPypiVersionErr
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	assert.ErrorIs(t, err, errMock)
 	getPypiVersion = GetPypiVersion
 }
 
 func TestGetBaseDockerImageURI(t *testing.T) {
 	getBaseDockerImageURI = mockBaseDockerImageURIErr
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	assert.ErrorIs(t, err, errMock)
 	getBaseDockerImageURI = GetBaseDockerImageURI
 }
@@ -175,7 +175,7 @@ func TestOsWriteFileErr(t *testing.T) {
 		mockOs.On("WriteFile", mock.Anything, mock.Anything, mock.Anything).Return(errMock)
 		return mockOs
 	}
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	assert.ErrorIs(t, err, errMock)
 	Os = NewOsBind
 }
@@ -186,7 +186,7 @@ func TestImageBuildFailure(t *testing.T) {
 		mockDocker.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, errMock)
 		return mockDocker, nil
 	}
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("image building failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
 }
@@ -198,10 +198,10 @@ func TestImageBuildResponseDisplayMessagesFailure(t *testing.T) {
 		return mockDocker, nil
 	}
 	DisplayMessages = mockDisplayMessagesErr
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("image build response read failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 }
 
 func TestContainerCreateFailure(t *testing.T) {
@@ -212,10 +212,10 @@ func TestContainerCreateFailure(t *testing.T) {
 		return mockDocker, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("docker container creation failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 }
 
 func TestContainerStartFailure(t *testing.T) {
@@ -227,10 +227,10 @@ func TestContainerStartFailure(t *testing.T) {
 		return mockDocker, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("docker container start failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 }
 
 func TestContainerWaitFailure(t *testing.T) {
@@ -243,10 +243,10 @@ func TestContainerWaitFailure(t *testing.T) {
 		return mockDocker, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("docker container wait failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 }
 
 func TestContainerLogsFailure(t *testing.T) {
@@ -260,13 +260,13 @@ func TestContainerLogsFailure(t *testing.T) {
 		return mockDocker, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("docker container logs fetching failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 }
 
-func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
+func TestExecuteCmdInDockerLogsCopyFailure(t *testing.T) {
 	mockDocker := mocks.NewDockerBind(t)
 	Docker = func() (DockerBind, error) {
 		mockDocker.On("ImageBuild", mock.Anything, mock.Anything, mock.Anything).Return(imageBuildResponse, nil)
@@ -282,10 +282,10 @@ func TestCommonDockerUtilLogsCopyFailure(t *testing.T) {
 		mockIo.On("Copy", mock.Anything, mock.Anything).Return(int64(0), errMock)
 		return mockIo
 	}
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("docker logs forwarding failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 	Io = NewIoBind
 }
 
@@ -306,10 +306,10 @@ func TestContainerRemoveFailure(t *testing.T) {
 		mockIo.On("Copy", mock.Anything, mock.Anything).Return(int64(0), nil)
 		return mockIo
 	}
-	_, _, err := CommonDockerUtil(testCommand, nil, nil, nil, false)
+	_, _, err := ExecuteCmdInDocker(testCommand, nil, nil, nil, false)
 	expectedErr := fmt.Errorf("docker remove failed %w", errMock)
 	assert.Equal(t, expectedErr, err)
-	DisplayMessages = displayMessages
+	DisplayMessages = OriginalDisplayMessages
 	Io = NewIoBind
 }
 

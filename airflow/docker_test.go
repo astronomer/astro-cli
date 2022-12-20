@@ -154,6 +154,7 @@ services:
       start_period: 5s
       timeout: 60s
     
+
 `
 		mockM1Checker := func(myOS, myArch string) bool {
 			return false
@@ -286,6 +287,7 @@ services:
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_logs:/usr/local/airflow/logs
     
+
 `
 		mockM1Checker := func(myOS, myArch string) bool {
 			return false
@@ -1425,7 +1427,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 
 		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.ErrorIs(t, err, errWebServerUnHealthy)
-		assert.ErrorContains(t, err, "webserver failed to start: timed out after 1s")
+		assert.ErrorContains(t, err, "webserver has not become healthy yet: the health check timed out after 1s")
 	})
 	t.Run("timeout waiting for webserver to get to healthy with long timeout", func(t *testing.T) {
 		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
@@ -1454,7 +1456,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 
 		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
 		assert.ErrorIs(t, err, errWebServerUnHealthy)
-		assert.ErrorContains(t, err, "webserver failed to start: timed out after 1s")
+		assert.ErrorContains(t, err, "webserver has not become healthy yet: the health check timed out after 1s")
 	})
 }
 

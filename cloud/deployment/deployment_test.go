@@ -730,6 +730,7 @@ func TestUpdate(t *testing.T) {
 
 		err := Update("test-id", "", ws, "", "", "", 0, 0, []astro.WorkerQueue{}, true, mockClient)
 		assert.ErrorIs(t, err, errMock)
+		assert.NotContains(t, err.Error(), astro.AstronomerConnectionErrMsg)
 		mockClient.AssertExpectations(t)
 	})
 
