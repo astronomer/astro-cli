@@ -51,6 +51,7 @@ var (
 				airflowVersion
 			}
 			deploymentSpec {
+				executor
 				image {
 					tag
 				}
@@ -101,6 +102,7 @@ var (
 				airflowVersion
 			}
 			deploymentSpec {
+				executor
 				image {
 					tag
 				}
