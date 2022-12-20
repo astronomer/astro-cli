@@ -77,7 +77,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentDeleteCmd(),
 		newDeploymentCreateCmd(out),
 		newDeploymentLogsCmd(),
-		newDeploymentUpdateCmd(),
+		newDeploymentUpdateCmd(out),
 		newDeploymentVariableRootCmd(out),
 		newDeploymentWorkerQueueRootCmd(out),
 		newDeploymentInspectCmd(out),
@@ -138,17 +138,20 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDeploymentUpdateCmd() *cobra.Command {
+func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [DEPLOYMENT-ID]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro Deployment",
 		Long:    "Update the configuration for an Astro Deployment. All flags are optional",
-		RunE:    deploymentUpdate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentUpdate(cmd, args, out)
+		},
 	}
 	cmd.Flags().StringVarP(&label, "name", "n", "", "Update the Deployment's name. If the new name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace the Deployment is located in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to update. File can be in either JSON or YAML format.")
 	cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&forceUpdate, "force", "f", false, "Force update: Don't prompt a user before Deployment update")
@@ -304,7 +307,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return errFlag
 		}
 
-		return fromfile.CreateOrUpdate(inputFile, "create", astroClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
@@ -321,13 +324,22 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string) error {
+func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
+	// request is to update from a file
+	if inputFile != "" {
+		requestedFlags := cmd.Flags().NFlag()
+		if requestedFlags > 1 {
+			// other flags were requested
+			return errFlag
+		}
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, out)
+	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
 	}
