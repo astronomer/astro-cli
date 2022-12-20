@@ -499,7 +499,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	if d.ID == "" {
