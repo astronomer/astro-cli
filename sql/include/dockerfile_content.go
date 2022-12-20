@@ -16,15 +16,12 @@ RUN apt-install-and-clean \
 
 RUN pip install astro-sql-cli==%s
 
-RUN useradd --uid %s --create-home %s
+RUN id -u %s 2>/dev/null || useradd --uid %s --create-home %s
 # This is necessary to run the docker image in GNU Linux since Astro CLI 1.8
 # It is temporary, since some SQL commands still rely on the default airflow config
 # https://github.com/astronomer/astro-sdk/issues/1219
 RUN chmod -R 777 /usr/local/airflow
 
-
-# override Runtime ENTRYPOINT in a way it's cached (empty ENTRYPOINT [] isn't)
-ENTRYPOINT ["/usr/bin/env"]
-
-
+ENTRYPOINT ["flow"]
+CMD ["--help"]
 `)

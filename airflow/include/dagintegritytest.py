@@ -1,9 +1,3 @@
-package include
-
-import "strings"
-
-// Dagintegritytest created with astro dev init
-var Dagintegritytest = strings.TrimSpace(`
 """Test the validity of all DAGs. This test ensures that all Dags have tags, retries set to two, and no import errors. Feel free to add and remove tests."""
 
 import os
@@ -87,6 +81,3 @@ def test_dag_retries(dag_id, dag, fileloc):
     assert (
         dag.default_args.get("retries", None) >= 2
     ), f"{dag_id} in {fileloc} does not have retries not set to 2."
-
-
-`)

@@ -8,7 +8,6 @@ import (
 
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -24,7 +23,7 @@ var (
 )
 
 var (
-	configCommandString = []string{"flow", "config"}
+	configCommandString = []string{"config"}
 	globalConfigKeys    = []string{"airflow_home", "airflow_dags_folder"}
 )
 
@@ -67,7 +66,7 @@ func getBaseMountDirs(projectDir string) ([]string, error) {
 
 var appendConfigKeyMountDir = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
 	args := []string{configKey}
-	exitCode, output, err := sql.CommonDockerUtil(configCommandString, args, configFlags, mountDirs, true)
+	exitCode, output, err := sql.ExecuteCmdInDocker(configCommandString, args, configFlags, mountDirs, true)
 	if err != nil {
 		return mountDirs, fmt.Errorf("error running %v: %w", configCommandString, err)
 	}
@@ -79,7 +78,7 @@ var appendConfigKeyMountDir = func(configKey string, configFlags map[string]stri
 		return mountDirs, err
 	}
 	mountDirs = append(mountDirs, strings.TrimSpace(configKeyDir))
-	return mountDirs, err
+	return mountDirs, nil
 }
 
 func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder, mountGlobalDirs bool) (flags map[string]string, mountDirs []string, err error) {
@@ -130,11 +129,11 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 }
 
 func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, mountDirs []string) error {
-	cmdString := []string{cmd.Parent().Name(), cmd.Name()}
+	cmdString := []string{cmd.Name()}
 	if debug {
-		cmdString = slices.Insert(cmdString, 1, "--debug")
+		cmdString = []string{"--debug", cmd.Name()}
 	}
-	exitCode, _, err := sql.CommonDockerUtil(cmdString, args, flags, mountDirs, false)
+	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, args, flags, mountDirs, false)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", cmdString, err)
 	}
@@ -271,7 +270,7 @@ func executeRun(cmd *cobra.Command, args []string) error {
 }
 
 func executeHelp(cmd *cobra.Command, cmdString []string) {
-	exitCode, _, err := sql.CommonDockerUtil(cmdString, nil, nil, nil, false)
+	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, nil, nil, nil, false)
 	if err != nil {
 		panic(fmt.Errorf("error running %v: %w", cmdString, err))
 	}
@@ -388,10 +387,8 @@ func NewFlowCommand() *cobra.Command {
 		Use:               "flow",
 		Short:             "Run flow commands",
 		PersistentPreRunE: login,
-		Run: func(cmd *cobra.Command, args []string) {
-			executeHelp(cmd, []string{cmd.Name(), "--help"})
-		},
-		SilenceUsage: true,
+		Run:               executeHelp,
+		SilenceUsage:      true,
 	}
 	cmd.SetHelpFunc(executeHelp)
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "")
