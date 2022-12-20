@@ -16,7 +16,7 @@ RUN apt-install-and-clean \
 
 RUN pip install astro-sql-cli==%s
 
-RUN id -u %s &>/dev/null || useradd --uid %s --create-home %s
+RUN id -u %s 2>/dev/null || useradd --uid %s --create-home %s
 # This is necessary to run the docker image in GNU Linux since Astro CLI 1.8
 # It is temporary, since some SQL commands still rely on the default airflow config
 # https://github.com/astronomer/astro-sdk/issues/1219
