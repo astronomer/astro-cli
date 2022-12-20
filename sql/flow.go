@@ -106,7 +106,7 @@ var CommonDockerUtil = func(cmd, args []string, flags map[string]string, mountDi
 
 	currentUser, _ := user.Current()
 
-	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Uid, currentUser.Username))
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Username, currentUser.Uid, currentUser.Username))
 	if err := Os().WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
 		return statusCode, cout, fmt.Errorf("error writing dockerfile %w", err)
 	}
