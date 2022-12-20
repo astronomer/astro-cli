@@ -141,14 +141,7 @@ func CheckTriggererEnabled(client houston.ClientInterface) bool {
 }
 
 func addTriggererReplicasArg(vars map[string]interface{}, client houston.ClientInterface, airflowVersion string, triggererReplicas int) {
-	// reset triggerer count to zero in case airflowVersion < 2.2.0
-	if airflowVersion != "" {
-		if version, _ := semver.NewVersion(airflowVersion); version != nil && version.LessThan(triggererAllowedAirflowVersion) {
-			triggererReplicas = 0
-		}
-	}
-
-	if CheckTriggererEnabled(client) {
+	if CheckTriggererEnabled(client) && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
 	}
 }

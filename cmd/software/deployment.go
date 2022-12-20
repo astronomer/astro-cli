@@ -143,7 +143,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 1, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", -1, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
 	if runtimeEnabled {
