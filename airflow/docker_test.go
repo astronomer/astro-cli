@@ -1426,8 +1426,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		isM1 = mockIsM1
 
 		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		assert.ErrorIs(t, err, errWebServerUnHealthy)
-		assert.ErrorContains(t, err, "webserver has not become healthy yet: the health check timed out after 1s")
+		assert.ErrorContains(t, err, "The webserver health check timed out after 1s")
 	})
 	t.Run("timeout waiting for webserver to get to healthy with long timeout", func(t *testing.T) {
 		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
@@ -1455,8 +1454,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 		isM1 = mockIsM1
 
 		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
-		assert.ErrorIs(t, err, errWebServerUnHealthy)
-		assert.ErrorContains(t, err, "webserver has not become healthy yet: the health check timed out after 1s")
+		assert.ErrorContains(t, err, "The webserver health check timed out after 1s")
 	})
 }
 
