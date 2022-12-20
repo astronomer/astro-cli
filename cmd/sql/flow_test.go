@@ -172,28 +172,38 @@ func TestFlowInitCmdWithFlags(t *testing.T) {
 	projectDir := t.TempDir()
 	AirflowHome := t.TempDir()
 	AirflowDagsFolder := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
+	DataDir := t.TempDir()
+	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder, "--data-dir", DataDir)
 	assert.NoError(t, err)
 }
 
 func TestFlowConfigCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	AirflowHome := t.TempDir()
-	AirflowDagsFolder := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
-	assert.NoError(t, err)
 
-	err = execFlowCmd("config", "--project-dir", projectDir, "airflow_home")
-	assert.NoError(t, err)
+	testCases := []struct {
+		initFlag  string
+		configKey string
+	}{
+		{"--airflow-home", "airflow_home"},
+		{"--airflow-dags-folder", "airflow_dags_folder"},
+		{"--data-dir", "data_dir"},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("with init flag %s and config key %s", tc.initFlag, tc.configKey), func(t *testing.T) {
+			projectDir := t.TempDir()
+			err := execFlowCmd("init", projectDir, tc.initFlag, t.TempDir())
+			assert.NoError(t, err)
+
+			err = execFlowCmd("config", "--project-dir", projectDir, tc.configKey)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowConfigCmdArgumentNotSetError(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
-	AirflowHome := t.TempDir()
-	AirflowDagsFolder := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder)
+	err := execFlowCmd("init", projectDir)
 	assert.NoError(t, err)
 
 	err = execFlowCmd("config", "--project-dir", projectDir)
@@ -323,7 +333,7 @@ func TestBuildFlagsAndMountDirsFailures(t *testing.T) {
 	originalAppendConfigKeyMountDir := appendConfigKeyMountDir
 
 	appendConfigKeyMountDir = mockAppendConfigKeyMountDirErr
-	_, _, err := buildFlagsAndMountDirs("", false, false, false, true)
+	_, _, err := buildFlagsAndMountDirs("", false, false, false, false, true)
 	assert.EqualError(t, err, "mock error")
 
 	appendConfigKeyMountDir = originalAppendConfigKeyMountDir
