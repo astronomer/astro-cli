@@ -26,8 +26,11 @@ core_api_gen:
 	make mock_astro_core
 
 test:
-	go test -count=1 -cover ./...
-	go test -coverprofile=coverage.txt -covermode=atomic ./...
+	go test -count=1 -cover $(shell go list ./... | grep -v e2e)
+	go test -coverprofile=coverage.txt -covermode=atomic $(shell go list ./... | grep -v e2e)
+
+e2e_test:
+	go test -count=1 $(shell go list ./... | grep e2e)
 
 mock: mock_airflow mock_houston mock_astro mock_pkg mock_sql_cli mock_astro_core
 

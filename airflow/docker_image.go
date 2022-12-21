@@ -270,7 +270,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 	return nil
 }
 
-func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, taskLogs bool) error {
+func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile string, taskLogs bool) error {
 	stdout := os.Stdout
 	stderr := os.Stderr
 	// delete container
@@ -319,9 +319,12 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName string, ta
 		}
 		args = append(args, []string{d.imageName}...)
 	}
+	if !strings.Contains(dagFile, "dags/") {
+		dagFile = "./dags/" + dagFile
+	}
 	cmdArgs := []string{
 		"run_dag",
-		"./dags/",
+		dagFile,
 		dagID,
 	}
 	// settings file exists append it to args

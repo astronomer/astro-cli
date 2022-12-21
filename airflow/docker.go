@@ -64,7 +64,6 @@ var (
 	errNoFile                = errors.New("file specified does not exist")
 	errSettingsPath          = "error looking for settings.yaml"
 	errComposeProjectRunning = errors.New("project is up and running")
-	errWebServerUnHealthy    = errors.New("webserver has not become healthy yet")
 
 	initSettings      = settings.ConfigSettings
 	exportSettings    = settings.Export
@@ -582,7 +581,7 @@ func (d *DockerCompose) getWebServerContainerID() (string, error) {
 	return "", err
 }
 
-func (d *DockerCompose) RunDAG(dagID, settingsFile string, noCache, taskLogs bool) error {
+func (d *DockerCompose) RunDAG(dagID, settingsFile, dagFile string, noCache, taskLogs bool) error {
 	// Get project containers
 	psInfo, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
 		All: true,
@@ -595,7 +594,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile string, noCache, taskLogs boo
 		for i := range psInfo {
 			if checkServiceState(psInfo[i].State, dockerStateUp) {
 				if strings.Contains(psInfo[i].Name, SchedulerDockerContainerName) {
-					err = d.imageHandler.Run(dagID, d.envFile, settingsFile, psInfo[i].Name, taskLogs)
+					err = d.imageHandler.Run(dagID, d.envFile, settingsFile, psInfo[i].Name, dagFile, taskLogs)
 					if err != nil {
 						return err
 					}
@@ -633,7 +632,7 @@ func (d *DockerCompose) RunDAG(dagID, settingsFile string, noCache, taskLogs boo
 		return err
 	}
 
-	err = d.imageHandler.Run(dagID, d.envFile, settingsFile, "", taskLogs)
+	err = d.imageHandler.Run(dagID, d.envFile, settingsFile, "", dagFile, taskLogs)
 	if err != nil {
 		return err
 	}
@@ -762,8 +761,8 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Println("\nProject is not yet running. The project is still attempting to start up. Run 'astro dev logs --webserver | --scheduler' for details.")
-			return fmt.Errorf("%w: the health check timed out after %s. Use the --wait flag to increase the time out", errWebServerUnHealthy, timeout)
+			fmt.Printf("\n")
+			return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout) //nolint:goerr113
 		}
 		if !errors.Is(err, errComposeProjectRunning) {
 			return err

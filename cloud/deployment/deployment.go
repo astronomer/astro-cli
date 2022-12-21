@@ -446,7 +446,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 
 	spec := astro.DeploymentCreateSpec{
 		Scheduler: scheduler,
-		Executor:  "CeleryExecutor",
+		Executor:  currentDeployment.DeploymentSpec.Executor,
 	}
 
 	deploymentUpdate := &astro.UpdateDeploymentInput{

@@ -546,7 +546,7 @@ func TestUpdate(t *testing.T) {
 	deploymentResp := astro.Deployment{
 		ID:             "test-id",
 		RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
-		DeploymentSpec: astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+		DeploymentSpec: astro.DeploymentSpec{Executor: "CeleryExecutor", Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
 		Cluster: astro.Cluster{
 			NodePools: []astro.NodePool{
 				{
@@ -776,7 +776,7 @@ func TestUpdate(t *testing.T) {
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			RuntimeRelease:   astro.RuntimeRelease{Version: "4.2.5"},
-			DeploymentSpec:   astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+			DeploymentSpec:   astro.DeploymentSpec{Executor: "CeleryExecutor", Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
 			DagDeployEnabled: true,
 			Cluster: astro.Cluster{
 				NodePools: []astro.NodePool{
