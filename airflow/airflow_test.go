@@ -78,6 +78,7 @@ func TestInit(t *testing.T) {
 		"airflow_settings.yaml",
 		"dags/example_dag_basic.py",
 		"dags/example_dag_advanced.py",
+		"dags/.airflowignore",
 		"README.md",
 	}
 	for _, file := range expectedFiles {
