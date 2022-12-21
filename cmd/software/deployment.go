@@ -146,10 +146,6 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
-	if !cmd.Flags().Changed("triggerer-replicas") {
-		createTriggererReplicas = -1
-	}
-
 	if runtimeEnabled {
 		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	}
@@ -366,6 +362,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+	}
+
+	if !cmd.Flags().Changed("triggerer-replicas") {
+		createTriggererReplicas = -1
 	}
 
 	// we should validate only in case when this feature has been enabled
