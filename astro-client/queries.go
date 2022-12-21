@@ -71,6 +71,7 @@ var (
 			}
 			workspace {
 				id
+				label
 				organizationId
 				label
 			}

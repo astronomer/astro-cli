@@ -49,7 +49,15 @@ func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "NAMESPACE", "WORKSPACE ID", "CLUSTER ID", "DEPLOYMENT ID", "DOCKER IMAGE TAG", "RUNTIME VERSION", "DAG DEPLOY ENABLED"},
+		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED"},
+	}
+}
+
+func newTableOutAll() *printutil.Table {
+	return &printutil.Table{
+		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
+		DynamicPadding: true,
+		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED"},
 	}
 }
 
@@ -59,9 +67,10 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
+	tab := newTableOut()
 	if all {
 		ws = ""
+		tab = newTableOutAll()
 	}
 	deployments, err := client.ListDeployments(c.Organization, ws)
 	if err != nil {
@@ -70,18 +79,15 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 
 	sort.Slice(deployments, func(i, j int) bool { return deployments[i].Label > deployments[j].Label })
 
-	tab := newTableOut()
-
 	// Build rows
 	for i := range deployments {
 		d := deployments[i]
-		currentTag := d.DeploymentSpec.Image.Tag
-		if currentTag == "" {
-			currentTag = "?"
-		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
-
-		tab.AddRow([]string{d.Label, d.ReleaseName, d.Workspace.ID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		if all {
+			tab.AddRow([]string{d.Label, d.Workspace.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		} else {
+			tab.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		}
 	}
 
 	return tab.Print(out)

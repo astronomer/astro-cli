@@ -37,6 +37,19 @@ func TestList(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("success with all true", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", org, "").Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := List("", true, mockClient, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "test-id-1")
+		assert.Contains(t, buf.String(), "test-id-2")
+
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
