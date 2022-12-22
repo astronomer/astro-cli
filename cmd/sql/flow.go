@@ -15,6 +15,7 @@ var (
 	connection        string
 	airflowHome       string
 	airflowDagsFolder string
+	dataDir           string
 	projectDir        string
 	generateTasks     bool
 	noGenerateTasks   bool
@@ -24,7 +25,7 @@ var (
 
 var (
 	configCommandString = []string{"config"}
-	globalConfigKeys    = []string{"airflow_home", "airflow_dags_folder"}
+	globalConfigKeys    = []string{"airflow_home", "airflow_dags_folder", "data_dir"}
 )
 
 func getAbsolutePath(path string) (string, error) {
@@ -81,7 +82,7 @@ var appendConfigKeyMountDir = func(configKey string, configFlags map[string]stri
 	return mountDirs, nil
 }
 
-func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder, mountGlobalDirs bool) (flags map[string]string, mountDirs []string, err error) {
+func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, setAirflowDagsFolder, setDataDir, mountGlobalDirs bool) (flags map[string]string, mountDirs []string, err error) {
 	flags = make(map[string]string)
 	mountDirs, err = getBaseMountDirs(projectDir)
 	if err != nil {
@@ -125,6 +126,15 @@ func buildFlagsAndMountDirs(projectDir string, setProjectDir, setAirflowHome, se
 		mountDirs = append(mountDirs, airflowDagsFolderAbs)
 	}
 
+	if setDataDir && dataDir != "" {
+		dataDirAbs, err := getAbsolutePath(dataDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		flags["data-dir"] = dataDirAbs
+		mountDirs = append(mountDirs, dataDirAbs)
+	}
+
 	return flags, mountDirs, nil
 }
 
@@ -145,7 +155,7 @@ func executeCmd(cmd *cobra.Command, args []string, flags map[string]string, moun
 }
 
 func executeBase(cmd *cobra.Command, args []string) error {
-	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, false, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, false, false, false, false)
 	if err != nil {
 		return err
 	}
@@ -157,7 +167,7 @@ func executeInit(cmd *cobra.Command, args []string) error {
 		projectDir = args[0]
 	}
 
-	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, true, true, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, true, true, true, false)
 	if err != nil {
 		return err
 	}
@@ -173,7 +183,7 @@ func executeConfig(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("key")
 	}
 
-	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, false, false)
 	if err != nil {
 		return err
 	}
@@ -190,7 +200,7 @@ func executeValidate(cmd *cobra.Command, args []string) error {
 		projectDir = args[0]
 	}
 
-	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, false, false, false)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, false, false, false, false, false)
 	if err != nil {
 		return err
 	}
@@ -218,7 +228,7 @@ func executeGenerate(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("workflow_name")
 	}
 
-	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, true)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, false, true)
 	if err != nil {
 		return err
 	}
@@ -246,7 +256,7 @@ func executeRun(cmd *cobra.Command, args []string) error {
 		return sql.ArgNotSetError("workflow_name")
 	}
 
-	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, true)
+	flags, mountDirs, err := buildFlagsAndMountDirs(projectDir, true, false, false, false, true)
 	if err != nil {
 		return err
 	}
@@ -311,6 +321,7 @@ func initCommand() *cobra.Command {
 	cmd.SetHelpFunc(executeHelp)
 	cmd.Flags().StringVar(&airflowHome, "airflow-home", "", "")
 	cmd.Flags().StringVar(&airflowDagsFolder, "airflow-dags-folder", "", "")
+	cmd.Flags().StringVar(&dataDir, "data-dir", "", "")
 	return cmd
 }
 
