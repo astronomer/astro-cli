@@ -129,5 +129,5 @@ Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
 Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx), ctx, houstonVersion, ansi.Bold(version))
+`, ansi.Bold(ctx), ctx, houstonVersion, ansi.Bold(houstonVersion))
 }
