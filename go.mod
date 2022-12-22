@@ -37,6 +37,7 @@ require (
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-github/v48 v48.2.0
+	github.com/hashicorp/go-version v1.3.0
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
@@ -96,7 +97,6 @@ require (
 	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20180507213350-8e809c8a8645 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.0 // indirect
-	github.com/hashicorp/go-version v1.3.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
