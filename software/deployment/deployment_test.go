@@ -133,6 +133,22 @@ func TestCreate(t *testing.T) {
 		api.AssertExpectations(t)
 	})
 
+	t.Run("create trigger enabled with trigger replicas count -1", func(t *testing.T) {
+		mockAppConfig.TriggererEnabled = true
+
+		api := new(mocks.ClientInterface)
+		api.On("GetAppConfig", nil).Return(mockAppConfig, nil)
+		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
+
+		triggerReplicas = -1
+		buf := new(bytes.Buffer)
+		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas}
+		err := Create(req, api, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		api.AssertExpectations(t)
+	})
+
 	t.Run("create nfslocation enabled", func(t *testing.T) {
 		mockAppConfig.TriggererEnabled = false
 

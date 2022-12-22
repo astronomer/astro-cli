@@ -143,7 +143,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 1, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
 	if runtimeEnabled {
@@ -362,6 +362,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	if appConfig != nil {
 		nfsMountDAGDeploymentEnabled = appConfig.Flags.NfsMountDagDeployment
 		gitSyncDAGDeploymentEnabled = appConfig.Flags.GitSyncEnabled
+	}
+
+	if !cmd.Flags().Changed("triggerer-replicas") {
+		createTriggererReplicas = -1
 	}
 
 	// we should validate only in case when this feature has been enabled
