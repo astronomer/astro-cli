@@ -7,6 +7,8 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/astronomer/astro-cli/version"
+
 )
 
 func executeCommandC(args ...string) (c *cobra.Command, output string, err error) {
@@ -39,6 +41,7 @@ func TestRootCommand(t *testing.T) {
 
 func TestRootCommandCloudContext(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	version.CurrVersion = "1.0.0"
 	output, err := executeCommand("help")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro [command]")
@@ -55,6 +58,7 @@ func TestRootCommandCloudContext(t *testing.T) {
 
 func TestRootCommandSoftwareContext(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	version.CurrVersion = "1.0.0"
 	output, err := executeCommand("help")
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro [command]")

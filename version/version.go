@@ -59,7 +59,7 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 	}
 
 	// Parse the current and latest versions into semver objects
-	currentSemver, err := semver.NewVersion("CurrVersion")
+	currentSemver, err := semver.NewVersion(CurrVersion)
 	if err != nil {
 		return err
 	}
