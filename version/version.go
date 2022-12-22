@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v48/github"
 	semver "github.com/Masterminds/semver/v3"
 )
 
@@ -34,6 +34,10 @@ func getLatestRelease(client *github.Client, owner, repo string) (*github.Reposi
 	// Find the latest release (by release tag)
 	var latestRelease *github.RepositoryRelease
 	for _, release := range releases {
+		// Skip pre-releases
+		if release.GetPrerelease() {
+			continue
+		}
 		if latestRelease == nil || release.GetTagName() > latestRelease.GetTagName() {
 			latestRelease = release
 		}
@@ -59,6 +63,7 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 	if err != nil {
 		return err
 	}
+
 	latestSemver, err := semver.NewVersion(latestRelease.GetTagName())
 	if err != nil {
 		return err
@@ -71,7 +76,7 @@ func CompareVersions(client *github.Client, owner, repo string) error {
 		} else {
 			fmt.Printf("\nA newer version of Astro CLI is available: %s\nPlease see https://docs.astronomer.io/astro/cli/install-cli#upgrade-the-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		}
-		fmt.Printf("\nIf don't want to see this message again run 'astro config set -g upgrade_message false'\n\n")
+		fmt.Printf("If you don't want to see this message again run 'astro config set -g upgrade_message false'\n\n")
 	}
 
 	return nil
