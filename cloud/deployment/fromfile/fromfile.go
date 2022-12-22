@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
@@ -17,29 +18,33 @@ import (
 var (
 	errEmptyFile                      = errors.New("has no content")
 	errCreateFailed                   = errors.New("failed to create deployment with input")
+	errUpdateFailed                   = errors.New("failed to update deployment with input")
 	errRequiredField                  = errors.New("missing required field")
 	errCannotUpdateExistingDeployment = errors.New("already exists")
 	errNotFound                       = errors.New("does not exist")
 )
 
 const (
-	jsonFormat = "json"
+	jsonFormat   = "json"
+	createAction = "create"
+	updateAction = "update"
 )
 
-// Create takes a file and creates a deployment with the confiuration specified in the file.
+// CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func Create(inputFile string, client astro.Client, out io.Writer) error {
+func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer) error {
 	var (
-		err                                           error
-		errHelp, clusterID, workspaceID, outputFormat string
-		dataBytes                                     []byte
-		formattedDeployment                           inspect.FormattedDeployment
-		createInput                                   astro.CreateDeploymentInput
-		existingDeployments                           []astro.Deployment
-		createdDeployment                             astro.Deployment
-		nodePools                                     []astro.NodePool
-		jsonOutput                                    bool
+		err                                            error
+		errHelp, clusterID, workspaceID, outputFormat  string
+		dataBytes                                      []byte
+		formattedDeployment                            inspect.FormattedDeployment
+		createInput                                    astro.CreateDeploymentInput
+		updateInput                                    astro.UpdateDeploymentInput
+		existingDeployment, createdOrUpdatedDeployment astro.Deployment
+		existingDeployments                            []astro.Deployment
+		nodePools                                      []astro.NodePool
+		jsonOutput                                     bool
 	)
 
 	// get file contents as []byte
@@ -81,35 +86,57 @@ func Create(inputFile string, client astro.Client, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// check if deployment exists
-	if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
-		// create does not allow updating existing deployments
-		errHelp = fmt.Sprintf("use deployment update --from-file %s instead", inputFile)
-		return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
-			errCannotUpdateExistingDeployment, errHelp)
-	}
-	// this deployment does not exist so create it
-
-	// transform formattedDeployment to DeploymentCreateInput
-	createInput, err = getCreateInput(&formattedDeployment, clusterID, workspaceID, nodePools, client)
-	if err != nil {
-		return err
-	}
-	// create the deployment
-	createdDeployment, err = client.CreateDeployment(&createInput)
-	if err != nil {
-		return fmt.Errorf("%s: %w %+v", err.Error(), errCreateFailed, createInput)
+	switch action {
+	case createAction:
+		// check if deployment exists
+		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
+			// create does not allow updating existing deployments
+			errHelp = fmt.Sprintf("use deployment update --from-file %s instead", inputFile)
+			return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
+				errCannotUpdateExistingDeployment, errHelp)
+		}
+		// this deployment does not exist so create it
+		// transform formattedDeployment to DeploymentCreateInput
+		createInput, _, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, createAction, &astro.Deployment{}, nodePools, client)
+		if err != nil {
+			return err
+		}
+		// create the deployment
+		createdOrUpdatedDeployment, err = client.CreateDeployment(&createInput)
+		if err != nil {
+			return fmt.Errorf("%s: %w %+v", err.Error(), errCreateFailed, createInput)
+		}
+	case updateAction:
+		// check if deployment does not exist
+		if !deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
+			// update does not allow creating new deployments
+			errHelp = fmt.Sprintf("use deployment create --from-file %s instead", inputFile)
+			return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
+				errNotFound, errHelp)
+		}
+		// this deployment exists so update it
+		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+		// transform formattedDeployment to DeploymentUpdateInput
+		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, client)
+		if err != nil {
+			return err
+		}
+		// update the deployment
+		createdOrUpdatedDeployment, err = client.UpdateDeployment(&updateInput)
+		if err != nil {
+			return fmt.Errorf("%s: %w %+v", err.Error(), errUpdateFailed, updateInput)
+		}
 	}
 	// create environment variables
 	if hasEnvVars(&formattedDeployment) {
-		_, err = createEnvVars(&formattedDeployment, createdDeployment.ID, client)
+		_, err = createEnvVars(&formattedDeployment, createdOrUpdatedDeployment.ID, client)
 		if err != nil {
 			return err
 		}
 	}
 	// create alert emails
 	if hasAlertEmails(&formattedDeployment) {
-		_, err = createAlertEmails(&formattedDeployment, createdDeployment.ID, client)
+		_, err = createAlertEmails(&formattedDeployment, createdOrUpdatedDeployment.ID, client)
 		if err != nil {
 			return err
 		}
@@ -117,19 +144,22 @@ func Create(inputFile string, client astro.Client, out io.Writer) error {
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", createdDeployment.ID, outputFormat, client, out, "")
+	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, out, "")
 }
 
-// getCreateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput.
-// If worker-queues were requested, it gets node pool id from the worker type and validates queue options.
+// getCreateOrUpdateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput or
+// astro.UpdateDeploymentInput based on the action requested.
+// If worker-queues were requested, it gets node pool id work the workers and validates queue options.
 // If no queue options were specified, it sets default values.
 // It returns an error if getting default options fail.
 // It returns an error if worker-queue options are not valid.
 // It returns an error if node pool id could not be found for the worker type.
-func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID string, nodePools []astro.NodePool, client astro.Client) (astro.CreateDeploymentInput, error) {
+func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, workspaceID, action string, existingDeployment *astro.Deployment, nodePools []astro.NodePool, client astro.Client) (astro.CreateDeploymentInput, astro.UpdateDeploymentInput, error) {
 	var (
 		defaultOptions astro.WorkerQueueDefaultOptions
 		listQueues     []astro.WorkerQueue
+		createInput    astro.CreateDeploymentInput
+		updateInput    astro.UpdateDeploymentInput
 		err            error
 	)
 
@@ -138,12 +168,12 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, 
 		// get defaults for min-count, max-count and concurrency from API
 		defaultOptions, err = workerqueue.GetWorkerQueueDefaultOptions(client)
 		if err != nil {
-			return astro.CreateDeploymentInput{}, err
+			return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 		}
 		// transform inspect.WorkerQ to []astro.WorkerQueue
-		listQueues, err = getQueues(deploymentFromFile, nodePools)
+		listQueues, err = getQueues(deploymentFromFile, nodePools, existingDeployment.WorkerQueues)
 		if err != nil {
-			return astro.CreateDeploymentInput{}, err
+			return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 		}
 		for i := range listQueues {
 			// set default values if none were specified
@@ -151,29 +181,48 @@ func getCreateInput(deploymentFromFile *inspect.FormattedDeployment, clusterID, 
 			// check if queue is valid
 			err = workerqueue.IsWorkerQueueInputValid(a, defaultOptions)
 			if err != nil {
-				return astro.CreateDeploymentInput{}, err
+				return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 			}
 			// add it to the list of queues to be created
 			listQueues[i] = *a
 		}
 	}
-	createInput := astro.CreateDeploymentInput{
-		WorkspaceID:           workspaceID,
-		ClusterID:             clusterID,
-		Label:                 deploymentFromFile.Deployment.Configuration.Name,
-		Description:           deploymentFromFile.Deployment.Configuration.Description,
-		RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
-		DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
-		DeploymentSpec: astro.DeploymentCreateSpec{
-			Executor: "CeleryExecutor",
-			Scheduler: astro.Scheduler{
-				AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
-				Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+	switch action {
+	case createAction:
+		createInput = astro.CreateDeploymentInput{
+			WorkspaceID:           workspaceID,
+			ClusterID:             clusterID,
+			Label:                 deploymentFromFile.Deployment.Configuration.Name,
+			Description:           deploymentFromFile.Deployment.Configuration.Description,
+			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor: "CeleryExecutor",
+				Scheduler: astro.Scheduler{
+					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+				},
 			},
-		},
-		WorkerQueues: listQueues,
+			WorkerQueues: listQueues,
+		}
+	case updateAction:
+		updateInput = astro.UpdateDeploymentInput{
+			ID:               existingDeployment.ID,
+			ClusterID:        clusterID,
+			Label:            deploymentFromFile.Deployment.Configuration.Name,
+			Description:      deploymentFromFile.Deployment.Configuration.Description,
+			DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor: "CeleryExecutor",
+				Scheduler: astro.Scheduler{
+					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+				},
+			},
+			WorkerQueues: listQueues,
+		}
 	}
-	return createInput, nil
+	return createInput, updateInput, nil
 }
 
 // checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.
@@ -205,7 +254,7 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error 
 	return nil
 }
 
-// DeploymentExists deploymentToCreate as its argument.
+// deploymentExists deploymentToCreate as its argument.
 // It returns true if deploymentToCreate exists.
 // It returns false if deploymentToCreate does not exist.
 func deploymentExists(existingDeployments []astro.Deployment, deploymentNameToCreate string) bool {
@@ -216,6 +265,18 @@ func deploymentExists(existingDeployments []astro.Deployment, deploymentNameToCr
 		}
 	}
 	return false
+}
+
+// deploymentFromName takes existingDeployments and deploymentName as its arguments.
+// It returns the existing deployment that matches deploymentName.
+func deploymentFromName(existingDeployments []astro.Deployment, deploymentName string) astro.Deployment {
+	for i := range existingDeployments {
+		if existingDeployments[i].Label == deploymentName {
+			// deployment that matched name
+			return existingDeployments[i]
+		}
+	}
+	return astro.Deployment{}
 }
 
 // getClusterInfoFromName takes clusterName and organizationID as its arguments.
@@ -277,7 +338,7 @@ func getNodePoolIDFromWorkerType(workerType, clusterName string, nodePools []ast
 }
 
 // createEnvVars takes a deploymentFromFile, deploymentID and a client as its arguments.
-// It updates the deployment identified by deploymentID with environment variables.
+// It updates the deployment identified by deploymentID with requested environment variables.
 // It returns an error if it fails to modify the environment variables for a deployment.
 func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) ([]astro.EnvironmentVariablesObject, error) {
 	var (
@@ -305,23 +366,45 @@ func createEnvVars(deploymentFromFile *inspect.FormattedDeployment, deploymentID
 }
 
 // getQueues takes a deploymentFromFile as its arguments.
-// It returns a list of worker queues to be created.
-func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astro.NodePool) ([]astro.WorkerQueue, error) {
+// It returns a list of worker queues to be created or updated.
+func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astro.NodePool, existingQueues []astro.WorkerQueue) ([]astro.WorkerQueue, error) {
 	var (
 		qList      []astro.WorkerQueue
 		nodePoolID string
 		err        error
 	)
 	requestedQueues := deploymentFromFile.Deployment.WorkerQs
+	// sort existing queues by name
+	if len(existingQueues) > 1 {
+		sort.Slice(existingQueues, func(i, j int) bool {
+			return existingQueues[i].Name < existingQueues[j].Name
+		})
+	}
+	// sort requested queues by name
+	if len(requestedQueues) > 1 {
+		sort.Slice(requestedQueues, func(i, j int) bool {
+			return requestedQueues[i].Name < requestedQueues[j].Name
+		})
+	}
 	qList = make([]astro.WorkerQueue, len(requestedQueues))
-	for i, queue := range requestedQueues {
-		qList[i].Name = queue.Name
-		qList[i].IsDefault = queue.IsDefault
-		qList[i].MinWorkerCount = queue.MinWorkerCount
-		qList[i].MaxWorkerCount = queue.MaxWorkerCount
-		qList[i].WorkerConcurrency = queue.WorkerConcurrency
+	for i := range requestedQueues {
+		// check if requested queue exists
+		if i < len(existingQueues) {
+			// add existing queue to list of queues to return
+			if requestedQueues[i].Name == existingQueues[i].Name {
+				// update existing queue
+				qList[i].Name = existingQueues[i].Name
+				qList[i].ID = existingQueues[i].ID
+			}
+		}
+		// add new queue or update existing queue properties to list of queues to return
+		qList[i].Name = requestedQueues[i].Name
+		qList[i].IsDefault = requestedQueues[i].IsDefault
+		qList[i].MinWorkerCount = requestedQueues[i].MinWorkerCount
+		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
+		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		// map worker type to node pool id
-		nodePoolID, err = getNodePoolIDFromWorkerType(queue.WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
+		nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +432,7 @@ func hasAlertEmails(deploymentFromFile *inspect.FormattedDeployment) bool {
 }
 
 // createAlertEmails takes a deploymentFromFile and deploymentID and a client as its arguments.
-// It creates alert emails for the deplyment identified by deploymentID.
+// It creates or updates alert emails for the deployment identified by deploymentID.
 // It returns an error if it fails to update the alert emails for a deployment.
 func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deploymentID string, client astro.Client) (astro.DeploymentAlerts, error) {
 	var (
