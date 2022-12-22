@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+
+	"github.com/hashicorp/go-version"
 )
 
 type pypiVersionResponse struct {
-	Info struct {
-		Version string `json:"version"`
-	} `json:"info"`
+	Releases map[string]json.RawMessage `json:"releases"`
 }
 
 type configResponse struct {
@@ -44,7 +45,17 @@ func GetPypiVersion(projectURL string) (string, error) {
 		return "", fmt.Errorf("error parsing response for project version %w", err)
 	}
 
-	return resp.Info.Version, nil
+	versions := make([]*version.Version, len(resp.Releases))
+	index := 0
+	for release := range resp.Releases {
+		versions[index], err = version.NewVersion(release)
+		if err != nil {
+			return "", fmt.Errorf("error parsing release version %w", err)
+		}
+		index++
+	}
+	sort.Sort(sort.Reverse(version.Collection(versions)))
+	return versions[0].Original(), nil
 }
 
 func GetBaseDockerImageURI(configURL string) (string, error) {
