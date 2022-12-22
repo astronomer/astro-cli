@@ -48,11 +48,12 @@ func GetPypiVersion(projectURL string) (string, error) {
 	versions := make([]*version.Version, len(resp.Releases))
 	index := 0
 	for release := range resp.Releases {
-		versions[index], err = version.NewVersion(release)
-		if err != nil {
-			return "", fmt.Errorf("error parsing release version %w", err)
+		if v, err := version.NewVersion(release); err != nil {
+			fmt.Println(fmt.Errorf("error parsing release version %w", err))
+		} else {
+			versions[index] = v
+			index++
 		}
-		index++
 	}
 	sort.Sort(sort.Reverse(version.Collection(versions)))
 	return versions[0].Original(), nil
