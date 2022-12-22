@@ -16,10 +16,9 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/version"
 
+	"github.com/google/go-github/v48/github"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/google/go-github/v48/github"
-
 )
 
 var (
@@ -123,12 +122,12 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	return rootCmd
 }
 
-func getResourcesHelpTemplate(version, ctx string) string {
+func getResourcesHelpTemplate(houstonVersion, ctx string) string {
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
 Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
 Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx), ctx, version, ansi.Bold(version))
+`, ansi.Bold(ctx), ctx, houstonVersion, ansi.Bold(version))
 }

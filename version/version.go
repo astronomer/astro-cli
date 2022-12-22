@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/google/go-github/v48/github"
 	semver "github.com/Masterminds/semver/v3"
+	"github.com/google/go-github/v48/github"
 )
 
 var CurrVersion string
