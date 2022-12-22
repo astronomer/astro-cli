@@ -14,9 +14,12 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/version"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/google/go-github/v28/github"
+
 )
 
 var (
@@ -63,6 +66,16 @@ func NewRootCmd() *cobra.Command {
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Check for latest version
+			if config.CFG.UpgradeMessage.GetBool() {
+				// create github client
+				githubClient := github.NewClient(nil)
+				// compare current version to latest
+				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
+				if err != nil {
+					return err
+				}
+			}
 			if isCloudCtx {
 				return cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
 			}
