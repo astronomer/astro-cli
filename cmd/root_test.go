@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/version"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"github.com/astronomer/astro-cli/version"
-
 )
 
 func executeCommandC(args ...string) (c *cobra.Command, output string, err error) {
