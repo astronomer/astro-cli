@@ -18,7 +18,6 @@ import (
 
 	"github.com/google/go-github/v48/github"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -73,7 +72,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				// compare current version to latest
 				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
 				if err != nil {
-					log.Debug(err)
+					logrus.Debug(err)
 				}
 			}
 			if isCloudCtx {
