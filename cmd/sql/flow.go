@@ -15,6 +15,7 @@ var configCmd *cobra.Command
 
 // All cmd names
 const (
+	flowCmdName     = "flow"
 	aboutCmdName    = "about"
 	configCmdName   = "config"
 	generateCmdName = "generate"
@@ -248,7 +249,11 @@ func readCmdOutput(cmd *cobra.Command, args []string) string {
 }
 
 // Execute help cmd
-func executeHelp(cmd *cobra.Command, cmdString []string) {
+func executeHelp(cmd *cobra.Command, args []string) {
+	var cmdString []string
+	if cmd.Name() != flowCmdName {
+		cmdString = []string{cmd.Name(), "--help"}
+	}
 	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, nil, false)
 	if err != nil {
 		panic(fmt.Errorf("error running %v: %w", cmdString, err))
@@ -360,7 +365,7 @@ func login(cmd *cobra.Command, args []string) error {
 
 func NewFlowCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "flow",
+		Use:               flowCmdName,
 		Short:             "Run flow commands",
 		PersistentPreRunE: login,
 		Run:               executeHelp,

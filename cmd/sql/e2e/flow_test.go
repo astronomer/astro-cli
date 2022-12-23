@@ -47,6 +47,11 @@ func TestE2EFlowVersionCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestE2EFlowVersionHelpCmd(t *testing.T) {
+	err := execFlowCmd("version", "--help")
+	assert.NoError(t, err)
+}
+
 func TestE2EFlowAboutCmd(t *testing.T) {
 	err := execFlowCmd("about")
 	assert.NoError(t, err)

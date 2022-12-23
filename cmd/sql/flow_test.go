@@ -138,6 +138,12 @@ func TestFlowVersionCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowVersionHelpCmd(t *testing.T) {
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("version", "--help")
+	assert.NoError(t, err)
+}
+
 func TestFlowAboutCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd("about")
