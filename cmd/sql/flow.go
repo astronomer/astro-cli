@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
@@ -100,7 +101,8 @@ func getProjectDirFromArgs(args []string) string {
 // Read config cmd output for retrieving config settings such as airflow_home
 func readConfigCmdOutput(key string) string {
 	args := []string{key}
-	return readCmdOutput(configCmd, args)
+	output := readCmdOutput(configCmd, args)
+	return strings.TrimSpace(output) // remove spaces such as \r\n
 }
 
 // Resolve filepath to absolute
