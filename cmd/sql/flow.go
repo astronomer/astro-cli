@@ -195,7 +195,7 @@ func getDirs(cmd *cobra.Command) []string {
 	case validateCmdName:
 		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("data_dir"))
 	case generateCmdName:
-		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("airflow_dags_folder"))
+		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("airflow_dags_folder"), readConfigCmdOutput("data_dir"))
 	case runCmdName:
 		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("airflow_dags_folder"), readConfigCmdOutput("data_dir"))
 	}
