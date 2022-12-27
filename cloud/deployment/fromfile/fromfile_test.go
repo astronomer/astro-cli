@@ -894,6 +894,7 @@ deployment:
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
 			assert.ErrorIs(t, err, errTest)
+			assert.ErrorContains(t, err, "\n failed to create alert emails")
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if creating alert emails fails", func(t *testing.T) {

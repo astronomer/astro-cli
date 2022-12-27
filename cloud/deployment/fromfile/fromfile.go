@@ -131,7 +131,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 	if hasEnvVars(&formattedDeployment) {
 		_, err = createEnvVars(&formattedDeployment, createdOrUpdatedDeployment.ID, client)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w \n failed to %s alert emails", err, action)
 		}
 	}
 	// create alert emails
