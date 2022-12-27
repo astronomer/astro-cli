@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/mail"
 	"os"
 	"sort"
 
@@ -20,6 +21,7 @@ var (
 	errCreateFailed                   = errors.New("failed to create deployment with input")
 	errUpdateFailed                   = errors.New("failed to update deployment with input")
 	errRequiredField                  = errors.New("missing required field")
+	errInvalidEmail                   = errors.New("invalid email")
 	errCannotUpdateExistingDeployment = errors.New("already exists")
 	errNotFound                       = errors.New("does not exist")
 )
@@ -64,7 +66,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 		return err
 	}
 	// validate required fields
-	err = checkRequiredFields(&formattedDeployment)
+	err = checkRequiredFields(&formattedDeployment, action)
 	if err != nil {
 		return err
 	}
@@ -227,12 +229,26 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 
 // checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.
 // It returns errRequiredField if required fields are missing and nil if not.
-func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error {
+func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action string) error {
 	if deploymentFromFile.Deployment.Configuration.Name == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.name")
 	}
 	if deploymentFromFile.Deployment.Configuration.ClusterName == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_name")
+	}
+	// if alert emails are requested
+	if hasAlertEmails(deploymentFromFile) {
+		err := checkAlertEmails(deploymentFromFile)
+		if err != nil {
+			return err
+		}
+	}
+	// if environment variables are requested
+	if hasEnvVars(deploymentFromFile) {
+		err := checkEnvVars(deploymentFromFile, action)
+		if err != nil {
+			return err
+		}
 	}
 	// if worker queues were requested check queue name, isDefault and worker type
 	if hasQueues(deploymentFromFile) {
@@ -459,4 +475,38 @@ func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deployme
 func isJSON(data []byte) bool {
 	var js interface{}
 	return json.Unmarshal(data, &js) == nil
+}
+
+// isValidEmail returns true if email is a valid email address.
+// It returns false if not.
+func isValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+// checkAlertEmails returns an error if email in deploymentFromFile.AlertEmails is not valid.
+func checkAlertEmails(deploymentFromFile *inspect.FormattedDeployment) error {
+	for _, email := range deploymentFromFile.Deployment.AlertEmails {
+		if !isValidEmail(email) {
+			return fmt.Errorf("%w: %s", errInvalidEmail, email)
+		}
+	}
+	return nil
+}
+
+// checkEnvVars returns an error if either key or value are missing for any deploymentFromFile.Deployment.EnvVars.
+func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string) error {
+	for i, envVar := range deploymentFromFile.Deployment.EnvVars {
+		if envVar.Key == "" {
+			missingField := fmt.Sprintf("deployment.environment_variables[%d].key", i)
+			return fmt.Errorf("%w: %s", errRequiredField, missingField)
+		}
+		if action == createAction {
+			if envVar.Value == "" {
+				missingField := fmt.Sprintf("deployment.environment_variables[%d].value", i)
+				return fmt.Errorf("%w: %s", errRequiredField, missingField)
+			}
+		}
+	}
+	return nil
 }

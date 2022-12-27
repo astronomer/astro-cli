@@ -1473,8 +1473,8 @@ deployment:
             "webserver_url": "some-url"
         },
         "alert_emails": [
-            "email1",
-            "email2"
+            "email1@test.com",
+            "email2@test.com"
         ]
     }
 }`
@@ -1600,8 +1600,8 @@ deployment:
             "webserver_url": "some-url"
         },
         "alert_emails": [
-            "email1",
-            "email2"
+            "email1@test.com",
+            "email2@test.com"
         ]
     }
 }`
@@ -2118,8 +2118,8 @@ deployment:
             "webserver_url": "some-url"
         },
         "alert_emails": [
-            "email1",
-            "email2"
+            "email1@test.com",
+            "email2@test.com"
         ]
     }
 }`
@@ -2250,8 +2250,8 @@ deployment:
             "webserver_url": "some-url"
         },
         "alert_emails": [
-            "email1",
-            "email2"
+            "email1@test.com",
+            "email2@test.com"
         ]
     }
 }`
@@ -2904,17 +2904,50 @@ func TestCheckRequiredFields(t *testing.T) {
 	)
 	input.Deployment.Configuration.Description = "test-description"
 	t.Run("returns an error if name is missing", func(t *testing.T) {
-		err = checkRequiredFields(&input)
+		err = checkRequiredFields(&input, "")
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
 	})
 	t.Run("returns an error if cluster_name is missing", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
-		err = checkRequiredFields(&input)
+		err = checkRequiredFields(&input, "")
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.configuration.cluster_name")
 	})
+	t.Run("returns an error if alert email is invalid", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []string{"test@test.com", "testing@testing.com", "not-an-email"}
+		input.Deployment.AlertEmails = list
+		err = checkRequiredFields(&input, "")
+		assert.ErrorIs(t, err, errInvalidEmail)
+		assert.ErrorContains(t, err, "invalid email: not-an-email")
+	})
+	t.Run("returns an error if env var keys are missing on create", func(t *testing.T) {
+		input = inspect.FormattedDeployment{}
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+		}
+		input.Deployment.EnvVars = list
+		err = checkRequiredFields(&input, "create")
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[0].key")
+	})
 	t.Run("if queues were requested, it returns an error if queue name is missing", func(t *testing.T) {
+		input = inspect.FormattedDeployment{}
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		qList := []inspect.Workerq{
@@ -2930,7 +2963,7 @@ func TestCheckRequiredFields(t *testing.T) {
 			},
 		}
 		input.Deployment.WorkerQs = qList
-		err = checkRequiredFields(&input)
+		err = checkRequiredFields(&input, "create")
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name")
 	})
@@ -2950,7 +2983,7 @@ func TestCheckRequiredFields(t *testing.T) {
 			},
 		}
 		input.Deployment.WorkerQs = qList
-		err = checkRequiredFields(&input)
+		err = checkRequiredFields(&input, "create")
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[1].name = default")
 	})
@@ -2969,7 +3002,7 @@ func TestCheckRequiredFields(t *testing.T) {
 			},
 		}
 		input.Deployment.WorkerQs = qList
-		err = checkRequiredFields(&input)
+		err = checkRequiredFields(&input, "create")
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].worker_type")
 	})
@@ -2989,7 +3022,7 @@ func TestCheckRequiredFields(t *testing.T) {
 			},
 		}
 		input.Deployment.WorkerQs = qList
-		err = checkRequiredFields(&input)
+		err = checkRequiredFields(&input, "create")
 		assert.NoError(t, err)
 	})
 }
@@ -3709,5 +3742,140 @@ func TestDeploymentFromName(t *testing.T) {
 		expectedeployment = astro.Deployment{}
 		actual = deploymentFromName(existingDeployments, deploymentToCreate)
 		assert.Equal(t, expectedeployment, actual)
+	})
+}
+
+func TestIsValidEmail(t *testing.T) {
+	var (
+		actual     bool
+		emailInput string
+	)
+	t.Run("returns true if email is valid", func(t *testing.T) {
+		emailInput = "test123@superomain.cool.com"
+		actual = isValidEmail(emailInput)
+		assert.True(t, actual)
+	})
+	t.Run("returns false if email is invalid", func(t *testing.T) {
+		emailInput = "invalid-email.com"
+		actual = isValidEmail(emailInput)
+		assert.False(t, actual)
+	})
+}
+
+func TestValidateAlertEmails(t *testing.T) {
+	var (
+		err   error
+		input inspect.FormattedDeployment
+	)
+	t.Run("returns an error if alert email is invalid", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []string{"test@test.com", "testing@testing.com", "not-an-email"}
+		input.Deployment.AlertEmails = list
+		err = checkAlertEmails(&input)
+		assert.ErrorIs(t, err, errInvalidEmail)
+		assert.ErrorContains(t, err, "invalid email: not-an-email")
+	})
+	t.Run("returns nil if alert email is valid", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []string{"test@test.com", "testing@testing.com"}
+		input.Deployment.AlertEmails = list
+		err = checkAlertEmails(&input)
+		assert.NoError(t, err)
+	})
+}
+
+func TestCheckEnvVars(t *testing.T) {
+	var (
+		err   error
+		input inspect.FormattedDeployment
+	)
+	t.Run("returns an error if env var keys are missing on create", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+		}
+		input.Deployment.EnvVars = list
+		err = checkEnvVars(&input, "create")
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[0].key")
+	})
+	t.Run("returns an error if env var values are missing on create", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "",
+			},
+		}
+		input.Deployment.EnvVars = list
+		err = checkEnvVars(&input, "create")
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[1].value")
+	})
+	t.Run("returns an error if env var keys are missing on update", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "",
+				UpdatedAt: "",
+				Value:     "val-2",
+			},
+		}
+		input.Deployment.EnvVars = list
+		err = checkEnvVars(&input, "update")
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[1].key")
+	})
+	t.Run("returns nil if env var values are missing on update", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		list := []inspect.EnvironmentVariable{
+			{
+				IsSecret:  false,
+				Key:       "key-1",
+				UpdatedAt: "",
+				Value:     "val-1",
+			},
+			{
+				IsSecret:  true,
+				Key:       "key-2",
+				UpdatedAt: "",
+				Value:     "",
+			},
+		}
+		input.Deployment.EnvVars = list
+		err = checkEnvVars(&input, "update")
+		assert.NoError(t, err)
 	})
 }
