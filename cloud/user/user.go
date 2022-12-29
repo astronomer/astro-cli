@@ -2,11 +2,11 @@ package user
 
 import (
 	httpContext "context"
+	"fmt"
 	"io"
 	"os"
-	"fmt"
-	"time"
 	"strconv"
+	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
@@ -18,11 +18,11 @@ import (
 )
 
 var (
-	ErrNoShortName  = errors.New("cannot retrieve organization short name from context")
-	ErrInvalidRole  = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidEmail = errors.New("no email provided for the invite. Retry with a valid email address")
+	ErrNoShortName    = errors.New("cannot retrieve organization short name from context")
+	ErrInvalidRole    = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrInvalidEmail   = errors.New("no email provided for the invite. Retry with a valid email address")
 	ErrInvalidUserKey = errors.New("invalid User selected")
-	selectLimit = 1000
+	selectLimit       = 1000
 )
 
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
@@ -135,7 +135,7 @@ func selectUser(users []astrocore.User) (astrocore.User, error) {
 	for i := range users {
 		index := i + 1
 		table.AddRow([]string{
-			strconv.Itoa(index), 
+			strconv.Itoa(index),
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
@@ -170,9 +170,9 @@ func GetOrgUsers(client astrocore.CoreClient, limit int) ([]astrocore.User, erro
 
 	for {
 		resp, err := client.ListOrgUsersWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrgUsersParams{
-		Offset: &offset,
-		Limit: &limit,
-	})
+			Offset: &offset,
+			Limit:  &limit,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -217,4 +217,3 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient, limit int) error {
 	table.Print(out)
 	return nil
 }
-

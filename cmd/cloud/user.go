@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	role string
-	limit int
+	role         string
+	limit        int
 	limitDefault = 100
 )
 
@@ -52,7 +52,7 @@ func newUserListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"inv"},
 		Short:   "List all the users in your Astro Organization",
-		Long: "List all the users in your Astro Organization",
+		Long:    "List all the users in your Astro Organization",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listUsers(cmd, out)
 		},
