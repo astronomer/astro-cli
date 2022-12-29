@@ -22,7 +22,7 @@ var (
 	ErrInvalidRole  = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidEmail = errors.New("no email provided for the invite. Retry with a valid email address")
 	ErrInvalidUserKey = errors.New("invalid User selected")
-
+	selectLimit = 1000
 )
 
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
@@ -76,21 +76,21 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 		return ErrNoShortName
 	}
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetOrgUsers(client, 1000)
+	users, err := GetOrgUsers(client, selectLimit)
 	if err != nil {
 		return err
 	}
 	if email == "" {
-		user, err := selectUser(users, out)
+		user, err := selectUser(users)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
 			return err
 		}
 	} else {
-		for _, user := range users {
-			if user.Username == email {
-				userID = user.Id
+		for i := range users {
+			if users[i].Username == email {
+				userID = users[i].Id
 			}
 		}
 	}
@@ -122,7 +122,7 @@ func IsRoleValid(role string) error {
 	return ErrInvalidRole
 }
 
-func selectUser(users []astrocore.User, out io.Writer) (astrocore.User, error) {
+func selectUser(users []astrocore.User) (astrocore.User, error) {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
@@ -130,10 +130,6 @@ func selectUser(users []astrocore.User, out io.Writer) (astrocore.User, error) {
 	}
 
 	fmt.Println("\nPlease select the user who's role you would like to update:")
-
-	// sort.Slice(deployments, func(i, j int) bool {
-	// 	return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
-	// })
 
 	userMap := map[string]astrocore.User{}
 	for i := range users {

@@ -12,6 +12,7 @@ import (
 var (
 	role string
 	limit int
+	limitDefault = 100
 )
 
 func newUserCmd(out io.Writer) *cobra.Command {
@@ -53,10 +54,10 @@ func newUserListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the users in your Astro Organization",
 		Long: "List all the users in your Astro Organization",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listUsers(cmd, args, out)
+			return listUsers(cmd, out)
 		},
 	}
-	cmd.Flags().IntVarP(&limit, "limit", "l", 100, "Maximum number of organization users listed")
+	cmd.Flags().IntVarP(&limit, "limit", "l", limitDefault, "Maximum number of organization users listed")
 	return cmd
 }
 
@@ -91,7 +92,7 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	return user.CreateInvite(email, role, out, astroCoreClient)
 }
 
-func listUsers(cmd *cobra.Command, args []string, out io.Writer) error {
+func listUsers(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	return user.ListOrgUsers(out, astroCoreClient, limit)
 }
