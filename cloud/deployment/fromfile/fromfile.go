@@ -144,7 +144,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, out, "")
+	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, out, "", false)
 }
 
 // getCreateOrUpdateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput or

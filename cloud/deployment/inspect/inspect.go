@@ -78,7 +78,7 @@ const (
 	jsonFormat = "json"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string, template bool) error {
 	var (
 		requestedDeployment                                                        astro.Deployment
 		err                                                                        error
@@ -111,7 +111,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		fmt.Fprintln(out, value)
 	} else {
 		// print the entire deployment in outputFormat
-		infoToPrint, err = formatPrintableDeployment(outputFormat, false, printableDeployment)
+		infoToPrint, err = formatPrintableDeployment(outputFormat, template, printableDeployment)
 		if err != nil {
 			return err
 		}
