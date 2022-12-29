@@ -1368,23 +1368,74 @@ func TestGetTemplate(t *testing.T) {
 	info, _ := getDeploymentInfo(&sourceDeployment)
 	config := getDeploymentConfig(&sourceDeployment)
 	additional := getAdditional(&sourceDeployment)
-	printableDeployment := map[string]interface{}{
-		"deployment": map[string]interface{}{
-			"metadata":              info,
-			"configuration":         config,
-			"alert_emails":          additional["alert_emails"],
-			"worker_queues":         additional["worker_queues"],
-			"environment_variables": additional["environment_variables"],
-		},
-	}
-	var decoded, expected FormattedDeployment
-	err := decodeToStruct(printableDeployment, &decoded)
-	assert.NoError(t, err)
-	err = decodeToStruct(printableDeployment, &expected)
-	assert.NoError(t, err)
+
 	t.Run("returns a formatted template", func(t *testing.T) {
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"metadata":              info,
+				"configuration":         config,
+				"alert_emails":          additional["alert_emails"],
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
+			},
+		}
+		var decoded, expected FormattedDeployment
+		err := decodeToStruct(printableDeployment, &decoded)
+		assert.NoError(t, err)
+		err = decodeToStruct(printableDeployment, &expected)
+		assert.NoError(t, err)
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = ""
+		}
+		actual := getTemplate(&decoded)
+		assert.Equal(t, expected, actual)
+	})
+	t.Run("returns a template without env vars if they are empty", func(t *testing.T) {
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"metadata":      info,
+				"configuration": config,
+				"alert_emails":  additional["alert_emails"],
+				"worker_queues": additional["worker_queues"],
+			},
+		}
+		var decoded, expected FormattedDeployment
+		err := decodeToStruct(printableDeployment, &decoded)
+		assert.NoError(t, err)
+		err = decodeToStruct(printableDeployment, &expected)
+		assert.NoError(t, err)
+		err = decodeToStruct(printableDeployment, &decoded)
+		assert.NoError(t, err)
+		err = decodeToStruct(printableDeployment, &expected)
+		assert.NoError(t, err)
+		expected.Deployment.Configuration.Name = ""
+		expected.Deployment.Metadata = nil
+		expected.Deployment.EnvVars = nil
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = ""
+		}
+		actual := getTemplate(&decoded)
+		assert.Equal(t, expected, actual)
+	})
+	t.Run("returns a template without alert emails if they are empty", func(t *testing.T) {
+		printableDeployment := map[string]interface{}{
+			"deployment": map[string]interface{}{
+				"metadata":              info,
+				"configuration":         config,
+				"worker_queues":         additional["worker_queues"],
+				"environment_variables": additional["environment_variables"],
+			},
+		}
+		var decoded, expected FormattedDeployment
+		err := decodeToStruct(printableDeployment, &decoded)
+		assert.NoError(t, err)
+		err = decodeToStruct(printableDeployment, &expected)
+		assert.NoError(t, err)
+		expected.Deployment.Configuration.Name = ""
+		expected.Deployment.Metadata = nil
+		expected.Deployment.AlertEmails = nil
 		for i := range expected.Deployment.EnvVars {
 			expected.Deployment.EnvVars[i].UpdatedAt = ""
 		}
