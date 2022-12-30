@@ -18,12 +18,12 @@ import (
 )
 
 var (
-	ErrNoShortName    = errors.New("cannot retrieve organization short name from context")
-	ErrInvalidRole    = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
-	ErrInvalidEmail   = errors.New("no email provided for the invite. Retry with a valid email address")
-	ErrInvalidUserKey = errors.New("invalid User selected")
-	selectLimit       = 1000
+	ErrNoShortName          = errors.New("cannot retrieve organization short name from context")
+	ErrInvalidRole          = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
+	ErrInvalidEmail         = errors.New("no email provided for the invite. Retry with a valid email address")
+	ErrInvalidUserKey       = errors.New("invalid User selected")
+	selectLimit             = 1000
 )
 
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
@@ -330,7 +330,7 @@ func IsWorkspaceRoleValid(role string) error {
 		}
 	}
 	return ErrInvalidWorkspaceRole
-}	
+}
 
 func selectWorkspaceUser(users []astrocore.User) (astrocore.User, error) {
 	table := printutil.Table{
@@ -470,5 +470,3 @@ func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	fmt.Fprintf(out, "The Workspace user %s was successfully removed from the workspace\n", email)
 	return nil
 }
-
-

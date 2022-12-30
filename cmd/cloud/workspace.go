@@ -3,8 +3,8 @@ package cloud
 import (
 	"io"
 
-	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/cloud/user"
+	"github.com/astronomer/astro-cli/cloud/workspace"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
