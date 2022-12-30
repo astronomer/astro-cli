@@ -59,12 +59,12 @@ var (
 		JSON200: nil,
 	}
 	orgRole = "ORGANIZATION_MEMBER"
-	user1 = astrocore.User{
+	user1   = astrocore.User{
 		CreatedAt: time.Now(),
-		FullName: "user 1",
-		Id: "user1-id",
-		OrgRole: &orgRole,
-		Username: "user@1.com",
+		FullName:  "user 1",
+		Id:        "user1-id",
+		OrgRole:   &orgRole,
+		Username:  "user@1.com",
 	}
 	users = []astrocore.User{
 		user1,
@@ -74,10 +74,10 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.UsersPaginated{
-			Limit: 1,
-			Offset:   0,
+			Limit:      1,
+			Offset:     0,
 			TotalCount: 1,
-			Users: users,
+			Users:      users,
 		},
 	}
 	errorBodyList, _ = json.Marshal(astrocore.Error{
@@ -246,7 +246,7 @@ func TestUserList(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"list"}		
+		cmdArgs := []string{"list"}
 		_, err := execUserCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
@@ -275,7 +275,7 @@ func TestUserUpdate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
-		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"		
+		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()

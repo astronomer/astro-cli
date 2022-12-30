@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"time"
 	"net/http"
 	"testing"
+	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
@@ -20,13 +20,13 @@ import (
 var (
 	errorNetwork = errors.New("network error")
 	errorInvite  = errors.New("test-inv-error")
-	orgRole = "ORGANIZATION_MEMBER"
-	user1 = astrocore.User{
+	orgRole      = "ORGANIZATION_MEMBER"
+	user1        = astrocore.User{
 		CreatedAt: time.Now(),
-		FullName: "user 1",
-		Id: "user1-id",
-		OrgRole: &orgRole,
-		Username: "user@1.com",
+		FullName:  "user 1",
+		Id:        "user1-id",
+		OrgRole:   &orgRole,
+		Username:  "user@1.com",
 	}
 	users = []astrocore.User{
 		user1,
@@ -36,10 +36,10 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.UsersPaginated{
-			Limit: 1,
-			Offset:   0,
+			Limit:      1,
+			Offset:     0,
 			TotalCount: 1,
-			Users: users,
+			Users:      users,
 		},
 	}
 	errorBodyList, _ = json.Marshal(astrocore.Error{
@@ -217,7 +217,7 @@ func TestUpdateUserRole(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()		
+		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
