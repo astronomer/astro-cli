@@ -226,10 +226,6 @@ func TestUpdateUserRole(t *testing.T) {
 	t.Run("error path when MutateOrgUserRoleWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		// createInviteRequest := astrocore.CreateUserInviteRequest{
-		// 	InviteeEmail: "test-email@test.com",
-		// 	Role:         "ORGANIZATION_MEMBER",
-		// }
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
@@ -239,10 +235,6 @@ func TestUpdateUserRole(t *testing.T) {
 	t.Run("error path when MutateOrgUserRoleWithResponse returns an error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		// createInviteRequest := astrocore.CreateUserInviteRequest{
-		// 	InviteeEmail: "test-email@test.com",
-		// 	Role:         "ORGANIZATION_MEMBER",
-		// }
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseError, nil).Once()
 		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
