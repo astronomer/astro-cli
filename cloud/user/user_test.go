@@ -293,7 +293,7 @@ func TestUpdateUserRole(t *testing.T) {
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER\n"
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
-		err = UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
+		err = UpdateUserRole("", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
