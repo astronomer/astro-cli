@@ -27,7 +27,7 @@ func execUserCmd(args ...string) (string, error) {
 }
 
 func TestUserRootCommand(t *testing.T) {
-	expectedHelp := "Manage users in your Astro Organization."
+	expectedHelp := "Manage users to your Astro Organization."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newUserCmd(os.Stdout)
@@ -263,7 +263,7 @@ func TestUserUpdate(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
-		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER\n"
+		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
@@ -319,7 +319,7 @@ func TestUserUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER\n"
+		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
 		cmdArgs := []string{"update", "--role", "ORGANIZATION_MEMBER"}
