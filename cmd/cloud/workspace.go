@@ -22,6 +22,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newWorkspaceListCmd(out),
 		newWorkspaceSwitchCmd(out),
+		newWorkspaceUserRootCmd(out),
 	)
 	return cmd
 }
@@ -39,7 +40,22 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+
 func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "switch [workspace_id]",
+		Aliases: []string{"sw"},
+		Short:   "Switch to a different Astronomer Workspace",
+		Long:    "Switch to a different Astronomer Workspace",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceSwitch(cmd, out, args)
+		},
+	}
+	return cmd
+}
+
+func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
 		Aliases: []string{"us"},
