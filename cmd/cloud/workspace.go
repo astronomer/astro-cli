@@ -51,7 +51,23 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserListCmd(out),
 		newWorkspaceUserUpdateCmd(out),
 		newWorkspaceUserRemoveCmd(out),
+		newWorkspaceUserAddCmd(out),
 	)
+	return cmd
+}
+
+func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "add [email]",
+		Short:   "Add a user to an Astro Workspace with a specfic role",
+		Long: "Add a user to an Astro Workspace with a specfic role\n$astro workspace user add [email] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_BILLING_ADMIN, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addWorkspaceUsers(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&role, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
+		"new user. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -74,7 +90,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [email]",
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user in an Astro Workspace",
-		Long: "Update the role of a user in an Astro Workspace\n$astro user update [email] --role [WORKSPACE_MEMBER, " +
+		Long: "Update the role of a user in an Astro Workspace\n$astro workspace user update [email] --role [WORKSPACE_MEMBER, " +
 			"WORKSPACE_BILLING_ADMIN, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceUsers(cmd, args, out)
@@ -115,6 +131,18 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 
 	return workspace.Switch(id, astroClient, out)
+}
+
+func addWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		email = args[0]
+	}
+
+	cmd.SilenceUsage = true
+	return user.AddWorkspaceUser(email, role, "", out, astroCoreClient)
 }
 
 func listWorkspaceUsers(cmd *cobra.Command, out io.Writer) error {

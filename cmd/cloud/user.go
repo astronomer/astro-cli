@@ -72,7 +72,7 @@ func newUserUpdateCmd(out io.Writer) *cobra.Command {
 			return userUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The new role for the "+
+	cmd.Flags().StringVarP(&role, "role", "r", "", "The new role for the "+
 		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	return cmd
 }
@@ -88,6 +88,10 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = input.Text("enter email address to invite a user: ")
 	}
 
+	if role == "" {
+		role = "ORGANIZATION_MEMBER"
+	}
+ 
 	cmd.SilenceUsage = true
 	return user.CreateInvite(email, role, out, astroCoreClient)
 }
