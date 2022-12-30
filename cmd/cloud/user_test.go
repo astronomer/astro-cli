@@ -338,6 +338,5 @@ func TestUserUpdate(t *testing.T) {
 		resp, err := execUserCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
-		// mockClient.AssertExpectations(t)
 	})
 }
