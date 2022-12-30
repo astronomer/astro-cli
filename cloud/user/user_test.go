@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"time"
 	"net/http"
 	"testing"
 
@@ -19,6 +20,56 @@ import (
 var (
 	errorNetwork = errors.New("network error")
 	errorInvite  = errors.New("test-inv-error")
+	orgRole = "ORGANIZATION_MEMBER"
+	user1 = astrocore.User{
+		CreatedAt: time.Now(),
+		FullName: "user 1",
+		Id: "user1-id",
+		OrgRole: &orgRole,
+		Username: "user@1.com",
+	}
+	users = []astrocore.User{
+		user1,
+	}
+	ListOrgUsersResponseOK = astrocore.ListOrgUsersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.UsersPaginated{
+			Limit: 1,
+			Offset:   0,
+			TotalCount: 1,
+			Users: users,
+		},
+	}
+	errorBodyList, _ = json.Marshal(astrocore.Error{
+		Message: "failed to list users",
+	})
+	ListOrgUsersResponseError = astrocore.ListOrgUsersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBodyList,
+		JSON200: nil,
+	}
+	MutateOrgUserRoleResponseOK = astrocore.MutateOrgUserRoleResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.UserRole{
+			Role: "ORGANIZATION_MEMBER",
+		},
+	}
+	errorBodyUpdate, _ = json.Marshal(astrocore.Error{
+		Message: "failed to update user",
+	})
+	MutateOrgUserRoleResponseError = astrocore.MutateOrgUserRoleResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBodyUpdate,
+		JSON200: nil,
+	}
 )
 
 type testWriter struct {
@@ -159,3 +210,73 @@ func TestIsRoleValid(t *testing.T) {
 		assert.ErrorIs(t, err, ErrInvalidRole)
 	})
 }
+
+func TestUpdateUserRole(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		expectedOutMessage := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER\n"
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()		
+		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when MutateOrgUserRoleWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		// createInviteRequest := astrocore.CreateUserInviteRequest{
+		// 	InviteeEmail: "test-email@test.com",
+		// 	Role:         "ORGANIZATION_MEMBER",
+		// }
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
+	t.Run("error path when MutateOrgUserRoleWithResponse returns an error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		// createInviteRequest := astrocore.CreateUserInviteRequest{
+		// 	InviteeEmail: "test-email@test.com",
+		// 	Role:         "ORGANIZATION_MEMBER",
+		// }
+		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
+		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseError, nil).Once()
+		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.EqualError(t, err, "failed to update user")
+	})
+	t.Run("error path when isValidRole returns an error", func(t *testing.T) {
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := UpdateUserRole("user@1.com", "test-role", out, mockClient)
+		assert.ErrorIs(t, err, ErrInvalidRole)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err = UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.ErrorIs(t, err, ErrNoShortName)
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := UpdateUserRole("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
+
