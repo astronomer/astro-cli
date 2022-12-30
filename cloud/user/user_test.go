@@ -267,7 +267,7 @@ func TestUpdateUserRole(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := UpdateUserRole("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
+		err := UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -293,7 +293,7 @@ func TestUpdateUserRole(t *testing.T) {
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
-		err = UpdateUserRole("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
+		err = UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
