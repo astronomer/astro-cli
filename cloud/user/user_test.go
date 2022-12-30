@@ -294,7 +294,7 @@ func TestUpdateUserRole(t *testing.T) {
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
 		err = UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
-		assert.Error(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})
 }
