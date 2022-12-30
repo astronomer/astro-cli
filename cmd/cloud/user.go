@@ -91,7 +91,7 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	if role == "" {
 		role = "ORGANIZATION_MEMBER"
 	}
- 
+
 	cmd.SilenceUsage = true
 	return user.CreateInvite(email, role, out, astroCoreClient)
 }

@@ -74,8 +74,8 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "add [email]",
-		Short:   "Add a user to an Astro Workspace with a specfic role",
+		Use:   "add [email]",
+		Short: "Add a user to an Astro Workspace with a specfic role",
 		Long: "Add a user to an Astro Workspace with a specfic role\n$astro workspace user add [email] --role [WORKSPACE_MEMBER, " +
 			"WORKSPACE_BILLING_ADMIN, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
