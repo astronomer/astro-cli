@@ -40,7 +40,6 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-
 func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch [workspace_id]",
