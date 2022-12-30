@@ -290,7 +290,7 @@ func TestUpdateUserRole(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
+		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER\n"
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
 		err = UpdateUserRole("user@1.com", "ORGANIZATION_MEMBER", out, mockClient)
