@@ -64,15 +64,29 @@ func TestE2EFlowInitCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestE2EFlowInitCmdInUserHomeDir(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(homeDir, "astro-flow-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = execFlowCmd("init", dir)
+	assert.NoError(t, err)
+}
+
 func TestE2EFlowInitCmdWithArgs(t *testing.T) {
 	cmd := "init"
 	testCases := []struct {
 		args []string
 	}{
 		{[]string{cmd, t.TempDir()}},
-		{[]string{cmd, "--airflow-home", t.TempDir()}},
-		{[]string{cmd, "--airflow-dags-folder", t.TempDir()}},
-		{[]string{cmd, "--data-dir", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--airflow-home", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--airflow-dags-folder", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--data-dir", t.TempDir()}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
