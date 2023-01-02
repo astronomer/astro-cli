@@ -69,7 +69,7 @@ func TestE2EFlowInitCmdInUserHomeDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir, err := os.MkdirTemp(homeDir, "astro-flow-")
+	dir, err := os.MkdirTemp(homeDir, fmt.Sprintf("astro-cli-%s", t.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,4 +179,21 @@ func TestE2EFlowRunCmd(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestE2EFlowRunCmdInUserHomeDir(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(homeDir, fmt.Sprintf("astro-cli-%s", t.Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = execFlowCmd("init", dir)
+	assert.NoError(t, err)
+
+	err = execFlowCmd("run", "example_basic_transform", "--project-dir", dir)
+	assert.NoError(t, err)
 }
