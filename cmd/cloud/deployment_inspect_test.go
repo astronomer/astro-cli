@@ -110,14 +110,13 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
-
 	t.Run("returns deployment in yaml format when a deployment name was provided", func(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		cmdArgs := []string{"inspect", "-n", "test-deployment-label"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, deploymentResponse[0].ReleaseName)
-		assert.Contains(t, resp, deploymentName)
+		assert.Contains(t, resp, deploymentResponse[0].Label)
 		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
 		mockClient.AssertExpectations(t)
 	})
@@ -127,8 +126,18 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, deploymentResponse[0].ReleaseName)
-		assert.Contains(t, resp, deploymentName)
+		assert.Contains(t, resp, deploymentResponse[0].Label)
 		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns deployment template in yaml format when a deployment id was provided", func(t *testing.T) {
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		cmdArgs := []string{"inspect", "test-deployment-id", "--template"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
+		assert.NotContains(t, resp, deploymentResponse[0].ReleaseName)
+		assert.NotContains(t, resp, deploymentResponse[0].Label)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns a deployment's specific field", func(t *testing.T) {
