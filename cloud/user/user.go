@@ -82,7 +82,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 		return err
 	}
 	if email == "" {
-		user, err := selectUser(users)
+		user, err := selectUser(users, false)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -123,11 +123,15 @@ func IsRoleValid(role string) error {
 	return ErrInvalidRole
 }
 
-func selectUser(users []astrocore.User) (astrocore.User, error) {
+func selectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
+	roleColumn := "ORGANIZATION ROLE"
+	if workspace {
+		roleColumn = "WORKSPACE ROLE"
+	}
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"#", "FULLNAME", "EMAIL", "ID", "ORGANIZATION ROLE", "CREATE DATE"},
+		Header:         []string{"#", "FULLNAME", "EMAIL", "ID", roleColumn, "CREATE DATE"},
 	}
 
 	fmt.Println("\nPlease select the user who's role you would like to update:")
@@ -135,14 +139,25 @@ func selectUser(users []astrocore.User) (astrocore.User, error) {
 	userMap := map[string]astrocore.User{}
 	for i := range users {
 		index := i + 1
-		table.AddRow([]string{
-			strconv.Itoa(index),
-			users[i].FullName,
-			users[i].Username,
-			users[i].Id,
-			*users[i].OrgRole,
-			users[i].CreatedAt.Format(time.RFC3339),
-		}, false)
+		if workspace {
+			table.AddRow([]string{
+				strconv.Itoa(index),
+				users[i].FullName,
+				users[i].Username,
+				users[i].Id,
+				*users[i].WorkspaceRole,
+				users[i].CreatedAt.Format(time.RFC3339),
+			}, false)
+		} else {
+			table.AddRow([]string{
+				strconv.Itoa(index),
+				users[i].FullName,
+				users[i].Username,
+				users[i].Id,
+				*users[i].OrgRole,
+				users[i].CreatedAt.Format(time.RFC3339),
+			}, false)
+		}
 		userMap[strconv.Itoa(index)] = users[i]
 	}
 
@@ -240,7 +255,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 		return err
 	}
 	if email == "" {
-		user, err := selectUser(users)
+		user, err := selectUser(users, false)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -290,7 +305,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 		return err
 	}
 	if email == "" {
-		user, err := selectWorkspaceUser(users)
+		user, err := selectUser(users, true)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -332,37 +347,6 @@ func IsWorkspaceRoleValid(role string) error {
 		}
 	}
 	return ErrInvalidWorkspaceRole
-}
-
-func selectWorkspaceUser(users []astrocore.User) (astrocore.User, error) {
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"#", "FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
-	}
-	fmt.Println("\nPlease select the user who's role you would like to update:")
-
-	userMap := map[string]astrocore.User{}
-	for i := range users {
-		index := i + 1
-		table.AddRow([]string{
-			strconv.Itoa(index),
-			users[i].FullName,
-			users[i].Username,
-			users[i].Id,
-			*users[i].WorkspaceRole,
-			users[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-		userMap[strconv.Itoa(index)] = users[i]
-	}
-
-	table.Print(os.Stdout)
-	choice := input.Text("\n> ")
-	selected, ok := userMap[choice]
-	if !ok {
-		return astrocore.User{}, ErrInvalidUserKey
-	}
-	return selected, nil
 }
 
 // Returns a list of all of an organizations users
@@ -448,7 +432,7 @@ func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 		return err
 	}
 	if email == "" {
-		user, err := selectWorkspaceUser(users)
+		user, err := selectUser(users, true)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
