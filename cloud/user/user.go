@@ -124,7 +124,7 @@ func IsRoleValid(role string) error {
 }
 
 func selectUser(users []astrocore.User) (astrocore.User, error) {
-	var table = printutil.Table{}
+	table := printutil.Table{}
 	table = printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,

@@ -84,7 +84,6 @@ func TestWorkspaceSwitch(t *testing.T) {
 }
 
 func TestWorkspaceUserRootCommand(t *testing.T) {
-	// expectedHelp := "Manage users in your Astro Organization."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newUserCmd(os.Stdout)
@@ -92,7 +91,6 @@ func TestWorkspaceUserRootCommand(t *testing.T) {
 	cmdArgs := []string{"user", "-h"}
 	_, err := execWorkspaceCmd(cmdArgs...)
 	assert.NoError(t, err)
-	// assert.Contains(t, buf.String(), expectedHelp)
 }
 
 var (
