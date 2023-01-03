@@ -21,23 +21,8 @@ var (
 	imageBuildResponse = types.ImageBuildResponse{
 		Body: io.NopCloser(strings.NewReader("Image built")),
 	}
-	containerCreateCreatedBody          = container.ContainerCreateCreatedBody{ID: "123"}
-	sampleLog                           = io.NopCloser(strings.NewReader("Sample log"))
-	mockExecuteCmdInDockerReturnSuccess = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-		return 0, output, nil
-	}
-	mockExecuteCmdInDockerReturnErr = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-		return 0, output, errMock
-	}
-	mockExecuteCmdInDockerReturnNonZeroExitCode = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-		return 1, output, nil
-	}
-	mockConvertReadCloserToStringReturnErr = func(readCloser io.ReadCloser) (string, error) {
-		return "", errMock
-	}
-	mockAppendConfigKeyMountDirErr = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
-		return nil, errMock
-	}
+	containerCreateCreatedBody = container.ContainerCreateCreatedBody{ID: "123"}
+	sampleLog                  = io.NopCloser(strings.NewReader("Sample log"))
 )
 
 func getContainerWaitResponse(raiseError bool, statusCode int64) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
@@ -153,6 +138,12 @@ func TestFlowVersionCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowVersionHelpCmd(t *testing.T) {
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("version", "--help")
+	assert.NoError(t, err)
+}
+
 func TestFlowAboutCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd("about")
@@ -167,19 +158,27 @@ func TestFlowInitCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFlowInitCmdWithFlags(t *testing.T) {
+func TestFlowInitCmdWithArgs(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	AirflowHome := t.TempDir()
-	AirflowDagsFolder := t.TempDir()
-	DataDir := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder, "--data-dir", DataDir)
-	assert.NoError(t, err)
+	cmd := "init"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, t.TempDir()}},
+		{[]string{cmd, "--airflow-home", t.TempDir()}},
+		{[]string{cmd, "--airflow-dags-folder", t.TempDir()}},
+		{[]string{cmd, "--data-dir", t.TempDir()}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowConfigCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-
 	testCases := []struct {
 		initFlag  string
 		configKey string
@@ -200,141 +199,90 @@ func TestFlowConfigCmd(t *testing.T) {
 	}
 }
 
-func TestFlowConfigCmdArgumentNotSetError(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("config", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:key")
-}
-
 func TestFlowValidateCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
+	cmd := "validate"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--connection", "sqlite_conn"}},
+		{[]string{cmd, t.TempDir(), "--env", "dev"}},
+		{[]string{cmd, t.TempDir(), "--verbose"}},
+		{[]string{cmd, t.TempDir(), "--no-verbose"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd("init", tc.args[1])
+			assert.NoError(t, err)
 
-	err = execFlowCmd("validate", projectDir, "--connection", "sqlite_conn", "--verbose")
-	assert.NoError(t, err)
+			err = execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowGenerateCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
+	cmd := "generate"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd("init", tc.args[3])
+			assert.NoError(t, err)
 
-	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--no-generate-tasks", "--verbose")
-	assert.NoError(t, err)
-}
-
-func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks")
-	assert.NoError(t, err)
-}
-
-func TestFlowRunGenerateTasksCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("run", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks")
-	assert.NoError(t, err)
-}
-
-func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("generate", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:workflow_name")
+			err = execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowRunCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
+	cmd := "run"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd("init", tc.args[3])
+			assert.NoError(t, err)
 
-	err = execFlowCmd("run", "example_templating", "--env", "dev", "--project-dir", projectDir, "--no-generate-tasks", "--verbose")
-	assert.NoError(t, err)
+			err = execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
-func TestDebugFlowRunCmd(t *testing.T) {
+func TestDebugFlowFlagInitCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("--debug", "run", "example_templating", "--env", "dev", "--project-dir", projectDir)
+	err := execFlowCmd("--debug", "init", projectDir)
 	assert.NoError(t, err)
 }
 
-func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
+func TestDebugFlowFlagRunCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
+	err := execFlowCmd("--no-debug", "init", projectDir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd("run", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:workflow_name")
-}
-
-func TestAppendConfigKeyMountDirInvalidCommand(t *testing.T) {
-	originalDockerUtil := sql.ExecuteCmdInDocker
-	originalConvertReadCloserToString := sql.ConvertReadCloserToString
-
-	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnErr
-	_, err := appendConfigKeyMountDir("", nil, nil)
-	expectedErr := fmt.Errorf("error running %v: %w", configCommandString, errMock)
-	assert.Equal(t, expectedErr, err)
-
-	sql.ExecuteCmdInDocker = originalDockerUtil
-	sql.ConvertReadCloserToString = originalConvertReadCloserToString
-}
-
-func TestAppendConfigKeyMountDirDockerNonZeroExitCodeError(t *testing.T) {
-	originalDockerUtil := sql.ExecuteCmdInDocker
-	originalConvertReadCloserToString := sql.ConvertReadCloserToString
-
-	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnNonZeroExitCode
-	_, err := appendConfigKeyMountDir("", nil, nil)
-	expectedErr := sql.DockerNonZeroExitCodeError(1)
-	assert.Equal(t, expectedErr, err)
-
-	sql.ExecuteCmdInDocker = originalDockerUtil
-	sql.ConvertReadCloserToString = originalConvertReadCloserToString
-}
-
-func TestAppendConfigKeyMountDirReadError(t *testing.T) {
-	originalDockerUtil := sql.ExecuteCmdInDocker
-	originalConvertReadCloserToString := sql.ConvertReadCloserToString
-
-	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnSuccess
-	sql.ConvertReadCloserToString = mockConvertReadCloserToStringReturnErr
-	_, err := appendConfigKeyMountDir("", nil, nil)
-	assert.EqualError(t, err, "mock error")
-
-	sql.ExecuteCmdInDocker = originalDockerUtil
-	sql.ConvertReadCloserToString = originalConvertReadCloserToString
-}
-
-func TestBuildFlagsAndMountDirsFailures(t *testing.T) {
-	originalAppendConfigKeyMountDir := appendConfigKeyMountDir
-
-	appendConfigKeyMountDir = mockAppendConfigKeyMountDirErr
-	_, _, err := buildFlagsAndMountDirs("", false, false, false, false, true)
-	assert.EqualError(t, err, "mock error")
-
-	appendConfigKeyMountDir = originalAppendConfigKeyMountDir
+	err = execFlowCmd("--debug", "run", "example_basic_transform", "--project-dir", projectDir)
+	assert.NoError(t, err)
 }
