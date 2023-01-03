@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"net/http"
 	"os"
-	"time"
 	"testing"
+	"time"
 
-
-	astrocore "github.com/astronomer/astro-cli/astro-client-core"
-	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/astro-client"
-	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/cloud/user"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -94,13 +93,13 @@ func TestWorkspaceUserRootCommand(t *testing.T) {
 }
 
 var (
-	workspaceRole = "WORKSPACE_MEMBER"
-	workspaceUser1   = astrocore.User{
-		CreatedAt: time.Now(),
-		FullName:  "user 1",
-		Id:        "user1-id",
-		WorkspaceRole:   &workspaceRole,
-		Username:  "user@1.com",
+	workspaceRole  = "WORKSPACE_MEMBER"
+	workspaceUser1 = astrocore.User{
+		CreatedAt:     time.Now(),
+		FullName:      "user 1",
+		Id:            "user1-id",
+		WorkspaceRole: &workspaceRole,
+		Username:      "user@1.com",
 	}
 	workspaceUsers = []astrocore.User{
 		workspaceUser1,
