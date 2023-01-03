@@ -14,7 +14,9 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/version"
 
+	"github.com/google/go-github/v48/github"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -63,6 +65,16 @@ func NewRootCmd() *cobra.Command {
 
 Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, Astronomer Software, or Local Development.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Check for latest version
+			if config.CFG.UpgradeMessage.GetBool() {
+				// create github client
+				githubClient := github.NewClient(nil)
+				// compare current version to latest
+				err = version.CompareVersions(githubClient, "astronomer", "astro-cli")
+				if err != nil {
+					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
+				}
+			}
 			if isCloudCtx {
 				return cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
 			}
@@ -110,12 +122,12 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	return rootCmd
 }
 
-func getResourcesHelpTemplate(version, ctx string) string {
+func getResourcesHelpTemplate(houstonVersion, ctx string) string {
 	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
 Current Context: %s{{if and (eq "%s" "Astronomer Software") (ne "%s" "")}}
 Platform Version: %s{{end}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx), ctx, version, ansi.Bold(version))
+`, ansi.Bold(ctx), ctx, houstonVersion, ansi.Bold(houstonVersion))
 }
