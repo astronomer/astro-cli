@@ -10,6 +10,8 @@ OUTPUT ?= astro
 # golangci-lint version
 GOLANGCI_LINT_VERSION ?=v1.50.1
 
+PWD=$(shell pwd)
+
 lint:
 	@test -f ${ENVTEST_ASSETS_DIR}/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${ENVTEST_ASSETS_DIR} ${GOLANGCI_LINT_VERSION}
 	${ENVTEST_ASSETS_DIR}/golangci-lint version
@@ -31,6 +33,12 @@ test:
 
 e2e_test:
 	go test -count=1 $(shell go list ./... | grep e2e)
+
+temp-astro:
+	cd $(shell mktemp -d) && ${PWD}/astro dev init
+
+temp-astro-flow:
+	./astro flow init $(shell mktemp -d)
 
 mock: mock_airflow mock_houston mock_astro mock_pkg mock_sql_cli mock_astro_core
 

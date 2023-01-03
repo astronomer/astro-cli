@@ -83,7 +83,7 @@ var ConvertReadCloserToString = func(readCloser io.ReadCloser) (string, error) {
 	return buf.String(), nil
 }
 
-var ExecuteCmdInDocker = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+var ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
 	var statusCode int64
 	var cout io.ReadCloser
 
@@ -126,11 +126,6 @@ var ExecuteCmdInDocker = func(cmd, args []string, flags map[string]string, mount
 
 	if err := DisplayMessages(body.Body); err != nil {
 		return statusCode, cout, fmt.Errorf("image build response read failed %w", err)
-	}
-
-	cmd = append(cmd, args...)
-	for key, value := range flags {
-		cmd = append(cmd, fmt.Sprintf("--%s", key), value)
 	}
 
 	binds := []string{}
