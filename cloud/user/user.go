@@ -22,7 +22,7 @@ var (
 	ErrInvalidRole          = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
 	ErrInvalidEmail         = errors.New("no email provided for the invite. Retry with a valid email address")
-	ErrInvalidUserKey       = errors.New("invalid User selected")
+	ErrInvalidUserKey       = errors.New("invalid user selected")
 	selectLimit             = 1000
 )
 
@@ -318,7 +318,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 		fmt.Println("error in NormalizeAPIError")
 		return err
 	}
-	fmt.Fprintf(out, "The Workspace user %s role was successfully updated to %s\n", email, role)
+	fmt.Fprintf(out, "The workspace user %s role was successfully updated to %s\n", email, role)
 	return nil
 }
 
@@ -470,6 +470,6 @@ func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "The Workspace user %s was successfully removed from the workspace\n", email)
+	fmt.Fprintf(out, "The workspace user %s was successfully removed from the workspace\n", email)
 	return nil
 }

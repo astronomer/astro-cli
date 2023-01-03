@@ -59,7 +59,7 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		Use:     "user",
 		Aliases: []string{"us"},
 		Short:   "Manage users in your Astro Workspace",
-		Long:    "Manage users to your Astro Workspace.",
+		Long:    "Manage users in your Astro Workspace.",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
