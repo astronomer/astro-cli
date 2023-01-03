@@ -43,11 +43,14 @@ var (
 )
 
 // Build the cmd string to execute
-func buildCmd(cmd *cobra.Command, args []string) []string {
+func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
 	globalCmdArgs := initGlobalCmdArgs()
-	localCmdArgs := initLocalCmdArgs(cmd, args)
+	localCmdArgs, err := initLocalCmdArgs(cmd, args)
+	if err != nil {
+		return nil, err
+	}
 	localCmdArgs = extendLocalCmdArgsWithFlags(cmd, localCmdArgs)
-	return append(append(globalCmdArgs, cmd.Name()), localCmdArgs...)
+	return append(append(globalCmdArgs, cmd.Name()), localCmdArgs...), nil
 }
 
 // Initialize persistent/global flags inserted before the cmd
@@ -63,31 +66,56 @@ func initGlobalCmdArgs() []string {
 }
 
 // Initialize specific cmd args by setting the cmd flags, resolving filepaths and overwriting args
-func initLocalCmdArgs(cmd *cobra.Command, args []string) []string {
+func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
+	var err error
 	switch cmd.Name() {
 	case initCmdName:
-		projectDir = resolvePath(getProjectDirFromArgs(args))
+		projectDir, err = resolvePath(getProjectDirFromArgs(args))
+		if err != nil {
+			return nil, err
+		}
 		if airflowHome != "" {
-			airflowHome = resolvePath(airflowHome)
+			airflowHome, err = resolvePath(airflowHome)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if airflowDagsFolder != "" {
-			airflowDagsFolder = resolvePath(airflowDagsFolder)
+			airflowDagsFolder, err = resolvePath(airflowDagsFolder)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if dataDir != "" {
-			dataDir = resolvePath(dataDir)
+			dataDir, err = resolvePath(dataDir)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return []string{projectDir}
+		return []string{projectDir}, nil
 	case configCmdName:
-		projectDir = resolvePath(projectDir)
+		projectDir, err = resolvePath(projectDir)
+		if err != nil {
+			return nil, err
+		}
 	case validateCmdName:
-		projectDir = resolvePath(getProjectDirFromArgs(args))
-		return []string{projectDir}
+		projectDir, err = resolvePath(getProjectDirFromArgs(args))
+		if err != nil {
+			return nil, err
+		}
+		return []string{projectDir}, nil
 	case generateCmdName:
-		projectDir = resolvePath(projectDir)
+		projectDir, err = resolvePath(projectDir)
+		if err != nil {
+			return nil, err
+		}
 	case runCmdName:
-		projectDir = resolvePath(projectDir)
+		projectDir, err = resolvePath(projectDir)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return args
+	return args, nil
 }
 
 // Get the projectDir flag from args if given
@@ -99,19 +127,22 @@ func getProjectDirFromArgs(args []string) string {
 }
 
 // Read config cmd output for retrieving config settings such as airflow_home
-func readConfigCmdOutput(key string) string {
+func readConfigCmdOutput(key string) (string, error) {
 	args := []string{key}
-	output := readCmdOutput(configCmd, args)
-	return strings.TrimSpace(output) // remove spaces such as \r\n
+	output, err := readCmdOutput(configCmd, args)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output), nil // remove spaces such as \r\n
 }
 
 // Resolve filepath to absolute
-func resolvePath(path string) string {
+func resolvePath(path string) (string, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("error resolving path %v: %w", path, err)
 	}
-	return path
+	return path, nil
 }
 
 // Extends args with flags e.g. "--project-dir ." or "--verbose"
@@ -170,14 +201,18 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 }
 
 // Create mounts for a given cmd
-func createMounts(cmd *cobra.Command) []string {
-	dirs := getDirs(cmd)
+func createMounts(cmd *cobra.Command) ([]string, error) {
+	dirs, err := getDirs(cmd)
+	if err != nil {
+		return nil, err
+	}
 	return resolvePathsAndMakeDirs(dirs)
 }
 
 // Get all directories for a given cmd
-func getDirs(cmd *cobra.Command) []string {
+func getDirs(cmd *cobra.Command) ([]string, error) {
 	var dirs []string
+	var err error
 	switch cmd.Name() {
 	case initCmdName:
 		dirs = append(dirs, projectDir)
@@ -193,35 +228,85 @@ func getDirs(cmd *cobra.Command) []string {
 	case configCmdName:
 		dirs = append(dirs, projectDir)
 	case validateCmdName:
-		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("data_dir"))
+		dirs = append(dirs, projectDir)
+		airflowHome, err = readConfigCmdOutput("airflow_home")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, airflowHome)
+		dataDir, err = readConfigCmdOutput("data_dir")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, dataDir)
 	case generateCmdName:
-		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("airflow_dags_folder"), readConfigCmdOutput("data_dir"))
+		dirs = append(dirs, projectDir)
+		airflowHome, err = readConfigCmdOutput("airflow_home")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, airflowHome)
+		airflowDagsFolder, err = readConfigCmdOutput("airflow_dags_folder")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, airflowDagsFolder)
+		dataDir, err = readConfigCmdOutput("data_dir")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, dataDir)
 	case runCmdName:
-		dirs = append(dirs, projectDir, readConfigCmdOutput("airflow_home"), readConfigCmdOutput("airflow_dags_folder"), readConfigCmdOutput("data_dir"))
+		dirs = append(dirs, projectDir)
+		airflowHome, err = readConfigCmdOutput("airflow_home")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, airflowHome)
+		airflowDagsFolder, err = readConfigCmdOutput("airflow_dags_folder")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, airflowDagsFolder)
+		dataDir, err = readConfigCmdOutput("data_dir")
+		if err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, dataDir)
 	}
-	return dirs
+	return dirs, nil
 }
 
 // Resolve dirs to absolute and create them
-func resolvePathsAndMakeDirs(dirs []string) []string {
+func resolvePathsAndMakeDirs(dirs []string) ([]string, error) {
 	resolvedDirs := make([]string, len(dirs))
 	index := 0
 	for _, dir := range dirs {
-		if absPath := resolvePath(dir); !slices.Contains(resolvedDirs, absPath) {
+		absPath, err := resolvePath(dir)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(resolvedDirs, absPath) {
 			if err := os.MkdirAll(absPath, os.ModePerm); err != nil {
-				panic(err)
+				return resolvedDirs, fmt.Errorf("error creating directories for %v: %w", absPath, err)
 			}
 			resolvedDirs[index] = absPath
 			index++
 		}
 	}
-	return resolvedDirs
+	return resolvedDirs, nil
 }
 
 // Execute cobra cmd with args and write to stdout
 func executeCmd(cmd *cobra.Command, args []string) error {
-	cmdString := buildCmd(cmd, args)
-	mountDirs := createMounts(cmd)
+	cmdString, err := buildCmd(cmd, args)
+	if err != nil {
+		return err
+	}
+	mountDirs, err := createMounts(cmd)
+	if err != nil {
+		return err
+	}
 	exitCode, _, err := sql.ExecuteCmdInDocker(cmdString, mountDirs, false)
 	if err != nil {
 		return fmt.Errorf("error running %v: %w", cmdString, err)
@@ -233,21 +318,27 @@ func executeCmd(cmd *cobra.Command, args []string) error {
 }
 
 // Execute cobra cmd with args and return output
-func readCmdOutput(cmd *cobra.Command, args []string) string {
-	cmdString := buildCmd(cmd, args)
-	mountDirs := createMounts(cmd)
+func readCmdOutput(cmd *cobra.Command, args []string) (string, error) {
+	cmdString, err := buildCmd(cmd, args)
+	if err != nil {
+		return "", err
+	}
+	mountDirs, err := createMounts(cmd)
+	if err != nil {
+		return "", err
+	}
 	exitCode, output, err := sql.ExecuteCmdInDocker(cmdString, mountDirs, true)
 	if err != nil {
-		panic(fmt.Errorf("error running %v: %w", cmdString, err))
+		return "", fmt.Errorf("error running %v: %w", cmdString, err)
 	}
 	if exitCode != 0 {
-		panic(sql.DockerNonZeroExitCodeError(exitCode))
+		return "", sql.DockerNonZeroExitCodeError(exitCode)
 	}
 	outputString, err := sql.ConvertReadCloserToString(output)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return outputString
+	return outputString, nil
 }
 
 // Execute help cmd
