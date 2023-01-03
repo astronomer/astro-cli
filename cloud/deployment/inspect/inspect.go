@@ -16,16 +16,16 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID   string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID    string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID      string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName    string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	Status         string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt      time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt      time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL  string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL   string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	DeploymentID   *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID    *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID      *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName    *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	Status         *string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt      *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt      *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL  *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL   *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
 }
 
 type deploymentConfig struct {
@@ -51,16 +51,16 @@ type Workerq struct {
 type EnvironmentVariable struct {
 	IsSecret  bool   `mapstructure:"is_secret" yaml:"is_secret" json:"is_secret"`
 	Key       string `mapstructure:"key" yaml:"key" json:"key"`
-	UpdatedAt string `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	UpdatedAt string `mapstructure:"updated_at,omitempty" yaml:"updated_at,omitempty" json:"updated_at,omitempty"`
 	Value     string `mapstructure:"value" yaml:"value" json:"value"`
 }
 
 type orderedPieces struct {
-	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables" yaml:"environment_variables" json:"environment_variables"`
+	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables,omitempty" yaml:"environment_variables,omitempty" json:"environment_variables,omitempty"`
 	Configuration deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
 	WorkerQs      []Workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
-	Metadata      deploymentMetadata    `mapstructure:"metadata" yaml:"metadata" json:"metadata"`
-	AlertEmails   []string              `mapstructure:"alert_emails" yaml:"alert_emails" json:"alert_emails"`
+	Metadata      *deploymentMetadata   `mapstructure:"metadata,omitempty" yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	AlertEmails   []string              `mapstructure:"alert_emails,omitempty" yaml:"alert_emails,omitempty" json:"alert_emails,omitempty"`
 }
 
 type FormattedDeployment struct {
@@ -78,7 +78,7 @@ const (
 	jsonFormat = "json"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string, template bool) error {
 	var (
 		requestedDeployment                                                        astro.Deployment
 		err                                                                        error
@@ -111,7 +111,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		fmt.Fprintln(out, value)
 	} else {
 		// print the entire deployment in outputFormat
-		infoToPrint, err = formatPrintableDeployment(outputFormat, printableDeployment)
+		infoToPrint, err = formatPrintableDeployment(outputFormat, template, printableDeployment)
 		if err != nil {
 			return err
 		}
@@ -197,7 +197,7 @@ func getVariablesMap(sourceDeploymentVars []astro.EnvironmentVariablesObject) []
 	return variablesMap
 }
 
-func formatPrintableDeployment(outputFormat string, printableDeployment map[string]interface{}) ([]byte, error) {
+func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
 	var (
 		infoToPrint     []byte
 		err             error
@@ -208,6 +208,9 @@ func formatPrintableDeployment(outputFormat string, printableDeployment map[stri
 	err = decodeToStruct(printableDeployment, &formatWithOrder)
 	if err != nil {
 		return []byte{}, err
+	}
+	if template {
+		formatWithOrder = getTemplate(&formatWithOrder)
 	}
 	switch outputFormat {
 	case jsonFormat:
@@ -262,7 +265,7 @@ func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interfa
 	return printableDeployment
 }
 
-// getNodePoolIDFromWorkerType takes maps the workerType to a node pool id in nodePools.
+// getWorkerTypeFromNodePoolID takes maps the workerType to a node pool id in nodePools.
 // It returns an error if the worker type does not exist in any node pool in nodePools.
 func getWorkerTypeFromNodePoolID(poolID string, nodePools []astro.NodePool) string {
 	var pool astro.NodePool
@@ -272,4 +275,19 @@ func getWorkerTypeFromNodePoolID(poolID string, nodePools []astro.NodePool) stri
 		}
 	}
 	return ""
+}
+
+// getTemplate returns a Formatted Deployment that can be used as a template.
+// It has no metadata, no name and no updatedAt timestamp for environment_variables.
+// The output templates can be modified and used to create deployments.
+func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
+	template := *formattedDeployment
+	template.Deployment.Configuration.Name = ""
+	template.Deployment.Metadata = nil
+
+	for i := range template.Deployment.EnvVars {
+		// zero out updated at timestamp
+		template.Deployment.EnvVars[i].UpdatedAt = ""
+	}
+	return template
 }
