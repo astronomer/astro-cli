@@ -76,13 +76,13 @@ var (
 
 // workspace users variables
 var (
-	workspaceRole = "WORKSPACE_MEMBER"
-	workspaceUser1   = astrocore.User{
-		CreatedAt: time.Now(),
-		FullName:  "user 1",
-		Id:        "user1-id",
-		WorkspaceRole:   &workspaceRole,
-		Username:  "user@1.com",
+	workspaceRole  = "WORKSPACE_MEMBER"
+	workspaceUser1 = astrocore.User{
+		CreatedAt:     time.Now(),
+		FullName:      "user 1",
+		Id:            "user1-id",
+		WorkspaceRole: &workspaceRole,
+		Username:      "user@1.com",
 	}
 	workspaceUsers = []astrocore.User{
 		workspaceUser1,
