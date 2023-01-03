@@ -78,6 +78,7 @@ var (
 		PageSize:             newCfg("page_size", "20"),
 		SQLCLI:               newCfg("beta.sql_cli", "false"),
 		AuditLogs:            newCfg("beta.audit_logs", "false"),
+		UpgradeMessage:       newCfg("upgrade_message", "true"),
 	}
 
 	// viperHome is the viper object in the users home directory

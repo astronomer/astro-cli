@@ -38,6 +38,7 @@ type cfgs struct {
 	PageSize             cfg
 	SQLCLI               cfg
 	AuditLogs            cfg
+	UpgradeMessage       cfg
 }
 
 // Creates a new cfg struct

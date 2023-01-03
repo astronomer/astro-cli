@@ -36,6 +36,7 @@ require (
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
+	github.com/google/go-github/v48 v48.2.0
 	github.com/hashicorp/go-version v1.3.0
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/opencontainers/image-spec v1.0.2
@@ -86,7 +87,8 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.8 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0 // indirect
