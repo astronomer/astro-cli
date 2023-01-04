@@ -265,13 +265,9 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 func createOutput(workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
-	currentTag := d.DeploymentSpec.Image.Tag
-	if currentTag == "" {
-		currentTag = "?"
-	}
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
 	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
@@ -516,14 +512,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	if !queueCreateUpdate {
 		tabDeployment := newTableOut()
 
-		currentTag := d.DeploymentSpec.Image.Tag
-		if currentTag == "" {
-			currentTag = "?"
-		}
-
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
