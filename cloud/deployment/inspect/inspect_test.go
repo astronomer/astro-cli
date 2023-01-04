@@ -822,13 +822,11 @@ func TestFormatPrintableDeployment(t *testing.T) {
         workspace_name: test-ws
     worker_queues:
         - name: default
-          is_default: true
           max_worker_count: 130
           min_worker_count: 12
           worker_concurrency: 110
           worker_type: test-instance-type
         - name: test-queue-1
-          is_default: false
           max_worker_count: 175
           min_worker_count: 8
           worker_concurrency: 150
@@ -979,7 +977,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         "worker_queues": [
             {
                 "name": "default",
-                "is_default": true,
                 "max_worker_count": 130,
                 "min_worker_count": 12,
                 "worker_concurrency": 110,
@@ -987,7 +984,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
             },
             {
                 "name": "test-queue-1",
-                "is_default": false,
                 "max_worker_count": 175,
                 "min_worker_count": 8,
                 "worker_concurrency": 150,
