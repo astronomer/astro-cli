@@ -2352,7 +2352,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
-					IsDefault:         true,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2360,7 +2359,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 				{
 					Name:              "test-q-2",
-					IsDefault:         false,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2418,7 +2416,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
-					IsDefault:         true,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    30,
 					WorkerConcurrency: 200,
@@ -2426,7 +2423,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 				{
 					Name:              "test-q-2",
-					IsDefault:         false,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2484,7 +2480,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
-					IsDefault:         true,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    30,
 					WorkerConcurrency: 200,
@@ -2492,7 +2487,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 				{
 					Name:              "test-q-2",
-					IsDefault:         false,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2532,12 +2526,10 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			qList = []inspect.Workerq{
 				{
 					Name:       "default",
-					IsDefault:  true,
 					WorkerType: "test-worker-1",
 				},
 				{
 					Name:       "test-q-2",
-					IsDefault:  false,
 					WorkerType: "test-worker-2",
 				},
 			}
@@ -2659,7 +2651,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
-					IsDefault:         true,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2667,7 +2658,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 				{
 					Name:              "test-q-2",
-					IsDefault:         false,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2800,7 +2790,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
-					IsDefault:         true,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2808,7 +2797,6 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 				{
 					Name:              "test-q-2",
-					IsDefault:         false,
 					MaxWorkerCount:    16,
 					MinWorkerCount:    3,
 					WorkerConcurrency: 200,
@@ -2953,12 +2941,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:       "",
-				IsDefault:  true,
 				WorkerType: "test-worker-1",
 			},
 			{
 				Name:       "test-q-2",
-				IsDefault:  false,
 				WorkerType: "test-worker-2",
 			},
 		}
@@ -2967,37 +2953,33 @@ func TestCheckRequiredFields(t *testing.T) {
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name")
 	})
-	t.Run("if queues were requested, it returns an error if default queue is not named default", func(t *testing.T) {
+	t.Run("if queues were requested, it returns an error if no queue is not default", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		qList := []inspect.Workerq{
 			{
 				Name:       "test-q-1",
-				IsDefault:  false,
 				WorkerType: "test-worker-1",
 			},
 			{
 				Name:       "test-q-2",
-				IsDefault:  true,
 				WorkerType: "test-worker-2",
 			},
 		}
 		input.Deployment.WorkerQs = qList
 		err = checkRequiredFields(&input, "create")
 		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[1].name = default")
+		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name = default")
 	})
 	t.Run("if queues were requested, it returns an error if worker type is missing", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		qList := []inspect.Workerq{
 			{
-				Name:      "test-q-1",
-				IsDefault: false,
+				Name: "default",
 			},
 			{
 				Name:       "default",
-				IsDefault:  true,
 				WorkerType: "test-worker-2",
 			},
 		}
@@ -3012,12 +2994,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:       "default",
-				IsDefault:  true,
 				WorkerType: "test-worker-1",
 			},
 			{
 				Name:       "test-q-2",
-				IsDefault:  false,
 				WorkerType: "test-worker-2",
 			},
 		}
@@ -3340,7 +3320,6 @@ func TestHasQueues(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
-				IsDefault:         true,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3348,7 +3327,6 @@ func TestHasQueues(t *testing.T) {
 			},
 			{
 				Name:              "test-q-2",
-				IsDefault:         false,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3395,7 +3373,6 @@ func TestGetQueues(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
-				IsDefault:         true,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3403,7 +3380,6 @@ func TestGetQueues(t *testing.T) {
 			},
 			{
 				Name:              "test-q-2",
-				IsDefault:         false,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3462,7 +3438,6 @@ func TestGetQueues(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
-				IsDefault:         true,
 				MaxWorkerCount:    18,
 				MinWorkerCount:    4,
 				WorkerConcurrency: 25,
@@ -3470,7 +3445,6 @@ func TestGetQueues(t *testing.T) {
 			},
 			{
 				Name:              "test-q-2",
-				IsDefault:         false,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3538,7 +3512,6 @@ func TestGetQueues(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
-				IsDefault:         true,
 				MaxWorkerCount:    18,
 				MinWorkerCount:    4,
 				WorkerConcurrency: 25,
@@ -3546,7 +3519,6 @@ func TestGetQueues(t *testing.T) {
 			},
 			{
 				Name:              "test-q-2", // this queue is being added
-				IsDefault:         false,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3575,7 +3547,6 @@ func TestGetQueues(t *testing.T) {
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
-				IsDefault:         true,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,
@@ -3583,7 +3554,6 @@ func TestGetQueues(t *testing.T) {
 			},
 			{
 				Name:              "test-q-2",
-				IsDefault:         false,
 				MaxWorkerCount:    16,
 				MinWorkerCount:    3,
 				WorkerConcurrency: 20,

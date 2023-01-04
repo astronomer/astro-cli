@@ -30,6 +30,7 @@ const (
 	jsonFormat   = "json"
 	createAction = "create"
 	updateAction = "update"
+	defaultQueue = "default"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
@@ -252,12 +253,16 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	}
 	// if worker queues were requested check queue name, isDefault and worker type
 	if hasQueues(deploymentFromFile) {
+		var hasDefaultQueue bool
 		for i, queue := range deploymentFromFile.Deployment.WorkerQs {
 			if queue.Name == "" {
 				missingField := fmt.Sprintf("deployment.worker_queues[%d].name", i)
 				return fmt.Errorf("%w: %s", errRequiredField, missingField)
 			}
-			if queue.IsDefault && queue.Name != "default" {
+			if queue.Name == defaultQueue {
+				hasDefaultQueue = true
+			}
+			if !hasDefaultQueue && queue.Name != defaultQueue {
 				missingField := fmt.Sprintf("deployment.worker_queues[%d].name = default", i)
 				return fmt.Errorf("%w: %s", errRequiredField, missingField)
 			}
@@ -415,7 +420,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		}
 		// add new queue or update existing queue properties to list of queues to return
 		qList[i].Name = requestedQueues[i].Name
-		qList[i].IsDefault = requestedQueues[i].IsDefault
+		qList[i].IsDefault = requestedQueues[i].Name == defaultQueue
 		qList[i].MinWorkerCount = requestedQueues[i].MinWorkerCount
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
