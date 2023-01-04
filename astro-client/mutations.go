@@ -46,6 +46,7 @@ var (
 			dagDeployEnabled
 			cluster {
 				id
+				name
 			}
 			runtimeRelease {
 				version
@@ -87,6 +88,7 @@ var (
 			dagDeployEnabled
 			cluster {
 				id
+				name
 			}
 			runtimeRelease {
 				version
