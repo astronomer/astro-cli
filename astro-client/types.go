@@ -328,6 +328,8 @@ type WorkerQueue struct {
 	MinWorkerCount    int    `json:"minWorkerCount"`
 	WorkerConcurrency int    `json:"workerConcurrency"`
 	NodePoolID        string `json:"nodePoolId"`
+	PodCPU            string `json:"podCpu,omitempty"`
+	PodRAM            string `json:"podRam,omitempty"`
 }
 
 type WorkerQueueDefaultOptions struct {

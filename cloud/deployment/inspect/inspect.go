@@ -33,6 +33,7 @@ type deploymentConfig struct {
 	Description      string `mapstructure:"description" yaml:"description" json:"description"`
 	RunTimeVersion   string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
 	DagDeployEnabled bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	Executor         string `mapstructure:"executor" yaml:"executor" json:"executor"`
 	SchedulerAU      int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
 	SchedulerCount   int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
 	ClusterName      string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
@@ -41,10 +42,12 @@ type deploymentConfig struct {
 
 type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
-	MaxWorkerCount    int    `mapstructure:"max_worker_count" yaml:"max_worker_count" json:"max_worker_count"`
-	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
-	WorkerConcurrency int    `mapstructure:"worker_concurrency" yaml:"worker_concurrency" json:"worker_concurrency"`
+	MaxWorkerCount    int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
+	MinWorkerCount    int    `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
+	WorkerConcurrency int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
 	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
+	PodCPU            string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`
+	PodRAM            string `mapstructure:"pod_ram,omitempty" yaml:"pod_ram,omitempty" json:"pod_ram,omitempty"`
 }
 
 type EnvironmentVariable struct {
@@ -153,11 +156,12 @@ func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interfac
 		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
 		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
 		"scheduler_count":    sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+		"executor":           sourceDeployment.DeploymentSpec.Executor,
 	}
 }
 
 func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
-	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools)
+	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor)
 	return map[string]interface{}{
 		"alert_emails":          sourceDeployment.AlertEmails,
 		"worker_queues":         qList,
@@ -165,16 +169,31 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	}
 }
 
-func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool) []map[string]interface{} {
+func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {
+	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs {
+		if sourceExecutor == "CeleryExecutor" {
+			resources = map[string]interface{}{
+				"max_worker_count":   queue.MaxWorkerCount,
+				"min_worker_count":   queue.MinWorkerCount,
+				"worker_concurrency": queue.WorkerConcurrency,
+			}
+		} else {
+			resources = map[string]interface{}{
+				"pod_cpu": queue.PodCPU,
+				"pod_ram": queue.PodRAM,
+			}
+		}
 		newQ := map[string]interface{}{
-			"name":               queue.Name,
-			"max_worker_count":   queue.MaxWorkerCount,
-			"min_worker_count":   queue.MinWorkerCount,
-			"worker_concurrency": queue.WorkerConcurrency,
+			"name": queue.Name,
 			// map worker type to node pool id
 			"worker_type": getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools),
+		}
+
+		// add resources to queue
+		for k, v := range resources {
+			newQ[k] = v
 		}
 		queueMap = append(queueMap, newQ)
 	}
