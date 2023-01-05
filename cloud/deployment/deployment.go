@@ -406,7 +406,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
 	var queueCreateUpdate bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
@@ -445,6 +445,15 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	spec := astro.DeploymentCreateSpec{
 		Scheduler: scheduler,
 		Executor:  currentDeployment.DeploymentSpec.Executor,
+	}
+
+	// change the executor if requested
+	if executor != "" && spec.Executor != executor {
+		// if going from CE -> KE and if multiple queues exist,
+		// only a new default queue will persist
+		printWarning(executor, len(currentDeployment.WorkerQueues))
+
+		spec.Executor = executor
 	}
 
 	deploymentUpdate := &astro.UpdateDeploymentInput{
@@ -720,4 +729,16 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
 	}
 	return deploymentURL, nil
+}
+
+// printWarning lets the user know
+// when going from CE -> KE and if multiple queues exist,
+// a new default queue will get created.
+func printWarning(executor string, existingQLength int) {
+	if executor == KubeExecutor {
+		if existingQLength > 1 {
+			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
+				"with one default worker queue for this deployment.")
+		}
+	}
 }
