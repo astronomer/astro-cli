@@ -110,7 +110,7 @@ services:
       - postgres
     environment: *common-env-vars
     volumes:
-      - airflow_home/dags:/usr/local/airflow/dags:ro
+      - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
@@ -221,7 +221,7 @@ services:
       - postgres
     environment: *common-env-vars
     volumes:
-      - airflow_home/dags:/usr/local/airflow/dags:ro
+      - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
