@@ -18,22 +18,21 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// Reference to reusable config cmd
+// Reference to reusable cobra commands
 var configCmd *cobra.Command
+var generateCmd *cobra.Command
 
 // All cmd names
 const (
-	flowCmdName               = "flow"
-	aboutCmdName              = "about"
-	configCmdName             = "config"
-	generateCmdName           = "generate"
-	initCmdName               = "init"
-	runCmdName                = "run"
-	validateCmdName           = "validate"
-	versionCmdName            = "version"
-	deployCmdName             = "deploy"
-	astroDockerfilePath       = "Dockerfile"
-	astroRequirementsfilePath = "requirements.txt"
+	flowCmdName     = "flow"
+	aboutCmdName    = "about"
+	configCmdName   = "config"
+	generateCmdName = "generate"
+	initCmdName     = "init"
+	runCmdName      = "run"
+	validateCmdName = "validate"
+	versionCmdName  = "version"
+	deployCmdName   = "deploy"
 )
 
 // All cmd flags
@@ -48,8 +47,15 @@ var (
 	noDebug           bool
 	noGenerateTasks   bool
 	noVerbose         bool
+	outputDir         string
 	projectDir        string
 	verbose           bool
+	workflowName      string
+)
+
+const (
+	astroDockerfilePath       = "Dockerfile"
+	astroRequirementsfilePath = "requirements.txt"
 )
 
 var (
@@ -144,6 +150,12 @@ func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+		if outputDir != "" {
+			outputDir, err = resolvePath(outputDir)
+			if err != nil {
+				return nil, err
+			}
+		}
 	case runCmdName:
 		projectDir, err = resolvePath(projectDir)
 		if err != nil {
@@ -217,6 +229,9 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		if noVerbose {
 			args = append(args, "--no-verbose")
 		}
+		if outputDir != "" {
+			args = append(args, "--output-dir", outputDir)
+		}
 	case runCmdName:
 		args = append(args, "--project-dir", projectDir, "--env", env)
 		if generateTasks {
@@ -276,6 +291,9 @@ func getDirs(cmd *cobra.Command) ([]string, error) {
 		dirs = append(dirs, dataDir)
 	case generateCmdName:
 		dirs = append(dirs, projectDir)
+		if outputDir != "" {
+			dirs = append(dirs, outputDir)
+		}
 		airflowHome, err = readConfigCmdOutput("airflow_home")
 		if err != nil {
 			return nil, err
@@ -400,8 +418,38 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+	projectDir, err = resolvePath(projectDir)
+	if err != nil {
+		return err
+	}
+	dagsPath := filepath.Join(projectDir, ".deploy/"+env+"/dags")
+	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
+		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
+	}
+	generateCmdArgs := []string{"--output-dir", dagsPath}
+	if workflowName != "" {
+		generateCmdArgs := append(generateCmdArgs, workflowName)
+		err = executeCmd(generateCmd, generateCmdArgs)
+		if err != nil {
+			return err
+		}
+	} else {
+		items, _ := os.ReadDir("workflows")
+		for _, item := range items {
+			if item.IsDir() {
+				generateWorflowCmdArgs := append(generateCmdArgs, item.Name())
+				err = executeCmd(generateCmd, generateWorflowCmdArgs)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	astroDeployCmd := cloud.NewDeployCmd()
-	astroDeployCmd.SetArgs(args)
+	astroDeployArgs := []string{"--dags-path", dagsPath}
+	astroDeployCmd.SetArgs(astroDeployArgs)
+
 	_, err = astroDeployCmd.ExecuteC()
 	if err != nil {
 		return err
@@ -521,6 +569,7 @@ func generateCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&generateTasks, "generate-tasks", false, "")
 	cmd.Flags().BoolVar(&noGenerateTasks, "no-generate-tasks", false, "")
 	cmd.Flags().StringVar(&env, "env", "default", "")
+	cmd.Flags().StringVar(&outputDir, "output-dir", "", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	cmd.Flags().BoolVar(&noVerbose, "no-verbose", false, "")
@@ -571,6 +620,9 @@ func deployCommand() *cobra.Command {
 		RunE:         executeDeployCmd,
 		SilenceUsage: true,
 	}
+	cmd.Flags().StringVar(&env, "env", "default", "")
+	cmd.Flags().StringVar(&workflowName, "workflow-name", "", "")
+	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	return cmd
 }
 
@@ -594,9 +646,9 @@ func NewFlowCommand() *cobra.Command {
 	cmd.AddCommand(aboutCommand())
 	cmd.AddCommand(initCommand())
 	configCmd = configCommand()
-	cmd.AddCommand(configCmd)
 	cmd.AddCommand(validateCommand())
-	cmd.AddCommand(generateCommand())
+	generateCmd = generateCommand()
+	cmd.AddCommand(generateCmd)
 	cmd.AddCommand(runCommand())
 	// Currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release.
 	if context.IsCloudContext() {

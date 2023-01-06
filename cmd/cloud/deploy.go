@@ -20,6 +20,7 @@ var (
 	pytest           bool
 	parse            bool
 	dags             bool
+	dagsPath         string
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
@@ -64,6 +65,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
+	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
 	return cmd
@@ -134,6 +136,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DeploymentName: deploymentName,
 		Prompt:         forcePrompt,
 		Dags:           dags,
+		DagsPath:       dagsPath,
 	}
 
 	return deployImage(deployInput, astroClient)
