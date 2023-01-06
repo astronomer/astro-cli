@@ -442,6 +442,7 @@ func TestGetDeploymentConfig(t *testing.T) {
 			SchedulerAU:      sourceDeployment.DeploymentSpec.Scheduler.AU,
 			SchedulerCount:   sourceDeployment.DeploymentSpec.Scheduler.Replicas,
 			DagDeployEnabled: sourceDeployment.DagDeployEnabled,
+			Executor:         sourceDeployment.DeploymentSpec.Executor,
 		}
 		rawDeploymentConfig := getDeploymentConfig(&sourceDeployment)
 		err := decodeToStruct(rawDeploymentConfig, &actualDeploymentConfig)
@@ -599,6 +600,8 @@ func TestGetAdditional(t *testing.T) {
 				MinWorkerCount:    12,
 				WorkerConcurrency: 110,
 				NodePoolID:        "test-pool-id",
+				PodCPU:            "SmallCPU",
+				PodRAM:            "megsOfRam",
 			},
 			{
 				ID:                "test-wq-id-1",
@@ -608,15 +611,62 @@ func TestGetAdditional(t *testing.T) {
 				MinWorkerCount:    8,
 				WorkerConcurrency: 150,
 				NodePoolID:        "test-pool-id-1",
+				PodCPU:            "LotsOfCPU",
+				PodRAM:            "gigsOfRam",
 			},
 		},
 		UpdatedAt: time.Now(),
 		Status:    "UNHEALTHY",
 	}
 
-	t.Run("returns alert emails, queues and variables for the requested deployment", func(t *testing.T) {
+	t.Run("returns alert emails, queues and variables for the requested deployment with CeleryExecutor", func(t *testing.T) {
 		var expectedAdditional, actualAdditional orderedPieces
-		qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools)
+		qList := []map[string]interface{}{
+			{
+				"name":               "default",
+				"max_worker_count":   130,
+				"min_worker_count":   12,
+				"worker_concurrency": 110,
+				"worker_type":        "test-instance-type",
+			},
+			{
+				"name":               "test-queue-1",
+				"max_worker_count":   175,
+				"min_worker_count":   8,
+				"worker_concurrency": 150,
+				"worker_type":        "test-instance-type-1",
+			},
+		}
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		rawExpected := map[string]interface{}{
+			"alert_emails":          sourceDeployment.AlertEmails,
+			"worker_queues":         qList,
+			"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
+		}
+		rawAdditional := getAdditional(&sourceDeployment)
+		err := decodeToStruct(rawAdditional, &actualAdditional)
+		assert.NoError(t, err)
+		err = decodeToStruct(rawExpected, &expectedAdditional)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedAdditional, actualAdditional)
+	})
+	t.Run("returns alert emails, queues and variables for the requested deployment with KubernetesExecutor", func(t *testing.T) {
+		var expectedAdditional, actualAdditional orderedPieces
+		sourceDeployment.DeploymentSpec.Executor = "KubernetesExecutor"
+		qList := []map[string]interface{}{
+			{
+				"name":        "default",
+				"pod_cpu":     "SmallCPU",
+				"pod_ram":     "megsOfRam",
+				"worker_type": "test-instance-type",
+			},
+			{
+				"name":        "test-queue-1",
+				"pod_cpu":     "LotsOfCPU",
+				"pod_ram":     "gigsOfRam",
+				"worker_type": "test-instance-type-1",
+			},
+		}
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		rawExpected := map[string]interface{}{
 			"alert_emails":          sourceDeployment.AlertEmails,
@@ -692,6 +742,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				MinWorkerCount:    12,
 				WorkerConcurrency: 110,
 				NodePoolID:        "test-pool-id",
+				PodCPU:            "smallCPU",
+				PodRAM:            "megsOfRam",
 			},
 			{
 				ID:                "test-wq-id-1",
@@ -701,6 +753,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				MinWorkerCount:    8,
 				WorkerConcurrency: 150,
 				NodePoolID:        "test-pool-id-1",
+				PodCPU:            "LotsOfCPU",
+				PodRAM:            "gigsOfRam",
 			},
 		},
 		CreatedAt: time.Now(),
@@ -816,6 +870,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         description: description
         runtime_version: 6.0.0
         dag_deploy_enabled: true
+        executor: CeleryExecutor
         scheduler_au: 5
         scheduler_count: 3
         cluster_name: test-cluster
@@ -938,6 +993,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
 	})
 	t.Run("returns a json formatted template deployment", func(t *testing.T) {
+		sourceDeployment.DeploymentSpec.Executor = "KubernetesExecutor"
 		info, _ := getDeploymentInfo(&sourceDeployment)
 		config := getDeploymentConfig(&sourceDeployment)
 		additional := getAdditional(&sourceDeployment)
@@ -969,6 +1025,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "KubernetesExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -977,17 +1034,15 @@ func TestFormatPrintableDeployment(t *testing.T) {
         "worker_queues": [
             {
                 "name": "default",
-                "max_worker_count": 130,
-                "min_worker_count": 12,
-                "worker_concurrency": 110,
-                "worker_type": "test-instance-type"
+                "worker_type": "test-instance-type",
+                "pod_cpu": "smallCPU",
+                "pod_ram": "megsOfRam"
             },
             {
                 "name": "test-queue-1",
-                "max_worker_count": 175,
-                "min_worker_count": 8,
-                "worker_concurrency": 150,
-                "worker_type": "test-instance-type-1"
+                "worker_type": "test-instance-type-1",
+                "pod_cpu": "LotsOfCPU",
+                "pod_ram": "gigsOfRam"
             }
         ],
         "alert_emails": [
@@ -1100,6 +1155,8 @@ func TestGetSpecificField(t *testing.T) {
 				MinWorkerCount:    12,
 				WorkerConcurrency: 110,
 				NodePoolID:        "test-pool-id",
+				PodCPU:            "SmallCPU",
+				PodRAM:            "megsOfRam",
 			},
 			{
 				ID:                "test-wq-id-1",
@@ -1109,6 +1166,8 @@ func TestGetSpecificField(t *testing.T) {
 				MinWorkerCount:    8,
 				WorkerConcurrency: 150,
 				NodePoolID:        "test-pool-id-1",
+				PodCPU:            "LotsOfCPU",
+				PodRAM:            "gigsOfRam",
 			},
 		},
 		CreatedAt: time.Now(),
@@ -1192,7 +1251,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools), actual)
+		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"

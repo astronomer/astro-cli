@@ -11,6 +11,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
@@ -115,11 +116,11 @@ func TestDeploymentCreate(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(2)
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(2)
-	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(2)
-	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(4)
+	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(4)
+	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
+	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(3)
 	astroClient = mockClient
 
 	mockResponse := &airflowversions.Response{
@@ -143,19 +144,33 @@ func TestDeploymentCreate(t *testing.T) {
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
-
 	t.Run("creates a deployment when dag deploy is enabled", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
-
+	t.Run("creates a deployment when executor is specified", func(t *testing.T) {
+		deploymentCreateInput1.DeploymentSpec.Executor = "KubernetesExecutor"
+		defer func() { deploymentCreateInput1.DeploymentSpec.Executor = "CeleryExecutor" }()
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubernetesExecutor"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("creates a deployment with default executor", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-
+	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
+	})
 	t.Run("creates a deployment from file", func(t *testing.T) {
 		orgID := "test-org-id"
 		filePath := "./test-deployment.yaml"
@@ -581,4 +596,19 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 	assert.Contains(t, resp, "test-key-2")
 	assert.Contains(t, resp, "test-value-2-update")
 	mockClient.AssertExpectations(t)
+}
+
+func TestIsValidExecutor(t *testing.T) {
+	t.Run("returns true for Kubernetes Executor", func(t *testing.T) {
+		actual := isValidExecutor(deployment.KubeExecutor)
+		assert.True(t, actual)
+	})
+	t.Run("returns true for Celery Executor", func(t *testing.T) {
+		actual := isValidExecutor(deployment.CeleryExecutor)
+		assert.True(t, actual)
+	})
+	t.Run("returns false for any invalid executor", func(t *testing.T) {
+		actual := isValidExecutor("KubeExecutor")
+		assert.False(t, actual)
+	})
 }
