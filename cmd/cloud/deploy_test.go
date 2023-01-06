@@ -11,7 +11,7 @@ import (
 )
 
 func execDeployCmd(args ...string) error {
-	cmd := newDeployCmd()
+	cmd := NewDeployCmd()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
 	return err

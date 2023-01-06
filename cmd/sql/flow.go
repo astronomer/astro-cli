@@ -9,7 +9,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -371,7 +373,7 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if !runtimeVersionMet {
 		pythonSDKPromptContent := promptContent{
 			"Please say yes/no.",
-			fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt?", requiredPythonSDKVersion),
+			fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.", requiredPythonSDKVersion),
 		}
 		result, err := promptGetConfirmation(pythonSDKPromptContent)
 		if err != nil {
@@ -398,6 +400,13 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+	astroDeployCmd := cloud.NewDeployCmd()
+	astroDeployCmd.SetArgs(args)
+	_, err = astroDeployCmd.ExecuteC()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -589,6 +598,9 @@ func NewFlowCommand() *cobra.Command {
 	cmd.AddCommand(validateCommand())
 	cmd.AddCommand(generateCommand())
 	cmd.AddCommand(runCommand())
-	cmd.AddCommand(deployCommand())
+	// Currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release.
+	if context.IsCloudContext() {
+		cmd.AddCommand(deployCommand())
+	}
 	return cmd
 }

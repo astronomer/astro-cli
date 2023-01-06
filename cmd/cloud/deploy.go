@@ -45,7 +45,7 @@ const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
 )
 
-func newDeployCmd() *cobra.Command {
+func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT-ID",
 		Short:   "Deploy your project to a Deployment on Astro",
