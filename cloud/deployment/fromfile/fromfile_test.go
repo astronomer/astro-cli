@@ -7,6 +7,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
@@ -134,6 +135,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -193,6 +195,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -253,6 +256,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -313,6 +317,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: cluster-name
@@ -394,6 +399,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -465,6 +471,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -540,6 +547,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -670,6 +678,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -793,6 +802,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -922,6 +932,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -1049,6 +1060,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -1193,6 +1205,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -1360,6 +1373,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -1437,6 +1451,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -1564,6 +1579,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -1690,6 +1706,7 @@ deployment:
     description: description 1
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -1841,6 +1858,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -2005,6 +2023,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -2082,6 +2101,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -2214,6 +2234,7 @@ deployment:
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "executor": "CeleryExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
@@ -2523,6 +2544,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 			qList = []inspect.Workerq{
 				{
 					Name:       "default",
@@ -2590,7 +2612,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
-					Executor: "CeleryExecutor",
+					Executor: deployment.CeleryExecutor,
 					Scheduler: astro.Scheduler{
 						AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 						Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
@@ -2616,6 +2638,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 
 			expectedDeploymentInput = astro.CreateDeploymentInput{
 				WorkspaceID:           workspaceID,
@@ -2625,7 +2648,40 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
-					Executor: "CeleryExecutor",
+					Executor: deployment.CeleryExecutor,
+					Scheduler: astro.Scheduler{
+						AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+						Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+					},
+				},
+				WorkerQueues: nil,
+			}
+			mockClient := new(astro_mocks.Client)
+			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, nil, mockClient)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
+			mockClient.AssertExpectations(t)
+		})
+		t.Run("transforms formattedDeployment to CreateDeploymentInput if Kubernetes executor was requested", func(t *testing.T) {
+			deploymentFromFile = inspect.FormattedDeployment{}
+			expectedDeploymentInput = astro.CreateDeploymentInput{}
+			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+			deploymentFromFile.Deployment.Configuration.Name = "test-deployment"
+			deploymentFromFile.Deployment.Configuration.Description = "test-description"
+			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+
+			expectedDeploymentInput = astro.CreateDeploymentInput{
+				WorkspaceID:           workspaceID,
+				ClusterID:             clusterID,
+				Label:                 deploymentFromFile.Deployment.Configuration.Name,
+				Description:           deploymentFromFile.Deployment.Configuration.Description,
+				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
+				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DeploymentSpec: astro.DeploymentCreateSpec{
+					Executor: deployment.KubeExecutor,
 					Scheduler: astro.Scheduler{
 						AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 						Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
@@ -2648,6 +2704,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
@@ -2721,7 +2778,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 				DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 				DeploymentSpec: astro.DeploymentCreateSpec{
-					Executor: "CeleryExecutor",
+					Executor: deployment.CeleryExecutor,
 					Scheduler: astro.Scheduler{
 						AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 						Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
@@ -2902,9 +2959,25 @@ func TestCheckRequiredFields(t *testing.T) {
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.configuration.cluster_name")
 	})
+	t.Run("returns an error if executor is missing", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		err = checkRequiredFields(&input, "")
+		assert.ErrorIs(t, err, errRequiredField)
+		assert.ErrorContains(t, err, "missing required field: deployment.configuration.executor")
+	})
+	t.Run("returns an error if executor value is invalid", func(t *testing.T) {
+		input.Deployment.Configuration.Name = "test-deployment"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = "test-executor"
+		err = checkRequiredFields(&input, "")
+		assert.ErrorIs(t, err, errInvalidValue)
+		assert.ErrorContains(t, err, "is not valid. It can either be CeleryExecutor or KubernetesExecutor")
+	})
 	t.Run("returns an error if alert email is invalid", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
-		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		list := []string{"test@test.com", "testing@testing.com", "not-an-email"}
 		input.Deployment.AlertEmails = list
 		err = checkRequiredFields(&input, "")
@@ -2914,7 +2987,8 @@ func TestCheckRequiredFields(t *testing.T) {
 	t.Run("returns an error if env var keys are missing on create", func(t *testing.T) {
 		input = inspect.FormattedDeployment{}
 		input.Deployment.Configuration.Name = "test-deployment"
-		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		list := []inspect.EnvironmentVariable{
 			{
 				IsSecret:  false,
@@ -2937,7 +3011,8 @@ func TestCheckRequiredFields(t *testing.T) {
 	t.Run("if queues were requested, it returns an error if queue name is missing", func(t *testing.T) {
 		input = inspect.FormattedDeployment{}
 		input.Deployment.Configuration.Name = "test-deployment"
-		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		qList := []inspect.Workerq{
 			{
 				Name:       "",
@@ -2953,9 +3028,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		assert.ErrorIs(t, err, errRequiredField)
 		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name")
 	})
-	t.Run("if queues were requested, it returns an error if no queue is not default", func(t *testing.T) {
+	t.Run("if queues were requested, it returns an error if default queue is missing", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
-		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		qList := []inspect.Workerq{
 			{
 				Name:       "test-q-1",
@@ -2973,7 +3049,8 @@ func TestCheckRequiredFields(t *testing.T) {
 	})
 	t.Run("if queues were requested, it returns an error if worker type is missing", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
-		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		qList := []inspect.Workerq{
 			{
 				Name: "default",
@@ -2990,7 +3067,8 @@ func TestCheckRequiredFields(t *testing.T) {
 	})
 	t.Run("returns nil if there are no missing fields", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
-		input.Deployment.Configuration.ClusterName = "test-cluster-id"
+		input.Deployment.Configuration.ClusterName = "test-cluster"
+		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		qList := []inspect.Workerq{
 			{
 				Name:       "default",
@@ -3847,5 +3925,20 @@ func TestCheckEnvVars(t *testing.T) {
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "update")
 		assert.NoError(t, err)
+	})
+}
+
+func TestIsValidExecutor(t *testing.T) {
+	t.Run("returns true if executor is Celery", func(t *testing.T) {
+		actual := isValidExecutor(deployment.CeleryExecutor)
+		assert.True(t, actual)
+	})
+	t.Run("returns true if executor is Kubernetes", func(t *testing.T) {
+		actual := isValidExecutor(deployment.KubeExecutor)
+		assert.True(t, actual)
+	})
+	t.Run("returns false if executor is neither Celery nor Kubernetes", func(t *testing.T) {
+		actual := isValidExecutor("test-executor")
+		assert.False(t, actual)
 	})
 }

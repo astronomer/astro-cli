@@ -24,6 +24,7 @@ var (
 	errInvalidEmail                   = errors.New("invalid email")
 	errCannotUpdateExistingDeployment = errors.New("already exists")
 	errNotFound                       = errors.New("does not exist")
+	errInvalidValue                   = errors.New("is not valid")
 )
 
 const (
@@ -200,7 +201,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: "CeleryExecutor",
+				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
 					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
@@ -229,13 +230,19 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 }
 
 // checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.
-// It returns errRequiredField if required fields are missing and nil if not.
+// It returns errRequiredField if required fields are missing, errInvalidValue if values are not valid and nil if not.
 func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action string) error {
 	if deploymentFromFile.Deployment.Configuration.Name == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.name")
 	}
 	if deploymentFromFile.Deployment.Configuration.ClusterName == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_name")
+	}
+	if deploymentFromFile.Deployment.Configuration.Executor == "" {
+		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
+	}
+	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor) {
+		return fmt.Errorf("executor %s %w. It can either be CeleryExecutor or KubernetesExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
 	// if alert emails are requested
 	if hasAlertEmails(deploymentFromFile) {
@@ -514,4 +521,9 @@ func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string
 		}
 	}
 	return nil
+}
+
+// isValidExecutor returns true for valid executor values and false if not.
+func isValidExecutor(executor string) bool {
+	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor
 }
