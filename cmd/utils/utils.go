@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/astronomer/astro-cli/config"
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -17,4 +18,19 @@ func EnsureProjectDir(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) {
+	v1, err := version.NewVersion(currentVersion)
+	if err != nil {
+		return false, err
+	}
+	v2, err := version.NewVersion(requiredVersion)
+	if err != nil {
+		return false, err
+	}
+	if v1.LessThan(v2) {
+		return false, nil
+	}
+	return true, nil
 }

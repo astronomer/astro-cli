@@ -18,6 +18,15 @@ type configResponse struct {
 	BaseDockerImage string `json:"baseDockerImage"`
 }
 
+type compatibilityVersions struct {
+	AstroRuntime   string `json:"astro-runtime"`
+	AstroSdkPython string `json:"astro-sdk-python"`
+}
+
+type compatibilityResponse struct {
+	Compatibility map[string]compatibilityVersions `json:"compatibility"`
+}
+
 const (
 	defaultDockerImageURI = "quay.io/astronomer/astro-runtime:6.0.4-base"
 )
@@ -78,4 +87,26 @@ func GetBaseDockerImageURI(configURL string) (string, error) {
 	}
 
 	return resp.BaseDockerImage, nil
+}
+
+func GetPythonSDKComptability(configURL, sqlCliVersion string) (astroRuntimeVersion, astroSDKPythonVersion string, err error) {
+	httpClient := &http.Client{}
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, configURL, http.NoBody)
+	if err != nil {
+		return "", "", fmt.Errorf("error creating HTTP request %w. Using the default", err)
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("error retrieving the latest configuration %s,  %w. Using the default", configURL, err)
+	}
+	defer res.Body.Close()
+
+	var resp compatibilityResponse
+	err = json.NewDecoder(res.Body).Decode(&resp)
+	if err != nil {
+		return "", "", fmt.Errorf("error parsing the compatibility versions from the configuration file: %w. Using the default", err)
+	}
+
+	SQLCLICompatibilityVersions := resp.Compatibility[sqlCliVersion]
+	return SQLCLICompatibilityVersions.AstroRuntime, SQLCLICompatibilityVersions.AstroSdkPython, nil
 }

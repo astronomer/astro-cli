@@ -17,12 +17,12 @@ import (
 )
 
 const (
-	astroSQLCLIProjectURL     = "https://pypi.org/pypi/astro-sql-cli/json"
-	astroSQLCLIConfigURL      = "https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json"
-	SQLCliDockerfilePath      = ".Dockerfile.sql_cli"
-	SQLCLIDockerfileWriteMode = 0o600
-	SQLCliDockerImageName     = "sql_cli"
-	PythonVersion             = "3.9"
+	AstroSQLCLIProjectURL = "https://pypi.org/pypi/astro-sql-cli/json"
+	AstroSQLCLIConfigURL  = "https://raw.githubusercontent.com/astronomer/astro-sdk/1473-check-python-sdk-version/sql-cli/config/astro-cli.json"
+	SQLCliDockerfilePath  = ".Dockerfile.sql_cli"
+	FileWriteMode         = 0o600
+	SQLCliDockerImageName = "sql_cli"
+	PythonVersion         = "3.9"
 )
 
 var (
@@ -94,12 +94,12 @@ var ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitC
 		return statusCode, cout, fmt.Errorf("docker client initialization failed %w", err)
 	}
 
-	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
+	astroSQLCliVersion, err := getPypiVersion(AstroSQLCLIProjectURL)
 	if err != nil {
 		return statusCode, cout, err
 	}
 
-	baseImage, err := getBaseDockerImageURI(astroSQLCLIConfigURL)
+	baseImage, err := getBaseDockerImageURI(AstroSQLCLIConfigURL)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -107,7 +107,7 @@ var ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitC
 	currentUser, _ := user.Current()
 
 	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Username, currentUser.Uid, currentUser.Username))
-	if err := Os().WriteFile(SQLCliDockerfilePath, dockerfileContent, SQLCLIDockerfileWriteMode); err != nil {
+	if err := Os().WriteFile(SQLCliDockerfilePath, dockerfileContent, FileWriteMode); err != nil {
 		return statusCode, cout, fmt.Errorf("error writing dockerfile %w", err)
 	}
 	defer os.Remove(SQLCliDockerfilePath)

@@ -1,12 +1,17 @@
 package sql
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/sql"
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 )
@@ -16,14 +21,17 @@ var configCmd *cobra.Command
 
 // All cmd names
 const (
-	flowCmdName     = "flow"
-	aboutCmdName    = "about"
-	configCmdName   = "config"
-	generateCmdName = "generate"
-	initCmdName     = "init"
-	runCmdName      = "run"
-	validateCmdName = "validate"
-	versionCmdName  = "version"
+	flowCmdName               = "flow"
+	aboutCmdName              = "about"
+	configCmdName             = "config"
+	generateCmdName           = "generate"
+	initCmdName               = "init"
+	runCmdName                = "run"
+	validateCmdName           = "validate"
+	versionCmdName            = "version"
+	deployCmdName             = "deploy"
+	astroDockerfilePath       = "Dockerfile"
+	astroRequirementsfilePath = "requirements.txt"
 )
 
 // All cmd flags
@@ -41,6 +49,31 @@ var (
 	projectDir        string
 	verbose           bool
 )
+
+var (
+	ErrNoBaseAstroRuntimeImage = errors.New("base image is not an Astro runtime image in the provided Dockerfile")
+	ErrPythonSDKVersionNotMet  = errors.New("required version for Python SDK dependency not met")
+)
+
+func getAstroDockerfileRuntimeVersion() (string, error) {
+	file, err := os.Open(astroDockerfilePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Scan()
+	text := scanner.Text()
+	runtimeImagePrefix := "quay.io/astronomer/astro-runtime:"
+	if !strings.Contains(text, runtimeImagePrefix) {
+		return "", ErrNoBaseAstroRuntimeImage
+	}
+	re := regexp.MustCompile(runtimeImagePrefix + "([^-]*)")
+	runtimeVersion := re.FindStringSubmatch(text)[1]
+
+	return runtimeVersion, nil
+}
 
 // Build the cmd string to execute
 func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
@@ -317,6 +350,57 @@ func executeCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func executeDeployCmd(cmd *cobra.Command, args []string) error {
+	astroRuntimeVersion, err := getAstroDockerfileRuntimeVersion()
+	if err != nil {
+		return err
+	}
+	SQLCLIVersion, err := sql.GetPypiVersion(sql.AstroSQLCLIProjectURL)
+	if err != nil {
+		return err
+	}
+	requiredRuntimeVersion, requiredPythonSDKVersion, err := sql.GetPythonSDKComptability(sql.AstroSQLCLIConfigURL, SQLCLIVersion)
+	if err != nil {
+		return err
+	}
+	runtimeVersionMet, err := utils.IsRequiredVersionMet(astroRuntimeVersion, requiredRuntimeVersion)
+	if err != nil {
+		return err
+	}
+
+	if !runtimeVersionMet {
+		pythonSDKPromptContent := promptContent{
+			"Please say yes/no.",
+			fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt?", requiredPythonSDKVersion),
+		}
+		result, err := promptGetConfirmation(pythonSDKPromptContent)
+		if err != nil {
+			return err
+		}
+		if result == "no" {
+			return ErrPythonSDKVersionNotMet
+		}
+		requiredPythonSDKDependency := "\nastro-sdk-python==" + requiredPythonSDKVersion
+		b, err := os.ReadFile(astroRequirementsfilePath)
+		if err != nil {
+			return err
+		}
+		existingRequirements := string(b)
+		if !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
+			f, err := os.OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, sql.FileWriteMode)
+			if err != nil {
+				return err
+			}
+
+			defer f.Close()
+			if _, err = f.WriteString(requiredPythonSDKDependency); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Execute cobra cmd with args and return output
 func readCmdOutput(cmd *cobra.Command, args []string) (string, error) {
 	cmdString, err := buildCmd(cmd, args)
@@ -451,6 +535,36 @@ func runCommand() *cobra.Command {
 	return cmd
 }
 
+type promptContent struct {
+	errorMsg string
+	label    string
+}
+
+func promptGetConfirmation(pc promptContent) (string, error) {
+	prompt := promptui.Select{
+		Label: pc.label,
+		Items: []string{"yes", "no"},
+	}
+
+	_, result, err := prompt.Run()
+	if err != nil {
+		fmt.Printf("Prompt failed %v\n", pc.errorMsg)
+		return "", err
+	}
+
+	return result, nil
+}
+
+//nolint:dupl
+func deployCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          deployCmdName,
+		RunE:         executeDeployCmd,
+		SilenceUsage: true,
+	}
+	return cmd
+}
+
 func login(cmd *cobra.Command, args []string) error {
 	// flow currently does not require login
 	return nil
@@ -475,5 +589,6 @@ func NewFlowCommand() *cobra.Command {
 	cmd.AddCommand(validateCommand())
 	cmd.AddCommand(generateCommand())
 	cmd.AddCommand(runCommand())
+	cmd.AddCommand(deployCommand())
 	return cmd
 }
