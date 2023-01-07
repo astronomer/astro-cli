@@ -562,6 +562,7 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
+		defer testUtil.MockUserInput(t, "1")()
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
@@ -570,7 +571,23 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 
-	t.Run("success but with workspace switch failure", func(t *testing.T) {
+	t.Run("returns invalid selection error with workspace switch", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
+
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
+		defer testUtil.MockUserInput(t, "4")()
+		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
+		buf := new(bytes.Buffer)
+		err = CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
+		assert.ErrorContains(t, err, "invalid workspace selection")
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+
+	t.Run("returns error when workspace switch failure occurs", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
@@ -580,7 +597,7 @@ func TestCheckUserSession(t *testing.T) {
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockAuthConfig, mockClient, mockCoreClient, buf)
-		assert.NoError(t, err)
+		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -637,7 +654,8 @@ func TestLogin(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id", Label: "something-label"}}, nil).Once()
+		defer testUtil.MockUserInput(t, "some@email.com")()
 		err := Login("astronomer.io", "", "", mockClient, mockCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -676,7 +694,8 @@ func TestLogin(t *testing.T) {
 		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
 
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id", Label: "something-label"}}, nil).Once()
+		defer testUtil.MockUserInput(t, "some@email.com")()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()

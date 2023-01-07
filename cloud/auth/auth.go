@@ -374,6 +374,7 @@ func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client ast
 			err := workspace.Switch("", client, out)
 			if err != nil {
 				fmt.Print(cliSetWorkspaceExample)
+				return err
 			}
 		} else {
 			fmt.Printf(configSetDefaultWorkspace, w.Label)
