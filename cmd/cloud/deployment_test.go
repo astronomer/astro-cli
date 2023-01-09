@@ -632,6 +632,10 @@ func TestIsValidExecutor(t *testing.T) {
 		actual := isValidExecutor(deployment.CeleryExecutor)
 		assert.True(t, actual)
 	})
+	t.Run("returns true when no Executor is requested", func(t *testing.T) {
+		actual := isValidExecutor("")
+		assert.True(t, actual)
+	})
 	t.Run("returns false for any invalid executor", func(t *testing.T) {
 		actual := isValidExecutor("KubeExecutor")
 		assert.False(t, actual)

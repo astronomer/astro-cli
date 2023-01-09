@@ -949,6 +949,22 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
+
+	t.Run("do not update deployment with executor if user did not request it", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		deploymentResp = astro.Deployment{
+			ID: "test-id",
+			DeploymentSpec: astro.DeploymentSpec{
+				Executor: KubeExecutor,
+			},
+		}
+
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		err := Update("test-id", "", ws, "", "", "disable", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestDelete(t *testing.T) {

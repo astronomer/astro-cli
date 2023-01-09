@@ -734,11 +734,17 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 // printWarning lets the user know
 // when going from CE -> KE and if multiple queues exist,
 // a new default queue will get created.
+// If going from KE -> CE, it lets user know that a new default worker queue will be created.
 func printWarning(executor string, existingQLength int) {
 	if executor == KubeExecutor {
 		if existingQLength > 1 {
 			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
-				"with one default worker queue for this deployment.")
+				"with one new default worker queue for this deployment.")
+		}
+	} else {
+		if executor == CeleryExecutor {
+			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue" +
+				"with a new default worker queue for this deployment.")
 		}
 	}
 }
