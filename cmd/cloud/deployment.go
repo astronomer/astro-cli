@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/astronomer/astro-cli/astro-client"
@@ -41,6 +42,7 @@ var (
 	variableValue                 string
 	useEnvFile                    bool
 	makeSecret                    bool
+	executor                      string
 	inputFile                     string
 	deploymentVariableListExample = `
 		# List a deployment's variables
@@ -60,8 +62,9 @@ var (
 		# Update a deployment variables from a file
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
-	httpClient = httputil.NewHTTPClient()
-	errFlag    = errors.New("--deployment-file can not be used with other arguments")
+	httpClient         = httputil.NewHTTPClient()
+	errFlag            = errors.New("--deployment-file can not be used with other arguments")
+	errInvalidExecutor = errors.New("not a valid executor")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -131,6 +134,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
+	cmd.Flags().StringVarP(&executor, "executor", "e", deployment.CeleryExecutor, "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
@@ -299,6 +303,11 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	// check if executor is valid
+	if !isValidExecutor(executor) {
+		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
+	}
+
 	// request is to create from a file
 	if inputFile != "" {
 		requestedFlags := cmd.Flags().NFlag()
@@ -321,7 +330,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return err
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -410,4 +419,8 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 	cmd.SilenceUsage = true
 
 	return deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile, deploymentName, variableList, useEnvFile, makeSecret, true, astroClient, out)
+}
+
+func isValidExecutor(executor string) bool {
+	return executor == deployment.KubeExecutor || executor == deployment.CeleryExecutor
 }

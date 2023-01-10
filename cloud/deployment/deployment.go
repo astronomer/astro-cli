@@ -32,6 +32,8 @@ var (
 
 const (
 	noWorkspaceMsg = "no workspaces with id (%s) found"
+	KubeExecutor   = "KubernetesExecutor"
+	CeleryExecutor = "CeleryExecutor"
 )
 
 // TODO: get these values from the Astrohub API
@@ -143,7 +145,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -171,7 +173,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	// validate workspace
 	ws, err := client.ListWorkspaces(c.Organization)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	for i := range ws {
@@ -217,7 +219,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	spec := astro.DeploymentCreateSpec{
-		Executor:  "CeleryExecutor",
+		Executor:  executor,
 		Scheduler: scheduler,
 	}
 
@@ -240,7 +242,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	// Create request
 	d, err := client.CreateDeployment(createInput)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	if waitForStatus {
@@ -679,7 +681,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", SchedulerAuMin, SchedulerReplicasMin, client, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, SchedulerAuMin, SchedulerReplicasMin, client, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
