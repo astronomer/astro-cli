@@ -128,7 +128,7 @@ func getProjectDirFromArgs(args []string) string {
 
 // Read config cmd output for retrieving config settings such as airflow_home
 func readConfigCmdOutput(key string) (string, error) {
-	args := []string{key}
+	args := []string{"get", key}
 	output, err := readCmdOutput(configCmd, args)
 	if err != nil {
 		return "", err
