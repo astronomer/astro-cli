@@ -21,6 +21,7 @@ type deploymentMetadata struct {
 	ClusterID      *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
 	ReleaseName    *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
 	AirflowVersion *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	CurrentTag     *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
 	Status         *string    `mapstructure:"status" yaml:"status" json:"status"`
 	CreatedAt      *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
 	UpdatedAt      *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
@@ -137,6 +138,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		"workspace_id":    sourceDeployment.Workspace.ID,
 		"cluster_id":      sourceDeployment.Cluster.ID,
 		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
+		"current_tag":     sourceDeployment.DeploymentSpec.Image.Tag,
 		"release_name":    sourceDeployment.ReleaseName,
 		"deployment_url":  deploymentURL,
 		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,

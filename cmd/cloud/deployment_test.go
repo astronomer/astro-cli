@@ -190,6 +190,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
@@ -349,6 +350,7 @@ deployment:
     description: description
     runtime_version: 6.0.0
     dag_deploy_enabled: true
+    executor: CeleryExecutor
     scheduler_au: 5
     scheduler_count: 3
     cluster_name: test-cluster
