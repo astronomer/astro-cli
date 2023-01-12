@@ -807,7 +807,7 @@ func TestSetWorkerQueueValues(t *testing.T) {
 	})
 }
 
-func TestIsWorkerQueueInputValid(t *testing.T) {
+func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
@@ -839,19 +839,19 @@ func TestIsWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 275
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.NoError(t, err)
 	})
 	t.Run("returns an error when min worker count is not between default floor and ceiling values", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: min worker count must be between 1 and 20")
 	})
 	t.Run("returns an error when max worker count is not between default floor and ceiling values", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -859,9 +859,94 @@ func TestIsWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 350
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: worker concurrency must be between 175 and 275")
+	})
+}
+
+func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	requestedWorkerQueue := &astro.WorkerQueue{
+		Name:       "default",
+		NodePoolID: "test-pool-id",
+	}
+
+	t.Run("returns nil when queue input is valid", func(t *testing.T) {
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.NoError(t, err)
+	})
+	t.Run("returns an error when queue name is not default", func(t *testing.T) {
+		requestedWorkerQueue.Name = "test-queue"
+		defer func() {
+			requestedWorkerQueue = &astro.WorkerQueue{
+				Name:       "default",
+				NodePoolID: "test-pool-id",
+			}
+		}()
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "a non default worker queue in the request. Rename the queue to default")
+	})
+	t.Run("returns an error when pod_cpu is in input", func(t *testing.T) {
+		requestedWorkerQueue.PodCPU = "1.0"
+		defer func() {
+			requestedWorkerQueue = &astro.WorkerQueue{
+				Name:       "default",
+				NodePoolID: "test-pool-id",
+			}
+		}()
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod_cpu in the request. It will be calculated based on the requested worker_type")
+	})
+	t.Run("returns an error when pod_ram is in input", func(t *testing.T) {
+		requestedWorkerQueue.PodRAM = "1.0"
+		defer func() {
+			requestedWorkerQueue = &astro.WorkerQueue{
+				Name:       "default",
+				NodePoolID: "test-pool-id",
+			}
+		}()
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod_ram in the request. It will be calculated based on the requested worker_type")
+	})
+	t.Run("returns an error when min_worker_count is in input", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		defer func() {
+			requestedWorkerQueue = &astro.WorkerQueue{
+				Name:       "default",
+				NodePoolID: "test-pool-id",
+			}
+		}()
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support min_worker_count in the request. It can only be used with CeleryExecutor")
+	})
+	t.Run("returns an error when max_worker_count is in input", func(t *testing.T) {
+		requestedWorkerQueue.MaxWorkerCount = 25
+		defer func() {
+			requestedWorkerQueue = &astro.WorkerQueue{
+				Name:       "default",
+				NodePoolID: "test-pool-id",
+			}
+		}()
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support max_worker_count in the request. It can only be used with CeleryExecutor")
+	})
+	t.Run("returns an error when worker_concurrency is in input", func(t *testing.T) {
+		requestedWorkerQueue.WorkerConcurrency = 350
+		defer func() {
+			requestedWorkerQueue = &astro.WorkerQueue{
+				Name:       "default",
+				NodePoolID: "test-pool-id",
+			}
+		}()
+		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support worker_concurrency in the request. It can only be used with CeleryExecutor")
 	})
 }
 

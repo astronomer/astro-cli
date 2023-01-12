@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	createAction = "create"
-	updateAction = "update"
+	createAction     = "create"
+	updateAction     = "update"
+	defaultQueueName = "default"
 )
 
 var (
@@ -29,6 +30,7 @@ var (
 	errQueueDoesNotExist         = errors.New("worker queue does not exist")
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
+	ErrNotSupported              = errors.New("KubernetesExecutor does not support")
 )
 
 func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error {
@@ -65,7 +67,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 	queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
 
-	err = IsWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
+	err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
 	if err != nil {
 		return err
 	}
@@ -112,7 +114,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", 0, 0, listToCreate, true, client)
+	err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", 0, 0, listToCreate, true, client)
 	if err != nil {
 		return err
 	}
@@ -165,10 +167,10 @@ func GetWorkerQueueDefaultOptions(client astro.Client) (astro.WorkerQueueDefault
 	return workerQueueDefaultOptions, nil
 }
 
-// IsWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions
-// if it adheres to them, it returns nil
-// errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range
-func IsWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
+// IsCeleryWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions
+// if it adheres to them, it returns nil.
+// errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
+func IsCeleryWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOptions astro.WorkerQueueDefaultOptions) error {
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= defaultOptions.MinWorkerCount.Floor) ||
 		!(requestedWorkerQueue.MinWorkerCount <= defaultOptions.MinWorkerCount.Ceiling) {
@@ -185,6 +187,39 @@ func IsWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue, defaultOpt
 		errorMessage = fmt.Sprintf("worker concurrency must be between %d and %d", defaultOptions.WorkerConcurrency.Floor, defaultOptions.WorkerConcurrency.Ceiling)
 		return fmt.Errorf("%w: %s", errInvalidWorkerQueueOption, errorMessage)
 	}
+	return nil
+}
+
+// IsKubernetesWorkerQueueInputValid checks if the requestedQueue has all the necessary properties
+// required to create a worker queue for the KubernetesExecutor.
+// errNotSupported is returned for any invalid properties.
+func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) error {
+	var errorMessage string
+	if requestedWorkerQueue.Name != defaultQueueName {
+		errorMessage = "a non default worker queue in the request. Rename the queue to default"
+		return fmt.Errorf("%w %s", ErrNotSupported, errorMessage)
+	}
+	if requestedWorkerQueue.PodCPU != "" {
+		errorMessage = "pod_cpu in the request. It will be calculated based on the requested worker_type"
+		return fmt.Errorf("%w %s", ErrNotSupported, errorMessage)
+	}
+	if requestedWorkerQueue.PodRAM != "" {
+		errorMessage = "pod_ram in the request. It will be calculated based on the requested worker_type"
+		return fmt.Errorf("%w %s", ErrNotSupported, errorMessage)
+	}
+	if requestedWorkerQueue.MinWorkerCount != 0 {
+		errorMessage = "min_worker_count in the request. It can only be used with CeleryExecutor"
+		return fmt.Errorf("%w %s", ErrNotSupported, errorMessage)
+	}
+	if requestedWorkerQueue.MaxWorkerCount != 0 {
+		errorMessage = "max_worker_count in the request. It can only be used with CeleryExecutor"
+		return fmt.Errorf("%w %s", ErrNotSupported, errorMessage)
+	}
+	if requestedWorkerQueue.WorkerConcurrency != 0 {
+		errorMessage = "worker_concurrency in the request. It can only be used with CeleryExecutor"
+		return fmt.Errorf("%w %s", ErrNotSupported, errorMessage)
+	}
+
 	return nil
 }
 
@@ -289,7 +324,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		}
 	}
 	// check if default queue is being deleted
-	if name == "default" {
+	if name == defaultQueueName {
 		return errCannotDeleteDefaultQueue
 	}
 	queueToDelete = &astro.WorkerQueue{
@@ -315,7 +350,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 			}
 		}
 		// update the deployment with the new list
-		err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", 0, 0, listToDelete, true, client)
+		err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", 0, 0, listToDelete, true, client)
 		if err != nil {
 			return err
 		}

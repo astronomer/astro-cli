@@ -324,9 +324,9 @@ type WorkerQueue struct {
 	ID                string `json:"id,omitempty"` // Empty when creating new WorkerQueues
 	Name              string `json:"name"`
 	IsDefault         bool   `json:"isDefault"`
-	MaxWorkerCount    int    `json:"maxWorkerCount"`
-	MinWorkerCount    int    `json:"minWorkerCount"`
-	WorkerConcurrency int    `json:"workerConcurrency"`
+	MaxWorkerCount    int    `json:"maxWorkerCount,omitempty"`
+	MinWorkerCount    int    `json:"minWorkerCount,omitempty"`
+	WorkerConcurrency int    `json:"workerConcurrency,omitempty"`
 	NodePoolID        string `json:"nodePoolId"`
 	PodCPU            string `json:"podCpu,omitempty"`
 	PodRAM            string `json:"podRam,omitempty"`

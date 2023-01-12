@@ -406,23 +406,12 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
-	var queueCreateUpdate bool
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
-	}
-
-	// prompt user
-	if !forceDeploy {
-		i, _ := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Label)))
-
-		if !i {
-			fmt.Println("Canceling Deployment update")
-			return nil
-		}
 	}
 
 	// build query input
@@ -446,6 +435,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 		Scheduler: scheduler,
 		Executor:  currentDeployment.DeploymentSpec.Executor,
 	}
+
+	// change the executor if requested
+	confirmWithUser, spec = mutateExecutor(executor, spec, len(currentDeployment.WorkerQueues))
 
 	deploymentUpdate := &astro.UpdateDeploymentInput{
 		ID:             currentDeployment.ID,
@@ -478,13 +470,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 			return nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
-			i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
-				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
-				"\nAre you sure you want to continue?")
-			if !i {
-				fmt.Println("Canceling deployment update...")
-				return nil
-			}
+			fmt.Printf("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
+				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update.")
+			confirmWithUser = true
 		}
 		deploymentUpdate.DagDeployEnabled = false
 	}
@@ -500,6 +488,18 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 		return nil
 	}
 
+	// confirm changes with user only if force=false
+	if !forceDeploy {
+		if confirmWithUser {
+			y, _ := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Label)))
+
+			if !y {
+				fmt.Println("Canceling Deployment update")
+				return nil
+			}
+		}
+	}
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)
 	if err != nil {
@@ -720,4 +720,40 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
 	}
 	return deploymentURL, nil
+}
+
+// printWarning lets the user know
+// when going from CE -> KE and if multiple queues exist,
+// a new default queue will get created.
+// If going from KE -> CE, it lets user know that a new default worker queue will be created.
+// It returns true if a warning was printed and false if not.
+func printWarning(executor string, existingQLength int) bool {
+	var printed bool
+	if executor == KubeExecutor {
+		if existingQLength > 1 {
+			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
+				"with one new default worker queue for this deployment.")
+			printed = true
+		}
+	} else {
+		if executor == CeleryExecutor {
+			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue " +
+				"with a new default worker queue for this deployment.")
+			printed = true
+		}
+	}
+	return printed
+}
+
+// mutateExecutor updates currentSpec.Executor if requestedExecutor is not "" and not the same value.
+// It prints a helpful message describing the change and returns a bool used to confirm the change with the user.
+// If a helpful message was not printed, it returns false.
+func mutateExecutor(requestedExecutor string, currentSpec astro.DeploymentCreateSpec, existingQLength int) (bool, astro.DeploymentCreateSpec) {
+	var printed bool
+	if requestedExecutor != "" && currentSpec.Executor != requestedExecutor {
+		// print helpful message describing the change
+		printed = printWarning(requestedExecutor, existingQLength)
+		currentSpec.Executor = requestedExecutor
+	}
+	return printed, currentSpec
 }

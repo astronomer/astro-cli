@@ -271,6 +271,9 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 				Replicas: 3,
 			},
 			Webserver: astro.Webserver{URL: "some-url"},
+			Image: astro.Image{
+				Tag: "some-tag",
+			},
 		},
 		WorkerQueues: []astro.WorkerQueue{
 			{
@@ -307,6 +310,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 			WorkspaceID:    &sourceDeployment.Workspace.ID,
 			ClusterID:      &sourceDeployment.Cluster.ID,
 			AirflowVersion: &sourceDeployment.RuntimeRelease.AirflowVersion,
+			CurrentTag:     &sourceDeployment.DeploymentSpec.Image.Tag,
 			ReleaseName:    &sourceDeployment.ReleaseName,
 			DeploymentURL:  &expectedCloudDomainURL,
 			WebserverURL:   &sourceDeployment.DeploymentSpec.Webserver.URL,
@@ -331,6 +335,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 			ClusterID:      &sourceDeployment.Cluster.ID,
 			ReleaseName:    &sourceDeployment.ReleaseName,
 			AirflowVersion: &sourceDeployment.RuntimeRelease.AirflowVersion,
+			CurrentTag:     &sourceDeployment.DeploymentSpec.Image.Tag,
 			Status:         &sourceDeployment.Status,
 			CreatedAt:      &sourceDeployment.CreatedAt,
 			UpdatedAt:      &sourceDeployment.UpdatedAt,
