@@ -240,7 +240,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Description:      deploymentFromFile.Deployment.Configuration.Description,
 			DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: "CeleryExecutor",
+				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
 					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
