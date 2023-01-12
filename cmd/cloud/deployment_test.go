@@ -324,14 +324,21 @@ func TestDeploymentUpdate(t *testing.T) {
 	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
-	cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force"}
-	_, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-
-	cmdArgs = []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--dag-deploy", "some-value"}
-	_, err = execDeploymentCmd(cmdArgs...)
-	assert.Error(t, err)
-
+	t.Run("updates the deployment successfully", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("returns an error if dag-deploy has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--dag-deploy", "some-value"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--executor", "KubeExecutor"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
+	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
@@ -455,18 +462,18 @@ deployment:
 			afero.NewOsFs().Remove(filePath)
 		}()
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if updating a deployment from file fails", func(t *testing.T) {
 		cmdArgs := []string{"update", "--deployment-file", "test-file-name.json"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
 	})
 	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorIs(t, err, errFlag)
 	})
 	mockClient.AssertExpectations(t)
@@ -623,6 +630,10 @@ func TestIsValidExecutor(t *testing.T) {
 	})
 	t.Run("returns true for Celery Executor", func(t *testing.T) {
 		actual := isValidExecutor(deployment.CeleryExecutor)
+		assert.True(t, actual)
+	})
+	t.Run("returns true when no Executor is requested", func(t *testing.T) {
+		actual := isValidExecutor("")
 		assert.True(t, actual)
 	})
 	t.Run("returns false for any invalid executor", func(t *testing.T) {
