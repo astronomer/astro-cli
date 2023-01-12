@@ -343,7 +343,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"update", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "failed to find a valid workspace")
 		assert.Contains(t, resp, expectedOut)
 	})
 	t.Run("updates a deployment from file", func(t *testing.T) {
