@@ -12,6 +12,7 @@ import (
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
@@ -331,6 +332,20 @@ func TestDeploymentUpdate(t *testing.T) {
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.Error(t, err)
 
+	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.Workspace = ""
+		err = ctx.SetContext()
+		assert.NoError(t, err)
+		defer testUtil.InitTestConfig(testUtil.CloudPlatform)
+		expectedOut := "Usage:\n"
+		cmdArgs := []string{"update", "-n", "doesnotexist"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to find a valid workspace")
+		assert.Contains(t, resp, expectedOut)
+	})
 	t.Run("updates a deployment from file", func(t *testing.T) {
 		orgID := "test-org-id"
 		filePath := "./test-deployment.yaml"
@@ -402,8 +417,9 @@ deployment:
 			},
 		}
 		updatedDeployment := astro.Deployment{
-			ID:    "test-deployment-id",
-			Label: "test-deployment-label",
+			ID:      "test-deployment-id",
+			Label:   "test-deployment-label",
+			Cluster: astro.Cluster{ID: "test-cluster-id", Name: "test-cluster"},
 		}
 		mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 			MinWorkerCount: astro.WorkerQueueOption{
