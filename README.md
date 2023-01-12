@@ -196,6 +196,10 @@ Astronomer ships major, minor, and patch releases of the Astro CLI in the follow
 
 All Astro CLI releases prior to 1.0.0 are considered beta.
 
+## Change Log
+
+Change log between each version can be found on the [releases](https://github.com/astronomer/astro-cli/releases) page
+
 ## Debug
 
 The Astro CLI includes a debug flag that allows you to view queries and internal logs. To enable it, you can pass `--verbosity=debug` in your commands, or you can add the following entry to your `~/.astro/config.yaml` file:
