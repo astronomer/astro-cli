@@ -193,7 +193,7 @@ func TestFlowConfigCmd(t *testing.T) {
 			err := execFlowCmd("init", projectDir, tc.initFlag, t.TempDir())
 			assert.NoError(t, err)
 
-			err = execFlowCmd("config", "--project-dir", projectDir, tc.configKey)
+			err = execFlowCmd("config", "get", tc.configKey, "--project-dir", projectDir)
 			assert.NoError(t, err)
 		})
 	}
