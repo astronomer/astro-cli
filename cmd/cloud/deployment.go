@@ -331,6 +331,9 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return errors.Wrap(err, "failed to find a valid workspace")
 	}
 
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
 	// request is to update from a file
 	if inputFile != "" {
 		requestedFlags := cmd.Flags().NFlag()
@@ -343,9 +346,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	// Get release name from args, if passed
 	if len(args) > 0 {

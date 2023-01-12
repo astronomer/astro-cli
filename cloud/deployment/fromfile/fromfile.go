@@ -24,6 +24,7 @@ var (
 	errInvalidEmail                   = errors.New("invalid email")
 	errCannotUpdateExistingDeployment = errors.New("already exists")
 	errNotFound                       = errors.New("does not exist")
+	errNotPermitted                   = errors.New("is not permitted")
 )
 
 const (
@@ -209,6 +210,11 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			WorkerQueues: listQueues,
 		}
 	case updateAction:
+		// check if cluster is being changed
+		if clusterID != existingDeployment.Cluster.ID {
+			return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{},
+				fmt.Errorf("changing an existing deployment's cluster %w", errNotPermitted)
+		}
 		updateInput = astro.UpdateDeploymentInput{
 			ID:               existingDeployment.ID,
 			ClusterID:        clusterID,

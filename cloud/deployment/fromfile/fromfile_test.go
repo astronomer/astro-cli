@@ -1792,6 +1792,22 @@ deployment:
 				ID:          "test-deployment-id",
 				Label:       "test-deployment-label",
 				Description: "description",
+				Cluster: astro.Cluster{
+					ID:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							ID:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
 			}
 			updatedDeployment := astro.Deployment{
 				ID:          "test-deployment-id",
@@ -1952,6 +1968,22 @@ deployment:
 				ID:          "test-deployment-id",
 				Label:       "test-deployment-label",
 				Description: "description",
+				Cluster: astro.Cluster{
+					ID:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							ID:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
 			}
 			updatedDeployment := astro.Deployment{
 				ID:          "test-deployment-id",
@@ -2291,6 +2323,22 @@ deployment:
 				ID:          "test-deployment-id",
 				Label:       "test-deployment-label",
 				Description: "description",
+				Cluster: astro.Cluster{
+					ID:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							ID:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
 			}
 			orgID = "test-org-id"
 			mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
@@ -2774,6 +2822,32 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			mockClient := new(astro_mocks.Client)
 			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, mockClient)
 			assert.NoError(t, err)
+			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(t)
+		})
+		t.Run("returns an error if the cluster is being changed", func(t *testing.T) {
+			deploymentID = "test-deployment-id"
+			deploymentFromFile = inspect.FormattedDeployment{}
+			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
+			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster-1"
+			deploymentFromFile.Deployment.Configuration.Name = "test-deployment-modified"
+			deploymentFromFile.Deployment.Configuration.Description = "test-description"
+			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			existingDeployment := astro.Deployment{
+				ID:    deploymentID,
+				Label: "test-deployment",
+				Cluster: astro.Cluster{
+					ID: "test-cluster-id",
+				},
+			}
+
+			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
+			mockClient := new(astro_mocks.Client)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, mockClient)
+			assert.ErrorIs(t, err, errNotPermitted)
+			assert.ErrorContains(t, err, "changing an existing deployment's cluster is not permitted")
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
 			mockClient.AssertExpectations(t)
 		})
