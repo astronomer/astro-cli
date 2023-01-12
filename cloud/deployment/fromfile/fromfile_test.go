@@ -3129,6 +3129,136 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
 			mockClient.AssertExpectations(t)
 		})
+		t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with no queues", func(t *testing.T) {
+			deploymentID = "test-deployment-id"
+			deploymentFromFile = inspect.FormattedDeployment{}
+			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
+			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+			deploymentFromFile.Deployment.Configuration.Name = "test-deployment-modified"
+			deploymentFromFile.Deployment.Configuration.Description = "test-description"
+			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+
+			existingPools = []astro.NodePool{
+				{
+					ID:               "test-pool-id",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-1",
+				},
+				{
+					ID:               "test-pool-id-2",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-2",
+				},
+			}
+			existingDeployment := astro.Deployment{
+				ID:    deploymentID,
+				Label: "test-deployment",
+				Cluster: astro.Cluster{
+					ID:        "test-cluster-id",
+					NodePools: existingPools,
+				},
+				DeploymentSpec: astro.DeploymentSpec{
+					Executor: deployment.CeleryExecutor,
+				},
+				WorkerQueues: expectedQList,
+			}
+
+			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{
+				ID:               deploymentID,
+				ClusterID:        clusterID,
+				Label:            deploymentFromFile.Deployment.Configuration.Name,
+				Description:      deploymentFromFile.Deployment.Configuration.Description,
+				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DeploymentSpec: astro.DeploymentCreateSpec{
+					Executor: deploymentFromFile.Deployment.Configuration.Executor,
+					Scheduler: astro.Scheduler{
+						AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+						Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+					},
+				},
+				WorkerQueues: nil, // a default queue is created by the api
+			}
+			mockClient := new(astro_mocks.Client)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, mockClient)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(t)
+		})
+		t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue", func(t *testing.T) {
+			deploymentID = "test-deployment-id"
+			deploymentFromFile = inspect.FormattedDeployment{}
+			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
+			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
+			deploymentFromFile.Deployment.Configuration.Name = "test-deployment-modified"
+			deploymentFromFile.Deployment.Configuration.Description = "test-description"
+			deploymentFromFile.Deployment.Configuration.RunTimeVersion = "test-runtime-v"
+			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
+			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
+			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+			qList = []inspect.Workerq{
+				{
+					Name:       "default",
+					WorkerType: "test-worker-1",
+				},
+			}
+			deploymentFromFile.Deployment.WorkerQs = qList
+			expectedQList = []astro.WorkerQueue{
+				{
+					Name:       "default",
+					IsDefault:  true,
+					NodePoolID: "test-pool-id",
+				},
+			}
+			existingPools = []astro.NodePool{
+				{
+					ID:               "test-pool-id",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-1",
+				},
+				{
+					ID:               "test-pool-id-2",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-2",
+				},
+			}
+			existingDeployment := astro.Deployment{
+				ID:    deploymentID,
+				Label: "test-deployment",
+				Cluster: astro.Cluster{
+					ID:        "test-cluster-id",
+					Name:      "test-cluster",
+					NodePools: existingPools,
+				},
+				DeploymentSpec: astro.DeploymentSpec{
+					Executor: deployment.CeleryExecutor,
+				},
+				WorkerQueues: expectedQList,
+			}
+
+			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{
+				ID:               deploymentID,
+				ClusterID:        clusterID,
+				Label:            deploymentFromFile.Deployment.Configuration.Name,
+				Description:      deploymentFromFile.Deployment.Configuration.Description,
+				DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+				DeploymentSpec: astro.DeploymentCreateSpec{
+					Executor: deploymentFromFile.Deployment.Configuration.Executor,
+					Scheduler: astro.Scheduler{
+						AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
+						Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
+					},
+				},
+				WorkerQueues: expectedQList,
+			}
+			mockClient := new(astro_mocks.Client)
+			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, mockClient)
+			assert.NoError(t, err)
+			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(t)
+		})
 		t.Run("returns correct update deployment input when multiple queues are requested", func(t *testing.T) {
 			deploymentID = "test-deployment-id"
 			deploymentFromFile = inspect.FormattedDeployment{}
