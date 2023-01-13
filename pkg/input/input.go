@@ -41,11 +41,13 @@ func Password(promptText string) (string, error) {
 	return string(bytePassword), nil
 }
 
+// Structure to hold content required for displayig prompts required for promptui library functions
 type PromptContent struct {
 	ErrorMsg string
 	Label    string
 }
 
+// Gets a y/n confirmation from the user for the given prompt content using the promptui library and returns a boolean accordingly
 func PromptGetConfirmation(pc PromptContent) (bool, error) {
 	prompt := promptui.Select{
 		Label: pc.Label,
