@@ -73,6 +73,7 @@ func initGlobalCmdArgs() []string {
 }
 
 // Initialize specific cmd args by setting the cmd flags, resolving filepaths and overwriting args
+// nolint:gocognit
 func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	var err error
 	switch cmd.Name() {
