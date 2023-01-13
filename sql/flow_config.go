@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/Masterminds/semver"
+	"github.com/hashicorp/go-version"
 )
 
 type pypiVersionResponse struct {
@@ -55,17 +55,17 @@ func GetPypiVersion(projectURL string) (string, error) {
 		return "", fmt.Errorf("error parsing response for project version %w", err)
 	}
 
-	versions := make([]*semver.Version, len(resp.Releases))
+	versions := make([]*version.Version, len(resp.Releases))
 	index := 0
 	for release := range resp.Releases {
-		if v, err := semver.NewVersion(release); err != nil {
+		if v, err := version.NewVersion(release); err != nil {
 			fmt.Println(fmt.Errorf("error parsing release version %w", err))
 		} else {
 			versions[index] = v
 			index++
 		}
 	}
-	sort.Sort(sort.Reverse(semver.Collection(versions)))
+	sort.Sort(sort.Reverse(version.Collection(versions)))
 	return versions[0].Original(), nil
 }
 

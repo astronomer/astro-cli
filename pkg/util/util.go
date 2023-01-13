@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	// "Masterminds/semver" does not support the format of pre-release tags for SQL CLI, so we're using "hashicorp/go-version"
+	goVersion "github.com/hashicorp/go-version"
 )
 
 // coerce a string into SemVer if possible
@@ -88,11 +90,11 @@ func IsM1(myOS, myArch string) bool {
 }
 
 func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) {
-	v1, err := semver.NewVersion(currentVersion)
+	v1, err := goVersion.NewVersion(currentVersion)
 	if err != nil {
 		return false, err
 	}
-	constraints, err := semver.NewConstraint(requiredVersion)
+	constraints, err := goVersion.NewConstraint(requiredVersion)
 	if err != nil {
 		return false, err
 	}
