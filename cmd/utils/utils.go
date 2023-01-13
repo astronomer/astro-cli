@@ -25,12 +25,12 @@ func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	v2, err := version.NewVersion(requiredVersion)
+	constraints, err := version.NewConstraint(requiredVersion)
 	if err != nil {
 		return false, err
 	}
-	if v1.LessThan(v2) {
-		return false, nil
+	if constraints.Check(v1) {
+		return true, nil
 	}
-	return true, nil
+	return false, nil
 }

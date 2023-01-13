@@ -389,7 +389,6 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("helllo4")
 	if !runtimeVersionMet {
 		pythonSDKPromptContent := input.PromptContent{
 			ErrorMsg: "Please say y/n.",
