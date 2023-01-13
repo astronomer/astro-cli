@@ -37,7 +37,6 @@ require (
 	github.com/fatih/camelcase v1.0.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-github/v48 v48.2.0
-	github.com/hashicorp/go-version v1.3.0
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
@@ -47,7 +46,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
+require (
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
+	github.com/hashicorp/go-version v1.3.0 // indirect
+)
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.2.3 // indirect

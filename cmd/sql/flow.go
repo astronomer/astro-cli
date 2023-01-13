@@ -1,18 +1,14 @@
 package sql
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -24,16 +20,15 @@ var generateCmd *cobra.Command
 
 // All cmd names
 const (
-	flowCmdName        = "flow"
-	aboutCmdName       = "about"
-	configCmdName      = "config"
-	generateCmdName    = "generate"
-	initCmdName        = "init"
-	runCmdName         = "run"
-	validateCmdName    = "validate"
-	versionCmdName     = "version"
-	deployCmdName      = "deploy"
-	runtimeImagePrefix = "quay.io/astronomer/astro-runtime:"
+	flowCmdName     = "flow"
+	aboutCmdName    = "about"
+	configCmdName   = "config"
+	generateCmdName = "generate"
+	initCmdName     = "init"
+	runCmdName      = "run"
+	validateCmdName = "validate"
+	versionCmdName  = "version"
+	deployCmdName   = "deploy"
 )
 
 // All cmd flags
@@ -53,37 +48,6 @@ var (
 	verbose           bool
 	workflowName      string
 )
-
-const (
-	astroDockerfilePath       = "Dockerfile"
-	astroRequirementsfilePath = "requirements.txt"
-)
-
-var (
-	ErrNoBaseAstroRuntimeImage = errors.New("base image is not an Astro runtime image in the provided Dockerfile")
-	ErrPythonSDKVersionNotMet  = errors.New("required version for Python SDK dependency not met")
-)
-
-var astroRuntimeVersionRegex = regexp.MustCompile(runtimeImagePrefix + "([^-]*)")
-
-func getAstroDockerfileRuntimeVersion() (string, error) {
-	file, err := os.Open(astroDockerfilePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	scanner.Scan()
-	text := scanner.Text()
-	if !strings.Contains(text, runtimeImagePrefix) {
-		return "", ErrNoBaseAstroRuntimeImage
-	}
-
-	runtimeVersion := astroRuntimeVersionRegex.FindStringSubmatch(text)[1]
-
-	return runtimeVersion, nil
-}
 
 // Build the cmd string to execute
 func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
@@ -372,53 +336,34 @@ func executeCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func executeDeployCmd(cmd *cobra.Command, args []string) error {
-	astroRuntimeVersion, err := getAstroDockerfileRuntimeVersion()
-	if err != nil {
-		return err
-	}
-	SQLCLIVersion, err := sql.GetPypiVersion(sql.AstroSQLCLIProjectURL)
-	if err != nil {
-		return err
-	}
-	requiredRuntimeVersion, requiredPythonSDKVersion, err := sql.GetPythonSDKComptability(sql.AstroSQLCLIConfigURL, SQLCLIVersion)
-	if err != nil {
-		return err
-	}
-	runtimeVersionMet, err := utils.IsRequiredVersionMet(astroRuntimeVersion, requiredRuntimeVersion)
-	if err != nil {
-		return err
-	}
-	if !runtimeVersionMet {
-		pythonSDKPromptContent := input.PromptContent{
-			ErrorMsg: "Please say y/n.",
-			Label:    fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.", requiredPythonSDKVersion),
-		}
-		result, err := input.PromptGetConfirmation(pythonSDKPromptContent)
+func generateWorkflows(dagsPath string) error {
+	generateCmdArgs := []string{"--output-dir", dagsPath}
+	if workflowName != "" {
+		generateCmdArgs = append(generateCmdArgs, workflowName)
+		err := executeCmd(generateCmd, generateCmdArgs)
 		if err != nil {
 			return err
 		}
-		if !result {
-			return ErrPythonSDKVersionNotMet
-		}
-		requiredPythonSDKDependency := "\nastro-sdk-python==" + requiredPythonSDKVersion
-		b, err := os.ReadFile(astroRequirementsfilePath)
-		if err != nil {
-			return err
-		}
-		existingRequirements := string(b)
-		if !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
-			f, err := os.OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, sql.FileWriteMode)
-			if err != nil {
-				return err
+	} else {
+		items, _ := os.ReadDir("workflows")
+		for _, item := range items {
+			if item.IsDir() {
+				err := executeCmd(generateCmd, append(generateCmdArgs, item.Name()))
+				if err != nil {
+					return err
+				}
 			}
+		}
+	}
+	return nil
+}
 
-			defer f.Close()
-			if _, err = f.WriteString(requiredPythonSDKDependency); err != nil {
-				return err
-			}
-		}
+func executeDeployCmd(cmd *cobra.Command, args []string) error {
+	err := sql.EnsurePythonSdkVersionIsMet()
+	if err != nil {
+		return err
 	}
+
 	projectDir, err = resolvePath(projectDir)
 	if err != nil {
 		return err
@@ -427,30 +372,15 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
 	}
-	generateCmdArgs := []string{"--output-dir", dagsPath}
-	if workflowName != "" {
-		generateCmdArgs = append(generateCmdArgs, workflowName)
-		err = executeCmd(generateCmd, generateCmdArgs)
-		if err != nil {
-			return err
-		}
-	} else {
-		items, _ := os.ReadDir("workflows")
-		for _, item := range items {
-			if item.IsDir() {
-				err = executeCmd(generateCmd, append(generateCmdArgs, item.Name()))
-				if err != nil {
-					return err
-				}
-			}
-		}
+
+	err = generateWorkflows(dagsPath)
+	if err != nil {
+		return err
 	}
 
 	astroDeployCmd := cloud.NewDeployCmd()
 	astroDeployArgs := []string{"--dags-path", dagsPath}
-	astroDeployCmd.SetArgs(astroDeployArgs)
-
-	_, err = astroDeployCmd.ExecuteC()
+	err = utils.ExecuteCobraCmd(astroDeployCmd, astroDeployArgs)
 	if err != nil {
 		return err
 	}

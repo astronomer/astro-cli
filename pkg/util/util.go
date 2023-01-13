@@ -86,3 +86,18 @@ func IsM1(myOS, myArch string) bool {
 	}
 	return false
 }
+
+func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) {
+	v1, err := semver.NewVersion(currentVersion)
+	if err != nil {
+		return false, err
+	}
+	constraints, err := semver.NewConstraint(requiredVersion)
+	if err != nil {
+		return false, err
+	}
+	if constraints.Check(v1) {
+		return true, nil
+	}
+	return false, nil
+}
