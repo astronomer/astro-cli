@@ -16,8 +16,10 @@ import (
 )
 
 // Reference to reusable cobra commands
-var configCmd *cobra.Command
-var generateCmd *cobra.Command
+var (
+	configCmd   *cobra.Command
+	generateCmd *cobra.Command
+)
 
 // All cmd names
 const (
@@ -76,7 +78,8 @@ func initGlobalCmdArgs() []string {
 }
 
 // Initialize specific cmd args by setting the cmd flags, resolving filepaths and overwriting args
-// nolint:gocognit
+//
+//nolint:gocognit
 func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	var err error
 	switch cmd.Name() {
