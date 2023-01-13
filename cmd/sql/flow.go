@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,6 +49,8 @@ var (
 	verbose           bool
 	workflowName      string
 )
+
+var ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
 
 // Build the cmd string to execute
 func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
@@ -360,6 +363,10 @@ func generateWorkflows(dagsPath string) error {
 }
 
 func executeDeployCmd(cmd *cobra.Command, args []string) error {
+	// Currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release.
+	if !context.IsCloudContext() {
+		return ErrNotCloudContext
+	}
 	err := sql.EnsurePythonSdkVersionIsMet()
 	if err != nil {
 		return err
@@ -561,9 +568,6 @@ func NewFlowCommand() *cobra.Command {
 	generateCmd = generateCommand()
 	cmd.AddCommand(generateCmd)
 	cmd.AddCommand(runCommand())
-	// Currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release.
-	if context.IsCloudContext() {
-		cmd.AddCommand(deployCommand())
-	}
+	cmd.AddCommand(deployCommand())
 	return cmd
 }
