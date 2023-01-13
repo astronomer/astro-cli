@@ -109,7 +109,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
-			listToCreate = updateQueueList(requestedDeployment.WorkerQueues, queueToCreateOrUpdate)
+			listToCreate = updateQueueList(requestedDeployment.WorkerQueues, queueToCreateOrUpdate, requestedDeployment.DeploymentSpec.Executor)
 		} else {
 			// update does not allow creating new queues
 			errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
@@ -406,7 +406,7 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 	return queueToDelete.Name, nil
 }
 
-func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue) []astro.WorkerQueue {
+func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string) []astro.WorkerQueue {
 	for i, queue := range existingQueues {
 		if queue.Name != queueToUpdate.Name {
 			continue
@@ -414,9 +414,18 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 
 		queue.ID = existingQueues[i].ID               // we need IDs to update existing queues
 		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
-		queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
-		queue.MinWorkerCount = queueToUpdate.MinWorkerCount
-		queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+		if executor == deployment.CeleryExecutor {
+			queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
+			queue.MinWorkerCount = queueToUpdate.MinWorkerCount
+			queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+		} else if executor == deployment.KubeExecutor {
+			// KubernetesExecutor calculates resources automatically based on the worker type
+			queue.WorkerConcurrency = 0
+			queue.MinWorkerCount = 0
+			queue.MaxWorkerCount = 0
+			queue.PodRAM = ""
+			queue.PodCPU = ""
+		}
 		queue.NodePoolID = queueToUpdate.NodePoolID
 		existingQueues[i] = queue
 		return existingQueues
