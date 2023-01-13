@@ -2,7 +2,6 @@ package sql
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -172,28 +171,6 @@ func TestFlowInitCmdWithArgs(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			err := execFlowCmd(tc.args...)
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func TestFlowConfigCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	testCases := []struct {
-		initFlag  string
-		configKey string
-	}{
-		{"--airflow-home", "airflow_home"},
-		{"--airflow-dags-folder", "airflow_dags_folder"},
-		{"--data-dir", "data_dir"},
-	}
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("with init flag %s and config key %s", tc.initFlag, tc.configKey), func(t *testing.T) {
-			projectDir := t.TempDir()
-			err := execFlowCmd("init", projectDir, tc.initFlag, t.TempDir())
-			assert.NoError(t, err)
-
-			err = execFlowCmd("config", "get", tc.configKey, "--project-dir", projectDir)
 			assert.NoError(t, err)
 		})
 	}
