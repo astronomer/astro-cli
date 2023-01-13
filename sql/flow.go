@@ -246,7 +246,7 @@ func EnsurePythonSdkVersionIsMet() error {
 		if !result {
 			return ErrPythonSDKVersionNotMet
 		}
-		requiredPythonSDKDependency := "\nastro-sdk-python==" + requiredPythonSDKVersion
+		requiredPythonSDKDependency := "\nastro-sdk-python" + requiredPythonSDKVersion
 		b, err := os.ReadFile(astroRequirementsfilePath)
 		if err != nil {
 			return err
