@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/manifoldco/promptui"
 	"golang.org/x/term"
 )
 
@@ -38,4 +39,27 @@ func Password(promptText string) (string, error) {
 	}
 	fmt.Print("\n")
 	return string(bytePassword), nil
+}
+
+type PromptContent struct {
+	ErrorMsg string
+	Label    string
+}
+
+func PromptGetConfirmation(pc PromptContent) (bool, error) {
+	prompt := promptui.Select{
+		Label: pc.Label,
+		Items: []string{"y", "n"},
+	}
+
+	_, result, err := prompt.Run()
+	if err != nil {
+		fmt.Printf("Prompt failed %v\n", pc.ErrorMsg)
+		return false, err
+	}
+
+	if result == "y" {
+		return true, nil
+	}
+	return false, nil
 }

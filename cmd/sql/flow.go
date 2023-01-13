@@ -12,8 +12,8 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/sql"
-	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 )
@@ -24,15 +24,16 @@ var generateCmd *cobra.Command
 
 // All cmd names
 const (
-	flowCmdName     = "flow"
-	aboutCmdName    = "about"
-	configCmdName   = "config"
-	generateCmdName = "generate"
-	initCmdName     = "init"
-	runCmdName      = "run"
-	validateCmdName = "validate"
-	versionCmdName  = "version"
-	deployCmdName   = "deploy"
+	flowCmdName        = "flow"
+	aboutCmdName       = "about"
+	configCmdName      = "config"
+	generateCmdName    = "generate"
+	initCmdName        = "init"
+	runCmdName         = "run"
+	validateCmdName    = "validate"
+	versionCmdName     = "version"
+	deployCmdName      = "deploy"
+	runtimeImagePrefix = "quay.io/astronomer/astro-runtime:"
 )
 
 // All cmd flags
@@ -63,6 +64,8 @@ var (
 	ErrPythonSDKVersionNotMet  = errors.New("required version for Python SDK dependency not met")
 )
 
+var astroRuntimeVersionRegex = regexp.MustCompile(runtimeImagePrefix + "([^-]*)")
+
 func getAstroDockerfileRuntimeVersion() (string, error) {
 	file, err := os.Open(astroDockerfilePath)
 	if err != nil {
@@ -73,12 +76,11 @@ func getAstroDockerfileRuntimeVersion() (string, error) {
 	scanner := bufio.NewScanner(file)
 	scanner.Scan()
 	text := scanner.Text()
-	runtimeImagePrefix := "quay.io/astronomer/astro-runtime:"
 	if !strings.Contains(text, runtimeImagePrefix) {
 		return "", ErrNoBaseAstroRuntimeImage
 	}
-	re := regexp.MustCompile(runtimeImagePrefix + "([^-]*)")
-	runtimeVersion := re.FindStringSubmatch(text)[1]
+
+	runtimeVersion := astroRuntimeVersionRegex.FindStringSubmatch(text)[1]
 
 	return runtimeVersion, nil
 }
@@ -387,17 +389,17 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("helllo4")
 	if !runtimeVersionMet {
-		pythonSDKPromptContent := promptContent{
-			"Please say yes/no.",
-			fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.", requiredPythonSDKVersion),
+		pythonSDKPromptContent := input.PromptContent{
+			ErrorMsg: "Please say y/n.",
+			Label:    fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.", requiredPythonSDKVersion),
 		}
-		result, err := promptGetConfirmation(pythonSDKPromptContent)
+		result, err := input.PromptGetConfirmation(pythonSDKPromptContent)
 		if err != nil {
 			return err
 		}
-		if result == "no" {
+		if !result {
 			return ErrPythonSDKVersionNotMet
 		}
 		requiredPythonSDKDependency := "\nastro-sdk-python==" + requiredPythonSDKVersion
@@ -428,7 +430,7 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	}
 	generateCmdArgs := []string{"--output-dir", dagsPath}
 	if workflowName != "" {
-		generateCmdArgs := append(generateCmdArgs, workflowName)
+		generateCmdArgs = append(generateCmdArgs, workflowName)
 		err = executeCmd(generateCmd, generateCmdArgs)
 		if err != nil {
 			return err
@@ -437,8 +439,7 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 		items, _ := os.ReadDir("workflows")
 		for _, item := range items {
 			if item.IsDir() {
-				generateWorflowCmdArgs := append(generateCmdArgs, item.Name())
-				err = executeCmd(generateCmd, generateWorflowCmdArgs)
+				err = executeCmd(generateCmd, append(generateCmdArgs, item.Name()))
 				if err != nil {
 					return err
 				}
@@ -591,26 +592,6 @@ func runCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	cmd.Flags().BoolVar(&noVerbose, "no-verbose", false, "")
 	return cmd
-}
-
-type promptContent struct {
-	errorMsg string
-	label    string
-}
-
-func promptGetConfirmation(pc promptContent) (string, error) {
-	prompt := promptui.Select{
-		Label: pc.label,
-		Items: []string{"yes", "no"},
-	}
-
-	_, result, err := prompt.Run()
-	if err != nil {
-		fmt.Printf("Prompt failed %v\n", pc.errorMsg)
-		return "", err
-	}
-
-	return result, nil
 }
 
 //nolint:dupl

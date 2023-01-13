@@ -36,8 +36,9 @@ var (
 	getBaseDockerImageURI = GetBaseDockerImageURI
 )
 
+var httpClient = &http.Client{}
+
 func GetPypiVersion(projectURL string) (string, error) {
-	httpClient := &http.Client{}
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, projectURL, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("error creating HTTP request %w", err)
@@ -69,7 +70,6 @@ func GetPypiVersion(projectURL string) (string, error) {
 }
 
 func GetBaseDockerImageURI(configURL string) (string, error) {
-	httpClient := &http.Client{}
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, configURL, http.NoBody)
 	if err != nil {
 		return defaultDockerImageURI, fmt.Errorf("error creating HTTP request %w. Using the default", err)
@@ -90,7 +90,6 @@ func GetBaseDockerImageURI(configURL string) (string, error) {
 }
 
 func GetPythonSDKComptability(configURL, sqlCliVersion string) (astroRuntimeVersion, astroSDKPythonVersion string, err error) {
-	httpClient := &http.Client{}
 	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, configURL, http.NoBody)
 	if err != nil {
 		return "", "", fmt.Errorf("error creating HTTP request %w. Using the default", err)
