@@ -776,7 +776,7 @@ func TestDelete(t *testing.T) {
 			ID:    "test-deployment-id",
 			Label: "test-deployment-label",
 			DeploymentSpec: astro.DeploymentSpec{
-				Executor: "CeleryExecutor",
+				Executor: deployment.CeleryExecutor,
 				Scheduler: astro.Scheduler{
 					AU:       5,
 					Replicas: 3,
@@ -792,6 +792,8 @@ func TestDelete(t *testing.T) {
 					MinWorkerCount:    12,
 					WorkerConcurrency: 110,
 					NodePoolID:        "test-pool-id",
+					PodRAM:            "lots",
+					PodCPU:            "huge",
 				},
 				{
 					ID:                "test-wq-id-1",
@@ -1072,6 +1074,25 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
 		assert.Contains(t, err.Error(), "worker queue option is invalid: worker concurrency must be between 175 and 275")
 	})
+	t.Run("returns an error when podCPU is present in input", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MaxWorkerCount = 25
+		requestedWorkerQueue.WorkerConcurrency = 275
+		requestedWorkerQueue.PodCPU = "lots"
+		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "CeleryExecutor does not support pod_cpu in the request. It can only be used with KubernetesExecutor")
+	})
+	t.Run("returns an error when podRAM is present in input", func(t *testing.T) {
+		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MaxWorkerCount = 25
+		requestedWorkerQueue.WorkerConcurrency = 275
+		requestedWorkerQueue.PodCPU = ""
+		requestedWorkerQueue.PodRAM = "huge"
+		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		assert.ErrorIs(t, err, ErrNotSupported)
+		assert.Contains(t, err.Error(), "CeleryExecutor does not support pod_ram in the request. It can only be used with KubernetesExecutor")
+	})
 }
 
 func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
@@ -1095,7 +1116,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "a non default worker queue in the request. Rename the queue to default")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 	})
 	t.Run("returns an error when pod_cpu is in input", func(t *testing.T) {
 		requestedWorkerQueue.PodCPU = "1.0"
@@ -1394,7 +1415,7 @@ func TestUpdateQueueList(t *testing.T) {
 			WorkerConcurrency: 20,
 			NodePoolID:        "test-worker-1",
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, "")
+		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, deployment.CeleryExecutor)
 		assert.Equal(t, existingQs, updatedQueueList)
 	})
 	t.Run("zeroes out podRam and podCPU for KE queue updates", func(t *testing.T) {
@@ -1513,5 +1534,70 @@ func TestGetQueueName(t *testing.T) {
 		defer testUtil.MockUserInput(t, "8")()
 		actualName, err = getQueueName("", updateAction, &existingDeployment, out)
 		assert.Error(t, err)
+	})
+}
+
+func TestSanitizeExistingQueues(t *testing.T) {
+	var existingQs, actualQs []astro.WorkerQueue
+	existingQs = []astro.WorkerQueue{
+		{
+			ID:                "q-1",
+			Name:              "default",
+			IsDefault:         true,
+			MaxWorkerCount:    10,
+			MinWorkerCount:    1,
+			WorkerConcurrency: 16,
+			PodRAM:            "lots",
+			PodCPU:            "huge",
+			NodePoolID:        "test-worker",
+		},
+		{
+			ID:                "q-2",
+			Name:              "test-q-1",
+			IsDefault:         false,
+			MaxWorkerCount:    15,
+			MinWorkerCount:    2,
+			WorkerConcurrency: 18,
+			PodRAM:            "lots+1",
+			PodCPU:            "huge+1",
+			NodePoolID:        "test-worker-1",
+		},
+	}
+	t.Run("updates existing queues for CeleryExecutor", func(t *testing.T) {
+		expectedQs := []astro.WorkerQueue{
+			{
+				ID:                "q-1",
+				Name:              "default",
+				IsDefault:         true,
+				MaxWorkerCount:    10,
+				MinWorkerCount:    1,
+				WorkerConcurrency: 16,
+				NodePoolID:        "test-worker",
+			},
+			{
+				ID:                "q-2",
+				Name:              "test-q-1",
+				IsDefault:         false,
+				MaxWorkerCount:    15,
+				MinWorkerCount:    2,
+				WorkerConcurrency: 18,
+				NodePoolID:        "test-worker-1",
+			},
+		}
+		actualQs = sanitizeExistingQueues(existingQs, deployment.CeleryExecutor)
+		assert.Equal(t, expectedQs, actualQs)
+	})
+	t.Run("updates existing queues for KubernetesExecutor", func(t *testing.T) {
+		existingQs = []astro.WorkerQueue{existingQs[0]}
+		expectedQs := []astro.WorkerQueue{
+			{
+				ID:         "q-1",
+				Name:       "default",
+				IsDefault:  true,
+				NodePoolID: "test-worker",
+			},
+		}
+		actualQs = sanitizeExistingQueues(existingQs, deployment.KubeExecutor)
+		assert.Equal(t, expectedQs, actualQs)
 	})
 }
