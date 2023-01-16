@@ -7,10 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/astro-client"
+	cloud_deploy "github.com/astronomer/astro-cli/cloud/deploy"
+	cloud_cmd "github.com/astronomer/astro-cli/cmd/cloud"
+	"github.com/astronomer/astro-cli/cmd/utils"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	sql "github.com/astronomer/astro-cli/sql"
 	"github.com/astronomer/astro-cli/sql/mocks"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -74,6 +80,24 @@ func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 		sql.Docker = sql.NewDockerBind
 		sql.Io = sql.NewIoBind
 		sql.DisplayMessages = sql.OriginalDisplayMessages
+	}
+}
+
+// patches "astro deploy" command i.e. cloud.NewDeployCmd()
+func patchDeployCmd() func() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	cloud_cmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+
+	cloud_cmd.DeployImage = func(deployInput cloud_deploy.InputDeploy, client astro.Client) error {
+		return nil
+	}
+
+	return func() {
+		cloud_cmd.EnsureProjectDir = utils.EnsureProjectDir
+		cloud_cmd.DeployImage = cloud_deploy.Deploy
 	}
 }
 
@@ -261,5 +285,17 @@ func TestDebugFlowFlagRunCmd(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = execFlowCmd("--debug", "run", "example_basic_transform", "--project-dir", projectDir)
+	assert.NoError(t, err)
+}
+
+func TestFlowDeployCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func() error {
+		return nil
+	}
+
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
 }

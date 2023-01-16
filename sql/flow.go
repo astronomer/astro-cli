@@ -217,7 +217,7 @@ func getAstroDockerfileRuntimeVersion() (string, error) {
 	return runtimeVersion, nil
 }
 
-func EnsurePythonSdkVersionIsMet() error {
+var EnsurePythonSdkVersionIsMet = func() error {
 	astroRuntimeVersion, err := getAstroDockerfileRuntimeVersion()
 	if err != nil {
 		return err

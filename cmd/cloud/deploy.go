@@ -31,8 +31,8 @@ Menu will be presented if you do not specify a deployment ID:
   $ astro deploy
 `
 
-	deployImage      = cloud.Deploy
-	ensureProjectDir = utils.EnsureProjectDir
+	DeployImage      = cloud.Deploy
+	EnsureProjectDir = utils.EnsureProjectDir
 )
 
 var (
@@ -52,7 +52,7 @@ func NewDeployCmd() *cobra.Command {
 		Short:   "Deploy your project to a Deployment on Astro",
 		Long:    "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. It does not include any metadata associated with your local Airflow environment.",
 		Args:    cobra.MaximumNArgs(1),
-		PreRunE: ensureProjectDir,
+		PreRunE: EnsureProjectDir,
 		RunE:    deploy,
 		Example: deployExample,
 	}
@@ -139,5 +139,5 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DagsPath:       dagsPath,
 	}
 
-	return deployImage(deployInput, astroClient)
+	return DeployImage(deployInput, astroClient)
 }
