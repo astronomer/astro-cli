@@ -68,7 +68,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
-	cmd.Flags().MarkHidden("dags-path")
+	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	return cmd
 }
 
