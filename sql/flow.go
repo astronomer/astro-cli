@@ -217,7 +217,7 @@ var getAstroDockerfileRuntimeVersion = func() (string, error) {
 	return runtimeVersion, nil
 }
 
-var EnsurePythonSdkVersionIsMet = func() error {
+var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
 	astroRuntimeVersion, err := getAstroDockerfileRuntimeVersion()
 	if err != nil {
 		return err
@@ -235,11 +235,7 @@ var EnsurePythonSdkVersionIsMet = func() error {
 		return err
 	}
 	if !runtimeVersionMet {
-		pythonSDKPromptContent := input.PromptContent{
-			ErrorMsg: "Please say y/n.",
-			Label:    fmt.Sprintf("Would you like to add the required version %s of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.", requiredPythonSDKVersion),
-		}
-		result, err := input.PromptGetConfirmation(pythonSDKPromptContent)
+		result, err := input.PromptGetConfirmation(promptRunner)
 		if err != nil {
 			return err
 		}

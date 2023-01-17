@@ -1,6 +1,8 @@
 package sql
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,4 +64,23 @@ func TestGetPythonSDKComptabilityHTTPRequestFailure(t *testing.T) {
 	_, _, err := GetPythonSDKComptability("gs://pyconuk-workshop/", "")
 	expectedErrContains := "error retrieving the latest configuration gs://pyconuk-workshop/"
 	assert.ErrorContains(t, err, expectedErrContains)
+}
+
+func TestGetPythonSDKCompatabilitySuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"baseDockerImage": "quay.io/astronomer/astro-runtime:6.0.4-base",
+			"compatibility": {
+			  "0.1": {
+				"astroRuntimeVersion": ">=8.0.0, <8.1.0",
+				"astroSDKPythonVersion": ">=1.3.0, <1.5"
+			  }
+			}
+		}`))
+	}))
+	astroRuntime, astroSdkPython, err := GetPythonSDKComptability(server.URL, "0.1")
+	assert.NoError(t, err)
+	assert.Equal(t, ">=8.0.0, <8.1.0", astroRuntime)
+	assert.Equal(t, ">=1.3.0, <1.5", astroSdkPython)
 }

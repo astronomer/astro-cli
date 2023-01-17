@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -370,7 +371,11 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if !context.IsCloudContext() {
 		return ErrNotCloudContext
 	}
-	err := sql.EnsurePythonSdkVersionIsMet()
+	pythonSDKPromptContent := input.PromptContent{
+		Label: "Would you like to add the required version of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.",
+	}
+	promptRunner := input.GetYesNoSelector(pythonSDKPromptContent)
+	err := sql.EnsurePythonSdkVersionIsMet(promptRunner)
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,7 @@ import (
 	cloud_deploy "github.com/astronomer/astro-cli/cloud/deploy"
 	cloud_cmd "github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	sql "github.com/astronomer/astro-cli/sql"
 	"github.com/astronomer/astro-cli/sql/mocks"
@@ -291,7 +292,7 @@ func TestDebugFlowFlagRunCmd(t *testing.T) {
 func TestFlowDeployCmd(t *testing.T) {
 	defer patchDeployCmd()()
 
-	sql.EnsurePythonSdkVersionIsMet = func() error {
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
 		return nil
 	}
 
