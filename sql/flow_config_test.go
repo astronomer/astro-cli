@@ -43,3 +43,23 @@ func TestGetBaseDockerImageURIInvalidHTTPRequestFailure(t *testing.T) {
 	expectedErrContains := "error retrieving the latest configuration gs://pyconuk-workshop/"
 	assert.ErrorContains(t, err, expectedErrContains)
 }
+
+func TestGetPythonSDKComptabilityInvalidURLFailure(t *testing.T) {
+	_, _, err := GetPythonSDKComptability("http://efgh", "")
+	expectedErrContains := "error retrieving the latest configuration http://efgh,  Get \"http://efgh\": dial tcp: lookup efgh"
+	assert.ErrorContains(t, err, expectedErrContains)
+	expectedErrContains = "no such host. Using the default"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
+func TestGetPythonSDKComptabilityInvalidJSONFailure(t *testing.T) {
+	_, _, err := GetPythonSDKComptability("https://github.com/astronomer/astro-sdk/blob/main/README.md", "")
+	expectedErrContains := "error parsing the compatibility versions from the configuration file: invalid character '<' looking for beginning of value"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
+func TestGetPythonSDKComptabilityHTTPRequestFailure(t *testing.T) {
+	_, _, err := GetPythonSDKComptability("gs://pyconuk-workshop/", "")
+	expectedErrContains := "error retrieving the latest configuration gs://pyconuk-workshop/"
+	assert.ErrorContains(t, err, expectedErrContains)
+}

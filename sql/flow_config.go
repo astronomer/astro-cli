@@ -32,8 +32,9 @@ const (
 )
 
 var (
-	getPypiVersion        = GetPypiVersion
-	getBaseDockerImageURI = GetBaseDockerImageURI
+	getPypiVersion           = GetPypiVersion
+	getBaseDockerImageURI    = GetBaseDockerImageURI
+	getPythonSDKComptability = GetPythonSDKComptability
 )
 
 var httpClient = &http.Client{}

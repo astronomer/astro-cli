@@ -1,7 +1,6 @@
 package sql
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -37,6 +36,7 @@ var (
 	Io              = NewIoBind
 	DisplayMessages = OriginalDisplayMessages
 	Os              = NewOsBind
+	BufIo           = NewBufIoBind
 )
 
 func getContext(filePath string) io.Reader {
@@ -198,14 +198,14 @@ var (
 
 var astroRuntimeVersionRegex = regexp.MustCompile(runtimeImagePrefix + "([^-]*)")
 
-func getAstroDockerfileRuntimeVersion() (string, error) {
-	file, err := os.Open(astroDockerfilePath)
+var getAstroDockerfileRuntimeVersion = func() (string, error) {
+	file, err := Os().Open(astroDockerfilePath)
 	if err != nil {
 		return "", err
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := BufIo().NewScanner(file)
 	scanner.Scan()
 	text := scanner.Text()
 	if !strings.Contains(text, runtimeImagePrefix) {
@@ -222,11 +222,11 @@ var EnsurePythonSdkVersionIsMet = func() error {
 	if err != nil {
 		return err
 	}
-	SQLCLIVersion, err := GetPypiVersion(astroSQLCliProjectURL)
+	SQLCLIVersion, err := getPypiVersion(astroSQLCliProjectURL)
 	if err != nil {
 		return err
 	}
-	requiredRuntimeVersion, requiredPythonSDKVersion, err := GetPythonSDKComptability(astroSQLCliConfigURL, SQLCLIVersion)
+	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCliConfigURL, SQLCLIVersion)
 	if err != nil {
 		return err
 	}
@@ -247,13 +247,13 @@ var EnsurePythonSdkVersionIsMet = func() error {
 			return ErrPythonSDKVersionNotMet
 		}
 		requiredPythonSDKDependency := "\nastro-sdk-python" + requiredPythonSDKVersion
-		b, err := os.ReadFile(astroRequirementsfilePath)
+		b, err := Os().ReadFile(astroRequirementsfilePath)
 		if err != nil {
 			return err
 		}
 		existingRequirements := string(b)
 		if !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
-			f, err := os.OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, fileWriteMode)
+			f, err := Os().OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, fileWriteMode)
 			if err != nil {
 				return err
 			}
