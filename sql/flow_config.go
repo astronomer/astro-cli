@@ -19,8 +19,8 @@ type configResponse struct {
 }
 
 type compatibilityVersions struct {
-	AstroRuntime   string `json:"astro-runtime"`
-	AstroSdkPython string `json:"astro-sdk-python"`
+	AstroRuntime   string `json:"astroRuntimeVersion"`
+	AstroSdkPython string `json:"astroSDKPythonVersion"`
 }
 
 type compatibilityResponse struct {
