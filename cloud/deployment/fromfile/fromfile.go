@@ -198,8 +198,8 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			// check if more than one queue is requested
 			if len(listQueues) > 1 {
 				return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{},
-					fmt.Errorf("%w more than one worker queue. (%d) were requested",
-						workerqueue.ErrNotSupported, len(listQueues))
+					fmt.Errorf("%s %w more than one worker queue. (%d) were requested",
+						deployment.KubeExecutor, workerqueue.ErrNotSupported, len(listQueues))
 			}
 			for i := range listQueues {
 				err = workerqueue.IsKubernetesWorkerQueueInputValid(&listQueues[i])
