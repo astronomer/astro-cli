@@ -48,12 +48,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		return err
 	}
 
-	// get defaults for min-count, max-count and concurrency from API
-	defaultOptions, err = GetWorkerQueueDefaultOptions(client)
-	if err != nil {
-		return err
-	}
-
 	// get the node poolID to use
 	nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
 	if err != nil {
@@ -65,19 +59,36 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		IsDefault:  false, // cannot create a default queue
 		NodePoolID: nodePoolID,
 	}
-	queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
 
-	err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
-	if err != nil {
-		return err
+	if name == "" {
+		queueToCreateOrUpdate.Name, err = getQueueName(name, action, &requestedDeployment, out)
+		if err != nil {
+			return err
+		}
+	}
+	switch requestedDeployment.DeploymentSpec.Executor {
+	case deployment.CeleryExecutor:
+		// get defaults for min-count, max-count and concurrency from API
+		defaultOptions, err = GetWorkerQueueDefaultOptions(client)
+		if err != nil {
+			return err
+		}
+
+		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions)
+
+		err = IsCeleryWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions)
+		if err != nil {
+			return err
+		}
+	case deployment.KubeExecutor:
+		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdate)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch action {
 	case createAction:
-		if name == "" {
-			// prompt for name if one was not provided
-			queueToCreateOrUpdate.Name = input.Text("Enter a name for the worker queue\n> ")
-		}
 		if QueueExists(requestedDeployment.WorkerQueues, queueToCreateOrUpdate) {
 			// create does not allow updating existing queues
 			errHelp = fmt.Sprintf("use worker queue update %s instead", queueToCreateOrUpdate.Name)
@@ -87,13 +98,6 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// user requested create, so we add queueToCreateOrUpdate to the list
 		listToCreate = append(requestedDeployment.WorkerQueues, *queueToCreateOrUpdate) //nolint
 	case updateAction:
-		if name == "" {
-			// user selects a queue as no name was provided
-			queueToCreateOrUpdate.Name, err = selectQueue(requestedDeployment.WorkerQueues, out)
-			if err != nil {
-				return err
-			}
-		}
 		if QueueExists(requestedDeployment.WorkerQueues, queueToCreateOrUpdate) {
 			if !force {
 				i, _ := input.Confirm(
@@ -418,4 +422,28 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 		return existingQueues
 	}
 	return existingQueues
+}
+
+// getQueueName returns the name for a worker-queue. If action is to create, it prompts the user for a name to use.
+// If action is to update, it makes the user select a queue from a list of existing ones.
+// It returns errInvalidQueue if a user chooses a queue not on the list
+func getQueueName(name, action string, requestedDeployment *astro.Deployment, out io.Writer) (string, error) {
+	var (
+		queueName string
+		err       error
+	)
+	if name == "" {
+		switch action {
+		case createAction:
+			// prompt for name if one was not provided
+			queueName = input.Text("Enter a name for the worker queue\n> ")
+		case updateAction:
+			// user selects a queue as no name was provided
+			queueName, err = selectQueue(requestedDeployment.WorkerQueues, out)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	return queueName, nil
 }
