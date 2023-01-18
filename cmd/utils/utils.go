@@ -18,9 +18,3 @@ func EnsureProjectDir(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
-func ExecuteCobraCmd(cmd *cobra.Command, args []string) error {
-	cmd.SetArgs(args)
-	_, err := cmd.ExecuteC()
-	return err
-}
