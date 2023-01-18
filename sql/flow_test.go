@@ -441,7 +441,7 @@ func TestEnsurePythonSdkVersionSelectErrPrompt(t *testing.T) {
 	getPypiVersion = mockGetPypiVersion
 	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
 	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectErrMock{})
-	assert.ErrorIs(t, err, errMock)
+	assert.EqualError(t, err, errMock.Error())
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
 	getPythonSDKComptability = GetPythonSDKComptability
