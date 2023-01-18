@@ -353,7 +353,13 @@ func generateWorkflows(dagsPath string) error {
 			return err
 		}
 	} else {
-		items, _ := os.ReadDir("workflows")
+		workflowsDir := filepath.Join(projectDir, "workflows")
+		items, _ := os.ReadDir(workflowsDir)
+		if len(items) == 0 {
+			fmt.Printf("No workflows found in directory %v. No DAGs to deploy and existing DAGs will be deleted from the deployment.", workflowsDir)
+			return nil
+			// TODO: Prompt for confirmation.
+		}
 		for _, item := range items {
 			if item.IsDir() {
 				err := executeCmd(generateCmd, append(generateCmdArgs, item.Name()))
@@ -388,7 +394,6 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
 	}
-
 	err = generateWorkflows(dagsPath)
 	if err != nil {
 		return err

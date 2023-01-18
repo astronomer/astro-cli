@@ -436,6 +436,17 @@ func TestEnsurePythonSdkVersionSelectNoPrompt(t *testing.T) {
 	getPythonSDKComptability = GetPythonSDKComptability
 }
 
+func TestEnsurePythonSdkVersionSelectErrPrompt(t *testing.T) {
+	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
+	getPypiVersion = mockGetPypiVersion
+	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
+	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectErrMock{})
+	assert.ErrorIs(t, err, errMock)
+	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
+	getPypiVersion = GetPypiVersion
+	getPythonSDKComptability = GetPythonSDKComptability
+}
+
 func TestEnsurePythonSdkVersionRequirementsReadFailure(t *testing.T) {
 	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
 	getPypiVersion = mockGetPypiVersion
@@ -481,7 +492,7 @@ func TestEnsurePythonSdkVersionRequirementsAddDependencyOpenAppendFileFailure(t 
 		return mockOs
 	}
 	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectYesMock{})
-	assert.ErrorIs(t, err, errMock)
+	assert.EqualError(t, err, errMock.Error())
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
 	getPythonSDKComptability = GetPythonSDKComptability
