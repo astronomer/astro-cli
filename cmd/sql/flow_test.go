@@ -10,8 +10,8 @@ import (
 	"testing/fstest"
 
 	"github.com/astronomer/astro-cli/astro-client"
-	cloud_deploy "github.com/astronomer/astro-cli/cloud/deploy"
-	cloud_cmd "github.com/astronomer/astro-cli/cmd/cloud"
+	cloudDeploy "github.com/astronomer/astro-cli/cloud/deploy"
+	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -90,17 +90,17 @@ func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 func patchDeployCmd() func() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	cloud_cmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+	cloudCmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cloud_cmd.DeployImage = func(deployInput cloud_deploy.InputDeploy, client astro.Client) error {
+	cloudCmd.DeployImage = func(deployInput cloudDeploy.InputDeploy, client astro.Client) error {
 		return nil
 	}
 
 	return func() {
-		cloud_cmd.EnsureProjectDir = utils.EnsureProjectDir
-		cloud_cmd.DeployImage = cloud_deploy.Deploy
+		cloudCmd.EnsureProjectDir = utils.EnsureProjectDir
+		cloudCmd.DeployImage = cloudDeploy.Deploy
 	}
 }
 

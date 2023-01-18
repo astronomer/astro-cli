@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/sql/mocks"
+	"github.com/astronomer/astro-cli/sql/testutil"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -353,15 +354,15 @@ func TestGetAstroDockerfileRuntimeVersionNoBaseAstroRuntimeImage(t *testing.T) {
 		mockOs.On("Open", mock.Anything).Return(&os.File{}, nil)
 		return mockOs
 	}
-	mockBufIo := mocks.NewBufIoBind(t)
-	BufIo = func() BufIoBind {
+	mockBufIo := mocks.NewBufIOBind(t)
+	BufIo = func() BufIOBind {
 		mockBufIo.On("NewScanner", mock.Anything).Return(bufio.NewScanner(strings.NewReader("hello")))
 		return mockBufIo
 	}
 	_, err := getAstroDockerfileRuntimeVersion()
 	assert.ErrorIs(t, err, ErrNoBaseAstroRuntimeImage)
 	Os = NewOsBind
-	BufIo = NewBufIoBind
+	BufIo = NewBufIOBind
 }
 
 func TestGetAstroDockerfileRuntimeVersionSuccess(t *testing.T) {
@@ -370,15 +371,15 @@ func TestGetAstroDockerfileRuntimeVersionSuccess(t *testing.T) {
 		mockOs.On("Open", mock.Anything).Return(&os.File{}, nil)
 		return mockOs
 	}
-	mockBufIo := mocks.NewBufIoBind(t)
-	BufIo = func() BufIoBind {
+	mockBufIo := mocks.NewBufIOBind(t)
+	BufIo = func() BufIOBind {
 		mockBufIo.On("NewScanner", mock.Anything).Return(bufio.NewScanner(strings.NewReader(runtimeImagePrefix + "7.1.0")))
 		return mockBufIo
 	}
 	_, err := getAstroDockerfileRuntimeVersion()
 	assert.NoError(t, err)
 	Os = NewOsBind
-	BufIo = NewBufIoBind
+	BufIo = NewBufIOBind
 }
 
 func TestEnsurePythonSdkVersionGetRuntimeVersionFailure(t *testing.T) {
@@ -429,7 +430,7 @@ func TestEnsurePythonSdkVersionSelectNoPrompt(t *testing.T) {
 	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
 	getPypiVersion = mockGetPypiVersion
 	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
-	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectNoMock{})
+	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectNoMock{})
 	assert.ErrorIs(t, err, ErrPythonSDKVersionNotMet)
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
@@ -440,7 +441,7 @@ func TestEnsurePythonSdkVersionSelectErrPrompt(t *testing.T) {
 	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
 	getPypiVersion = mockGetPypiVersion
 	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
-	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectErrMock{})
+	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectErrMock{})
 	assert.EqualError(t, err, errMock.Error())
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
@@ -456,7 +457,7 @@ func TestEnsurePythonSdkVersionRequirementsReadFailure(t *testing.T) {
 		mockOs.On("ReadFile", mock.Anything).Return(nil, errMock)
 		return mockOs
 	}
-	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectYesMock{})
+	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectYesMock{})
 	assert.ErrorIs(t, err, errMock)
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
@@ -473,7 +474,7 @@ func TestEnsurePythonSdkVersionRequirementsContainsDependency(t *testing.T) {
 		mockOs.On("ReadFile", mock.Anything).Return([]byte("\nastro-sdk-python==1.3.0"), nil)
 		return mockOs
 	}
-	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectYesMock{})
+	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectYesMock{})
 	assert.NoError(t, err)
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
@@ -491,7 +492,7 @@ func TestEnsurePythonSdkVersionRequirementsAddDependencyOpenAppendFileFailure(t 
 		mockOs.On("OpenFile", mock.Anything, mock.Anything, mock.Anything).Return(&os.File{}, errMock)
 		return mockOs
 	}
-	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectYesMock{})
+	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectYesMock{})
 	assert.EqualError(t, err, errMock.Error())
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion
@@ -512,7 +513,7 @@ func TestEnsurePythonSdkVersionRequirementsAddDependencyWriteAppendFileFailure(t
 		mockOs.On("OpenFile", mock.Anything, mock.Anything, mock.Anything).Return(mockOpenFile, nil)
 		return mockOs
 	}
-	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectYesMock{})
+	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectYesMock{})
 	assert.EqualError(t, err, "invalid argument")
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
 	getPypiVersion = GetPypiVersion

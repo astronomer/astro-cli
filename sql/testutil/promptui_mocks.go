@@ -1,4 +1,4 @@
-package mocks
+package testutil
 
 import "errors"
 

@@ -5,16 +5,16 @@ import (
 	"io"
 )
 
-type BufIoBinder struct{}
+type BufIOBinder struct{}
 
-type BufIoBind interface {
+type BufIOBind interface {
 	NewScanner(r io.Reader) *bufio.Scanner
 }
 
-func (BufIoBinder) NewScanner(r io.Reader) *bufio.Scanner {
+func (BufIOBinder) NewScanner(r io.Reader) *bufio.Scanner {
 	return bufio.NewScanner(r)
 }
 
-func NewBufIoBind() BufIoBind {
-	return &BufIoBinder{}
+func NewBufIOBind() BufIOBind {
+	return &BufIOBinder{}
 }
