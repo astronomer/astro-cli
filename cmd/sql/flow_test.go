@@ -194,6 +194,8 @@ func TestFlowInitCmdWithArgs(t *testing.T) {
 		{[]string{cmd, "--airflow-home", t.TempDir()}},
 		{[]string{cmd, "--airflow-dags-folder", t.TempDir()}},
 		{[]string{cmd, "--data-dir", t.TempDir()}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--no-verbose"}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
@@ -210,17 +212,14 @@ func TestFlowValidateCmd(t *testing.T) {
 		args []string
 	}{
 		{[]string{cmd, t.TempDir()}},
-		{[]string{cmd, t.TempDir(), "--connection", "sqlite_conn"}},
-		{[]string{cmd, t.TempDir(), "--env", "dev"}},
-		{[]string{cmd, t.TempDir(), "--verbose"}},
-		{[]string{cmd, t.TempDir(), "--no-verbose"}},
+		{[]string{cmd, "--connection", "<connection>"}},
+		{[]string{cmd, "--env", "<env>"}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--no-verbose"}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
-			err := execFlowCmd("init", tc.args[1])
-			assert.NoError(t, err)
-
-			err = execFlowCmd(tc.args...)
+			err := execFlowCmd(tc.args...)
 			assert.NoError(t, err)
 		})
 	}
@@ -232,20 +231,17 @@ func TestFlowGenerateCmd(t *testing.T) {
 	testCases := []struct {
 		args []string
 	}{
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--output-dir", t.TempDir()}},
+		{[]string{cmd, "--project-dir", t.TempDir()}},
+		{[]string{cmd, "--generate-tasks"}},
+		{[]string{cmd, "--no-generate-tasks"}},
+		{[]string{cmd, "--no-verbose"}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--env", "<env>"}},
+		{[]string{cmd, "--output-dir", t.TempDir()}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
-			err := execFlowCmd("init", tc.args[3])
-			assert.NoError(t, err)
-
-			err = execFlowCmd(tc.args...)
+			err := execFlowCmd(tc.args...)
 			assert.NoError(t, err)
 		})
 	}
@@ -257,39 +253,45 @@ func TestFlowRunCmd(t *testing.T) {
 	testCases := []struct {
 		args []string
 	}{
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
-		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
+		{[]string{cmd, "--project-dir", t.TempDir()}},
+		{[]string{cmd, "--generate-tasks"}},
+		{[]string{cmd, "--no-generate-tasks"}},
+		{[]string{cmd, "--no-verbose"}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--env", "<env>"}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
-			err := execFlowCmd("init", tc.args[3])
-			assert.NoError(t, err)
-
-			err = execFlowCmd(tc.args...)
+			err := execFlowCmd(tc.args...)
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func TestDebugFlowFlagInitCmd(t *testing.T) {
+func TestDebugFlowFlagCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("--debug", "init", projectDir)
-	assert.NoError(t, err)
-}
-
-func TestDebugFlowFlagRunCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("--no-debug", "init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("--debug", "run", "example_basic_transform", "--project-dir", projectDir)
-	assert.NoError(t, err)
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{"--debug", "version"}},
+		{[]string{"--no-debug", "version"}},
+		{[]string{"--debug", "about"}},
+		{[]string{"--no-debug", "about"}},
+		{[]string{"--debug", "init"}},
+		{[]string{"--no-debug", "init"}},
+		{[]string{"--debug", "validate"}},
+		{[]string{"--no-debug", "validate"}},
+		{[]string{"--debug", "generate"}},
+		{[]string{"--no-debug", "generate"}},
+		{[]string{"--debug", "run"}},
+		{[]string{"--no-debug", "run"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowDeployWithWorkflowCmd(t *testing.T) {
