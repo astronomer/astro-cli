@@ -53,7 +53,10 @@ var (
 	workflowName      string
 )
 
-var ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
+var (
+	ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
+	Os                 = sql.NewOsBind
+)
 
 // Build the cmd string to execute
 func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
@@ -354,7 +357,7 @@ func generateWorkflows(dagsPath string) error {
 		}
 	} else {
 		workflowsDir := filepath.Join(projectDir, "workflows")
-		items, _ := os.ReadDir(workflowsDir)
+		items, _ := Os().ReadDir(workflowsDir)
 		if len(items) == 0 {
 			fmt.Printf("No workflows found in directory %v. No DAGs to deploy and existing DAGs will be deleted from the deployment.", workflowsDir)
 			return nil

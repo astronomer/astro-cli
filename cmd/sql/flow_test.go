@@ -3,9 +3,11 @@ package sql
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/astronomer/astro-cli/astro-client"
 	cloud_deploy "github.com/astronomer/astro-cli/cloud/deploy"
@@ -289,7 +291,7 @@ func TestDebugFlowFlagRunCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFlowDeployCmd(t *testing.T) {
+func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 	defer patchDeployCmd()()
 
 	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
@@ -297,6 +299,54 @@ func TestFlowDeployCmd(t *testing.T) {
 	}
 
 	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("deploy", "--workflow-name", "test.sql")
+	assert.NoError(t, err)
+}
+
+func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows": {
+				Mode: fs.ModeDir,
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
+
+	Os = sql.NewOsBind
+}
+
+func TestFlowDeployWorkflowsCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows/test.sql": {
+				Data: []byte("select 1"),
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("deploy")
+	assert.NoError(t, err)
+
+	Os = sql.NewOsBind
 }

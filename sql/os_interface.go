@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"io/fs"
 	"os"
 )
 
@@ -11,6 +12,7 @@ type OsBind interface {
 	Open(name string) (*os.File, error)
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	ReadFile(name string) ([]byte, error)
+	ReadDir(name string) ([]fs.DirEntry, error)
 }
 
 func (OsBinder) WriteFile(name string, data []byte, perm os.FileMode) error {
@@ -27,6 +29,10 @@ func (OsBinder) OpenFile(name string, flag int, perm os.FileMode) (*os.File, err
 
 func (OsBinder) ReadFile(name string) ([]byte, error) {
 	return os.ReadFile(name)
+}
+
+func (OsBinder) ReadDir(name string) ([]fs.DirEntry, error) {
+	return os.ReadDir(name)
 }
 
 func NewOsBind() OsBind {
