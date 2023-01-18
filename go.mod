@@ -24,10 +24,8 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.8.1
-	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/net v0.1.0
 	golang.org/x/sys v0.1.0
-	golang.org/x/text v0.4.0 // indirect
 )
 
 require (
@@ -43,7 +41,6 @@ require (
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/mod v0.6.0
 	golang.org/x/term v0.1.0
-	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -141,9 +138,11 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210828152312-66f60bf46e71 // indirect
@@ -151,6 +150,7 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.63.2 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apimachinery v0.21.0 // indirect
 	k8s.io/client-go v0.21.0 // indirect
 	k8s.io/klog/v2 v2.8.0 // indirect
