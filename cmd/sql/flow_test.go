@@ -238,6 +238,7 @@ func TestFlowGenerateCmd(t *testing.T) {
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--output-dir", t.TempDir()}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
