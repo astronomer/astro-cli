@@ -336,7 +336,7 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 	mockOs := mocks.NewOsBind(t)
 	Os = func() sql.OsBind {
 		fs := fstest.MapFS{
-			"workflows/test.sql": {
+			"workflows/workflow/.sql": {
 				Data: []byte("select 1"),
 			},
 		}
