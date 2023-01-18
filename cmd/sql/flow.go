@@ -397,7 +397,7 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
 	}
-	if err = generateWorkflows(dagsPath); err != nil {
+	if err := generateWorkflows(dagsPath); err != nil {
 		return err
 	}
 	astroDeployCmd := cloud.NewDeployCmd()
