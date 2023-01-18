@@ -498,3 +498,24 @@ func TestEnsurePythonSdkVersionRequirementsAddDependencyOpenAppendFileFailure(t 
 	getPythonSDKComptability = GetPythonSDKComptability
 	Os = NewOsBind
 }
+
+func TestEnsurePythonSdkVersionRequirementsAddDependencyWriteAppendFileFailure(t *testing.T) {
+	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
+	getPypiVersion = mockGetPypiVersion
+	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
+	tmpFile := "/tmp/tmp.txt"
+	mockOpenFile, _ := os.OpenFile(tmpFile, os.O_APPEND, 0o600)
+	defer os.Remove(tmpFile)
+	mockOs := mocks.NewOsBind(t)
+	Os = func() OsBind {
+		mockOs.On("ReadFile", mock.Anything).Return([]byte("\nastro-sdk-python==1.2.0"), nil)
+		mockOs.On("OpenFile", mock.Anything, mock.Anything, mock.Anything).Return(mockOpenFile, nil)
+		return mockOs
+	}
+	err := EnsurePythonSdkVersionIsMet(mocks.PromptSelectYesMock{})
+	assert.EqualError(t, err, "invalid argument")
+	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
+	getPypiVersion = GetPypiVersion
+	getPythonSDKComptability = GetPythonSDKComptability
+	Os = NewOsBind
+}
