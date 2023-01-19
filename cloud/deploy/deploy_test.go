@@ -317,6 +317,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		DeploymentName: "",
 		Prompt:         true,
 		Dags:           true,
+		DagsPath:       "./testfiles/dags",
 	}
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	config.CFG.ShowWarnings.SetHomeString("false")

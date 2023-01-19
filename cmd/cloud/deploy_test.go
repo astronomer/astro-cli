@@ -11,7 +11,7 @@ import (
 )
 
 func execDeployCmd(args ...string) error {
-	cmd := newDeployCmd()
+	cmd := NewDeployCmd()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
 	return err
@@ -20,11 +20,11 @@ func execDeployCmd(args ...string) error {
 func TestDeployImage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	ensureProjectDir = func(cmd *cobra.Command, args []string) error {
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	deployImage = func(deployInput cloud.InputDeploy, client astro.Client) error {
+	DeployImage = func(deployInput cloud.InputDeploy, client astro.Client) error {
 		return nil
 	}
 

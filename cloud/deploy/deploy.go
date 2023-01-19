@@ -89,6 +89,7 @@ type InputDeploy struct {
 	DeploymentName string
 	Prompt         bool
 	Dags           bool
+	DagsPath       string
 }
 
 func getRegistryURL(domain string) string {
@@ -102,9 +103,8 @@ func getRegistryURL(domain string) string {
 	return registry
 }
 
-func deployDags(path, runtimeID string, client astro.Client) error {
+func deployDags(path, dagsPath, runtimeID string, client astro.Client) error {
 	// Check the dags directory
-	dagsPath := filepath.Join(path, "dags")
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
@@ -175,7 +175,13 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		return errors.New("no domain set, re-authenticate")
 	}
 
-	dagsPath := filepath.Join(deployInput.Path, "dags")
+	var dagsPath string
+	if deployInput.DagsPath != "" {
+		dagsPath = deployInput.DagsPath
+	} else {
+		dagsPath = filepath.Join(deployInput.Path, "dags")
+	}
+
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
 	// Deploy dags if deployInput runtimeId is virtual runtime
@@ -189,7 +195,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 		}
 		fmt.Println("Initiating DAG deploy for: " + deployInput.RuntimeID)
-		err = deployDags(deployInput.Path, deployInput.RuntimeID, client)
+		err = deployDags(deployInput.Path, dagsPath, deployInput.RuntimeID, client)
 		if err != nil {
 			return err
 		}
@@ -238,7 +244,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
+		err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -309,7 +315,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			err = deployDags(deployInput.Path, deployInfo.deploymentID, client)
+			err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}

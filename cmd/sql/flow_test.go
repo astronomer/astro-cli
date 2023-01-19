@@ -2,16 +2,24 @@ package sql
 
 import (
 	"errors"
-	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
+	"github.com/astronomer/astro-cli/astro-client"
+	cloudDeploy "github.com/astronomer/astro-cli/cloud/deploy"
+	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/pkg/input"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	sql "github.com/astronomer/astro-cli/sql"
 	"github.com/astronomer/astro-cli/sql/mocks"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -75,6 +83,24 @@ func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 		sql.Docker = sql.NewDockerBind
 		sql.Io = sql.NewIoBind
 		sql.DisplayMessages = sql.OriginalDisplayMessages
+	}
+}
+
+// patches "astro deploy" command i.e. cloud.NewDeployCmd()
+func patchDeployCmd() func() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	cloudCmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+
+	cloudCmd.DeployImage = func(deployInput cloudDeploy.InputDeploy, client astro.Client) error {
+		return nil
+	}
+
+	return func() {
+		cloudCmd.EnsureProjectDir = utils.EnsureProjectDir
+		cloudCmd.DeployImage = cloudDeploy.Deploy
 	}
 }
 
@@ -177,28 +203,6 @@ func TestFlowInitCmdWithArgs(t *testing.T) {
 	}
 }
 
-func TestFlowConfigCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	testCases := []struct {
-		initFlag  string
-		configKey string
-	}{
-		{"--airflow-home", "airflow_home"},
-		{"--airflow-dags-folder", "airflow_dags_folder"},
-		{"--data-dir", "data_dir"},
-	}
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("with init flag %s and config key %s", tc.initFlag, tc.configKey), func(t *testing.T) {
-			projectDir := t.TempDir()
-			err := execFlowCmd("init", projectDir, tc.initFlag, t.TempDir())
-			assert.NoError(t, err)
-
-			err = execFlowCmd("config", "get", tc.configKey, "--project-dir", projectDir)
-			assert.NoError(t, err)
-		})
-	}
-}
-
 func TestFlowValidateCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	cmd := "validate"
@@ -234,6 +238,7 @@ func TestFlowGenerateCmd(t *testing.T) {
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--output-dir", t.TempDir()}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
@@ -285,4 +290,64 @@ func TestDebugFlowFlagRunCmd(t *testing.T) {
 
 	err = execFlowCmd("--debug", "run", "example_basic_transform", "--project-dir", projectDir)
 	assert.NoError(t, err)
+}
+
+func TestFlowDeployWithWorkflowCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("deploy", "--workflow-name", "test.sql")
+	assert.NoError(t, err)
+}
+
+func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows": {
+				Mode: fs.ModeDir,
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("deploy")
+	assert.NoError(t, err)
+
+	Os = sql.NewOsBind
+}
+
+func TestFlowDeployWorkflowsCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows/workflow/.sql": {
+				Data: []byte("select 1"),
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("deploy")
+	assert.NoError(t, err)
+
+	Os = sql.NewOsBind
 }
