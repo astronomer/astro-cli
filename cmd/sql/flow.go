@@ -81,8 +81,6 @@ func initGlobalCmdArgs() []string {
 }
 
 // Initialize specific cmd args by setting the cmd flags, resolving filepaths and overwriting args
-//
-//nolint:gocognit
 func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	var err error
 	switch cmd.Name() {
@@ -91,23 +89,17 @@ func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if airflowHome != "" {
-			airflowHome, err = resolvePath(airflowHome)
-			if err != nil {
-				return nil, err
-			}
+		airflowHome, err = resolvePath(airflowHome)
+		if err != nil {
+			return nil, err
 		}
-		if airflowDagsFolder != "" {
-			airflowDagsFolder, err = resolvePath(airflowDagsFolder)
-			if err != nil {
-				return nil, err
-			}
+		airflowDagsFolder, err = resolvePath(airflowDagsFolder)
+		if err != nil {
+			return nil, err
 		}
-		if dataDir != "" {
-			dataDir, err = resolvePath(dataDir)
-			if err != nil {
-				return nil, err
-			}
+		dataDir, err = resolvePath(dataDir)
+		if err != nil {
+			return nil, err
 		}
 		return []string{projectDir}, nil
 	case configCmdName:
@@ -126,11 +118,9 @@ func initLocalCmdArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if outputDir != "" {
-			outputDir, err = resolvePath(outputDir)
-			if err != nil {
-				return nil, err
-			}
+		outputDir, err = resolvePath(outputDir)
+		if err != nil {
+			return nil, err
 		}
 	case runCmdName:
 		projectDir, err = resolvePath(projectDir)
@@ -161,6 +151,9 @@ func readConfigCmdOutput(key string) (string, error) {
 
 // Resolve filepath to absolute
 func resolvePath(path string) (string, error) {
+	if path == "" { // base negative case in which no path is passed
+		return "", nil
+	}
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("error resolving path %v: %w", path, err)
