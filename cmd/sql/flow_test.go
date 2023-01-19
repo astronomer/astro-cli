@@ -17,6 +17,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	sql "github.com/astronomer/astro-cli/sql"
 	"github.com/astronomer/astro-cli/sql/mocks"
+	"github.com/astronomer/astro-cli/version"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/spf13/cobra"
@@ -132,6 +133,7 @@ func execFlowCmd(args ...string) error {
 
 func TestFlowCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
+	version.CurrVersion = "1.8"
 	err := execFlowCmd()
 	assert.NoError(t, err)
 }
