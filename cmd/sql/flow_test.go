@@ -86,6 +86,22 @@ func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 	}
 }
 
+// Mock ExecuteCmdInDocker to return a specific output for "config get --json" calls
+func mockExecuteCmdInDockerOutputForJSONConfig(outputString string) func() {
+	originalExecuteCmdInDocker := sql.ExecuteCmdInDocker
+
+	sql.ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+		if returnOutput && cmd[0] == "config" && cmd[1] == "get" && cmd[2] == "--json" {
+			return 0, io.NopCloser(strings.NewReader(outputString)), nil
+		}
+		return 0, io.NopCloser(strings.NewReader("")), nil
+	}
+
+	return func() {
+		sql.ExecuteCmdInDocker = originalExecuteCmdInDocker
+	}
+}
+
 // patches "astro deploy" command i.e. cloud.NewDeployCmd()
 func patchDeployCmd() func() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -301,7 +317,7 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 		return nil
 	}
 
-	defer patchExecuteCmdInDocker(t, 0, nil)()
+	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
 	err := execFlowCmd("deploy", "--workflow-name", "test.sql")
 	assert.NoError(t, err)
 }
@@ -323,7 +339,7 @@ func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
 		return mockOs
 	}
 
-	defer patchExecuteCmdInDocker(t, 0, nil)()
+	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
 	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
 
@@ -347,7 +363,7 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 		return mockOs
 	}
 
-	defer patchExecuteCmdInDocker(t, 0, nil)()
+	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
 	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
 
