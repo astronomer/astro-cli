@@ -87,6 +87,8 @@ func TestE2EFlowInitCmdWithArgs(t *testing.T) {
 		{[]string{cmd, t.TempDir(), "--airflow-home", t.TempDir()}},
 		{[]string{cmd, t.TempDir(), "--airflow-dags-folder", t.TempDir()}},
 		{[]string{cmd, t.TempDir(), "--data-dir", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--verbose"}},
+		{[]string{cmd, t.TempDir(), "--no-verbose"}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
@@ -104,6 +106,8 @@ func TestE2EFlowValidateCmd(t *testing.T) {
 		{[]string{cmd, t.TempDir()}},
 		{[]string{cmd, t.TempDir(), "--connection", "sqlite_conn"}},
 		{[]string{cmd, t.TempDir(), "--env", "dev"}},
+		{[]string{cmd, t.TempDir(), "--verbose"}},
+		{[]string{cmd, t.TempDir(), "--no-verbose"}},
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
@@ -122,7 +126,9 @@ func TestE2EFlowGenerateCmd(t *testing.T) {
 		args []string
 	}{
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--verbose"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
 	}

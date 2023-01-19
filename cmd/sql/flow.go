@@ -162,6 +162,8 @@ func resolvePath(path string) (string, error) {
 }
 
 // Extends args with flags e.g. "--project-dir ." or "--verbose"
+//
+//nolint:gocognit
 func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 	switch cmd.Name() {
 	case initCmdName:
@@ -173,6 +175,12 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		}
 		if dataDir != "" {
 			args = append(args, "--data-dir", dataDir)
+		}
+		if verbose {
+			args = append(args, "--verbose")
+		}
+		if noVerbose {
+			args = append(args, "--no-verbose")
 		}
 	case configCmdName:
 		args = append(args, "--project-dir", projectDir, "--env", env)
@@ -473,6 +481,8 @@ func initCommand() *cobra.Command {
 	cmd.Flags().StringVar(&airflowHome, "airflow-home", "", "")
 	cmd.Flags().StringVar(&airflowDagsFolder, "airflow-dags-folder", "", "")
 	cmd.Flags().StringVar(&dataDir, "data-dir", "", "")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
+	cmd.Flags().BoolVar(&noVerbose, "no-verbose", false, "")
 	return cmd
 }
 
