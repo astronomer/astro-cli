@@ -26,6 +26,12 @@ func TestGetPypiVersionInvalidHTTPRequestFailure(t *testing.T) {
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
+func TestGetPypiVersionInvalidAstroCliVersionFailure(t *testing.T) {
+	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "foo")
+	expectedErrContains := "error parsing response for SQL CLI version"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
 func TestGetBaseDockerImageURIInvalidURLFailure(t *testing.T) {
 	_, err := GetBaseDockerImageURI("http://efgh")
 	expectedErrContains := "error retrieving the latest configuration http://efgh,  Get \"http://efgh\": dial tcp: lookup efgh"

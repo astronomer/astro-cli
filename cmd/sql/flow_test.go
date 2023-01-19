@@ -125,6 +125,15 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
+	version.CurrVersion = "1.8"
+	cmd := NewFlowCommand()
+	cmd.SetArgs(args)
+	_, err := cmd.ExecuteC()
+	return err
+}
+
+func execFlowCmdWrongVersion(args ...string) error {
+	version.CurrVersion = "foo"
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
@@ -133,9 +142,12 @@ func execFlowCmd(args ...string) error {
 
 func TestFlowCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	version.CurrVersion = "1.8"
 	err := execFlowCmd()
 	assert.NoError(t, err)
+}
+
+func TestFlowCmdWrongVersion(t *testing.T) {
+	assert.PanicsWithError(t, "error running []: error parsing response for SQL CLI version %!w(<nil>)", func() { execFlowCmdWrongVersion() })
 }
 
 func TestFlowCmdError(t *testing.T) {
