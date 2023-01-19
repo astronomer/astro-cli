@@ -47,6 +47,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+require github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.1.0 // indirect
@@ -99,13 +101,14 @@ require (
 	github.com/hashicorp/go-multierror v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
-	github.com/inconshreveable/mousetrap v1.0.1 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaguilar/vt100 v0.0.0-20150826170717-2703a27b14ea // indirect
 	github.com/jinzhu/gorm v1.9.11 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.11.13 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
+	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect

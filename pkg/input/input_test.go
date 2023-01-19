@@ -1,8 +1,12 @@
 package input
 
 import (
+	"io"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/manifoldco/promptui"
 )
 
 func TestText(t *testing.T) {
@@ -158,6 +162,49 @@ func TestPassword(t *testing.T) {
 
 			// Restore stdin right after the test.
 			os.Stdin = stdin
+		})
+	}
+}
+
+func TestPromptGetConfirmation(t *testing.T) {
+	runner := GetYesNoSelector(PromptContent{Label: "test label, enter y/n"})
+	runner.Keys = &promptui.SelectKeys{Next: promptui.Key{Code: rune('S')}, Prev: promptui.Key{Code: rune('W')}, PageUp: promptui.Key{Code: rune('D')}, PageDown: promptui.Key{Code: rune('A')}}
+	tests := []struct {
+		name        string
+		inputString string
+		want        bool
+		wantErr     bool
+	}{
+		{
+			name:        "basic yes case",
+			inputString: "\n",
+			want:        true,
+			wantErr:     false,
+		},
+		{
+			name:        "basic no case",
+			inputString: "S\n",
+			want:        false,
+			wantErr:     false,
+		},
+		{
+			name:        "no input case",
+			inputString: "",
+			want:        false,
+			wantErr:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner.Stdin = io.NopCloser(strings.NewReader(tt.inputString))
+			got, err := PromptGetConfirmation(runner)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PromptGetConfirmation() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("PromptGetConfirmation() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

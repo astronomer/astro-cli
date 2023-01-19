@@ -20,6 +20,7 @@ var (
 	pytest           bool
 	parse            bool
 	dags             bool
+	dagsPath         string
 	deployExample    = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
@@ -30,8 +31,8 @@ Menu will be presented if you do not specify a deployment ID:
   $ astro deploy
 `
 
-	deployImage      = cloud.Deploy
-	ensureProjectDir = utils.EnsureProjectDir
+	DeployImage      = cloud.Deploy
+	EnsureProjectDir = utils.EnsureProjectDir
 )
 
 var (
@@ -45,13 +46,13 @@ const (
 	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
 )
 
-func newDeployCmd() *cobra.Command {
+func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy DEPLOYMENT-ID",
 		Short:   "Deploy your project to a Deployment on Astro",
 		Long:    "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. It does not include any metadata associated with your local Airflow environment.",
 		Args:    cobra.MaximumNArgs(1),
-		PreRunE: ensureProjectDir,
+		PreRunE: EnsureProjectDir,
 		RunE:    deploy,
 		Example: deployExample,
 	}
@@ -64,8 +65,10 @@ func newDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a custom image to deploy")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
+	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
+	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	return cmd
 }
 
@@ -134,7 +137,8 @@ func deploy(cmd *cobra.Command, args []string) error {
 		DeploymentName: deploymentName,
 		Prompt:         forcePrompt,
 		Dags:           dags,
+		DagsPath:       dagsPath,
 	}
 
-	return deployImage(deployInput, astroClient)
+	return DeployImage(deployInput, astroClient)
 }

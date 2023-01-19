@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/manifoldco/promptui"
 	"golang.org/x/term"
 )
 
@@ -38,4 +39,32 @@ func Password(promptText string) (string, error) {
 	}
 	fmt.Print("\n")
 	return string(bytePassword), nil
+}
+
+// Structure to hold content required for displaying prompts required for promptui library functions
+type PromptContent struct {
+	Label string
+}
+
+type PromptRunner interface {
+	Run() (int, string, error)
+}
+
+func GetYesNoSelector(pc PromptContent) *promptui.Select {
+	return &promptui.Select{
+		Label: pc.Label,
+		Items: []string{"y", "n"},
+	}
+}
+
+// Gets a y/n confirmation from the user for the given prompt content using the promptui library and returns a boolean accordingly
+func PromptGetConfirmation(runner PromptRunner) (bool, error) {
+	_, result, err := runner.Run()
+	if err != nil {
+		return false, err
+	}
+	if result == "y" {
+		return true, nil
+	}
+	return false, nil
 }
