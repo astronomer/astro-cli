@@ -41,7 +41,7 @@ func Password(promptText string) (string, error) {
 	return string(bytePassword), nil
 }
 
-// Structure to hold content required for displayig prompts required for promptui library functions
+// Structure to hold content required for displaying prompts required for promptui library functions
 type PromptContent struct {
 	Label string
 }
