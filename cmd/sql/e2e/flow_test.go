@@ -126,9 +126,9 @@ func TestE2EFlowGenerateCmd(t *testing.T) {
 		args []string
 	}{
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--verbose"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
 	}
@@ -149,9 +149,9 @@ func TestE2EFlowRunCmd(t *testing.T) {
 		args []string
 	}{
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
-		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--verbose"}},
 		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
 		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
 	}
