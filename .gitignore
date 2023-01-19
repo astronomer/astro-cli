@@ -6,6 +6,8 @@
 .vscode/
 airflow/pod-config.yml
 airflow_settings*
+airflow/Dockerfile
+cmd/dags/.airflowignore
 astro
 astro-cli
 cover.out
