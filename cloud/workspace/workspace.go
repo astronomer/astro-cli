@@ -70,7 +70,7 @@ func List(client astro.Client, out io.Writer) error {
 	return nil
 }
 
-func GetWorkspaceSelection(client astro.Client, out io.Writer) (string, error) {
+var GetWorkspaceSelection = func(client astro.Client, out io.Writer) (string, error) {
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,

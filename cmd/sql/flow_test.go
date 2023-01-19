@@ -11,6 +11,8 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	cloudDeploy "github.com/astronomer/astro-cli/cloud/deploy"
+	astroDeployment "github.com/astronomer/astro-cli/cloud/deployment"
+	astroWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -29,8 +31,29 @@ var (
 	imageBuildResponse = types.ImageBuildResponse{
 		Body: io.NopCloser(strings.NewReader("Image built")),
 	}
-	containerCreateCreatedBody = container.ContainerCreateCreatedBody{ID: "123"}
-	sampleLog                  = io.NopCloser(strings.NewReader("Sample log"))
+	containerCreateCreatedBody    = container.ContainerCreateCreatedBody{ID: "123"}
+	sampleLog                     = io.NopCloser(strings.NewReader("Sample log"))
+	originalGetWorkspaceSelection = astroWorkspace.GetWorkspaceSelection
+	originalGetDeployments        = astroDeployment.GetDeployments
+	originalSelectDeployment      = astroDeployment.SelectDeployment
+	mockGetWorkspaceSelection     = func(client astro.Client, out io.Writer) (string, error) {
+		return "W1", nil
+	}
+	mockGetWorkspaceSelectionErr = func(client astro.Client, out io.Writer) (string, error) {
+		return "", errMock
+	}
+	mockGetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
+		return nil, nil
+	}
+	mockGetDeploymentsErr = func(ws string, client astro.Client) ([]astro.Deployment, error) {
+		return nil, errMock
+	}
+	mockSelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+		return astro.Deployment{ID: "D1", Workspace: astro.Workspace{ID: "W1"}}, nil
+	}
+	mockSelectDeploymentErr = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+		return astro.Deployment{}, errMock
+	}
 )
 
 func getContainerWaitResponse(raiseError bool, statusCode int64) (bodyCh <-chan container.ContainerWaitOKBody, errCh <-chan error) {
@@ -368,4 +391,87 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 	assert.NoError(t, err)
 
 	Os = sql.NewOsBind
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
+	_, _, err := promptAstroCloudConfig("", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetDeploymentsFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	astroDeployment.GetDeployments = mockGetDeploymentsErr
+	_, _, err := promptAstroCloudConfig("", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+	astroDeployment.GetDeployments = originalGetDeployments
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetSelectDeploymentFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeploymentErr
+	_, _, err := promptAstroCloudConfig("", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetSuccess(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeployment
+	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("", "")
+	assert.NoError(t, err)
+	assert.EqualValues(t, "D1", selectedAstroDeploymentID)
+	assert.EqualValues(t, "W1", selectedAstroWorkspaceID)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
+}
+
+func TestPromptAstroCloudConfigDeploymentUnsetGetDeploymentsFailure(t *testing.T) {
+	astroDeployment.GetDeployments = mockGetDeploymentsErr
+	_, _, err := promptAstroCloudConfig("", "W2")
+	assert.ErrorIs(t, err, errMock)
+	astroDeployment.GetDeployments = originalGetDeployments
+}
+
+func TestPromptAstroCloudConfigDeploymentUnsetSelectDeploymentFailure(t *testing.T) {
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeploymentErr
+	_, _, err := promptAstroCloudConfig("", "W2")
+	assert.ErrorIs(t, err, errMock)
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
+}
+
+func TestPromptAstroCloudConfigDeploymentUnsetSuccess(t *testing.T) {
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeployment
+	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("", "W2")
+	assert.NoError(t, err)
+	assert.EqualValues(t, "D1", selectedAstroDeploymentID)
+	assert.EqualValues(t, "W2", selectedAstroWorkspaceID)
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
+}
+
+func TestPromptAstroCloudConfigWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
+	_, _, err := promptAstroCloudConfig("D2", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+}
+
+func TestPromptAstroCloudConfigWorkspaceUnsetSuccess(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("D2", "")
+	assert.NoError(t, err)
+	assert.EqualValues(t, "D2", selectedAstroDeploymentID)
+	assert.EqualValues(t, "W1", selectedAstroWorkspaceID)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
 }

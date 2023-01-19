@@ -559,7 +559,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 	return nil
 }
 
-func GetDeployments(ws string, client astro.Client) ([]astro.Deployment, error) {
+var GetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return []astro.Deployment{}, err
@@ -573,7 +573,7 @@ func GetDeployments(ws string, client astro.Client) ([]astro.Deployment, error) 
 	return deployments, nil
 }
 
-func SelectDeployment(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+var SelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
 		i, _ := input.Confirm(noDeployments)
