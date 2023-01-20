@@ -433,6 +433,11 @@ func TestEnsurePythonSdkVersionSelectNoPrompt(t *testing.T) {
 	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
 	getPypiVersion = mockGetPypiVersion
 	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
+	mockOs := mocks.NewOsBind(t)
+	Os = func() OsBind {
+		mockOs.On("ReadFile", mock.Anything).Return([]byte("\nastro-sdk-python"), nil)
+		return mockOs
+	}
 	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectNoMock{})
 	assert.ErrorIs(t, err, ErrPythonSDKVersionNotMet)
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
@@ -444,6 +449,11 @@ func TestEnsurePythonSdkVersionSelectErrPrompt(t *testing.T) {
 	getAstroDockerfileRuntimeVersion = mockGetAstroDockerfileRuntimeVersion
 	getPypiVersion = mockGetPypiVersion
 	getPythonSDKComptability = mockGetPythonSDKComptabilityUnMatch
+	mockOs := mocks.NewOsBind(t)
+	Os = func() OsBind {
+		mockOs.On("ReadFile", mock.Anything).Return([]byte("\nastro-sdk-python"), nil)
+		return mockOs
+	}
 	err := EnsurePythonSdkVersionIsMet(testutil.PromptSelectErrMock{})
 	assert.EqualError(t, err, errMock.Error())
 	getAstroDockerfileRuntimeVersion = originalGetAstroDockerfileRuntimeVersion
