@@ -50,7 +50,7 @@ func newUserInviteCmd(out io.Writer) *cobra.Command {
 func newUserListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
-		Aliases: []string{"inv"},
+		Aliases: []string{"ls"},
 		Short:   "List all the users in your Astro Organization",
 		Long:    "List all the users in your Astro Organization",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,7 +64,7 @@ func newUserListCmd(out io.Writer) *cobra.Command {
 func newUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [email]",
-		Aliases: []string{"inv"},
+		Aliases: []string{"up"},
 		Short:   "Update a the role of a user your in Astro Organization",
 		Long: "Update the role of a user in your Astro Organization\n$astro user update [email] --role [ORGANIZATION_MEMBER, " +
 			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
