@@ -33,7 +33,7 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
-	// Set the astro-cli version to a specific version we want to test for
+	// Set the astro-cli version to a version compatible with the latest sql-cli version for e2e tests
 	version.CurrVersion = "1.10.0"
 	cmd := sql.NewFlowCommand()
 	cmd.SetArgs(args)
