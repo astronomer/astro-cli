@@ -254,6 +254,7 @@ func TestRequestToken(t *testing.T) {
 func TestAuthorizeCallbackHandler(t *testing.T) {
 	httpClient = httputil.NewHTTPClient()
 	t.Run("success", func(t *testing.T) {
+		callbackServer = "localhost:12345"
 		go func() {
 			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
 
@@ -270,11 +271,12 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		callbackServer = "localhost:12346"
 		go func() {
 			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
 			opts := &httputil.DoOptions{
 				Method: http.MethodGet,
-				Path:   "http://localhost:12345/callback?error=error&error_description=fatal_error",
+				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
 			}
 			_, err = httpClient.Do(opts) //nolint
 			assert.NoError(t, err)
@@ -284,6 +286,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	})
 
 	t.Run("timeout", func(t *testing.T) {
+		callbackServer = "localhost:12347"
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallbackHandler()
 		assert.Contains(t, err.Error(), "the operation has timed out")

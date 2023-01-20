@@ -55,6 +55,7 @@ var (
 	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
+	callbackServer  = "localhost:12345"
 	userEmail       = ""
 )
 
@@ -139,7 +140,7 @@ func requestToken(authConfig astro.AuthConfig, verifier, code string) (Result, e
 
 func authorizeCallbackHandler() (string, error) {
 	m := http.NewServeMux()
-	s := http.Server{Addr: "localhost:12345", Handler: m, ReadHeaderTimeout: 0}
+	s := http.Server{Addr: callbackServer, Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if errorCode, ok := req.URL.Query()["error"]; ok {
