@@ -269,6 +269,20 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("error", func(t *testing.T) {
+		go func() {
+			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
+			opts := &httputil.DoOptions{
+				Method: http.MethodGet,
+				Path:   "http://localhost:12345/callback?error=error&error_description=fatal_error",
+			}
+			_, err = httpClient.Do(opts) //nolint
+			assert.NoError(t, err)
+		}()
+		_, err := authorizeCallbackHandler()
+		assert.Contains(t, err.Error(), "fatal_error")
+	})
+
 	t.Run("timeout", func(t *testing.T) {
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallbackHandler()

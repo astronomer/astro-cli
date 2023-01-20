@@ -52,7 +52,7 @@ var (
 
 var (
 	err             error
-	callbackChannel = make(chan string, 1)
+	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
 	userEmail       = ""
@@ -143,13 +143,12 @@ func authorizeCallbackHandler() (string, error) {
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if errorCode, ok := req.URL.Query()["error"]; ok {
-			log.Fatalf(
-				"Could not authorize your device. %s: %s",
-				errorCode, req.URL.Query()["error_description"],
-			)
+			callbackChannel <- CallbackMessage{errorMessage: fmt.Sprintf("Could not authorize your device. %s: %s",
+				errorCode, req.URL.Query()["error_description"])}
+			resp := &http.Request{}
+			http.Redirect(w, resp, "https://auth.astronomer.io/device/denied", http.StatusFound)
 		} else {
-			authorizationCode := req.URL.Query().Get("code")
-			callbackChannel <- authorizationCode
+			callbackChannel <- CallbackMessage{authorizationCode: req.URL.Query().Get("code")}
 			resp := &http.Request{}
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/success", http.StatusFound)
 		}
@@ -164,10 +163,12 @@ func authorizeCallbackHandler() (string, error) {
 	authorizationCode := ""
 	for authorizationCode == "" {
 		select {
-		case code := <-callbackChannel:
-			authorizationCode = code
+		case callbackMessage := <-callbackChannel:
+			if callbackMessage.errorMessage != "" {
+				return "", errors.New(callbackMessage.errorMessage)
+			}
+			authorizationCode = callbackMessage.authorizationCode
 		case <-time.After(callbackTimeout):
-
 			err := s.Shutdown(http_context.Background())
 			if err != nil {
 				fmt.Printf("error: %s", err)

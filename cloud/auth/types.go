@@ -44,6 +44,11 @@ type Result struct {
 	UserEmail    string
 }
 
+type CallbackMessage struct {
+	authorizationCode string
+	errorMessage      string
+}
+
 func (res Result) writeToContext(c *config.Context) error {
 	err = c.SetContextKey("token", "Bearer "+res.AccessToken)
 	if err != nil {
