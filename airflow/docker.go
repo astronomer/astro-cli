@@ -471,7 +471,8 @@ func (d *DockerCompose) Bash(container string) error {
 		}
 	}
 	// exec into container
-	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "exec", "-it", containerName, "bash")
 	if err != nil {
 		return err
 	}
@@ -802,8 +803,10 @@ func checkServiceState(serviceState, expectedState string) bool {
 }
 
 func startDocker() error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
 	buf := new(bytes.Buffer)
-	err := cmdExec(DockerCmd, buf, buf, "ps")
+	err := cmdExec(dockerCommand, buf, buf, "ps")
 	if err != nil {
 		// open docker
 		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
@@ -824,6 +827,8 @@ func startDocker() error {
 }
 
 func waitForDocker() error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
 	buf := new(bytes.Buffer)
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Millisecond)
@@ -835,7 +840,7 @@ func waitForDocker() error {
 		// Got a tick, we should check if docker is up & running
 		case <-ticker.C:
 			buf.Reset()
-			err := cmdExec(DockerCmd, buf, buf, "ps")
+			err := cmdExec(dockerCommand, buf, buf, "ps")
 			if err != nil {
 				continue
 			} else {
