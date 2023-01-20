@@ -143,7 +143,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		resp, err := getWorkspaceSelection(mockClient, buf)
+		resp, err := GetWorkspaceSelection(mockClient, buf)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse[0].ID, resp)
 		mockClient.AssertExpectations(t)
@@ -153,7 +153,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 		buf := new(bytes.Buffer)
-		_, err := getWorkspaceSelection(mockClient, buf)
+		_, err := GetWorkspaceSelection(mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -179,7 +179,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		_, err = getWorkspaceSelection(mockClient, buf)
+		_, err = GetWorkspaceSelection(mockClient, buf)
 		assert.ErrorIs(t, err, errInvalidWorkspaceKey)
 		mockClient.AssertExpectations(t)
 	})
@@ -190,7 +190,7 @@ func TestGetWorkspaceSelection(t *testing.T) {
 		assert.NoError(t, err)
 
 		buf := new(bytes.Buffer)
-		_, err = getWorkspaceSelection(mockClient, buf)
+		_, err = GetWorkspaceSelection(mockClient, buf)
 		assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		mockClient.AssertExpectations(t)
 	})

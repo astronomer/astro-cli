@@ -1,14 +1,19 @@
 package sql
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/astro-client"
+	astroDeployment "github.com/astronomer/astro-cli/cloud/deployment"
+	astroWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
@@ -56,6 +61,79 @@ var (
 	ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
 	Os                 = sql.NewOsBind
 )
+
+// Return the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env
+func getAstroCloudConfig() (astroDeploymentID, astroWorkspaceID string, err error) {
+	configJSON, err := readConfigCmdOutput("get", "--json")
+	if err != nil {
+		return
+	}
+
+	var config map[string]interface{}
+	if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return
+	}
+
+	envConfig := config[env].(map[string]interface{})
+	deployment, _ := envConfig["deployment"].(map[string]interface{})
+	astroDeploymentID, _ = deployment["astro_deployment_id"].(string)
+	astroWorkspaceID, _ = deployment["astro_workspace_id"].(string)
+	return
+}
+
+// Prompt the user for astro cloud config (astroDeploymentID and/or astroWorkspaceID) and return them
+//
+//nolint:gocritic
+func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selectedAstroDeploymentID, selectedAstroWorkspaceID string, err error) {
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+
+	if astroDeploymentID == "" && astroWorkspaceID == "" {
+		fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
+		workspace, err := astroWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
+		if err != nil {
+			return "", "", err
+		}
+		deployments, err := astroDeployment.GetDeployments(workspace, astroClient)
+		if err != nil {
+			return "", "", err
+		}
+		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with"+env+"?")
+		if err != nil {
+			return "", "", err
+		}
+		selectedAstroDeploymentID = deployment.ID
+		selectedAstroWorkspaceID = deployment.Workspace.ID
+	} else if astroDeploymentID == "" {
+		deployments, err := astroDeployment.GetDeployments(astroWorkspaceID, astroClient)
+		if err != nil {
+			return "", "", err
+		}
+		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with"+env+"?")
+		if err != nil {
+			return "", "", err
+		}
+		selectedAstroDeploymentID = deployment.ID
+		selectedAstroWorkspaceID = astroWorkspaceID
+	} else if astroWorkspaceID == "" {
+		fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
+		workspace, err := astroWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
+		if err != nil {
+			return "", "", err
+		}
+		selectedAstroDeploymentID = astroDeploymentID
+		selectedAstroWorkspaceID = workspace
+	}
+
+	return selectedAstroDeploymentID, selectedAstroWorkspaceID, err
+}
+
+// Set the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env.
+func setAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) error {
+	if err := executeCmd(configCmd, []string{"set", "deploy", "--astro-workspace-id", astroWorkspaceID, "--astro-deployment-id", astroDeploymentID}); err != nil {
+		return err
+	}
+	return nil
+}
 
 // Build the cmd string to execute
 func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
@@ -140,8 +218,7 @@ func getProjectDirFromArgs(args []string) string {
 }
 
 // Read config cmd output for retrieving config settings such as airflow_home
-func readConfigCmdOutput(key string) (string, error) {
-	args := []string{"get", key}
+func readConfigCmdOutput(args ...string) (string, error) {
 	output, err := readCmdOutput(configCmd, args)
 	if err != nil {
 		return "", err
@@ -256,12 +333,12 @@ func getDirs(cmd *cobra.Command) ([]string, error) {
 		dirs = append(dirs, projectDir)
 	case validateCmdName:
 		dirs = append(dirs, projectDir)
-		airflowHome, err = readConfigCmdOutput("airflow_home")
+		airflowHome, err = readConfigCmdOutput("get", "airflow_home")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowHome)
-		dataDir, err = readConfigCmdOutput("data_dir")
+		dataDir, err = readConfigCmdOutput("get", "data_dir")
 		if err != nil {
 			return nil, err
 		}
@@ -271,34 +348,34 @@ func getDirs(cmd *cobra.Command) ([]string, error) {
 		if outputDir != "" {
 			dirs = append(dirs, outputDir)
 		}
-		airflowHome, err = readConfigCmdOutput("airflow_home")
+		airflowHome, err = readConfigCmdOutput("get", "airflow_home")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowHome)
-		airflowDagsFolder, err = readConfigCmdOutput("airflow_dags_folder")
+		airflowDagsFolder, err = readConfigCmdOutput("get", "airflow_dags_folder")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowDagsFolder)
-		dataDir, err = readConfigCmdOutput("data_dir")
+		dataDir, err = readConfigCmdOutput("get", "data_dir")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, dataDir)
 	case runCmdName:
 		dirs = append(dirs, projectDir)
-		airflowHome, err = readConfigCmdOutput("airflow_home")
+		airflowHome, err = readConfigCmdOutput("get", "airflow_home")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowHome)
-		airflowDagsFolder, err = readConfigCmdOutput("airflow_dags_folder")
+		airflowDagsFolder, err = readConfigCmdOutput("get", "airflow_dags_folder")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowDagsFolder)
-		dataDir, err = readConfigCmdOutput("data_dir")
+		dataDir, err = readConfigCmdOutput("get", "data_dir")
 		if err != nil {
 			return nil, err
 		}
@@ -401,8 +478,21 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := generateWorkflows(dagsPath); err != nil {
 		return err
 	}
+
+	astroDeploymentID, astroWorkspaceID, err := getAstroCloudConfig()
+	if err != nil {
+		return err
+	}
+	astroDeploymentID, astroWorkspaceID, err = promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID)
+	if err != nil {
+		return err
+	}
+	if err := setAstroCloudConfig(astroDeploymentID, astroWorkspaceID); err != nil {
+		return err
+	}
+
 	astroDeployCmd := cloud.NewDeployCmd()
-	astroDeployCmd.SetArgs([]string{"--dags-path", dagsPath})
+	astroDeployCmd.SetArgs([]string{astroDeploymentID, "--workspace-id", astroWorkspaceID, "--dags-path", dagsPath})
 	if _, err := astroDeployCmd.ExecuteC(); err != nil {
 		return err
 	}
