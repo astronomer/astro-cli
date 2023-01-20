@@ -17,6 +17,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	sql "github.com/astronomer/astro-cli/sql"
 	"github.com/astronomer/astro-cli/sql/mocks"
+	"github.com/astronomer/astro-cli/version"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/spf13/cobra"
@@ -124,6 +125,15 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
+	version.CurrVersion = "1.8"
+	cmd := NewFlowCommand()
+	cmd.SetArgs(args)
+	_, err := cmd.ExecuteC()
+	return err
+}
+
+func execFlowCmdWrongVersion(args ...string) error {
+	version.CurrVersion = "foo"
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
@@ -134,6 +144,10 @@ func TestFlowCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd()
 	assert.NoError(t, err)
+}
+
+func TestFlowCmdWrongVersion(t *testing.T) {
+	assert.PanicsWithError(t, "error running []: error parsing response for SQL CLI version %!w(<nil>)", func() { execFlowCmdWrongVersion() })
 }
 
 func TestFlowCmdError(t *testing.T) {

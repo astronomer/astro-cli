@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/version"
+
 	"github.com/astronomer/astro-cli/sql/mocks"
 	"github.com/astronomer/astro-cli/sql/testutil"
 	"github.com/docker/docker/api/types"
@@ -34,8 +36,8 @@ var (
 	mockDisplayMessagesErr = func(r io.Reader) error {
 		return errMock
 	}
-	mockGetPypiVersionErr = func(projectURL string) (string, error) {
-		return "", errMock
+	mockGetPypiVersionErr = func(configUrl string, cliVersion string) (AstroSQLCliVersion, error) {
+		return AstroSQLCliVersion{}, errMock
 	}
 	mockBaseDockerImageURIErr = func(astroSQLCLIConfigURL string) (string, error) {
 		return "", errMock
@@ -44,8 +46,8 @@ var (
 	mockGetAstroDockerfileRuntimeVersion     = func() (string, error) {
 		return "7.1.0", nil
 	}
-	mockGetPypiVersion = func(projectURL string) (string, error) {
-		return "", nil
+	mockGetPypiVersion = func(configUrl string, cliVersion string) (AstroSQLCliVersion, error) {
+		return AstroSQLCliVersion{}, nil
 	}
 	mockGetPythonSDKComptabilityUnMatch = func(configURL, sqlCliVersion string) (astroRuntimeVersion, astroSDKPythonVersion string, err error) {
 		return ">7.1.0", "==1.3.0", nil
@@ -84,6 +86,7 @@ func TestExecuteCmdInDockerWithReturnValue(t *testing.T) {
 		return mockDockerBinder, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
+	version.CurrVersion = "1.8"
 	_, output, err := ExecuteCmdInDocker(testCommand, nil, true)
 	assert.NoError(t, err)
 
