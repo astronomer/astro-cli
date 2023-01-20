@@ -9,20 +9,26 @@ import (
 )
 
 func TestGetPypiVersionInvalidHostFailure(t *testing.T) {
-	_, err := GetPypiVersion("http://abcd")
+	_, err := GetPypiVersion("http://abcd", "0.1")
 	expectedErrContains := "error getting latest release version for project url http://abcd,  Get \"http://abcd\": dial tcp: lookup abcd"
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
 func TestGetPypiVersionInvalidJSONFailure(t *testing.T) {
-	_, err := GetPypiVersion("https://pypi.org")
+	_, err := GetPypiVersion("https://pypi.org", "0.1")
 	expectedErrContains := "error parsing response for project version invalid character '<' looking for beginning of value"
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
 func TestGetPypiVersionInvalidHTTPRequestFailure(t *testing.T) {
-	_, err := GetPypiVersion("gs://pyconuk-workshop/")
+	_, err := GetPypiVersion("gs://pyconuk-workshop/", "0.1")
 	expectedErrContains := "error getting latest release version for project url gs://pyconuk-workshop/"
+	assert.ErrorContains(t, err, expectedErrContains)
+}
+
+func TestGetPypiVersionInvalidAstroCliVersionFailure(t *testing.T) {
+	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "foo")
+	expectedErrContains := "error parsing response for SQL CLI version"
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 

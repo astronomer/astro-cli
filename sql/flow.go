@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/sql/include"
+	"github.com/astronomer/astro-cli/version"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
@@ -106,19 +107,22 @@ var ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitC
 		return statusCode, cout, fmt.Errorf("docker client initialization failed %w", err)
 	}
 
-	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
-	if err != nil {
-		return statusCode, cout, err
-	}
-
 	baseImage, err := getBaseDockerImageURI(astroSQLCLIConfigURL)
 	if err != nil {
 		fmt.Println(err)
 	}
+	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIConfigURL, version.CurrVersion)
+	if err != nil {
+		return statusCode, cout, err
+	}
+	preReleaseOptString := ""
+	if astroSQLCliVersion.Prerelease {
+		preReleaseOptString = "--pre"
+	}
 
 	currentUser, _ := user.Current()
 
-	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Username, currentUser.Uid, currentUser.Username))
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion.Version, preReleaseOptString, currentUser.Username, currentUser.Uid, currentUser.Username))
 	if err := Os().WriteFile(sqlCLIDockerfilePath, dockerfileContent, fileWriteMode); err != nil {
 		return statusCode, cout, fmt.Errorf("error writing dockerfile %w", err)
 	}
@@ -224,11 +228,11 @@ var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
 	if err != nil {
 		return err
 	}
-	SQLCLIVersion, err := getPypiVersion(astroSQLCLIProjectURL)
+	SQLCLIVersion, err := getPypiVersion(astroSQLCLIConfigURL, version.CurrVersion)
 	if err != nil {
 		return err
 	}
-	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCLIConfigURL, SQLCLIVersion)
+	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCLIConfigURL, SQLCLIVersion.Version)
 	if err != nil {
 		return err
 	}
