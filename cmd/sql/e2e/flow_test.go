@@ -33,8 +33,9 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
+	// Set the astro-cli version to a version compatible with the latest sql-cli version for e2e tests
+	version.CurrVersion = "1.10.0"
 	cmd := sql.NewFlowCommand()
-	version.CurrVersion = "1.8"
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
 	return err
@@ -160,7 +161,6 @@ func TestE2EFlowRunCmd(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
-			version.CurrVersion = "1.8"
 			err := execFlowCmd("init", tc.args[3])
 			assert.NoError(t, err)
 

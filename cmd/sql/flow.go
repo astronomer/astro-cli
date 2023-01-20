@@ -97,7 +97,7 @@ func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selecte
 		if err != nil {
 			return "", "", err
 		}
-		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with"+env+"?")
+		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
 		if err != nil {
 			return "", "", err
 		}
@@ -108,7 +108,7 @@ func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selecte
 		if err != nil {
 			return "", "", err
 		}
-		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with"+env+"?")
+		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
 		if err != nil {
 			return "", "", err
 		}
@@ -122,6 +122,9 @@ func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selecte
 		}
 		selectedAstroDeploymentID = astroDeploymentID
 		selectedAstroWorkspaceID = workspace
+	} else {
+		selectedAstroDeploymentID = astroDeploymentID
+		selectedAstroWorkspaceID = astroWorkspaceID
 	}
 
 	return selectedAstroDeploymentID, selectedAstroWorkspaceID, err
