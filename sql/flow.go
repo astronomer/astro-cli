@@ -240,7 +240,15 @@ var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
 	if err != nil {
 		return err
 	}
-	if !runtimeVersionMet {
+
+	requiredPythonSDKDependency := "\nastro-sdk-python" + requiredPythonSDKVersion
+	b, err := Os().ReadFile(astroRequirementsfilePath)
+	if err != nil {
+		return err
+	}
+	existingRequirements := string(b)
+
+	if !runtimeVersionMet && !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
 		result, err := input.PromptGetConfirmation(promptRunner)
 		if err != nil {
 			return err
@@ -248,22 +256,15 @@ var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
 		if !result {
 			return ErrPythonSDKVersionNotMet
 		}
-		requiredPythonSDKDependency := "\nastro-sdk-python" + requiredPythonSDKVersion
-		b, err := Os().ReadFile(astroRequirementsfilePath)
+
+		f, err := Os().OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, fileWriteMode)
 		if err != nil {
 			return err
 		}
-		existingRequirements := string(b)
-		if !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
-			f, err := Os().OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, fileWriteMode)
-			if err != nil {
-				return err
-			}
 
-			defer f.Close()
-			if _, err = f.WriteString(requiredPythonSDKDependency); err != nil {
-				return err
-			}
+		defer f.Close()
+		if _, err = f.WriteString(requiredPythonSDKDependency); err != nil {
+			return err
 		}
 	}
 	return nil
