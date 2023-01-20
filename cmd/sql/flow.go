@@ -122,6 +122,9 @@ func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selecte
 		}
 		selectedAstroDeploymentID = astroDeploymentID
 		selectedAstroWorkspaceID = workspace
+	} else {
+		selectedAstroDeploymentID = astroDeploymentID
+		selectedAstroWorkspaceID = astroWorkspaceID
 	}
 
 	return selectedAstroDeploymentID, selectedAstroWorkspaceID, err
