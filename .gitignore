@@ -4,10 +4,12 @@
 .env
 .idea/
 .vscode/
+airflow/Dockerfile
 airflow/pod-config.yml
 airflow_settings*
 astro
 astro-cli
+cmd/dags/.airflowignore
 cover.out
 coverage.txt
 dist/

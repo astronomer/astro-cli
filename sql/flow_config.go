@@ -5,14 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
-
-	"github.com/hashicorp/go-version"
 )
-
-type pypiVersionResponse struct {
-	Releases map[string]json.RawMessage `json:"releases"`
-}
 
 type configResponse struct {
 	BaseDockerImage string `json:"baseDockerImage"`
@@ -23,8 +16,14 @@ type compatibilityVersions struct {
 	AstroSdkPython string `json:"astroSDKPythonVersion"`
 }
 
+type sqlCliCompatibilityVersions struct {
+	SQLCliVersion string `json:"sqlCliVersion"`
+	PreRelease    bool   `json:"preRelease"`
+}
+
 type compatibilityResponse struct {
-	Compatibility map[string]compatibilityVersions `json:"compatibility"`
+	Compatibility       map[string]compatibilityVersions       `json:"compatibility"`
+	SQLCliCompatibility map[string]sqlCliCompatibilityVersions `json:"astroCliCompatibility"`
 }
 
 const (
@@ -39,35 +38,32 @@ var (
 
 var httpClient = &http.Client{}
 
-func GetPypiVersion(projectURL string) (string, error) {
-	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, projectURL, http.NoBody)
+type AstroSQLCliVersion struct {
+	Version    string
+	Prerelease bool
+}
+
+func GetPypiVersion(configURL, astroCliVersion string) (AstroSQLCliVersion, error) {
+	req, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, configURL, http.NoBody)
 	if err != nil {
-		return "", fmt.Errorf("error creating HTTP request %w", err)
+		return AstroSQLCliVersion{}, fmt.Errorf("error creating HTTP request %w", err)
 	}
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error getting latest release version for project url %s,  %w", projectURL, err)
+		return AstroSQLCliVersion{}, fmt.Errorf("error getting latest release version for project url %s,  %w", configURL, err)
 	}
 	defer res.Body.Close()
 
-	var resp pypiVersionResponse
+	var resp compatibilityResponse
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		return "", fmt.Errorf("error parsing response for project version %w", err)
+		return AstroSQLCliVersion{}, fmt.Errorf("error parsing response for project version %w", err)
 	}
-
-	versions := make([]*version.Version, len(resp.Releases))
-	index := 0
-	for release := range resp.Releases {
-		if v, err := version.NewVersion(release); err != nil {
-			fmt.Println(fmt.Errorf("error parsing release version %w", err))
-		} else {
-			versions[index] = v
-			index++
-		}
+	SQLCliCompatibility, exists := resp.SQLCliCompatibility[astroCliVersion]
+	if !exists {
+		return AstroSQLCliVersion{}, fmt.Errorf("error parsing response for SQL CLI version %w", err)
 	}
-	sort.Sort(sort.Reverse(version.Collection(versions)))
-	return versions[0].Original(), nil
+	return AstroSQLCliVersion{SQLCliCompatibility.SQLCliVersion, SQLCliCompatibility.PreRelease}, nil
 }
 
 func GetBaseDockerImageURI(configURL string) (string, error) {
