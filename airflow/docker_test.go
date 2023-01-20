@@ -190,7 +190,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:12.6
+    image: docker.io/postgres:12.6
     restart: unless-stopped
     networks:
       - airflow
