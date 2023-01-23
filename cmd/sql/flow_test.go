@@ -359,6 +359,18 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowDeployWithTooManyArgs(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	err := execFlowCmd("deploy", "test.sql", "abc")
+	assert.ErrorIs(t, err, ErrTooManyArgs)
+}
+
 func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
 	defer patchDeployCmd()()
 
