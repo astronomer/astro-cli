@@ -23,7 +23,7 @@ import (
 
 const (
 	astroSQLCLIProjectURL     = "https://pypi.org/pypi/astro-sql-cli/json"
-	astroSQLCLIConfigURL      = "https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json"
+	astroSQLCLIConfigURL      = "https://raw.githubusercontent.com/astronomer/astro-sdk/1652-compatibility/sql-cli/config/astro-cli.json"
 	sqlCLIDockerfilePath      = ".Dockerfile.sql_cli"
 	fileWriteMode             = 0o600
 	sqlCLIDockerImageName     = "sql_cli"
@@ -223,19 +223,17 @@ var getAstroDockerfileRuntimeVersion = func() (string, error) {
 	return runtimeVersion, nil
 }
 
-var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
+var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner, installedSQLCLIVersion string) error {
 	astroRuntimeVersion, err := getAstroDockerfileRuntimeVersion()
 	if err != nil {
 		return err
 	}
-	SQLCLIVersion, err := getPypiVersion(astroSQLCLIConfigURL, version.CurrVersion)
+
+	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCLIConfigURL, installedSQLCLIVersion)
 	if err != nil {
 		return err
 	}
-	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCLIConfigURL, SQLCLIVersion.Version)
-	if err != nil {
-		return err
-	}
+
 	runtimeVersionMet, err := util.IsRequiredVersionMet(astroRuntimeVersion, requiredRuntimeVersion)
 	if err != nil {
 		return err
