@@ -58,7 +58,7 @@ var (
 
 var (
 	ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
-	ErrTooManyArgs     = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command.")
+	ErrTooManyArgs     = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command")
 	Os                 = sql.NewOsBind
 )
 

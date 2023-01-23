@@ -355,7 +355,7 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 	}
 
 	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
-	err := execFlowCmd("deploy", "--workflow-name", "test.sql")
+	err := execFlowCmd("deploy", "test.sql")
 	assert.NoError(t, err)
 }
 
