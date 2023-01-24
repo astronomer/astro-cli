@@ -29,15 +29,15 @@ var (
 
 // All cmd names
 const (
-	flowCmdName            = "flow"
-	aboutCmdName           = "about"
-	configCmdName          = "config"
-	generateCmdName        = "generate"
-	initCmdName            = "init"
-	runCmdName             = "run"
-	validateCmdName        = "validate"
-	versionCmdName         = "version"
-	deployCmdName          = "deploy"
+	flowCmdName     = "flow"
+	aboutCmdName    = "about"
+	configCmdName   = "config"
+	generateCmdName = "generate"
+	initCmdName     = "init"
+	runCmdName      = "run"
+	validateCmdName = "validate"
+	versionCmdName  = "version"
+	deployCmdName   = "deploy"
 )
 
 // All cmd flags
