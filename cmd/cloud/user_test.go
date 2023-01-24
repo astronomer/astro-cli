@@ -9,15 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func execUserCmd(args ...string) (string, error) {
-	buf := new(bytes.Buffer)
-	cmd := newUserCmd(buf)
-	cmd.SetOut(buf)
-	cmd.SetArgs(args)
-	_, err := cmd.ExecuteC()
-	return buf.String(), err
-}
-
 func TestUserRootCommand(t *testing.T) {
 	expectedHelp := "Invite a user to your Astro Organization."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
