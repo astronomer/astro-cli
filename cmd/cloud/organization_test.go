@@ -3,17 +3,17 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
-	"github.com/astronomer/astro-cli/cloud/user"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
+	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -206,7 +206,7 @@ func TestUserInvite(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateUserInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"user","invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
+		cmdArgs := []string{"user", "invite", "some@email.com", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
