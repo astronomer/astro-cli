@@ -51,7 +51,7 @@ var (
 		JSON200: nil,
 	}
 	errNetwork = errors.New("network error")
-	errMock  = errors.New("mock error")
+	errMock    = errors.New("mock error")
 )
 
 func TestList(t *testing.T) {
