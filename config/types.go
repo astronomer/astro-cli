@@ -14,6 +14,7 @@ type cfgs struct {
 	CloudAPIToken        cfg
 	Context              cfg
 	Contexts             cfg
+	DockerCommand        cfg
 	LocalEnabled         cfg
 	LocalAstro           cfg
 	LocalCore            cfg
@@ -38,6 +39,7 @@ type cfgs struct {
 	PageSize             cfg
 	SQLCLI               cfg
 	AuditLogs            cfg
+	UpgradeMessage       cfg
 }
 
 // Creates a new cfg struct

@@ -366,7 +366,7 @@ func TestListOrgUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		err := ListOrgUsers(out, mockClient, 1)
+		err := ListOrgUsers(out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -374,7 +374,7 @@ func TestListOrgUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListOrgUsers(out, mockClient, 1)
+		err := ListOrgUsers(out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -382,7 +382,7 @@ func TestListOrgUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseError, nil).Twice()
-		err := ListOrgUsers(out, mockClient, 1)
+		err := ListOrgUsers(out, mockClient)
 		assert.EqualError(t, err, "failed to list users")
 	})
 
@@ -394,7 +394,7 @@ func TestListOrgUser(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = ListOrgUsers(out, mockClient, 1)
+		err = ListOrgUsers(out, mockClient)
 		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
@@ -403,7 +403,7 @@ func TestListOrgUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := ListOrgUsers(out, mockClient, 1)
+		err := ListOrgUsers(out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})

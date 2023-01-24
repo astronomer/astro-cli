@@ -96,7 +96,6 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 			return listWorkspaceUsers(cmd, out)
 		},
 	}
-	cmd.Flags().IntVarP(&limit, "limit", "l", limitDefault, "Maximum number of workspace users listed")
 	return cmd
 }
 
@@ -162,7 +161,7 @@ func addWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {
 
 func listWorkspaceUsers(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsers(out, astroCoreClient, "", limit)
+	return user.ListWorkspaceUsers(out, astroCoreClient, "")
 }
 
 func updateWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {

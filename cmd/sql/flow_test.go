@@ -2,16 +2,27 @@ package sql
 
 import (
 	"errors"
-	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
+	"github.com/astronomer/astro-cli/astro-client"
+	cloudDeploy "github.com/astronomer/astro-cli/cloud/deploy"
+	astroDeployment "github.com/astronomer/astro-cli/cloud/deployment"
+	astroWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
+	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/pkg/input"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	sql "github.com/astronomer/astro-cli/sql"
 	"github.com/astronomer/astro-cli/sql/mocks"
+	"github.com/astronomer/astro-cli/version"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -21,22 +32,28 @@ var (
 	imageBuildResponse = types.ImageBuildResponse{
 		Body: io.NopCloser(strings.NewReader("Image built")),
 	}
-	containerCreateCreatedBody          = container.ContainerCreateCreatedBody{ID: "123"}
-	sampleLog                           = io.NopCloser(strings.NewReader("Sample log"))
-	mockExecuteCmdInDockerReturnSuccess = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-		return 0, output, nil
+	containerCreateCreatedBody    = container.ContainerCreateCreatedBody{ID: "123"}
+	sampleLog                     = io.NopCloser(strings.NewReader("Sample log"))
+	originalGetWorkspaceSelection = astroWorkspace.GetWorkspaceSelection
+	originalGetDeployments        = astroDeployment.GetDeployments
+	originalSelectDeployment      = astroDeployment.SelectDeployment
+	mockGetWorkspaceSelection     = func(client astro.Client, out io.Writer) (string, error) {
+		return "W1", nil
 	}
-	mockExecuteCmdInDockerReturnErr = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-		return 0, output, errMock
-	}
-	mockExecuteCmdInDockerReturnNonZeroExitCode = func(cmd, args []string, flags map[string]string, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
-		return 1, output, nil
-	}
-	mockConvertReadCloserToStringReturnErr = func(readCloser io.ReadCloser) (string, error) {
+	mockGetWorkspaceSelectionErr = func(client astro.Client, out io.Writer) (string, error) {
 		return "", errMock
 	}
-	mockAppendConfigKeyMountDirErr = func(configKey string, configFlags map[string]string, mountDirs []string) ([]string, error) {
+	mockGetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
+		return nil, nil
+	}
+	mockGetDeploymentsErr = func(ws string, client astro.Client) ([]astro.Deployment, error) {
 		return nil, errMock
+	}
+	mockSelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+		return astro.Deployment{ID: "D1", Workspace: astro.Workspace{ID: "W1"}}, nil
+	}
+	mockSelectDeploymentErr = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+		return astro.Deployment{}, errMock
 	}
 )
 
@@ -93,6 +110,41 @@ func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 	}
 }
 
+// Mock ExecuteCmdInDocker to return a specific output for "config get --json" calls
+func mockExecuteCmdInDockerOutputForJSONConfig() func() {
+	outputString := "{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}"
+	originalExecuteCmdInDocker := sql.ExecuteCmdInDocker
+
+	sql.ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
+		if returnOutput && cmd[0] == "config" && cmd[1] == "get" && cmd[2] == "--json" {
+			return 0, io.NopCloser(strings.NewReader(outputString)), nil
+		}
+		return 0, io.NopCloser(strings.NewReader("")), nil
+	}
+
+	return func() {
+		sql.ExecuteCmdInDocker = originalExecuteCmdInDocker
+	}
+}
+
+// patches "astro deploy" command i.e. cloud.NewDeployCmd()
+func patchDeployCmd() func() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	cloudCmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+
+	cloudCmd.DeployImage = func(deployInput cloudDeploy.InputDeploy, client astro.Client) error {
+		return nil
+	}
+
+	return func() {
+		cloudCmd.EnsureProjectDir = utils.EnsureProjectDir
+		cloudCmd.DeployImage = cloudDeploy.Deploy
+	}
+}
+
 // chdir changes the current working directory to the named directory and
 // returns a function that, when called, restores the original working
 // directory.
@@ -113,6 +165,15 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
+	version.CurrVersion = "1.8.0"
+	cmd := NewFlowCommand()
+	cmd.SetArgs(args)
+	_, err := cmd.ExecuteC()
+	return err
+}
+
+func execFlowCmdWrongVersion(args ...string) error {
+	version.CurrVersion = "foo"
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
@@ -123,6 +184,10 @@ func TestFlowCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd()
 	assert.NoError(t, err)
+}
+
+func TestFlowCmdWrongVersion(t *testing.T) {
+	assert.PanicsWithError(t, "error running []: error parsing response for SQL CLI version %!w(<nil>)", func() { execFlowCmdWrongVersion() })
 }
 
 func TestFlowCmdError(t *testing.T) {
@@ -153,6 +218,12 @@ func TestFlowVersionCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestFlowVersionHelpCmd(t *testing.T) {
+	defer patchExecuteCmdInDocker(t, 0, nil)()
+	err := execFlowCmd("version", "--help")
+	assert.NoError(t, err)
+}
+
 func TestFlowAboutCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
 	err := execFlowCmd("about")
@@ -167,174 +238,267 @@ func TestFlowInitCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFlowInitCmdWithFlags(t *testing.T) {
+func TestFlowInitCmdWithArgs(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	AirflowHome := t.TempDir()
-	AirflowDagsFolder := t.TempDir()
-	DataDir := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", AirflowHome, "--airflow-dags-folder", AirflowDagsFolder, "--data-dir", DataDir)
-	assert.NoError(t, err)
-}
-
-func TestFlowConfigCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-
+	cmd := "init"
 	testCases := []struct {
-		initFlag  string
-		configKey string
+		args []string
 	}{
-		{"--airflow-home", "airflow_home"},
-		{"--airflow-dags-folder", "airflow_dags_folder"},
-		{"--data-dir", "data_dir"},
+		{[]string{cmd, t.TempDir()}},
+		{[]string{cmd, "--airflow-home", t.TempDir()}},
+		{[]string{cmd, "--airflow-dags-folder", t.TempDir()}},
+		{[]string{cmd, "--data-dir", t.TempDir()}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--no-verbose"}},
 	}
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("with init flag %s and config key %s", tc.initFlag, tc.configKey), func(t *testing.T) {
-			projectDir := t.TempDir()
-			err := execFlowCmd("init", projectDir, tc.initFlag, t.TempDir())
-			assert.NoError(t, err)
-
-			err = execFlowCmd("config", "--project-dir", projectDir, tc.configKey)
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func TestFlowConfigCmdArgumentNotSetError(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("config", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:key")
-}
-
 func TestFlowValidateCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("validate", projectDir, "--connection", "sqlite_conn", "--verbose")
-	assert.NoError(t, err)
+	cmd := "validate"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, t.TempDir()}},
+		{[]string{cmd, "--connection", "<connection>"}},
+		{[]string{cmd, "--env", "<env>"}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--no-verbose"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowGenerateCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--no-generate-tasks", "--verbose")
-	assert.NoError(t, err)
-}
-
-func TestFlowGenerateGenerateTasksCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("generate", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks")
-	assert.NoError(t, err)
-}
-
-func TestFlowRunGenerateTasksCmd(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("run", "example_basic_transform", "--project-dir", projectDir, "--generate-tasks")
-	assert.NoError(t, err)
-}
-
-func TestFlowGenerateCmdWorkflowNameNotSet(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("generate", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:workflow_name")
+	cmd := "generate"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, "--project-dir", t.TempDir()}},
+		{[]string{cmd, "--generate-tasks"}},
+		{[]string{cmd, "--no-generate-tasks"}},
+		{[]string{cmd, "--no-verbose"}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--env", "<env>"}},
+		{[]string{cmd, "--output-dir", t.TempDir()}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestFlowRunCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("run", "example_templating", "--env", "dev", "--project-dir", projectDir, "--no-generate-tasks", "--verbose")
-	assert.NoError(t, err)
+	cmd := "run"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, "--project-dir", t.TempDir()}},
+		{[]string{cmd, "--generate-tasks"}},
+		{[]string{cmd, "--no-generate-tasks"}},
+		{[]string{cmd, "--no-verbose"}},
+		{[]string{cmd, "--verbose"}},
+		{[]string{cmd, "--env", "<env>"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
-func TestDebugFlowRunCmd(t *testing.T) {
+func TestDebugFlowFlagCmd(t *testing.T) {
 	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{"--debug", "version"}},
+		{[]string{"--no-debug", "version"}},
+		{[]string{"--debug", "about"}},
+		{[]string{"--no-debug", "about"}},
+		{[]string{"--debug", "init"}},
+		{[]string{"--no-debug", "init"}},
+		{[]string{"--debug", "validate"}},
+		{[]string{"--no-debug", "validate"}},
+		{[]string{"--debug", "generate"}},
+		{[]string{"--no-debug", "generate"}},
+		{[]string{"--debug", "run"}},
+		{[]string{"--no-debug", "run"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestFlowDeployWithWorkflowCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy", "test.sql")
+	assert.NoError(t, err)
+}
+
+func TestFlowDeployWithTooManyArgs(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy", "test.sql", "abc")
+	assert.ErrorIs(t, err, ErrTooManyArgs)
+}
+
+func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows": {
+				Mode: fs.ModeDir,
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
 
-	err = execFlowCmd("--debug", "run", "example_templating", "--env", "dev", "--project-dir", projectDir)
+	Os = sql.NewOsBind
+}
+
+func TestFlowDeployWorkflowsCmd(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows/workflow/.sql": {
+				Data: []byte("select 1"),
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
+
+	Os = sql.NewOsBind
 }
 
-func TestFlowRunCmdWorkflowNameNotSet(t *testing.T) {
-	defer patchExecuteCmdInDocker(t, 0, nil)()
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
+	_, _, err := promptAstroCloudConfig("", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetDeploymentsFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	astroDeployment.GetDeployments = mockGetDeploymentsErr
+	_, _, err := promptAstroCloudConfig("", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+	astroDeployment.GetDeployments = originalGetDeployments
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetSelectDeploymentFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeploymentErr
+	_, _, err := promptAstroCloudConfig("", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
+}
+
+func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetSuccess(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeployment
+	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("", "")
 	assert.NoError(t, err)
-
-	err = execFlowCmd("run", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:workflow_name")
+	assert.EqualValues(t, "D1", selectedAstroDeploymentID)
+	assert.EqualValues(t, "W1", selectedAstroWorkspaceID)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
 }
 
-func TestAppendConfigKeyMountDirInvalidCommand(t *testing.T) {
-	originalDockerUtil := sql.ExecuteCmdInDocker
-	originalConvertReadCloserToString := sql.ConvertReadCloserToString
-
-	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnErr
-	_, err := appendConfigKeyMountDir("", nil, nil)
-	expectedErr := fmt.Errorf("error running %v: %w", configCommandString, errMock)
-	assert.Equal(t, expectedErr, err)
-
-	sql.ExecuteCmdInDocker = originalDockerUtil
-	sql.ConvertReadCloserToString = originalConvertReadCloserToString
+func TestPromptAstroCloudConfigDeploymentUnsetGetDeploymentsFailure(t *testing.T) {
+	astroDeployment.GetDeployments = mockGetDeploymentsErr
+	_, _, err := promptAstroCloudConfig("", "W2")
+	assert.ErrorIs(t, err, errMock)
+	astroDeployment.GetDeployments = originalGetDeployments
 }
 
-func TestAppendConfigKeyMountDirDockerNonZeroExitCodeError(t *testing.T) {
-	originalDockerUtil := sql.ExecuteCmdInDocker
-	originalConvertReadCloserToString := sql.ConvertReadCloserToString
-
-	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnNonZeroExitCode
-	_, err := appendConfigKeyMountDir("", nil, nil)
-	expectedErr := sql.DockerNonZeroExitCodeError(1)
-	assert.Equal(t, expectedErr, err)
-
-	sql.ExecuteCmdInDocker = originalDockerUtil
-	sql.ConvertReadCloserToString = originalConvertReadCloserToString
+func TestPromptAstroCloudConfigDeploymentUnsetSelectDeploymentFailure(t *testing.T) {
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeploymentErr
+	_, _, err := promptAstroCloudConfig("", "W2")
+	assert.ErrorIs(t, err, errMock)
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
 }
 
-func TestAppendConfigKeyMountDirReadError(t *testing.T) {
-	originalDockerUtil := sql.ExecuteCmdInDocker
-	originalConvertReadCloserToString := sql.ConvertReadCloserToString
-
-	sql.ExecuteCmdInDocker = mockExecuteCmdInDockerReturnSuccess
-	sql.ConvertReadCloserToString = mockConvertReadCloserToStringReturnErr
-	_, err := appendConfigKeyMountDir("", nil, nil)
-	assert.EqualError(t, err, "mock error")
-
-	sql.ExecuteCmdInDocker = originalDockerUtil
-	sql.ConvertReadCloserToString = originalConvertReadCloserToString
+func TestPromptAstroCloudConfigDeploymentUnsetSuccess(t *testing.T) {
+	astroDeployment.GetDeployments = mockGetDeployments
+	astroDeployment.SelectDeployment = mockSelectDeployment
+	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("", "W2")
+	assert.NoError(t, err)
+	assert.EqualValues(t, "D1", selectedAstroDeploymentID)
+	assert.EqualValues(t, "W2", selectedAstroWorkspaceID)
+	astroDeployment.GetDeployments = originalGetDeployments
+	astroDeployment.SelectDeployment = originalSelectDeployment
 }
 
-func TestBuildFlagsAndMountDirsFailures(t *testing.T) {
-	originalAppendConfigKeyMountDir := appendConfigKeyMountDir
+func TestPromptAstroCloudConfigWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
+	_, _, err := promptAstroCloudConfig("D2", "")
+	assert.ErrorIs(t, err, errMock)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+}
 
-	appendConfigKeyMountDir = mockAppendConfigKeyMountDirErr
-	_, _, err := buildFlagsAndMountDirs("", false, false, false, false, true)
-	assert.EqualError(t, err, "mock error")
-
-	appendConfigKeyMountDir = originalAppendConfigKeyMountDir
+func TestPromptAstroCloudConfigWorkspaceUnsetSuccess(t *testing.T) {
+	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
+	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("D2", "")
+	assert.NoError(t, err)
+	assert.EqualValues(t, "D2", selectedAstroDeploymentID)
+	assert.EqualValues(t, "W1", selectedAstroWorkspaceID)
+	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
 }

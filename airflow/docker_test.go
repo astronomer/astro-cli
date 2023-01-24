@@ -79,7 +79,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:12.6
+    image: docker.io/postgres:12.6
     restart: unless-stopped
     networks:
       - airflow
@@ -110,7 +110,7 @@ services:
       - postgres
     environment: *common-env-vars
     volumes:
-      - airflow_home/dags:/usr/local/airflow/dags:ro
+      - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
@@ -190,7 +190,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:12.6
+    image: docker.io/postgres:12.6
     restart: unless-stopped
     networks:
       - airflow
@@ -221,7 +221,7 @@ services:
       - postgres
     environment: *common-env-vars
     volumes:
-      - airflow_home/dags:/usr/local/airflow/dags:ro
+      - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z

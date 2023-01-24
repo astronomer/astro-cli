@@ -3,7 +3,10 @@ package e2e
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/version"
 
 	sql "github.com/astronomer/astro-cli/cmd/sql"
 
@@ -30,6 +33,8 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
+	// Set the astro-cli version to a version compatible with the latest sql-cli version for e2e tests
+	version.CurrVersion = "1.10.0"
 	cmd := sql.NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
@@ -46,6 +51,11 @@ func TestE2EFlowVersionCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestE2EFlowVersionHelpCmd(t *testing.T) {
+	err := execFlowCmd("version", "--help")
+	assert.NoError(t, err)
+}
+
 func TestE2EFlowAboutCmd(t *testing.T) {
 	err := execFlowCmd("about")
 	assert.NoError(t, err)
@@ -58,123 +68,121 @@ func TestE2EFlowInitCmd(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestE2EFlowInitCmdWithFlags(t *testing.T) {
-	projectDir := t.TempDir()
-	airflowHome := t.TempDir()
-	airflowDagsFolder := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", airflowHome, "--airflow-dags-folder", airflowDagsFolder)
+func TestE2EFlowInitCmdInUserHomeDir(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(homeDir, fmt.Sprintf("astro-cli-%s", t.Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = execFlowCmd("init", dir)
 	assert.NoError(t, err)
 }
 
-func TestE2EFlowConfigCmd(t *testing.T) {
-	projectDir := t.TempDir()
-	airflowHome := t.TempDir()
-	airflowDagsFolder := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", airflowHome, "--airflow-dags-folder", airflowDagsFolder)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("config", "--project-dir", projectDir, "airflow_home")
-	assert.NoError(t, err)
-}
-
-func TestE2EFlowConfigCmdArgumentNotSetError(t *testing.T) {
-	projectDir := t.TempDir()
-	airflowHome := t.TempDir()
-	airflowDagsFolder := t.TempDir()
-	err := execFlowCmd("init", projectDir, "--airflow-home", airflowHome, "--airflow-dags-folder", airflowDagsFolder)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("config", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:key")
+func TestE2EFlowInitCmdWithArgs(t *testing.T) {
+	cmd := "init"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--airflow-home", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--airflow-dags-folder", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--data-dir", t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--verbose"}},
+		{[]string{cmd, t.TempDir(), "--no-verbose"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestE2EFlowValidateCmd(t *testing.T) {
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
+	cmd := "validate"
+	testCases := []struct {
+		args []string
+	}{
+		{[]string{cmd, t.TempDir()}},
+		{[]string{cmd, t.TempDir(), "--connection", "sqlite_conn"}},
+		{[]string{cmd, t.TempDir(), "--env", "dev"}},
+		{[]string{cmd, t.TempDir(), "--verbose"}},
+		{[]string{cmd, t.TempDir(), "--no-verbose"}},
+	}
+	for _, tc := range testCases {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd("init", tc.args[1])
+			assert.NoError(t, err)
 
-	err = execFlowCmd("validate", projectDir, "--connection", "sqlite_conn")
-	assert.NoError(t, err)
-}
-
-func TestE2EFlowValidateAllCmd(t *testing.T) {
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("validate", projectDir)
-	assert.NoError(t, err)
+			err = execFlowCmd(tc.args...)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestE2EFlowGenerateCmd(t *testing.T) {
+	cmd := "generate"
 	testCases := []struct {
-		workflowName  string
-		env           string
-		generateTasks string
+		args []string
 	}{
-		{"example_basic_transform", "default", "--generate-tasks"},
-		{"example_basic_transform", "default", "--no-generate-tasks"},
-		{"example_templating", "dev", "--generate-tasks"},
-		{"example_templating", "dev", "--no-generate-tasks"},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
 	}
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s in %s with %s", tc.workflowName, tc.env, tc.generateTasks), func(t *testing.T) {
-			projectDir := t.TempDir()
-			err := execFlowCmd("init", projectDir)
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd("init", tc.args[3])
 			assert.NoError(t, err)
 
-			err = execFlowCmd("generate", tc.workflowName, "--project-dir", projectDir, "--env", tc.env, tc.generateTasks)
+			err = execFlowCmd(tc.args...)
 			assert.NoError(t, err)
 		})
 	}
-}
-
-func TestE2EFlowGenerateCmdWorkflowNameNotSetError(t *testing.T) {
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("generate", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:workflow_name")
 }
 
 func TestE2EFlowRunCmd(t *testing.T) {
+	cmd := "run"
 	testCases := []struct {
-		workflowName  string
-		env           string
-		generateTasks string
+		args []string
 	}{
-		{"example_basic_transform", "default", "--generate-tasks"},
-		{"example_basic_transform", "default", "--no-generate-tasks"},
-		{"example_templating", "dev", "--generate-tasks"},
-		{"example_templating", "dev", "--no-generate-tasks"},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-generate-tasks"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--no-verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--verbose"}},
+		{[]string{cmd, "example_basic_transform", "--project-dir", t.TempDir(), "--env", "default"}},
+		{[]string{cmd, "example_templating", "--project-dir", t.TempDir(), "--env", "dev"}},
 	}
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s in %s with %s", tc.workflowName, tc.env, tc.generateTasks), func(t *testing.T) {
-			projectDir := t.TempDir()
-			err := execFlowCmd("init", projectDir)
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			err := execFlowCmd("init", tc.args[3])
 			assert.NoError(t, err)
 
-			err = execFlowCmd("run", tc.workflowName, "--project-dir", projectDir, "--env", tc.env, tc.generateTasks)
+			err = execFlowCmd(tc.args...)
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func TestE2EFlowRunVerboseCmd(t *testing.T) {
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
+func TestE2EFlowRunCmdInUserHomeDir(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(homeDir, fmt.Sprintf("astro-cli-%s", t.Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = execFlowCmd("init", dir)
 	assert.NoError(t, err)
 
-	err = execFlowCmd("run", "example_basic_transform", "--project-dir", projectDir, "--verbose")
+	err = execFlowCmd("run", "example_basic_transform", "--project-dir", dir)
 	assert.NoError(t, err)
-}
-
-func TestE2EFlowRunCmdWorkflowNameNotSetError(t *testing.T) {
-	projectDir := t.TempDir()
-	err := execFlowCmd("init", projectDir)
-	assert.NoError(t, err)
-
-	err = execFlowCmd("run", "--project-dir", projectDir)
-	assert.EqualError(t, err, "argument not set:workflow_name")
 }

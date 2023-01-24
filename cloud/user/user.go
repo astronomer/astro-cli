@@ -18,12 +18,13 @@ import (
 )
 
 var (
-	ErrNoShortName          = errors.New("cannot retrieve organization short name from context")
-	ErrInvalidRole          = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrNoShortName     = errors.New("cannot retrieve organization short name from context")
+	ErrInvalidRole     = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
-	ErrInvalidEmail         = errors.New("no email provided for the invite. Retry with a valid email address")
-	ErrInvalidUserKey       = errors.New("invalid user selected")
-	selectLimit             = 1000
+	ErrInvalidEmail    = errors.New("no email provided for the invite. Retry with a valid email address")
+	ErrInvalidUserKey  = errors.New("invalid User selected")
+	userPagnationLimit = 100
+	ErrUserNotFound    = errors.New("no user was found for the email you provided")
 )
 
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
@@ -76,23 +77,30 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 	if ctx.OrganizationShortName == "" {
 		return ErrNoShortName
 	}
-	// Get all org users. Setting limit to 1000 for now
-	users, err := GetOrgUsers(client, selectLimit)
+	// Get all org users
+	users, err := GetOrgUsers(client)
 	if err != nil {
 		return err
 	}
-	if email == "" {
+	if email != "" {
+		if err != nil {
+			return err
+		}
+
+		for i := range users {
+			if users[i].Username == email {
+				userID = users[i].Id
+			}
+		}
+		if userID == "" {
+			return ErrUserNotFound
+		}
+	} else {
 		user, err := selectUser(users, false)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
 			return err
-		}
-	} else {
-		for i := range users {
-			if users[i].Username == email {
-				userID = users[i].Id
-			}
 		}
 	}
 	mutateUserInput := astrocore.MutateOrgUserRoleRequest{
@@ -171,7 +179,7 @@ func selectUser(users []astrocore.User, workspace bool) (astrocore.User, error) 
 }
 
 // Returns a list of all of an organizations users
-func GetOrgUsers(client astrocore.CoreClient, limit int) ([]astrocore.User, error) {
+func GetOrgUsers(client astrocore.CoreClient) ([]astrocore.User, error) {
 	offset := 0
 	var users []astrocore.User
 
@@ -186,7 +194,7 @@ func GetOrgUsers(client astrocore.CoreClient, limit int) ([]astrocore.User, erro
 	for {
 		resp, err := client.ListOrgUsersWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrgUsersParams{
 			Offset: &offset,
-			Limit:  &limit,
+			Limit:  &userPagnationLimit,
 		})
 		if err != nil {
 			return nil, err
@@ -201,20 +209,20 @@ func GetOrgUsers(client astrocore.CoreClient, limit int) ([]astrocore.User, erro
 			break
 		}
 
-		offset += limit
+		offset += userPagnationLimit
 	}
 
 	return users, nil
 }
 
 // Prints a list of all of an organizations users
-func ListOrgUsers(out io.Writer, client astrocore.CoreClient, limit int) error {
+func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"FULLNAME", "EMAIL", "ID", "ORGANIZATION ROLE", "CREATE DATE"},
 	}
-	users, err := GetOrgUsers(client, limit)
+	users, err := GetOrgUsers(client)
 	if err != nil {
 		return err
 	}
@@ -250,7 +258,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 		workspace = ctx.Workspace
 	}
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetOrgUsers(client, selectLimit)
+	users, err := GetOrgUsers(client)
 	if err != nil {
 		return err
 	}
@@ -300,7 +308,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 		workspace = ctx.Workspace
 	}
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetWorkspaceUsers(client, workspace, selectLimit)
+	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -389,13 +397,13 @@ func GetWorkspaceUsers(client astrocore.CoreClient, workspace string, limit int)
 }
 
 // Prints a list of all of an organizations users
-func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace string, limit int) error {
+func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace string) error {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"FULLNAME", "EMAIL", "ID", "WORKSPACE ROLE", "CREATE DATE"},
 	}
-	users, err := GetWorkspaceUsers(client, workspace, limit)
+	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
 	if err != nil {
 		return err
 	}
@@ -427,7 +435,7 @@ func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 		workspace = ctx.Workspace
 	}
 	// Get all org users. Setting limit to 1000 for now
-	users, err := GetWorkspaceUsers(client, workspace, selectLimit)
+	users, err := GetWorkspaceUsers(client, workspace, userPagnationLimit)
 	if err != nil {
 		return err
 	}
