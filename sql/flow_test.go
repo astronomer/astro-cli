@@ -86,7 +86,7 @@ func TestExecuteCmdInDockerWithReturnValue(t *testing.T) {
 		return mockDockerBinder, nil
 	}
 	DisplayMessages = mockDisplayMessagesNil
-	version.CurrVersion = "1.8"
+	version.CurrVersion = "1.8.0"
 	_, output, err := ExecuteCmdInDocker(testCommand, nil, true)
 	assert.NoError(t, err)
 
