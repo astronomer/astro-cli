@@ -164,7 +164,7 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
-	version.CurrVersion = "1.8"
+	version.CurrVersion = "1.8.0"
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
