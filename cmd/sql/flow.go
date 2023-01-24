@@ -236,7 +236,7 @@ func readConfigCmdOutput(args ...string) (string, error) {
 }
 
 // Read version cmd output for retrieving installed version of SQL CLI
-func getInstalledFlowVersion() (string, error) {
+var getInstalledFlowVersion = func() (string, error) {
 	output, err := readCmdOutput(versionCmd, []string{"--json"})
 	if err != nil {
 		return "", err
