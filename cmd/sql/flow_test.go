@@ -366,7 +366,7 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 func TestFlowDeployWithTooManyArgs(t *testing.T) {
 	defer patchDeployCmd()()
 
-	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
 	}
 
