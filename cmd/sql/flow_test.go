@@ -111,7 +111,8 @@ func patchExecuteCmdInDocker(t *testing.T, statusCode int64, err error) func() {
 }
 
 // Mock ExecuteCmdInDocker to return a specific output for "config get --json" calls
-func mockExecuteCmdInDockerOutputForJSONConfig(outputString string) func() {
+func mockExecuteCmdInDockerOutputForJSONConfig() func() {
+	outputString := "{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}"
 	originalExecuteCmdInDocker := sql.ExecuteCmdInDocker
 
 	sql.ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitCode int64, output io.ReadCloser, err error) {
@@ -357,7 +358,7 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 		return "", nil
 	}
 
-	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
 	err := execFlowCmd("deploy", "--workflow-name", "test.sql")
 	assert.NoError(t, err)
 }
@@ -382,7 +383,7 @@ func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
 		return mockOs
 	}
 
-	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
 	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
 
@@ -409,7 +410,7 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 		return mockOs
 	}
 
-	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
 	err := execFlowCmd("deploy")
 	assert.NoError(t, err)
 
@@ -423,7 +424,7 @@ func TestFlowDeployCmdInstalledFlowVersionFailure(t *testing.T) {
 		return "", errMock
 	}
 
-	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	defer mockExecuteCmdInDockerOutputForJSONConfig()
 	err := execFlowCmd("deploy")
 	assert.ErrorIs(t, err, errMock)
 }
@@ -438,7 +439,7 @@ func TestFlowDeployCmdEnsurePythonSDKVersionIsMetFailure(t *testing.T) {
 		return "", nil
 	}
 
-	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
 	err := execFlowCmd("deploy")
 	assert.ErrorIs(t, err, errMock)
 }
