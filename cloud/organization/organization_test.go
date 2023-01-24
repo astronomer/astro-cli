@@ -264,7 +264,7 @@ func TestSwitch(t *testing.T) {
 		}
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockClient, mockCoreClient, buf, false)
-		assert.ErrorIs(t, err, mockErr)
+		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
 
