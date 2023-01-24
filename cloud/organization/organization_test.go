@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"errors"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
@@ -15,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
