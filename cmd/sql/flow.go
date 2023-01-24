@@ -38,7 +38,6 @@ const (
 	validateCmdName        = "validate"
 	versionCmdName         = "version"
 	deployCmdName          = "deploy"
-	versionCmdOutputPrefix = "Astro SQL CLI"
 )
 
 // All cmd flags
