@@ -55,12 +55,12 @@ var (
 	outputDir         string
 	projectDir        string
 	verbose           bool
-	workflowName      string
 )
 
 var (
-	ErrNotCloudContext             = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
 	ErrInvalidInstalledFlowVersion = errors.New("invalid flow version installed")
+	ErrNotCloudContext             = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
+  ErrTooManyArgs                 = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command")
 	Os                             = sql.NewOsBind
 )
 
@@ -447,7 +447,7 @@ func executeCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func generateWorkflows(dagsPath string) error {
+func generateWorkflows(dagsPath, workflowName string) error {
 	generateCmdArgs := []string{"--output-dir", dagsPath}
 	if workflowName != "" {
 		generateCmdArgs = append(generateCmdArgs, workflowName)
@@ -481,6 +481,10 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 		return ErrNotCloudContext
 	}
 
+	if len(args) > 1 {
+		return ErrTooManyArgs
+	}
+
 	pythonSDKPromptContent := input.PromptContent{
 		Label: "Would you like to add the required version of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.",
 	}
@@ -503,7 +507,11 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
 	}
-	if err := generateWorkflows(dagsPath); err != nil {
+	var workflowName string
+	if len(args) > 0 {
+		workflowName = args[0]
+	}
+	if err := generateWorkflows(dagsPath, workflowName); err != nil {
 		return err
 	}
 
@@ -673,7 +681,6 @@ func deployCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.Flags().StringVar(&env, "env", "default", "")
-	cmd.Flags().StringVar(&workflowName, "workflow-name", "", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	return cmd
 }

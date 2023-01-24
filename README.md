@@ -131,13 +131,11 @@ To install a specific version of the CLI, specify the version number as a flag a
 curl -sSL install.astronomer.io | sudo bash -s -- v1.1.0
 ```
 
-:::info
-
-If you receive a `mkdir` error during installation, download and run the [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh) script locally.
-
-    $ cat godownloader.sh | bash -s -- -b /usr/local/bin
-
-:::
+> If you receive a `mkdir` error during installation, download and run the [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh) script locally using:
+>
+>```sh
+>$ cat godownloader.sh | bash -s -- -b /usr/local/bin
+>```
 
 #### Troubleshoot installation issues
 

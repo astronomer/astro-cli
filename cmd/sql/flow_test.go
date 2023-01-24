@@ -165,7 +165,7 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
-	version.CurrVersion = "1.8"
+	version.CurrVersion = "1.8.0"
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
@@ -359,8 +359,20 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 	}
 
 	defer mockExecuteCmdInDockerOutputForJSONConfig()()
-	err := execFlowCmd("deploy", "--workflow-name", "test.sql")
+	err := execFlowCmd("deploy", "test.sql")
 	assert.NoError(t, err)
+}
+
+func TestFlowDeployWithTooManyArgs(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+		return nil
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy", "test.sql", "abc")
+	assert.ErrorIs(t, err, ErrTooManyArgs)
 }
 
 func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
