@@ -51,7 +51,7 @@ var (
 		JSON200: nil,
 	}
 	errNetwork = errors.New("network error")
-	mockError  = errors.New("mock error")
+	errMock  = errors.New("mock error")
 )
 
 func TestList(t *testing.T) {
@@ -260,11 +260,11 @@ func TestSwitch(t *testing.T) {
 			return astro.AuthConfig{}, nil
 		}
 		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return mockError
+			return errMock
 		}
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockClient, mockCoreClient, buf, false)
-		assert.ErrorIs(t, err, mockError)
+		assert.ErrorIs(t, err, mockErr)
 		mockCoreClient.AssertExpectations(t)
 	})
 
