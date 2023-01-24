@@ -55,6 +55,7 @@ var (
 		CloudAPIToken:        newCfg("cloud.api.token", ""),
 		Context:              newCfg("context", ""),
 		Contexts:             newCfg("contexts", ""),
+		DockerCommand:        newCfg("container.binary", "docker"),
 		LocalAstro:           newCfg("local.astrohub", "http://localhost:8871/v1"),
 		LocalCore:            newCfg("local.core", "http://localhost:8888/v1alpha1"),
 		LocalPublicAstro:     newCfg("local.public_astrohub", "http://localhost:8871/graphql"),
@@ -78,6 +79,7 @@ var (
 		PageSize:             newCfg("page_size", "20"),
 		SQLCLI:               newCfg("beta.sql_cli", "false"),
 		AuditLogs:            newCfg("beta.audit_logs", "false"),
+		UpgradeMessage:       newCfg("upgrade_message", "true"),
 	}
 
 	// viperHome is the viper object in the users home directory

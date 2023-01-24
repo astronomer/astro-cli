@@ -32,6 +32,8 @@ var (
 
 const (
 	noWorkspaceMsg = "no workspaces with id (%s) found"
+	KubeExecutor   = "KubernetesExecutor"
+	CeleryExecutor = "CeleryExecutor"
 )
 
 // TODO: get these values from the Astrohub API
@@ -143,7 +145,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -171,7 +173,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	// validate workspace
 	ws, err := client.ListWorkspaces(c.Organization)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	for i := range ws {
@@ -193,7 +195,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		if label == "" {
 			return errors.New("you must give your Deployment a name")
 		}
-		deployments, err := getDeployments(workspaceID, client)
+		deployments, err := GetDeployments(workspaceID, client)
 		if err != nil {
 			return errors.Wrap(err, errInvalidDeployment.Error())
 		}
@@ -217,7 +219,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	spec := astro.DeploymentCreateSpec{
-		Executor:  "CeleryExecutor",
+		Executor:  executor,
 		Scheduler: scheduler,
 	}
 
@@ -240,7 +242,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	// Create request
 	d, err := client.CreateDeployment(createInput)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	if waitForStatus {
@@ -265,13 +267,9 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 func createOutput(workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
-	currentTag := d.DeploymentSpec.Image.Tag
-	if currentTag == "" {
-		currentTag = "?"
-	}
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-	tab.AddRow([]string{d.Label, d.ReleaseName, workspaceID, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+	tab.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
 	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
@@ -388,7 +386,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
-			deployments, err := getDeployments(ws, client)
+			deployments, err := GetDeployments(ws, client)
 			if err != nil {
 				return err
 			}
@@ -408,23 +406,12 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
-	var queueCreateUpdate bool
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
-	}
-
-	// prompt user
-	if !forceDeploy {
-		i, _ := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Label)))
-
-		if !i {
-			fmt.Println("Canceling Deployment update")
-			return nil
-		}
 	}
 
 	// build query input
@@ -448,6 +435,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 		Scheduler: scheduler,
 		Executor:  currentDeployment.DeploymentSpec.Executor,
 	}
+
+	// change the executor if requested
+	confirmWithUser, spec = mutateExecutor(executor, spec, len(currentDeployment.WorkerQueues))
 
 	deploymentUpdate := &astro.UpdateDeploymentInput{
 		ID:             currentDeployment.ID,
@@ -480,13 +470,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 			return nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
-			i, _ := input.Confirm("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
-				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update." +
-				"\nAre you sure you want to continue?")
-			if !i {
-				fmt.Println("Canceling deployment update...")
-				return nil
-			}
+			fmt.Printf("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
+				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update.")
+			confirmWithUser = true
 		}
 		deploymentUpdate.DagDeployEnabled = false
 	}
@@ -502,6 +488,18 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 		return nil
 	}
 
+	// confirm changes with user only if force=false
+	if !forceDeploy {
+		if confirmWithUser {
+			y, _ := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Label)))
+
+			if !y {
+				fmt.Println("Canceling Deployment update")
+				return nil
+			}
+		}
+	}
 	// update deployment
 	d, err := client.UpdateDeployment(deploymentUpdate)
 	if err != nil {
@@ -516,14 +514,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy stri
 	if !queueCreateUpdate {
 		tabDeployment := newTableOut()
 
-		currentTag := d.DeploymentSpec.Image.Tag
-		if currentTag == "" {
-			currentTag = "?"
-		}
-
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 
-		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, ws, d.Cluster.ID, d.ID, currentTag, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
@@ -566,7 +559,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 	return nil
 }
 
-func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) {
+var GetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return []astro.Deployment{}, err
@@ -580,7 +573,7 @@ func getDeployments(ws string, client astro.Client) ([]astro.Deployment, error) 
 	return deployments, nil
 }
 
-func selectDeployment(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+var SelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
 		i, _ := input.Confirm(noDeployments)
@@ -629,7 +622,7 @@ func selectDeployment(deployments []astro.Deployment, message string) (astro.Dep
 }
 
 func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client) (astro.Deployment, error) {
-	deployments, err := getDeployments(ws, client)
+	deployments, err := GetDeployments(ws, client)
 	if err != nil {
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
@@ -675,7 +668,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 }
 
 func deploymentSelectionProcess(ws string, deployments []astro.Deployment, client astro.Client) (astro.Deployment, error) {
-	currentDeployment, err := selectDeployment(deployments, "Select a Deployment")
+	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
 		return astro.Deployment{}, err
 	}
@@ -688,17 +681,17 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", SchedulerAuMin, SchedulerReplicasMin, client, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, SchedulerAuMin, SchedulerReplicasMin, client, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
 
 		// get a new deployment list
-		deployments, err = getDeployments(ws, client)
+		deployments, err = GetDeployments(ws, client)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
-		currentDeployment, err = selectDeployment(deployments, "Select which Deployment you want to update")
+		currentDeployment, err = SelectDeployment(deployments, "Select which Deployment you want to update")
 		if err != nil {
 			return astro.Deployment{}, err
 		}
@@ -727,4 +720,40 @@ func GetDeploymentURL(deploymentID, workspaceID string) (string, error) {
 		deploymentURL = "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID + "/analytics"
 	}
 	return deploymentURL, nil
+}
+
+// printWarning lets the user know
+// when going from CE -> KE and if multiple queues exist,
+// a new default queue will get created.
+// If going from KE -> CE, it lets user know that a new default worker queue will be created.
+// It returns true if a warning was printed and false if not.
+func printWarning(executor string, existingQLength int) bool {
+	var printed bool
+	if executor == KubeExecutor {
+		if existingQLength > 1 {
+			fmt.Println("\n Switching to KubernetesExecutor will replace all existing worker queues " +
+				"with one new default worker queue for this deployment.")
+			printed = true
+		}
+	} else {
+		if executor == CeleryExecutor {
+			fmt.Println("\n Switching to CeleryExecutor will replace the existing worker queue " +
+				"with a new default worker queue for this deployment.")
+			printed = true
+		}
+	}
+	return printed
+}
+
+// mutateExecutor updates currentSpec.Executor if requestedExecutor is not "" and not the same value.
+// It prints a helpful message describing the change and returns a bool used to confirm the change with the user.
+// If a helpful message was not printed, it returns false.
+func mutateExecutor(requestedExecutor string, currentSpec astro.DeploymentCreateSpec, existingQLength int) (bool, astro.DeploymentCreateSpec) {
+	var printed bool
+	if requestedExecutor != "" && currentSpec.Executor != requestedExecutor {
+		// print helpful message describing the change
+		printed = printWarning(requestedExecutor, existingQLength)
+		currentSpec.Executor = requestedExecutor
+	}
+	return printed, currentSpec
 }

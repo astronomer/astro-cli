@@ -16,16 +16,17 @@ import (
 )
 
 type deploymentMetadata struct {
-	DeploymentID   string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
-	WorkspaceID    string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
-	ClusterID      string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
-	ReleaseName    string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
-	AirflowVersion string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
-	Status         string    `mapstructure:"status" yaml:"status" json:"status"`
-	CreatedAt      time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
-	UpdatedAt      time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
-	DeploymentURL  string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
-	WebserverURL   string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
+	DeploymentID   *string    `mapstructure:"deployment_id" yaml:"deployment_id" json:"deployment_id"`
+	WorkspaceID    *string    `mapstructure:"workspace_id" yaml:"workspace_id" json:"workspace_id"`
+	ClusterID      *string    `mapstructure:"cluster_id" yaml:"cluster_id" json:"cluster_id"`
+	ReleaseName    *string    `mapstructure:"release_name" yaml:"release_name" json:"release_name"`
+	AirflowVersion *string    `mapstructure:"airflow_version" yaml:"airflow_version" json:"airflow_version"`
+	CurrentTag     *string    `mapstructure:"current_tag" yaml:"current_tag" json:"current_tag"`
+	Status         *string    `mapstructure:"status" yaml:"status" json:"status"`
+	CreatedAt      *time.Time `mapstructure:"created_at" yaml:"created_at" json:"created_at"`
+	UpdatedAt      *time.Time `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	DeploymentURL  *string    `mapstructure:"deployment_url" yaml:"deployment_url" json:"deployment_url"`
+	WebserverURL   *string    `mapstructure:"webserver_url" yaml:"webserver_url" json:"webserver_url"`
 }
 
 type deploymentConfig struct {
@@ -33,6 +34,7 @@ type deploymentConfig struct {
 	Description      string `mapstructure:"description" yaml:"description" json:"description"`
 	RunTimeVersion   string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
 	DagDeployEnabled bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	Executor         string `mapstructure:"executor" yaml:"executor" json:"executor"`
 	SchedulerAU      int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
 	SchedulerCount   int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
 	ClusterName      string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
@@ -41,26 +43,27 @@ type deploymentConfig struct {
 
 type Workerq struct {
 	Name              string `mapstructure:"name" yaml:"name" json:"name"`
-	IsDefault         bool   `mapstructure:"is_default" yaml:"is_default" json:"is_default"`
-	MaxWorkerCount    int    `mapstructure:"max_worker_count" yaml:"max_worker_count" json:"max_worker_count"`
-	MinWorkerCount    int    `mapstructure:"min_worker_count" yaml:"min_worker_count" json:"min_worker_count"`
-	WorkerConcurrency int    `mapstructure:"worker_concurrency" yaml:"worker_concurrency" json:"worker_concurrency"`
+	MaxWorkerCount    int    `mapstructure:"max_worker_count,omitempty" yaml:"max_worker_count,omitempty" json:"max_worker_count,omitempty"`
+	MinWorkerCount    int    `mapstructure:"min_worker_count,omitempty" yaml:"min_worker_count,omitempty" json:"min_worker_count,omitempty"`
+	WorkerConcurrency int    `mapstructure:"worker_concurrency,omitempty" yaml:"worker_concurrency,omitempty" json:"worker_concurrency,omitempty"`
 	WorkerType        string `mapstructure:"worker_type" yaml:"worker_type" json:"worker_type"`
+	PodCPU            string `mapstructure:"pod_cpu,omitempty" yaml:"pod_cpu,omitempty" json:"pod_cpu,omitempty"`
+	PodRAM            string `mapstructure:"pod_ram,omitempty" yaml:"pod_ram,omitempty" json:"pod_ram,omitempty"`
 }
 
 type EnvironmentVariable struct {
 	IsSecret  bool   `mapstructure:"is_secret" yaml:"is_secret" json:"is_secret"`
 	Key       string `mapstructure:"key" yaml:"key" json:"key"`
-	UpdatedAt string `mapstructure:"updated_at" yaml:"updated_at" json:"updated_at"`
+	UpdatedAt string `mapstructure:"updated_at,omitempty" yaml:"updated_at,omitempty" json:"updated_at,omitempty"`
 	Value     string `mapstructure:"value" yaml:"value" json:"value"`
 }
 
 type orderedPieces struct {
-	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables" yaml:"environment_variables" json:"environment_variables"`
+	EnvVars       []EnvironmentVariable `mapstructure:"environment_variables,omitempty" yaml:"environment_variables,omitempty" json:"environment_variables,omitempty"`
 	Configuration deploymentConfig      `mapstructure:"configuration" yaml:"configuration" json:"configuration"`
 	WorkerQs      []Workerq             `mapstructure:"worker_queues" yaml:"worker_queues" json:"worker_queues"`
-	Metadata      deploymentMetadata    `mapstructure:"metadata" yaml:"metadata" json:"metadata"`
-	AlertEmails   []string              `mapstructure:"alert_emails" yaml:"alert_emails" json:"alert_emails"`
+	Metadata      *deploymentMetadata   `mapstructure:"metadata,omitempty" yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	AlertEmails   []string              `mapstructure:"alert_emails,omitempty" yaml:"alert_emails,omitempty" json:"alert_emails,omitempty"`
 }
 
 type FormattedDeployment struct {
@@ -78,7 +81,7 @@ const (
 	jsonFormat = "json"
 )
 
-func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string) error {
+func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string, template bool) error {
 	var (
 		requestedDeployment                                                        astro.Deployment
 		err                                                                        error
@@ -111,7 +114,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		fmt.Fprintln(out, value)
 	} else {
 		// print the entire deployment in outputFormat
-		infoToPrint, err = formatPrintableDeployment(outputFormat, printableDeployment)
+		infoToPrint, err = formatPrintableDeployment(outputFormat, template, printableDeployment)
 		if err != nil {
 			return err
 		}
@@ -135,6 +138,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		"workspace_id":    sourceDeployment.Workspace.ID,
 		"cluster_id":      sourceDeployment.Cluster.ID,
 		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
+		"current_tag":     sourceDeployment.DeploymentSpec.Image.Tag,
 		"release_name":    sourceDeployment.ReleaseName,
 		"deployment_url":  deploymentURL,
 		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,
@@ -154,11 +158,12 @@ func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interfac
 		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
 		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
 		"scheduler_count":    sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+		"executor":           sourceDeployment.DeploymentSpec.Executor,
 	}
 }
 
 func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
-	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools)
+	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor)
 	return map[string]interface{}{
 		"alert_emails":          sourceDeployment.AlertEmails,
 		"worker_queues":         qList,
@@ -166,17 +171,31 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	}
 }
 
-func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool) []map[string]interface{} {
+func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {
+	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs {
+		if sourceExecutor == "CeleryExecutor" {
+			resources = map[string]interface{}{
+				"max_worker_count":   queue.MaxWorkerCount,
+				"min_worker_count":   queue.MinWorkerCount,
+				"worker_concurrency": queue.WorkerConcurrency,
+			}
+		} else {
+			resources = map[string]interface{}{
+				"pod_cpu": queue.PodCPU,
+				"pod_ram": queue.PodRAM,
+			}
+		}
 		newQ := map[string]interface{}{
-			"name":               queue.Name,
-			"is_default":         queue.IsDefault,
-			"max_worker_count":   queue.MaxWorkerCount,
-			"min_worker_count":   queue.MinWorkerCount,
-			"worker_concurrency": queue.WorkerConcurrency,
+			"name": queue.Name,
 			// map worker type to node pool id
 			"worker_type": getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools),
+		}
+
+		// add resources to queue
+		for k, v := range resources {
+			newQ[k] = v
 		}
 		queueMap = append(queueMap, newQ)
 	}
@@ -197,7 +216,7 @@ func getVariablesMap(sourceDeploymentVars []astro.EnvironmentVariablesObject) []
 	return variablesMap
 }
 
-func formatPrintableDeployment(outputFormat string, printableDeployment map[string]interface{}) ([]byte, error) {
+func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
 	var (
 		infoToPrint     []byte
 		err             error
@@ -208,6 +227,9 @@ func formatPrintableDeployment(outputFormat string, printableDeployment map[stri
 	err = decodeToStruct(printableDeployment, &formatWithOrder)
 	if err != nil {
 		return []byte{}, err
+	}
+	if template {
+		formatWithOrder = getTemplate(&formatWithOrder)
 	}
 	switch outputFormat {
 	case jsonFormat:
@@ -262,7 +284,7 @@ func getPrintableDeployment(infoMap, configMap, additionalMap map[string]interfa
 	return printableDeployment
 }
 
-// getNodePoolIDFromWorkerType takes maps the workerType to a node pool id in nodePools.
+// getWorkerTypeFromNodePoolID takes maps the workerType to a node pool id in nodePools.
 // It returns an error if the worker type does not exist in any node pool in nodePools.
 func getWorkerTypeFromNodePoolID(poolID string, nodePools []astro.NodePool) string {
 	var pool astro.NodePool
@@ -272,4 +294,19 @@ func getWorkerTypeFromNodePoolID(poolID string, nodePools []astro.NodePool) stri
 		}
 	}
 	return ""
+}
+
+// getTemplate returns a Formatted Deployment that can be used as a template.
+// It has no metadata, no name and no updatedAt timestamp for environment_variables.
+// The output templates can be modified and used to create deployments.
+func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
+	template := *formattedDeployment
+	template.Deployment.Configuration.Name = ""
+	template.Deployment.Metadata = nil
+
+	for i := range template.Deployment.EnvVars {
+		// zero out updated at timestamp
+		template.Deployment.EnvVars[i].UpdatedAt = ""
+	}
+	return template
 }

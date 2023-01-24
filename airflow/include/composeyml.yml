@@ -23,7 +23,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:12.6
+    image: docker.io/postgres:12.6
     restart: unless-stopped
     networks:
       - airflow
@@ -54,7 +54,7 @@ services:
       - postgres
     environment: *common-env-vars
     volumes:
-      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:ro
+      - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:{{ .MountLabel }}

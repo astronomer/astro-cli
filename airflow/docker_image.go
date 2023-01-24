@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	DockerCmd          = "docker"
 	EchoCmd            = "echo"
 	pushingImagePrompt = "Pushing image to Astronomer registry"
 	astroRunContainer  = "astro-run"
@@ -43,6 +42,8 @@ func DockerImageInit(image string) *DockerImage {
 }
 
 func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
 	err := os.Chdir(buildConfig.Path)
 	if err != nil {
 		return err
@@ -69,7 +70,7 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 		stdout = nil
 		stderr = nil
 	}
-	err = cmdExec(DockerCmd, stdout, stderr, args...)
+	err = cmdExec(dockerCommand, stdout, stderr, args...)
 	if err != nil {
 		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
 	}
@@ -78,7 +79,8 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 
 func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs []string, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
 	// delete container
-	err := cmdExec(DockerCmd, nil, nil, "rm", "astro-pytest")
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	err := cmdExec(dockerCommand, nil, nil, "rm", "astro-pytest")
 	if err != nil {
 		log.Debug(err)
 	}
@@ -122,7 +124,7 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		stderr = nil
 	}
 	// run pytest
-	docErr := cmdExec(DockerCmd, stdout, stderr, args...)
+	docErr := cmdExec(dockerCommand, stdout, stderr, args...)
 	if docErr != nil {
 		log.Debug(docErr)
 	}
@@ -134,13 +136,13 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		"--format='{{.State.ExitCode}}'",
 	}
 	var outb bytes.Buffer
-	err = cmdExec(DockerCmd, &outb, stderr, args...)
+	err = cmdExec(dockerCommand, &outb, stderr, args...)
 	if err != nil {
 		log.Debug(err)
 	}
 
 	// delete container
-	err = cmdExec(DockerCmd, nil, stderr, "rm", "astro-pytest")
+	err = cmdExec(dockerCommand, nil, stderr, "rm", "astro-pytest")
 	if err != nil {
 		log.Debug(err)
 	}
@@ -149,7 +151,8 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 }
 
 func (d *DockerImage) Push(registry, username, token, remoteImage string) error {
-	err := cmdExec(DockerCmd, nil, nil, "tag", d.imageName, remoteImage)
+	dockerCommand := config.CFG.DockerCommand.GetString()
+	err := cmdExec(dockerCommand, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
 		return fmt.Errorf("command 'docker tag %s %s' failed: %w", d.imageName, remoteImage, err)
 	}
@@ -209,7 +212,7 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 		return useBash(&authConfig, remoteImage)
 	}
 	// Delete the image tags we just generated
-	err = cmdExec(DockerCmd, nil, nil, "rmi", remoteImage)
+	err = cmdExec(dockerCommand, nil, nil, "rmi", remoteImage)
 	if err != nil {
 		return fmt.Errorf("command 'docker rmi %s' failed: %w", remoteImage, err)
 	}
@@ -226,12 +229,13 @@ var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback f
 }
 
 func (d *DockerImage) GetLabel(labelName string) (string, error) {
+	dockerCommand := config.CFG.DockerCommand.GetString()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
 	labelFmt := fmt.Sprintf("{{ index .Config.Labels %q }}", labelName)
 	var label string
-	err := cmdExec(DockerCmd, stdout, stderr, "inspect", "--format", labelFmt, d.imageName)
+	err := cmdExec(dockerCommand, stdout, stderr, "inspect", "--format", labelFmt, d.imageName)
 	if err != nil {
 		return label, err
 	}
@@ -244,11 +248,13 @@ func (d *DockerImage) GetLabel(labelName string) (string, error) {
 }
 
 func (d *DockerImage) ListLabels() (map[string]string, error) {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
 	var labels map[string]string
-	err := cmdExec(DockerCmd, stdout, stderr, "inspect", "--format", "{{ json .Config.Labels }}", d.imageName)
+	err := cmdExec(dockerCommand, stdout, stderr, "inspect", "--format", "{{ json .Config.Labels }}", d.imageName)
 	if err != nil {
 		return labels, err
 	}
@@ -263,7 +269,9 @@ func (d *DockerImage) ListLabels() (map[string]string, error) {
 }
 
 func (d *DockerImage) TagLocalImage(localImage string) error {
-	err := cmdExec(DockerCmd, nil, nil, "tag", localImage, d.imageName)
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
+	err := cmdExec(dockerCommand, nil, nil, "tag", localImage, d.imageName)
 	if err != nil {
 		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
 	}
@@ -271,10 +279,12 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 }
 
 func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile string, taskLogs bool) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
 	stdout := os.Stdout
 	stderr := os.Stderr
 	// delete container
-	err := cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
+	err := cmdExec(dockerCommand, nil, nil, "rm", astroRunContainer)
 	if err != nil {
 		log.Debug(err)
 	}
@@ -336,7 +346,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile s
 	fmt.Println("\nStarting a DAG run for " + dagID + "...")
 	fmt.Println("\nLoading DAGs...")
 
-	cmdErr := cmdExec(DockerCmd, stdout, stderr, args...)
+	cmdErr := cmdExec(dockerCommand, stdout, stderr, args...)
 	// add back later fmt.Println("\nSee the output of this command for errors. To view task logs, use the '--task-logs' flag.")
 	if cmdErr != nil {
 		log.Debug(cmdErr)
@@ -346,7 +356,7 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile s
 	}
 	if containerName == "" {
 		// delete container
-		err = cmdExec(DockerCmd, nil, nil, "rm", astroRunContainer)
+		err = cmdExec(dockerCommand, nil, nil, "rm", astroRunContainer)
 		if err != nil {
 			log.Debug(err)
 		}
@@ -375,6 +385,8 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 
 // When login and push do not work use bash to run docker commands, this function is for users using colima
 func useBash(authConfig *cliTypes.AuthConfig, image string) error {
+	dockerCommand := config.CFG.DockerCommand.GetString()
+
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		cmd := "echo \"" + authConfig.Password + "\"" + " | docker login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
@@ -384,12 +396,12 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 		return err
 	}
 	// docker push <image>
-	err = cmdExec(DockerCmd, os.Stdout, os.Stderr, "push", image)
+	err = cmdExec(dockerCommand, os.Stdout, os.Stderr, "push", image)
 	if err != nil {
 		return err
 	}
 	// Delete the image tags we just generated
-	err = cmdExec(DockerCmd, nil, nil, "rmi", image)
+	err = cmdExec(dockerCommand, nil, nil, "rmi", image)
 	if err != nil {
 		return fmt.Errorf("command 'docker rmi %s' failed: %w", image, err)
 	}

@@ -9,6 +9,7 @@ import (
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/spf13/afero"
@@ -18,6 +19,8 @@ import (
 var errMock = errors.New("build error")
 
 func TestDockerImageBuild(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
 	handler := DockerImage{
 		imageName: "testing",
 	}

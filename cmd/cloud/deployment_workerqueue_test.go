@@ -467,7 +467,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 
 		// updating min, max and concurrency to defaults along with worker type
-		cmdArgs := []string{"worker-queue", "update", "-n", "test-queue-1", "-t", "test-instance-type"}
+		cmdArgs := []string{"worker-queue", "update", "-n", "test-queue-1", "-t", "test-instance-type", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)

@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/mail"
 	"os"
 	"sort"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
 	"github.com/astronomer/astro-cli/config"
@@ -20,14 +22,18 @@ var (
 	errCreateFailed                   = errors.New("failed to create deployment with input")
 	errUpdateFailed                   = errors.New("failed to update deployment with input")
 	errRequiredField                  = errors.New("missing required field")
+	errInvalidEmail                   = errors.New("invalid email")
 	errCannotUpdateExistingDeployment = errors.New("already exists")
 	errNotFound                       = errors.New("does not exist")
+	errInvalidValue                   = errors.New("is not valid")
+	errNotPermitted                   = errors.New("is not permitted")
 )
 
 const (
 	jsonFormat   = "json"
 	createAction = "create"
 	updateAction = "update"
+	defaultQueue = "default"
 )
 
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
@@ -64,7 +70,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 		return err
 	}
 	// validate required fields
-	err = checkRequiredFields(&formattedDeployment)
+	err = checkRequiredFields(&formattedDeployment, action)
 	if err != nil {
 		return err
 	}
@@ -144,7 +150,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 	if jsonOutput {
 		outputFormat = jsonFormat
 	}
-	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, out, "")
+	return inspect.Inspect(workspaceID, "", createdOrUpdatedDeployment.ID, outputFormat, client, out, "", false)
 }
 
 // getCreateOrUpdateInput transforms an inspect.FormattedDeployment into astro.CreateDeploymentInput or
@@ -165,26 +171,42 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 
 	// Add worker queues if they were requested
 	if hasQueues(deploymentFromFile) {
-		// get defaults for min-count, max-count and concurrency from API
-		defaultOptions, err = workerqueue.GetWorkerQueueDefaultOptions(client)
-		if err != nil {
-			return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
-		}
 		// transform inspect.WorkerQ to []astro.WorkerQueue
 		listQueues, err = getQueues(deploymentFromFile, nodePools, existingDeployment.WorkerQueues)
 		if err != nil {
 			return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 		}
-		for i := range listQueues {
-			// set default values if none were specified
-			a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &listQueues[i], defaultOptions)
-			// check if queue is valid
-			err = workerqueue.IsWorkerQueueInputValid(a, defaultOptions)
+		if deploymentFromFile.Deployment.Configuration.Executor == deployment.CeleryExecutor {
+			// get defaults for min-count, max-count and concurrency from API
+			defaultOptions, err = workerqueue.GetWorkerQueueDefaultOptions(client)
 			if err != nil {
 				return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
 			}
-			// add it to the list of queues to be created
-			listQueues[i] = *a
+			for i := range listQueues {
+				// set default values if none were specified
+				a := workerqueue.SetWorkerQueueValues(listQueues[i].MinWorkerCount, listQueues[i].MaxWorkerCount, listQueues[i].WorkerConcurrency, &listQueues[i], defaultOptions)
+				// check if queue is valid
+				err = workerqueue.IsCeleryWorkerQueueInputValid(a, defaultOptions)
+				if err != nil {
+					return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
+				}
+				// add it to the list of queues to be created
+				listQueues[i] = *a
+			}
+		} else {
+			// executor is KubernetesExecutor
+			// check if more than one queue is requested
+			if len(listQueues) > 1 {
+				return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{},
+					fmt.Errorf("%s %w more than one worker queue. (%d) were requested",
+						deployment.KubeExecutor, workerqueue.ErrNotSupported, len(listQueues))
+			}
+			for i := range listQueues {
+				err = workerqueue.IsKubernetesWorkerQueueInputValid(&listQueues[i])
+				if err != nil {
+					return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{}, err
+				}
+			}
 		}
 	}
 	switch action {
@@ -197,7 +219,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: "CeleryExecutor",
+				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
 					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
@@ -206,6 +228,11 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			WorkerQueues: listQueues,
 		}
 	case updateAction:
+		// check if cluster is being changed
+		if clusterID != existingDeployment.Cluster.ID {
+			return astro.CreateDeploymentInput{}, astro.UpdateDeploymentInput{},
+				fmt.Errorf("changing an existing deployment's cluster %w", errNotPermitted)
+		}
 		updateInput = astro.UpdateDeploymentInput{
 			ID:               existingDeployment.ID,
 			ClusterID:        clusterID,
@@ -213,7 +240,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Description:      deploymentFromFile.Deployment.Configuration.Description,
 			DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
 			DeploymentSpec: astro.DeploymentCreateSpec{
-				Executor: "CeleryExecutor",
+				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
 					AU:       deploymentFromFile.Deployment.Configuration.SchedulerAU,
 					Replicas: deploymentFromFile.Deployment.Configuration.SchedulerCount,
@@ -226,22 +253,46 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 }
 
 // checkRequiredFields ensures all required fields are present in inspect.FormattedDeployment.
-// It returns errRequiredField if required fields are missing and nil if not.
-func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment) error {
+// It returns errRequiredField if required fields are missing, errInvalidValue if values are not valid and nil if not.
+func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action string) error {
 	if deploymentFromFile.Deployment.Configuration.Name == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.name")
 	}
 	if deploymentFromFile.Deployment.Configuration.ClusterName == "" {
 		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.cluster_name")
 	}
+	if deploymentFromFile.Deployment.Configuration.Executor == "" {
+		return fmt.Errorf("%w: %s", errRequiredField, "deployment.configuration.executor")
+	}
+	if !isValidExecutor(deploymentFromFile.Deployment.Configuration.Executor) {
+		return fmt.Errorf("executor %s %w. It can either be CeleryExecutor or KubernetesExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
+	}
+	// if alert emails are requested
+	if hasAlertEmails(deploymentFromFile) {
+		err := checkAlertEmails(deploymentFromFile)
+		if err != nil {
+			return err
+		}
+	}
+	// if environment variables are requested
+	if hasEnvVars(deploymentFromFile) {
+		err := checkEnvVars(deploymentFromFile, action)
+		if err != nil {
+			return err
+		}
+	}
 	// if worker queues were requested check queue name, isDefault and worker type
 	if hasQueues(deploymentFromFile) {
+		var hasDefaultQueue bool
 		for i, queue := range deploymentFromFile.Deployment.WorkerQs {
 			if queue.Name == "" {
 				missingField := fmt.Sprintf("deployment.worker_queues[%d].name", i)
 				return fmt.Errorf("%w: %s", errRequiredField, missingField)
 			}
-			if queue.IsDefault && queue.Name != "default" {
+			if queue.Name == defaultQueue {
+				hasDefaultQueue = true
+			}
+			if !hasDefaultQueue && queue.Name != defaultQueue {
 				missingField := fmt.Sprintf("deployment.worker_queues[%d].name = default", i)
 				return fmt.Errorf("%w: %s", errRequiredField, missingField)
 			}
@@ -394,15 +445,21 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 			if requestedQueues[i].Name == existingQueues[i].Name {
 				// update existing queue
 				qList[i].Name = existingQueues[i].Name
-				qList[i].ID = existingQueues[i].ID
+				if deploymentFromFile.Deployment.Configuration.Executor != deployment.KubeExecutor {
+					// only add id when executor is Celery
+					qList[i].ID = existingQueues[i].ID
+				}
 			}
 		}
 		// add new queue or update existing queue properties to list of queues to return
 		qList[i].Name = requestedQueues[i].Name
-		qList[i].IsDefault = requestedQueues[i].IsDefault
+		qList[i].IsDefault = requestedQueues[i].Name == defaultQueue
 		qList[i].MinWorkerCount = requestedQueues[i].MinWorkerCount
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
+		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
+		qList[i].PodCPU = requestedQueues[i].PodCPU
+		qList[i].PodRAM = requestedQueues[i].PodRAM
 		// map worker type to node pool id
 		nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
 		if err != nil {
@@ -459,4 +516,43 @@ func createAlertEmails(deploymentFromFile *inspect.FormattedDeployment, deployme
 func isJSON(data []byte) bool {
 	var js interface{}
 	return json.Unmarshal(data, &js) == nil
+}
+
+// isValidEmail returns true if email is a valid email address.
+// It returns false if not.
+func isValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+// checkAlertEmails returns an error if email in deploymentFromFile.AlertEmails is not valid.
+func checkAlertEmails(deploymentFromFile *inspect.FormattedDeployment) error {
+	for _, email := range deploymentFromFile.Deployment.AlertEmails {
+		if !isValidEmail(email) {
+			return fmt.Errorf("%w: %s", errInvalidEmail, email)
+		}
+	}
+	return nil
+}
+
+// checkEnvVars returns an error if either key or value are missing for any deploymentFromFile.Deployment.EnvVars.
+func checkEnvVars(deploymentFromFile *inspect.FormattedDeployment, action string) error {
+	for i, envVar := range deploymentFromFile.Deployment.EnvVars {
+		if envVar.Key == "" {
+			missingField := fmt.Sprintf("deployment.environment_variables[%d].key", i)
+			return fmt.Errorf("%w: %s", errRequiredField, missingField)
+		}
+		if action == createAction {
+			if envVar.Value == "" {
+				missingField := fmt.Sprintf("deployment.environment_variables[%d].value", i)
+				return fmt.Errorf("%w: %s", errRequiredField, missingField)
+			}
+		}
+	}
+	return nil
+}
+
+// isValidExecutor returns true for valid executor values and false if not.
+func isValidExecutor(executor string) bool {
+	return executor == deployment.CeleryExecutor || executor == deployment.KubeExecutor
 }
