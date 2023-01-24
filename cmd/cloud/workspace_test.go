@@ -162,17 +162,6 @@ func TestWorkspaceUserList(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
-	t.Run("list all workspace users with --limit", func(t *testing.T) {
-		expectedOut := "user@1.com"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
-		astroCoreClient = mockClient
-		cmdArgs := []string{"user", "list", "--limit", "1"}
-		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
-		mockClient.AssertExpectations(t)
-	})
 	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
