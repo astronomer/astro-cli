@@ -435,7 +435,7 @@ func TestListWorkspaceUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
-		err := ListWorkspaceUsers(out, mockClient, "", 1)
+		err := ListWorkspaceUsers(out, mockClient, "")
 		assert.NoError(t, err)
 	})
 
@@ -443,7 +443,7 @@ func TestListWorkspaceUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListWorkspaceUsers(out, mockClient, "", 1)
+		err := ListWorkspaceUsers(out, mockClient, "")
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -451,7 +451,7 @@ func TestListWorkspaceUser(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Twice()
-		err := ListWorkspaceUsers(out, mockClient, "", 1)
+		err := ListWorkspaceUsers(out, mockClient, "")
 		assert.EqualError(t, err, "failed to list users")
 	})
 
@@ -463,7 +463,7 @@ func TestListWorkspaceUser(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = ListWorkspaceUsers(out, mockClient, "", 1)
+		err = ListWorkspaceUsers(out, mockClient, "")
 		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
@@ -472,7 +472,7 @@ func TestListWorkspaceUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := ListWorkspaceUsers(out, mockClient, "", 1)
+		err := ListWorkspaceUsers(out, mockClient, "")
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
