@@ -18,13 +18,13 @@ import (
 )
 
 var (
-	ErrNoShortName     = errors.New("cannot retrieve organization short name from context")
-	ErrInvalidRole     = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	ErrNoShortName          = errors.New("cannot retrieve organization short name from context")
+	ErrInvalidRole          = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
-	ErrInvalidEmail    = errors.New("no email provided for the invite. Retry with a valid email address")
-	ErrInvalidUserKey  = errors.New("invalid User selected")
-	userPagnationLimit = 100
-	ErrUserNotFound    = errors.New("no user was found for the email you provided")
+	ErrInvalidEmail         = errors.New("no email provided for the invite. Retry with a valid email address")
+	ErrInvalidUserKey       = errors.New("invalid User selected")
+	userPagnationLimit      = 100
+	ErrUserNotFound         = errors.New("no user was found for the email you provided")
 )
 
 // CreateInvite calls the CreateUserInvite mutation to create a user invite
