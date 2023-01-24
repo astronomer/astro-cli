@@ -18,6 +18,7 @@ var (
 		deployments(organizationId: $organizationId, workspaceId: $workspaceId) {
 			id
 			label
+			description
 			releaseName
 			dagDeployEnabled
 			cluster {
@@ -84,6 +85,7 @@ var (
 		deployment(id: $deploymentId) {
 			id
 			label
+			description
 			releaseName
 			cluster {
 				id
