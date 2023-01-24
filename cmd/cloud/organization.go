@@ -13,6 +13,9 @@ import (
 
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/cloud/user"
+	"github.com/astronomer/astro-cli/pkg/input"
+
 )
 
 var (
@@ -24,6 +27,7 @@ var (
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 90
 	shouldDisplayLoginLink             bool
+	role                               string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -36,6 +40,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
+		neOrganizationwUserRootCmd(out),
 	)
 	if config.CFG.AuditLogs.GetBool() {
 		cmd.AddCommand(newOrganizationAuditLogs(out))
@@ -107,6 +112,68 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 	return cmd
 }
 
+
+func neOrganizationwUserRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "user",
+		Aliases: []string{"us"},
+		Short:   "Manage users in your Astro Organization",
+		Long:    "Manage users in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationUserInviteCmd(out),
+		newOrganizationUserListCmd(out),
+		newOrganizationUserUpdateCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "invite [email]",
+		Aliases: []string{"inv"},
+		Short: "Invite a user to your Astro Organization",
+		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return userInvite(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
+		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	return cmd
+}
+
+func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the users in your Astro Organization",
+		Long:    "List all the users in your Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listUsers(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [email]",
+		Aliases: []string{"up"},
+		Short:   "Update a the role of a user your in Astro Organization",
+		Long: "Update the role of a user in your Astro Organization\n$astro user update [email] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return userUpdate(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The new role for the "+
+		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+	return cmd
+}
+
 func organizationList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -146,4 +213,36 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 	out := bufio.NewWriter(f)
 
 	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
+}
+
+func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		email = args[0]
+	} else {
+		// no email was provided so ask the user for it
+		email = input.Text("enter email address to invite a user: ")
+	}
+
+	cmd.SilenceUsage = true
+	return user.CreateInvite(email, role, out, astroCoreClient)
+}
+
+func listUsers(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return user.ListOrgUsers(out, astroCoreClient)
+}
+
+func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		email = args[0]
+	}
+
+	cmd.SilenceUsage = true
+	return user.UpdateUserRole(email, role, out, astroCoreClient)
 }
