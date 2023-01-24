@@ -120,10 +120,17 @@ type FeatureFlag struct {
 
 // Invite defines model for Invite.
 type Invite struct {
-	ExpiresAt      string  `json:"expiresAt"`
-	InviteId       string  `json:"inviteId"`
-	OrganizationId string  `json:"organizationId"`
-	UserId         *string `json:"userId,omitempty"`
+	ExpiresAt       string  `json:"expiresAt"`
+	InviteId        string  `json:"inviteId"`
+	InviterFullName *string `json:"inviterFullName,omitempty"`
+	InviterId       *string `json:"inviterId,omitempty"`
+	InviterUsername *string `json:"inviterUsername,omitempty"`
+	OAuthInviteId   *string `json:"oAuthInviteId,omitempty"`
+	OrgName         *string `json:"orgName,omitempty"`
+	OrgShortName    *string `json:"orgShortName,omitempty"`
+	OrganizationId  string  `json:"organizationId"`
+	TicketId        *string `json:"ticketId,omitempty"`
+	UserId          *string `json:"userId,omitempty"`
 }
 
 // JitPolicy defines model for JitPolicy.
@@ -160,14 +167,18 @@ type MutateWorkspaceUserRoleRequest struct {
 type Organization struct {
 	AuthServiceId  string                        `json:"authServiceId"`
 	CreatedAt      time.Time                     `json:"createdAt"`
+	CreatedBy      *string                       `json:"createdBy,omitempty"`
 	Domains        *[]string                     `json:"domains,omitempty"`
 	Entitlements   *map[string]Entitlement       `json:"entitlements,omitempty"`
 	Id             string                        `json:"id"`
 	ManagedDomains *[]SsoConnectionManagedDomain `json:"managedDomains,omitempty"`
+	MetronomeId    *string                       `json:"metronomeId,omitempty"`
 	Name           string                        `json:"name"`
 	ProductTier    OrganizationProductTier       `json:"productTier"`
 	ShortName      string                        `json:"shortName"`
+	TrialExpiresAt *time.Time                    `json:"trialExpiresAt,omitempty"`
 	UpdatedAt      time.Time                     `json:"updatedAt"`
+	UpdatedBy      *string                       `json:"updatedBy,omitempty"`
 }
 
 // OrganizationProductTier defines model for Organization.ProductTier.
@@ -201,6 +212,7 @@ type SsoConnection struct {
 	Auth0ConnectionId   string                       `json:"auth0ConnectionId"`
 	Auth0ConnectionName string                       `json:"auth0ConnectionName"`
 	Configuration       SsoConnectionConfig          `json:"configuration"`
+	Enabled             bool                         `json:"enabled"`
 	Id                  string                       `json:"id"`
 	JitPolicy           *JitPolicy                   `json:"jitPolicy,omitempty"`
 	ManagedDomains      []SsoConnectionManagedDomain `json:"managedDomains"`
@@ -234,6 +246,14 @@ type UpdateInviteRequest struct {
 
 // UpdateInviteRequestInviteStatus defines model for UpdateInviteRequest.InviteStatus.
 type UpdateInviteRequestInviteStatus string
+
+// UpdateSsoConnectionRequest defines model for UpdateSsoConnectionRequest.
+type UpdateSsoConnectionRequest struct {
+	Configuration  SsoConnectionConfig          `json:"configuration"`
+	Enabled        *bool                        `json:"enabled,omitempty"`
+	JitPolicy      *JitPolicy                   `json:"jitPolicy,omitempty"`
+	ManagedDomains []SsoConnectionManagedDomain `json:"managedDomains"`
+}
 
 // User defines model for User.
 type User struct {
@@ -355,6 +375,9 @@ type CreateUserInviteJSONRequestBody = CreateUserInviteRequest
 // CreateSsoConnectionJSONRequestBody defines body for CreateSsoConnection for application/json ContentType.
 type CreateSsoConnectionJSONRequestBody = CreateSsoConnectionRequest
 
+// UpdateSsoConnectionJSONRequestBody defines body for UpdateSsoConnection for application/json ContentType.
+type UpdateSsoConnectionJSONRequestBody = UpdateSsoConnectionRequest
+
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
 
@@ -437,6 +460,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetUserInvite request
+	GetUserInvite(ctx context.Context, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -481,8 +507,16 @@ type ClientInterface interface {
 
 	CreateSsoConnection(ctx context.Context, orgShortNameId string, body CreateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteSsoConnection request
+	DeleteSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetSsoConnection request
 	GetSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSsoConnection request with any body
+	UpdateSsoConnectionWithBody(ctx context.Context, orgShortNameId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrgUsers request
 	ListOrgUsers(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -516,6 +550,18 @@ type ClientInterface interface {
 	UpdateSelfUserInviteWithBody(ctx context.Context, inviteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateSelfUserInvite(ctx context.Context, inviteId string, body UpdateSelfUserInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetUserInvite(ctx context.Context, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserInviteRequest(c.Server, inviteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -710,8 +756,44 @@ func (c *Client) CreateSsoConnection(ctx context.Context, orgShortNameId string,
 	return c.Client.Do(req)
 }
 
+func (c *Client) DeleteSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSsoConnectionRequest(c.Server, orgShortNameId, connectionId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSsoConnectionRequest(c.Server, orgShortNameId, connectionId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSsoConnectionWithBody(ctx context.Context, orgShortNameId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSsoConnectionRequestWithBody(c.Server, orgShortNameId, connectionId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSsoConnectionRequest(c.Server, orgShortNameId, connectionId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -864,6 +946,40 @@ func (c *Client) UpdateSelfUserInvite(ctx context.Context, inviteId string, body
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetUserInviteRequest generates requests for GetUserInvite
+func NewGetUserInviteRequest(server string, inviteId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "inviteId", runtime.ParamLocationPath, inviteId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/invites/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewListOrganizationAuthIdsRequest generates requests for ListOrganizationAuthIds
@@ -1355,6 +1471,47 @@ func NewCreateSsoConnectionRequestWithBody(server string, orgShortNameId string,
 	return req, nil
 }
 
+// NewDeleteSsoConnectionRequest generates requests for DeleteSsoConnection
+func NewDeleteSsoConnectionRequest(server string, orgShortNameId string, connectionId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "connectionId", runtime.ParamLocationPath, connectionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/sso-connections/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetSsoConnectionRequest generates requests for GetSsoConnection
 func NewGetSsoConnectionRequest(server string, orgShortNameId string, connectionId string) (*http.Request, error) {
 	var err error
@@ -1392,6 +1549,60 @@ func NewGetSsoConnectionRequest(server string, orgShortNameId string, connection
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateSsoConnectionRequest calls the generic UpdateSsoConnection builder with application/json body
+func NewUpdateSsoConnectionRequest(server string, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSsoConnectionRequestWithBody(server, orgShortNameId, connectionId, "application/json", bodyReader)
+}
+
+// NewUpdateSsoConnectionRequestWithBody generates requests for UpdateSsoConnection with any type of body
+func NewUpdateSsoConnectionRequestWithBody(server string, orgShortNameId string, connectionId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "connectionId", runtime.ParamLocationPath, connectionId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/sso-connections/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2005,6 +2216,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetUserInvite request
+	GetUserInviteWithResponse(ctx context.Context, inviteId string, reqEditors ...RequestEditorFn) (*GetUserInviteResponse, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error)
 
@@ -2049,8 +2263,16 @@ type ClientWithResponsesInterface interface {
 
 	CreateSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, body CreateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSsoConnectionResponse, error)
 
+	// DeleteSsoConnection request
+	DeleteSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*DeleteSsoConnectionResponse, error)
+
 	// GetSsoConnection request
 	GetSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*GetSsoConnectionResponse, error)
+
+	// UpdateSsoConnection request with any body
+	UpdateSsoConnectionWithBodyWithResponse(ctx context.Context, orgShortNameId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error)
+
+	UpdateSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error)
 
 	// ListOrgUsers request
 	ListOrgUsersWithResponse(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error)
@@ -2084,6 +2306,33 @@ type ClientWithResponsesInterface interface {
 	UpdateSelfUserInviteWithBodyWithResponse(ctx context.Context, inviteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSelfUserInviteResponse, error)
 
 	UpdateSelfUserInviteWithResponse(ctx context.Context, inviteId string, body UpdateSelfUserInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSelfUserInviteResponse, error)
+}
+
+type GetUserInviteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Invite
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUserInviteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUserInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type ListOrganizationAuthIdsResponse struct {
@@ -2407,6 +2656,33 @@ func (r CreateSsoConnectionResponse) StatusCode() int {
 	return 0
 }
 
+type DeleteSsoConnectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SsoConnection
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSsoConnectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSsoConnectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetSsoConnectionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2428,6 +2704,33 @@ func (r GetSsoConnectionResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetSsoConnectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateSsoConnectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SsoConnection
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSsoConnectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSsoConnectionResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2675,6 +2978,15 @@ func (r UpdateSelfUserInviteResponse) StatusCode() int {
 	return 0
 }
 
+// GetUserInviteWithResponse request returning *GetUserInviteResponse
+func (c *ClientWithResponses) GetUserInviteWithResponse(ctx context.Context, inviteId string, reqEditors ...RequestEditorFn) (*GetUserInviteResponse, error) {
+	rsp, err := c.GetUserInvite(ctx, inviteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUserInviteResponse(rsp)
+}
+
 // ListOrganizationAuthIdsWithResponse request returning *ListOrganizationAuthIdsResponse
 func (c *ClientWithResponses) ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error) {
 	rsp, err := c.ListOrganizationAuthIds(ctx, params, reqEditors...)
@@ -2815,6 +3127,15 @@ func (c *ClientWithResponses) CreateSsoConnectionWithResponse(ctx context.Contex
 	return ParseCreateSsoConnectionResponse(rsp)
 }
 
+// DeleteSsoConnectionWithResponse request returning *DeleteSsoConnectionResponse
+func (c *ClientWithResponses) DeleteSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*DeleteSsoConnectionResponse, error) {
+	rsp, err := c.DeleteSsoConnection(ctx, orgShortNameId, connectionId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSsoConnectionResponse(rsp)
+}
+
 // GetSsoConnectionWithResponse request returning *GetSsoConnectionResponse
 func (c *ClientWithResponses) GetSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, reqEditors ...RequestEditorFn) (*GetSsoConnectionResponse, error) {
 	rsp, err := c.GetSsoConnection(ctx, orgShortNameId, connectionId, reqEditors...)
@@ -2822,6 +3143,23 @@ func (c *ClientWithResponses) GetSsoConnectionWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseGetSsoConnectionResponse(rsp)
+}
+
+// UpdateSsoConnectionWithBodyWithResponse request with arbitrary body returning *UpdateSsoConnectionResponse
+func (c *ClientWithResponses) UpdateSsoConnectionWithBodyWithResponse(ctx context.Context, orgShortNameId string, connectionId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error) {
+	rsp, err := c.UpdateSsoConnectionWithBody(ctx, orgShortNameId, connectionId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSsoConnectionResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error) {
+	rsp, err := c.UpdateSsoConnection(ctx, orgShortNameId, connectionId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSsoConnectionResponse(rsp)
 }
 
 // ListOrgUsersWithResponse request returning *ListOrgUsersResponse
@@ -2927,6 +3265,67 @@ func (c *ClientWithResponses) UpdateSelfUserInviteWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseUpdateSelfUserInviteResponse(rsp)
+}
+
+// ParseGetUserInviteResponse parses an HTTP response from a GetUserInviteWithResponse call
+func ParseGetUserInviteResponse(rsp *http.Response) (*GetUserInviteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUserInviteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Invite
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListOrganizationAuthIdsResponse parses an HTTP response from a ListOrganizationAuthIdsWithResponse call
@@ -3640,6 +4039,67 @@ func ParseCreateSsoConnectionResponse(rsp *http.Response) (*CreateSsoConnectionR
 	return response, nil
 }
 
+// ParseDeleteSsoConnectionResponse parses an HTTP response from a DeleteSsoConnectionWithResponse call
+func ParseDeleteSsoConnectionResponse(rsp *http.Response) (*DeleteSsoConnectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSsoConnectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SsoConnection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetSsoConnectionResponse parses an HTTP response from a GetSsoConnectionWithResponse call
 func ParseGetSsoConnectionResponse(rsp *http.Response) (*GetSsoConnectionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -3649,6 +4109,67 @@ func ParseGetSsoConnectionResponse(rsp *http.Response) (*GetSsoConnectionRespons
 	}
 
 	response := &GetSsoConnectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SsoConnection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSsoConnectionResponse parses an HTTP response from a UpdateSsoConnectionWithResponse call
+func ParseUpdateSsoConnectionResponse(rsp *http.Response) (*UpdateSsoConnectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSsoConnectionResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
