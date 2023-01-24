@@ -3,6 +3,7 @@ package organization
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -51,6 +51,7 @@ var (
 		JSON200: nil,
 	}
 	errNetwork = errors.New("network error")
+	mockError  = errors.New("mock error")
 )
 
 func TestList(t *testing.T) {
@@ -252,7 +253,6 @@ func TestSwitch(t *testing.T) {
 	})
 
 	t.Run("failed switch bad login", func(t *testing.T) {
-		mockError := errors.New("mock error")
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
