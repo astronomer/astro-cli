@@ -24,6 +24,7 @@ import (
 var (
 	configCmd   *cobra.Command
 	generateCmd *cobra.Command
+	versionCmd  *cobra.Command
 )
 
 // All cmd names
@@ -57,10 +58,15 @@ var (
 )
 
 var (
-	ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
-	ErrTooManyArgs     = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command")
-	Os                 = sql.NewOsBind
+	ErrInvalidInstalledFlowVersion = errors.New("invalid flow version installed")
+	ErrNotCloudContext             = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
+	ErrTooManyArgs                 = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command")
+	Os                             = sql.NewOsBind
 )
+
+type VersionCmdResponse struct {
+	Version string `json:"version"`
+}
 
 // Return the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env
 func getAstroCloudConfig() (astroDeploymentID, astroWorkspaceID string, err error) {
@@ -227,6 +233,20 @@ func readConfigCmdOutput(args ...string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(output), nil // remove spaces such as \r\n
+}
+
+// Read version cmd output for retrieving installed version of SQL CLI
+var getInstalledFlowVersion = func() (string, error) {
+	output, err := readCmdOutput(versionCmd, []string{"--json"})
+	if err != nil {
+		return "", err
+	}
+	var resp VersionCmdResponse
+	err = json.Unmarshal([]byte(output), &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
 }
 
 // Resolve filepath to absolute
@@ -469,7 +489,12 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 		Label: "Would you like to add the required version of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.",
 	}
 	promptRunner := input.GetYesNoSelector(pythonSDKPromptContent)
-	err := sql.EnsurePythonSdkVersionIsMet(promptRunner)
+
+	installedSQLCLIVersion, err := getInstalledFlowVersion()
+	if err != nil {
+		return err
+	}
+	err = sql.EnsurePythonSdkVersionIsMet(promptRunner, installedSQLCLIVersion)
 	if err != nil {
 		return err
 	}
@@ -676,7 +701,8 @@ func NewFlowCommand() *cobra.Command {
 	cmd.SetHelpFunc(executeHelp)
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "")
 	cmd.PersistentFlags().BoolVar(&noDebug, "no-debug", false, "")
-	cmd.AddCommand(versionCommand())
+	versionCmd = versionCommand()
+	cmd.AddCommand(versionCmd)
 	cmd.AddCommand(aboutCommand())
 	cmd.AddCommand(initCommand())
 	configCmd = configCommand()
