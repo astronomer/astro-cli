@@ -2,10 +2,10 @@ package organization
 
 import (
 	http_context "context"
+	"errors"
+	"fmt"
 	"io"
 	"strconv"
-	"fmt"
-	"errors"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -54,7 +54,7 @@ func List(out io.Writer, coreClient astrocore.CoreClient) error {
 	}
 	or, err := ListOrganizations(coreClient)
 	if err != nil {
-		return fmt.Errorf(astro.AstronomerConnectionErrMsg +  "%w", err)
+		return fmt.Errorf(astro.AstronomerConnectionErrMsg+"%w", err)
 	}
 	tab := newTableOut()
 	for i := range or {
