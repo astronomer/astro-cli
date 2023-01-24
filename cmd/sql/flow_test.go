@@ -416,6 +416,33 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 	Os = sql.NewOsBind
 }
 
+func TestFlowDeployCmdInstalledFlowVersionFailure(t *testing.T) {
+	defer patchDeployCmd()()
+
+	getInstalledFlowVersion = func() (string, error) {
+		return "", errMock
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	err := execFlowCmd("deploy")
+	assert.ErrorIs(t, err, errMock)
+}
+
+func TestFlowDeployCmdEnsurePythonSDKVersionIsMetFailure(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
+		return errMock
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig("{\"default\": {\"deployment\": {\"astro_deployment_id\": \"foo\", \"astro_workspace_id\": \"bar\"}}}")()
+	err := execFlowCmd("deploy")
+	assert.ErrorIs(t, err, errMock)
+}
+
 func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
 	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
 	_, _, err := promptAstroCloudConfig("", "")
