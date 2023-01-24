@@ -24,7 +24,7 @@ func newUserInviteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "invite [email]",
 		Aliases: []string{"inv"},
-		Short: "Invite a user to your Astro Organization",
+		Short:   "Invite a user to your Astro Organization",
 		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
 			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {

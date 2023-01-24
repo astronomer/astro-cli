@@ -12,10 +12,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/organization"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/cloud/user"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/input"
-
 )
 
 var (
@@ -112,7 +111,6 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 	return cmd
 }
 
-
 func neOrganizationwUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
@@ -133,7 +131,7 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "invite [email]",
 		Aliases: []string{"inv"},
-		Short: "Invite a user to your Astro Organization",
+		Short:   "Invite a user to your Astro Organization",
 		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
 			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
