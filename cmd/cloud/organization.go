@@ -111,7 +111,7 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 	return cmd
 }
 
-func neOrganizationwUserRootCmd(out io.Writer) *cobra.Command {
+func newOrganizationUserRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
 		Aliases: []string{"us"},
