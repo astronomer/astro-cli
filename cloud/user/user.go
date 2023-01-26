@@ -432,8 +432,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	return nil
 }
 
-func getUserID(email string, users []astrocore.User, workspace bool) (string, string, error) {
-	var userID string
+func getUserID(email string, users []astrocore.User, workspace bool) (userID, newEmail string,err error) {
 	if email == "" {
 		user, err := selectUser(users, workspace)
 		userID = user.Id
