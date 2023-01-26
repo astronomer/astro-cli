@@ -415,8 +415,8 @@ func TestIsWorkspaceRoleValid(t *testing.T) {
 		err = IsWorkspaceRoleValid("WORKSPACE_MEMBER")
 		assert.NoError(t, err)
 	})
-	t.Run("happy path when role is WORKSPACE_BILLING_ADMIN", func(t *testing.T) {
-		err = IsWorkspaceRoleValid("WORKSPACE_BILLING_ADMIN")
+	t.Run("happy path when role is WORKSPACE_EDITOR", func(t *testing.T) {
+		err = IsWorkspaceRoleValid("WORKSPACE_EDITOR")
 		assert.NoError(t, err)
 	})
 	t.Run("happy path when role is WORKSPACE_OWNER", func(t *testing.T) {
@@ -662,7 +662,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
-		err := DeleteWorkspaceUser("user@1.com", "", out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -672,7 +672,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := DeleteWorkspaceUser("user@1.com", "", out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", "", out, mockClient)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -681,7 +681,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseError, nil).Once()
-		err := DeleteWorkspaceUser("user@1.com", "", out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", "", out, mockClient)
 		assert.EqualError(t, err, "failed to update user")
 	})
 
@@ -693,7 +693,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		assert.NoError(t, err)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err = DeleteWorkspaceUser("user@1.com", "", out, mockClient)
+		err = RemoveWorkspaceUser("user@1.com", "", out, mockClient)
 		assert.ErrorIs(t, err, ErrNoShortName)
 	})
 
@@ -702,7 +702,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := DeleteWorkspaceUser("user@1.com", "", out, mockClient)
+		err := RemoveWorkspaceUser("user@1.com", "", out, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
@@ -728,7 +728,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		expectedOut := "The workspace user user@1.com was successfully removed from the workspace\n"
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
 
-		err = DeleteWorkspaceUser("", "", out, mockClient)
+		err = RemoveWorkspaceUser("", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
 	})

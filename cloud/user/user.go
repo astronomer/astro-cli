@@ -20,7 +20,7 @@ import (
 var (
 	ErrNoShortName          = errors.New("cannot retrieve organization short name from context")
 	ErrInvalidRole          = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
+	ErrInvalidWorkspaceRole = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_EDITOR and WORKSPACE_OWNER ")
 	ErrInvalidEmail         = errors.New("no email provided for the invite. Retry with a valid email address")
 	ErrInvalidUserKey       = errors.New("invalid User selected")
 	userPagnationLimit      = 100
@@ -242,7 +242,6 @@ func ListOrgUsers(out io.Writer, client astrocore.CoreClient) error {
 }
 
 func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
-	var userID string
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -262,19 +261,9 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	if email == "" {
-		user, err := selectUser(users, false)
-		userID = user.Id
-		email = user.Username
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range users {
-			if users[i].Username == email {
-				userID = users[i].Id
-			}
-		}
+	userID, err := getUserID(email, users, false)
+	if err != nil {
+		return err
 	}
 	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
 		Role: role,
@@ -292,7 +281,6 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 }
 
 func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
-	var userID string
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -312,19 +300,9 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	if err != nil {
 		return err
 	}
-	if email == "" {
-		user, err := selectUser(users, true)
-		userID = user.Id
-		email = user.Username
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range users {
-			if users[i].Username == email {
-				userID = users[i].Id
-			}
-		}
+	userID, err := getUserID(email, users, true)
+	if err != nil {
+		return err
 	}
 	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
 		Role: role,
@@ -348,7 +326,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 // If the role is valid, it returns nil
 // error ErrInvalidWorkspaceRole is returned if the role is not valid
 func IsWorkspaceRoleValid(role string) error {
-	validRoles := []string{"WORKSPACE_MEMBER", "WORKSPACE_BILLING_ADMIN", "WORKSPACE_OWNER"}
+	validRoles := []string{"WORKSPACE_MEMBER", "WORKSPACE_EDITOR", "WORKSPACE_OWNER"}
 	for _, validRole := range validRoles {
 		if role == validRole {
 			return nil
@@ -422,8 +400,7 @@ func ListWorkspaceUsers(out io.Writer, client astrocore.CoreClient, workspace st
 	return nil
 }
 
-func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocore.CoreClient) error {
-	var userID string
+func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -439,19 +416,9 @@ func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	if email == "" {
-		user, err := selectUser(users, true)
-		userID = user.Id
-		email = user.Username
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range users {
-			if users[i].Username == email {
-				userID = users[i].Id
-			}
-		}
+	userID, err := getUserID(email, users, true)
+	if err != nil {
+		return err
 	}
 	resp, err := client.DeleteWorkspaceUserWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, userID)
 	if err != nil {
@@ -461,6 +428,25 @@ func DeleteWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "The workspace user %s was successfully removed from the workspace\n", email)
+	fmt.Fprintf(out, "The user %s was successfully removed from the workspace\n", email)
 	return nil
+}
+
+func getUserID(email string, users []astrocore.User, workspace bool) (string, error) {
+	var userID string
+	if email == "" {
+		user, err := selectUser(users, workspace)
+		userID = user.Id
+		email = user.Username
+		if err != nil {
+			return "", err
+		}
+	} else {
+		for i := range users {
+			if users[i].Username == email {
+				userID = users[i].Id
+			}
+		}
+	}
+	return userID, nil
 }

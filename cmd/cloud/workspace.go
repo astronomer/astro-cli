@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
@@ -76,13 +77,13 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add [email]",
 		Short: "Add a user to an Astro Workspace with a specific role",
 		Long: "Add a user to an Astro Workspace with a specific role\n$astro workspace user add [email] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_BILLING_ADMIN, WORKSPACE_OWNER].",
+			"WORKSPACE_EDITOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addWorkspaceUsers(cmd, args, out)
+			return addWorkspaceUser(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&role, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
-		"new user. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
+		"new user. Possible values are WORKSPACE_MEMBER, WORKSPACE_EDITOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -93,7 +94,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the users in an Astro Workspace",
 		Long:    "List all the users in an Astro Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceUsers(cmd, out)
+			return listWorkspaceUser(cmd, out)
 		},
 	}
 	return cmd
@@ -105,13 +106,13 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a the role of a user in an Astro Workspace",
 		Long: "Update the role of a user in an Astro Workspace\n$astro workspace user update [email] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_BILLING_ADMIN, WORKSPACE_OWNER].",
+			"WORKSPACE_EDITOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateWorkspaceUsers(cmd, args, out)
+			return updateWorkspaceUser(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&role, "role", "r", "WORKSPACE_MEMBER", "The new role for the "+
-		"user. Possible values are WORKSPACE_MEMBER, WORKSPACE_BILLING_ADMIN and WORKSPACE_OWNER ")
+		"user. Possible values are WORKSPACE_MEMBER, WORKSPACE_EDITOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -122,7 +123,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 		Short:   "Remove a user from an Astro Workspace",
 		Long:    "Remove a user from an Astro Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeWorkspaceUsers(cmd, args, out)
+			return removeWorkspaceUser(cmd, args, out)
 		},
 	}
 	return cmd
@@ -147,7 +148,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	return workspace.Switch(id, astroClient, out)
 }
 
-func addWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {
+func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -159,12 +160,12 @@ func addWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {
 	return user.AddWorkspaceUser(email, role, "", out, astroCoreClient)
 }
 
-func listWorkspaceUsers(cmd *cobra.Command, out io.Writer) error {
+func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	return user.ListWorkspaceUsers(out, astroCoreClient, "")
 }
 
-func updateWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -176,16 +177,17 @@ func updateWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) erro
 	return user.UpdateWorkspaceUserRole(email, role, "", out, astroCoreClient)
 }
 
-func removeWorkspaceUsers(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email in lowercase
+		email = strings.ToLower(args[0])
 	}
 
 	cmd.SilenceUsage = true
-	return user.DeleteWorkspaceUser(email, "", out, astroCoreClient)
+	return user.RemoveWorkspaceUser(email, "", out, astroCoreClient)
 }
 
 func coalesceWorkspace() (string, error) {
