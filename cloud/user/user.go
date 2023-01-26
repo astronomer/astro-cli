@@ -261,7 +261,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	userID, err := getUserID(email, users, false)
+	userID, email, err := getUserID(email, users, false)
 	if err != nil {
 		return err
 	}
@@ -300,7 +300,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	if err != nil {
 		return err
 	}
-	userID, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, true)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	if err != nil {
 		return err
 	}
-	userID, err := getUserID(email, users, true)
+	userID, email, err := getUserID(email, users, true)
 	if err != nil {
 		return err
 	}
@@ -432,14 +432,14 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 	return nil
 }
 
-func getUserID(email string, users []astrocore.User, workspace bool) (string, error) {
+func getUserID(email string, users []astrocore.User, workspace bool) (string, string, error) {
 	var userID string
 	if email == "" {
 		user, err := selectUser(users, workspace)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
-			return "", err
+			return "", email, err
 		}
 	} else {
 		for i := range users {
@@ -448,5 +448,5 @@ func getUserID(email string, users []astrocore.User, workspace bool) (string, er
 			}
 		}
 	}
-	return userID, nil
+	return userID, email, nil
 }
