@@ -351,8 +351,11 @@ func TestDebugFlowFlagCmd(t *testing.T) {
 func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 	defer patchDeployCmd()()
 
-	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
 	}
 
 	defer mockExecuteCmdInDockerOutputForJSONConfig()()
@@ -363,7 +366,7 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 func TestFlowDeployWithTooManyArgs(t *testing.T) {
 	defer patchDeployCmd()()
 
-	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
 	}
 
@@ -375,8 +378,11 @@ func TestFlowDeployWithTooManyArgs(t *testing.T) {
 func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
 	defer patchDeployCmd()()
 
-	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
 	}
 	mockOs := mocks.NewOsBind(t)
 	Os = func() sql.OsBind {
@@ -399,8 +405,11 @@ func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
 func TestFlowDeployWorkflowsCmd(t *testing.T) {
 	defer patchDeployCmd()()
 
-	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner) error {
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
 	}
 	mockOs := mocks.NewOsBind(t)
 	Os = func() sql.OsBind {
@@ -418,6 +427,33 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 	assert.NoError(t, err)
 
 	Os = sql.NewOsBind
+}
+
+func TestFlowDeployCmdInstalledFlowVersionFailure(t *testing.T) {
+	defer patchDeployCmd()()
+
+	getInstalledFlowVersion = func() (string, error) {
+		return "", errMock
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()
+	err := execFlowCmd("deploy")
+	assert.ErrorIs(t, err, errMock)
+}
+
+func TestFlowDeployCmdEnsurePythonSDKVersionIsMetFailure(t *testing.T) {
+	defer patchDeployCmd()()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
+		return errMock
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy")
+	assert.ErrorIs(t, err, errMock)
 }
 
 func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
