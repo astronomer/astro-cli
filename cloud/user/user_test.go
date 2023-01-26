@@ -657,7 +657,7 @@ func TestAddWorkspaceUser(t *testing.T) {
 func TestDeleteWorkspaceUser(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("happy path DeleteWorkspaceUser", func(t *testing.T) {
-		expectedOutMessage := "The workspace user user@1.com was successfully removed from the workspace\n"
+		expectedOutMessage := "The user user@1.com was successfully removed from the workspace\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
@@ -725,7 +725,7 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "The workspace user user@1.com was successfully removed from the workspace\n"
+		expectedOut := "The user user@1.com was successfully removed from the workspace\n"
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
 
 		err = RemoveWorkspaceUser("", "", out, mockClient)

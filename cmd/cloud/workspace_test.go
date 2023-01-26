@@ -346,7 +346,7 @@ func TestWorkspacUserRemove(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("valid email removes user", func(t *testing.T) {
-		expectedOut := "The workspace user user@1.com was successfully removed from the workspace"
+		expectedOut := "The user user@1.com was successfully removed from the workspace"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
@@ -392,7 +392,7 @@ func TestWorkspacUserRemove(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "The workspace user user@1.com was successfully removed from the workspace"
+		expectedOut := "The user user@1.com was successfully removed from the workspace"
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
 
 		cmdArgs := []string{"user", "remove"}
