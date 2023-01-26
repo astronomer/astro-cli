@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
