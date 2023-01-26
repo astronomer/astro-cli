@@ -153,7 +153,8 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
 	}
 
 	cmd.SilenceUsage = true
@@ -170,7 +171,8 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
 	}
 
 	cmd.SilenceUsage = true
@@ -182,7 +184,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		// make sure the email in lowercase
+		// make sure the email is lowercase
 		email = strings.ToLower(args[0])
 	}
 
