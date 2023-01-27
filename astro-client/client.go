@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	AstronomerConnectionErrMsg = "Cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails"
+	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails"
 
-	permissionsErrMsg = "You do not have the appropriate permissions for that"
+	permissionsErrMsg = "you do not have the appropriate permissions for that"
 )
 
 // Client containers the logger and HTTPClient used to communicate with the Astronomer API

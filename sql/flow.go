@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/astronomer/astro-cli/sql/include"
+	"github.com/astronomer/astro-cli/version"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/archive"
@@ -106,19 +107,22 @@ var ExecuteCmdInDocker = func(cmd, mountDirs []string, returnOutput bool) (exitC
 		return statusCode, cout, fmt.Errorf("docker client initialization failed %w", err)
 	}
 
-	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIProjectURL)
-	if err != nil {
-		return statusCode, cout, err
-	}
-
 	baseImage, err := getBaseDockerImageURI(astroSQLCLIConfigURL)
 	if err != nil {
 		fmt.Println(err)
 	}
+	astroSQLCliVersion, err := getPypiVersion(astroSQLCLIConfigURL, version.CurrVersion)
+	if err != nil {
+		return statusCode, cout, err
+	}
+	preReleaseOptString := ""
+	if astroSQLCliVersion.Prerelease {
+		preReleaseOptString = "--pre"
+	}
 
 	currentUser, _ := user.Current()
 
-	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion, currentUser.Username, currentUser.Uid, currentUser.Username))
+	dockerfileContent := []byte(fmt.Sprintf(include.Dockerfile, baseImage, astroSQLCliVersion.Version, preReleaseOptString, currentUser.Username, currentUser.Uid, currentUser.Username))
 	if err := Os().WriteFile(sqlCLIDockerfilePath, dockerfileContent, fileWriteMode); err != nil {
 		return statusCode, cout, fmt.Errorf("error writing dockerfile %w", err)
 	}
@@ -219,24 +223,30 @@ var getAstroDockerfileRuntimeVersion = func() (string, error) {
 	return runtimeVersion, nil
 }
 
-var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
+var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner, installedSQLCLIVersion string) error {
 	astroRuntimeVersion, err := getAstroDockerfileRuntimeVersion()
 	if err != nil {
 		return err
 	}
-	SQLCLIVersion, err := getPypiVersion(astroSQLCLIProjectURL)
+
+	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCLIConfigURL, installedSQLCLIVersion)
 	if err != nil {
 		return err
 	}
-	requiredRuntimeVersion, requiredPythonSDKVersion, err := getPythonSDKComptability(astroSQLCLIConfigURL, SQLCLIVersion)
-	if err != nil {
-		return err
-	}
+
 	runtimeVersionMet, err := util.IsRequiredVersionMet(astroRuntimeVersion, requiredRuntimeVersion)
 	if err != nil {
 		return err
 	}
-	if !runtimeVersionMet {
+
+	requiredPythonSDKDependency := "\nastro-sdk-python" + requiredPythonSDKVersion
+	b, err := Os().ReadFile(astroRequirementsfilePath)
+	if err != nil {
+		return err
+	}
+	existingRequirements := string(b)
+
+	if !runtimeVersionMet && !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
 		result, err := input.PromptGetConfirmation(promptRunner)
 		if err != nil {
 			return err
@@ -244,22 +254,15 @@ var EnsurePythonSdkVersionIsMet = func(promptRunner input.PromptRunner) error {
 		if !result {
 			return ErrPythonSDKVersionNotMet
 		}
-		requiredPythonSDKDependency := "\nastro-sdk-python" + requiredPythonSDKVersion
-		b, err := Os().ReadFile(astroRequirementsfilePath)
+
+		f, err := Os().OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, fileWriteMode)
 		if err != nil {
 			return err
 		}
-		existingRequirements := string(b)
-		if !strings.Contains(existingRequirements, requiredPythonSDKDependency) {
-			f, err := Os().OpenFile(astroRequirementsfilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, fileWriteMode)
-			if err != nil {
-				return err
-			}
 
-			defer f.Close()
-			if _, err = f.WriteString(requiredPythonSDKDependency); err != nil {
-				return err
-			}
+		defer f.Close()
+		if _, err = f.WriteString(requiredPythonSDKDependency); err != nil {
+			return err
 		}
 	}
 	return nil

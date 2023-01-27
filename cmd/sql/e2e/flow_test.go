@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/version"
+
 	sql "github.com/astronomer/astro-cli/cmd/sql"
 
 	"github.com/stretchr/testify/assert"
@@ -31,6 +33,8 @@ func chdir(t *testing.T, dir string) func() {
 }
 
 func execFlowCmd(args ...string) error {
+	// Set the astro-cli version to a version compatible with the latest sql-cli version for e2e tests
+	version.CurrVersion = "1.10.0"
 	cmd := sql.NewFlowCommand()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()

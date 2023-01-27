@@ -1,14 +1,19 @@
 package sql
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/astro-client"
+	astroDeployment "github.com/astronomer/astro-cli/cloud/deployment"
+	astroWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
@@ -19,6 +24,7 @@ import (
 var (
 	configCmd   *cobra.Command
 	generateCmd *cobra.Command
+	versionCmd  *cobra.Command
 )
 
 // All cmd names
@@ -49,13 +55,94 @@ var (
 	outputDir         string
 	projectDir        string
 	verbose           bool
-	workflowName      string
 )
 
 var (
-	ErrNotCloudContext = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
-	Os                 = sql.NewOsBind
+	ErrInvalidInstalledFlowVersion = errors.New("invalid flow version installed")
+	ErrNotCloudContext             = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
+	ErrTooManyArgs                 = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command")
+	Os                             = sql.NewOsBind
 )
+
+type VersionCmdResponse struct {
+	Version string `json:"version"`
+}
+
+// Return the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env
+func getAstroCloudConfig() (astroDeploymentID, astroWorkspaceID string, err error) {
+	configJSON, err := readConfigCmdOutput("get", "--json")
+	if err != nil {
+		return
+	}
+
+	var config map[string]interface{}
+	if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return
+	}
+
+	envConfig := config[env].(map[string]interface{})
+	deployment, _ := envConfig["deployment"].(map[string]interface{})
+	astroDeploymentID, _ = deployment["astro_deployment_id"].(string)
+	astroWorkspaceID, _ = deployment["astro_workspace_id"].(string)
+	return
+}
+
+// Prompt the user for astro cloud config (astroDeploymentID and/or astroWorkspaceID) and return them
+//
+//nolint:gocritic
+func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selectedAstroDeploymentID, selectedAstroWorkspaceID string, err error) {
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+
+	if astroDeploymentID == "" && astroWorkspaceID == "" {
+		fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
+		workspace, err := astroWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
+		if err != nil {
+			return "", "", err
+		}
+		deployments, err := astroDeployment.GetDeployments(workspace, astroClient)
+		if err != nil {
+			return "", "", err
+		}
+		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
+		if err != nil {
+			return "", "", err
+		}
+		selectedAstroDeploymentID = deployment.ID
+		selectedAstroWorkspaceID = deployment.Workspace.ID
+	} else if astroDeploymentID == "" {
+		deployments, err := astroDeployment.GetDeployments(astroWorkspaceID, astroClient)
+		if err != nil {
+			return "", "", err
+		}
+		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
+		if err != nil {
+			return "", "", err
+		}
+		selectedAstroDeploymentID = deployment.ID
+		selectedAstroWorkspaceID = astroWorkspaceID
+	} else if astroWorkspaceID == "" {
+		fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
+		workspace, err := astroWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
+		if err != nil {
+			return "", "", err
+		}
+		selectedAstroDeploymentID = astroDeploymentID
+		selectedAstroWorkspaceID = workspace
+	} else {
+		selectedAstroDeploymentID = astroDeploymentID
+		selectedAstroWorkspaceID = astroWorkspaceID
+	}
+
+	return selectedAstroDeploymentID, selectedAstroWorkspaceID, err
+}
+
+// Set the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env.
+func setAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) error {
+	if err := executeCmd(configCmd, []string{"set", "deploy", "--astro-workspace-id", astroWorkspaceID, "--astro-deployment-id", astroDeploymentID}); err != nil {
+		return err
+	}
+	return nil
+}
 
 // Build the cmd string to execute
 func buildCmd(cmd *cobra.Command, args []string) ([]string, error) {
@@ -140,13 +227,26 @@ func getProjectDirFromArgs(args []string) string {
 }
 
 // Read config cmd output for retrieving config settings such as airflow_home
-func readConfigCmdOutput(key string) (string, error) {
-	args := []string{"get", key}
+func readConfigCmdOutput(args ...string) (string, error) {
 	output, err := readCmdOutput(configCmd, args)
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(output), nil // remove spaces such as \r\n
+}
+
+// Read version cmd output for retrieving installed version of SQL CLI
+var getInstalledFlowVersion = func() (string, error) {
+	output, err := readCmdOutput(versionCmd, []string{"--json"})
+	if err != nil {
+		return "", err
+	}
+	var resp VersionCmdResponse
+	err = json.Unmarshal([]byte(output), &resp)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
 }
 
 // Resolve filepath to absolute
@@ -256,12 +356,12 @@ func getDirs(cmd *cobra.Command) ([]string, error) {
 		dirs = append(dirs, projectDir)
 	case validateCmdName:
 		dirs = append(dirs, projectDir)
-		airflowHome, err = readConfigCmdOutput("airflow_home")
+		airflowHome, err = readConfigCmdOutput("get", "airflow_home")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowHome)
-		dataDir, err = readConfigCmdOutput("data_dir")
+		dataDir, err = readConfigCmdOutput("get", "data_dir")
 		if err != nil {
 			return nil, err
 		}
@@ -271,34 +371,34 @@ func getDirs(cmd *cobra.Command) ([]string, error) {
 		if outputDir != "" {
 			dirs = append(dirs, outputDir)
 		}
-		airflowHome, err = readConfigCmdOutput("airflow_home")
+		airflowHome, err = readConfigCmdOutput("get", "airflow_home")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowHome)
-		airflowDagsFolder, err = readConfigCmdOutput("airflow_dags_folder")
+		airflowDagsFolder, err = readConfigCmdOutput("get", "airflow_dags_folder")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowDagsFolder)
-		dataDir, err = readConfigCmdOutput("data_dir")
+		dataDir, err = readConfigCmdOutput("get", "data_dir")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, dataDir)
 	case runCmdName:
 		dirs = append(dirs, projectDir)
-		airflowHome, err = readConfigCmdOutput("airflow_home")
+		airflowHome, err = readConfigCmdOutput("get", "airflow_home")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowHome)
-		airflowDagsFolder, err = readConfigCmdOutput("airflow_dags_folder")
+		airflowDagsFolder, err = readConfigCmdOutput("get", "airflow_dags_folder")
 		if err != nil {
 			return nil, err
 		}
 		dirs = append(dirs, airflowDagsFolder)
-		dataDir, err = readConfigCmdOutput("data_dir")
+		dataDir, err = readConfigCmdOutput("get", "data_dir")
 		if err != nil {
 			return nil, err
 		}
@@ -347,7 +447,7 @@ func executeCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func generateWorkflows(dagsPath string) error {
+func generateWorkflows(dagsPath, workflowName string) error {
 	generateCmdArgs := []string{"--output-dir", dagsPath}
 	if workflowName != "" {
 		generateCmdArgs = append(generateCmdArgs, workflowName)
@@ -381,11 +481,20 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 		return ErrNotCloudContext
 	}
 
+	if len(args) > 1 {
+		return ErrTooManyArgs
+	}
+
 	pythonSDKPromptContent := input.PromptContent{
 		Label: "Would you like to add the required version of Python SDK dependency to requirements.txt? Otherwise, the deployment will not proceed.",
 	}
 	promptRunner := input.GetYesNoSelector(pythonSDKPromptContent)
-	err := sql.EnsurePythonSdkVersionIsMet(promptRunner)
+
+	installedSQLCLIVersion, err := getInstalledFlowVersion()
+	if err != nil {
+		return err
+	}
+	err = sql.EnsurePythonSdkVersionIsMet(promptRunner, installedSQLCLIVersion)
 	if err != nil {
 		return err
 	}
@@ -398,11 +507,28 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
 	}
-	if err := generateWorkflows(dagsPath); err != nil {
+	var workflowName string
+	if len(args) > 0 {
+		workflowName = args[0]
+	}
+	if err := generateWorkflows(dagsPath, workflowName); err != nil {
 		return err
 	}
+
+	astroDeploymentID, astroWorkspaceID, err := getAstroCloudConfig()
+	if err != nil {
+		return err
+	}
+	astroDeploymentID, astroWorkspaceID, err = promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID)
+	if err != nil {
+		return err
+	}
+	if err := setAstroCloudConfig(astroDeploymentID, astroWorkspaceID); err != nil {
+		return err
+	}
+
 	astroDeployCmd := cloud.NewDeployCmd()
-	astroDeployCmd.SetArgs([]string{"--dags-path", dagsPath})
+	astroDeployCmd.SetArgs([]string{astroDeploymentID, "--workspace-id", astroWorkspaceID, "--dags-path", dagsPath})
 	if _, err := astroDeployCmd.ExecuteC(); err != nil {
 		return err
 	}
@@ -555,7 +681,6 @@ func deployCommand() *cobra.Command {
 		SilenceUsage: true,
 	}
 	cmd.Flags().StringVar(&env, "env", "default", "")
-	cmd.Flags().StringVar(&workflowName, "workflow-name", "", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	return cmd
 }
@@ -576,7 +701,8 @@ func NewFlowCommand() *cobra.Command {
 	cmd.SetHelpFunc(executeHelp)
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "")
 	cmd.PersistentFlags().BoolVar(&noDebug, "no-debug", false, "")
-	cmd.AddCommand(versionCommand())
+	versionCmd = versionCommand()
+	cmd.AddCommand(versionCmd)
 	cmd.AddCommand(aboutCommand())
 	cmd.AddCommand(initCommand())
 	configCmd = configCommand()

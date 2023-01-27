@@ -55,6 +55,7 @@ var (
 		CloudAPIToken:        newCfg("cloud.api.token", ""),
 		Context:              newCfg("context", ""),
 		Contexts:             newCfg("contexts", ""),
+		DockerCommand:        newCfg("container.binary", "docker"),
 		LocalAstro:           newCfg("local.astrohub", "http://localhost:8871/v1"),
 		LocalCore:            newCfg("local.core", "http://localhost:8888/v1alpha1"),
 		LocalPublicAstro:     newCfg("local.public_astrohub", "http://localhost:8871/graphql"),

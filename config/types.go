@@ -14,6 +14,7 @@ type cfgs struct {
 	CloudAPIToken        cfg
 	Context              cfg
 	Contexts             cfg
+	DockerCommand        cfg
 	LocalEnabled         cfg
 	LocalAstro           cfg
 	LocalCore            cfg
