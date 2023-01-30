@@ -152,6 +152,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		SettingsFile:         settingsFile,
 		SettingsFileExist:    settingsFileExist,
 		TriggererEnabled:     triggererEnabled,
+		DuplicateImageVolumes:          config.CFG.DuplicateImageVolumes.GetBool(),
 		ProjectName:          projectName,
 	}
 

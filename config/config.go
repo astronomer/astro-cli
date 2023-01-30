@@ -74,6 +74,7 @@ var (
 		Verbosity:            newCfg("verbosity", "warning"),
 		HoustonDialTimeout:   newCfg("houston.dial_timeout", "10"),
 		HoustonSkipVerifyTLS: newCfg("houston.skip_verify_tls", "false"),
+		DuplicateImageVolumes:          newCfg("duplicate_volumes", "true"),
 		SkipParse:            newCfg("skip_parse", "false"),
 		Interactive:          newCfg("interactive", "false"),
 		PageSize:             newCfg("page_size", "20"),

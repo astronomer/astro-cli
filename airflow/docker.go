@@ -93,6 +93,7 @@ type ComposeConfig struct {
 	MountLabel           string
 	SettingsFile         string
 	SettingsFileExist    bool
+	DuplicateImageVolumes          bool
 	TriggererEnabled     bool
 	ProjectName          string
 }
@@ -209,7 +210,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
-		Create: api.CreateOptions{},
+		Create: api.CreateOptions{ },
 	})
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)

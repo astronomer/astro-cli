@@ -22,6 +22,7 @@ type cfgs struct {
 	LocalRegistry        cfg
 	LocalHouston         cfg
 	LocalPlatform        cfg
+	DuplicateImageVolumes          cfg
 	PostgresUser         cfg
 	PostgresPassword     cfg
 	PostgresHost         cfg
