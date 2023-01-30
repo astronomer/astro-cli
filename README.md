@@ -31,7 +31,7 @@ Use these instructions to install, upgrade, or uninstall the Astro CLI.
 
 To install the Astro CLI on Mac, you'll need:
 
-- [Homebrew](https://docs.docker.com/get-docker/)
+- [Homebrew](https://brew.sh/)
 - [Docker Desktop](https://docs.docker.com/get-docker/) (v18.09 or higher)
 
 To install the Astro CLI on Windows, you'll need:
