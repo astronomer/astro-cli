@@ -80,22 +80,22 @@ var (
 
 // ComposeConfig is input data to docker compose yaml template
 type ComposeConfig struct {
-	PytestFile           string
-	PostgresUser         string
-	PostgresPassword     string
-	PostgresHost         string
-	PostgresPort         string
-	AirflowEnvFile       string
-	AirflowImage         string
-	AirflowHome          string
-	AirflowUser          string
-	AirflowWebserverPort string
-	MountLabel           string
-	SettingsFile         string
-	SettingsFileExist    bool
-	DuplicateImageVolumes          bool
-	TriggererEnabled     bool
-	ProjectName          string
+	PytestFile            string
+	PostgresUser          string
+	PostgresPassword      string
+	PostgresHost          string
+	PostgresPort          string
+	AirflowEnvFile        string
+	AirflowImage          string
+	AirflowHome           string
+	AirflowUser           string
+	AirflowWebserverPort  string
+	MountLabel            string
+	SettingsFile          string
+	SettingsFileExist     bool
+	DuplicateImageVolumes bool
+	TriggererEnabled      bool
+	ProjectName           string
 }
 
 type DockerCompose struct {
@@ -210,7 +210,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 
 	// Start up our project
 	err = d.composeService.Up(context.Background(), project, api.UpOptions{
-		Create: api.CreateOptions{ },
+		Create: api.CreateOptions{},
 	})
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)

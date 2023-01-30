@@ -8,39 +8,39 @@ type cfg struct {
 
 // cfgs houses all configurations for an astro project
 type cfgs struct {
-	CloudAPIProtocol     cfg
-	CloudAPIPort         cfg
-	CloudWSProtocol      cfg
-	CloudAPIToken        cfg
-	Context              cfg
-	Contexts             cfg
-	DockerCommand        cfg
-	LocalEnabled         cfg
-	LocalAstro           cfg
-	LocalCore            cfg
-	LocalPublicAstro     cfg
-	LocalRegistry        cfg
-	LocalHouston         cfg
-	LocalPlatform        cfg
-	DuplicateImageVolumes          cfg
-	PostgresUser         cfg
-	PostgresPassword     cfg
-	PostgresHost         cfg
-	PostgresPort         cfg
-	ProjectName          cfg
-	ProjectDeployment    cfg
-	ProjectWorkspace     cfg
-	WebserverPort        cfg
-	ShowWarnings         cfg
-	Verbosity            cfg
-	HoustonDialTimeout   cfg
-	HoustonSkipVerifyTLS cfg
-	SkipParse            cfg
-	Interactive          cfg
-	PageSize             cfg
-	SQLCLI               cfg
-	AuditLogs            cfg
-	UpgradeMessage       cfg
+	CloudAPIProtocol      cfg
+	CloudAPIPort          cfg
+	CloudWSProtocol       cfg
+	CloudAPIToken         cfg
+	Context               cfg
+	Contexts              cfg
+	DockerCommand         cfg
+	LocalEnabled          cfg
+	LocalAstro            cfg
+	LocalCore             cfg
+	LocalPublicAstro      cfg
+	LocalRegistry         cfg
+	LocalHouston          cfg
+	LocalPlatform         cfg
+	DuplicateImageVolumes cfg
+	PostgresUser          cfg
+	PostgresPassword      cfg
+	PostgresHost          cfg
+	PostgresPort          cfg
+	ProjectName           cfg
+	ProjectDeployment     cfg
+	ProjectWorkspace      cfg
+	WebserverPort         cfg
+	ShowWarnings          cfg
+	Verbosity             cfg
+	HoustonDialTimeout    cfg
+	HoustonSkipVerifyTLS  cfg
+	SkipParse             cfg
+	Interactive           cfg
+	PageSize              cfg
+	SQLCLI                cfg
+	AuditLogs             cfg
+	UpgradeMessage        cfg
 }
 
 // Creates a new cfg struct

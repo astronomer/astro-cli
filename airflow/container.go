@@ -139,21 +139,21 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 	}
 
 	cfg := ComposeConfig{
-		PostgresUser:         config.CFG.PostgresUser.GetString(),
-		PostgresPassword:     config.CFG.PostgresPassword.GetString(),
-		PostgresHost:         config.CFG.PostgresHost.GetString(),
-		PostgresPort:         config.CFG.PostgresPort.GetString(),
-		AirflowImage:         airflowImage,
-		AirflowHome:          airflowHome,
-		AirflowUser:          "astro",
-		AirflowWebserverPort: config.CFG.WebserverPort.GetString(),
-		AirflowEnvFile:       envFile,
-		MountLabel:           "z",
-		SettingsFile:         settingsFile,
-		SettingsFileExist:    settingsFileExist,
-		TriggererEnabled:     triggererEnabled,
-		DuplicateImageVolumes:          config.CFG.DuplicateImageVolumes.GetBool(),
-		ProjectName:          projectName,
+		PostgresUser:          config.CFG.PostgresUser.GetString(),
+		PostgresPassword:      config.CFG.PostgresPassword.GetString(),
+		PostgresHost:          config.CFG.PostgresHost.GetString(),
+		PostgresPort:          config.CFG.PostgresPort.GetString(),
+		AirflowImage:          airflowImage,
+		AirflowHome:           airflowHome,
+		AirflowUser:           "astro",
+		AirflowWebserverPort:  config.CFG.WebserverPort.GetString(),
+		AirflowEnvFile:        envFile,
+		MountLabel:            "z",
+		SettingsFile:          settingsFile,
+		SettingsFileExist:     settingsFileExist,
+		TriggererEnabled:      triggererEnabled,
+		DuplicateImageVolumes: config.CFG.DuplicateImageVolumes.GetBool(),
+		ProjectName:           projectName,
 	}
 
 	buff := new(bytes.Buffer)
