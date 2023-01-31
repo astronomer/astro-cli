@@ -10,8 +10,8 @@ func newUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "user",
 		Aliases: []string{"us"},
-		Short:   "Invite a user to your Astro Organization",
-		Long:    "Invite a user to your Astro Organization.",
+		Short:   "Manage users in your Astro Organization",
+		Long:    "Manage users in your Astro Organization.",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(

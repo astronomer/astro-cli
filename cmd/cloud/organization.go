@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -218,7 +219,8 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
 	} else {
 		// no email was provided so ask the user for it
 		email = input.Text("enter email address to invite a user: ")
@@ -238,7 +240,8 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
 	}
 
 	cmd.SilenceUsage = true
