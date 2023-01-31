@@ -95,15 +95,15 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile string, pytestArgs
 		"--name",
 		"astro-pytest",
 		"-v",
-		airflowHome + "/dags:/usr/local/airflow/dags:ro",
+		airflowHome + "/dags:/usr/local/airflow/dags:rw",
 		"-v",
-		airflowHome + "/plugins:/usr/local/airflow/plugins:z",
+		airflowHome + "/plugins:/usr/local/airflow/plugins:rw",
 		"-v",
-		airflowHome + "/include:/usr/local/airflow/include:z",
+		airflowHome + "/include:/usr/local/airflow/include:rw",
 		"-v",
-		airflowHome + "/.astro:/usr/local/airflow/.astro:z",
+		airflowHome + "/.astro:/usr/local/airflow/.astro:rw",
 		"-v",
-		airflowHome + "/tests:/usr/local/airflow/tests:z",
+		airflowHome + "/tests:/usr/local/airflow/tests:rw",
 	}
 	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
@@ -309,11 +309,11 @@ func (d *DockerImage) Run(dagID, envFile, settingsFile, containerName, dagFile s
 			"--name",
 			astroRunContainer,
 			"-v",
-			config.WorkingPath + "/dags:/usr/local/airflow/dags:ro",
+			config.WorkingPath + "/dags:/usr/local/airflow/dags:rw",
 			"-v",
-			config.WorkingPath + "/plugins:/usr/local/airflow/plugins:z",
+			config.WorkingPath + "/plugins:/usr/local/airflow/plugins:rw",
 			"-v",
-			config.WorkingPath + "/include:/usr/local/airflow/include:z",
+			config.WorkingPath + "/include:/usr/local/airflow/include:rw",
 		}
 		// if settings file exists append it to args
 		if settingsFileExist {
