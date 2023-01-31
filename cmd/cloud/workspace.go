@@ -2,7 +2,9 @@ package cloud
 
 import (
 	"io"
+	"strings"
 
+	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 
 	"github.com/pkg/errors"
@@ -21,6 +23,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newWorkspaceListCmd(out),
 		newWorkspaceSwitchCmd(out),
+		newWorkspaceUserRootCmd(out),
 	)
 	return cmd
 }
@@ -29,8 +32,8 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all Astronomer Workspaces in your Organization",
-		Long:    "List all Astronomer Workspaces in your Organization.",
+		Short:   "List all Astronomer Workspaces in your organization",
+		Long:    "List all Astronomer Workspaces in your organization.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, out)
 		},
@@ -47,6 +50,80 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(cmd, out, args)
+		},
+	}
+	return cmd
+}
+
+func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "user",
+		Aliases: []string{"us"},
+		Short:   "Manage users in your Astro Workspace",
+		Long:    "Manage users in your Astro Workspace.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newWorkspaceUserListCmd(out),
+		newWorkspaceUserUpdateCmd(out),
+		newWorkspaceUserRemoveCmd(out),
+		newWorkspaceUserAddCmd(out),
+	)
+	return cmd
+}
+
+func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [email]",
+		Short: "Add a user to an Astro Workspace with a specific role",
+		Long: "Add a user to an Astro Workspace with a specific role\n$astro workspace user add [email] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_EDITOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addWorkspaceUser(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&role, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
+		"new user. Possible values are WORKSPACE_MEMBER, WORKSPACE_EDITOR and WORKSPACE_OWNER ")
+	return cmd
+}
+
+func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the users in an Astro Workspace",
+		Long:    "List all the users in an Astro Workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listWorkspaceUser(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [email]",
+		Aliases: []string{"up"},
+		Short:   "Update a the role of a user in an Astro Workspace",
+		Long: "Update the role of a user in an Astro Workspace\n$astro workspace user update [email] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_EDITOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateWorkspaceUser(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&role, "role", "r", "WORKSPACE_MEMBER", "The new role for the "+
+		"user. Possible values are WORKSPACE_MEMBER, WORKSPACE_EDITOR and WORKSPACE_OWNER ")
+	return cmd
+}
+
+func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "remove",
+		Aliases: []string{"rm"},
+		Short:   "Remove a user from an Astro Workspace",
+		Long:    "Remove a user from an Astro Workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeWorkspaceUser(cmd, args, out)
 		},
 	}
 	return cmd
@@ -69,6 +146,50 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 
 	return workspace.Switch(id, astroClient, out)
+}
+
+func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return user.AddWorkspaceUser(email, role, "", out, astroCoreClient)
+}
+
+func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return user.ListWorkspaceUsers(out, astroCoreClient, "")
+}
+
+func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return user.UpdateWorkspaceUserRole(email, role, "", out, astroCoreClient)
+}
+
+func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
+	var email string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return user.RemoveWorkspaceUser(email, "", out, astroCoreClient)
 }
 
 func coalesceWorkspace() (string, error) {
