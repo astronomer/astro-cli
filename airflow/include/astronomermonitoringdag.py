@@ -1,4 +1,4 @@
-"""A Monitoring DAG used by Astronomer to alert users via Control Plane when tasks aren't executing"""
+"""A Monitoring DAG used and maintained by Astronomer. All tasks in this DAG are executed by workers in the default worker queue. When tasks in the Monitoring DAG fail, it might indicate a problem with your Deployment. Astronomer will alert you via email."""
 
 import os
 from datetime import timedelta
