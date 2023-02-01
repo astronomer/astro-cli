@@ -1,4 +1,4 @@
-"""This is a test file, content of the file isn't important as much as the existence of the file iteslf"""
+"""This is a test file, content of the file isn't important as much as the existence of the file itself"""
 """Test the validity of all DAGs. **USED BY DEV PARSE COMMAND DO NOT EDIT**"""
 from contextlib import contextmanager
 import logging
@@ -34,7 +34,7 @@ def get_import_errors():
         def strip_path_prefix(path):
             return os.path.relpath(path, os.environ.get("AIRFLOW_HOME"))
 
-        # we prepend "(None,None)" to ensure that a test object is always created even if its a no op.
+        # prepend "(None,None)" to ensure that a test object is always created even if it's a no op.
         return [(None, None)] + [
             (strip_path_prefix(k), v.strip()) for k, v in dag_bag.import_errors.items()
         ]
