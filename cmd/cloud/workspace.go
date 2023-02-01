@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	workspaceID string
+	workspaceID      string
 	addWorkspaceRole string
-	workspaceRole string
+	workspaceRole    string
 )
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
