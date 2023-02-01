@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	workspaceID      string
-	addWorkspaceRole string
+	workspaceID         string
+	addWorkspaceRole    string
 	updateWorkspaceRole string
 )
 
