@@ -415,8 +415,8 @@ func TestIsWorkspaceRoleValid(t *testing.T) {
 		err = IsWorkspaceRoleValid("WORKSPACE_MEMBER")
 		assert.NoError(t, err)
 	})
-	t.Run("happy path when role is WORKSPACE_EDITOR", func(t *testing.T) {
-		err = IsWorkspaceRoleValid("WORKSPACE_EDITOR")
+	t.Run("happy path when role is WORKSPACE_OPERATOR", func(t *testing.T) {
+		err = IsWorkspaceRoleValid("WORKSPACE_OPERATOR")
 		assert.NoError(t, err)
 	})
 	t.Run("happy path when role is WORKSPACE_OWNER", func(t *testing.T) {

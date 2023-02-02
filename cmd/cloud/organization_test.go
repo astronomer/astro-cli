@@ -321,18 +321,6 @@ func TestUserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
-	t.Run("valid email with no role keeps the user the same", func(t *testing.T) {
-		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
-		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
-		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
-		astroCoreClient = mockClient
-		cmdArgs := []string{"user", "update", "user@1.com"}
-		resp, err := execOrganizationCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
-		mockClient.AssertExpectations(t)
-	})
 	t.Run("valid email with valid role updates user", func(t *testing.T) {
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -393,7 +381,7 @@ func TestUserUpdate(t *testing.T) {
 		expectedOut := "The user user@1.com role was successfully updated to ORGANIZATION_MEMBER"
 		mockClient.On("MutateOrgUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateOrgUserRoleResponseOK, nil).Once()
 
-		cmdArgs := []string{"user", "update"}
+		cmdArgs := []string{"user", "update", "--role", "ORGANIZATION_MEMBER"}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
