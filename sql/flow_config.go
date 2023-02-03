@@ -39,7 +39,7 @@ var (
 
 var httpClient = &http.Client{}
 
-var semVerRegex = regexp.MustCompile(`^(\d{1,})[.](\d{1,})[.](\d{1,})$`)
+var semVerRegex = regexp.MustCompile(`^(\d+)[.](\d+)[.](\d+)$`)
 
 const (
 	trimmedMinorVersionRegexMatchString = "$1.$2"
