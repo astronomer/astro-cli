@@ -26,17 +26,17 @@ func TestGetPypiVersionInvalidHTTPRequestFailure(t *testing.T) {
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
-func TestGetPypiVersionInvalidAstroCliVersionExactMatchSuccess(t *testing.T) {
+func TestGetPypiVersionAstroCliVersionExactMatchSuccess(t *testing.T) {
 	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "1.9.0")
 	assert.NoError(t, err)
 }
 
-func TestGetPypiVersionInvalidAstroCliVersionMinorVersionMatchSuccess(t *testing.T) {
+func TestGetPypiVersionAstroCliVersionMinorVersionMatchSuccess(t *testing.T) {
 	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "1.10.1")
 	assert.NoError(t, err)
 }
 
-func TestGetPypiVersionInvalidAstroCliVersionDefaultMatchSuccess(t *testing.T) {
+func TestGetPypiVersionAstroCliVersionDefaultMatchSuccess(t *testing.T) {
 	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "x.y.z")
 	assert.NoError(t, err)
 }
