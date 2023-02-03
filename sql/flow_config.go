@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 )
 
 type configResponse struct {
@@ -38,6 +39,13 @@ var (
 
 var httpClient = &http.Client{}
 
+var semVerRegex = regexp.MustCompile("^(.*)[.](.*)[.](.*)$")
+
+const (
+	trimmedMinorVersionRegexMatchString = "$1.$2"
+	defaultVersionString                = "default"
+)
+
 type AstroSQLCliVersion struct {
 	Version    string
 	Prerelease bool
@@ -61,7 +69,14 @@ func GetPypiVersion(configURL, astroCliVersion string) (AstroSQLCliVersion, erro
 	}
 	SQLCliCompatibility, exists := resp.SQLCliCompatibility[astroCliVersion]
 	if !exists {
-		return AstroSQLCliVersion{}, fmt.Errorf("error parsing response for SQL CLI version %w", err)
+		astroCliMinorVersion := semVerRegex.ReplaceAllString(astroCliVersion, trimmedMinorVersionRegexMatchString)
+		SQLCliCompatibility, exists = resp.SQLCliCompatibility[astroCliMinorVersion]
+		if !exists {
+			SQLCliCompatibility, exists = resp.SQLCliCompatibility[defaultVersionString]
+			if !exists {
+				return AstroSQLCliVersion{}, fmt.Errorf("error parsing response for SQL CLI version %w", err)
+			}
+		}
 	}
 	return AstroSQLCliVersion{SQLCliCompatibility.SQLCliVersion, SQLCliCompatibility.PreRelease}, nil
 }
