@@ -212,23 +212,23 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) 
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.PodCPU != "" {
-		errorMessage = "pod_cpu in the request. It will be calculated based on the requested worker_type"
+		errorMessage = "pod cpu in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.PodRAM != "" {
-		errorMessage = "pod_ram in the request. It will be calculated based on the requested worker_type"
+		errorMessage = "pod ram in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.MinWorkerCount != 0 {
-		errorMessage = "min_worker_count in the request. It can only be used with CeleryExecutor"
+		errorMessage = "minimum worker count in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.MaxWorkerCount != 0 {
-		errorMessage = "max_worker_count in the request. It can only be used with CeleryExecutor"
+		errorMessage = "maximum worker count in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.WorkerConcurrency != 0 {
-		errorMessage = "worker_concurrency in the request. It can only be used with CeleryExecutor"
+		errorMessage = "worker concurrency in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 
