@@ -23,7 +23,7 @@ import (
 
 const (
 	astroSQLCLIProjectURL     = "https://pypi.org/pypi/astro-sql-cli/json"
-	astroSQLCLIConfigURL      = "https://raw.githubusercontent.com/astronomer/astro-sdk/1673-minor-version-match/sql-cli/config/astro-cli.json"
+	astroSQLCLIConfigURL      = "https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json"
 	sqlCLIDockerfilePath      = ".Dockerfile.sql_cli"
 	fileWriteMode             = 0o600
 	sqlCLIDockerImageName     = "sql_cli"
