@@ -56,9 +56,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	queueToCreateOrUpdate = &astro.WorkerQueue{
-		Name:       name,
-		IsDefault:  false, // cannot create a default queue
-		NodePoolID: nodePoolID,
+		Name:              name,
+		IsDefault:         false, // cannot create a default queue
+		NodePoolID:        nodePoolID,
+		MinWorkerCount:    wQueueMin,         // use the value from the user input
+		MaxWorkerCount:    wQueueMax,         // use the value from the user input
+		WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 	}
 
 	if name == "" {
@@ -135,25 +138,18 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 // SetWorkerQueueValues sets values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency
 // Default values are used if the user did not request any
 func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
-	if wQueueMin != 0 {
-		// use the value from the user input
-		workerQueueToCreate.MinWorkerCount = wQueueMin
-	} else {
+	if wQueueMin == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MinWorkerCount = workerQueueDefaultOptions.MinWorkerCount.Default
 	}
 
-	if wQueueMax != 0 {
-		// use the value from the user input
-		workerQueueToCreate.MaxWorkerCount = wQueueMax
-	} else {
+	if wQueueMax == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MaxWorkerCount = workerQueueDefaultOptions.MaxWorkerCount.Default
 	}
 
-	if wQueueConcurrency != 0 {
-		workerQueueToCreate.WorkerConcurrency = wQueueConcurrency
-	} else {
+	if wQueueConcurrency == 0 {
+		// set default value as user input did not have it
 		workerQueueToCreate.WorkerConcurrency = workerQueueDefaultOptions.WorkerConcurrency.Default
 	}
 	return workerQueueToCreate
