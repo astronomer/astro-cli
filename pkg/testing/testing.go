@@ -58,6 +58,7 @@ func NewTestConfig(platform string) []byte {
 local:
   enabled: true
   host: http://localhost:8871/v1
+duplicate_volumes: true
 context: %s
 contexts:
   %s:
