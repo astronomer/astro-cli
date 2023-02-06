@@ -11,6 +11,7 @@ from airflow.hooks.base import BaseHook
 
 # The following code patches errors caused by missing OS Variables, Airflow Connections, and Airflow Variables
 
+
 # =========== MONKEYPATCH BaseHook.get_connection() ===========
 def basehook_get_connection_monkeypatch(key: str, *args, **kwargs):
     print(
@@ -21,6 +22,7 @@ def basehook_get_connection_monkeypatch(key: str, *args, **kwargs):
 
 BaseHook.get_connection = basehook_get_connection_monkeypatch
 # # =========== /MONKEYPATCH BASEHOOK.GET_CONNECTION() ===========
+
 
 # =========== MONKEYPATCH OS.GETENV() ===========
 def os_getenv_monkeypatch(key: str, *args, default=None, **kwargs):
