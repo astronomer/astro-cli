@@ -33,7 +33,11 @@ services:
     ports:
       - 127.0.0.1:{{ .PostgresPort }}:5432
     volumes:
+      {{if .DuplicateImageVolumes}}
       - postgres_data:/var/lib/postgresql/data
+      {{else}}
+      []
+      {{end}}
     environment:
       POSTGRES_USER: {{ .PostgresUser }}
       POSTGRES_PASSWORD: {{ .PostgresPassword }}
@@ -61,7 +65,9 @@ services:
 {{if .SettingsFileExist}}
       - {{ .AirflowHome }}/{{ .SettingsFile }}:/usr/local/airflow/{{ .SettingsFile }}:{{ .MountLabel }}
 {{end}}
+      {{if .DuplicateImageVolumes}}
       - airflow_logs:/usr/local/airflow/logs
+      {{end}}
     {{ .AirflowEnvFile }}
 
   webserver:
@@ -92,7 +98,9 @@ services:
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
       - {{ .AirflowHome }}/tests:/usr/local/airflow/tests:{{ .MountLabel }}
+      {{if .DuplicateImageVolumes}}
       - airflow_logs:/usr/local/airflow/logs
+      {{end}}
     healthcheck:
       test: curl --fail http://webserver:8080/health || exit 1
       interval: 2s
@@ -120,6 +128,8 @@ services:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
       - {{ .AirflowHome }}/include:/usr/local/airflow/include:{{ .MountLabel }}
+      {{if .DuplicateImageVolumes}}
       - airflow_logs:/usr/local/airflow/logs
+      {{end}}
     {{ .AirflowEnvFile }}
 {{end}}

@@ -10,7 +10,7 @@ import (
 )
 
 func TestUserRootCommand(t *testing.T) {
-	expectedHelp := "Invite a user to your Astro Organization."
+	expectedHelp := "Manage users in your Astro Organization."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newUserCmd(os.Stdout)

@@ -89,7 +89,9 @@ services:
     ports:
       - 127.0.0.1:5432:5432
     volumes:
+      
       - postgres_data:/var/lib/postgresql/data
+      
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -115,7 +117,9 @@ services:
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
 
+      
       - airflow_logs:/usr/local/airflow/logs
+      
     
 
   webserver:
@@ -146,7 +150,9 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+      
       - airflow_logs:/usr/local/airflow/logs
+      
     healthcheck:
       test: curl --fail http://webserver:8080/health || exit 1
       interval: 2s
@@ -200,7 +206,9 @@ services:
     ports:
       - 127.0.0.1:5432:5432
     volumes:
+      
       - postgres_data:/var/lib/postgresql/data
+      
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -226,7 +234,9 @@ services:
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
 
+      
       - airflow_logs:/usr/local/airflow/logs
+      
     
 
   webserver:
@@ -257,7 +267,9 @@ services:
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
       - airflow_home/tests:/usr/local/airflow/tests:z
+      
       - airflow_logs:/usr/local/airflow/logs
+      
     healthcheck:
       test: curl --fail http://webserver:8080/health || exit 1
       interval: 2s
@@ -285,7 +297,9 @@ services:
       - airflow_home/dags:/usr/local/airflow/dags:z
       - airflow_home/plugins:/usr/local/airflow/plugins:z
       - airflow_home/include:/usr/local/airflow/include:z
+      
       - airflow_logs:/usr/local/airflow/logs
+      
     
 
 `

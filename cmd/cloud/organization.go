@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -27,6 +28,7 @@ var (
 	auditLogsEarliestParamDefaultValue = 90
 	shouldDisplayLoginLink             bool
 	role                               string
+	updateRole                         string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -167,7 +169,7 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 			return userUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The new role for the "+
+	cmd.Flags().StringVarP(&updateRole, "role", "r", "", "The new role for the "+
 		"user. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	return cmd
 }
@@ -218,7 +220,8 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
 	} else {
 		// no email was provided so ask the user for it
 		email = input.Text("enter email address to invite a user: ")
@@ -238,9 +241,15 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// if an email was provided in the args we use it
 	if len(args) > 0 {
-		email = args[0]
+		// make sure the email is lowercase
+		email = strings.ToLower(args[0])
+	}
+
+	if updateRole == "" {
+		// no role was provided so ask the user for it
+		updateRole = input.Text("enter a user organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateUserRole(email, role, out, astroCoreClient)
+	return user.UpdateUserRole(email, updateRole, out, astroCoreClient)
 }
