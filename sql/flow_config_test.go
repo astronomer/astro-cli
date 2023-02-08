@@ -26,10 +26,19 @@ func TestGetPypiVersionInvalidHTTPRequestFailure(t *testing.T) {
 	assert.ErrorContains(t, err, expectedErrContains)
 }
 
-func TestGetPypiVersionInvalidAstroCliVersionFailure(t *testing.T) {
-	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "foo")
-	expectedErrContains := "error parsing response for SQL CLI version"
-	assert.ErrorContains(t, err, expectedErrContains)
+func TestGetPypiVersionAstroCliVersionExactMatchSuccess(t *testing.T) {
+	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "1.9.0")
+	assert.NoError(t, err)
+}
+
+func TestGetPypiVersionAstroCliVersionMinorVersionMatchSuccess(t *testing.T) {
+	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "1.10.1")
+	assert.NoError(t, err)
+}
+
+func TestGetPypiVersionAstroCliVersionDefaultMatchSuccess(t *testing.T) {
+	_, err := GetPypiVersion("https://raw.githubusercontent.com/astronomer/astro-sdk/astro-cli/sql-cli/config/astro-cli.json", "x.y.z")
+	assert.NoError(t, err)
 }
 
 func TestGetBaseDockerImageURIInvalidURLFailure(t *testing.T) {

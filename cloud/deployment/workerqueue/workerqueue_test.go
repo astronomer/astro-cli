@@ -1128,7 +1128,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod_cpu in the request. It will be calculated based on the requested worker_type")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod cpu in the request. It will be calculated based on the requested worker type")
 	})
 	t.Run("returns an error when pod_ram is in input", func(t *testing.T) {
 		requestedWorkerQueue.PodRAM = "1.0"
@@ -1140,7 +1140,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod_ram in the request. It will be calculated based on the requested worker_type")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
 	})
 	t.Run("returns an error when min_worker_count is in input", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
@@ -1152,7 +1152,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support min_worker_count in the request. It can only be used with CeleryExecutor")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
 	})
 	t.Run("returns an error when max_worker_count is in input", func(t *testing.T) {
 		requestedWorkerQueue.MaxWorkerCount = 25
@@ -1164,7 +1164,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support max_worker_count in the request. It can only be used with CeleryExecutor")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
 	})
 	t.Run("returns an error when worker_concurrency is in input", func(t *testing.T) {
 		requestedWorkerQueue.WorkerConcurrency = 350
@@ -1176,7 +1176,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support worker_concurrency in the request. It can only be used with CeleryExecutor")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
 	})
 }
 

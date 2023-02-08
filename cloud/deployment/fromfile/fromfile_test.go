@@ -2753,7 +2753,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support min_worker_count in the request. It can only be used with CeleryExecutor")
+				assert.ErrorContains(t, err, "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
 			})
@@ -2790,7 +2790,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support max_worker_count in the request. It can only be used with CeleryExecutor")
+				assert.ErrorContains(t, err, "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
 			})
@@ -2827,7 +2827,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support worker_concurrency in the request. It can only be used with CeleryExecutor")
+				assert.ErrorContains(t, err, "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
 			})
@@ -2864,7 +2864,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support pod_ram in the request. It will be calculated based on the requested worker_type")
+				assert.ErrorContains(t, err, "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
 				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
 				mockClient.AssertExpectations(t)
 			})
