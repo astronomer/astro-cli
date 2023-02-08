@@ -79,6 +79,16 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
+	// Check for APITokens before API keys or refresh tokens
+	apiToken, err := checkAPIToken(client, coreClient, args)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+	}
+	if apiToken {
+		return nil
+	}
+
 	// run auth setup for any command that requires auth
 	apiKey, err := checkAPIKeys(client, coreClient, args)
 	if err != nil {
@@ -278,6 +288,77 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	if err != nil {
 		return false, err
 	}
+	orgs, err := organization.ListOrganizations(coreClient)
+	if err != nil {
+		return false, err
+	}
+	org := orgs[0]
+	orgID := org.Id
+	orgShortName := org.ShortName
+
+	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
+	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
+		// get workspace ID
+		deployments, err := astroClient.ListDeployments(orgID, "")
+		if err != nil {
+			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		}
+		workspaceID = deployments[0].Workspace.ID
+
+		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+		if err != nil {
+			fmt.Println("no workspace set")
+		}
+	}
+	err = c.SetOrganizationContext(orgID, orgShortName)
+	if err != nil {
+		fmt.Println("no organization context set")
+	}
+	return true, nil
+}
+
+func checkAPIToken(astroClient astro.Client, coreClient astrocore.CoreClient, args []string) (bool, error) {
+	// check os variables
+	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
+	if astroAPIToken == "" {
+		return false, nil
+	}
+
+	fmt.Println("Using an Astro API Token")
+
+	// get authConfig
+	c, err := context.GetCurrentContext() // get current context
+	if err != nil {
+		// set context
+		domain := "astronomer.io"
+		if !context.Exists(domain) {
+			err := context.SetContext(domain)
+			if err != nil {
+				return false, err
+			}
+
+			// Switch context
+			err = context.Switch(domain)
+			if err != nil {
+				return false, err
+			}
+		}
+		c, err = context.GetContext(domain) // get current context
+		if err != nil {
+			return false, err
+		}
+	}
+
+	err = c.SetContextKey("token", "Bearer "+astroAPIToken)
+	if err != nil {
+		return false, err
+	}
+
+	err = c.SetExpiresIn(time.Now().AddDate(1, 0, 0).Unix())
+	if err != nil {
+		return false, err
+	}
+
 	orgs, err := organization.ListOrganizations(coreClient)
 	if err != nil {
 		return false, err
