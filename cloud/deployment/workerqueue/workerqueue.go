@@ -115,7 +115,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
-			listToCreate = updateQueueList(existingQueues, queueToCreateOrUpdate, requestedDeployment.DeploymentSpec.Executor)
+			listToCreate = updateQueueList(existingQueues, queueToCreateOrUpdate, requestedDeployment.DeploymentSpec.Executor, wQueueMin, wQueueMax, wQueueConcurrency)
 		} else {
 			// update does not allow creating new queues
 			errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
@@ -135,10 +135,10 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	return nil
 }
 
-// SetWorkerQueueValues sets values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency
-// Default values are used if the user did not request any
+// SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
 func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
-	if wQueueMin == 0 {
+	// -1 is the CLI default to allow users to request wQueueMin=0
+	if wQueueMin == -1 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MinWorkerCount = workerQueueDefaultOptions.MinWorkerCount.Default
 	}
@@ -420,7 +420,7 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
 // sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
-func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string) []astro.WorkerQueue {
+func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string, wQueueMin, wQueueMax, wQueueConcurrency int) []astro.WorkerQueue {
 	for i, queue := range existingQueues {
 		if queue.Name != queueToUpdate.Name {
 			continue
@@ -429,9 +429,15 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 		queue.ID = existingQueues[i].ID               // we need IDs to update existing queues
 		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
 		if executor == deployment.CeleryExecutor {
-			queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
-			queue.MinWorkerCount = queueToUpdate.MinWorkerCount
-			queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+			if wQueueMin != -1 {
+				queue.MinWorkerCount = queueToUpdate.MinWorkerCount
+			}
+			if wQueueMax != 0 {
+				queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+			}
+			if wQueueConcurrency != 0 {
+				queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
+			}
 		} else if executor == deployment.KubeExecutor {
 			// KubernetesExecutor calculates resources automatically based on the worker type
 			queue.WorkerConcurrency = 0

@@ -2419,18 +2419,19 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			minCount := 3
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 200,
 					WorkerType:        "test-worker-1",
 				},
 				{
 					Name:              "test-q-2",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 200,
 					WorkerType:        "test-worker-8",
 				},
@@ -2484,18 +2485,20 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+				minCountThirty := 30
+				minCountThree := 3
 				qList = []inspect.Workerq{
 					{
 						Name:              "default",
 						MaxWorkerCount:    16,
-						MinWorkerCount:    30,
+						MinWorkerCount:    &minCountThirty,
 						WorkerConcurrency: 200,
 						WorkerType:        "test-worker-1",
 					},
 					{
 						Name:              "test-q-2",
 						MaxWorkerCount:    16,
-						MinWorkerCount:    3,
+						MinWorkerCount:    &minCountThree,
 						WorkerConcurrency: 200,
 						WorkerType:        "test-worker-2",
 					},
@@ -2549,18 +2552,20 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+				minCountThirty := 30
+				minCountThree := 3
 				qList = []inspect.Workerq{
 					{
 						Name:              "default",
 						MaxWorkerCount:    16,
-						MinWorkerCount:    30,
+						MinWorkerCount:    &minCountThirty,
 						WorkerConcurrency: 200,
 						WorkerType:        "test-worker-1",
 					},
 					{
 						Name:              "test-q-2",
 						MaxWorkerCount:    16,
-						MinWorkerCount:    3,
+						MinWorkerCount:    &minCountThree,
 						WorkerConcurrency: 200,
 						WorkerType:        "test-worker-2",
 					},
@@ -2596,14 +2601,17 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+				minCount := -1
 				qList = []inspect.Workerq{
 					{
-						Name:       "default",
-						WorkerType: "test-worker-1",
+						Name:           "default",
+						WorkerType:     "test-worker-1",
+						MinWorkerCount: &minCount,
 					},
 					{
-						Name:       "test-q-2",
-						WorkerType: "test-worker-2",
+						Name:           "test-q-2",
+						WorkerType:     "test-worker-2",
+						MinWorkerCount: &minCount,
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
@@ -2639,7 +2647,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				}
 				mockWorkerQueueDefaultOptions = astro.WorkerQueueDefaultOptions{
 					MinWorkerCount: astro.WorkerQueueOption{
-						Floor:   1,
+						Floor:   0,
 						Ceiling: 20,
 						Default: 5,
 					},
@@ -2730,11 +2738,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 				deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 				deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
+				minCount := 10
 				qList = []inspect.Workerq{
 					{
 						Name:           "default",
 						WorkerType:     "test-worker-1",
-						MinWorkerCount: 10,
+						MinWorkerCount: &minCount,
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
@@ -2972,18 +2981,19 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			minCount := 3
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 200,
 					WorkerType:        "test-worker-1",
 				},
 				{
 					Name:              "test-q-2",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 200,
 					WorkerType:        "test-worker-2",
 				},
@@ -3270,18 +3280,19 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerAU = 4
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
+			minCount := 3
 			qList = []inspect.Workerq{
 				{
 					Name:              "default",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 200,
 					WorkerType:        "test-worker-1",
 				},
 				{
 					Name:              "test-q-2",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 200,
 					WorkerType:        "test-worker-2",
 				},
@@ -3821,18 +3832,19 @@ func TestCreateEnvVars(t *testing.T) {
 func TestHasQueues(t *testing.T) {
 	t.Run("returns true if there are worker queues in the deployment", func(t *testing.T) {
 		var deploymentFromFile inspect.FormattedDeployment
+		minCount := 3
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
 				MaxWorkerCount:    16,
-				MinWorkerCount:    3,
+				MinWorkerCount:    &minCount,
 				WorkerConcurrency: 20,
 				WorkerType:        "test-worker-1",
 			},
 			{
 				Name:              "test-q-2",
 				MaxWorkerCount:    16,
-				MinWorkerCount:    3,
+				MinWorkerCount:    &minCount,
 				WorkerConcurrency: 20,
 				WorkerType:        "test-worker-2",
 			},
@@ -3875,18 +3887,19 @@ func TestGetQueues(t *testing.T) {
 					NodePoolID:        "test-pool-id-2",
 				},
 			}
+			minCount := 3
 			qList := []inspect.Workerq{
 				{
 					Name:              "default",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 20,
 					WorkerType:        "test-worker-1",
 				},
 				{
 					Name:              "test-q-2",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCount,
 					WorkerConcurrency: 20,
 					WorkerType:        "test-worker-2",
 				},
@@ -3941,18 +3954,20 @@ func TestGetQueues(t *testing.T) {
 					NodePoolID:        "test-pool-id-2",
 				},
 			}
+			minCountThree := 3
+			minCountFour := 4
 			qList := []inspect.Workerq{
 				{
 					Name:              "default",
 					MaxWorkerCount:    18,
-					MinWorkerCount:    4,
+					MinWorkerCount:    &minCountFour,
 					WorkerConcurrency: 25,
 					WorkerType:        "test-worker-1",
 				},
 				{
 					Name:              "test-q-2",
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCountThree,
 					WorkerConcurrency: 20,
 					WorkerType:        "test-worker-2",
 				},
@@ -4016,18 +4031,20 @@ func TestGetQueues(t *testing.T) {
 					NodePoolID:        "test-pool-id-2",
 				},
 			}
+			minCountThree := 3
+			minCountFour := 4
 			qList := []inspect.Workerq{
 				{
 					Name:              "default",
 					MaxWorkerCount:    18,
-					MinWorkerCount:    4,
+					MinWorkerCount:    &minCountFour,
 					WorkerConcurrency: 25,
 					WorkerType:        "test-worker-1",
 				},
 				{
 					Name:              "test-q-2", // this queue is being added
 					MaxWorkerCount:    16,
-					MinWorkerCount:    3,
+					MinWorkerCount:    &minCountThree,
 					WorkerConcurrency: 20,
 					WorkerType:        "test-worker-2",
 				},
@@ -4111,18 +4128,19 @@ func TestGetQueues(t *testing.T) {
 		})
 	})
 	t.Run("returns an error if unable to determine nodepool id", func(t *testing.T) {
+		minCount := 3
 		qList := []inspect.Workerq{
 			{
 				Name:              "default",
 				MaxWorkerCount:    16,
-				MinWorkerCount:    3,
+				MinWorkerCount:    &minCount,
 				WorkerConcurrency: 20,
 				WorkerType:        "test-worker-1",
 			},
 			{
 				Name:              "test-q-2",
 				MaxWorkerCount:    16,
-				MinWorkerCount:    3,
+				MinWorkerCount:    &minCount,
 				WorkerConcurrency: 20,
 				WorkerType:        "test-worker-4",
 			},
