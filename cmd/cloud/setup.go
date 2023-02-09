@@ -25,7 +25,7 @@ import (
 
 var (
 	authLogin = auth.Login
-
+	defaultDomain = "astronomer.io"
 	client = httputil.NewHTTPClient()
 )
 
@@ -217,7 +217,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := "astronomer.io"
+		domain := defaultDomain
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
@@ -330,7 +330,7 @@ func checkAPIToken(astroClient astro.Client, coreClient astrocore.CoreClient, ar
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := "astronomer.io"
+		domain := defaultDomain
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
