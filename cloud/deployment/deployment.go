@@ -646,6 +646,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 		}
 		if len(stageDeployments) < 1 {
 			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
+			return astro.Deployment{}, errInvalidDeployment
 		}
 	}
 
