@@ -24,9 +24,9 @@ import (
 )
 
 var (
-	authLogin = auth.Login
+	authLogin     = auth.Login
 	defaultDomain = "astronomer.io"
-	client = httputil.NewHTTPClient()
+	client        = httputil.NewHTTPClient()
 )
 
 const (
