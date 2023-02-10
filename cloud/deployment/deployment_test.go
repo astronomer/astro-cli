@@ -74,13 +74,12 @@ func TestGetDeployment(t *testing.T) {
 	})
 	deploymentName := "test-wrong"
 	deploymentID = "test-id"
-	t.Run("auto select after invalid deployment Name", func(t *testing.T) {
+	t.Run("error after invalid deployment Name", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentID, deployment.ID)
+		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
