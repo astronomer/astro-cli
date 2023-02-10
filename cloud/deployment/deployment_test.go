@@ -79,7 +79,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
 
 		_, err := GetDeployment(ws, "", deploymentName, mockClient)
-		assert.ErrorIs(t, err, errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified"))
+		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
 
