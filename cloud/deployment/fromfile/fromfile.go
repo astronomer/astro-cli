@@ -454,7 +454,9 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		// add new queue or update existing queue properties to list of queues to return
 		qList[i].Name = requestedQueues[i].Name
 		qList[i].IsDefault = requestedQueues[i].Name == defaultQueue
-		qList[i].MinWorkerCount = requestedQueues[i].MinWorkerCount
+		if requestedQueues[i].MinWorkerCount != nil {
+			qList[i].MinWorkerCount = *requestedQueues[i].MinWorkerCount
+		}
 		qList[i].MaxWorkerCount = requestedQueues[i].MaxWorkerCount
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
