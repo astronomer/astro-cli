@@ -52,7 +52,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
-	github.com/Microsoft/hcsshim v0.8.24 // indirect
+	github.com/Microsoft/hcsshim v0.8.25 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -64,7 +64,7 @@ require (
 	github.com/compose-spec/godotenv v1.1.1 // indirect
 	github.com/containerd/cgroups v1.0.3 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/containerd v1.5.16 // indirect
+	github.com/containerd/containerd v1.5.18 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
