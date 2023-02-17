@@ -1,5 +1,11 @@
 package houston
 
+import (
+	"errors"
+
+	"github.com/astronomer/astro-cli/config"
+)
+
 var (
 	appConfig    *AppConfig
 	appConfigErr error
@@ -82,7 +88,8 @@ func (h ClientImplementation) GetAppConfig(_ interface{}) (*AppConfig, error) {
 	// If application config has already been requested, we do not want to request it again
 	// since this is a CLI program that gets executed and exits at the end of execution, we don't want to send multiple
 	// times the same call to get the app config, since it probably won't change in a few milliseconds.
-	if appConfig != nil || appConfigErr != nil {
+	// We would like to retry on ErrGetHomeString error in case context has been set correctly now.
+	if appConfig != nil || (appConfigErr != nil && !errors.Is(appConfigErr, config.ErrGetHomeString)) {
 		return appConfig, appConfigErr
 	}
 
@@ -125,7 +132,8 @@ func (h ClientImplementation) GetAvailableNamespaces(_ interface{}) ([]Namespace
 
 // GetPlatformVersion would fetch the current platform version
 func (h ClientImplementation) GetPlatformVersion(_ interface{}) (string, error) {
-	if version != "" || versionErr != nil {
+	// we would like to retry on ErrGetHomeString error in case context has been set correctly now
+	if version != "" || (versionErr != nil && !errors.Is(versionErr, config.ErrGetHomeString)) {
 		return version, versionErr
 	}
 

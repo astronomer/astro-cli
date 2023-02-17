@@ -76,7 +76,10 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				return cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
+				err = cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
+				if err != nil {
+					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
+				}
 			}
 			// common PersistentPreRunE component between software & cloud
 			// setting up log verbosity and dumping debug logs collected during CLI-initialization
