@@ -213,13 +213,14 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 			if err != nil {
 				return false, err
 			}
-
-			// Switch context
-			err = context.Switch(domain)
-			if err != nil {
-				return false, err
-			}
 		}
+
+		// Switch context
+		err = context.Switch(domain)
+		if err != nil {
+			return false, err
+		}
+
 		c, err = context.GetContext(domain) // get current context
 		if err != nil {
 			return false, err
@@ -282,6 +283,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	if err != nil {
 		return false, err
 	}
+
 	org := orgs[0]
 	orgID := org.Id
 	orgShortName := org.ShortName
