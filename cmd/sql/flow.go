@@ -49,11 +49,13 @@ var (
 	debug             bool
 	env               string
 	generateTasks     bool
+	includeUpstream   bool
 	noDebug           bool
 	noGenerateTasks   bool
 	noVerbose         bool
 	outputDir         string
 	projectDir        string
+	taskId            string
 	verbose           bool
 )
 
@@ -314,6 +316,9 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		if generateTasks {
 			args = append(args, "--generate-tasks")
 		}
+		if includeUpstream {
+			args = append(args, "--include-upstream")
+		}
 		if noGenerateTasks {
 			args = append(args, "--no-generate-tasks")
 		}
@@ -322,6 +327,9 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		}
 		if noVerbose {
 			args = append(args, "--no-verbose")
+		}
+		if taskId != "" {
+			args = append(args, "--task-id", taskId)
 		}
 	}
 	return args
@@ -670,6 +678,8 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	cmd.Flags().BoolVar(&noVerbose, "no-verbose", false, "")
+	cmd.Flags().StringVar(&taskId, "task-id", "", "")
+	cmd.Flags().BoolVar(&includeUpstream, "include-upstream", false, "")
 	return cmd
 }
 
