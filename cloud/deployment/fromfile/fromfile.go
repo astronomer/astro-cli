@@ -78,11 +78,6 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 	if err != nil {
 		return err
 	}
-	// map workspace name to id
-	workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, client)
-	if err != nil {
-		return err
-	}
 	// map cluster name to id and collect node pools for cluster
 	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, client)
 	if err != nil {
@@ -94,6 +89,11 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 	}
 	switch action {
 	case createAction:
+		// map workspace name to id
+		workspaceID, err = getWorkspaceIDFromName(formattedDeployment.Deployment.Configuration.WorkspaceName, c.Organization, client)
+		if err != nil {
+			return err
+		}
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
 			// create does not allow updating existing deployments
@@ -122,6 +122,8 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 		}
 		// this deployment exists so update it
 		existingDeployment = deploymentFromName(existingDeployments, formattedDeployment.Deployment.Configuration.Name)
+		workspaceID = existingDeployment.Workspace.ID
+
 		// transform formattedDeployment to DeploymentUpdateInput
 		_, updateInput, err = getCreateOrUpdateInput(&formattedDeployment, clusterID, workspaceID, updateAction, &existingDeployment, nodePools, client)
 		if err != nil {
