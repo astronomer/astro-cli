@@ -55,7 +55,7 @@ var (
 	noVerbose         bool
 	outputDir         string
 	projectDir        string
-	taskId            string
+	taskID            string
 	verbose           bool
 )
 
@@ -328,8 +328,8 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		if noVerbose {
 			args = append(args, "--no-verbose")
 		}
-		if taskId != "" {
-			args = append(args, "--task-id", taskId)
+		if taskID != "" {
+			args = append(args, "--task-id", taskID)
 		}
 	}
 	return args
@@ -678,7 +678,7 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	cmd.Flags().BoolVar(&noVerbose, "no-verbose", false, "")
-	cmd.Flags().StringVar(&taskId, "task-id", "", "")
+	cmd.Flags().StringVar(&taskID, "task-id", "", "")
 	cmd.Flags().BoolVar(&includeUpstream, "include-upstream", false, "")
 	return cmd
 }
