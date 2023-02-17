@@ -37,6 +37,7 @@ import (
 
 const (
 	componentName                  = "airflow"
+	podman                         = "podman"
 	dockerStateUp                  = "running"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
@@ -716,8 +717,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 			if err != nil {
 				return err
 			}
-
-			if string(marshal) == `{"action":"health_status: healthy"}` {
+			if string(marshal) == `{"action":"health_status: healthy"}` || config.CFG.DockerCommand.GetString() == podman {
 				psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 					All: true,
 				})
@@ -741,8 +741,11 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 						}
 					}
 				}
-
-				fmt.Println("\nProject is running! All components are now available.")
+				if config.CFG.DockerCommand.GetString() == podman {
+					fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
+				} else {
+					fmt.Println("\nProject is running! All components are now available.")
+				}
 				parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 				webserverURL := "http://localhost:" + parts[len(parts)-1]
 				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
