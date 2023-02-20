@@ -296,6 +296,8 @@ func TestFlowRunCmd(t *testing.T) {
 		args []string
 	}{
 		{[]string{cmd, "--project-dir", t.TempDir()}},
+		{[]string{cmd, "--task-id", "<task_id>"}},
+		{[]string{cmd, "--task-id", "<task_id>", "--include-upstream"}},
 		{[]string{cmd, "--generate-tasks"}},
 		{[]string{cmd, "--no-generate-tasks"}},
 		{[]string{cmd, "--no-verbose"}},

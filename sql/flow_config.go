@@ -78,7 +78,7 @@ func GetPypiVersion(configURL, astroCliVersion string) (AstroSQLCliVersion, erro
 			}
 		}
 	}
-	return AstroSQLCliVersion{SQLCliCompatibility.SQLCliVersion, SQLCliCompatibility.PreRelease}, nil
+	return AstroSQLCliVersion{SQLCliCompatibility.SQLCliVersion, true}, nil
 }
 
 func GetBaseDockerImageURI(configURL string) (string, error) {
