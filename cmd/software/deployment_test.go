@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
@@ -30,8 +31,8 @@ var (
 			{URL: "https://deployments.local.astronomer.io/accurate-radioactivity-8677/airflow", Type: "airflow"},
 			{URL: "https://deployments.local.astronomer.io/accurate-radioactivity-8677/flower", Type: "flower"},
 		},
-		CreatedAt: "2021-04-26T20:03:36.262Z",
-		UpdatedAt: "2021-04-26T20:03:36.262Z",
+		CreatedAt: time.Time{},
+		UpdatedAt: time.Time{},
 	}
 	mockDeploymentSA = &houston.ServiceAccount{
 		ID:         "q1w2e3r4t5y6u7i8o9p0",
@@ -65,6 +66,7 @@ func execDeploymentCmd(args ...string) (string, error) {
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
 }

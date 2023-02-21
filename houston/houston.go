@@ -21,6 +21,8 @@ import (
 var (
 	HoustonClient ClientInterface
 
+	HoustonConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: %w"
+
 	errInaptPermissionsMsg       = "You do not have the appropriate permissions for that"
 	errAuthTokenRefreshFailedMsg = "AUTH_TOKEN_REFRESH_FAILED" //nolint:gosec
 	ErrVerboseInaptPermissions   = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")

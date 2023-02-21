@@ -22,6 +22,7 @@ import (
 
 //nolint:unparam
 func execOrganizationCmd(args ...string) (string, error) {
+	testUtil.SetupOSArgsForGinkgo()
 	buf := new(bytes.Buffer)
 	cmd := newOrganizationCmd(buf)
 	cmd.SetOut(buf)
@@ -31,6 +32,7 @@ func execOrganizationCmd(args ...string) (string, error) {
 }
 
 func TestOrganizationRootCommand(t *testing.T) {
+	testUtil.SetupOSArgsForGinkgo()
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newOrganizationCmd(os.Stdout)

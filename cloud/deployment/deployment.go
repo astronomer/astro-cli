@@ -25,7 +25,6 @@ var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
-	noDeployments           = "No Deployments found in this Workspace. Would you like to create one now?"
 	// Monkey patched to write unit tests
 	createDeployment = Create
 )
@@ -576,11 +575,6 @@ var GetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, e
 var SelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 	// select deployment
 	if len(deployments) == 0 {
-		i, _ := input.Confirm(noDeployments)
-		if !i {
-			fmt.Println("Exiting command...")
-			os.Exit(1)
-		}
 		return astro.Deployment{}, nil
 	}
 

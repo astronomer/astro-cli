@@ -22,6 +22,7 @@ func execWorkspaceCmd(args ...string) (string, error) {
 	cmd := newWorkspaceCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
 }
@@ -31,6 +32,7 @@ func TestWorkspaceRootCommand(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceCmd(os.Stdout)
 	cmd.SetOut(buf)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "workspace")

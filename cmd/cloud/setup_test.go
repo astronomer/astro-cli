@@ -25,6 +25,7 @@ func TestSetup(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("login cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -33,6 +34,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("dev cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "dev"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -45,6 +47,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("flow cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "flow"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -57,6 +60,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("help cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "help"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -69,6 +73,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("version cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "version"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -81,6 +86,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("context cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "list"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -93,6 +99,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("completion cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "generate"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -105,6 +112,7 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("deploy cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "deploy"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
@@ -141,6 +149,7 @@ func TestSetup(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
+		testUtil.SetupOSArgsForGinkgo()
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
 
@@ -188,6 +197,7 @@ func TestSetup(t *testing.T) {
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
+		testUtil.SetupOSArgsForGinkgo()
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
 

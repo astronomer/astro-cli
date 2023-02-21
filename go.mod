@@ -37,6 +37,8 @@ require (
 	github.com/google/go-github/v48 v48.2.0
 	github.com/hashicorp/go-version v1.3.0
 	github.com/mitchellh/mapstructure v1.4.2
+	github.com/onsi/ginkgo v1.12.0
+	github.com/onsi/gomega v1.9.0
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/mod v0.6.0
@@ -44,7 +46,13 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
+require (
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
+	github.com/hpcloud/tail v1.0.0 // indirect
+	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
+	gopkg.in/fsnotify.v1 v1.4.7 // indirect
+	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+)
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.2.3 // indirect

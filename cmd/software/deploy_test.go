@@ -10,8 +10,9 @@ import (
 )
 
 func execDeployCmd(args ...string) error {
-	cmd := newDeployCmd()
+	cmd := NewDeployCmd()
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return err
 }
@@ -24,10 +25,10 @@ func TestDeploy(t *testing.T) {
 			BYORegistryEnabled: true,
 		},
 	}
-	ensureProjectDir = func(cmd *cobra.Command, args []string) error {
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
-	deployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
 		return nil
 	}
 
