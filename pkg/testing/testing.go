@@ -139,3 +139,24 @@ func MockUserInput(t *testing.T, i string) func() {
 	os.Stdin = r
 	return func() { os.Stdin = realStdin }
 }
+
+// This handles a bug in ginkgo when testing cobra commands. Essentially when no arguments are supplied
+// Cobra uses os.Args[1:] as the arguments to the command. This causes a panic when os.Args is empty or
+// if it contains a ginkgo argument.
+func SetupOSArgsForGinkgo() func() {
+	origArgs := os.Args
+	newArgs := []string{}
+	for i := range origArgs {
+		if !(strings.Contains(origArgs[i], "ginkgo") || strings.Contains(origArgs[i], "test")) {
+			newArgs = append(newArgs, origArgs[i])
+		}
+	}
+	if len(os.Args) > 1 {
+		os.Args = newArgs
+	} else {
+		os.Args = []string{"single-arg-for-cobra"}
+	}
+	return func() {
+		os.Args = origArgs
+	}
+}

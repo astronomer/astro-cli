@@ -20,6 +20,7 @@ func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	t.Run("worker-queue command runs", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		wQueueCmd := newDeploymentWorkerQueueRootCmd(os.Stdout)
 		wQueueCmd.SetOut(buf)
 		_, err := wQueueCmd.ExecuteC()

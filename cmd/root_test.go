@@ -11,6 +11,7 @@ import (
 )
 
 func executeCommandC(args ...string) (c *cobra.Command, output string, err error) {
+	testUtil.SetupOSArgsForGinkgo()
 	buf := new(bytes.Buffer)
 	rootCmd := NewRootCmd()
 	rootCmd.SetOut(buf)
@@ -24,13 +25,13 @@ func executeCommand(args ...string) (output string, err error) {
 	return output, err
 }
 
-func TestRootCommand(t *testing.T) {
+func TestRootCommandLocal(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand()
 	assert.NoError(t, err)
 	assert.Contains(t, output, "astro [command]")
-
-	// Software root command
+	//
+	//// Software root command
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	output, err = executeCommand()
 	assert.NoError(t, err)

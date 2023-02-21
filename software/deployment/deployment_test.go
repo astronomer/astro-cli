@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
+	"time"
 
 	semver "github.com/Masterminds/semver/v3"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -22,6 +24,126 @@ var (
 	errUpdateDeploymentMock = errors.New("update deployment error")
 	errRegMock              = errors.New("error")
 )
+
+func TestGetDeployments(t *testing.T) {
+	// Create a mock Houston client
+	mockClient := &mocks.ClientInterface{}
+
+	// Define the expected response from the ListDeployments function
+	expectedDeployments := []houston.Deployment{
+		{ID: "123"},
+		{ID: "456"},
+	}
+
+	// Set up the mock client to return the expected response
+	mockClient.On("ListDeployments", mock.Anything).Return(expectedDeployments, nil)
+
+	// Call the GetDeployments function with the mock client
+	deployments, err := GetDeployments("workspace", mockClient)
+
+	// Assert that the returned deployments match the expected deployments
+	if !reflect.DeepEqual(deployments, expectedDeployments) {
+		t.Errorf("Expected deployments to be %v, but got %v", expectedDeployments, deployments)
+	}
+
+	// Assert that there was no error returned
+	if err != nil {
+		t.Errorf("Expected no error, but got %v", err)
+	}
+
+	// Assert that the ListDeployments function was called with the correct parameters
+	expectedRequest := houston.ListDeploymentsRequest{WorkspaceID: "workspace"}
+	mockClient.AssertCalled(t, "ListDeployments", expectedRequest)
+
+	mockClientErr := &mocks.ClientInterface{}
+	mockClientErr.On("ListDeployments", mock.Anything).Return(nil, errMock)
+	_, err = GetDeployments("workspace", mockClientErr)
+	assert.EqualError(t, err, GetDeploymentsErr(errMock).Error())
+}
+
+func TestSelectDeployment(t *testing.T) {
+	t.Run("no deployments", func(t *testing.T) {
+		deployments := []houston.Deployment{}
+		message := "Choose a deployment:"
+		dep, err := SelectDeployment(deployments, message)
+		assert.Equal(t, houston.Deployment{}, dep)
+		assert.Nil(t, err)
+	})
+	t.Run("One deployment", func(t *testing.T) {
+		createdAt := time.Now().Add(-1 * time.Hour)
+		deployments := []houston.Deployment{
+			{
+				ID:          "123",
+				Label:       "deployment-1",
+				ReleaseName: "release-1",
+				CreatedAt:   createdAt,
+			},
+		}
+		message := "Choose a deployment:"
+		dep, err := SelectDeployment(deployments, message)
+		assert.Equal(t, deployments[0], dep)
+		assert.Nil(t, err)
+	})
+	//
+	t.Run("Multiple deployments", func(t *testing.T) {
+		createdAt := time.Now().Add(-1 * time.Hour)
+		deployments := []houston.Deployment{
+			{
+				ID:          "123",
+				Label:       "deployment-1",
+				ReleaseName: "release-1",
+				CreatedAt:   createdAt,
+			},
+			{
+				ID:          "456",
+				Label:       "deployment-2",
+				ReleaseName: "release-2",
+				CreatedAt:   createdAt.Add(-1 * time.Minute),
+			},
+			{
+				ID:          "789",
+				Label:       "deployment-3",
+				ReleaseName: "release-3",
+				CreatedAt:   createdAt.Add(-2 * time.Minute),
+			},
+		}
+		message := "Choose a deployment:"
+		testUtil.MockUserInput(t, "2\n")
+		dep, err := SelectDeployment(deployments, message)
+		assert.Equal(t, deployments[1], dep)
+		assert.Nil(t, err)
+	})
+	//
+	t.Run("Invalid choice", func(t *testing.T) {
+		createdAt := time.Now().Add(-1 * time.Hour)
+		deployments := []houston.Deployment{
+			{
+				ID:          "123",
+				Label:       "deployment-1",
+				ReleaseName: "release-1",
+				CreatedAt:   createdAt,
+			},
+			{
+				ID:          "456",
+				Label:       "deployment-2",
+				ReleaseName: "release-2",
+				CreatedAt:   createdAt.Add(-1 * time.Minute),
+			},
+			{
+				ID:          "789",
+				Label:       "deployment-3",
+				ReleaseName: "release-3",
+				CreatedAt:   createdAt.Add(-2 * time.Minute),
+			},
+		}
+		message := "Choose a deployment:"
+		testUtil.MockUserInput(t, "4\n")
+
+		dep, err := SelectDeployment(deployments, message)
+		assert.Equal(t, houston.Deployment{}, dep)
+		assert.Equal(t, ErrInvalidDeploymentKey, err)
+	})
+}
 
 func TestCheckManualReleaseNames(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
@@ -89,8 +211,8 @@ func TestCreate(t *testing.T) {
 				URL:  "http://flower.com",
 			},
 		},
-		CreatedAt: "2020-06-25T20:10:33.898Z",
-		UpdatedAt: "2020-06-25T20:10:33.898Z",
+		CreatedAt: time.Time{},
+		UpdatedAt: time.Time{},
 	}
 
 	label := "label"
@@ -500,8 +622,8 @@ func TestUpdate(t *testing.T) {
 		DeploymentInfo: houston.DeploymentInfo{
 			Current: "2.2.2-1",
 		},
-		CreatedAt: "2020-06-25T20:09:38.341Z",
-		UpdatedAt: "2020-06-25T20:09:38.342Z",
+		CreatedAt: time.Time{},
+		UpdatedAt: time.Time{},
 	}
 
 	role := "test-role"

@@ -28,6 +28,7 @@ func execWorkspaceCmd(args ...string) (string, error) {
 	cmd := newWorkspaceCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
 }

@@ -11,6 +11,7 @@ import (
 )
 
 func execDeployCmd(args ...string) error {
+	testUtil.SetupOSArgsForGinkgo()
 	cmd := NewDeployCmd()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()

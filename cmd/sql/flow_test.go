@@ -9,11 +9,21 @@ import (
 	"testing"
 	"testing/fstest"
 
+	softwareDeployment "github.com/astronomer/astro-cli/software/deployment"
+
+	"github.com/astronomer/astro-cli/houston"
+	softwareWorkspace "github.com/astronomer/astro-cli/software/workspace"
+
+	"github.com/onsi/ginkgo/extensions/table"
+
 	"github.com/astronomer/astro-cli/astro-client"
 	cloudDeploy "github.com/astronomer/astro-cli/cloud/deploy"
-	astroDeployment "github.com/astronomer/astro-cli/cloud/deployment"
-	astroWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
+	cloudDeployment "github.com/astronomer/astro-cli/cloud/deployment"
+	cloudWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
+	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
+	softwareDeploy "github.com/astronomer/astro-cli/software/deploy"
+
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -22,6 +32,8 @@ import (
 	"github.com/astronomer/astro-cli/version"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,28 +44,54 @@ var (
 	imageBuildResponse = types.ImageBuildResponse{
 		Body: io.NopCloser(strings.NewReader("Image built")),
 	}
-	containerCreateCreatedBody    = container.ContainerCreateCreatedBody{ID: "123"}
-	sampleLog                     = io.NopCloser(strings.NewReader("Sample log"))
-	originalGetWorkspaceSelection = astroWorkspace.GetWorkspaceSelection
-	originalGetDeployments        = astroDeployment.GetDeployments
-	originalSelectDeployment      = astroDeployment.SelectDeployment
-	mockGetWorkspaceSelection     = func(client astro.Client, out io.Writer) (string, error) {
+	containerCreateCreatedBody            = container.ContainerCreateCreatedBody{ID: "123"}
+	sampleLog                             = io.NopCloser(strings.NewReader("Sample log"))
+	originalGetCloudWorkspaceSelection    = cloudWorkspace.GetWorkspaceSelection
+	originalGetSoftwareWorkspaceSelection = softwareWorkspace.GetWorkspaceSelectionID
+	originalGetCloudDeployments           = cloudDeployment.GetDeployments
+	originalGetSoftwareDeployments        = softwareDeployment.GetDeployments
+	originalSelectCloudDeployment         = cloudDeployment.SelectDeployment
+	originalSelectSoftwareDeployment      = softwareDeployment.SelectDeployment
+	originalGetHoustonClient              = GetHoustonClient
+	mockGetHoustonClient                  = func() houston.ClientInterface {
+		return houston.ClientImplementation{}
+	}
+	mockGetCloudWorkspaceSelection = func(client astro.Client, out io.Writer) (string, error) {
 		return "W1", nil
 	}
-	mockGetWorkspaceSelectionErr = func(client astro.Client, out io.Writer) (string, error) {
+	mockGetSoftwareWorkspaceSelection = func(client houston.ClientInterface, out io.Writer) (string, error) {
+		return "W1", nil
+	}
+	mockGetCloudWorkspaceSelectionErr = func(client astro.Client, out io.Writer) (string, error) {
 		return "", errMock
 	}
-	mockGetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
+	mockGetSoftwareWorkspaceSelectionErr = func(client houston.ClientInterface, out io.Writer) (string, error) {
+		return "", errMock
+	}
+	mockGetCloudDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
 		return nil, nil
 	}
-	mockGetDeploymentsErr = func(ws string, client astro.Client) ([]astro.Deployment, error) {
+	mockGetCloudDeploymentsErr = func(ws string, client astro.Client) ([]astro.Deployment, error) {
 		return nil, errMock
 	}
-	mockSelectDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+	mockGetSoftwareDeployments = func(ws string, client houston.ClientInterface) ([]houston.Deployment, error) {
+		return nil, nil
+	}
+	mockGetSoftwareDeploymentsErr = func(ws string, client houston.ClientInterface) ([]houston.Deployment, error) {
+		return nil, errMock
+	}
+
+	mockSelectCloudDeployment = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 		return astro.Deployment{ID: "D1", Workspace: astro.Workspace{ID: "W1"}}, nil
 	}
-	mockSelectDeploymentErr = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
+	mockSelectCloudDeploymentErr = func(deployments []astro.Deployment, message string) (astro.Deployment, error) {
 		return astro.Deployment{}, errMock
+	}
+	mockSelectSoftwareDeployment = func(deployments []houston.Deployment, message string) (houston.Deployment, error) {
+		return houston.Deployment{ID: "D1", Workspace: houston.Workspace{ID: "W1"}}, nil
+	}
+	mockSelectSoftwareDeploymentErr = func(deployments []houston.Deployment, message string) (houston.Deployment, error) {
+		return houston.Deployment{}, errMock
 	}
 )
 
@@ -128,8 +166,8 @@ func mockExecuteCmdInDockerOutputForJSONConfig() func() {
 }
 
 // patches "astro deploy" command i.e. cloud.NewDeployCmd()
-func patchDeployCmd() func() {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
+func patchDeployCmd(platform string) func() {
+	testUtil.InitTestConfig(platform)
 
 	cloudCmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
@@ -139,9 +177,18 @@ func patchDeployCmd() func() {
 		return nil
 	}
 
+	softwareCmd.EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+
+	softwareCmd.DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled, prompt bool) error {
+		return nil
+	}
 	return func() {
 		cloudCmd.EnsureProjectDir = utils.EnsureProjectDir
 		cloudCmd.DeployImage = cloudDeploy.Deploy
+		softwareCmd.EnsureProjectDir = utils.EnsureProjectDir
+		softwareCmd.DeployAirflowImage = softwareDeploy.Airflow
 	}
 }
 
@@ -166,9 +213,12 @@ func chdir(t *testing.T, dir string) func() {
 
 func execFlowCmd(args ...string) error {
 	version.CurrVersion = "1.8.0"
+	testUtil.SetupOSArgsForGinkgo()
 	cmd := NewFlowCommand()
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
+
 	return err
 }
 
@@ -296,8 +346,6 @@ func TestFlowRunCmd(t *testing.T) {
 		args []string
 	}{
 		{[]string{cmd, "--project-dir", t.TempDir()}},
-		{[]string{cmd, "--task-id", "<task_id>"}},
-		{[]string{cmd, "--task-id", "<task_id>", "--include-upstream"}},
 		{[]string{cmd, "--generate-tasks"}},
 		{[]string{cmd, "--no-generate-tasks"}},
 		{[]string{cmd, "--no-verbose"}},
@@ -339,7 +387,7 @@ func TestDebugFlowFlagCmd(t *testing.T) {
 }
 
 func TestFlowDeployWithWorkflowCmd(t *testing.T) {
-	defer patchDeployCmd()()
+	defer patchDeployCmd(testUtil.CloudPlatform)()
 
 	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
@@ -354,7 +402,7 @@ func TestFlowDeployWithWorkflowCmd(t *testing.T) {
 }
 
 func TestFlowDeployWithTooManyArgs(t *testing.T) {
-	defer patchDeployCmd()()
+	defer patchDeployCmd(testUtil.CloudPlatform)()
 
 	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
@@ -366,7 +414,7 @@ func TestFlowDeployWithTooManyArgs(t *testing.T) {
 }
 
 func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
-	defer patchDeployCmd()()
+	defer patchDeployCmd(testUtil.CloudPlatform)()
 
 	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
@@ -392,8 +440,8 @@ func TestFlowDeployNoWorkflowsCmd(t *testing.T) {
 	Os = sql.NewOsBind
 }
 
-func TestFlowDeployWorkflowsCmd(t *testing.T) {
-	defer patchDeployCmd()()
+func TestFlowDeployWorkflowsCmdCloud(t *testing.T) {
+	defer patchDeployCmd(testUtil.CloudPlatform)()
 
 	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return nil
@@ -419,8 +467,66 @@ func TestFlowDeployWorkflowsCmd(t *testing.T) {
 	Os = sql.NewOsBind
 }
 
+func TestFlowDeployWorkflowsCmdSoftware(t *testing.T) {
+	defer patchDeployCmd(testUtil.SoftwarePlatform)()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
+		return nil
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows/workflow/.sql": {
+				Data: []byte("select 1"),
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	err := execFlowCmd("deploy")
+	assert.NoError(t, err)
+
+	Os = sql.NewOsBind
+}
+
+func TestFlowDeployWorkflowsCmdWithDelete(t *testing.T) {
+	defer patchDeployCmd(testUtil.CloudPlatform)()
+
+	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
+		return nil
+	}
+	getInstalledFlowVersion = func() (string, error) {
+		return "", nil
+	}
+	mockOs := mocks.NewOsBind(t)
+	Os = func() sql.OsBind {
+		fs := fstest.MapFS{
+			"workflows/workflow/.sql": {
+				Data: []byte("select 1"),
+			},
+		}
+		mockOs.On("ReadDir", mock.Anything).Return(fs.ReadDir("workflows"))
+		return mockOs
+	}
+
+	defer mockExecuteCmdInDockerOutputForJSONConfig()()
+	RemoveDirectory = func(path string) error { return nil }
+	err := execFlowCmd("deploy", "--delete-dags=true")
+	assert.NoError(t, err)
+	RemoveDirectory = func(path string) error { return errMock }
+	err = execFlowCmd("deploy", "--delete-dags=true")
+	assert.Error(t, err)
+	Os = sql.NewOsBind
+	RemoveDirectory = os.RemoveAll
+}
+
 func TestFlowDeployCmdInstalledFlowVersionFailure(t *testing.T) {
-	defer patchDeployCmd()()
+	defer patchDeployCmd(testUtil.CloudPlatform)()
 
 	getInstalledFlowVersion = func() (string, error) {
 		return "", errMock
@@ -432,7 +538,7 @@ func TestFlowDeployCmdInstalledFlowVersionFailure(t *testing.T) {
 }
 
 func TestFlowDeployCmdEnsurePythonSDKVersionIsMetFailure(t *testing.T) {
-	defer patchDeployCmd()()
+	defer patchDeployCmd(testUtil.CloudPlatform)()
 
 	sql.EnsurePythonSdkVersionIsMet = func(input.PromptRunner, string) error {
 		return errMock
@@ -446,85 +552,183 @@ func TestFlowDeployCmdEnsurePythonSDKVersionIsMetFailure(t *testing.T) {
 	assert.ErrorIs(t, err, errMock)
 }
 
-func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
-	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
-	_, _, err := promptAstroCloudConfig("", "")
-	assert.ErrorIs(t, err, errMock)
-	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
+func WorkspaceErr(isStart bool) {
+	if isStart {
+		cloudWorkspace.GetWorkspaceSelection = mockGetCloudWorkspaceSelectionErr
+		softwareWorkspace.GetWorkspaceSelectionID = mockGetSoftwareWorkspaceSelectionErr
+	} else {
+		cloudWorkspace.GetWorkspaceSelection = originalGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = originalGetSoftwareWorkspaceSelection
+	}
 }
 
-func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetGetDeploymentsFailure(t *testing.T) {
-	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
-	astroDeployment.GetDeployments = mockGetDeploymentsErr
-	_, _, err := promptAstroCloudConfig("", "")
-	assert.ErrorIs(t, err, errMock)
-	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
-	astroDeployment.GetDeployments = originalGetDeployments
+func FoundWorkspaceCantFindDeploymentErr(isStart bool) {
+	if isStart {
+		cloudWorkspace.GetWorkspaceSelection = mockGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = mockGetSoftwareWorkspaceSelection
+		cloudDeployment.GetDeployments = mockGetCloudDeploymentsErr
+		softwareDeployment.GetDeployments = mockGetSoftwareDeploymentsErr
+	} else {
+		cloudWorkspace.GetWorkspaceSelection = originalGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = originalGetSoftwareWorkspaceSelection
+		cloudDeployment.GetDeployments = originalGetCloudDeployments
+		softwareDeployment.GetDeployments = originalGetSoftwareDeployments
+	}
 }
 
-func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetSelectDeploymentFailure(t *testing.T) {
-	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
-	astroDeployment.GetDeployments = mockGetDeployments
-	astroDeployment.SelectDeployment = mockSelectDeploymentErr
-	_, _, err := promptAstroCloudConfig("", "")
-	assert.ErrorIs(t, err, errMock)
-	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
-	astroDeployment.GetDeployments = originalGetDeployments
-	astroDeployment.SelectDeployment = originalSelectDeployment
+func FoundWorkspaceFoundDeploymentSelectDeploymentErr(isStart bool) {
+	if isStart {
+		cloudWorkspace.GetWorkspaceSelection = mockGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = mockGetSoftwareWorkspaceSelection
+		cloudDeployment.GetDeployments = mockGetCloudDeployments
+		softwareDeployment.GetDeployments = mockGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = mockSelectCloudDeploymentErr
+		softwareDeployment.SelectDeployment = mockSelectSoftwareDeploymentErr
+	} else {
+		cloudWorkspace.GetWorkspaceSelection = originalGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = originalGetSoftwareWorkspaceSelection
+		cloudDeployment.GetDeployments = originalGetCloudDeployments
+		softwareDeployment.GetDeployments = originalGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = originalSelectCloudDeployment
+		softwareDeployment.SelectDeployment = originalSelectSoftwareDeployment
+	}
 }
 
-func TestPromptAstroCloudConfigDeploymentAndWorkspaceUnsetSuccess(t *testing.T) {
-	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
-	astroDeployment.GetDeployments = mockGetDeployments
-	astroDeployment.SelectDeployment = mockSelectDeployment
-	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("", "")
-	assert.NoError(t, err)
-	assert.EqualValues(t, "D1", selectedAstroDeploymentID)
-	assert.EqualValues(t, "W1", selectedAstroWorkspaceID)
-	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
-	astroDeployment.GetDeployments = originalGetDeployments
-	astroDeployment.SelectDeployment = originalSelectDeployment
+func UnsetDeploymentSuccess(isStart bool) {
+	if isStart {
+		cloudWorkspace.GetWorkspaceSelection = mockGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = mockGetSoftwareWorkspaceSelection
+		cloudDeployment.GetDeployments = mockGetCloudDeployments
+		softwareDeployment.GetDeployments = mockGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = mockSelectCloudDeployment
+		softwareDeployment.SelectDeployment = mockSelectSoftwareDeployment
+	} else {
+		cloudWorkspace.GetWorkspaceSelection = originalGetCloudWorkspaceSelection
+		softwareWorkspace.GetWorkspaceSelectionID = originalGetSoftwareWorkspaceSelection
+		cloudDeployment.GetDeployments = originalGetCloudDeployments
+		softwareDeployment.GetDeployments = originalGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = originalSelectCloudDeployment
+		softwareDeployment.SelectDeployment = originalSelectSoftwareDeployment
+	}
 }
 
-func TestPromptAstroCloudConfigDeploymentUnsetGetDeploymentsFailure(t *testing.T) {
-	astroDeployment.GetDeployments = mockGetDeploymentsErr
-	_, _, err := promptAstroCloudConfig("", "W2")
-	assert.ErrorIs(t, err, errMock)
-	astroDeployment.GetDeployments = originalGetDeployments
+func WorkspaceGivenGetDeploymentsFailure(isStart bool) {
+	if isStart {
+		cloudDeployment.GetDeployments = mockGetCloudDeploymentsErr
+		softwareDeployment.GetDeployments = mockGetSoftwareDeploymentsErr
+	} else {
+		cloudDeployment.GetDeployments = originalGetCloudDeployments
+		softwareDeployment.GetDeployments = originalGetSoftwareDeployments
+	}
 }
 
-func TestPromptAstroCloudConfigDeploymentUnsetSelectDeploymentFailure(t *testing.T) {
-	astroDeployment.GetDeployments = mockGetDeployments
-	astroDeployment.SelectDeployment = mockSelectDeploymentErr
-	_, _, err := promptAstroCloudConfig("", "W2")
-	assert.ErrorIs(t, err, errMock)
-	astroDeployment.GetDeployments = originalGetDeployments
-	astroDeployment.SelectDeployment = originalSelectDeployment
+func WorkspaceGivenSelectDeploymentFailure(isStart bool) {
+	if isStart {
+		cloudDeployment.GetDeployments = mockGetCloudDeployments
+		softwareDeployment.GetDeployments = mockGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = mockSelectCloudDeploymentErr
+		softwareDeployment.SelectDeployment = mockSelectSoftwareDeploymentErr
+	} else {
+		cloudDeployment.GetDeployments = originalGetCloudDeployments
+		softwareDeployment.GetDeployments = originalGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = originalSelectCloudDeployment
+		softwareDeployment.SelectDeployment = originalSelectSoftwareDeployment
+	}
 }
 
-func TestPromptAstroCloudConfigDeploymentUnsetSuccess(t *testing.T) {
-	astroDeployment.GetDeployments = mockGetDeployments
-	astroDeployment.SelectDeployment = mockSelectDeployment
-	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("", "W2")
-	assert.NoError(t, err)
-	assert.EqualValues(t, "D1", selectedAstroDeploymentID)
-	assert.EqualValues(t, "W2", selectedAstroWorkspaceID)
-	astroDeployment.GetDeployments = originalGetDeployments
-	astroDeployment.SelectDeployment = originalSelectDeployment
+func WorkspaceGivenGetDeploymentSuccess(isStart bool) {
+	if isStart {
+		cloudDeployment.GetDeployments = mockGetCloudDeployments
+		softwareDeployment.GetDeployments = mockGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = mockSelectCloudDeployment
+		softwareDeployment.SelectDeployment = mockSelectSoftwareDeployment
+	} else {
+		cloudDeployment.GetDeployments = originalGetCloudDeployments
+		softwareDeployment.GetDeployments = originalGetSoftwareDeployments
+		cloudDeployment.SelectDeployment = originalSelectCloudDeployment
+		softwareDeployment.SelectDeployment = originalSelectSoftwareDeployment
+	}
 }
 
-func TestPromptAstroCloudConfigWorkspaceUnsetGetWorkspaceSelectionFailure(t *testing.T) {
-	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelectionErr
-	_, _, err := promptAstroCloudConfig("D2", "")
-	assert.ErrorIs(t, err, errMock)
-	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
-}
-
-func TestPromptAstroCloudConfigWorkspaceUnsetSuccess(t *testing.T) {
-	astroWorkspace.GetWorkspaceSelection = mockGetWorkspaceSelection
-	selectedAstroDeploymentID, selectedAstroWorkspaceID, err := promptAstroCloudConfig("D2", "")
-	assert.NoError(t, err)
-	assert.EqualValues(t, "D2", selectedAstroDeploymentID)
-	assert.EqualValues(t, "W1", selectedAstroWorkspaceID)
-	astroWorkspace.GetWorkspaceSelection = originalGetWorkspaceSelection
-}
+var _ = Describe("Prompt users for deployment and workspace", func() {
+	BeforeEach(func() {
+		GetHoustonClient = mockGetHoustonClient
+	})
+	table.DescribeTable("If neither workspace or deployment given",
+		func(isCloud bool, setUpAndTearDownMocks func(bool), throwsError bool, expectedError error) {
+			setUpAndTearDownMocks(true)
+			_, _, err := promptAstroEnvironmentConfig("", "", isCloud)
+			if throwsError {
+				Expect(err).To(Equal(expectedError))
+			} else {
+				Expect(err).To(BeNil())
+			}
+			setUpAndTearDownMocks(false)
+		},
+		table.Entry("can't find workspace", true, WorkspaceErr, true, errMock),
+		table.Entry("can't find workspace", false, WorkspaceErr, true, errMock),
+		table.Entry("found workspace and can't find deployments", true, FoundWorkspaceCantFindDeploymentErr, true, errMock),
+		table.Entry("found workspace and can't find deployments", false, FoundWorkspaceCantFindDeploymentErr, true, errMock),
+		table.Entry("found workspace and deployments but can not select deployment", false, FoundWorkspaceFoundDeploymentSelectDeploymentErr, true, errMock),
+		table.Entry("found workspace and deployments but can not select deployment", true, FoundWorkspaceFoundDeploymentSelectDeploymentErr, true, errMock),
+		table.Entry("found workspace and successfully finds deployment", true, UnsetDeploymentSuccess, false, nil),
+		table.Entry("found workspace and successfully finds deployment", true, UnsetDeploymentSuccess, false, nil),
+	)
+	table.DescribeTable("If workspace given but deployment not given",
+		func(isCloud bool, setUpAndTearDownMocks func(bool), throwsError bool, expectedError error) {
+			setUpAndTearDownMocks(true)
+			_, _, err := promptAstroEnvironmentConfig("", "W2", isCloud)
+			if throwsError {
+				Expect(err).To(Equal(expectedError))
+			} else {
+				Expect(err).To(BeNil())
+			}
+			setUpAndTearDownMocks(false)
+		},
+		table.Entry("can't find deployments", true, WorkspaceGivenGetDeploymentsFailure, true, errMock),
+		table.Entry("can't find deployments", false, WorkspaceGivenGetDeploymentsFailure, true, errMock),
+		table.Entry("found deployments but can't select deployment", true, WorkspaceGivenSelectDeploymentFailure, true, errMock),
+		table.Entry("found deployments but can't select deployment", false, WorkspaceGivenSelectDeploymentFailure, true, errMock),
+		table.Entry("successfully found the deployment", true, WorkspaceGivenGetDeploymentSuccess, false, errMock),
+		table.Entry("successfully found the deployment", false, WorkspaceGivenGetDeploymentSuccess, false, errMock),
+	)
+	Describe("If the deployment is successfully found", func() {
+		It("returns the deployment and workspace", func() {
+			UnsetDeploymentSuccess(true)
+			deployment, workspace, err := promptAstroEnvironmentConfig("", "W2", true)
+			Expect(err).To(BeNil())
+			Expect(workspace).To(Equal("W2"))
+			Expect(deployment).To(Equal("D1"))
+			deployment, workspace, err = promptAstroEnvironmentConfig("", "W2", false)
+			Expect(err).To(BeNil())
+			Expect(workspace).To(Equal("W2"))
+			Expect(deployment).To(Equal("D1"))
+			UnsetDeploymentSuccess(false)
+		})
+	})
+	Describe("If the user supplies a deployment and not a workspace", func() {
+		It("fails if it can't find a workspace", func() {
+			cloudWorkspace.GetWorkspaceSelection = mockGetCloudWorkspaceSelectionErr
+			softwareWorkspace.GetWorkspaceSelectionID = mockGetSoftwareWorkspaceSelectionErr
+			_, _, err := promptAstroEnvironmentConfig("D1", "", true)
+			Expect(err).To(Equal(errMock))
+			_, _, err = promptAstroEnvironmentConfig("D1", "", false)
+			Expect(err).To(Equal(errMock))
+			cloudWorkspace.GetWorkspaceSelection = originalGetCloudWorkspaceSelection
+			softwareWorkspace.GetWorkspaceSelectionID = originalGetSoftwareWorkspaceSelection
+		})
+		It("passes if it can find a workspace", func() {
+			cloudWorkspace.GetWorkspaceSelection = mockGetCloudWorkspaceSelection
+			softwareWorkspace.GetWorkspaceSelectionID = mockGetSoftwareWorkspaceSelection
+			_, _, err := promptAstroEnvironmentConfig("D1", "", true)
+			Expect(err).To(BeNil())
+			_, _, err = promptAstroEnvironmentConfig("D1", "", false)
+			Expect(err).To(BeNil())
+			cloudWorkspace.GetWorkspaceSelection = originalGetCloudWorkspaceSelection
+			softwareWorkspace.GetWorkspaceSelectionID = originalGetSoftwareWorkspaceSelection
+		})
+	})
+	AfterEach(func() {
+		GetHoustonClient = originalGetHoustonClient
+	})
+})

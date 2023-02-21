@@ -18,8 +18,8 @@ var (
 
 	ignoreCacheDeploy = false
 
-	ensureProjectDir   = utils.EnsureProjectDir
-	deployAirflowImage = deploy.Airflow
+	EnsureProjectDir   = utils.EnsureProjectDir
+	DeployAirflowImage = deploy.Airflow
 )
 
 var deployExample = `
@@ -36,13 +36,13 @@ const (
 	registryUncommittedChanges = "Project directory has uncommmited changes, use `astro deploy <deployment-id> -f` to force deploy."
 )
 
-func newDeployCmd() *cobra.Command {
+func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [DEPLOYMENT ID]",
 		Short:   "Deploy an Airflow project",
 		Long:    "Deploy an Airflow project to an Astronomer Cluster",
 		Args:    cobra.MaximumNArgs(1),
-		PreRunE: ensureProjectDir,
+		PreRunE: EnsureProjectDir,
 		RunE:    deployAirflow,
 		Example: deployExample,
 	}
@@ -90,5 +90,5 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		byoRegistryDomain = appConfig.BYORegistryDomain
 	}
 
-	return deployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
+	return DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, forcePrompt)
 }

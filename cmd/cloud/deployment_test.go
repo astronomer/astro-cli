@@ -26,6 +26,7 @@ func execDeploymentCmd(args ...string) (string, error) {
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
 }
@@ -35,6 +36,7 @@ func TestDeploymentRootCommand(t *testing.T) {
 	buf := new(bytes.Buffer)
 	deplyCmd := newDeploymentRootCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := deplyCmd.ExecuteC()
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "deployment")
