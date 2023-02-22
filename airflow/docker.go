@@ -723,7 +723,6 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 				marshal, err := json.Marshal(map[string]interface{}{
 					"action": event.Status,
 				})
-
 				if err != nil {
 					return err
 				}
