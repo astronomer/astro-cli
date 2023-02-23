@@ -1416,10 +1416,10 @@ func TestCheckWebserverHealth(t *testing.T) {
 		}
 		defer func() { initSettings = orgInitSetting }()
 
-		// orgStdout := os.Stdout
-		// defer func() { os.Stdout = orgStdout }()
-		// r, w, _ := os.Pipe()
-		// os.Stdout = w
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
 
 		// set config to podman
 		config.CFG.DockerCommand.SetHomeString("podman")
