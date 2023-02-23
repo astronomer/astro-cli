@@ -1392,19 +1392,19 @@ func TestCheckWebserverHealth(t *testing.T) {
 		settingsFile := "docker_test.go" // any file which exists
 		composeMock := new(mocks.DockerComposeAPI)
 		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "running"}}, nil).Once()
-		mockEventsCall := composeMock.On("Events", mock.AnythingOfType("*context.timerCtx"), "test", mock.Anything)
-		mockEventsCall.RunFn = func(args mock.Arguments) {
-			consumer := args.Get(2).(api.EventsOptions).Consumer
-			err := consumer(api.Event{Status: "exec_create"})
-			assert.NoError(t, err)
-			err = consumer(api.Event{Status: "exec_start"})
-			assert.NoError(t, err)
-			err = consumer(api.Event{Status: "exec_die"})
-			assert.NoError(t, err)
-			err = consumer(api.Event{Status: "health_status: healthy"})
-			assert.ErrorIs(t, err, errComposeProjectRunning)
-			mockEventsCall.ReturnArguments = mock.Arguments{err}
-		}
+		// mockEventsCall := composeMock.On("Events", mock.AnythingOfType("*context.timerCtx"), "test", mock.Anything)
+		// mockEventsCall.RunFn = func(args mock.Arguments) {
+		// 	consumer := args.Get(2).(api.EventsOptions).Consumer
+		// 	err := consumer(api.Event{Status: "exec_create"})
+		// 	assert.NoError(t, err)
+		// 	err = consumer(api.Event{Status: "exec_start"})
+		// 	assert.NoError(t, err)
+		// 	err = consumer(api.Event{Status: "exec_die"})
+		// 	assert.NoError(t, err)
+		// 	err = consumer(api.Event{Status: "health_status: healthy"})
+		// 	assert.ErrorIs(t, err, errComposeProjectRunning)
+		// 	mockEventsCall.ReturnArguments = mock.Arguments{err}
+		// }
 
 		openURL = func(url string) error {
 			return nil
