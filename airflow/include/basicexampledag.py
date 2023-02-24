@@ -6,6 +6,7 @@ from airflow.decorators import (
     task,
 )  # DAG and task decorators for interfacing with the TaskFlow API
 
+
 # When using the DAG decorator, The "dag_id" value defaults to the name of the function
 # it is decorating if not explicitly set. In this example, the "dag_id" value would be "example_dag_basic".
 @dag(
