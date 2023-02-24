@@ -26,6 +26,7 @@ func execDeploymentCmd(args ...string) (string, error) {
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
 }
@@ -35,6 +36,7 @@ func TestDeploymentRootCommand(t *testing.T) {
 	buf := new(bytes.Buffer)
 	deplyCmd := newDeploymentRootCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := deplyCmd.ExecuteC()
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "deployment")
@@ -264,9 +266,9 @@ deployment:
 			},
 		}
 		mockClient = new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-workspace"}}, nil)
+		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: orgID, Label: "test-workspace"}}, nil)
 		mockClient.On("ListClusters", orgID).Return(clusters, nil)
-		mockClient.On("ListDeployments", orgID, ws).Return([]astro.Deployment{}, nil).Once()
+		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
@@ -446,14 +448,13 @@ deployment:
 			},
 		}
 		mockClient = new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-workspace"}}, nil)
 		mockClient.On("ListClusters", orgID).Return(clusters, nil)
-		mockClient.On("ListDeployments", orgID, ws).Return([]astro.Deployment{updatedDeployment}, nil).Once()
+		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
 		mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, nil)
-		mockClient.On("ListDeployments", orgID, ws).Return([]astro.Deployment{updatedDeployment}, nil)
+		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
 		origClient := astroClient
 		astroClient = mockClient
 		fileutil.WriteStringToFile(filePath, data)

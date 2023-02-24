@@ -69,7 +69,7 @@ func login(cmd *cobra.Command, args []string, astroClient astro.Client, coreClie
 				// print an error if context domain is a valid cloud domain
 				fmt.Fprintf(out, "Error: %s is an invalid domain to login into Astro.\n", args[0])
 				// give the user an option to login to software
-				y, _ := input.Confirm("Are you trying to authenticate to Astronomer Software?")
+				y, _ := input.Confirm("Are you trying to authenticate to Astronomer Software or Nebula?")
 				if !y {
 					fmt.Println("Canceling login...")
 					return nil

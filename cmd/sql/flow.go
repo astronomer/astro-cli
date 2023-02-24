@@ -8,13 +8,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/astronomer/astro-cli/astro-client"
-	astroDeployment "github.com/astronomer/astro-cli/cloud/deployment"
-	astroWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
-	"github.com/astronomer/astro-cli/cmd/cloud"
+	"github.com/astronomer/astro-cli/houston"
+
 	"github.com/astronomer/astro-cli/context"
+
+	"github.com/astronomer/astro-cli/cmd/software"
+	"github.com/astronomer/astro-cli/config"
+
+	"github.com/astronomer/astro-cli/astro-client"
+	cloudDeployment "github.com/astronomer/astro-cli/cloud/deployment"
+	cloudWorkspace "github.com/astronomer/astro-cli/cloud/workspace"
+	"github.com/astronomer/astro-cli/cmd/cloud"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	softwareDeployment "github.com/astronomer/astro-cli/software/deployment"
+	softwareWorkspace "github.com/astronomer/astro-cli/software/workspace"
 	"github.com/astronomer/astro-cli/sql"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -49,11 +57,14 @@ var (
 	debug             bool
 	env               string
 	generateTasks     bool
+	includeUpstream   bool
 	noDebug           bool
 	noGenerateTasks   bool
 	noVerbose         bool
 	outputDir         string
 	projectDir        string
+	deleteDags        bool
+	taskID            string
 	verbose           bool
 )
 
@@ -62,25 +73,26 @@ var (
 	ErrNotCloudContext             = errors.New("currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release. ")
 	ErrTooManyArgs                 = errors.New("too many arguments supplied to the command. Refer --help for the usage of the command")
 	Os                             = sql.NewOsBind
+	RemoveDirectory                = os.RemoveAll
 )
 
 type VersionCmdResponse struct {
 	Version string `json:"version"`
 }
 
-// Return the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env
-func getAstroCloudConfig() (astroDeploymentID, astroWorkspaceID string, err error) {
+// Return the astro cloud or software config (astroDeploymentID and astroWorkspaceID) for the current env
+func getAstroDeploymentConfig() (astroDeploymentID, astroWorkspaceID string, err error) {
 	configJSON, err := readConfigCmdOutput("get", "--json")
 	if err != nil {
 		return
 	}
 
-	var config map[string]interface{}
-	if err = json.Unmarshal([]byte(configJSON), &config); err != nil {
+	var deploymentConfig map[string]interface{}
+	if err = json.Unmarshal([]byte(configJSON), &deploymentConfig); err != nil {
 		return
 	}
 
-	envConfig := config[env].(map[string]interface{})
+	envConfig := deploymentConfig[env].(map[string]interface{})
 	deployment, _ := envConfig["deployment"].(map[string]interface{})
 	astroDeploymentID, _ = deployment["astro_deployment_id"].(string)
 	astroWorkspaceID, _ = deployment["astro_workspace_id"].(string)
@@ -90,54 +102,137 @@ func getAstroCloudConfig() (astroDeploymentID, astroWorkspaceID string, err erro
 // Prompt the user for astro cloud config (astroDeploymentID and/or astroWorkspaceID) and return them
 //
 //nolint:gocritic
-func promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) (selectedAstroDeploymentID, selectedAstroWorkspaceID string, err error) {
-	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
-
+func promptAstroEnvironmentConfig(astroDeploymentID, astroWorkspaceID string, isCloud bool) (selectedAstroDeploymentID, selectedAstroWorkspaceID string, err error) {
 	if astroDeploymentID == "" && astroWorkspaceID == "" {
-		fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
-		workspace, err := astroWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
-		if err != nil {
-			return "", "", err
+		if isCloud {
+			selectedAstroDeploymentID, selectedAstroWorkspaceID, err = getCloudDeploymentAndWorkspaceID()
+		} else {
+			selectedAstroDeploymentID, selectedAstroWorkspaceID, err = getSoftwareDeploymentAndWorkspaceID()
 		}
-		deployments, err := astroDeployment.GetDeployments(workspace, astroClient)
 		if err != nil {
-			return "", "", err
+			return
 		}
-		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
-		if err != nil {
-			return "", "", err
-		}
-		selectedAstroDeploymentID = deployment.ID
-		selectedAstroWorkspaceID = deployment.Workspace.ID
 	} else if astroDeploymentID == "" {
-		deployments, err := astroDeployment.GetDeployments(astroWorkspaceID, astroClient)
-		if err != nil {
-			return "", "", err
-		}
-		deployment, err := astroDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
-		if err != nil {
-			return "", "", err
-		}
-		selectedAstroDeploymentID = deployment.ID
 		selectedAstroWorkspaceID = astroWorkspaceID
-	} else if astroWorkspaceID == "" {
-		fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
-		workspace, err := astroWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
-		if err != nil {
-			return "", "", err
+		if isCloud {
+			selectedAstroDeploymentID, err = getCloudDeploymentIDWithWorkspaceID(selectedAstroWorkspaceID)
+		} else {
+			selectedAstroDeploymentID, err = getSoftwareDeploymentIDWithWorkspaceID(selectedAstroWorkspaceID)
 		}
+		if err != nil {
+			return
+		}
+	} else if astroWorkspaceID == "" {
 		selectedAstroDeploymentID = astroDeploymentID
-		selectedAstroWorkspaceID = workspace
+		if isCloud {
+			selectedAstroWorkspaceID, err = getCloudWorkspaceID()
+		} else {
+			selectedAstroWorkspaceID, err = getSoftwareWorkspaceID()
+		}
+		if err != nil {
+			return
+		}
 	} else {
 		selectedAstroDeploymentID = astroDeploymentID
 		selectedAstroWorkspaceID = astroWorkspaceID
 	}
-
-	return selectedAstroDeploymentID, selectedAstroWorkspaceID, err
+	return selectedAstroDeploymentID, selectedAstroWorkspaceID, nil
 }
 
-// Set the astro cloud config (astroDeploymentID and astroWorkspaceID) for the current env.
-func setAstroCloudConfig(astroDeploymentID, astroWorkspaceID string) error {
+func getCloudWorkspaceID() (string, error) {
+	fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+	workspace, err := cloudWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
+	if err != nil {
+		return "", err
+	}
+	return workspace, nil
+}
+
+func getSoftwareWorkspaceID() (string, error) {
+	fmt.Println("\nWhich Astro Software workspace should be associated with " + env + "?")
+	houstonClient := GetHoustonClient()
+	workspace, err := softwareWorkspace.GetWorkspaceSelectionID(houstonClient, os.Stdout)
+	if err != nil {
+		return "", err
+	}
+	return workspace, nil
+}
+
+func getCloudDeploymentIDWithWorkspaceID(astroWorkspaceID string) (string, error) {
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+	deployments, err := cloudDeployment.GetDeployments(astroWorkspaceID, astroClient)
+	if err != nil {
+		return "", err
+	}
+	deployment, err := cloudDeployment.SelectDeployment(deployments, "Which Astro Cloud deployment should be associated with "+env+"?")
+	if err != nil {
+		return "", err
+	}
+	return deployment.ID, nil
+}
+
+func getSoftwareDeploymentIDWithWorkspaceID(astroWorkspaceID string) (string, error) {
+	houstonClient := GetHoustonClient()
+	deployments, err := softwareDeployment.GetDeployments(astroWorkspaceID, houstonClient)
+	if err != nil {
+		return "", err
+	}
+	deployment, err := softwareDeployment.SelectDeployment(deployments, "Which Astro Software deployment should be associated with "+env+"?")
+	if err != nil {
+		return "", err
+	}
+	return deployment.ID, nil
+}
+
+func getCloudDeploymentAndWorkspaceID() (deploymentID, workspaceID string, err error) {
+	astroClient := astro.NewAstroClient(httputil.NewHTTPClient())
+	fmt.Println("\nWhich Astro Cloud workspace should be associated with " + env + "?")
+	workspace, err := cloudWorkspace.GetWorkspaceSelection(astroClient, os.Stdout)
+	if err != nil {
+		return
+	}
+	deployments, err := cloudDeployment.GetDeployments(workspace, astroClient)
+	if err != nil {
+		return
+	}
+	deployment, err := cloudDeployment.SelectDeployment(deployments, "Which Astro deployment should be associated with "+env+"?")
+	if err != nil {
+		return
+	}
+	deploymentID = deployment.ID
+	workspaceID = deployment.Workspace.ID
+	return
+}
+
+func getSoftwareDeploymentAndWorkspaceID() (deploymentID, workspaceID string, err error) {
+	houstonClient := GetHoustonClient()
+	fmt.Println("\nWhich Astro Software workspace should be associated with " + env + "?")
+	workspace, err := softwareWorkspace.GetWorkspaceSelectionID(houstonClient, os.Stdout)
+	if err != nil {
+		return
+	}
+	deployments, err := softwareDeployment.GetDeployments(workspace, houstonClient)
+	if err != nil {
+		return
+	}
+	deployment, err := softwareDeployment.SelectDeployment(deployments, "Which Software deployment should be associated with "+env+"?")
+	if err != nil {
+		return
+	}
+	deploymentID = deployment.ID
+	workspaceID = deployment.Workspace.ID
+	return
+}
+
+var GetHoustonClient = func() houston.ClientInterface {
+	httpClient := houston.NewHTTPClient()
+	houstonClient := houston.NewClient(httpClient)
+	return houstonClient
+}
+
+// Set the astro cloud or software config (astroDeploymentID and astroWorkspaceID) for the current env.
+func setAstroConfig(astroDeploymentID, astroWorkspaceID string) error {
 	if err := executeCmd(configCmd, []string{"set", "deploy", "--astro-workspace-id", astroWorkspaceID, "--astro-deployment-id", astroDeploymentID}); err != nil {
 		return err
 	}
@@ -314,6 +409,9 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		if generateTasks {
 			args = append(args, "--generate-tasks")
 		}
+		if includeUpstream {
+			args = append(args, "--include-upstream")
+		}
 		if noGenerateTasks {
 			args = append(args, "--no-generate-tasks")
 		}
@@ -322,6 +420,9 @@ func extendLocalCmdArgsWithFlags(cmd *cobra.Command, args []string) []string {
 		}
 		if noVerbose {
 			args = append(args, "--no-verbose")
+		}
+		if taskID != "" {
+			args = append(args, "--task-id", taskID)
 		}
 	}
 	return args
@@ -476,11 +577,6 @@ func generateWorkflows(dagsPath, workflowName string) error {
 }
 
 func executeDeployCmd(cmd *cobra.Command, args []string) error {
-	// Currently, we only support Astronomer cloud deployments. Software deploy support is planned to be added in a later release.
-	if !context.IsCloudContext() {
-		return ErrNotCloudContext
-	}
-
 	if len(args) > 1 {
 		return ErrTooManyArgs
 	}
@@ -503,7 +599,81 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	dagsPath := filepath.Join(projectDir, ".deploy/"+env+"/dags")
+	dagsPath := filepath.Join(config.WorkingPath, "dags/.astro-sql-deploy/"+env)
+
+	if err := updateDags(dagsPath, args); err != nil {
+		return fmt.Errorf("error updating DAGs based on workflows: %w", err)
+	}
+
+	if context.IsCloudContext() {
+		err = uploadDagsToCloud(dagsPath)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = uploadDagsToSoftware()
+		if err != nil {
+			return fmt.Errorf("error uploading DAGs to software: %w", err)
+		}
+	}
+	if deleteDags {
+		err = RemoveDirectory(dagsPath)
+		if err != nil {
+			return fmt.Errorf("error deleting DAGs directory: %w", err)
+		}
+	}
+	return nil
+}
+
+func uploadDagsToSoftware() error {
+	astroDeploymentID, astroWorkspaceID, err := getAstroDeploymentConfig()
+	if err != nil {
+		return err
+	}
+	astroDeploymentID, astroWorkspaceID, err = promptAstroEnvironmentConfig(astroDeploymentID, astroWorkspaceID, false)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Deployment ID: %s, workspace ID: %s\n", astroDeploymentID, astroWorkspaceID)
+
+	if err := setAstroConfig(astroDeploymentID, astroWorkspaceID); err != nil {
+		return err
+	}
+
+	astroDeployCmd := software.NewDeployCmd()
+	astroDeployCmd.SetArgs([]string{astroDeploymentID, "--workspace-id", astroWorkspaceID})
+	if _, err := astroDeployCmd.ExecuteC(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func uploadDagsToCloud(dagsPath string) error {
+	astroDeploymentID, astroWorkspaceID, err := getAstroDeploymentConfig()
+	if err != nil {
+		return err
+	}
+	astroDeploymentID, astroWorkspaceID, err = promptAstroEnvironmentConfig(astroDeploymentID, astroWorkspaceID, true)
+	if err != nil {
+		return err
+	}
+	if err := setAstroConfig(astroDeploymentID, astroWorkspaceID); err != nil {
+		return err
+	}
+
+	astroDeployCmd := cloud.NewDeployCmd()
+	astroDeployCmd.SetArgs([]string{astroDeploymentID, "--workspace-id", astroWorkspaceID, "--dags-path", dagsPath})
+	if _, err := astroDeployCmd.ExecuteC(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateDags(dagsPath string, args []string) error {
+	if err := os.RemoveAll(dagsPath); err != nil {
+		return fmt.Errorf("error removing dags path: %w", err)
+	}
 	if err := os.MkdirAll(dagsPath, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories for %v: %w", dagsPath, err)
 	}
@@ -514,25 +684,6 @@ func executeDeployCmd(cmd *cobra.Command, args []string) error {
 	if err := generateWorkflows(dagsPath, workflowName); err != nil {
 		return err
 	}
-
-	astroDeploymentID, astroWorkspaceID, err := getAstroCloudConfig()
-	if err != nil {
-		return err
-	}
-	astroDeploymentID, astroWorkspaceID, err = promptAstroCloudConfig(astroDeploymentID, astroWorkspaceID)
-	if err != nil {
-		return err
-	}
-	if err := setAstroCloudConfig(astroDeploymentID, astroWorkspaceID); err != nil {
-		return err
-	}
-
-	astroDeployCmd := cloud.NewDeployCmd()
-	astroDeployCmd.SetArgs([]string{astroDeploymentID, "--workspace-id", astroWorkspaceID, "--dags-path", dagsPath})
-	if _, err := astroDeployCmd.ExecuteC(); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -670,6 +821,8 @@ func runCommand() *cobra.Command {
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "")
 	cmd.Flags().BoolVar(&noVerbose, "no-verbose", false, "")
+	cmd.Flags().StringVar(&taskID, "task-id", "", "")
+	cmd.Flags().BoolVar(&includeUpstream, "include-upstream", false, "")
 	return cmd
 }
 
@@ -682,6 +835,7 @@ func deployCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&env, "env", "default", "")
 	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "")
+	cmd.Flags().BoolVar(&deleteDags, "delete-dags", false, "If you would like to delete flow generated DAGs after deploying to astronomer. This would mean that the DAGs disappear if you run `astro deploy` in the future.")
 	return cmd
 }
 

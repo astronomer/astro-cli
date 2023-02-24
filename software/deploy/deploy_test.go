@@ -3,6 +3,7 @@ package deploy
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
@@ -38,8 +39,8 @@ var (
 			{URL: "https://deployments.local.astronomer.io/testDeploymentName/airflow", Type: "airflow"},
 			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 		},
-		CreatedAt: "2021-04-26T20:03:36.262Z",
-		UpdatedAt: "2021-04-26T20:03:36.262Z",
+		CreatedAt: time.Time{},
+		UpdatedAt: time.Time{},
 	}
 )
 

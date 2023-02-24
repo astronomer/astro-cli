@@ -18,6 +18,7 @@ func execTeamCmd(args ...string) (string, error) {
 	cmd := newTeamCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return buf.String(), err
 }

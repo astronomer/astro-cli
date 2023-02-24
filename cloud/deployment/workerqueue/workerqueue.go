@@ -56,9 +56,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	queueToCreateOrUpdate = &astro.WorkerQueue{
-		Name:       name,
-		IsDefault:  false, // cannot create a default queue
-		NodePoolID: nodePoolID,
+		Name:              name,
+		IsDefault:         false, // cannot create a default queue
+		NodePoolID:        nodePoolID,
+		MinWorkerCount:    wQueueMin,         // use the value from the user input
+		MaxWorkerCount:    wQueueMax,         // use the value from the user input
+		WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 	}
 
 	if name == "" {
@@ -112,7 +115,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
-			listToCreate = updateQueueList(existingQueues, queueToCreateOrUpdate, requestedDeployment.DeploymentSpec.Executor)
+			listToCreate = updateQueueList(existingQueues, queueToCreateOrUpdate, requestedDeployment.DeploymentSpec.Executor, wQueueMin, wQueueMax, wQueueConcurrency)
 		} else {
 			// update does not allow creating new queues
 			errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdate.Name)
@@ -132,28 +135,21 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	return nil
 }
 
-// SetWorkerQueueValues sets values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency
-// Default values are used if the user did not request any
+// SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
 func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate *astro.WorkerQueue, workerQueueDefaultOptions astro.WorkerQueueDefaultOptions) *astro.WorkerQueue {
-	if wQueueMin != 0 {
-		// use the value from the user input
-		workerQueueToCreate.MinWorkerCount = wQueueMin
-	} else {
+	// -1 is the CLI default to allow users to request wQueueMin=0
+	if wQueueMin == -1 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MinWorkerCount = workerQueueDefaultOptions.MinWorkerCount.Default
 	}
 
-	if wQueueMax != 0 {
-		// use the value from the user input
-		workerQueueToCreate.MaxWorkerCount = wQueueMax
-	} else {
+	if wQueueMax == 0 {
 		// set default value as user input did not have it
 		workerQueueToCreate.MaxWorkerCount = workerQueueDefaultOptions.MaxWorkerCount.Default
 	}
 
-	if wQueueConcurrency != 0 {
-		workerQueueToCreate.WorkerConcurrency = wQueueConcurrency
-	} else {
+	if wQueueConcurrency == 0 {
+		// set default value as user input did not have it
 		workerQueueToCreate.WorkerConcurrency = workerQueueDefaultOptions.WorkerConcurrency.Default
 	}
 	return workerQueueToCreate
@@ -216,23 +212,23 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) 
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.PodCPU != "" {
-		errorMessage = "pod_cpu in the request. It will be calculated based on the requested worker_type"
+		errorMessage = "pod cpu in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.PodRAM != "" {
-		errorMessage = "pod_ram in the request. It will be calculated based on the requested worker_type"
+		errorMessage = "pod ram in the request. It will be calculated based on the requested worker type"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.MinWorkerCount != 0 {
-		errorMessage = "min_worker_count in the request. It can only be used with CeleryExecutor"
+		errorMessage = "minimum worker count in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.MaxWorkerCount != 0 {
-		errorMessage = "max_worker_count in the request. It can only be used with CeleryExecutor"
+		errorMessage = "maximum worker count in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 	if requestedWorkerQueue.WorkerConcurrency != 0 {
-		errorMessage = "worker_concurrency in the request. It can only be used with CeleryExecutor"
+		errorMessage = "worker concurrency in the request. It can only be used with CeleryExecutor"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
 	}
 
@@ -424,7 +420,7 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it
 // sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
-func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string) []astro.WorkerQueue {
+func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string, wQueueMin, wQueueMax, wQueueConcurrency int) []astro.WorkerQueue {
 	for i, queue := range existingQueues {
 		if queue.Name != queueToUpdate.Name {
 			continue
@@ -433,9 +429,15 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 		queue.ID = existingQueues[i].ID               // we need IDs to update existing queues
 		queue.IsDefault = existingQueues[i].IsDefault // users can not change this
 		if executor == deployment.CeleryExecutor {
-			queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
-			queue.MinWorkerCount = queueToUpdate.MinWorkerCount
-			queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+			if wQueueMin != -1 {
+				queue.MinWorkerCount = queueToUpdate.MinWorkerCount
+			}
+			if wQueueMax != 0 {
+				queue.MaxWorkerCount = queueToUpdate.MaxWorkerCount
+			}
+			if wQueueConcurrency != 0 {
+				queue.WorkerConcurrency = queueToUpdate.WorkerConcurrency
+			}
 		} else if executor == deployment.KubeExecutor {
 			// KubernetesExecutor calculates resources automatically based on the worker type
 			queue.WorkerConcurrency = 0

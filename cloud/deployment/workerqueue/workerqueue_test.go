@@ -272,7 +272,7 @@ func TestCreate(t *testing.T) {
 	}
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
-			Floor:   1,
+			Floor:   0,
 			Ceiling: 20,
 			Default: 5,
 		},
@@ -296,7 +296,7 @@ func TestCreate(t *testing.T) {
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
-			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "test-instance-type-1", -1, 0, 0, true, mockClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), expectedOutMessage)
 		})
@@ -370,7 +370,7 @@ func TestCreate(t *testing.T) {
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
-			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", 0, 0, 0, false, mockClient, out)
+			err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", -1, 0, 0, false, mockClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), expectedOutMessage)
 			mockClient.AssertExpectations(t)
@@ -539,9 +539,9 @@ func TestUpdate(t *testing.T) {
 			ID:                "test-wq-id-1",
 			Name:              "test-queue-1",
 			IsDefault:         false,
-			MaxWorkerCount:    125,
-			MinWorkerCount:    5,
-			WorkerConcurrency: 180,
+			MaxWorkerCount:    175,
+			MinWorkerCount:    8,
+			WorkerConcurrency: 150,
 			NodePoolID:        "test-pool-id-1",
 		},
 	}
@@ -572,7 +572,7 @@ func TestUpdate(t *testing.T) {
 	}
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
-			Floor:   1,
+			Floor:   0,
 			Ceiling: 20,
 			Default: 5,
 		},
@@ -597,7 +597,7 @@ func TestUpdate(t *testing.T) {
 				mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 				mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 				mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
-				err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", 0, 0, 0, false, mockClient, out)
+				err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 0, 0, false, mockClient, out)
 				assert.NoError(t, err)
 				assert.Equal(t, expectedOutMessage, out.String())
 				mockClient.AssertExpectations(t)
@@ -622,7 +622,7 @@ func TestUpdate(t *testing.T) {
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
-			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", -1, 0, 0, true, mockClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), expectedOutMessage)
 		})
@@ -706,7 +706,7 @@ func TestUpdate(t *testing.T) {
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
-			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", 0, 0, 0, true, mockClient, out)
+			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 0, 0, true, mockClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), expectedOutMessage)
 			mockClient.AssertExpectations(t)
@@ -993,7 +993,7 @@ func TestSetWorkerQueueValues(t *testing.T) {
 		NodePoolID:        "",
 	}
 	t.Run("sets user provided min worker count for queue", func(t *testing.T) {
-		actualQueue := SetWorkerQueueValues(10, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions)
+		actualQueue := SetWorkerQueueValues(0, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.Equal(t, mockWorkerQueue.MinWorkerCount, actualQueue.MinWorkerCount)
 	})
 	t.Run("sets user provided max worker count for queue", func(t *testing.T) {
@@ -1005,7 +1005,7 @@ func TestSetWorkerQueueValues(t *testing.T) {
 		assert.Equal(t, mockWorkerQueue.WorkerConcurrency, actualQueue.WorkerConcurrency)
 	})
 	t.Run("sets default min worker count for queue if user did not provide it", func(t *testing.T) {
-		actualQueue := SetWorkerQueueValues(0, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions)
+		actualQueue := SetWorkerQueueValues(-1, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.Equal(t, mockWorkerQueueDefaultOptions.MinWorkerCount.Default, actualQueue.MinWorkerCount)
 	})
 	t.Run("sets default max worker count for queue if user did not provide it", func(t *testing.T) {
@@ -1022,7 +1022,7 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 		MinWorkerCount: astro.WorkerQueueOption{
-			Floor:   1,
+			Floor:   0,
 			Ceiling: 20,
 			Default: 5,
 		},
@@ -1047,7 +1047,7 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 	}
 
 	t.Run("happy path when min or max worker count and worker concurrency are within default floor and ceiling", func(t *testing.T) {
-		requestedWorkerQueue.MinWorkerCount = 8
+		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 275
 		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
@@ -1057,7 +1057,7 @@ func TestIsCeleryWorkerQueueInputValid(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 35
 		err := IsCeleryWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		assert.ErrorIs(t, err, errInvalidWorkerQueueOption)
-		assert.Contains(t, err.Error(), "worker queue option is invalid: min worker count must be between 1 and 20")
+		assert.Contains(t, err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	t.Run("returns an error when max worker count is not between default floor and ceiling values", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
@@ -1128,7 +1128,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod_cpu in the request. It will be calculated based on the requested worker_type")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod cpu in the request. It will be calculated based on the requested worker type")
 	})
 	t.Run("returns an error when pod_ram is in input", func(t *testing.T) {
 		requestedWorkerQueue.PodRAM = "1.0"
@@ -1140,7 +1140,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod_ram in the request. It will be calculated based on the requested worker_type")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
 	})
 	t.Run("returns an error when min_worker_count is in input", func(t *testing.T) {
 		requestedWorkerQueue.MinWorkerCount = 8
@@ -1152,7 +1152,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support min_worker_count in the request. It can only be used with CeleryExecutor")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
 	})
 	t.Run("returns an error when max_worker_count is in input", func(t *testing.T) {
 		requestedWorkerQueue.MaxWorkerCount = 25
@@ -1164,7 +1164,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support max_worker_count in the request. It can only be used with CeleryExecutor")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
 	})
 	t.Run("returns an error when worker_concurrency is in input", func(t *testing.T) {
 		requestedWorkerQueue.WorkerConcurrency = 350
@@ -1176,7 +1176,7 @@ func TestIsKubernetesWorkerQueueInputValid(t *testing.T) {
 		}()
 		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		assert.ErrorIs(t, err, ErrNotSupported)
-		assert.Contains(t, err.Error(), "KubernetesExecutor does not support worker_concurrency in the request. It can only be used with CeleryExecutor")
+		assert.Contains(t, err.Error(), "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
 	})
 }
 
@@ -1380,7 +1380,7 @@ func TestUpdateQueueList(t *testing.T) {
 			WorkerConcurrency: 20,
 			NodePoolID:        "test-worker-1",
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQ, deployment.CeleryExecutor)
+		updatedQueueList := updateQueueList(existingQs, &updatedQ, deployment.CeleryExecutor, 3, 16, 20)
 		assert.Equal(t, updatedQ, updatedQueueList[1])
 	})
 	t.Run("does not update id or isDefault when queue exists", func(t *testing.T) {
@@ -1402,7 +1402,7 @@ func TestUpdateQueueList(t *testing.T) {
 			WorkerConcurrency: 20,
 			NodePoolID:        "test-worker-1",
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, "")
+		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, deployment.CeleryExecutor, 3, 16, 20)
 		assert.Equal(t, updatedQ, updatedQueueList[1])
 	})
 	t.Run("does not change any queues if queue to update does not exist", func(t *testing.T) {
@@ -1415,7 +1415,20 @@ func TestUpdateQueueList(t *testing.T) {
 			WorkerConcurrency: 20,
 			NodePoolID:        "test-worker-1",
 		}
-		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, deployment.CeleryExecutor)
+		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, deployment.CeleryExecutor, 0, 0, 0)
+		assert.Equal(t, existingQs, updatedQueueList)
+	})
+	t.Run("does not change any queues if user did not request min, max, concurrency", func(t *testing.T) {
+		updatedQRequest := astro.WorkerQueue{
+			ID:                "q-2",
+			Name:              "test-q-1",
+			IsDefault:         false,
+			MaxWorkerCount:    15,
+			MinWorkerCount:    5,
+			WorkerConcurrency: 18,
+			NodePoolID:        "test-worker",
+		}
+		updatedQueueList := updateQueueList(existingQs, &updatedQRequest, deployment.CeleryExecutor, -1, 0, 0)
 		assert.Equal(t, existingQs, updatedQueueList)
 	})
 	t.Run("zeroes out podRam and podCPU for KE queue updates", func(t *testing.T) {
@@ -1449,7 +1462,7 @@ func TestUpdateQueueList(t *testing.T) {
 			},
 		}
 
-		updatedQueueList := updateQueueList(existingKEQ, &updatedQRequest, deployment.KubeExecutor)
+		updatedQueueList := updateQueueList(existingKEQ, &updatedQRequest, deployment.KubeExecutor, 0, 0, 0)
 		assert.Equal(t, expectedQList, updatedQueueList)
 	})
 	t.Run("updates nodepoolID for KE queue updates", func(t *testing.T) {
@@ -1483,7 +1496,7 @@ func TestUpdateQueueList(t *testing.T) {
 			},
 		}
 
-		updatedQueueList := updateQueueList(existingKEQ, &updatedQRequest, deployment.KubeExecutor)
+		updatedQueueList := updateQueueList(existingKEQ, &updatedQRequest, deployment.KubeExecutor, 0, 0, 0)
 		assert.Equal(t, expectedQList, updatedQueueList)
 	})
 }

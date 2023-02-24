@@ -28,8 +28,9 @@ core_api_gen:
 	make mock_astro_core
 
 test:
-	go test -count=1 -cover $(shell go list ./... | grep -v e2e)
-	go test -coverprofile=coverage.txt -covermode=atomic $(shell go list ./... | grep -v e2e)
+	go mod download
+	go install github.com/onsi/ginkgo/ginkgo@v1.12.0
+	ginkgo --skipPackage=e2e -r -v --cover --covermode atomic --coverprofile=coverage.txt
 
 e2e_test:
 	go test -count=1 $(shell go list ./... | grep e2e)

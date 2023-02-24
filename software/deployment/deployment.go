@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
+
 	"github.com/astronomer/astro-cli/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -29,6 +31,8 @@ var (
 	errInvalidSSHKeyPath               = errors.New("wrong path specified, no file exists for ssh key")
 	errInvalidKnownHostsPath           = errors.New("wrong path specified, no file exists for known hosts")
 	errHostNotPresent                  = errors.New("git repository host not present in known hosts file")
+
+	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
 
 	errDeploymentNotOnRuntime     = errors.New("deployment is not using Runtime image, please migrate to Runtime image via `astro deployment runtime migrate` before trying to upgrade Runtime version")
 	errDeploymentNotOnAirflow     = errors.New("deployment is not using Airflow image, please make sure deployment is using Airflow image before trying to upgrade Airflow version")
@@ -837,4 +841,60 @@ func getURLHost(gitURL string) (string, error) {
 	}
 	// Hostname will remove the port from the host if present, check if that is needed
 	return u.Hostname(), nil
+}
+
+func GetDeploymentsErr(err error) error {
+	return fmt.Errorf(houston.HoustonConnectionErrMsg, err) //nolint:all
+}
+
+var GetDeployments = func(ws string, client houston.ClientInterface) ([]houston.Deployment, error) {
+	deployments, err := houston.Call(client.ListDeployments)(houston.ListDeploymentsRequest{WorkspaceID: ws})
+	if err != nil {
+		return deployments, GetDeploymentsErr(err)
+	}
+
+	return deployments, nil
+}
+
+var SelectDeployment = func(deployments []houston.Deployment, message string) (houston.Deployment, error) {
+	// select deployment
+	if len(deployments) == 0 {
+		return houston.Deployment{}, nil
+	}
+
+	if len(deployments) == 1 {
+		fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
+			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
+			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
+
+		return deployments[0], nil
+	}
+
+	tab := printutil.Table{
+		Padding:        []int{5, 30, 30, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
+	}
+
+	fmt.Println(message)
+
+	sort.Slice(deployments, func(i, j int) bool {
+		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
+	})
+
+	deployMap := map[string]houston.Deployment{}
+	for i := range deployments {
+		index := i + 1
+		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID}, false)
+
+		deployMap[strconv.Itoa(index)] = deployments[i]
+	}
+
+	tab.Print(os.Stdout)
+	choice := input.Text("\n> ")
+	selected, ok := deployMap[choice]
+	if !ok {
+		return houston.Deployment{}, ErrInvalidDeploymentKey
+	}
+	return selected, nil
 }

@@ -2,6 +2,7 @@ package houston
 
 import (
 	"fmt"
+	"time"
 
 	semver "github.com/Masterminds/semver/v3"
 )
@@ -114,8 +115,8 @@ type Deployment struct {
 	DeploymentInfo        DeploymentInfo  `json:"deployInfo"`
 	Workspace             Workspace       `json:"workspace"`
 	Urls                  []DeploymentURL `json:"urls"`
-	CreatedAt             string          `json:"createdAt"`
-	UpdatedAt             string          `json:"updatedAt"`
+	CreatedAt             time.Time       `json:"createdAt"`
+	UpdatedAt             time.Time       `json:"updatedAt"`
 }
 
 // DeploymentURL defines structure of a houston response DeploymentURL object

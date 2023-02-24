@@ -32,6 +32,8 @@ const (
 	workspacePaginationWithQuitOptions     = "q. quit\n> "
 )
 
+var errInvalidWorkspaceKey = errors.New("invalid workspace selection")
+
 var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
 func newTableOut() *printutil.Table {
@@ -120,6 +122,44 @@ func GetCurrentWorkspace() (string, error) {
 	}
 
 	return c.Workspace, nil
+}
+
+var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer) (string, error) {
+	tab := printutil.Table{
+		Padding:        []int{5, 44, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "NAME", "ID"},
+		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	}
+
+	var c config.Context
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return "", err
+	}
+
+	ws, err := houston.Call(client.ListWorkspaces)(c.Organization)
+	if err != nil {
+		return "", err
+	}
+
+	deployMap := map[string]houston.Workspace{}
+	for i := range ws {
+		index := i + 1
+
+		color := c.Workspace == ws[i].ID
+		tab.AddRow([]string{strconv.Itoa(index), ws[i].Label, ws[i].ID}, color)
+
+		deployMap[strconv.Itoa(index)] = ws[i]
+	}
+	tab.Print(out)
+	choice := input.Text("\n> ")
+	selected, ok := deployMap[choice]
+	if !ok {
+		return "", errInvalidWorkspaceKey
+	}
+
+	return selected.ID, nil
 }
 
 // workspacesPromptPaginatedOption Show pagination option based on page size and total record

@@ -37,6 +37,7 @@ import (
 
 const (
 	componentName                  = "airflow"
+	podman                         = "podman"
 	dockerStateUp                  = "running"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
@@ -80,21 +81,22 @@ var (
 
 // ComposeConfig is input data to docker compose yaml template
 type ComposeConfig struct {
-	PytestFile           string
-	PostgresUser         string
-	PostgresPassword     string
-	PostgresHost         string
-	PostgresPort         string
-	AirflowEnvFile       string
-	AirflowImage         string
-	AirflowHome          string
-	AirflowUser          string
-	AirflowWebserverPort string
-	MountLabel           string
-	SettingsFile         string
-	SettingsFileExist    bool
-	TriggererEnabled     bool
-	ProjectName          string
+	PytestFile            string
+	PostgresUser          string
+	PostgresPassword      string
+	PostgresHost          string
+	PostgresPort          string
+	AirflowEnvFile        string
+	AirflowImage          string
+	AirflowHome           string
+	AirflowUser           string
+	AirflowWebserverPort  string
+	MountLabel            string
+	SettingsFile          string
+	SettingsFileExist     bool
+	DuplicateImageVolumes bool
+	TriggererEnabled      bool
+	ProjectName           string
 }
 
 type DockerCompose struct {
@@ -715,8 +717,7 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 			if err != nil {
 				return err
 			}
-
-			if string(marshal) == `{"action":"health_status: healthy"}` {
+			if string(marshal) == `{"action":"health_status: healthy"}` || config.CFG.DockerCommand.GetString() == podman {
 				psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
 					All: true,
 				})
@@ -740,8 +741,11 @@ var checkWebserverHealth = func(settingsFile string, project *types.Project, com
 						}
 					}
 				}
-
-				fmt.Println("\nProject is running! All components are now available.")
+				if config.CFG.DockerCommand.GetString() == podman {
+					fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
+				} else {
+					fmt.Println("\nProject is running! All components are now available.")
+				}
 				parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
 				webserverURL := "http://localhost:" + parts[len(parts)-1]
 				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
