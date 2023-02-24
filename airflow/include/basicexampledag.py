@@ -1,22 +1,23 @@
 import json
-from datetime import datetime, timedelta
+from pendulum import datetime
 
 from airflow.decorators import (
     dag,
     task,
 )  # DAG and task decorators for interfacing with the TaskFlow API
 
-
+# When using the DAG decorator, The "dag_id" value defaults to the name of the function
+# it is decorating if not explicitly set. In this example, the "dag_id" value would be "example_dag_basic".
 @dag(
     # This defines how often your DAG will run, or the schedule by which your DAG runs. In this case, this DAG
     # will run daily
-    schedule_interval="@daily",
-    # This DAG is set to run for the first time on January 1, 2021. Best practice is to use a static
-    # start_date. Subsequent DAG runs are instantiated based on scheduler_interval
-    start_date=datetime(2021, 1, 1),
-    # When catchup=False, your DAG will only run for the latest schedule_interval. In this case, this means
-    # that tasks will not be run between January 1, 2021 and 30 mins ago. When turned on, this DAG's first
-    # run will be for the next 30 mins, per the schedule_interval
+    schedule="@daily",
+    # This DAG is set to run for the first time on January 1, 2023. Best practice is to use a static
+    # start_date. Subsequent DAG runs are instantiated based on the schedule
+    start_date=datetime(2023, 1, 1),
+    # When catchup=False, your DAG will only run the latest run that would have been scheduled. In this case, this means
+    # that tasks will not be run between January 1, 2023 and 30 mins ago. When turned on, this DAG's first
+    # run will be for the next 30 mins, per the its schedule
     catchup=False,
     default_args={
         "retries": 2,  # If a task fails, it will retry 2 times.
@@ -76,4 +77,4 @@ def example_dag_basic():
     load(order_summary["total_order_value"])
 
 
-example_dag_basic = example_dag_basic()
+example_dag_basic()

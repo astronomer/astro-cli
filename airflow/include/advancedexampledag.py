@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from pendulum import datetime, duration
 from typing import Dict
 
 # Airflow operators are templates for tasks and encompass the logic that your DAG will actually execute.
@@ -13,7 +13,7 @@ from airflow.models.baseoperator import (
     chain,
 )  # A function that sets sequential dependencies between tasks including lists of tasks.
 from airflow.operators.bash import BashOperator
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.operators.email import EmailOperator
 from airflow.operators.python import BranchPythonOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
@@ -23,9 +23,6 @@ from airflow.utils.edgemodifier import (
 from airflow.utils.task_group import (
     TaskGroup,
 )  # Used to group tasks together in the Graph view of the Airflow UI
-from airflow.utils.trigger_rule import (
-    TriggerRule,
-)  # Used to change how an Operator is triggered
 from airflow.utils.weekday import (
     WeekDay,
 )  # Used to determine what day of the week it is
@@ -34,9 +31,9 @@ from airflow.utils.weekday import (
 """
 This DAG is intended to demonstrate a number of core Apache Airflow concepts that are central to the pipeline
 authoring experience, including the TaskFlow API, Edge Labels, Jinja templating, branching,
-dynamic task generation, Task Groups, and Trigger Rules.
+generating tasks within a loop, task groups, and trigger rules.
 
-First, this DAG checks if the current day is a weekday or weekend. Next, the DAG  checks which day of the week
+First, this DAG checks if the current day is a weekday or weekend. Next, the DAG checks which day of the week
 it is. Lastly, the DAG prints out a bash statement based on which day it is. On Tuesday, for example, the DAG
 prints "It's Tuesday and I'm busy with studying".
 
@@ -48,11 +45,11 @@ BashOperator -
     See more info about this operator here:
         https://registry.astronomer.io/providers/apache-airflow/modules/bashoperator
 
-DummyOperator -
-    Does nothing but can be used to group tasks in a DAG
+EmptyOperator -
+    Does nothing but can be used to structure your DAG
 
     See more info about this operator here:
-        https://registry.astronomer.io/providers/apache-airflow/modules/dummyoperator
+        https://registry.astronomer.io/providers/apache-airflow/modules/emptyoperator
 
 EmailOperator -
     Used to send emails
@@ -109,35 +106,36 @@ def _get_activity(day_name) -> str:
 # The "dag_id" value defaults to the name of the function it is decorating if not explicitly set.
 # In this example, the "dag_id" value would be "example_dag_advanced".
 @dag(
-    # This DAG is set to run for the first time on June 11, 2021. Best practice is to use a static start_date.
-    # Subsequent DAG runs are instantiated based on scheduler_interval below.
-    start_date=datetime(2021, 6, 11),
+    # This DAG is set to run for the first time on January 1, 2023. Best practice is to use a static start_date.
+    # Subsequent DAG runs are instantiated based on "scheduler" parameter below.
+    start_date=datetime(2023, 1, 1),
     # This defines how many instantiations of this DAG (DAG Runs) can execute concurrently. In this case,
     # we're only allowing 1 DAG run at any given time, as opposed to allowing multiple overlapping DAG runs.
     max_active_runs=1,
     # This defines how often your DAG will run, or the schedule by which DAG runs are created. It can be
-    # defined as a cron expression or custom timetable. This DAG will run daily.
-    schedule_interval="@daily",
+    # defined as a cron expression, custom timetable, existing presets or using the Dataset feature.
+    # This DAG uses a preset to run daily.
+    schedule="@daily",
     # Default settings applied to all tasks within the DAG; can be overwritten at the task level.
     default_args={
         "owner": "community",  # This defines the value of the "owner" column in the DAG view of the Airflow UI
         "retries": 2,  # If a task fails, it will retry 2 times.
-        "retry_delay": timedelta(
+        "retry_delay": duration(
             minutes=3
         ),  # A task that fails will wait 3 minutes to retry.
     },
     default_view="graph",  # This defines the default view for this DAG in the Airflow UI
     # When catchup=False, your DAG will only run for the latest schedule interval. In this case, this means
-    # that tasks will not be run between June 11, 2021 and 1 day ago. When turned on, this DAG's first run
-    # will be for today, per the @daily schedule interval
+    # that tasks will not be run between January 1st, 2023 and 1 day ago. When turned on, this DAG's first run
+    # will be for today, per the @daily schedule
     catchup=False,
     tags=["example"],  # If set, this tag is shown in the DAG view of the Airflow UI
 )
 def example_dag_advanced():
-    # DummyOperator placeholder for first task
-    begin = DummyOperator(task_id="begin")
-    # Last task will only trigger if no previous task failed
-    end = DummyOperator(task_id="end", trigger_rule=TriggerRule.NONE_FAILED)
+    # EmptyOperator placeholder for first task
+    begin = EmptyOperator(task_id="begin")
+    # Last task will only trigger if all upstream tasks have succeeded or been skipped
+    end = EmptyOperator(task_id="end", trigger_rule="none_failed")
 
     # This task checks which day of the week it is
     check_day_of_week = BranchDayOfWeekOperator(
@@ -148,8 +146,8 @@ def example_dag_advanced():
         use_task_execution_day=True,  # If True, uses task’s execution day to compare with is_today
     )
 
-    weekend = DummyOperator(task_id="weekend")  # "weekend" placeholder task
-    weekday = DummyOperator(task_id="weekday")  # "weekday" placeholder task
+    weekend = EmptyOperator(task_id="weekend")  # "weekend" placeholder task
+    weekday = EmptyOperator(task_id="weekday")  # "weekday" placeholder task
 
     # Templated value for determining the name of the day of week based on the start date of the DAG Run
     day_name = "{{ dag_run.start_date.strftime('%A').lower() }}"
@@ -195,7 +193,7 @@ def example_dag_advanced():
             task_id="sleeping_in", bash_command="sleep $[ ( $RANDOM % 30 )  + 1 ]s"
         )
 
-        going_to_the_beach = _going_to_the_beach()  # Calling the taskflow function
+        going_to_the_beach = _going_to_the_beach()  # Calling the TaskFlow task
 
         # Because the "_going_to_the_beach()" function has "multiple_outputs" enabled, each dict key is
         # accessible as their own "XCom" key.
@@ -203,7 +201,7 @@ def example_dag_advanced():
             task_id="inviting_friends",
             to="friends@community.com",  # Email to send email to
             subject=going_to_the_beach["subject"],  # Email subject
-            html_content=going_to_the_beach["body"],  # Eamil body content
+            html_content=going_to_the_beach["body"],  # Email body content
         )
 
         # Using "chain()" here for list-to-list dependencies which are not supported by the bitshift
@@ -227,4 +225,4 @@ def example_dag_advanced():
     # going_to_the_beach >> inviting_friends
 
 
-dag = example_dag_advanced()
+example_dag_advanced()
