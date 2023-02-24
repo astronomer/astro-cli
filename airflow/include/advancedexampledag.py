@@ -11,7 +11,7 @@ from airflow.decorators import (
 )  # DAG and task decorators for interfacing with the TaskFlow API
 from airflow.models.baseoperator import (
     chain,
-)  # A function that sets sequential dependencies between tasks including lists of tasks.
+)  # A function that sets sequential dependencies between tasks including lists of tasks
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.email import EmailOperator
@@ -70,7 +70,7 @@ BranchDayOfWeekOperator -
         https://registry.astronomer.io/providers/apache-airflow/modules/branchdayofweekoperator
 """
 
-# Reference data that defines "weekday" as well as the activity assigned to each day of the week.
+# Reference data that defines "weekday" as well as the activity assigned to each day of the week
 DAY_ACTIVITY_MAPPING = {
     "monday": {"is_weekday": True, "activity": "guitar lessons"},
     "tuesday": {"is_weekday": True, "activity": "studying"},
@@ -107,7 +107,7 @@ def _get_activity(day_name) -> str:
 # In this example, the "dag_id" value would be "example_dag_advanced".
 @dag(
     # This DAG is set to run for the first time on January 1, 2023. Best practice is to use a static start_date.
-    # Subsequent DAG runs are instantiated based on "scheduler" parameter below.
+    # Subsequent DAG runs are instantiated based on the "schedule" parameter below.
     start_date=datetime(2023, 1, 1),
     # This defines how many instantiations of this DAG (DAG Runs) can execute concurrently. In this case,
     # we're only allowing 1 DAG run at any given time, as opposed to allowing multiple overlapping DAG runs.
