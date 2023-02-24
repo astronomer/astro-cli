@@ -25,17 +25,25 @@ BaseHook.get_connection = basehook_get_connection_monkeypatch
 
 
 # =========== MONKEYPATCH OS.GETENV() ===========
-def os_getenv_monkeypatch(key: str, *args, default=None, **kwargs):
-    print(
-        f"Attempted to fetch os environment variable during parse, returning a mocked value for {key}"
-    )
+def os_getenv_monkeypatch(key: str, *args, **kwargs):
+    
+    default=None
+    if args: 
+        default = args[0] # os.getenv should get at most 1 arg after the key
+    if kwargs:
+        default = kwargs.get('default',None) # and sometimes kwarg if people are using the sig
+
+    env_value = os.environ.get(key,None)
+
+    if env_value:
+        return env_value # if the env_value is set, return it
     if (
         key == "JENKINS_HOME" and default is None
     ):  # fix https://github.com/astronomer/astro-cli/issues/601
         return None
     if default:
-        return default
-    return "NON_DEFAULT_OS_ENV_VALUE"
+        return default # otherwise return whatever default has been passed
+    return f"MOCKED_{key.upper()}_VALUE" #if absolutely nothing has been passed - return the mocked value
 
 
 os.getenv = os_getenv_monkeypatch
