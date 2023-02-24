@@ -1428,7 +1428,7 @@ func TestCheckWebserverHealth(t *testing.T) {
 
 		w.Close()
 		out, _ := io.ReadAll(r)
-		assert.Contains(t, string(out), "Project is running! All components are now available.")
+		assert.Contains(t, string(out), "Components will be available soon.")
 	})
 
 	// set config to docker
