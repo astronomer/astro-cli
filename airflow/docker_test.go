@@ -1388,6 +1388,39 @@ func TestCheckWebserverHealth(t *testing.T) {
 		assert.Contains(t, string(out), "Project is running! All components are now available.")
 	})
 
+	t.Run("success with podman", func(t *testing.T) {
+		settingsFile := "docker_test.go" // any file which exists
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.AnythingOfType("string"), api.PsOptions{All: true}).Return([]api.ContainerSummary{{ID: "test-webserver-id", Name: fmt.Sprintf("test-%s", WebserverDockerContainerName), State: "running"}}, nil).Once()
+
+		openURL = func(url string) error {
+			return nil
+		}
+
+		orgInitSetting := initSettings
+		initSettings = func(id, settingsFile string, version uint64, connections, variables, pools bool) error {
+			return nil
+		}
+		defer func() { initSettings = orgInitSetting }()
+
+		orgStdout := os.Stdout
+		defer func() { os.Stdout = orgStdout }()
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// set config to podman
+		config.CFG.DockerCommand.SetHomeString("podman")
+		err := checkWebserverHealth(settingsFile, &types.Project{Name: "test"}, composeMock, 2, false, 1*time.Second)
+		assert.NoError(t, err)
+
+		w.Close()
+		out, _ := io.ReadAll(r)
+		assert.Contains(t, string(out), "Components will be available soon.")
+	})
+
+	// set config to docker
+	config.CFG.DockerCommand.SetHomeString("docker")
+
 	t.Run("compose ps failure", func(t *testing.T) {
 		settingsFile := "./testfiles/test_dag_inegrity_file.py" // any file which exists
 		composeMock := new(mocks.DockerComposeAPI)
