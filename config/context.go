@@ -3,11 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
-
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -20,14 +17,6 @@ var (
 const (
 	contextsKey = "contexts"
 )
-
-// newTableOut construct new printutil.Table
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding: []int{36, 36},
-		Header:  []string{"CONTEXT DOMAIN", "WORKSPACE"},
-	}
-}
 
 // Contexts holds all available Context structs in a map
 type Contexts struct {
@@ -187,11 +176,6 @@ func (c *Context) SwitchContext() error {
 	if err != nil {
 		return err
 	}
-
-	tab := newTableOut()
-	tab.AddRow([]string{ctx.Domain, ctx.Workspace}, false)
-	tab.SuccessMsg = "\n Switched context"
-	tab.Print(os.Stdout)
 
 	return nil
 }

@@ -11,12 +11,6 @@ import (
 
 var err error
 
-func TestNewTableOut(t *testing.T) {
-	tab := newTableOut()
-	assert.NotNil(t, tab)
-	assert.Equal(t, []int{36, 36}, tab.Padding)
-}
-
 func TestGetCurrentContextError(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:

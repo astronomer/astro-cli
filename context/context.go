@@ -3,6 +3,7 @@ package context
 import (
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 
@@ -29,6 +30,14 @@ var tab = printutil.Table{
 	Padding:      []int{44},
 	Header:       []string{"NAME"},
 	ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
+}
+
+// newTableOut construct new printutil.Table
+func newTableOut() *printutil.Table {
+	return &printutil.Table{
+		Padding: []int{36, 36},
+		Header:  []string{"CONTEXT DOMAIN", "WORKSPACE"},
+	}
 }
 
 // ContextExists checks to see if context exist in config
@@ -107,7 +116,24 @@ func SwitchContext(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		domain = args[0]
 	}
-	return Switch(domain)
+
+	err := Switch(domain)
+	if err != nil {
+		return err
+	}
+
+	c := config.Context{Domain: domain}
+	ctx, err := c.GetContext()
+	if err != nil {
+		return err
+	}
+
+	tab := newTableOut()
+	tab.AddRow([]string{ctx.Domain, ctx.Workspace}, false)
+	tab.SuccessMsg = "\n Switched context"
+	tab.Print(os.Stdout)
+
+	return nil
 }
 
 func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {

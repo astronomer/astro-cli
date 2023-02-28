@@ -24,9 +24,10 @@ import (
 )
 
 var (
-	authLogin     = auth.Login
-	defaultDomain = "astronomer.io"
-	client        = httputil.NewHTTPClient()
+	authLogin       = auth.Login
+	defaultDomain   = "astronomer.io"
+	client          = httputil.NewHTTPClient()
+	isDeploymentCmd = false
 )
 
 const (
@@ -64,10 +65,10 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
-	// version command does not need auth setup
-	if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
-		return nil
-	}
+	// // version command does not need auth setup
+	// if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
+	// 	return nil
+	// }
 
 	// completion command does not need auth setup
 	if cmd.Parent().Use == "completion" {
@@ -78,9 +79,13 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	if cmd.Parent().Use == "context" {
 		return nil
 	}
+	// if deployment commands are used
+	if cmd.Parent().Use == "deployment" {
+		isDeploymentCmd = true
+	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(client, coreClient, args)
+	apiToken, err := checkAPIToken(client, isDeploymentCmd, coreClient, args)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API keys, using regular auth instead")
@@ -319,14 +324,15 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	return true, nil
 }
 
-func checkAPIToken(astroClient astro.Client, coreClient astrocore.CoreClient, args []string) (bool, error) {
+func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient astrocore.CoreClient, args []string) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
 		return false, nil
 	}
-
-	fmt.Println("Using an Astro API Token")
+	if !isDeploymentCmd {
+		fmt.Println("Using an Astro API Token")
+	}
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context
@@ -338,13 +344,14 @@ func checkAPIToken(astroClient astro.Client, coreClient astrocore.CoreClient, ar
 			if err != nil {
 				return false, err
 			}
-
-			// Switch context
-			err = context.Switch(domain)
-			if err != nil {
-				return false, err
-			}
 		}
+
+		// Switch context
+		err = context.Switch(domain)
+		if err != nil {
+			return false, err
+		}
+
 		c, err = context.GetContext(domain) // get current context
 		if err != nil {
 			return false, err
