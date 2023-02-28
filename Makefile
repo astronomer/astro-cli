@@ -18,7 +18,7 @@ lint:
 	${ENVTEST_ASSETS_DIR}/golangci-lint run --timeout 3m0s
 
 build:
-	go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
+	GOOS=linux GOARCH=amd64 go build -o ${OUTPUT} -ldflags "${LDFLAGS_VERSION}" main.go
 
 core_api_gen:
     ifeq (, $(shell which oapi-codegen))

@@ -305,6 +305,12 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	template.Deployment.Metadata = nil
 
 	for i := range template.Deployment.EnvVars {
+		if template.Deployment.EnvVars[i].IsSecret == true {
+			template.Deployment.EnvVars[i].Value = "REPLACE WITH SECRET VALUE"
+		}
+	}
+
+	for i := range template.Deployment.EnvVars {
 		// zero out updated at timestamp
 		template.Deployment.EnvVars[i].UpdatedAt = ""
 	}
