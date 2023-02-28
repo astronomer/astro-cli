@@ -170,6 +170,42 @@ func TestDeleteError(t *testing.T) {
 	api.AssertExpectations(t)
 }
 
+func TestGetWorkspaceSelectionId(t *testing.T) {
+	// Create a mock client
+	testUtil.InitTestConfig("software")
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaces", "test-org-id").Return([]houston.Workspace{
+		{ID: "123", Label: "Workspace 1"},
+		{ID: "456", Label: "Workspace 2"},
+	}, nil)
+
+	// Set up a mock output buffer
+	buf := new(bytes.Buffer)
+
+	// Set up mock input
+	testUtil.MockUserInput(t, "1\n")
+	// Call the function
+	workspaceID, err := GetWorkspaceSelectionID(api, buf)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	// Check the output buffer
+	expectedOutput := ` #     NAME            ID      
+ 1     Workspace 1     123     
+ 2     Workspace 2     456     
+`
+	assert.Equal(t, expectedOutput, buf.String())
+
+	// Check the selected workspace ID
+	assert.Equal(t, "123", workspaceID)
+
+	testUtil.MockUserInput(t, "7\n")
+	// Call the function
+	_, err = GetWorkspaceSelectionID(api, buf)
+	assert.Error(t, err)
+}
+
 func TestGetCurrentWorkspace(t *testing.T) {
 	// we init default workspace to: ck05r3bor07h40d02y2hw4n4v
 	testUtil.InitTestConfig("software")

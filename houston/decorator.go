@@ -54,6 +54,9 @@ func Call[fReq any, fResp any, fType func(any) (any, error)](houstonFunc func(fR
 			return houstonFunc(r)
 		}
 
+		// get the current version of the connected platform
+		houstonVersion := getVersion()
+
 		// get function name of houstonFunc
 		funcName := getFunctionName(houstonFunc)
 		// check if any restrictions are defined on that API, else return
@@ -61,9 +64,6 @@ func Call[fReq any, fResp any, fType func(any) (any, error)](houstonFunc func(fR
 		if !ok {
 			return houstonFunc(r)
 		}
-
-		// get the current version of the connected platform
-		houstonVersion := getVersion()
 
 		// validate if the platform version fits within API restrictions
 		if VerifyVersionMatch(houstonVersion, funcRestriction) {
@@ -145,7 +145,7 @@ func isCalledFromUnitTestFile() bool {
 }
 
 func getVersion() string {
-	if version != "" || versionErr != nil {
+	if version != "" {
 		return version
 	}
 

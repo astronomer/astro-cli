@@ -20,6 +20,7 @@ func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	t.Run("worker-queue command runs", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
 		wQueueCmd := newDeploymentWorkerQueueRootCmd(os.Stdout)
 		wQueueCmd.SetOut(buf)
 		_, err := wQueueCmd.ExecuteC()
@@ -428,9 +429,9 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 				ID:                "test-wq-id-1",
 				Name:              "test-queue-1",
 				IsDefault:         false,
-				MaxWorkerCount:    125,
-				MinWorkerCount:    5,
-				WorkerConcurrency: 180,
+				MaxWorkerCount:    175,
+				MinWorkerCount:    0,
+				WorkerConcurrency: 150,
 				NodePoolID:        "test-pool-id",
 			},
 		}
@@ -445,7 +446,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		}
 		mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
 			MinWorkerCount: astro.WorkerQueueOption{
-				Floor:   1,
+				Floor:   0,
 				Ceiling: 20,
 				Default: 5,
 			},
@@ -466,8 +467,8 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 
-		// updating min, max and concurrency to defaults along with worker type
-		cmdArgs := []string{"worker-queue", "update", "-n", "test-queue-1", "-t", "test-instance-type", "-f"}
+		// updating min count
+		cmdArgs := []string{"worker-queue", "update", "-n", "test-queue-1", "-t", "test-instance-type", "--min-count", "0", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)

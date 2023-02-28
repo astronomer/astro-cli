@@ -13,7 +13,7 @@ import (
 var (
 	ErrCtxConfigErr = errors.New("context config invalid, no domain specified")
 
-	errGetHomeString = errors.New("no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 	errNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
 )
 
@@ -52,7 +52,7 @@ func GetCurrentContext() (Context, error) {
 
 	domain := CFG.Context.GetHomeString()
 	if domain == "" {
-		return Context{}, errGetHomeString
+		return Context{}, ErrGetHomeString
 	}
 
 	c.Domain = domain

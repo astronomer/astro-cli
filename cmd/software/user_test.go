@@ -12,6 +12,7 @@ import (
 
 func TestUserRootCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	testUtil.SetupOSArgsForGinkgo()
 	buf := new(bytes.Buffer)
 	userCmd := newUserCmd(os.Stdout)
 	userCmd.SetOut(buf)

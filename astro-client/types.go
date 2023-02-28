@@ -325,7 +325,7 @@ type WorkerQueue struct {
 	Name              string `json:"name"`
 	IsDefault         bool   `json:"isDefault"`
 	MaxWorkerCount    int    `json:"maxWorkerCount,omitempty"`
-	MinWorkerCount    int    `json:"minWorkerCount,omitempty"`
+	MinWorkerCount    int    `json:"minWorkerCount"`
 	WorkerConcurrency int    `json:"workerConcurrency,omitempty"`
 	NodePoolID        string `json:"nodePoolId"`
 	PodCPU            string `json:"podCpu,omitempty"`

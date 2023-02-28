@@ -1,3 +1,4 @@
+*.test
 .astro/
 .Dockerfile.sql_cli
 .DS_Store
@@ -11,6 +12,7 @@ astro
 astro-cli
 cmd/dags/.airflowignore
 cover.out
+coverage-2.txt
 coverage.txt
 dist/
 meta/

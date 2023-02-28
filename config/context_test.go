@@ -164,7 +164,7 @@ func TestResetCurrentContext(t *testing.T) {
 	assert.NoError(t, err)
 	ctx, err := GetCurrentContext()
 	assert.Equal(t, "", ctx.Domain)
-	assert.ErrorIs(t, err, errGetHomeString)
+	assert.ErrorIs(t, err, ErrGetHomeString)
 }
 
 func TestGetContexts(t *testing.T) {

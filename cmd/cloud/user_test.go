@@ -15,6 +15,7 @@ func TestUserRootCommand(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmd := newUserCmd(os.Stdout)
 	cmd.SetOut(buf)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), expectedHelp)

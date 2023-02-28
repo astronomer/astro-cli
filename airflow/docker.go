@@ -37,6 +37,7 @@ import (
 
 const (
 	componentName                  = "airflow"
+	podman                         = "podman"
 	dockerStateUp                  = "running"
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
@@ -705,72 +706,91 @@ var createDockerProject = func(projectName, airflowHome, envFile, buildImage, se
 }
 
 var checkWebserverHealth = func(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	// check if webserver is healthy for user
-	err := composeService.Events(ctx, project.Name, api.EventsOptions{
-		Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
-			marshal, err := json.Marshal(map[string]interface{}{
-				"action": event.Status,
-			})
-			if err != nil {
+	if config.CFG.DockerCommand.GetString() == podman {
+		err := printStatus(settingsFile, project, composeService, airflowDockerVersion, noBrowser)
+		if err != nil {
+			if !errors.Is(err, errComposeProjectRunning) {
 				return err
 			}
+		}
 
-			if string(marshal) == `{"action":"health_status: healthy"}` {
-				psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
-					All: true,
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		// check if webserver is healthy for user
+		err := composeService.Events(ctx, project.Name, api.EventsOptions{
+			Services: []string{WebserverDockerContainerName}, Consumer: func(event api.Event) error {
+				marshal, err := json.Marshal(map[string]interface{}{
+					"action": event.Status,
 				})
 				if err != nil {
-					return errors.Wrap(err, composeStatusCheckErrMsg)
+					return err
 				}
-
-				fileState, err := fileutil.Exists(settingsFile, nil)
-				if err != nil {
-					return errors.Wrap(err, errSettingsPath)
-				}
-
-				if fileState {
-					for i := range psInfo {
-						if strings.Contains(psInfo[i].Name, project.Name) &&
-							strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
-							err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
-							if err != nil {
-								return err
-							}
-						}
-					}
-				}
-
-				fmt.Println("\nProject is running! All components are now available.")
-				parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
-				webserverURL := "http://localhost:" + parts[len(parts)-1]
-				fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
-				fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
-				fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
-				fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
-				if !(noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
-					err = openURL(webserverURL)
+				if string(marshal) == `{"action":"health_status: healthy"}` {
+					err := printStatus(settingsFile, project, composeService, airflowDockerVersion, noBrowser)
 					if err != nil {
-						fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+						return err
 					}
 				}
-				return errComposeProjectRunning
-			}
 
-			return nil
-		},
-	})
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Printf("\n")
-			return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout) //nolint:goerr113
-		}
-		if !errors.Is(err, errComposeProjectRunning) {
-			return err
+				return nil
+			},
+		})
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				fmt.Printf("\n")
+				return fmt.Errorf("there might be a problem with your project starting up. The webserver health check timed out after %s but your project will continue trying to start. Run 'astro dev logs --webserver | --scheduler' for details.\n\nTry again or use the --wait flag to increase the time out", timeout) //nolint:goerr113
+			}
+			if !errors.Is(err, errComposeProjectRunning) {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func printStatus(settingsFile string, project *types.Project, composeService api.Service, airflowDockerVersion uint64, noBrowser bool) error {
+	psInfo, err := composeService.Ps(context.Background(), project.Name, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeStatusCheckErrMsg)
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+
+	if fileState {
+		for i := range psInfo {
+			if strings.Contains(psInfo[i].Name, project.Name) &&
+				strings.Contains(psInfo[i].Name, WebserverDockerContainerName) {
+				err = initSettings(psInfo[i].ID, settingsFile, airflowDockerVersion, true, true, true)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if config.CFG.DockerCommand.GetString() == podman {
+		fmt.Println("\nComponents will be available soon. If they are not running in the next few minutes, run 'astro dev logs --webserver | --scheduler' for details.")
+	} else {
+		fmt.Println("\nProject is running! All components are now available.")
+	}
+	parts := strings.Split(config.CFG.WebserverPort.GetString(), ":")
+	webserverURL := "http://localhost:" + parts[len(parts)-1]
+	fmt.Printf("\n"+composeLinkWebserverMsg+"\n", ansi.Bold(webserverURL))
+	fmt.Printf(composeLinkPostgresMsg+"\n", ansi.Bold("localhost:"+config.CFG.PostgresPort.GetString()+"/postgres"))
+	fmt.Printf(composeUserPasswordMsg+"\n", ansi.Bold("admin:admin"))
+	fmt.Printf(postgresUserPasswordMsg+"\n", ansi.Bold("postgres:postgres"))
+	if !(noBrowser || util.CheckEnvBool(os.Getenv("ASTRONOMER_NO_BROWSER"))) {
+		err = openURL(webserverURL)
+		if err != nil {
+			fmt.Println("\nUnable to open the webserver URL, please visit the following link: " + webserverURL)
+		}
+	}
+	return errComposeProjectRunning
 }
 
 // CheckTriggererEnabled checks if the airflow triggerer component should be enabled.

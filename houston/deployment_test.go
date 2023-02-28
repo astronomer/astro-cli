@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -32,8 +33,8 @@ func TestCreateDeployment(t *testing.T) {
 					{Type: "airflow", URL: "http://airflow.com"},
 					{Type: "flower", URL: "http://flower.com"},
 				},
-				CreatedAt: "2020-06-25T22:10:42.385Z",
-				UpdatedAt: "2020-06-25T22:10:42.385Z",
+				CreatedAt: time.Time{},
+				UpdatedAt: time.Time{},
 			},
 		},
 	}
@@ -91,8 +92,8 @@ func TestDeleteDeployment(t *testing.T) {
 					{Type: "airflow", URL: "http://airflow.com"},
 					{Type: "flower", URL: "http://flower.com"},
 				},
-				CreatedAt: "2020-06-25T22:10:42.385Z",
-				UpdatedAt: "2020-06-25T22:10:42.385Z",
+				CreatedAt: time.Time{},
+				UpdatedAt: time.Time{},
 			},
 		},
 	}
@@ -151,8 +152,8 @@ func TestListDeployments(t *testing.T) {
 						{Type: "airflow", URL: "http://airflow.com"},
 						{Type: "flower", URL: "http://flower.com"},
 					},
-					CreatedAt: "2020-06-25T22:10:42.385Z",
-					UpdatedAt: "2020-06-25T22:10:42.385Z",
+					CreatedAt: time.Time{},
+					UpdatedAt: time.Time{},
 				},
 			},
 		},
@@ -211,8 +212,8 @@ func TestUpdateDeployment(t *testing.T) {
 					{Type: "airflow", URL: "http://airflow.com"},
 					{Type: "flower", URL: "http://flower.com"},
 				},
-				CreatedAt: "2020-06-25T22:10:42.385Z",
-				UpdatedAt: "2020-06-25T22:10:42.385Z",
+				CreatedAt: time.Time{},
+				UpdatedAt: time.Time{},
 			},
 		},
 	}
@@ -270,8 +271,8 @@ func TestGetDeployment(t *testing.T) {
 					{Type: "airflow", URL: "http://airflow.com"},
 					{Type: "flower", URL: "http://flower.com"},
 				},
-				CreatedAt: "2020-06-25T22:10:42.385Z",
-				UpdatedAt: "2020-06-25T22:10:42.385Z",
+				CreatedAt: time.Time{},
+				UpdatedAt: time.Time{},
 			},
 		},
 	}
@@ -329,8 +330,8 @@ func TestUpdateDeploymentAirflow(t *testing.T) {
 					{Type: "airflow", URL: "http://airflow.com"},
 					{Type: "flower", URL: "http://flower.com"},
 				},
-				CreatedAt: "2020-06-25T22:10:42.385Z",
-				UpdatedAt: "2020-06-25T22:10:42.385Z",
+				CreatedAt: time.Time{},
+				UpdatedAt: time.Time{},
 			},
 		},
 	}
@@ -489,8 +490,8 @@ func TestUpdateDeploymentRuntime(t *testing.T) {
 					{Type: "airflow", URL: "http://airflow.com"},
 					{Type: "flower", URL: "http://flower.com"},
 				},
-				CreatedAt: "2020-06-25T22:10:42.385Z",
-				UpdatedAt: "2020-06-25T22:10:42.385Z",
+				CreatedAt: time.Time{},
+				UpdatedAt: time.Time{},
 			},
 		},
 	}

@@ -10,6 +10,7 @@ import (
 
 	sql "github.com/astronomer/astro-cli/cmd/sql"
 
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,8 +36,10 @@ func chdir(t *testing.T, dir string) func() {
 func execFlowCmd(args ...string) error {
 	// Set the astro-cli version to a version compatible with the latest sql-cli version for e2e tests
 	version.CurrVersion = "1.10.0"
+	testUtil.SetupOSArgsForGinkgo()
 	cmd := sql.NewFlowCommand()
 	cmd.SetArgs(args)
+	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
 	return err
 }
