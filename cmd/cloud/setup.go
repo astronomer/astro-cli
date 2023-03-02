@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -43,6 +44,17 @@ type TokenResponse struct {
 	Scope            string  `json:"scope"`
 	Error            *string `json:"error,omitempty"`
 	ErrorDescription string  `json:"error_description,omitempty"`
+}
+
+type CustomClaims struct {
+	OrgAuthServiceId      string   `json:"org_id"`
+	Scope                 string   `json:"scope"`
+	Permissions           []string `json:"permissions"`
+	Version               string   `json:"version"`
+	IsAstronomerGenerated bool     `json:"isAstronomerGenerated"`
+	RsaKeyId              string   `json:"kid"`
+	ApiTokenId            string   `json:"apiTokenId"`
+	jwt.RegisteredClaims
 }
 
 func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
@@ -372,9 +384,23 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient as
 	if err != nil {
 		return false, err
 	}
-	org := orgs[0]
-	orgID := org.Id
-	orgShortName := org.ShortName
+	var orgID string
+	var orgShortName string
+	if len(orgs) > 0 {
+		org := orgs[0]
+		orgID = org.Id
+		orgShortName = org.ShortName
+	} else {
+		// Parse the token to peek at the custom claims
+		jwtParser := jwt.NewParser()
+		parsedToken, _, err := jwtParser.ParseUnverified(astroAPIToken, &CustomClaims{})
+		claims, ok := parsedToken.Claims.(*CustomClaims)
+		if !ok {
+			return false, errors.Wrap(err, "failed to parse auth token")
+		}
+		orgID = strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
+		orgShortName = strings.Replace(claims.Permissions[3], "organizationId:", "", 1)
+	}
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
