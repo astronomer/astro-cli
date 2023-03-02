@@ -149,6 +149,8 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 }
 
 // Start starts a local airflow development cluster
+//
+//nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
