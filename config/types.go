@@ -41,6 +41,7 @@ type cfgs struct {
 	SQLCLI                cfg
 	AuditLogs             cfg
 	UpgradeMessage        cfg
+	DisableAstroRun       cfg
 }
 
 // Creates a new cfg struct

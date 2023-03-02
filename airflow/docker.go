@@ -176,16 +176,20 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 
 	// Build this project image
 	if imageName == "" {
-		// add astro-run-dag package
-		err = fileutil.AddLineToFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
-		if err != nil {
-			fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
+		if !config.CFG.DisableAstroRun.GetBool() {
+			// add astro-run-dag package
+			err = fileutil.AddLineToFile("./requirements.txt", "astro-run-dag", "# This package is needed for the astro run command. It will be removed before a deploy")
+			if err != nil {
+				fmt.Printf("Adding 'astro-run-dag' package to requirements.txt unsuccessful: %s\nManually add package to requirements.txt", err.Error())
+			}
 		}
 		imageBuildErr := d.imageHandler.Build(airflowTypes.ImageBuildConfig{Path: d.airflowHome, Output: true, NoCache: noCache})
-		// remove astro-run-dag from requirments.txt
-		err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
-		if err != nil {
-			fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+		if !config.CFG.DisableAstroRun.GetBool() {
+			// remove astro-run-dag from requirments.txt
+			err = fileutil.RemoveLineFromFile("./requirements.txt", "astro-run-dag", " # This package is needed for the astro run command. It will be removed before a deploy")
+			if err != nil {
+				fmt.Printf("Removing line 'astro-run-dag' package from requirements.txt unsuccessful: %s\n", err.Error())
+			}
 		}
 		if imageBuildErr != nil {
 			return imageBuildErr
