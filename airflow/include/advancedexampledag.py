@@ -1,31 +1,24 @@
 from pendulum import datetime, duration
-from typing import Dict
 
-# Airflow operators are templates for tasks and encompass the logic that your DAG will actually execute.
+# Airflow Operators are templates for tasks and encompass the logic that your DAG will actually execute.
 # To use an operator in your DAG, you first have to import it.
 # To learn more about operators, see: https://registry.astronomer.io/.
 
-from airflow.decorators import (
-    dag,
-    task,
-)  # DAG and task decorators for interfacing with the TaskFlow API
-from airflow.models.baseoperator import (
-    chain,
-)  # A function that sets sequential dependencies between tasks including lists of tasks
+# DAG and task decorators for interfacing with the TaskFlow API
+from airflow.decorators import dag, task, task_group
+
+# A function that sets sequential dependencies between tasks including lists of tasks
+from airflow.models.baseoperator import chain
+
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
-from airflow.operators.email import EmailOperator
-from airflow.operators.python import BranchPythonOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
-from airflow.utils.edgemodifier import (
-    Label,
-)  # Used to label node edges in the Airflow UI
-from airflow.utils.task_group import (
-    TaskGroup,
-)  # Used to group tasks together in the Graph view of the Airflow UI
-from airflow.utils.weekday import (
-    WeekDay,
-)  # Used to determine what day of the week it is
+
+# Used to label node edges in the Airflow UI
+from airflow.utils.edgemodifier import Label
+
+# Used to determine the day of the week
+from airflow.utils.weekday import WeekDay
 
 
 """
@@ -40,31 +33,19 @@ prints "It's Tuesday and I'm busy with studying".
 This DAG uses the following operators:
 
 BashOperator -
-    Executes a bash script or bash command.
+    Executes a Bash script, command, or set of commands.
 
     See more info about this operator here:
         https://registry.astronomer.io/providers/apache-airflow/modules/bashoperator
 
 EmptyOperator -
-    Does nothing but can be used to structure your DAG
+    Does nothing but can be used to structure your DAG.
 
     See more info about this operator here:
         https://registry.astronomer.io/providers/apache-airflow/modules/emptyoperator
 
-EmailOperator -
-    Used to send emails
-
-    See more info about this operator here:
-        https://registry.astronomer.io/providers/apache-airflow/modules/emailoperator
-
-BranchPythonOperator -
-    Allows a workflow to “branch” after a task based on the result of a Python function
-
-    See more info about this operator here:
-        https://registry.astronomer.io/providers/apache-airflow/modules/branchpythonoperator
-
 BranchDayOfWeekOperator -
-    Branches into one of two lists of tasks depending on the current day
+    Branches into one of two lists of tasks depending on the current day.
 
     See more info about this operator here:
         https://registry.astronomer.io/providers/apache-airflow/modules/branchdayofweekoperator
@@ -81,19 +62,29 @@ DAY_ACTIVITY_MAPPING = {
     "sunday": {"is_weekday": False, "activity": "sleeping in"},
 }
 
+# The TaskFlow API is also used in a number of tasks within this DAG. Check out of the TaskFlow API tutorial
+# to learn more.
+#   https://airflow.apache.org/docs/apache-airflow/stable/tutorial/taskflow.html
 
+# This is the TaskFlow equivalent of the PythonOperator:
+#   https://registry.astronomer.io/providers/apache-airflow/modules/pythonoperator
 @task(
-    multiple_outputs=True
-)  # multiple_outputs=True unrolls dictionaries into separate XCom values
-def _going_to_the_beach() -> Dict:
+    # By default the function name is used as the `task_id`, but it can be overriden if desired.
+    task_id="going_to_the_beach",
+    multiple_outputs=True,  # multiple_outputs=True unrolls dictionaries into separate XCom values
+)
+def _going_to_the_beach() -> dict[str, str]:
     return {
         "subject": "Beach day!",
-        "body": "It's Saturday and I'm heading to the beach.<br><br>Come join me!<br>",
+        "body": "It's Saturday and I'm heading to the beach.<br>Come join me!",
     }
 
 
-# This functions gets the activity from the "DAY_ACTIVITY_MAPPING" dictionary
-def _get_activity(day_name) -> str:
+# This is the TaskFlow API equivalent to the BranchPythonOperator:
+#   https://registry.astronomer.io/providers/apache-airflow/modules/branchpythonoperator
+# The task retrieves the activity from the "DAY_ACTIVITY_MAPPING" dictionary.
+@task.branch
+def get_activity(day_name: str) -> str:
     activity_id = DAY_ACTIVITY_MAPPING[day_name]["activity"].replace(" ", "_")
 
     if DAY_ACTIVITY_MAPPING[day_name]["is_weekday"]:
@@ -102,11 +93,24 @@ def _get_activity(day_name) -> str:
     return f"weekend_activities.{activity_id}"
 
 
+# This the TaskFlow API equivalent to the PythonVirtualEnvOperator:
+#   https://registry.astronomer.io/providers/apache-airflow/modules/pythonvirtualenvoperator
+@task.virtualenv(requirements=["beautifulsoup4==4.11.2"])
+def inviting_friends(subject: str, body: str) -> None:
+    from bs4 import BeautifulSoup
+
+    print("Inviting friends...")
+    html_doc = f"<title>{subject}</title><p>{body}</p>"
+    soup = BeautifulSoup(html_doc, "html.parser")
+    print(soup.prettify())
+
+
 # When using the DAG decorator, the "dag" argument doesn't need to be specified for each task.
 # The "dag_id" value defaults to the name of the function it is decorating if not explicitly set.
 # In this example, the "dag_id" value would be "example_dag_advanced".
 @dag(
-    # This DAG is set to run for the first time on January 1, 2023. Best practice is to use a static start_date.
+    # This DAG is set to run for the first time on January 1, 2023.
+    # Best practice is to use a static start_date.
     # Subsequent DAG runs are instantiated based on the "schedule" parameter below.
     start_date=datetime(2023, 1, 1),
     # This defines how many instantiations of this DAG (DAG Runs) can execute concurrently. In this case,
@@ -118,11 +122,9 @@ def _get_activity(day_name) -> str:
     schedule="@daily",
     # Default settings applied to all tasks within the DAG; can be overwritten at the task level.
     default_args={
-        "owner": "community",  # This defines the value of the "owner" column in the DAG view of the Airflow UI
+        "owner": "community",  # Defines the value of the "owner" column in the DAG view of the Airflow UI
         "retries": 2,  # If a task fails, it will retry 2 times.
-        "retry_delay": duration(
-            minutes=3
-        ),  # A task that fails will wait 3 minutes to retry.
+        "retry_delay": duration(minutes=3),  # A task that fails will wait 3 minutes to retry.
     },
     default_view="graph",  # This defines the default view for this DAG in the Airflow UI
     # When catchup=False, your DAG will only run for the latest schedule interval. In this case, this means
@@ -154,12 +156,13 @@ def example_dag_advanced():
 
     # Begin weekday tasks.
     # Tasks within this TaskGroup (weekday tasks) will be grouped together in the Airflow UI
-    with TaskGroup("weekday_activities") as weekday_activities:
-        which_weekday_activity_day = BranchPythonOperator(
-            task_id="which_weekday_activity_day",
-            python_callable=_get_activity,  # Python function called when task executes
-            op_args=[day_name],
-        )
+    @task_group
+    def weekday_activities():
+        # TaskFlow functions can also be reused which is beneficial if you want to use the same callable for
+        # multiple tasks and want to use different task attributes.
+        # See this tutorial for more information:
+        #   https://airflow.apache.org/docs/apache-airflow/stable/tutorial/taskflow.html#reusing-a-decorated-task
+        which_weekday_activity_day = get_activity.override(task_id="which_weekday_activity_day")(day_name)
 
         for day, day_info in DAY_ACTIVITY_MAPPING.items():
             if day_info["is_weekday"]:
@@ -169,7 +172,8 @@ def example_dag_advanced():
                 # This task prints the weekday activity to bash
                 do_activity = BashOperator(
                     task_id=activity.replace(" ", "_"),
-                    bash_command=f"echo It's {day.capitalize()} and I'm busy with {activity}.",  # This is the bash command to run
+                    # This is the Bash command to run
+                    bash_command=f"echo It's {day.capitalize()} and I'm busy with {activity}.",
                 )
 
                 # Declaring task dependencies within the "TaskGroup" via the classic bitshift operator.
@@ -177,31 +181,23 @@ def example_dag_advanced():
 
     # Begin weekend tasks
     # Tasks within this TaskGroup will be grouped together in the UI
-    with TaskGroup("weekend_activities") as weekend_activities:
-        which_weekend_activity_day = BranchPythonOperator(
-            task_id="which_weekend_activity_day",
-            python_callable=_get_activity,  # Python function called when task executes
-            op_args=[day_name],
-        )
+    @task_group
+    def weekend_activities():
+        which_weekend_activity_day = get_activity.override(task_id="which_weekend_activity_day")(day_name)
 
         # Labels that will appear in the Graph view of the Airflow UI
         saturday = Label(label="saturday")
         sunday = Label(label="sunday")
 
-        # This task prints the Sunday activity to bash
-        sleeping_in = BashOperator(
-            task_id="sleeping_in", bash_command="sleep $[ ( $RANDOM % 30 )  + 1 ]s"
-        )
+        # This task runs the Sunday activity of sleeping for a random interval between 1 and 30 seconds
+        sleeping_in = BashOperator(task_id="sleeping_in", bash_command="sleep $[ (1 + $RANDOM % 30) ]s")
 
         going_to_the_beach = _going_to_the_beach()  # Calling the TaskFlow task
 
         # Because the "_going_to_the_beach()" function has "multiple_outputs" enabled, each dict key is
         # accessible as their own "XCom" key.
-        inviting_friends = EmailOperator(
-            task_id="inviting_friends",
-            to="friends@community.com",  # Email to send email to
-            subject=going_to_the_beach["subject"],  # Email subject
-            html_content=going_to_the_beach["body"],  # Email body content
+        _inviting_friends = inviting_friends(
+            subject=going_to_the_beach["subject"], body=going_to_the_beach["body"]
         )
 
         # Using "chain()" here for list-to-list dependencies which are not supported by the bitshift
@@ -212,12 +208,16 @@ def example_dag_advanced():
             [going_to_the_beach, sleeping_in],
         )
 
+    # Call the @task_group TaskFlow functions to instantiate them in the DAG
+    _weekday_activities = weekday_activities()
+    _weekend_activities = weekend_activities()
+
     # High-level dependencies between tasks
     chain(
         begin,
         check_day_of_week,
         [weekday, weekend],
-        [weekday_activities, weekend_activities],
+        [_weekday_activities, _weekend_activities],
         end,
     )
 
