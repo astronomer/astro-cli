@@ -66,6 +66,7 @@ DAY_ACTIVITY_MAPPING = {
 # to learn more.
 #   https://airflow.apache.org/docs/apache-airflow/stable/tutorial/taskflow.html
 
+
 # This is the TaskFlow equivalent of the PythonOperator:
 #   https://registry.astronomer.io/providers/apache-airflow/modules/pythonoperator
 @task(
@@ -124,7 +125,9 @@ def inviting_friends(subject: str, body: str) -> None:
     default_args={
         "owner": "community",  # Defines the value of the "owner" column in the DAG view of the Airflow UI
         "retries": 2,  # If a task fails, it will retry 2 times.
-        "retry_delay": duration(minutes=3),  # A task that fails will wait 3 minutes to retry.
+        "retry_delay": duration(
+            minutes=3
+        ),  # A task that fails will wait 3 minutes to retry.
     },
     default_view="graph",  # This defines the default view for this DAG in the Airflow UI
     # When catchup=False, your DAG will only run for the latest schedule interval. In this case, this means
@@ -162,7 +165,9 @@ def example_dag_advanced():
         # multiple tasks and want to use different task attributes.
         # See this tutorial for more information:
         #   https://airflow.apache.org/docs/apache-airflow/stable/tutorial/taskflow.html#reusing-a-decorated-task
-        which_weekday_activity_day = get_activity.override(task_id="which_weekday_activity_day")(day_name)
+        which_weekday_activity_day = get_activity.override(
+            task_id="which_weekday_activity_day"
+        )(day_name)
 
         for day, day_info in DAY_ACTIVITY_MAPPING.items():
             if day_info["is_weekday"]:
@@ -183,14 +188,18 @@ def example_dag_advanced():
     # Tasks within this TaskGroup will be grouped together in the UI
     @task_group
     def weekend_activities():
-        which_weekend_activity_day = get_activity.override(task_id="which_weekend_activity_day")(day_name)
+        which_weekend_activity_day = get_activity.override(
+            task_id="which_weekend_activity_day"
+        )(day_name)
 
         # Labels that will appear in the Graph view of the Airflow UI
         saturday = Label(label="saturday")
         sunday = Label(label="sunday")
 
         # This task runs the Sunday activity of sleeping for a random interval between 1 and 30 seconds
-        sleeping_in = BashOperator(task_id="sleeping_in", bash_command="sleep $[ (1 + $RANDOM % 30) ]s")
+        sleeping_in = BashOperator(
+            task_id="sleeping_in", bash_command="sleep $[ (1 + $RANDOM % 30) ]s"
+        )
 
         going_to_the_beach = _going_to_the_beach()  # Calling the TaskFlow task
 
