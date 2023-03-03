@@ -79,12 +79,10 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 		return err
 	}
 	// map cluster name to id and collect node pools for cluster
-	// clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, client)
-	// if err != nil {
-	// 	return err
-	// }
-
-	clusterID = "clbzeum5y000v0tyn8hbv5vsa"
+	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, client)
+	if err != nil {
+		return err
+	}
 
 	existingDeployments, err = client.ListDeployments(c.Organization, workspaceID)
 	if err != nil {
