@@ -413,7 +413,13 @@ type MutateOrgUserRoleRequest struct {
 
 // MutateOrganizationRequest defines model for MutateOrganizationRequest.
 type MutateOrganizationRequest struct {
-	Name string `json:"name"`
+	Metadata *MutateOrganizationRequest_Metadata `json:"metadata,omitempty"`
+	Name     string                              `json:"name"`
+}
+
+// MutateOrganizationRequest_Metadata defines model for MutateOrganizationRequest.Metadata.
+type MutateOrganizationRequest_Metadata struct {
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // MutateWorkspaceUserRoleRequest defines model for MutateWorkspaceUserRoleRequest.
@@ -469,6 +475,28 @@ type PostLoginEvent struct {
 // PostLoginEvent_Transaction defines model for PostLoginEvent.Transaction.
 type PostLoginEvent_Transaction struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// RunGroup defines model for RunGroup.
+type RunGroup struct {
+	Children          *[]RunGroup          `json:"children,omitempty"`
+	ExtraLinks        *[]string            `json:"extraLinks,omitempty"`
+	HasOutletDatasets bool                 `json:"hasOutlet_datasets"`
+	Id                *string              `json:"id,omitempty"`
+	Instances         *[]RunGroupInstances `json:"instances,omitempty"`
+	IsMapped          bool                 `json:"isMapped"`
+	Label             *string              `json:"label,omitempty"`
+	Operator          *string              `json:"operator,omitempty"`
+}
+
+// RunGroupInstances defines model for RunGroupInstances.
+type RunGroupInstances struct {
+	EndDate   *string `json:"endDate,omitempty"`
+	RunId     string  `json:"runId"`
+	StartDate *string `json:"startDate,omitempty"`
+	State     string  `json:"state"`
+	TaskId    string  `json:"taskId"`
+	TryNumber int     `json:"tryNumber"`
 }
 
 // Scope defines model for Scope.
@@ -591,6 +619,15 @@ type User struct {
 	FullName            string    `json:"fullName"`
 	Id                  string    `json:"id"`
 	Invites             *[]Invite `json:"invites,omitempty"`
+
+	// Only shown if admin listing users
+	LastLogin *string `json:"lastLogin,omitempty"`
+
+	// Only shown if admin listing users
+	LastLoginConnectionName *string `json:"lastLoginConnectionName,omitempty"`
+
+	// Only shown if admin listing users
+	LastLoginConnectionType *string `json:"lastLoginConnectionType,omitempty"`
 
 	// Only shown if admin listing users
 	OrgCount *int `json:"orgCount,omitempty"`
@@ -1149,6 +1186,59 @@ func (a *EventUser_UserMetadata) UnmarshalJSON(b []byte) error {
 
 // Override default JSON handling for EventUser_UserMetadata to handle AdditionalProperties
 func (a EventUser_UserMetadata) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for MutateOrganizationRequest_Metadata. Returns the specified
+// element and whether it was found
+func (a MutateOrganizationRequest_Metadata) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for MutateOrganizationRequest_Metadata
+func (a *MutateOrganizationRequest_Metadata) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for MutateOrganizationRequest_Metadata to handle AdditionalProperties
+func (a *MutateOrganizationRequest_Metadata) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for MutateOrganizationRequest_Metadata to handle AdditionalProperties
+func (a MutateOrganizationRequest_Metadata) MarshalJSON() ([]byte, error) {
 	var err error
 	object := make(map[string]json.RawMessage)
 

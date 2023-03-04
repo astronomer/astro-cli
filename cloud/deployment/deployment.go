@@ -2,7 +2,9 @@ package deployment
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	astroContext "github.com/astronomer/astro-cli/context"
 	"io"
 	"os"
 	"sort"
@@ -11,6 +13,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
@@ -41,7 +44,7 @@ var (
 	SchedulerReplicasMin = 1
 	schedulerAuMax       = 30
 	schedulerReplicasMax = 4
-	sleepTime            = 180
+	sleepTime            = 5
 	tickNum              = 10
 	timeoutNum           = 180
 )
@@ -144,7 +147,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -245,7 +248,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	if waitForStatus {
-		err = healthPoll(d.ID, workspaceID, client)
+		err = healthPoll(d.ID, workspaceID, client, coreClient)
 		if err != nil {
 			errOutput := createOutput(workspaceID, &d)
 			if errOutput != nil {
@@ -371,7 +374,7 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	return clusterID, nil
 }
 
-func healthPoll(deploymentID, ws string, client astro.Client) error {
+func healthPoll(deploymentID, ws string, client astro.Client, coreClient astrocore.CoreClient) error {
 	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
 	buf := new(bytes.Buffer)
@@ -385,20 +388,40 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
-			deployments, err := GetDeployments(ws, client)
+			limit := 100
+			params := &astrocore.ListDeploymentsParams{
+				DeploymentIds: &deploymentID,
+				WorkspaceIds:  nil,
+				Offset:        nil,
+				Limit:         &limit,
+				Sorts:         nil,
+			}
+			ctx, err := astroContext.GetCurrentContext()
 			if err != nil {
 				return err
 			}
-
-			var currentDeployment astro.Deployment
-			for i := range deployments {
-				if deployments[i].ID == deploymentID {
-					currentDeployment = deployments[i]
-				}
+			orgShortID := ctx.OrganizationShortName
+			// TODO This is the query we should use
+			// getDeplymentStatusParams := astrocore.GetDeploymentsStatusesParams{
+			//	DeploymentIds: &deploymentID,
+			//	WorkspaceIds:  &ws,
+			//	Offset:        nil,
+			//	Limit:         &limit,
+			//	Sorts:         nil,
+			// }
+			// resp, err := coreClient.GetDeploymentsStatusesWithResponse(context.Background(), orgShortID, &getDeplymentStatusParams)
+			resp, err := coreClient.ListDeploymentsWithResponse(context.Background(), orgShortID, params)
+			if err != nil {
+				return err
 			}
-			if currentDeployment.Status == "HEALTHY" {
-				fmt.Printf("Deployment %s is now healthy\n", currentDeployment.Label)
-				return nil
+			for _, deployment := range resp.JSON200.Deployments {
+				if deployment.Id == deploymentID {
+					fmt.Printf("Status ----> %s \n\n", deployment.Status)
+					if deployment.Status == "HEALTHY" {
+						fmt.Printf("Deployment %s is now healthy\n", deployment.Label)
+						return nil
+					}
+				}
 			}
 			continue
 		}
@@ -676,7 +699,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, SchedulerAuMin, SchedulerReplicasMin, client, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, SchedulerAuMin, SchedulerReplicasMin, client, nil, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

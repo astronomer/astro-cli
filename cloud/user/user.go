@@ -2,6 +2,7 @@ package user
 
 import (
 	httpContext "context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,8 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-
-	"github.com/pkg/errors"
 )
 
 var (

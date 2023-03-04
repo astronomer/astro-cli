@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/astronomer/astro-cli/astro-client"
-
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -335,7 +334,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return err
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
