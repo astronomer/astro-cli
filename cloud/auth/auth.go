@@ -320,7 +320,12 @@ func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client ast
 		activeOrgID = *selfResp.JSON200.OrganizationId
 	}
 	// fetch all orgs that the user can access
-	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
+	orgParams := &astrocore.ListOrganizationsParams{
+		Search:      nil,
+		TrialStatus: nil,
+		ProductTier: nil,
+	}
+	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), orgParams)
 	if err != nil {
 		return err
 	}

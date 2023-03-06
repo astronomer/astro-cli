@@ -34,7 +34,12 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
-	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
+	orgParams := &astrocore.ListOrganizationsParams{
+		Search:      nil,
+		TrialStatus: nil,
+		ProductTier: nil,
+	}
+	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), orgParams)
 	if err != nil {
 		return nil, err
 	}

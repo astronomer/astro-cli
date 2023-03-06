@@ -60,7 +60,7 @@ func TestList(t *testing.T) {
 
 	t.Run("organization list success", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
@@ -70,7 +70,7 @@ func TestList(t *testing.T) {
 
 	t.Run("organization network error", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(nil, errNetwork).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		assert.Contains(t, err.Error(), "network error")
@@ -79,7 +79,7 @@ func TestList(t *testing.T) {
 
 	t.Run("organization list error", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockErrorResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockErrorResponse, nil).Once()
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
 		assert.Contains(t, err.Error(), "failed to fetch organizations")
@@ -92,7 +92,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("get organiation selection success", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -118,7 +118,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 
 	t.Run("get organization selection list error", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockErrorResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockErrorResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		_, err := getOrganizationSelection(buf, mockClient)
@@ -128,7 +128,7 @@ func TestGetOrganizationSelection(t *testing.T) {
 
 	t.Run("get organization selection select error", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("3")
@@ -160,7 +160,7 @@ func TestSwitch(t *testing.T) {
 		mockGQLClient := new(astro_mocks.Client)
 
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
 			return astro.AuthConfig{}, nil
 		}
@@ -176,7 +176,7 @@ func TestSwitch(t *testing.T) {
 	t.Run("successful switch without name", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
@@ -207,7 +207,7 @@ func TestSwitch(t *testing.T) {
 	t.Run("failed switch wrong name", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
 			return astro.AuthConfig{}, nil
 		}
@@ -223,7 +223,7 @@ func TestSwitch(t *testing.T) {
 	t.Run("failed switch bad selection", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("3")
@@ -255,7 +255,7 @@ func TestSwitch(t *testing.T) {
 	t.Run("failed switch bad login", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
 			return astro.AuthConfig{}, nil
 		}
@@ -271,7 +271,7 @@ func TestSwitch(t *testing.T) {
 	t.Run("switch in identity first flow", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
 			return astro.AuthConfig{
 				AuthFlow: auth.AuthFlowIdentityFirst,
