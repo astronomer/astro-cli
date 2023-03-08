@@ -399,6 +399,9 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient as
 	if !ok {
 		return false, errors.Wrap(err, "failed to parse auth token")
 	}
+	if len(claims.Permissions) == 0 {
+		return false, errors.New("the API token given does not appear to be an Astro API Token.")
+	}
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
 	orgShortName := strings.Replace(claims.Permissions[3], "organizationId:", "", 1)
 	// }
