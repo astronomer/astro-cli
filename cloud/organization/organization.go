@@ -112,11 +112,7 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*
 	return &selected, nil
 }
 
-func SwitchWithLogin(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-	return Login(domain, targetOrg.AuthServiceId, "", astroClient, coreClient, out, shouldDisplayLoginLink)
-}
-
-func SwitchWithContext(domain string, targetOrg *astrocore.Organization, authConfig astro.AuthConfig, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	c, _ := context.GetCurrentContext()
 	// reset org context
 	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
@@ -126,7 +122,7 @@ func SwitchWithContext(domain string, targetOrg *astrocore.Organization, authCon
 	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
-	return CheckUserSession(&c, authConfig, astroClient, coreClient, out)
+	return CheckUserSession(&c, astroClient, coreClient, out)
 }
 
 // Switch switches organizations
@@ -161,15 +157,7 @@ func Switch(orgNameOrID string, astroClient astro.Client, coreClient astrocore.C
 	if targetOrg == nil {
 		return errInvalidOrganizationName
 	}
-	// fetch auth config
-	authConfig, err := FetchDomainAuthConfig(c.Domain)
-	if err != nil {
-		return err
-	}
-	if authConfig.AuthFlow == auth.AuthFlowIdentityFirst {
-		return SwitchWithContext(c.Domain, targetOrg, authConfig, astroClient, coreClient, out)
-	}
-	return SwitchWithLogin(c.Domain, targetOrg, astroClient, coreClient, out, shouldDisplayLoginLink)
+	return SwitchWithContext(c.Domain, targetOrg, astroClient, coreClient, out)
 }
 
 // Write the audit logs to the provided io.Writer.

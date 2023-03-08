@@ -13,7 +13,6 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
-	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,6 @@ var (
 		JSON200: nil,
 	}
 	errNetwork = errors.New("network error")
-	errMock    = errors.New("mock error")
 )
 
 func TestList(t *testing.T) {
@@ -158,13 +156,9 @@ func TestSwitch(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("successful switch with name", func(t *testing.T) {
 		mockGQLClient := new(astro_mocks.Client)
-
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
-			return astro.AuthConfig{}, nil
-		}
-		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -177,6 +171,9 @@ func TestSwitch(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+			return nil
+		}
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
@@ -192,12 +189,6 @@ func TestSwitch(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
-			return astro.AuthConfig{}, nil
-		}
-		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return nil
-		}
 		buf := new(bytes.Buffer)
 		err = Switch("", mockClient, mockCoreClient, buf, false)
 		assert.NoError(t, err)
@@ -208,10 +199,7 @@ func TestSwitch(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
-			return astro.AuthConfig{}, nil
-		}
-		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 			return nil
 		}
 		buf := new(bytes.Buffer)
@@ -224,7 +212,9 @@ func TestSwitch(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+			return nil
+		}
 		// mock os.Stdin
 		input := []byte("3")
 		r, w, err := os.Pipe()
@@ -240,52 +230,9 @@ func TestSwitch(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
-			return astro.AuthConfig{}, nil
-		}
-		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return nil
-		}
 		buf := new(bytes.Buffer)
 		err = Switch("", mockClient, mockCoreClient, buf, false)
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
-		mockCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("failed switch bad login", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
-			return astro.AuthConfig{}, nil
-		}
-		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return errMock
-		}
-		buf := new(bytes.Buffer)
-		err := Switch("org1", mockClient, mockCoreClient, buf, false)
-		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
-	})
-
-	t.Run("switch in identity first flow", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOKResponse, nil).Once()
-		FetchDomainAuthConfig = func(domain string) (astro.AuthConfig, error) {
-			return astro.AuthConfig{
-				AuthFlow: auth.AuthFlowIdentityFirst,
-			}, nil
-		}
-		Login = func(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return errNetwork
-		}
-		CheckUserSession = func(c *config.Context, authConfig astro.AuthConfig, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
-			return nil
-		}
-		buf := new(bytes.Buffer)
-		err := Switch("org1", mockClient, mockCoreClient, buf, false)
-		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 	})
 }
