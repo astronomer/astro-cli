@@ -409,7 +409,15 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient as
 		if err != nil {
 			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 		}
-		workspaceID = deployments[0].Workspace.ID
+		if len(deployments) > 0 {
+			workspaceID = deployments[0].Workspace.ID
+		} else {
+			workspaces, err := astroClient.ListWorkspaces(orgID)
+			if err != nil {
+				return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+			}
+			workspaceID = workspaces[0].ID
+		}
 
 		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
 		if err != nil {
