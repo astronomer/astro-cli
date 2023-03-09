@@ -867,9 +867,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
         - is_secret: false
           key: foo
           value: bar
-        - is_secret: true
-          key: bar
-          value: baz
     configuration:
         name: ""
         description: description
@@ -1019,11 +1016,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
                 "key": "foo",
                 "value": "bar"
             },
-            {
-                "is_secret": true,
-                "key": "bar",
-                "value": "baz"
-            }
         ],
         "configuration": {
             "name": "",
@@ -1448,7 +1440,16 @@ func TestGetTemplate(t *testing.T) {
 		expected.Deployment.Metadata = nil
 		for i := range expected.Deployment.EnvVars {
 			expected.Deployment.EnvVars[i].UpdatedAt = ""
+
 		}
+		newEnvVars := []EnvironmentVariable{}
+		for i := range expected.Deployment.EnvVars {
+			if !expected.Deployment.EnvVars[i].IsSecret {
+				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
+			}
+		}
+		expected.Deployment.EnvVars = newEnvVars
+
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
 	})
@@ -1476,6 +1477,13 @@ func TestGetTemplate(t *testing.T) {
 		for i := range expected.Deployment.EnvVars {
 			expected.Deployment.EnvVars[i].UpdatedAt = ""
 		}
+		newEnvVars := []EnvironmentVariable{}
+		for i := range expected.Deployment.EnvVars {
+			if !expected.Deployment.EnvVars[i].IsSecret {
+				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
+			}
+		}
+		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
 	})
@@ -1499,6 +1507,13 @@ func TestGetTemplate(t *testing.T) {
 		for i := range expected.Deployment.EnvVars {
 			expected.Deployment.EnvVars[i].UpdatedAt = ""
 		}
+		newEnvVars := []EnvironmentVariable{}
+		for i := range expected.Deployment.EnvVars {
+			if !expected.Deployment.EnvVars[i].IsSecret {
+				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
+			}
+		}
+		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
 	})
