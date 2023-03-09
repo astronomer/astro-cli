@@ -306,8 +306,7 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	newEnvVars := []EnvironmentVariable{}
 
 	for i := range template.Deployment.EnvVars {
-		if template.Deployment.EnvVars[i].IsSecret == false {
-			// template.Deployment.EnvVars[i].Value = "REPLACE WITH SECRET VALUE"
+		if !template.Deployment.EnvVars[i].IsSecret {
 			newEnvVars = append(newEnvVars, template.Deployment.EnvVars[i])
 		}
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/pkg/errors"
@@ -34,6 +35,7 @@ var (
 const (
 	accessTokenExpThreshold = 5 * time.Minute
 	topLvlCmd               = "astro"
+	deploymentCmd           = "deployment"
 )
 
 type TokenResponse struct {
@@ -47,13 +49,13 @@ type TokenResponse struct {
 }
 
 type CustomClaims struct {
-	OrgAuthServiceId      string   `json:"org_id"`
+	OrgAuthServiceID      string   `json:"org_id"`
 	Scope                 string   `json:"scope"`
 	Permissions           []string `json:"permissions"`
 	Version               string   `json:"version"`
 	IsAstronomerGenerated bool     `json:"isAstronomerGenerated"`
-	RsaKeyId              string   `json:"kid"`
-	ApiTokenId            string   `json:"apiTokenId"`
+	RsaKeyID              string   `json:"kid"`
+	APITokenID            string   `json:"apiTokenId"`
 	jwt.RegisteredClaims
 }
 
@@ -63,49 +65,21 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
-	// If the user is using dev commands no need to go through auth setup.
-	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
-		return nil
-	}
-	// If the user is using flow commands no need to go through auth setup.
-	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
+	cmds := []string{"dev", "flow", "help", "version", "completion", "context"}
+
+	// If the user is using dev, flow, help, version, completion, or context commands no need to go through auth setup.
+	if util.Contains(cmds, cmd.CalledAs()) && cmd.Parent().Use == topLvlCmd {
 		return nil
 	}
 
-	// help command does not need auth setup
-	if cmd.CalledAs() == "help" && cmd.Parent().Use == topLvlCmd {
-		return nil
-	}
-
-	// version command does not need auth setup
-	if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
-		return nil
-	}
-
-	// completion command does not need auth setup
-	if cmd.Parent().Use == "completion" {
-		return nil
-	}
-
-	// context command does not need auth setup
-	if cmd.Parent().Use == "context" {
-		return nil
-	}
-	// if deployment inspect commands are used
-	if cmd.CalledAs() == "inspect" && cmd.Parent().Use == "deployment" {
-		isDeploymentCmd = true
-	}
-	// if deployment create commands are used
-	if cmd.CalledAs() == "create" && cmd.Parent().Use == "deployment" {
-		isDeploymentCmd = true
-	}
-	// if deployment update commands are used
-	if cmd.CalledAs() == "update" && cmd.Parent().Use == "deployment" {
+	// if deployment inspect, create, or udpate commands are used
+	deploymentCmds := []string{"inspect", "create", "update"}
+	if util.Contains(deploymentCmds, cmd.CalledAs()) && cmd.Parent().Use == deploymentCmd {
 		isDeploymentCmd = true
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(client, isDeploymentCmd, coreClient, args)
+	apiToken, err := checkAPIToken(client, isDeploymentCmd, args)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API tokens, using regular auth instead")
@@ -344,7 +318,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	return true, nil
 }
 
-func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient astrocore.CoreClient, args []string) (bool, error) {
+func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, args []string) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -395,7 +369,7 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient as
 		return false, errors.Wrap(err, "failed to parse auth token")
 	}
 	if len(claims.Permissions) == 0 {
-		return false, errors.New("the API token given does not appear to be an Astro API Token.")
+		return false, errors.New("the API token given does not appear to be an Astro API Token")
 	}
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
 	orgShortName := strings.Replace(claims.Permissions[3], "organizationId:", "", 1)
