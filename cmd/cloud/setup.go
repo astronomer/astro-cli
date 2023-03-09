@@ -77,10 +77,10 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
-	// // version command does not need auth setup
-	// if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
-	// 	return nil
-	// }
+	// version command does not need auth setup
+	if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
 
 	// completion command does not need auth setup
 	if cmd.Parent().Use == "completion" {
@@ -91,8 +91,16 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	if cmd.Parent().Use == "context" {
 		return nil
 	}
-	// if deployment commands are used
-	if cmd.Parent().Use == "deployment" {
+	// if deployment inspect commands are used
+	if cmd.CalledAs() == "inspect" && cmd.Parent().Use == "deployment" {
+		isDeploymentCmd = true
+	}
+	// if deployment create commands are used
+	if cmd.CalledAs() == "create" && cmd.Parent().Use == "deployment" {
+		isDeploymentCmd = true
+	}
+	// if deployment update commands are used
+	if cmd.CalledAs() == "update" && cmd.Parent().Use == "deployment" {
 		isDeploymentCmd = true
 	}
 
@@ -379,19 +387,6 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient as
 	if err != nil {
 		return false, err
 	}
-	// fmt.Println("got to line 382")
-	// orgs, err := organization.ListOrganizations(coreClient)
-	// if err != nil {
-	// 	return false, err
-	// }
-	// fmt.Println("got to line 387")
-	// var orgID string
-	// var orgShortName string
-	// if len(orgs) > 0 {
-	// 	org := orgs[0]
-	// 	orgID = org.Id
-	// 	orgShortName = org.ShortName
-	// } else {
 	// Parse the token to peek at the custom claims
 	jwtParser := jwt.NewParser()
 	parsedToken, _, err := jwtParser.ParseUnverified(astroAPIToken, &CustomClaims{})
@@ -404,7 +399,6 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, coreClient as
 	}
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
 	orgShortName := strings.Replace(claims.Permissions[3], "organizationId:", "", 1)
-	// }
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
 		// get workspace ID
