@@ -201,7 +201,7 @@ func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
 	return userEmail, err
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool, domain, auth0OrgID string) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// try to get UserEmail from config first
 	userEmail, err := getUserEmail(c)
 	if err != nil {
@@ -210,13 +210,6 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 
 	if userEmail == "" {
 		userEmail = input.Text("Please enter your account email: ")
-	}
-
-	if (auth0OrgID == "") && authConfig.AuthFlow != AuthFlowIdentityFirst {
-		auth0OrgID, err = a.orgChecker(domain)
-		if err != nil {
-			log.Fatalf("Something went wrong! Try again or contact Astronomer Support")
-		}
 	}
 
 	// Generate PKCE verifier and challenge
@@ -231,7 +224,7 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 	var res Result
 
 	authorizeURL := fmt.Sprintf(
-		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
+		"%sauthorize?prompt=login&audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
 		authConfig.DomainURL,
 		authConfig.Audience,
 		authConfig.ClientID,
@@ -239,10 +232,6 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 		userEmail,
 		challenge,
 	)
-	// trigger organization specific login only when auth0OrgID is provided
-	if auth0OrgID != "" {
-		authorizeURL = fmt.Sprintf("%s&organization=%s", authorizeURL, auth0OrgID)
-	}
 
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
 
@@ -299,7 +288,7 @@ func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) 
 }
 
 // check client status after a successfully login
-func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func CheckUserSession(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	// fetch self user based on token
 	// we set CreateIfNotExist to true so we always create astro user when a successfully login
 	createIfNotExist := true
@@ -314,11 +303,6 @@ func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client ast
 		return err
 	}
 	activeOrgID := c.Organization
-	// we only set activeOrgID base on auth org in org first auth flow
-	if authConfig.AuthFlow != AuthFlowIdentityFirst && selfResp.JSON200.OrganizationId != nil {
-		// OrganizationId is optional, it may not be returned by getSelf api
-		activeOrgID = *selfResp.JSON200.OrganizationId
-	}
 	// fetch all orgs that the user can access
 	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
 	if err != nil {
@@ -388,7 +372,7 @@ func CheckUserSession(c *config.Context, authConfig astro.AuthConfig, client ast
 }
 
 // Login handles authentication to astronomer api and registry
-func Login(domain, orgID, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+func Login(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 	var res Result
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
@@ -402,7 +386,7 @@ func Login(domain, orgID, token string, client astro.Client, coreClient astrocor
 	c, _ := context.GetCurrentContext()
 
 	if token == "" {
-		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink, domain, orgID)
+		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink)
 		if err != nil {
 			return err
 		}
@@ -433,7 +417,7 @@ func Login(domain, orgID, token string, client astro.Client, coreClient astrocor
 		return err
 	}
 
-	err = CheckUserSession(&c, authConfig, client, coreClient, out)
+	err = CheckUserSession(&c, client, coreClient, out)
 	if err != nil {
 		return err
 	}
