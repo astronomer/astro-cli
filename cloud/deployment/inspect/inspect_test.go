@@ -866,6 +866,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
     environment_variables:
         - is_secret: false
           key: foo
+		  updated_at: NOW
           value: bar
     configuration:
         name: ""
@@ -1014,6 +1015,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             {
                 "is_secret": false,
                 "key": "foo",
+				updated_at: NOW
                 "value": "bar"
             },
         ],
@@ -1438,9 +1440,6 @@ func TestGetTemplate(t *testing.T) {
 		assert.NoError(t, err)
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
-		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
-		}
 		newEnvVars := []EnvironmentVariable{}
 		for i := range expected.Deployment.EnvVars {
 			if !expected.Deployment.EnvVars[i].IsSecret {
@@ -1448,6 +1447,9 @@ func TestGetTemplate(t *testing.T) {
 			}
 		}
 		expected.Deployment.EnvVars = newEnvVars
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = ""
+		}
 
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
@@ -1473,14 +1475,14 @@ func TestGetTemplate(t *testing.T) {
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
 		expected.Deployment.EnvVars = nil
-		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
-		}
 		newEnvVars := []EnvironmentVariable{}
 		for i := range expected.Deployment.EnvVars {
 			if !expected.Deployment.EnvVars[i].IsSecret {
 				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
 			}
+		}
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = ""
 		}
 		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
@@ -1503,14 +1505,14 @@ func TestGetTemplate(t *testing.T) {
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
 		expected.Deployment.AlertEmails = nil
-		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
-		}
 		newEnvVars := []EnvironmentVariable{}
 		for i := range expected.Deployment.EnvVars {
 			if !expected.Deployment.EnvVars[i].IsSecret {
 				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
 			}
+		}
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = ""
 		}
 		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
