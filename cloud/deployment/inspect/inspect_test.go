@@ -1440,7 +1440,6 @@ func TestGetTemplate(t *testing.T) {
 		expected.Deployment.Metadata = nil
 		for i := range expected.Deployment.EnvVars {
 			expected.Deployment.EnvVars[i].UpdatedAt = ""
-
 		}
 		newEnvVars := []EnvironmentVariable{}
 		for i := range expected.Deployment.EnvVars {
