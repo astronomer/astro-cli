@@ -61,14 +61,37 @@ type CustomClaims struct {
 
 func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
+	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
 	}
 
-	cmds := []string{"dev", "flow", "help", "version", "completion", "context"}
+	// If the user is using dev commands no need to go through auth setup.
+	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
+	// If the user is using flow commands no need to go through auth setup.
+	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
 
-	// If the user is using dev, flow, help, version, completion, or context commands no need to go through auth setup.
-	if util.Contains(cmds, cmd.CalledAs()) && cmd.Parent().Use == topLvlCmd {
+	// help command does not need auth setup
+	if cmd.CalledAs() == "help" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
+
+	// version command does not need auth setup
+	if cmd.CalledAs() == "version" && cmd.Parent().Use == topLvlCmd {
+		return nil
+	}
+
+	// completion command does not need auth setup
+	if cmd.Parent().Use == "completion" {
+		return nil
+	}
+
+	// context command does not need auth setup
+	if cmd.Parent().Use == "context" {
 		return nil
 	}
 
