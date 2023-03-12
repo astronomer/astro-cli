@@ -866,7 +866,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
     environment_variables:
         - is_secret: false
           key: foo
-		  updated_at: NOW
+          updated_at: NOW
           value: bar
     configuration:
         name: ""
@@ -1015,9 +1015,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
             {
                 "is_secret": false,
                 "key": "foo",
-				updated_at: NOW
+                "updated_at": "NOW",
                 "value": "bar"
-            },
+            }
         ],
         "configuration": {
             "name": "",
