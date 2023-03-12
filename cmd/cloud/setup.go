@@ -59,6 +59,7 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
+//nolint:gocognit
 func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	// If the user is trying to login or logout no need to go through auth setup.
