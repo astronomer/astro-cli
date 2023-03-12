@@ -1482,7 +1482,7 @@ func TestGetTemplate(t *testing.T) {
 			}
 		}
 		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
+			expected.Deployment.EnvVars[i].UpdatedAt = "NOW"
 		}
 		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
