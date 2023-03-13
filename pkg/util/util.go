@@ -118,10 +118,10 @@ func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) 
 	return false, nil
 }
 
-func ParseAPIToken(AstroAPIToken string) (*CustomClaims, error) {
+func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	// Parse the token to peek at the custom claims
 	jwtParser := jwt.NewParser()
-	parsedToken, _, err := jwtParser.ParseUnverified(AstroAPIToken, &CustomClaims{})
+	parsedToken, _, err := jwtParser.ParseUnverified(astroAPIToken, &CustomClaims{})
 	claims, ok := parsedToken.Claims.(*CustomClaims)
 	if !ok {
 		return nil, errors.Wrap(err, "failed to parse auth token")

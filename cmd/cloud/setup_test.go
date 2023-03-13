@@ -323,12 +323,6 @@ func TestCheckToken(t *testing.T) {
 func TestCheckAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("test context switch", func(t *testing.T) {
-		mockDeplyResp := []astro.Deployment{
-			{
-				ID:        "test-id",
-				Workspace: astro.Workspace{ID: "workspace-id"},
-			},
-		}
 		permissions := []string{
 			"",
 			"workspaceId:workspace-id",
@@ -339,14 +333,11 @@ func TestCheckAPIToken(t *testing.T) {
 			Permissions: permissions,
 		}
 
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
-
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		parseAPIToken = func(AstroAPIToken string) (*util.CustomClaims, error) {
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
 			return &mockClaims, nil
 		}
 
@@ -358,30 +349,21 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(mockClient, true, []string{})
+		_, err = checkAPIToken(true, []string{})
 		assert.NoError(t, err)
 	})
 
 	t.Run("bad claims", func(t *testing.T) {
-		mockDeplyResp := []astro.Deployment{
-			{
-				ID:        "test-id",
-				Workspace: astro.Workspace{ID: "workspace-id"},
-			},
-		}
 		permissions := []string{}
 		mockClaims := util.CustomClaims{
 			Permissions: permissions,
 		}
 
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
-
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
 		}
 
-		parseAPIToken = func(AstroAPIToken string) (*util.CustomClaims, error) {
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
 			return &mockClaims, nil
 		}
 
@@ -393,7 +375,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(mockClient, true, []string{})
-		assert.ErrorIs(t, err, notTokenErr)
+		_, err = checkAPIToken(true, []string{})
+		assert.ErrorIs(t, err, errNotToken)
 	})
 }

@@ -31,7 +31,7 @@ var (
 	client          = httputil.NewHTTPClient()
 	isDeploymentCmd = false
 	parseAPIToken   = util.ParseAPIToken
-	notTokenErr     = errors.New("the API token given does not appear to be an Astro API Token")
+	errNotToken     = errors.New("the API token given does not appear to be an Astro API Token")
 )
 
 const (
@@ -105,7 +105,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(client, isDeploymentCmd, args)
+	apiToken, err := checkAPIToken(isDeploymentCmd, args)
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("\nThere was an error using API tokens, using regular auth instead")
@@ -344,7 +344,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	return true, nil
 }
 
-func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, args []string) (bool, error) {
+func checkAPIToken(isDeploymentCmd bool, args []string) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -393,9 +393,9 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, args []string
 		return false, err
 	}
 	if len(claims.Permissions) == 0 {
-		return false, notTokenErr
+		return false, errNotToken
 	}
-	workspaceID := strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
+	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
 	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
