@@ -45,6 +45,9 @@ var (
 
 	//go:embed include/settingsyml.yml
 	Settingsyml string
+
+	//go:embed include/requirements.txt
+	RequirementsTxt string
 )
 
 func initDirs(root string, dirs []string) error {
@@ -104,7 +107,7 @@ func Init(path, airflowImageName, airflowImageTag string) error {
 		"Dockerfile":                           fmt.Sprintf(Dockerfile, airflowImageName, airflowImageTag),
 		".gitignore":                           Gitignore,
 		"packages.txt":                         "",
-		"requirements.txt":                     "",
+		"requirements.txt":                     RequirementsTxt,
 		".env":                                 "",
 		"airflow_settings.yaml":                Settingsyml,
 		"dags/example_dag_basic.py":            ExampleDagBasic,
