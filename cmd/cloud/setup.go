@@ -30,6 +30,7 @@ var (
 	defaultDomain   = "astronomer.io"
 	client          = httputil.NewHTTPClient()
 	isDeploymentCmd = false
+	parseAPIToken   = util.ParseAPIToken
 )
 
 const (
@@ -386,35 +387,19 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, args []string
 		return false, err
 	}
 	// Parse the token to peek at the custom claims
-	jwtParser := jwt.NewParser()
-	parsedToken, _, err := jwtParser.ParseUnverified(astroAPIToken, &CustomClaims{})
-	claims, ok := parsedToken.Claims.(*CustomClaims)
-	if !ok {
-		return false, errors.Wrap(err, "failed to parse auth token")
+	claims, err := parseAPIToken(astroAPIToken)
+	if err != nil {
+		return false, err
 	}
 	if len(claims.Permissions) == 0 {
 		return false, errors.New("the API token given does not appear to be an Astro API Token")
 	}
+	workspaceID := strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
-	orgShortName := strings.Replace(claims.Permissions[3], "organizationId:", "", 1)
+	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
-		// get workspace ID
-		deployments, err := astroClient.ListDeployments(orgID, "")
-		if err != nil {
-			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-		}
-		if len(deployments) > 0 {
-			workspaceID = deployments[0].Workspace.ID
-		} else {
-			workspaces, err := astroClient.ListWorkspaces(orgID)
-			if err != nil {
-				return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-			}
-			workspaceID = workspaces[0].ID
-		}
-
-		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+		err := c.SetContextKey("workspace", workspaceID) // c.Workspace
 		if err != nil {
 			fmt.Println("no workspace set")
 		}

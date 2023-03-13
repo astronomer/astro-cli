@@ -13,6 +13,7 @@ import (
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -316,5 +317,83 @@ func TestCheckToken(t *testing.T) {
 		// run checkToken
 		err = checkToken(mockClient, mockCoreClient, nil)
 		assert.Contains(t, err.Error(), "failed to login")
+	})
+}
+
+func TestCheckAPIToken(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("test context switch", func(t *testing.T) {
+		mockDeplyResp := []astro.Deployment{
+			{
+				ID:        "test-id",
+				Workspace: astro.Workspace{ID: "workspace-id"},
+			},
+		}
+		permissions := []string{
+			"",
+			"workspaceId:workspace-id",
+			"organizationId:org-ID",
+			"orgShortNameId:org-short-name",
+		}
+		mockClaims := util.CustomClaims{
+			Permissions: permissions,
+		}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
+
+		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(AstroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIToken(mockClient, true, []string{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("bad claims", func(t *testing.T) {
+		mockDeplyResp := []astro.Deployment{
+			{
+				ID:        "test-id",
+				Workspace: astro.Workspace{ID: "workspace-id"},
+			},
+		}
+		permissions := []string{}
+		mockClaims := util.CustomClaims{
+			Permissions: permissions,
+		}
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
+
+		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(AstroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIToken(mockClient, true, []string{})
+		assert.ErrorIs(t, err, errors.New("the API token given does not appear to be an Astro API Token"))
 	})
 }

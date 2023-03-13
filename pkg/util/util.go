@@ -7,9 +7,23 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/pkg/errors"
+
 	// "Masterminds/semver" does not support the format of pre-release tags for SQL CLI, so we're using "hashicorp/go-version"
 	goVersion "github.com/hashicorp/go-version"
 )
+
+type CustomClaims struct {
+	OrgAuthServiceID      string   `json:"org_id"`
+	Scope                 string   `json:"scope"`
+	Permissions           []string `json:"permissions"`
+	Version               string   `json:"version"`
+	IsAstronomerGenerated bool     `json:"isAstronomerGenerated"`
+	RsaKeyID              string   `json:"kid"`
+	APITokenID            string   `json:"apiTokenId"`
+	jwt.RegisteredClaims
+}
 
 // coerce a string into SemVer if possible
 func Coerce(version string) *semver.Version {
@@ -102,4 +116,15 @@ func IsRequiredVersionMet(currentVersion, requiredVersion string) (bool, error) 
 		return true, nil
 	}
 	return false, nil
+}
+
+func ParseAPIToken(AstroAPIToken string) (*CustomClaims, error) {
+	// Parse the token to peek at the custom claims
+	jwtParser := jwt.NewParser()
+	parsedToken, _, err := jwtParser.ParseUnverified(AstroAPIToken, &CustomClaims{})
+	claims, ok := parsedToken.Claims.(*CustomClaims)
+	if !ok {
+		return nil, errors.Wrap(err, "failed to parse auth token")
+	}
+	return claims, nil
 }
