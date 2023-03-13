@@ -31,6 +31,7 @@ var (
 	client          = httputil.NewHTTPClient()
 	isDeploymentCmd = false
 	parseAPIToken   = util.ParseAPIToken
+	notTokenErr     = errors.New("the API token given does not appear to be an Astro API Token")
 )
 
 const (
@@ -392,7 +393,7 @@ func checkAPIToken(astroClient astro.Client, isDeploymentCmd bool, args []string
 		return false, err
 	}
 	if len(claims.Permissions) == 0 {
-		return false, errors.New("the API token given does not appear to be an Astro API Token")
+		return false, notTokenErr
 	}
 	workspaceID := strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)

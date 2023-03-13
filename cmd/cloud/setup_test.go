@@ -394,6 +394,6 @@ func TestCheckAPIToken(t *testing.T) {
 
 		// run CheckAPIKeys
 		_, err = checkAPIToken(mockClient, true, []string{})
-		assert.ErrorIs(t, err, errors.New("the API token given does not appear to be an Astro API Token"))
+		assert.ErrorIs(t, err, notTokenErr)
 	})
 }
