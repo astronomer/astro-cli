@@ -81,6 +81,7 @@ var (
 		SQLCLI:                newCfg("beta.sql_cli", "false"),
 		AuditLogs:             newCfg("beta.audit_logs", "false"),
 		UpgradeMessage:        newCfg("upgrade_message", "true"),
+		DisableAstroRun:       newCfg("disable_astro_run", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory
