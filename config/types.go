@@ -31,6 +31,7 @@ type cfgs struct {
 	ProjectDeployment     cfg
 	ProjectWorkspace      cfg
 	WebserverPort         cfg
+	AirflowExposePort     cfg
 	ShowWarnings          cfg
 	Verbosity             cfg
 	HoustonDialTimeout    cfg

@@ -148,6 +148,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		AirflowUser:           "astro",
 		AirflowWebserverPort:  config.CFG.WebserverPort.GetString(),
 		AirflowEnvFile:        envFile,
+		AirflowExposePort:     config.CFG.AirflowExposePort.GetBool(),
 		MountLabel:            "z",
 		SettingsFile:          settingsFile,
 		SettingsFileExist:     settingsFileExist,

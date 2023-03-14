@@ -91,6 +91,7 @@ type ComposeConfig struct {
 	AirflowHome           string
 	AirflowUser           string
 	AirflowWebserverPort  string
+	AirflowExposePort     bool
 	MountLabel            string
 	SettingsFile          string
 	SettingsFileExist     bool

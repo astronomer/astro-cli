@@ -70,6 +70,7 @@ var (
 		ProjectName:           newCfg("project.name", ""),
 		ProjectWorkspace:      newCfg("project.workspace", ""),
 		WebserverPort:         newCfg("webserver.port", "8080"),
+		AirflowExposePort:     newCfg("airflow.expose_port", "false"),
 		ShowWarnings:          newCfg("show_warnings", "true"),
 		Verbosity:             newCfg("verbosity", "warning"),
 		HoustonDialTimeout:    newCfg("houston.dial_timeout", "10"),
