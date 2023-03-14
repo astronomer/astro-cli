@@ -31,7 +31,11 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
     ports:
+      {{- if not .AirflowExposePort }}
       - 127.0.0.1:{{ .PostgresPort }}:5432
+      {{- else }}
+      - {{ .PostgresPort }}:5432
+      {{- end }}
     volumes:
       {{if .DuplicateImageVolumes}}
       - postgres_data:/var/lib/postgresql/data
@@ -92,7 +96,11 @@ services:
       - postgres
     environment: *common-env-vars
     ports:
+      {{- if not .AirflowExposePort }}
       - 127.0.0.1:{{ .AirflowWebserverPort }}:8080
+      {{- else }}
+      - {{ .AirflowWebserverPort }}:8080
+      {{- end }}
     volumes:
       - {{ .AirflowHome }}/dags:/usr/local/airflow/dags:{{ .MountLabel }}
       - {{ .AirflowHome }}/plugins:/usr/local/airflow/plugins:{{ .MountLabel }}
