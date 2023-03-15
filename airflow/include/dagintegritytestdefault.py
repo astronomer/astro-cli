@@ -7,7 +7,10 @@ import pytest
 
 from airflow.models import DagBag, Variable, Connection
 from airflow.hooks.base import BaseHook
+from airflow.utils.db import initdb
 
+# init airflow database
+initdb()
 
 # The following code patches errors caused by missing OS Variables, Airflow Connections, and Airflow Variables
 
