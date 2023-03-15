@@ -26,12 +26,12 @@ import (
 )
 
 var (
-	authLogin       = auth.Login
-	defaultDomain   = "astronomer.io"
-	client          = httputil.NewHTTPClient()
-	isDeploymentCmd = false
-	parseAPIToken   = util.ParseAPIToken
-	errNotToken     = errors.New("the API token given does not appear to be an Astro API Token")
+	authLogin        = auth.Login
+	defaultDomain    = "astronomer.io"
+	client           = httputil.NewHTTPClient()
+	isDeploymentFile = false
+	parseAPIToken    = util.ParseAPIToken
+	errNotAPIToken   = errors.New("the API token given does not appear to be an Astro API Token")
 )
 
 const (
@@ -63,7 +63,6 @@ type CustomClaims struct {
 
 //nolint:gocognit
 func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
-	// If the user is trying to login or logout no need to go through auth setup.
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -101,14 +100,13 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	// if deployment inspect, create, or udpate commands are used
 	deploymentCmds := []string{"inspect", "create", "update"}
 	if util.Contains(deploymentCmds, cmd.CalledAs()) && cmd.Parent().Use == deploymentCmd {
-		isDeploymentCmd = true
+		isDeploymentFile = true
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentCmd, args)
+	apiToken, err := checkAPIToken(isDeploymentFile, args)
 	if err != nil {
-		fmt.Println(err)
-		fmt.Println("\nThere was an error using API tokens, using regular auth instead")
+		return err
 	}
 	if apiToken {
 		return nil
@@ -117,8 +115,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	// run auth setup for any command that requires auth
 	apiKey, err := checkAPIKeys(client, coreClient, args)
 	if err != nil {
-		fmt.Println(err)
-		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+		return err
 	}
 	if apiKey {
 		return nil
@@ -344,13 +341,13 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentCmd bool, args []string) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
 		return false, nil
 	}
-	if !isDeploymentCmd {
+	if !isDeploymentFile {
 		fmt.Println("Using an Astro API Token")
 	}
 
@@ -393,7 +390,7 @@ func checkAPIToken(isDeploymentCmd bool, args []string) (bool, error) {
 		return false, err
 	}
 	if len(claims.Permissions) == 0 {
-		return false, errNotToken
+		return false, errNotAPIToken
 	}
 	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)

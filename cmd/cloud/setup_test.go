@@ -393,6 +393,6 @@ func TestCheckAPIToken(t *testing.T) {
 
 		// run CheckAPIKeys
 		_, err = checkAPIToken(true, []string{})
-		assert.ErrorIs(t, err, errNotToken)
+		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 }
