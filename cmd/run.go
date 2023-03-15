@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/spf13/cobra"
@@ -35,6 +37,12 @@ func newRunCommand() *cobra.Command {
 func run(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+
+	if config.CFG.DisableAstroRun.GetBool() {
+		fmt.Println("The 'astro run' command is currently disabled run 'astro config set disable_astro_run false' to enable it")
+
+		return nil
+	}
 
 	if len(args) > 0 {
 		dagID = args[0]

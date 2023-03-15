@@ -70,6 +70,7 @@ var (
 		ProjectName:           newCfg("project.name", ""),
 		ProjectWorkspace:      newCfg("project.workspace", ""),
 		WebserverPort:         newCfg("webserver.port", "8080"),
+		AirflowExposePort:     newCfg("airflow.expose_port", "false"),
 		ShowWarnings:          newCfg("show_warnings", "true"),
 		Verbosity:             newCfg("verbosity", "warning"),
 		HoustonDialTimeout:    newCfg("houston.dial_timeout", "10"),
@@ -81,6 +82,7 @@ var (
 		SQLCLI:                newCfg("beta.sql_cli", "false"),
 		AuditLogs:             newCfg("beta.audit_logs", "false"),
 		UpgradeMessage:        newCfg("upgrade_message", "true"),
+		DisableAstroRun:       newCfg("disable_astro_run", "false"),
 	}
 
 	// viperHome is the viper object in the users home directory
