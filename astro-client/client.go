@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using a API Key or Token make sure your context correct.\n\nDetails"
+	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using an API Key or Token make sure your context is correct.\n\nDetails"
 
 	permissionsErrMsg = "you do not have the appropriate permissions for that"
 )
