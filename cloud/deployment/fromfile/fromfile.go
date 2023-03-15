@@ -83,6 +83,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 	if err != nil {
 		return err
 	}
+
 	existingDeployments, err = client.ListDeployments(c.Organization, workspaceID)
 	if err != nil {
 		return err

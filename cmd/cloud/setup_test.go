@@ -13,6 +13,7 @@ import (
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -106,6 +107,23 @@ func TestSetup(t *testing.T) {
 
 		rootCmd := &cobra.Command{Use: "completion"}
 		rootCmd.AddCommand(cmd)
+
+		err = Setup(cmd, []string{}, nil, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("deployment cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
+		cmd := &cobra.Command{Use: "inspect"}
+		cmd, err := cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "deployment"}
+		rootCmd.AddCommand(cmd)
+
+		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
 
 		err = Setup(cmd, []string{}, nil, nil)
 		assert.NoError(t, err)
@@ -316,5 +334,65 @@ func TestCheckToken(t *testing.T) {
 		// run checkToken
 		err = checkToken(mockClient, mockCoreClient, nil)
 		assert.Contains(t, err.Error(), "failed to login")
+	})
+}
+
+func TestCheckAPIToken(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("test context switch", func(t *testing.T) {
+		permissions := []string{
+			"",
+			"workspaceId:workspace-id",
+			"organizationId:org-ID",
+			"orgShortNameId:org-short-name",
+		}
+		mockClaims := util.CustomClaims{
+			Permissions: permissions,
+		}
+
+		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIToken(true, []string{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("bad claims", func(t *testing.T) {
+		permissions := []string{}
+		mockClaims := util.CustomClaims{
+			Permissions: permissions,
+		}
+
+		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+
+		t.Setenv("ASTRO_API_TOKEN", "token")
+
+		// Switch context
+		domain := "astronomer-dev.io"
+		err := context.Switch(domain)
+		assert.NoError(t, err)
+
+		// run CheckAPIKeys
+		_, err = checkAPIToken(true, []string{})
+		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 }
