@@ -103,37 +103,37 @@ func getRegistryURL(domain string) string {
 	return registry
 }
 
-func deployDags(path, dagsPath, runtimeID string, client astro.Client) error {
+func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 	// Create monitoring dag file
 	err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Generate the dags tar
 	err = fileutil.Tar(dagsPath, path)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	dagDeployment, err := deployment.Initiate(runtimeID, client)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	dagsFilePath := filepath.Join(path, "dags.tar")
 	dagFile, err := os.Open(dagsFilePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer dagFile.Close()
 
 	versionID, err := azureUploader(dagDeployment.DagURL, dagFile)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Delete the tar file
@@ -156,10 +156,10 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) error {
 
 	_, err = deployment.ReportDagDeploymentStatus(dagDeployment.ID, runtimeID, action, versionID, status, message, client)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return versionID, nil
 }
 
 // Deploy pushes a new docker image
@@ -195,12 +195,12 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 		}
 		fmt.Println("Initiating DAG deploy for: " + deployInput.RuntimeID)
-		err = deployDags(deployInput.Path, dagsPath, deployInput.RuntimeID, client)
+		versionID, err := deployDags(deployInput.Path, dagsPath, deployInput.RuntimeID, client)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
+		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
 		return nil
 	}
 
@@ -244,7 +244,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
-		err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+		versionID, err := deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
 				return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
@@ -253,7 +253,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			return err
 		}
 
-		fmt.Println("\nSuccessfully uploaded DAGs to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
+		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 			"\n\n Access your Deployment: \n" +
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
@@ -315,7 +315,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) > 0 {
-			err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
+			_, err = deployDags(deployInput.Path, dagsPath, deployInfo.deploymentID, client)
 			if err != nil {
 				return err
 			}
