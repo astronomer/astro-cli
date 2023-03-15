@@ -18,20 +18,26 @@ import (
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/util"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var (
-	authLogin = auth.Login
-
-	client = httputil.NewHTTPClient()
+	authLogin        = auth.Login
+	defaultDomain    = "astronomer.io"
+	client           = httputil.NewHTTPClient()
+	isDeploymentFile = false
+	parseAPIToken    = util.ParseAPIToken
+	errNotAPIToken   = errors.New("the API token given does not appear to be an Astro API Token")
 )
 
 const (
 	accessTokenExpThreshold = 5 * time.Minute
 	topLvlCmd               = "astro"
+	deploymentCmd           = "deployment"
 )
 
 type TokenResponse struct {
@@ -44,6 +50,18 @@ type TokenResponse struct {
 	ErrorDescription string  `json:"error_description,omitempty"`
 }
 
+type CustomClaims struct {
+	OrgAuthServiceID      string   `json:"org_id"`
+	Scope                 string   `json:"scope"`
+	Permissions           []string `json:"permissions"`
+	Version               string   `json:"version"`
+	IsAstronomerGenerated bool     `json:"isAstronomerGenerated"`
+	RsaKeyID              string   `json:"kid"`
+	APITokenID            string   `json:"apiTokenId"`
+	jwt.RegisteredClaims
+}
+
+//nolint:gocognit
 func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
@@ -79,11 +97,25 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
+	// if deployment inspect, create, or udpate commands are used
+	deploymentCmds := []string{"inspect", "create", "update"}
+	if util.Contains(deploymentCmds, cmd.CalledAs()) && cmd.Parent().Use == deploymentCmd {
+		isDeploymentFile = true
+	}
+
+	// Check for APITokens before API keys or refresh tokens
+	apiToken, err := checkAPIToken(isDeploymentFile, args)
+	if err != nil {
+		return err
+	}
+	if apiToken {
+		return nil
+	}
+
 	// run auth setup for any command that requires auth
 	apiKey, err := checkAPIKeys(client, coreClient, args)
 	if err != nil {
-		fmt.Println(err)
-		fmt.Println("\nThere was an error using API keys, using regular auth instead")
+		return err
 	}
 	if apiKey {
 		return nil
@@ -207,7 +239,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	c, err := context.GetCurrentContext() // get current context
 	if err != nil {
 		// set context
-		domain := "astronomer.io"
+		domain := defaultDomain
 		if !context.Exists(domain) {
 			err := context.SetContext(domain)
 			if err != nil {
@@ -298,6 +330,74 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 		workspaceID = deployments[0].Workspace.ID
 
 		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+		if err != nil {
+			fmt.Println("no workspace set")
+		}
+	}
+	err = c.SetOrganizationContext(orgID, orgShortName)
+	if err != nil {
+		fmt.Println("no organization context set")
+	}
+	return true, nil
+}
+
+func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
+	// check os variables
+	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
+	if astroAPIToken == "" {
+		return false, nil
+	}
+	if !isDeploymentFile {
+		fmt.Println("Using an Astro API Token")
+	}
+
+	// get authConfig
+	c, err := context.GetCurrentContext() // get current context
+	if err != nil {
+		// set context
+		domain := defaultDomain
+		if !context.Exists(domain) {
+			err := context.SetContext(domain)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		// Switch context
+		err = context.Switch(domain)
+		if err != nil {
+			return false, err
+		}
+
+		c, err = context.GetContext(domain) // get current context
+		if err != nil {
+			return false, err
+		}
+	}
+
+	err = c.SetContextKey("token", "Bearer "+astroAPIToken)
+	if err != nil {
+		return false, err
+	}
+
+	err = c.SetExpiresIn(time.Now().AddDate(1, 0, 0).Unix())
+	if err != nil {
+		return false, err
+	}
+	// Parse the token to peek at the custom claims
+	claims, err := parseAPIToken(astroAPIToken)
+	if err != nil {
+		return false, err
+	}
+	if len(claims.Permissions) == 0 {
+		return false, errNotAPIToken
+	}
+	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
+	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
+	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
+	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
+	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
+		err := c.SetContextKey("workspace", workspaceID) // c.Workspace
 		if err != nil {
 			fmt.Println("no workspace set")
 		}

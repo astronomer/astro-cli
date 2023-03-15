@@ -866,10 +866,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
     environment_variables:
         - is_secret: false
           key: foo
+          updated_at: NOW
           value: bar
-        - is_secret: true
-          key: bar
-          value: baz
     configuration:
         name: ""
         description: description
@@ -1017,12 +1015,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
             {
                 "is_secret": false,
                 "key": "foo",
+                "updated_at": "NOW",
                 "value": "bar"
-            },
-            {
-                "is_secret": true,
-                "key": "bar",
-                "value": "baz"
             }
         ],
         "configuration": {
@@ -1446,9 +1440,17 @@ func TestGetTemplate(t *testing.T) {
 		assert.NoError(t, err)
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
+		newEnvVars := []EnvironmentVariable{}
 		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
+			if !expected.Deployment.EnvVars[i].IsSecret {
+				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
+			}
 		}
+		expected.Deployment.EnvVars = newEnvVars
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = "NOW"
+		}
+
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
 	})
@@ -1473,9 +1475,16 @@ func TestGetTemplate(t *testing.T) {
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
 		expected.Deployment.EnvVars = nil
+		newEnvVars := []EnvironmentVariable{}
 		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
+			if !expected.Deployment.EnvVars[i].IsSecret {
+				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
+			}
 		}
+		for i := range expected.Deployment.EnvVars {
+			expected.Deployment.EnvVars[i].UpdatedAt = "NOW"
+		}
+		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
 	})
@@ -1496,9 +1505,16 @@ func TestGetTemplate(t *testing.T) {
 		expected.Deployment.Configuration.Name = ""
 		expected.Deployment.Metadata = nil
 		expected.Deployment.AlertEmails = nil
+		newEnvVars := []EnvironmentVariable{}
+		for i := range expected.Deployment.EnvVars {
+			if !expected.Deployment.EnvVars[i].IsSecret {
+				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
+			}
+		}
 		for i := range expected.Deployment.EnvVars {
 			expected.Deployment.EnvVars[i].UpdatedAt = ""
 		}
+		expected.Deployment.EnvVars = newEnvVars
 		actual := getTemplate(&decoded)
 		assert.Equal(t, expected, actual)
 	})

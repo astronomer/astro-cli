@@ -11,6 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewTableOut(t *testing.T) {
+	tab := newTableOut()
+	assert.NotNil(t, tab)
+	assert.Equal(t, []int{36, 36}, tab.Padding)
+}
+
 func TestExists(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	// Check that we don't have localhost123 in test config from testUtils.NewTestConfig()

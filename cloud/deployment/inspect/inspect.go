@@ -303,10 +303,14 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	template := *formattedDeployment
 	template.Deployment.Configuration.Name = ""
 	template.Deployment.Metadata = nil
+	newEnvVars := []EnvironmentVariable{}
 
 	for i := range template.Deployment.EnvVars {
-		// zero out updated at timestamp
-		template.Deployment.EnvVars[i].UpdatedAt = ""
+		if !template.Deployment.EnvVars[i].IsSecret {
+			newEnvVars = append(newEnvVars, template.Deployment.EnvVars[i])
+		}
 	}
+	template.Deployment.EnvVars = newEnvVars
+
 	return template
 }
