@@ -112,6 +112,23 @@ func TestSetup(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("deployment cmd", func(t *testing.T) {
+		testUtil.SetupOSArgsForGinkgo()
+		cmd := &cobra.Command{Use: "inspect"}
+		cmd, err := cmd.ExecuteC()
+		assert.NoError(t, err)
+
+		rootCmd := &cobra.Command{Use: "deployment"}
+		rootCmd.AddCommand(cmd)
+
+		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		err = Setup(cmd, []string{}, nil, nil)
+		assert.NoError(t, err)
+	})
+
 	t.Run("deploy cmd", func(t *testing.T) {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "deploy"}
