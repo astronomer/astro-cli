@@ -1468,7 +1468,7 @@ deployment:
 			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 			mockClient.On("ListDeployments", orgID, "").Return(existingDeployments, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorContains(t, err, "deployment: test-deployment-label already exists: use deployment update --from-file deployment.yaml instead")
+			assert.ErrorContains(t, err, "deployment: test-deployment-label already exists: use deployment update --deployment-file deployment.yaml instead")
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if creating deployment input fails", func(t *testing.T) {
@@ -2147,7 +2147,7 @@ deployment:
 			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
-			assert.ErrorContains(t, err, "deployment: test-deployment-label does not exist: use deployment create --from-file deployment.yaml instead")
+			assert.ErrorContains(t, err, "deployment: test-deployment-label does not exist: use deployment create --deployment-file deployment.yaml instead")
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if creating update deployment input fails", func(t *testing.T) {
