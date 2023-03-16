@@ -98,7 +98,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 		// check if deployment exists
 		if deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
 			// create does not allow updating existing deployments
-			errHelp = fmt.Sprintf("use deployment update --from-file %s instead", inputFile)
+			errHelp = fmt.Sprintf("use deployment update --deployment-file %s instead", inputFile)
 			return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
 				errCannotUpdateExistingDeployment, errHelp)
 		}
@@ -117,7 +117,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, out io.Writer
 		// check if deployment does not exist
 		if !deploymentExists(existingDeployments, formattedDeployment.Deployment.Configuration.Name) {
 			// update does not allow creating new deployments
-			errHelp = fmt.Sprintf("use deployment create --from-file %s instead", inputFile)
+			errHelp = fmt.Sprintf("use deployment create --deployment-file %s instead", inputFile)
 			return fmt.Errorf("deployment: %s %w: %s", formattedDeployment.Deployment.Configuration.Name,
 				errNotFound, errHelp)
 		}
