@@ -224,7 +224,7 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 	var res Result
 
 	authorizeURL := fmt.Sprintf(
-		"%sauthorize?prompt=login&audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
+		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
 		authConfig.DomainURL,
 		authConfig.Audience,
 		authConfig.ClientID,
