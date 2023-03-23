@@ -25,7 +25,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -34,7 +33,6 @@ const (
 	AuthFlowIdentityFirst = "IDENTITY_FIRST"
 
 	authConfigEndpoint = "auth-config"
-	orgLookupEndpoint  = "organization-lookup"
 
 	cliChooseWorkspace     = "Please choose a workspace:"
 	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
@@ -47,7 +45,7 @@ const (
 var (
 	httpClient          = httputil.NewHTTPClient()
 	openURL             = browser.OpenURL
-	ErrorNoOrganization = errors.New("no Organization found. Please contact your Astro Organization Owner to be invited to the organization")
+	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 )
 
 var (
@@ -56,45 +54,38 @@ var (
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
 	callbackServer  = "localhost:12345"
-	userEmail       = ""
 )
 
 var authenticator = Authenticator{
-	orgChecker:      orgLookup,
-	tokenRequester:  requestToken,
-	callbackHandler: authorizeCallbackHandler,
+	userInfoRequester: requestUserInfo,
+	tokenRequester:    requestToken,
+	callbackHandler:   authorizeCallbackHandler,
 }
 
-func orgLookup(domain string) (string, error) {
-	addr := domainutil.GetURLToEndpoint("https", domain, orgLookupEndpoint)
-
+func requestUserInfo(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+	addr := authConfig.DomainURL + "userinfo"
 	ctx := http_context.Background()
-	reqData, err := json.Marshal(orgLookupRequest{Email: userEmail})
-	if err != nil {
-		return "", err
-	}
 	doOptions := &httputil.DoOptions{
-		Data:    reqData,
 		Context: ctx,
-		Headers: map[string]string{"x-request-id": "cli-auth-" + cuid.New(), "Content-Type": "application/json; charset=utf-8"},
+		Headers: map[string]string{"Content-Type": "application/json", "Authorization": fmt.Sprintf("Bearer %s", accessToken)},
 		Path:    addr,
-		Method:  http.MethodPost,
+		Method:  http.MethodGet,
 	}
 	res, err := httpClient.Do(doOptions)
 	if err != nil {
-		return "", err
+		return UserInfo{}, fmt.Errorf("cannot retrieve userinfo: %w", err)
 	}
 	defer res.Body.Close()
 
-	orgs := orgLookupResults{}
-	err = json.NewDecoder(res.Body).Decode(&orgs)
+	var user UserInfo
+	err = json.NewDecoder(res.Body).Decode(&user)
 	if err != nil {
-		return "", fmt.Errorf("cannot decode response: %w", err)
+		return UserInfo{}, fmt.Errorf("cannot decode userinfo response: %w", err)
 	}
-	if len(orgs.OrganizationIds) == 0 {
-		return "", errors.New("")
+	if user.Email == "" {
+		return UserInfo{}, fmt.Errorf("cannot retrieve email")
 	}
-	return orgs.OrganizationIds[0], nil
+	return user, nil
 }
 
 // request a device code from auth0 for the user's cli
@@ -118,7 +109,7 @@ func requestToken(authConfig astro.AuthConfig, verifier, code string) (Result, e
 	}
 	res, err := httpClient.Do(doOptions)
 	if err != nil {
-		return Result{}, fmt.Errorf("could not retrieve token: %w", err)
+		return Result{}, fmt.Errorf("cannot retrieve token: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -186,32 +177,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func getUserEmail(c config.Context) (string, error) { //nolint:gocritic
-	// Try to get the user's email from the config first
-	email := c.UserEmail
-
-	// If email is in config, use that and don't prompt, else prompt for email
-	if email == "" {
-		userEmail = input.Text("Please enter your account email: ")
-	} else {
-		userEmail = email
-		fmt.Printf("Logging in with saved user %s\n", userEmail)
-	}
-
-	return userEmail, err
-}
-
 func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
-	// try to get UserEmail from config first
-	userEmail, err := getUserEmail(c)
-	if err != nil {
-		return Result{}, err
-	}
-
-	if userEmail == "" {
-		userEmail = input.Text("Please enter your account email: ")
-	}
-
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:gomnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
@@ -224,12 +190,11 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 	var res Result
 
 	authorizeURL := fmt.Sprintf(
-		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&login_hint=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
+		"%sauthorize?prompt=login&audience=%s&client_id=%s&redirect_uri=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
 		authConfig.DomainURL,
 		authConfig.Audience,
 		authConfig.ClientID,
 		redirectURI,
-		userEmail,
 		challenge,
 	)
 
@@ -268,7 +233,6 @@ func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthC
 		}
 	}
 
-	res.UserEmail = userEmail
 	return res, nil
 }
 
@@ -366,8 +330,6 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 		}
 	}
 
-	fmt.Println(registryAuthSuccessMsg)
-
 	return nil
 }
 
@@ -391,12 +353,20 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 			return err
 		}
 	} else {
-		fmt.Println("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh")
+		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 24 hours and will not refresh\n\n")
 		res = Result{
 			AccessToken: token,
 			ExpiresIn:   86400, //nolint:gomnd
 		}
 	}
+
+	// fetch user info base on access token
+	userInfo, err := authenticator.userInfoRequester(authConfig, res.AccessToken)
+	if err != nil {
+		return err
+	}
+	// set email base on userinfo so it always match with access token
+	res.UserEmail = userInfo.Email
 
 	// Create context if it does not exist
 	if domain != "" {
@@ -406,7 +376,6 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 			return err
 		}
 	}
-
 	c, err = context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -417,11 +386,14 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 		return err
 	}
 
+	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
+
 	err = CheckUserSession(&c, client, coreClient, out)
 	if err != nil {
 		return err
 	}
 
+	fmt.Println(registryAuthSuccessMsg)
 	return nil
 }
 
