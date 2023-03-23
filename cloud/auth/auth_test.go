@@ -166,6 +166,7 @@ func TestRequestUserInfo(t *testing.T) {
 	emptyUserInfo := UserInfo{}
 	mockAccessToken := "access-token"
 	userInfoResponse, err := json.Marshal(mockUserInfo)
+	assert.NoError(t, err)
 	emptyResponse, err := json.Marshal(emptyUserInfo)
 	assert.NoError(t, err)
 
@@ -324,9 +325,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
+		resp, err := mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -339,9 +338,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -356,9 +353,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -371,9 +366,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return mockResponse, nil
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true)
+		resp, err := mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, true)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
@@ -383,9 +376,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true)
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
 
@@ -397,12 +388,9 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return Result{}, errMock
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true)
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
-
 }
 
 func TestSwitchToLastUsedWorkspace(t *testing.T) {

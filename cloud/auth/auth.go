@@ -46,6 +46,7 @@ var (
 	httpClient          = httputil.NewHTTPClient()
 	openURL             = browser.OpenURL
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
+	errEmailNotFound    = errors.New("cannot retrieve email")
 )
 
 var (
@@ -83,7 +84,7 @@ func requestUserInfo(authConfig astro.AuthConfig, accessToken string) (UserInfo,
 		return UserInfo{}, fmt.Errorf("cannot decode userinfo response: %w", err)
 	}
 	if user.Email == "" {
-		return UserInfo{}, fmt.Errorf("cannot retrieve email")
+		return UserInfo{}, errEmailNotFound
 	}
 	return user, nil
 }
@@ -177,7 +178,7 @@ func authorizeCallbackHandler() (string, error) {
 	return authorizationCode, nil
 }
 
-func (a *Authenticator) authDeviceLogin(c config.Context, authConfig astro.AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
+func (a *Authenticator) authDeviceLogin(authConfig astro.AuthConfig, shouldDisplayLoginLink bool) (Result, error) { //nolint:gocritic
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:gomnd
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
@@ -348,7 +349,7 @@ func Login(domain, token string, client astro.Client, coreClient astrocore.CoreC
 	c, _ := context.GetCurrentContext()
 
 	if token == "" {
-		res, err = authenticator.authDeviceLogin(c, authConfig, shouldDisplayLoginLink)
+		res, err = authenticator.authDeviceLogin(authConfig, shouldDisplayLoginLink)
 		if err != nil {
 			return err
 		}
