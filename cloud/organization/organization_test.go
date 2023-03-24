@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	mockGetSelfResponse = astrocore.GetSelfUserResponse{
+	mockOrganizationProduct = astrocore.OrganizationProductHYBRID
+	mockGetSelfResponse     = astrocore.GetSelfUserResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
@@ -35,8 +36,8 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &[]astrocore.Organization{
-			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1"},
-			{AuthServiceId: "auth-service-id", Id: "org2", Name: "org2"},
+			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1", Product: &mockOrganizationProduct},
+			{AuthServiceId: "auth-service-id", Id: "org2", Name: "org2", Product: &mockOrganizationProduct},
 		},
 	}
 	errorBody, _ = json.Marshal(astrocore.Error{
