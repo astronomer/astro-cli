@@ -20,7 +20,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var errorLogin = errors.New("failed to login")
+var (
+	errorLogin              = errors.New("failed to login")
+	mockOrganizationProduct = astrocore.OrganizationProductHYBRID
+)
 
 func TestSetup(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -158,7 +161,7 @@ func TestSetup(t *testing.T) {
 				StatusCode: 200,
 			},
 			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name"},
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
 			},
 		}
 		mockClient := new(astro_mocks.Client)
@@ -207,7 +210,7 @@ func TestSetup(t *testing.T) {
 				StatusCode: 200,
 			},
 			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name"},
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
 			},
 		}
 		mockClient := new(astro_mocks.Client)
@@ -265,7 +268,7 @@ func TestCheckAPIKeys(t *testing.T) {
 				StatusCode: 200,
 			},
 			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name"},
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
 			},
 		}
 		mockClient := new(astro_mocks.Client)
@@ -339,6 +342,16 @@ func TestCheckToken(t *testing.T) {
 
 func TestCheckAPIToken(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockOrgsResponse := astrocore.ListOrganizationsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &[]astrocore.Organization{
+			{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org-name", Product: &mockOrganizationProduct},
+		},
+	}
+
 	t.Run("test context switch", func(t *testing.T) {
 		permissions := []string{
 			"",
@@ -358,6 +371,8 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
 		// Switch context
@@ -366,7 +381,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(true, []string{})
+		_, err = checkAPIToken(true, mockCoreClient, []string{})
 		assert.NoError(t, err)
 	})
 
@@ -384,6 +399,8 @@ func TestCheckAPIToken(t *testing.T) {
 			return &mockClaims, nil
 		}
 
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
+
 		t.Setenv("ASTRO_API_TOKEN", "token")
 
 		// Switch context
@@ -392,7 +409,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIToken(true, []string{})
+		_, err = checkAPIToken(true, mockCoreClient, []string{})
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 }

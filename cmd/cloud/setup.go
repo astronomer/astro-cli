@@ -319,7 +319,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, arg
 	org := orgs[0]
 	orgID := org.Id
 	orgShortName := org.ShortName
-	orgProduct := fmt.Sprintf("%s", *org.Product)
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
@@ -402,7 +402,7 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args 
 	org := orgs[0]
 	orgID := org.Id
 	orgShortName := org.ShortName
-	orgProduct := fmt.Sprintf("%s", *org.Product)
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
