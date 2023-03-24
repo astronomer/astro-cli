@@ -34,7 +34,8 @@ func newTableOut() *printutil.Table {
 }
 
 func ListOrganizations(coreClient astrocore.CoreClient) ([]astrocore.Organization, error) {
-	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
+	organizationListParams := &astrocore.ListOrganizationsParams{}
+	resp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return nil, err
 	}
@@ -114,8 +115,9 @@ func getOrganizationSelection(out io.Writer, coreClient astrocore.CoreClient) (*
 
 func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroClient astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
 	c, _ := context.GetCurrentContext()
+
 	// reset org context
-	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName)
+	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName, fmt.Sprintf("%s", *targetOrg.Product)) //nolint
 	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug
 	_ = c.SetContextKey("token", c.Token)
 	_ = c.SetContextKey("refreshtoken", c.RefreshToken)
