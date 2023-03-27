@@ -45,6 +45,8 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
+	// clean output
 	deployment.CleanOutput = cleanOutput
+
 	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, astroClient, out, requestedField, template)
 }

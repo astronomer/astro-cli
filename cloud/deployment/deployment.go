@@ -581,7 +581,7 @@ var SelectDeployment = func(deployments []astro.Deployment, message string) (ast
 	}
 
 	if len(deployments) == 1 {
-		if CleanOutput == false {
+		if !CleanOutput {
 			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
 				fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
@@ -625,7 +625,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
 
-	if deploymentID != "" && deploymentName != "" && CleanOutput == false {
+	if deploymentID != "" && deploymentName != "" && !CleanOutput {
 		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used\n", deploymentID)
 	}
 	// find deployment by name
