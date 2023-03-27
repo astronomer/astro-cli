@@ -3,6 +3,7 @@ package cloud
 import (
 	"io"
 
+	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 
 	"github.com/spf13/cobra"
@@ -11,6 +12,7 @@ import (
 var (
 	outputFormat, requestedField string
 	template                     bool
+	cleanOutput                  bool
 )
 
 func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
@@ -27,6 +29,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "yaml", "Output format can be one of: yaml or json. By default the inspected deployment will be in YAML format.")
 	cmd.Flags().BoolVarP(&template, "template", "t", false, "Create a template from the deployment being inspected.")
 	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "A specific key for the deployment. Use --key configuration.cluster_id to get a deployment's cluster id.")
+	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
 	return cmd
 }
 
@@ -41,5 +44,7 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
+
+	deployment.CleanOutput = cleanOutput
 	return inspect.Inspect(wsID, deploymentName, deploymentID, outputFormat, astroClient, out, requestedField, template)
 }
