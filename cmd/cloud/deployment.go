@@ -139,7 +139,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
-	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
+	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	return cmd
 }
 
