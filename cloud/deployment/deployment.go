@@ -87,7 +87,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	for i := range deployments {
 		d := deployments[i]
 		clusterName := d.Cluster.Name
-		if organization.IsOrgHosted(c) {
+		if organization.IsOrgHosted() {
 			clusterName = "N/A"
 		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"

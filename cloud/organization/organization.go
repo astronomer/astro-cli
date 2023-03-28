@@ -177,9 +177,7 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 	return nil
 }
 
-func IsOrgHosted(c config.Context) bool {
-	if c.OrganizationProduct == "HOSTED" {
-		return true
-	}
-	return false
+func IsOrgHosted() bool {
+	c, _ := context.GetCurrentContext()
+	return c.OrganizationProduct == "HOSTED"
 }
