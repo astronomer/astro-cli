@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -156,26 +155,32 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	})
 }
 
-func TestOrgLookup(t *testing.T) {
+func TestRequestUserInfo(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := orgLookupResults{
-		OrganizationIds: []string{"test-org-id"},
+	mockUserInfo := UserInfo{
+		Email:      "test@astronomer.test",
+		Name:       "astro.crush",
+		FamilyName: "Crush",
+		GivenName:  "Astro",
 	}
-	jsonResponse, err := json.Marshal(mockResponse)
+	emptyUserInfo := UserInfo{}
+	mockAccessToken := "access-token"
+	userInfoResponse, err := json.Marshal(mockUserInfo)
+	assert.NoError(t, err)
+	emptyResponse, err := json.Marshal(emptyUserInfo)
 	assert.NoError(t, err)
 
 	t.Run("success", func(t *testing.T) {
 		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Body:       io.NopCloser(bytes.NewBuffer(userInfoResponse)),
 				Header:     make(http.Header),
 			}
 		})
-
-		resp, err := orgLookup("cloud.test-org.io")
+		resp, err := requestUserInfo(astro.AuthConfig{}, mockAccessToken)
 		assert.NoError(t, err)
-		assert.Equal(t, mockResponse.OrganizationIds[0], resp)
+		assert.Equal(t, mockUserInfo, resp)
 	})
 
 	t.Run("failure", func(t *testing.T) {
@@ -187,8 +192,21 @@ func TestOrgLookup(t *testing.T) {
 			}
 		})
 
-		_, err := orgLookup("cloud.test-org.io")
+		_, err := requestUserInfo(astro.AuthConfig{}, mockAccessToken)
 		assert.Contains(t, err.Error(), "Internal Server Error")
+	})
+
+	t.Run("fail with no email", func(t *testing.T) {
+		assert.NoError(t, err)
+		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(emptyResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		_, err := requestUserInfo(astro.AuthConfig{}, mockAccessToken)
+		assert.Contains(t, err.Error(), "cannot retrieve email")
 	})
 }
 
@@ -297,9 +315,6 @@ func TestAuthDeviceLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success without login link", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
@@ -309,35 +324,25 @@ func TestAuthDeviceLogin(t *testing.T) {
 		openURL = func(url string) error {
 			return nil
 		}
-		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+		resp, err := mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, false)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
 
 	t.Run("openURL & callback failure", func(t *testing.T) {
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		openURL = func(url string) error {
 			return errMock
 		}
 		callbackHandler := func() (string, error) {
 			return "", errMock
 		}
-		mockAuthenticator := Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
+		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
 	t.Run("token requester failure", func(t *testing.T) {
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
@@ -347,83 +352,44 @@ func TestAuthDeviceLogin(t *testing.T) {
 		openURL = func(url string) error {
 			return nil
 		}
-		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
 	t.Run("success with login link", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
-		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true)
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+		resp, err := mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, true)
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
 	})
 
 	t.Run("callback failure with login link", func(t *testing.T) {
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		callbackHandler := func() (string, error) {
 			return "", errMock
 		}
-		mockAuthenticator := Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true)
+		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, true)
 		assert.ErrorIs(t, err, errMock)
 	})
 
 	t.Run("token requester failure with login link", func(t *testing.T) {
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 			return Result{}, errMock
 		}
-		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		_, err = mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, true)
+		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
+		_, err = mockAuthenticator.authDeviceLogin(astro.AuthConfig{}, true)
 		assert.ErrorIs(t, err, errMock)
-	})
-
-	t.Run("do not call org lookup in identity first flow", func(t *testing.T) {
-		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		orgChecker := func(domain string) (string, error) {
-			return "", errMock
-		}
-		callbackHandler := func() (string, error) {
-			return "test-code", nil
-		}
-		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
-			return mockResponse, nil
-		}
-		openURL = func(url string) error {
-			return nil
-		}
-		mockAuthenticator := Authenticator{orgChecker, tokenRequester, callbackHandler}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		resp, err := mockAuthenticator.authDeviceLogin(c, astro.AuthConfig{}, false)
-		assert.NoError(t, err)
-		assert.Equal(t, mockResponse, resp)
 	})
 }
 
@@ -609,19 +575,20 @@ func TestLogin(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
+		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
+		userInfoRequester := func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+			return mockUserInfo, nil
+		}
 		openURL = func(url string) error {
 			return nil
 		}
-		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
+		authenticator = Authenticator{userInfoRequester, tokenRequester, callbackHandler}
 
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -651,20 +618,20 @@ func TestLogin(t *testing.T) {
 			}
 		})
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
+		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
+		userInfoRequester := func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+			return mockUserInfo, nil
+		}
 		openURL = func(url string) error {
 			return nil
 		}
-		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
-
+		authenticator = Authenticator{userInfoRequester, tokenRequester, callbackHandler}
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -697,32 +664,30 @@ func TestLogin(t *testing.T) {
 	})
 
 	t.Run("auth failure", func(t *testing.T) {
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
 		callbackHandler := func() (string, error) {
 			return "", errMock
 		}
-		authenticator = Authenticator{orgChecker: orgChecker, callbackHandler: callbackHandler}
+		authenticator = Authenticator{callbackHandler: callbackHandler}
 		err := Login("cloud.astronomer.io", "", nil, nil, os.Stdout, false)
 		assert.ErrorIs(t, err, errMock)
 	})
 
 	t.Run("check token failure", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
-		}
+		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
 		callbackHandler := func() (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
+		userInfoRequester := func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+			return mockUserInfo, nil
+		}
 		openURL = func(url string) error {
 			return nil
 		}
-		authenticator = Authenticator{orgChecker, tokenRequester, callbackHandler}
+		authenticator = Authenticator{userInfoRequester, tokenRequester, callbackHandler}
 
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -746,12 +711,13 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
+		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
+		userInfoRequester := func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+			return mockUserInfo, nil
 		}
 		authenticator = Authenticator{
-			orgChecker:      orgChecker,
-			callbackHandler: func() (string, error) { return "authorizationCode", nil },
+			userInfoRequester: userInfoRequester,
+			callbackHandler:   func() (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 				return Result{
 					RefreshToken: "refresh_token",
@@ -782,12 +748,13 @@ func TestLogin(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
-		orgChecker := func(domain string) (string, error) {
-			return "test-org-id", nil
+		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
+		userInfoRequester := func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error) {
+			return mockUserInfo, nil
 		}
 		authenticator = Authenticator{
-			orgChecker:      orgChecker,
-			callbackHandler: func() (string, error) { return "authorizationCode", nil },
+			userInfoRequester: userInfoRequester,
+			callbackHandler:   func() (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig astro.AuthConfig, verifier, code string) (Result, error) {
 				return Result{
 					RefreshToken: "refresh_token",
@@ -848,45 +815,6 @@ func TestLogout(t *testing.T) {
 		// test after logout
 		assertions("", "")
 	})
-}
-
-func Test_getUserEmail_FromConfig(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	c, err := config.GetCurrentContext()
-	assert.NoError(t, err)
-	err = c.SetContextKey("user_email", "test.user@astronomer.io")
-	assert.NoError(t, err)
-	c, err = config.GetCurrentContext()
-	assert.NoError(t, err)
-	userEmail, err := getUserEmail(c)
-	assert.NoError(t, err)
-	assert.Equal(t, "test.user@astronomer.io", userEmail)
-}
-
-func testGetsInputHelper(t *testing.T, c config.Context) { //nolint:gocritic
-	defer testUtil.MockUserInput(t, "test.user@astronomer.io")()
-	userEmail, err := getUserEmail(c)
-	assert.NoError(t, err)
-	// print a new line so that goland recognizes the test
-	fmt.Println("")
-	assert.Equal(t, "test.user@astronomer.io", userEmail)
-}
-
-func Test_getUserEmail_FromStdin(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	c, err := config.GetCurrentContext()
-	assert.NoError(t, err)
-	err = c.SetContextKey("user_email", "")
-	assert.NoError(t, err)
-	// TODO: remove set user email and get user email
-	testGetsInputHelper(t, c)
-}
-
-func Test_getUserEmail_OldStyleConfig(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	c, err := config.GetCurrentContext()
-	assert.NoError(t, err)
-	testGetsInputHelper(t, c)
 }
 
 func Test_writeResultToContext(t *testing.T) {
