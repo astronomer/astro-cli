@@ -9,7 +9,7 @@ import (
 
 const (
 	spinnerTextEllipsis = "…"
-	spinnerTextDone     = "done"
+	spinnerTextDone     = ""
 	spinnerTextFailed   = "failed"
 
 	spinnerColor = "cyan"

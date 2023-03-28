@@ -22,9 +22,10 @@ func newUserCmd(out io.Writer) *cobra.Command {
 
 func newUserInviteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "invite [email]",
-		Aliases: []string{"inv"},
-		Short:   "Invite a user to your Astro Organization",
+		Use:        "invite [email]",
+		Aliases:    []string{"inv"},
+		Deprecated: "WARNING: 'astro user invite' will be deprecated in Astro CLI v1.15.0. Any use of this command in your projects or automation needs to be updated to 'astro organization user invite' before Astro CLI v1.15.0 is released.\n",
+		Short:      "Invite a user to your Astro Organization",
 		Long: "Invite a user to your Astro Organization\n$astro user invite [email] --role [ORGANIZATION_MEMBER, " +
 			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -304,7 +304,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockClient, mockCoreClient, []string{})
+		_, err = checkAPIKeys(mockClient, mockCoreClient, false, []string{})
 		assert.NoError(t, err)
 	})
 }
