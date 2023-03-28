@@ -30,10 +30,20 @@ func TestIsProjectDir(t *testing.T) {
 	}
 }
 
-func TestInitHome(t *testing.T) {
+func TestInitHomeDefaultCase(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	initHome(fs)
-	assert.Contains(t, viperHome.ConfigFileUsed(), "config.yaml")
+	homeDir, err := fileutil.GetHomeDir()
+	assert.NoError(t, err)
+	assert.Equal(t, filepath.Join(homeDir, ".astro", "config.yaml"), viperHome.ConfigFileUsed())
+}
+
+func TestInitHomeConfigOverride(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	os.Setenv("ASTRO_HOME", "test")
+	initHome(fs)
+	assert.Equal(t, filepath.Join("test", ".astro", "config.yaml"), viperHome.ConfigFileUsed())
+	os.Unsetenv("ASTRO_HOME")
 }
 
 func TestInitProject(t *testing.T) {
