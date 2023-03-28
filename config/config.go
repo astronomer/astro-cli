@@ -111,6 +111,9 @@ func initHome(fs afero.Fs) {
 	if configPath != "" {
 		HomeConfigPath = filepath.Join(configPath, ConfigDir)
 		HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+	} else {
+		HomeConfigPath = filepath.Join(HomePath, ConfigDir)
+		HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
 	}
 	viperHome.SetConfigFile(HomeConfigFile)
 
