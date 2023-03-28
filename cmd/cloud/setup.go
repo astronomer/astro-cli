@@ -396,19 +396,20 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args 
 		return false, errNotAPIToken
 	}
 
+	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
+	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
+	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
+
 	orgs, err := organization.ListOrganizations(coreClient)
 	if err != nil {
 		return false, err
 	}
 
 	org := orgs[0]
-	orgID := org.Id
-	orgShortName := org.ShortName
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
-		workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 		err := c.SetContextKey("workspace", workspaceID) // c.Workspace
 		if err != nil {
 			fmt.Println("no workspace set")
