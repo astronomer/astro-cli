@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
+
 	"github.com/pkg/errors"
 )
 
@@ -27,6 +28,7 @@ var (
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	// Monkey patched to write unit tests
 	createDeployment = Create
+	CleanOutput      = false
 )
 
 const (
@@ -579,9 +581,11 @@ var SelectDeployment = func(deployments []astro.Deployment, message string) (ast
 	}
 
 	if len(deployments) == 1 {
-		fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
-			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
-			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
+		if !CleanOutput {
+			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
+				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
+				fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
+		}
 
 		return deployments[0], nil
 	}
@@ -621,7 +625,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
 
-	if deploymentID != "" && deploymentName != "" {
+	if deploymentID != "" && deploymentName != "" && !CleanOutput {
 		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used\n", deploymentID)
 	}
 	// find deployment by name

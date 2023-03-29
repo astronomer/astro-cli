@@ -17,11 +17,12 @@ import (
 )
 
 var (
-	errInvalidOrganizationKey  = errors.New("invalid organization selection")
-	errInvalidOrganizationName = errors.New("invalid organization name")
-	Login                      = auth.Login
-	CheckUserSession           = auth.CheckUserSession
-	FetchDomainAuthConfig      = auth.FetchDomainAuthConfig
+	errInvalidOrganizationKey   = errors.New("invalid organization selection")
+	errInvalidOrganizationName  = errors.New("invalid organization name")
+	Login                       = auth.Login
+	CheckUserSession            = auth.CheckUserSession
+	FetchDomainAuthConfig       = auth.FetchDomainAuthConfig
+	switchedOrganizationMessage = "\nSuccessfully switched organization"
 )
 
 func newTableOut() *printutil.Table {
@@ -123,7 +124,12 @@ func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroCl
 	_ = c.SetContextKey("user_email", c.UserEmail)
 	c, _ = context.GetCurrentContext()
 	// call check user session which will trigger workspace switcher flow
-	return CheckUserSession(&c, astroClient, coreClient, out)
+	err := CheckUserSession(&c, astroClient, coreClient, out)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(out, switchedOrganizationMessage)
+	return nil
 }
 
 // Switch switches organizations

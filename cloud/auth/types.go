@@ -7,15 +7,23 @@ import (
 
 // higher order functions to facilate writing unit test cases
 type (
-	OrgLookup                func(domain string) (string, error)
 	RequestToken             func(authConfig astro.AuthConfig, verifier, code string) (Result, error)
+	RequestUserInfo          func(authConfig astro.AuthConfig, accessToken string) (UserInfo, error)
 	AuthorizeCallbackHandler func() (string, error)
 )
 
 type Authenticator struct {
-	orgChecker      OrgLookup
-	tokenRequester  RequestToken
-	callbackHandler AuthorizeCallbackHandler
+	userInfoRequester RequestUserInfo
+	tokenRequester    RequestToken
+	callbackHandler   AuthorizeCallbackHandler
+}
+
+type UserInfo struct {
+	Email      string `json:"email"`
+	Picture    string `json:"picture"`
+	Name       string `json:"name"`
+	GivenName  string `json:"given_name"`
+	FamilyName string `json:"family_name"`
 }
 
 type postTokenResponse struct {
@@ -27,14 +35,6 @@ type postTokenResponse struct {
 	TokenType        string  `json:"token_type"`
 	Error            *string `json:"error,omitempty"`
 	ErrorDescription string  `json:"error_description,omitempty"`
-}
-
-type orgLookupRequest struct {
-	Email string `json:"email"`
-}
-
-type orgLookupResults struct {
-	OrganizationIds []string
 }
 
 type Result struct {

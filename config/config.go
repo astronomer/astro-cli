@@ -106,6 +106,15 @@ func initHome(fs afero.Fs) {
 	viperHome.SetFs(fs)
 	viperHome.SetConfigName(ConfigFileName)
 	viperHome.SetConfigType(ConfigFileType)
+
+	configPath := os.Getenv("ASTRO_HOME")
+	if configPath != "" {
+		HomeConfigPath = filepath.Join(configPath, ConfigDir)
+		HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+	} else {
+		HomeConfigPath = filepath.Join(HomePath, ConfigDir)
+		HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+	}
 	viperHome.SetConfigFile(HomeConfigFile)
 
 	for _, cfg := range CFGStrMap {

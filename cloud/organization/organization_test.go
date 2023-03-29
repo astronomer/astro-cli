@@ -164,6 +164,7 @@ func TestSwitch(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
 		assert.NoError(t, err)
+		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
 		mockCoreClient.AssertExpectations(t)
 	})
 
