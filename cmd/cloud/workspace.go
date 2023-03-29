@@ -13,21 +13,27 @@ import (
 )
 
 var (
-	workspaceID         string
-	addWorkspaceRole    string
-	updateWorkspaceRole string
+	workspaceID          string
+	addWorkspaceRole     string
+	updateWorkspaceRole  string
+	workspaceName        string
+	workspaceDescription string
+	enforceCD            string
 )
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"wo"},
-		Short:   "Manage Astronomer Workspaces",
+		Short:   "Manage Astro Workspaces",
 		Long:    "Create and manage Workspaces on Astro. Workspaces can contain multiple Deployments and can be shared across users.",
 	}
 	cmd.AddCommand(
 		newWorkspaceListCmd(out),
 		newWorkspaceSwitchCmd(out),
+		newWorkspaceCreateCmd(out),
+		newWorkspaceUpdateCmd(out),
+		newWorkspaceDeleteCmd(out),
 		newWorkspaceUserRootCmd(out),
 	)
 	return cmd
@@ -37,8 +43,8 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all Astronomer Workspaces in your organization",
-		Long:    "List all Astronomer Workspaces in your organization.",
+		Short:   "List all Astro Workspaces in your organization",
+		Long:    "List all Astro Workspaces in your organization.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, out)
 		},
@@ -50,11 +56,58 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "switch [workspace_id]",
 		Aliases: []string{"sw"},
-		Short:   "Switch to a different Astronomer Workspace",
-		Long:    "Switch to a different Astronomer Workspace",
+		Short:   "Switch to a different Astro Workspace",
+		Long:    "Switch to a different Astro Workspace",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(cmd, out, args)
+		},
+	}
+	return cmd
+}
+
+func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "create an Astro Workspace",
+		Long:    "create an Astro Workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceCreate(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire workspace in quotes \"\"")
+	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
+	return cmd
+}
+
+func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [workspace_id]",
+		Aliases: []string{"up"},
+		Short:   "update an Astro Workspace",
+		Long:    "update an Astro Workspace",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceUpdate(cmd, out, args)
+		},
+	}
+	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire workspace in quotes \"\"")
+	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
+	return cmd
+}
+
+func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [workspace_id]",
+		Aliases: []string{"up"},
+		Short:   "delete an Astro Workspace",
+		Long:    "delete an Astro Workspace",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return workspaceDelete(cmd, out, args)
 		},
 	}
 	return cmd
@@ -151,6 +204,38 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 
 	return workspace.Switch(id, astroClient, out)
+}
+
+func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
+
+	cmd.SilenceUsage = true
+	return workspace.Create(workspaceName, workspaceDescription, enforceCD, out, astroCoreClient)
+}
+
+func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+
+	cmd.SilenceUsage = true
+
+	id := ""
+
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	return workspace.Update(id, workspaceName, workspaceDescription, enforceCD, out, astroCoreClient)
+}
+
+func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+
+	cmd.SilenceUsage = true
+
+	id := ""
+
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	return workspace.Delete(id, out, astroCoreClient)
 }
 
 func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {

@@ -281,6 +281,72 @@ func (_m *ClientWithResponsesInterface) CreateUserInviteWithResponse(ctx context
 	return r0, r1
 }
 
+// CreateWorkspaceWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateWorkspaceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateWorkspaceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreateWorkspaceResponse, error)); ok {
+		return rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreateWorkspaceResponse); ok {
+		r0 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateWorkspaceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateWorkspaceWithResponse provides a mock function with given fields: ctx, orgShortNameId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, body astrocore.MutateWorkspaceRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateWorkspaceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateWorkspaceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.MutateWorkspaceRequest, ...astrocore.RequestEditorFn) (*astrocore.CreateWorkspaceResponse, error)); ok {
+		return rf(ctx, orgShortNameId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.MutateWorkspaceRequest, ...astrocore.RequestEditorFn) *astrocore.CreateWorkspaceResponse); ok {
+		r0 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateWorkspaceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.MutateWorkspaceRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteManagedDomainWithResponse provides a mock function with given fields: ctx, orgShortNameId, domainId, reqEditors
 func (_m *ClientWithResponsesInterface) DeleteManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteManagedDomainResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -472,6 +538,39 @@ func (_m *ClientWithResponsesInterface) DeleteWorkspaceUserWithResponse(ctx cont
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, workspaceId, userId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteWorkspaceWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, reqEditors
+func (_m *ClientWithResponsesInterface) DeleteWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteWorkspaceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, workspaceId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.DeleteWorkspaceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.DeleteWorkspaceResponse, error)); ok {
+		return rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.DeleteWorkspaceResponse); ok {
+		r0 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.DeleteWorkspaceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -743,6 +842,39 @@ func (_m *ClientWithResponsesInterface) GetUserWithResponse(ctx context.Context,
 	return r0, r1
 }
 
+// GetWorkspaceWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, reqEditors
+func (_m *ClientWithResponsesInterface) GetWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetWorkspaceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, workspaceId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.GetWorkspaceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.GetWorkspaceResponse, error)); ok {
+		return rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.GetWorkspaceResponse); ok {
+		r0 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.GetWorkspaceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListManagedDomainsWithResponse provides a mock function with given fields: ctx, orgShortNameId, reqEditors
 func (_m *ClientWithResponsesInterface) ListManagedDomainsWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListManagedDomainsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -908,6 +1040,39 @@ func (_m *ClientWithResponsesInterface) ListSsoConnectionsWithResponse(ctx conte
 	return r0, r1
 }
 
+// ListWorkspacePipelinesWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, reqEditors
+func (_m *ClientWithResponsesInterface) ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListWorkspacePipelinesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, workspaceId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListWorkspacePipelinesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.ListWorkspacePipelinesResponse, error)); ok {
+		return rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.ListWorkspacePipelinesResponse); ok {
+		r0 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListWorkspacePipelinesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListWorkspaceUsersWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, params, reqEditors
 func (_m *ClientWithResponsesInterface) ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *astrocore.ListWorkspaceUsersParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListWorkspaceUsersResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -934,6 +1099,39 @@ func (_m *ClientWithResponsesInterface) ListWorkspaceUsersWithResponse(ctx conte
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, *astrocore.ListWorkspaceUsersParams, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, workspaceId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListWorkspacesWithResponse provides a mock function with given fields: ctx, orgShortNameId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListWorkspacesWithResponse(ctx context.Context, orgShortNameId string, params *astrocore.ListWorkspacesParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListWorkspacesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListWorkspacesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListWorkspacesParams, ...astrocore.RequestEditorFn) (*astrocore.ListWorkspacesResponse, error)); ok {
+		return rf(ctx, orgShortNameId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListWorkspacesParams, ...astrocore.RequestEditorFn) *astrocore.ListWorkspacesResponse); ok {
+		r0 = rf(ctx, orgShortNameId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListWorkspacesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *astrocore.ListWorkspacesParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1330,6 +1528,72 @@ func (_m *ClientWithResponsesInterface) UpdateSsoConnectionWithResponse(ctx cont
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.UpdateSsoConnectionRequest, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, connectionId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateWorkspaceWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateWorkspaceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, workspaceId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateWorkspaceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.UpdateWorkspaceResponse, error)); ok {
+		return rf(ctx, orgShortNameId, workspaceId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.UpdateWorkspaceResponse); ok {
+		r0 = rf(ctx, orgShortNameId, workspaceId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateWorkspaceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, workspaceId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateWorkspaceWithResponse provides a mock function with given fields: ctx, orgShortNameId, workspaceId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body astrocore.MutateWorkspaceRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateWorkspaceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, workspaceId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateWorkspaceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.MutateWorkspaceRequest, ...astrocore.RequestEditorFn) (*astrocore.UpdateWorkspaceResponse, error)); ok {
+		return rf(ctx, orgShortNameId, workspaceId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.MutateWorkspaceRequest, ...astrocore.RequestEditorFn) *astrocore.UpdateWorkspaceResponse); ok {
+		r0 = rf(ctx, orgShortNameId, workspaceId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateWorkspaceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.MutateWorkspaceRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, workspaceId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
