@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -57,6 +58,26 @@ func TestList(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := List(ws, false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("success with hidden cluster information", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", org)
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err = List(ws, false, mockClient, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "test-id-1")
+		assert.Contains(t, buf.String(), "test-id-2")
+		assert.Contains(t, buf.String(), "N/A")
+
 		mockClient.AssertExpectations(t)
 	})
 }
