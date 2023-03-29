@@ -207,13 +207,11 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
-
 	cmd.SilenceUsage = true
 	return workspace.Create(workspaceName, workspaceDescription, enforceCD, out, astroCoreClient)
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-
 	cmd.SilenceUsage = true
 
 	id := ""
@@ -226,7 +224,6 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-
 	cmd.SilenceUsage = true
 
 	id := ""

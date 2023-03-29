@@ -167,11 +167,12 @@ func Switch(id string, client astro.Client, out io.Writer) error {
 
 func validateEnforceCD(enforceCD string) (bool, error) {
 	var enforce bool
-	if enforceCD == "OFF" || enforceCD == "" {
+	switch {
+	case enforceCD == "OFF" || enforceCD == "":
 		enforce = false
-	} else if enforceCD == "ON" {
+	case enforceCD == "ON":
 		enforce = true
-	} else {
+	default:
 		return false, ErrWrongEnforceInput
 	}
 	return enforce, nil
@@ -239,7 +240,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 			return ErrWorkspaceNotFound
 		}
 	}
-	workspaceId := workspace.Id
+	workspaceID := workspace.Id
 
 	workspaceUpdateRequest := astrocore.CreateWorkspaceJSONRequestBody{}
 
@@ -263,7 +264,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 		}
 		workspaceUpdateRequest.ApiKeyOnlyDeploymentsDefault = &enforce
 	}
-	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceId, workspaceUpdateRequest)
+	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID, workspaceUpdateRequest)
 	if err != nil {
 		return err
 	}
@@ -304,8 +305,8 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 			return ErrWorkspaceNotFound
 		}
 	}
-	workspaceId := workspace.Id
-	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceId)
+	workspaceID := workspace.Id
+	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -317,8 +318,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	return nil
 }
 
-func selectWorkspace(Workspaces []astrocore.Workspace) (astrocore.Workspace, error) {
-
+func selectWorkspace(workspaces []astrocore.Workspace) (astrocore.Workspace, error) {
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
@@ -328,15 +328,15 @@ func selectWorkspace(Workspaces []astrocore.Workspace) (astrocore.Workspace, err
 	fmt.Println("\nPlease select the workspace you would like to update:")
 
 	workspaceMap := map[string]astrocore.Workspace{}
-	for i := range Workspaces {
+	for i := range workspaces {
 		index := i + 1
 		table.AddRow([]string{
 			strconv.Itoa(index),
-			Workspaces[i].Name,
-			Workspaces[i].Id,
-			strconv.FormatBool(Workspaces[i].ApiKeyOnlyDeploymentsDefault),
+			workspaces[i].Name,
+			workspaces[i].Id,
+			strconv.FormatBool(workspaces[i].ApiKeyOnlyDeploymentsDefault),
 		}, false)
-		workspaceMap[strconv.Itoa(index)] = Workspaces[i]
+		workspaceMap[strconv.Itoa(index)] = workspaces[i]
 	}
 
 	table.Print(os.Stdout)
