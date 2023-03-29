@@ -186,6 +186,7 @@ func TestSetOrganizationContext(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "org1", outCtx.Organization)
 		assert.Equal(t, "org_short_name_1", outCtx.OrganizationShortName)
+		assert.Equal(t, "HYBRID", outCtx.OrganizationProduct)
 	})
 
 	t.Run("set organization context error", func(t *testing.T) {
