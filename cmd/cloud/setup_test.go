@@ -164,7 +164,7 @@ func TestSetup(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
 		testUtil.SetupOSArgsForGinkgo()
@@ -212,7 +212,7 @@ func TestSetup(t *testing.T) {
 		}
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		cmd := &cobra.Command{Use: "deploy"}
 		testUtil.SetupOSArgsForGinkgo()
@@ -271,7 +271,7 @@ func TestCheckAPIKeys(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", "test-org-id", "").Return(mockDeplyResp, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything).Return(&mockOrgsResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		authLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil
