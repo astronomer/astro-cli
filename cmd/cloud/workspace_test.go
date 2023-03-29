@@ -3,7 +3,6 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"os"
 	"testing"
@@ -408,7 +407,6 @@ func TestWorkspacUserRemove(t *testing.T) {
 }
 
 var (
-	errorNetwork              = errors.New("network error")
 	CreateWorkspaceResponseOK = astrocore.CreateWorkspaceResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
