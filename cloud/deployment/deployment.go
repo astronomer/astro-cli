@@ -36,6 +36,7 @@ const (
 	noWorkspaceMsg = "no workspaces with id (%s) found"
 	KubeExecutor   = "KubernetesExecutor"
 	CeleryExecutor = "CeleryExecutor"
+	notApplicable  = "N/A"
 )
 
 // TODO: get these values from the Astrohub API
@@ -88,7 +89,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		d := deployments[i]
 		clusterName := d.Cluster.Name
 		if organization.IsOrgHosted() {
-			clusterName = "N/A"
+			clusterName = notApplicable
 		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		if all {
@@ -274,8 +275,11 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
-
-	tab.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+	clusterName := d.Cluster.Name
+	if organization.IsOrgHosted() {
+		clusterName = notApplicable
+	}
+	tab.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
 	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
@@ -521,8 +525,11 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		tabDeployment := newTableOut()
 
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
-
-		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, d.Cluster.Name, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		clusterName := d.Cluster.Name
+		if organization.IsOrgHosted() {
+			clusterName = notApplicable
+		}
+		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
