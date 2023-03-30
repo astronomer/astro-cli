@@ -23,7 +23,7 @@ volumes:
 
 services:
   postgres:
-    image: {{ .PostgresImage }}
+    image: {{ .PostgresRepository }}:{{ .PostgresTag }}
     restart: unless-stopped
     networks:
       - airflow
