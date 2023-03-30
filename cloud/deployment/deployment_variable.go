@@ -279,7 +279,7 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 			fmt.Printf("key %s already exists within the file specified, skipping creation\n", key)
 			continue
 		}
-		
+
 		fmt.Printf("Cleaning quotes from variable value - %s", value)
 		value = strings.Trim(value, `"`)
 		value = strings.Trim(value, `'`)
