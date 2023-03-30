@@ -144,7 +144,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		PostgresHost:          config.CFG.PostgresHost.GetString(),
 		PostgresPort:          config.CFG.PostgresPort.GetString(),
 		PostgresRepository:    config.CFG.PostgresRepository.GetString(),
-		PostgresTag            config.CFG.PostgresTag.GetString(),
+		PostgresTag:           config.CFG.PostgresTag.GetString(),
 		AirflowImage:          airflowImage,
 		AirflowHome:           airflowHome,
 		AirflowUser:           "astro",
