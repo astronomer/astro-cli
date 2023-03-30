@@ -86,6 +86,7 @@ type ComposeConfig struct {
 	PostgresPassword      string
 	PostgresHost          string
 	PostgresPort          string
+	PostgresImage         string
 	AirflowEnvFile        string
 	AirflowImage          string
 	AirflowHome           string

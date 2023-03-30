@@ -23,7 +23,7 @@ volumes:
 
 services:
   postgres:
-    image: docker.io/postgres:12.6
+    image: {{ .PostgresImage }}
     restart: unless-stopped
     networks:
       - airflow
