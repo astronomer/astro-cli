@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -120,7 +122,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	}
 
 	// get deployment
-	deployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
+	deployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
 	if err != nil {
 		return err
 	}
@@ -152,7 +154,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error {
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -215,10 +217,16 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	// select and validate cluster
-	clusterID, err = selectCluster(clusterID, organizationID, client)
+	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID, client, coreClient)
+	fmt.Println(clusterID)
 	if err != nil {
 		return err
 	}
+
+	// clusterID, err = selectCluster(clusterID, organizationID, client)
+	// if err != nil {
+	// 	return err
+	// }
 
 	scheduler := astro.Scheduler{
 		AU:       schedulerAU,
@@ -382,6 +390,47 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 	return clusterID, nil
 }
 
+// useSharedCluster takes astrocore.SharedClusterCloudProvider and a region string as input.
+// It returns the clusterID of the cluster if one exists in the provider/region.
+// It returns a 404 if a cluster does not exist.
+func useSharedCluster(cloudProvider astrocore.SharedClusterCloudProvider, region string, coreClient astrocore.CoreClient) (clusterID string, err error) {
+	// get shared cluster request
+	getSharedClusterParams := astrocore.GetSharedClusterParams{
+		Region:        region,
+		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(cloudProvider),
+	}
+	response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
+	if err != nil {
+		return "", err
+	}
+	err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
+	if err != nil {
+		return "", err
+	}
+	return response.JSON200.Id, nil
+}
+
+// useSharedClusterOrSelectDedicatedCluster decides how to derive the clusterID to use for a deployment.
+// if cloudProvider and region are provided, it uses a useSharedCluster to get the ClusterID.
+// if not, it uses selectCluster to get the ClusterID.
+func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID string, client astro.Client, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
+	// if cloud provider and region are requested
+	if cloudProvider != "" && region != "" {
+		// use a shared cluster for the deployment
+		derivedClusterID, err = useSharedCluster(astrocore.SharedClusterCloudProvider(cloudProvider), region, coreClient)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// select and validate cluster
+		derivedClusterID, err = selectCluster(clusterID, organizationID, client)
+		if err != nil {
+			return "", err
+		}
+	}
+	return derivedClusterID, nil
+}
+
 func healthPoll(deploymentID, ws string, client astro.Client) error {
 	fmt.Printf("Waiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	time.Sleep(time.Duration(sleepTime) * time.Second)
@@ -419,7 +468,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
 	if err != nil {
 		return err
 	}
@@ -538,7 +587,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client astro.Client) error {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
 	if err != nil {
 		return err
 	}
@@ -631,7 +680,7 @@ var SelectDeployment = func(deployments []astro.Deployment, message string) (ast
 	return selected, nil
 }
 
-func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client) (astro.Deployment, error) {
+func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client, coreClient astrocore.CoreClient) (astro.Deployment, error) {
 	deployments, err := GetDeployments(ws, client)
 	if err != nil {
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
@@ -664,7 +713,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 
 	// select deployment if deploymentID is empty
 	if deploymentID == "" {
-		return deploymentSelectionProcess(ws, deployments, client)
+		return deploymentSelectionProcess(ws, deployments, client, coreClient)
 	}
 	// find deployment by ID
 	for i := range deployments {
@@ -678,7 +727,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client)
 	return currentDeployment, nil
 }
 
-func deploymentSelectionProcess(ws string, deployments []astro.Deployment, client astro.Client) (astro.Deployment, error) {
+func deploymentSelectionProcess(ws string, deployments []astro.Deployment, client astro.Client, coreClient astrocore.CoreClient) (astro.Deployment, error) {
 	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
 	if err != nil {
 		return astro.Deployment{}, err
@@ -692,7 +741,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, SchedulerAuMin, SchedulerReplicasMin, client, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", SchedulerAuMin, SchedulerReplicasMin, client, coreClient, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

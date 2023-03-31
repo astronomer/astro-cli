@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/astro-client"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -44,6 +45,8 @@ var (
 	makeSecret                    bool
 	executor                      string
 	inputFile                     string
+	cloudProvider                 string
+	region                        string
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -62,9 +65,11 @@ var (
 		# Update a deployment variables from a file
 		$ astro deployment variable update --deployment-id <deployment-id> --load --env .env.my-deployment
 		`
-	httpClient         = httputil.NewHTTPClient()
-	errFlag            = errors.New("--deployment-file can not be used with other arguments")
-	errInvalidExecutor = errors.New("not a valid executor")
+	httpClient              = httputil.NewHTTPClient()
+	errFlag                 = errors.New("--deployment-file can not be used with other arguments")
+	errInvalidExecutor      = errors.New("not a valid executor")
+	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp")
+	errNoRegion             = errors.New("region must be specified with --cloudProvider")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -135,6 +140,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
+	cmd.Flags().StringVarP(&cloudProvider, "cloudProvider", "p", "", "The cloud provider to use for the deployment. Possible values can be gcp.")
+	cmd.Flags().StringVarP(&region, "region", "", "", "The cloud provider region to use for the deployment.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
@@ -340,7 +347,16 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return err
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, schedulerAU, schedulerReplicas, astroClient, waitForStatus)
+	// validate cloudProvider
+	if cloudProvider != "" {
+		if !isValidCloudProvider(astrocore.SharedClusterCloudProvider(cloudProvider)) {
+			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
+		}
+		if region == "" {
+			return errNoRegion
+		}
+	}
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -440,4 +456,9 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 
 func isValidExecutor(executor string) bool {
 	return executor == deployment.KubeExecutor || executor == deployment.CeleryExecutor || executor == ""
+}
+
+// isValidCloudProvider returns true for valid CloudProvider values and false if not.
+func isValidCloudProvider(cloudProvider astrocore.SharedClusterCloudProvider) bool {
+	return cloudProvider == astrocore.SharedClusterCloudProviderGcp
 }
