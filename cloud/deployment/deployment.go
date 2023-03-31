@@ -223,11 +223,6 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		return err
 	}
 
-	// clusterID, err = selectCluster(clusterID, organizationID, client)
-	// if err != nil {
-	// 	return err
-	// }
-
 	scheduler := astro.Scheduler{
 		AU:       schedulerAU,
 		Replicas: schedulerReplicas,
