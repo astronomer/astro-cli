@@ -290,7 +290,12 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 			break
 		}
 	}
-	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.ShortName, fmt.Sprintf("%s", *activeOrg.Product)) //nolint
+
+	orgProduct := fmt.Sprintf("%s", *activeOrg.Product) //nolint
+	if orgProduct == "" {
+		orgProduct = "HYBRID"
+	}
+	err = c.SetOrganizationContext(activeOrg.Id, activeOrg.ShortName, orgProduct)
 	if err != nil {
 		return err
 	}
