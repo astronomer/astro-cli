@@ -260,3 +260,23 @@ func TestSwitch(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 }
+
+func TestIsOrgHosted(t *testing.T) {
+	// initialize empty config
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("org product is hosted", func(t *testing.T) {
+		ctx := config.Context{Domain: "localhost"}
+		ctx.SetOrganizationContext("org1", "org_short_name_1", "HOSTED")
+
+		isHosted := IsOrgHosted()
+		assert.Equal(t, isHosted, true)
+	})
+
+	t.Run("org product is hybrid", func(t *testing.T) {
+		ctx := config.Context{Domain: "localhost"}
+		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
+
+		isHosted := IsOrgHosted()
+		assert.Equal(t, isHosted, false)
+	})
+}
