@@ -118,9 +118,9 @@ func SwitchWithContext(domain string, targetOrg *astrocore.Organization, astroCl
 	c, _ := context.GetCurrentContext()
 
 	// reset org context
-	orgProduct := fmt.Sprintf("%s", *targetOrg.Product) //nolint
-	if orgProduct == "" {
-		orgProduct = "HYBRID"
+	orgProduct := "HYBRID"
+	if targetOrg.Product != nil {
+		orgProduct = fmt.Sprintf("%s", *targetOrg.Product) //nolint
 	}
 	_ = c.SetOrganizationContext(targetOrg.Id, targetOrg.ShortName, orgProduct)
 	// need to reset all relevant keys because of https://github.com/spf13/viper/issues/1106 :shrug

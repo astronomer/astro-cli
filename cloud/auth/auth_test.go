@@ -570,6 +570,27 @@ func TestCheckUserSession(t *testing.T) {
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
+
+	t.Run("set default org product", func(t *testing.T) {
+		mockOrganizationsResponse = astrocore.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &[]astrocore.Organization{
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org"},
+			},
+		}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
+		ctx := config.Context{Domain: "test-domain"}
+		buf := new(bytes.Buffer)
+		err := CheckUserSession(&ctx, mockClient, mockCoreClient, buf)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestLogin(t *testing.T) {
