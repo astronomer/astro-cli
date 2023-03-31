@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -57,6 +58,26 @@ func TestList(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := List(ws, false, mockClient, buf)
 		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("success with hidden cluster information", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", org)
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err = List(ws, false, mockClient, buf)
+		assert.NoError(t, err)
+		assert.Contains(t, buf.String(), "test-id-1")
+		assert.Contains(t, buf.String(), "test-id-2")
+		assert.Contains(t, buf.String(), "N/A")
+
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -430,6 +451,26 @@ func TestCreate(t *testing.T) {
 		assert.Contains(t, err.Error(), "no workspaces with id")
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("success with hidden cluster information", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", org)
+
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
+		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestValidateResources(t *testing.T) {
@@ -631,6 +672,44 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("success with hidden cluster information", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", org)
+
+		expectedQueue := []astro.WorkerQueue{
+			{
+				Name:       "test-queue",
+				IsDefault:  false,
+				NodePoolID: "test-node-pool-id",
+			},
+		}
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+
+		// mock os.Stdin
+		input := []byte("y")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, 0, 0, expectedQueue, false, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
