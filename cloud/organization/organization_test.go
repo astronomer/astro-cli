@@ -237,4 +237,46 @@ func TestSwitch(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidOrganizationKey)
 		mockCoreClient.AssertExpectations(t)
 	})
+
+	t.Run("successful switch with name and set default product", func(t *testing.T) {
+		mockOKResponse = astrocore.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &[]astrocore.Organization{
+				{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1"},
+			},
+		}
+		mockGQLClient := new(astro_mocks.Client)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
+		CheckUserSession = func(c *config.Context, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+			return nil
+		}
+		buf := new(bytes.Buffer)
+		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
+		assert.NoError(t, err)
+		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
+		mockCoreClient.AssertExpectations(t)
+	})
+}
+
+func TestIsOrgHosted(t *testing.T) {
+	// initialize empty config
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Run("org product is hosted", func(t *testing.T) {
+		ctx := config.Context{Domain: "localhost"}
+		ctx.SetOrganizationContext("org1", "org_short_name_1", "HOSTED")
+
+		isHosted := IsOrgHosted()
+		assert.Equal(t, isHosted, true)
+	})
+
+	t.Run("org product is hybrid", func(t *testing.T) {
+		ctx := config.Context{Domain: "localhost"}
+		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
+
+		isHosted := IsOrgHosted()
+		assert.Equal(t, isHosted, false)
+	})
 }
