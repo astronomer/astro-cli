@@ -10,6 +10,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/fromfile"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -47,6 +48,8 @@ var (
 	inputFile                     string
 	cloudProvider                 string
 	region                        string
+	schedulerSize                 string
+	highAvailability              bool
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -140,13 +143,17 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
-	cmd.Flags().StringVarP(&cloudProvider, "cloudProvider", "p", "", "The cloud provider to use for the deployment. Possible values can be gcp.")
-	cmd.Flags().StringVarP(&region, "region", "", "", "The cloud provider region to use for the deployment.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
 	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
+	if organization.IsOrgHosted() {
+		cmd.Flags().StringVarP(&cloudProvider, "cloudProvider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
+		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
+		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "medium", "The size of Scheduler for the Deployment") // Replace the default here
+		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment")   // Replace the default here
+	}
 	return cmd
 }
 
@@ -356,7 +363,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return errNoRegion
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, highAvailability)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
