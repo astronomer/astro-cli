@@ -72,7 +72,7 @@ var (
 	errFlag                 = errors.New("--deployment-file can not be used with other arguments")
 	errInvalidExecutor      = errors.New("not a valid executor")
 	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp")
-	errNoRegion             = errors.New("region must be specified with --cloudProvider")
+	errNoRegion             = errors.New("region must be specified with --cloud-provider")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -149,10 +149,10 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&cloudProvider, "cloudProvider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
+		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
-		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "medium", "The size of Scheduler for the Deployment") // Replace the default here
-		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment")   // Replace the default here
+		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment")     // Replace the default here
+		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment") // Replace the default here
 	}
 	return cmd
 }
