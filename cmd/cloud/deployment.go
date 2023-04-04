@@ -151,8 +151,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
-		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment")     // Replace the default here
-		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment") // Replace the default here
+		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "small", "The size of Scheduler for the Deployment") // Replace the default here
+		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment")  // Replace the default here
 	}
 	return cmd
 }
