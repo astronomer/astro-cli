@@ -91,7 +91,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
 	if err != nil {
 		return err
 	}
