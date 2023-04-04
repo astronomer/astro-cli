@@ -272,6 +272,8 @@ type CreateDeploymentInput struct {
 	DagDeployEnabled      bool                 `json:"dagDeployEnabled"`
 	DeploymentSpec        DeploymentCreateSpec `json:"deploymentSpec"`
 	WorkerQueues          []WorkerQueue        `json:"workerQueues"`
+	IsHighAvailability    bool                 `json:"isHighAvailability"`
+	SchedulerSize         string               `json:"schedulerSize"`
 }
 
 type DeploymentCreateSpec struct {

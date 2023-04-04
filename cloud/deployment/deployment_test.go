@@ -2,12 +2,16 @@ package deployment
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -89,7 +93,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		_, err := GetDeployment(ws, deploymentID, "", mockClient)
+		_, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -99,7 +103,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
 
-		_, err := GetDeployment(ws, "", deploymentName, mockClient)
+		_, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -108,7 +112,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		deployment, err := GetDeployment(ws, deploymentID, "", mockClient)
+		deployment, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -118,7 +122,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test"}}, nil).Once()
 
-		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentName, deployment.Label)
 		mockClient.AssertExpectations(t)
@@ -144,7 +148,7 @@ func TestGetDeployment(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		deployment, err := GetDeployment(ws, "", deploymentName, mockClient)
+		deployment, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentName, deployment.Label)
 		mockClient.AssertExpectations(t)
@@ -154,7 +158,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		deployment, err := GetDeployment(ws, deploymentID, deploymentName, mockClient)
+		deployment, err := GetDeployment(ws, deploymentID, deploymentName, mockClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -164,7 +168,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
-		_, err := GetDeployment(ws, deploymentID, "", mockClient)
+		_, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -174,7 +178,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 
 		// mock createDeployment
-		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error {
 			return errMock
 		}
 
@@ -194,7 +198,7 @@ func TestGetDeployment(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = GetDeployment(ws, "", "", mockClient)
+		_, err = GetDeployment(ws, "", "", mockClient, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -204,7 +208,7 @@ func TestGetDeployment(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 
 		// mock createDeployment
-		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error {
 			return nil
 		}
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, errMock).Once()
@@ -224,7 +228,7 @@ func TestGetDeployment(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = GetDeployment(ws, "", "", mockClient)
+		_, err = GetDeployment(ws, "", "", mockClient, nil)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -233,9 +237,10 @@ func TestGetDeployment(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 		// mock createDeployment
-		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor string, schedulerAU, schedulerReplicas int, client astro.Client, waitForStatus bool) error {
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error {
 			return nil
 		}
+
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		// mock os.Stdin
 		input := []byte("y")
@@ -253,7 +258,7 @@ func TestGetDeployment(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		deployment, err := GetDeployment(ws, "", "", mockClient)
+		deployment, err := GetDeployment(ws, "", "", mockClient, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
@@ -324,6 +329,8 @@ func TestCreate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	csID := "test-cluster-id"
+	region := "us-central1"
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	deploymentCreateInput := astro.CreateDeploymentInput{
 		WorkspaceID:           ws,
@@ -350,9 +357,37 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+	})
+	t.Run("success with cloud provider and region", func(t *testing.T) {
+		getSharedClusterParams := &astrocore.GetSharedClusterParams{
+			Region:        region,
+			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
+		}
+		mockClient := new(astro_mocks.Client)
+		deploymentCreateInput.DeploymentSpec.Executor = "KubernetesExecutor"
+		defer func() { deploymentCreateInput.DeploymentSpec.Executor = CeleryExecutor }()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+
+		mockOKResponse := &astrocore.GetSharedClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.SharedCluster{Id: csID},
+		}
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
+
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		err := Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "", 10, 3, mockClient, mockCoreClient, false, false)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("success with Kube Executor", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
@@ -366,9 +401,10 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "KubeExecutor", 10, 3, mockClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "KubeExecutor", "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("success and wait for status", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
@@ -384,7 +420,7 @@ func TestCreate(t *testing.T) {
 		tickNum = 2
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "HEALTHY"}}, nil).Once()
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, true)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, true, false)
 		assert.NoError(t, err)
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{}}, nil).Once()
@@ -393,7 +429,7 @@ func TestCreate(t *testing.T) {
 
 		// timeout
 		timeoutNum = 1
-		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, true)
+		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, true, false)
 		assert.ErrorIs(t, err, errTimedOut)
 		mockClient.AssertExpectations(t)
 	})
@@ -407,7 +443,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -415,7 +451,7 @@ func TestCreate(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -424,12 +460,12 @@ func TestCreate(t *testing.T) {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{}, errMock).Once()
-		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("invalid resources", func(t *testing.T) {
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 5, nil, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 5, nil, mockCoreClient, false, false)
 		assert.NoError(t, err)
 	})
 	t.Run("list workspace failure", func(t *testing.T) {
@@ -437,7 +473,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -446,7 +482,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 
-		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no workspaces with id")
 		mockClient.AssertExpectations(t)
@@ -467,7 +503,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, 10, 3, mockClient, false)
+		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1331,5 +1367,106 @@ func TestPrintWarning(t *testing.T) {
 	t.Run("returns false for any other executor is requested", func(t *testing.T) {
 		actual := printWarning("non-existent", 2)
 		assert.False(t, actual)
+	})
+}
+
+func TestUseSharedCluster(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	csID := "test-cluster-id"
+	region := "us-central1"
+	getSharedClusterParams := &astrocore.GetSharedClusterParams{
+		Region:        region,
+		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
+	}
+	t.Run("returns a cluster id", func(t *testing.T) {
+		mockOKResponse := &astrocore.GetSharedClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.SharedCluster{Id: csID},
+		}
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
+		actual, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
+		assert.NoError(t, err)
+		assert.Equal(t, csID, actual)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns a 404 error if a cluster is not found in the region", func(t *testing.T) {
+		errorBody, _ := json.Marshal(astrocore.Error{
+			Message: "Unable to find shared cluster",
+		})
+		mockErrorResponse := &astrocore.GetSharedClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 404,
+			},
+			Body:    errorBody,
+			JSON200: nil,
+		}
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockErrorResponse, nil).Once()
+		_, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
+		assert.Error(t, err)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if calling api fails", func(t *testing.T) {
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(nil, errMock).Once()
+		_, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
+		assert.ErrorIs(t, err, errMock)
+		mockCoreClient.AssertExpectations(t)
+	})
+}
+
+func TestUseSharedClusterOrSelectCluster(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	orgID := "test-org-id"
+	csID := "test-cluster-id"
+
+	t.Run("uses shared cluster if cloud provider and region are provided", func(t *testing.T) {
+		cloudProvider := "gcp"
+		region := "us-central1"
+		getSharedClusterParams := &astrocore.GetSharedClusterParams{
+			Region:        region,
+			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(cloudProvider),
+		}
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockOKResponse := &astrocore.GetSharedClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.SharedCluster{Id: csID},
+		}
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
+		actual, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", nil, mockCoreClient)
+		assert.NoError(t, err)
+		assert.Equal(t, csID, actual)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns error if using shared cluster fails", func(t *testing.T) {
+		cloudProvider := "gcp"
+		region := "us-central1"
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(nil, errMock).Once()
+		_, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", nil, mockCoreClient)
+		assert.ErrorIs(t, err, errMock)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("uses select cluster if cloud provider and region are not provided", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{{ID: csID}}, nil).Once()
+		defer testUtil.MockUserInput(t, "1")()
+		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", orgID, "", mockClient, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, csID, actual)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns error if selecting cluster fails", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errMock).Once()
+		_, err := useSharedClusterOrSelectDedicatedCluster("", "", orgID, "", mockClient, nil)
+		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
 	})
 }
