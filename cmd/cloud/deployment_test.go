@@ -127,6 +127,24 @@ func TestDeploymentCreate(t *testing.T) {
 	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(3)
+	deploymentCreateInput2 := astro.CreateDeploymentInput{
+		WorkspaceID:           ws,
+		ClusterID:             csID,
+		Label:                 "test-name",
+		Description:           "",
+		RuntimeReleaseVersion: "4.2.5",
+		DagDeployEnabled:      false,
+		SchedulerSize:         "small",
+		IsHighAvailability:    false,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 1,
+			},
+		},
+	}
+	mockClient.On("CreateDeployment", &deploymentCreateInput2).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
 	mockResponse := &airflowversions.Response{
@@ -309,13 +327,13 @@ deployment:
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
-			JSON200: &astrocore.SharedCluster{Id: "test-cluster-id"},
+			JSON200: &astrocore.SharedCluster{Id: csID},
 		}
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockCoreClient
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(mockOKResponse, nil).Once()
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "enable",
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
 			"--cloud-provider", "gcp", "--region", "us-central1",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -329,7 +347,7 @@ deployment:
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "enable",
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
 			"--executor", "KubernetesExecutor", "--cloud-provider", "azure",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
@@ -342,7 +360,7 @@ deployment:
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
 		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "enable",
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
 			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
