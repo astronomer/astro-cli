@@ -223,9 +223,78 @@ type Scheduler struct {
 	Replicas int `json:"replicas"`
 }
 
+type AuConfig struct {
+	Default int `json:"default"`
+	Limit   int `json:"limit"`
+	Request int `json:"request"`
+}
+
+type ReplicasConfig struct {
+	Default int `json:"default"`
+	Limit   int `json:"limit"`
+	Minimum int `json:"minimum"`
+}
+
+type WebserverConfig struct {
+	AU AuConfig `json:"au"`
+}
+
+type SchedulerConfig struct {
+	AU       AuConfig       `json:"au"`
+	Replicas ReplicasConfig `json:"replicas"`
+}
+
+type CeleryExecutorConfig struct {
+	Name string `json:"name"`
+}
+
+type KubernetesExecutorDefaultPodConfig struct {
+	CPU           int `json:"cpu"`
+	CPULimitCores int `json:"cpuLimitCores"`
+	Memory        int `json:"memory"`
+	MinPodCount   int `json:"minPodCount"`
+	Concurrency   int `json:"concurrency"`
+}
+
+type KubernetesExecutorConfig struct {
+	Name       string                             `json:"name"`
+	DefaultPod KubernetesExecutorDefaultPodConfig `json:"defaultPod"`
+}
+
+type ExecutorConfig struct {
+	CeleryExecutor     CeleryExecutorConfig     `json:"celeryExecutor"`
+	KubernetesExecutor KubernetesExecutorConfig `json:"kubernetesExecutor"`
+}
+
+type Components struct {
+	Scheduler SchedulerConfig `json:"scheduler"`
+	Webserver WebserverConfig `json:"webserver"`
+	Executor  ExecutorConfig  `json:"executor"`
+}
+
 type DeploymentConfig struct {
-	AstronomerUnit  AstronomerUnit   `json:"astroUnit"`
-	RuntimeReleases []RuntimeRelease `json:"runtimeReleases"`
+	AstronomerUnit       AstronomerUnit   `json:"astroUnit"`
+	RuntimeReleases      []RuntimeRelease `json:"runtimeReleases"`
+	AstroMachines        []Machine        `json:"astroMachines"`
+	DefaultAstroMachine  Machine          `json:"defaultAstroMachine"`
+	SchedulerSizes       []MachineUnit    `json:"schedulerSizes"`
+	DefaultSchedulerSize MachineUnit      `json:"defaultSchedulerSize"`
+	Components           Components       `json:"components"`
+}
+
+type Machine struct {
+	Type            string `json:"type"`
+	CPU             string `json:"cpu"`
+	Memory          string `json:"memory"`
+	StorageSize     string `json:"storageSize"`
+	ConcurrentTasks int    `json:"concurrentTasks"`
+	NodePoolType    string `json:"nodePoolType"`
+}
+
+type MachineUnit struct {
+	CPU    string `json:"cpu"`
+	Memory string `json:"memory"`
+	Size   string `json:"size"`
 }
 
 type AstronomerUnit struct {

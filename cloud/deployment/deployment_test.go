@@ -89,8 +89,9 @@ func TestList(t *testing.T) {
 func TestGetDeployment(t *testing.T) {
 	deploymentID := "test-id-wrong"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(astro_mocks.Client)
+
 	t.Run("invalid deployment ID", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		_, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
@@ -100,7 +101,6 @@ func TestGetDeployment(t *testing.T) {
 	deploymentName := "test-wrong"
 	deploymentID = "test-id"
 	t.Run("error after invalid deployment Name", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
 
 		_, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
@@ -109,7 +109,6 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("correct deployment ID", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
@@ -119,7 +118,6 @@ func TestGetDeployment(t *testing.T) {
 	})
 	deploymentName = "test"
 	t.Run("correct deployment Name", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
@@ -129,7 +127,6 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("two deployments with the same name", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}, {Label: "test", ID: "test-id2"}}, nil).Once()
 
 		// mock os.Stdin
@@ -155,7 +152,6 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("deployment name and deployment id", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, deploymentID, deploymentName, mockClient, nil)
@@ -165,7 +161,6 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("bad deployment call", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		_, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
@@ -174,9 +169,22 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("create deployment error", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
-
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
 		// mock createDeployment
 		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error {
 			return errMock
@@ -204,9 +212,22 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("get deployments after creation error", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
-
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
 		// mock createDeployment
 		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error {
 			return nil
@@ -234,8 +255,22 @@ func TestGetDeployment(t *testing.T) {
 	})
 
 	t.Run("test automatic deployment creation", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
 		// mock createDeployment
 		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error {
 			return nil
@@ -331,6 +366,7 @@ func TestCreate(t *testing.T) {
 	csID := "test-cluster-id"
 	region := "us-central1"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockClient := new(astro_mocks.Client)
 
 	deploymentCreateInput := astro.CreateDeploymentInput{
 		WorkspaceID:           ws,
@@ -348,8 +384,26 @@ func TestCreate(t *testing.T) {
 		},
 	}
 	t.Run("success with Celery Executor", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
@@ -362,14 +416,35 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("success with cloud provider and region", func(t *testing.T) {
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+			DefaultSchedulerSize: astro.MachineUnit{
+				Size: "small",
+			},
+		}, nil).Times(2)
 		getSharedClusterParams := &astrocore.GetSharedClusterParams{
 			Region:        region,
 			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
 		}
-		mockClient := new(astro_mocks.Client)
 		deploymentCreateInput.DeploymentSpec.Executor = "KubernetesExecutor"
 		defer func() { deploymentCreateInput.DeploymentSpec.Executor = CeleryExecutor }()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
@@ -384,16 +459,34 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "", 10, 3, mockClient, mockCoreClient, false, false)
+		err := Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", 10, 3, mockClient, mockCoreClient, false, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("success with Kube Executor", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		deploymentCreateInput.DeploymentSpec.Executor = "KubeExecutor"
 		defer func() { deploymentCreateInput.DeploymentSpec.Executor = CeleryExecutor }()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
@@ -407,8 +500,26 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("success and wait for status", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Twice()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(4)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Twice()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Twice()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
@@ -434,8 +545,26 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error when creating a deployment fails", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{}, errMock).Once()
@@ -448,7 +577,6 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("failed to validate resources", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
@@ -456,8 +584,26 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if cluster choice is not valid", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{}, errMock).Once()
 		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
@@ -465,12 +611,50 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("invalid resources", func(t *testing.T) {
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 5, nil, mockCoreClient, false, false)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(1)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 5, mockClient, mockCoreClient, false, false)
 		assert.NoError(t, err)
 	})
 	t.Run("list workspace failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
@@ -478,8 +662,26 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("invalid workspace failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 
 		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 10, 3, mockClient, mockCoreClient, false, false)
@@ -494,8 +696,26 @@ func TestCreate(t *testing.T) {
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
 
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
@@ -511,7 +731,37 @@ func TestCreate(t *testing.T) {
 
 func TestValidateResources(t *testing.T) {
 	t.Run("invalid schedulerAU", func(t *testing.T) {
-		resp := validateResources(0, 3)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
+		resp := validateResources(0, 3, astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		})
 		assert.False(t, resp)
 	})
 
@@ -601,6 +851,7 @@ func TestSelectCluster(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(astro_mocks.Client)
 
 	deploymentResp := astro.Deployment{
 		ID:             "test-id",
@@ -660,6 +911,26 @@ func TestUpdate(t *testing.T) {
 	}
 
 	t.Run("success", func(t *testing.T) {
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		expectedQueue := []astro.WorkerQueue{
 			{
 				Name:       "test-queue",
@@ -667,7 +938,6 @@ func TestUpdate(t *testing.T) {
 				NodePoolID: "test-node-pool-id",
 			},
 		}
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Twice()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput2).Return(astro.Deployment{ID: "test-id"}, nil).Once()
@@ -725,7 +995,26 @@ func TestUpdate(t *testing.T) {
 				NodePoolID: "test-node-pool-id",
 			},
 		}
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
@@ -751,7 +1040,6 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("list deployments failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, 5, 3, []astro.WorkerQueue{}, false, mockClient)
@@ -760,7 +1048,6 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("invalid deployment id", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}, {ID: "test-id-2", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
 
 		// mock os.Stdin
@@ -788,7 +1075,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("invalid resources", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(1)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		err := Update("test-id", "test-label", ws, "test-description", "", "", CeleryExecutor, 10, 5, []astro.WorkerQueue{}, true, mockClient)
 		assert.NoError(t, err)
@@ -796,7 +1102,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("cancel update", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Once()
 
 		// mock os.Stdin
@@ -821,7 +1146,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("update deployment failure", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
@@ -832,7 +1176,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("update deployment to enable dag deploy", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentUpdateInput := astro.UpdateDeploymentInput{
 			ID:               "test-id",
 			ClusterID:        "",
@@ -855,7 +1218,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("do not update deployment to enable dag deploy if already enabled", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			DagDeployEnabled: true,
@@ -872,7 +1254,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("update deployment to disable dag deploy", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(3)
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			Label:            "test-deployment",
@@ -937,7 +1338,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("do not update deployment to disable dag deploy if already disabled", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			DagDeployEnabled: false,
@@ -954,7 +1374,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("update deployment to change executor to KubernetesExecutor", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			RuntimeRelease:   astro.RuntimeRelease{Version: "4.2.5"},
@@ -1008,7 +1447,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("update deployment to change executor to CeleryExecutor", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			RuntimeRelease:   astro.RuntimeRelease{Version: "4.2.5"},
@@ -1062,7 +1520,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("do not update deployment if user says no to the executor change", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID:               "test-id",
 			Label:            "test-deployment",
@@ -1102,7 +1579,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("do not update deployment with executor if deployment already has it", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID: "test-id",
 			DeploymentSpec: astro.DeploymentSpec{
@@ -1118,7 +1614,26 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("do not update deployment with executor if user did not request it", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		deploymentResp = astro.Deployment{
 			ID: "test-id",
 			DeploymentSpec: astro.DeploymentSpec{

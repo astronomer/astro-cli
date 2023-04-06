@@ -97,7 +97,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
-	// if deployment inspect, create, or udpate commands are used
+	// if deployment inspect, create, or update commands are used
 	deploymentCmds := []string{"inspect", "create", "update"}
 	if util.Contains(deploymentCmds, cmd.CalledAs()) && cmd.Parent().Use == deploymentCmd {
 		isDeploymentFile = true

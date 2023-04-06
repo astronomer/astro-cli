@@ -144,15 +144,15 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
 	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to create. File can be in either JSON or YAML format.")
-	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", deployment.SchedulerAuMin, "The Deployment's Scheduler resources in AUs")
-	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", deployment.SchedulerReplicasMin, "The number of Scheduler replicas for the Deployment")
+	cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
+	cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
-		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "small", "The size of Scheduler for the Deployment") // Replace the default here
-		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment")  // Replace the default here
+		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
+		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment")
 	}
 	return cmd
 }
