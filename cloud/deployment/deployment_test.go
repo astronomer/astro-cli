@@ -298,6 +298,14 @@ func TestGetDeployment(t *testing.T) {
 		assert.Equal(t, deploymentID, deployment.ID)
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("failed to validate resources", func(t *testing.T) {
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
+
+		_, err := GetDeployment(ws, "", "", mockClient, nil)
+		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestLogs(t *testing.T) {
@@ -727,6 +735,53 @@ func TestCreate(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("success with default config", func(t *testing.T) {
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
+		deploymentCreateInput := astro.CreateDeploymentInput{
+			WorkspaceID:           ws,
+			ClusterID:             csID,
+			Label:                 "test-name",
+			Description:           "test-desc",
+			RuntimeReleaseVersion: "4.2.5",
+			DagDeployEnabled:      false,
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor: CeleryExecutor,
+				Scheduler: astro.Scheduler{
+					AU:       5,
+					Replicas: 1,
+				},
+			},
+		}
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
+		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", 0, 0, mockClient, mockCoreClient, false, false)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
 }
 
 func TestValidateResources(t *testing.T) {
@@ -979,6 +1034,15 @@ func TestUpdate(t *testing.T) {
 
 		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, 5, 3, []astro.WorkerQueue{}, false, mockClient)
 		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("failed to validate resources", func(t *testing.T) {
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
+
+		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 
