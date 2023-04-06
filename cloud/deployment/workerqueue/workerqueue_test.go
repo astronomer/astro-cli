@@ -293,6 +293,21 @@ func TestCreate(t *testing.T) {
 			defer testUtil.MockUserInput(t, "test-worker-queue")()
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Times(2)
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
@@ -340,6 +355,21 @@ func TestCreate(t *testing.T) {
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			defer testUtil.MockUserInput(t, "y")()
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
@@ -354,6 +384,21 @@ func TestCreate(t *testing.T) {
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			defer testUtil.MockUserInput(t, "y")()
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespNoQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(deploymentRespNoQueues[0], nil).Once()
@@ -367,6 +412,21 @@ func TestCreate(t *testing.T) {
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			defer testUtil.MockUserInput(t, "2")()
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
@@ -594,6 +654,21 @@ func TestUpdate(t *testing.T) {
 				defer testUtil.MockUserInput(t, "y")()
 				out := new(bytes.Buffer)
 				mockClient := new(astro_mocks.Client)
+				mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+					Components: astro.Components{
+						Scheduler: astro.SchedulerConfig{
+							AU: astro.AuConfig{
+								Default: 5,
+								Limit:   24,
+							},
+							Replicas: astro.ReplicasConfig{
+								Default: 1,
+								Minimum: 1,
+								Limit:   4,
+							},
+						},
+					},
+				}, nil).Once()
 				mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 				mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 				mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
@@ -619,6 +694,21 @@ func TestUpdate(t *testing.T) {
 			defer testUtil.MockUserInput(t, "2")()
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
@@ -689,6 +779,21 @@ func TestUpdate(t *testing.T) {
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
 			defer testUtil.MockUserInput(t, "y")()
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
@@ -702,7 +807,21 @@ func TestUpdate(t *testing.T) {
 			expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace updated\n"
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
-
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
@@ -735,7 +854,21 @@ func TestUpdate(t *testing.T) {
 			expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
-
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(keDeployment, nil).Twice()
 			mockClient.On("UpdateDeployment", &updateKEDeploymentInput).Return(keDeployment[0], nil).Once()
 			err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type", 0, 0, 0, true, mockClient, out)
@@ -747,6 +880,21 @@ func TestUpdate(t *testing.T) {
 			expectedOutMessage := "worker queue default for test-deployment-label in test-ws-id workspace updated\n"
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			origNodePoolID := updateKEDeploymentInput.WorkerQueues[0].NodePoolID
 			updateKEDeploymentInput.WorkerQueues[0].NodePoolID = "test-pool-id-1"
 			defer func() { updateKEDeploymentInput.WorkerQueues[0].NodePoolID = origNodePoolID }()
@@ -831,6 +979,21 @@ func TestDelete(t *testing.T) {
 	t.Run("happy path worker queue gets deleted", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
@@ -842,6 +1005,21 @@ func TestDelete(t *testing.T) {
 		defer testUtil.MockUserInput(t, "2")()
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "", true, mockClient, out)
@@ -853,6 +1031,21 @@ func TestDelete(t *testing.T) {
 			defer testUtil.MockUserInput(t, "y")()
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+				Components: astro.Components{
+					Scheduler: astro.SchedulerConfig{
+						AU: astro.AuConfig{
+							Default: 5,
+							Limit:   24,
+						},
+						Replicas: astro.ReplicasConfig{
+							Default: 1,
+							Minimum: 1,
+							Limit:   4,
+						},
+					},
+				},
+			}, nil).Once()
 			mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 			mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockClient, out)
@@ -921,6 +1114,21 @@ func TestDelete(t *testing.T) {
 	t.Run("returns an error if deployment update fails", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errUpdateDeployment).Once()
 		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockClient, out)
