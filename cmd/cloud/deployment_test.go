@@ -122,11 +122,30 @@ func TestDeploymentCreate(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(5)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+		Components: astro.Components{
+			Scheduler: astro.SchedulerConfig{
+				AU: astro.AuConfig{
+					Default: 5,
+					Limit:   24,
+				},
+				Replicas: astro.ReplicasConfig{
+					Default: 1,
+					Minimum: 1,
+					Limit:   4,
+				},
+			},
+		},
+		RuntimeReleases: []astro.RuntimeRelease{
+			{
+				Version: "4.2.5",
+			},
+		},
+	}, nil).Times(10)
 	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(5)
 	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
-	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(3)
+	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(6)
 	deploymentCreateInput2 := astro.CreateDeploymentInput{
 		WorkspaceID:           ws,
 		ClusterID:             csID,
@@ -392,6 +411,26 @@ func TestDeploymentUpdate(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+		Components: astro.Components{
+			Scheduler: astro.SchedulerConfig{
+				AU: astro.AuConfig{
+					Default: 5,
+					Limit:   24,
+				},
+				Replicas: astro.ReplicasConfig{
+					Default: 1,
+					Minimum: 1,
+					Limit:   4,
+				},
+			},
+		},
+		RuntimeReleases: []astro.RuntimeRelease{
+			{
+				Version: "4.2.5",
+			},
+		},
+	}, nil).Once()
 	mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
@@ -517,7 +556,6 @@ deployment:
 				Default: 180,
 			},
 		}
-		mockClient = new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return(clusters, nil)
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
