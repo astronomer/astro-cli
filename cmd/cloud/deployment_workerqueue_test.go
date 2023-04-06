@@ -177,7 +177,26 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
@@ -200,7 +219,26 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
@@ -223,7 +261,26 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
@@ -246,7 +303,26 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespDefaultQueue, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
@@ -334,6 +410,26 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 			WorkerQueues: listToDelete,
 		}
 		expectedOutMessage := "worker queue test-worker-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace deleted\n"
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 
@@ -463,6 +559,26 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		}
 
 		expectedOutMessage := "worker queue test-queue-1 for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace updated\n"
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()

@@ -41,15 +41,10 @@ const (
 	notApplicable  = "N/A"
 )
 
-// TODO: get these values from the Astrohub API
 var (
-	SchedulerAuMin       = 5
-	SchedulerReplicasMin = 1
-	schedulerAuMax       = 30
-	schedulerReplicasMax = 4
-	sleepTime            = 180
-	tickNum              = 10
-	timeoutNum           = 180
+	sleepTime  = 180
+	tickNum    = 10
+	timeoutNum = 180
 )
 
 func newTableOut() *printutil.Table {
@@ -164,8 +159,25 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		return err
 	}
 
+	configOption, err := client.GetDeploymentConfig()
+	if err != nil {
+		return err
+	}
+
+	if schedulerAU == 0 {
+		schedulerAU = configOption.Components.Scheduler.AU.Default
+	}
+
+	if schedulerReplicas == 0 {
+		schedulerReplicas = configOption.Components.Scheduler.Replicas.Default
+	}
+
+	if schedulerSize == "" {
+		schedulerSize = configOption.DefaultSchedulerSize.Size
+	}
+
 	// validate resources requests
-	resourcesValid := validateResources(schedulerAU, schedulerReplicas)
+	resourcesValid := validateResources(schedulerAU, schedulerReplicas, configOption)
 	if !resourcesValid {
 		return nil
 	}
@@ -302,13 +314,17 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 	return nil
 }
 
-func validateResources(schedulerAU, schedulerReplicas int) bool {
-	if schedulerAU > schedulerAuMax || schedulerAU < SchedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", SchedulerAuMin, schedulerAuMax)
+func validateResources(schedulerAU, schedulerReplicas int, configOption astro.DeploymentConfig) bool { //nolint:gocritic
+	schedulerAuMin := configOption.Components.Scheduler.AU.Default
+	schedulerAuMax := configOption.Components.Scheduler.AU.Limit
+	schedulerReplicasMin := configOption.Components.Scheduler.Replicas.Minimum
+	schedulerReplicasMax := configOption.Components.Scheduler.Replicas.Limit
+	if schedulerAU > schedulerAuMax || schedulerAU < schedulerAuMin {
+		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs", schedulerAuMax, schedulerAuMax)
 		return false
 	}
-	if schedulerReplicas > schedulerReplicasMax || schedulerReplicas < SchedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must between a min of %d and a max of %d Replicas", SchedulerReplicasMin, schedulerReplicasMax)
+	if schedulerReplicas > schedulerReplicasMax || schedulerReplicas < schedulerReplicasMin {
+		fmt.Printf("\nScheduler Replicas must between a min of %d and a max of %d Replicas", schedulerReplicasMin, schedulerReplicasMax)
 		return false
 	}
 	return true
@@ -472,6 +488,11 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		return err
 	}
 
+	configOption, err := client.GetDeploymentConfig()
+	if err != nil {
+		return err
+	}
+
 	// build query input
 	scheduler := astro.Scheduler{}
 
@@ -541,7 +562,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		deploymentUpdate.WorkerQueues = wQueueList
 	}
 	// validate resources requests
-	resourcesValid := validateResources(schedulerAU, schedulerReplicas)
+	resourcesValid := validateResources(schedulerAU, schedulerReplicas, configOption)
 	if !resourcesValid {
 		return nil
 	}
@@ -739,8 +760,16 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 			return astro.Deployment{}, err
 		}
 
+		configOption, err := client.GetDeploymentConfig()
+		if err != nil {
+			return astro.Deployment{}, err
+		}
+
+		schedulerAU := configOption.Components.Scheduler.AU.Default
+		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
+
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", SchedulerAuMin, SchedulerReplicasMin, client, coreClient, false, false) // replace defaults
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", schedulerAU, schedulerReplicas, client, coreClient, false, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
