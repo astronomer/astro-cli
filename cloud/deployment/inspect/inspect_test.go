@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/stretchr/testify/assert"
@@ -235,6 +236,22 @@ func TestInspect(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "", false)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("Hide Cluster Info if an org is hosted", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		out := new(bytes.Buffer)
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
+		err = Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "", false)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), deploymentResponse[0].ReleaseName)
+		assert.Contains(t, out.String(), deploymentName)
+		assert.Contains(t, out.String(), deploymentResponse[0].RuntimeRelease.Version)
+		assert.Contains(t, out.String(), "N/A")
 		mockClient.AssertExpectations(t)
 	})
 }

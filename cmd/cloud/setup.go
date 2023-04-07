@@ -97,14 +97,14 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 		return nil
 	}
 
-	// if deployment inspect, create, or udpate commands are used
+	// if deployment inspect, create, or update commands are used
 	deploymentCmds := []string{"inspect", "create", "update"}
 	if util.Contains(deploymentCmds, cmd.CalledAs()) && cmd.Parent().Use == deploymentCmd {
 		isDeploymentFile = true
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, args)
+	apiToken, err := checkAPIToken(isDeploymentFile, coreClient, args)
 	if err != nil {
 		return err
 	}
@@ -321,6 +321,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	org := orgs[0]
 	orgID := org.Id
 	orgShortName := org.ShortName
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
@@ -336,14 +337,14 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetOrganizationContext(orgID, orgShortName)
+	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args []string) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -394,9 +395,19 @@ func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
 	if len(claims.Permissions) == 0 {
 		return false, errNotAPIToken
 	}
+
 	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
 	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
+
+	orgs, err := organization.ListOrganizations(coreClient)
+	if err != nil {
+		return false, err
+	}
+
+	org := orgs[0]
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
+
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
 		err := c.SetContextKey("workspace", workspaceID) // c.Workspace
@@ -404,7 +415,7 @@ func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetOrganizationContext(orgID, orgShortName)
+	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
