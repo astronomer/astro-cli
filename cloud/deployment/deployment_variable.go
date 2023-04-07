@@ -280,9 +280,10 @@ func addVariablesFromFile(envFile string, oldKeyList []string, oldEnvironmentVar
 			continue
 		}
 
-		fmt.Printf("Cleaning quotes from variable value - %s", value)
+		fmt.Printf("Cleaning quotes and whitespaces from variable value - %s", value)
 		value = strings.Trim(value, `"`)
 		value = strings.Trim(value, `'`)
+		value = strings.TrimSpace(value)
 
 		// check if key already exists
 		exist, num := contains(oldKeyList, key)
