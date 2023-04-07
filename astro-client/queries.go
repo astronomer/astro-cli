@@ -204,6 +204,32 @@ var (
 			channel
 			version
 		}
+		astroMachines {
+			concurrentTasks
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultAstroMachine {
+			concurrentTasks
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultSchedulerSize {
+			cpu
+			memory
+			size
+		}
+		schedulerSizes {
+			cpu
+			memory
+			size
+		}
 	  }
 	}
   `
