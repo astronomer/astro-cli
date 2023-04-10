@@ -119,5 +119,8 @@ func GetPythonSDKComptability(configURL, sqlCliVersion string) (astroRuntimeVers
 	}
 
 	SQLCLICompatibilityVersions := resp.Compatibility[sqlCliVersion]
+	if SQLCLICompatibilityVersions.AstroRuntime == "" {
+		return "", "", fmt.Errorf("could not find a matching SQL CLI compatibility version: current version %s version map: %v  %w", sqlCliVersion, resp.Compatibility, err)
+	}
 	return SQLCLICompatibilityVersions.AstroRuntime, SQLCLICompatibilityVersions.AstroSdkPython, nil
 }
