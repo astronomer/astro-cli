@@ -149,7 +149,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error { //nolint
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -262,7 +262,10 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 
 	if organization.IsOrgHosted() {
 		createInput.SchedulerSize = schedulerSize
-		createInput.IsHighAvailability = highAvailability
+		createInput.IsHighAvailability = false
+		if highAvailability == "enable" { //nolint: goconst
+			createInput.IsHighAvailability = true
+		}
 	}
 
 	// Create request
@@ -480,7 +483,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
@@ -532,6 +535,19 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		deploymentUpdate.Description = description
 	} else {
 		deploymentUpdate.Description = currentDeployment.Description
+	}
+
+	if organization.IsOrgHosted() {
+		if schedulerSize != "" {
+			deploymentUpdate.SchedulerSize = schedulerSize
+		} else {
+			deploymentUpdate.SchedulerSize = currentDeployment.SchedulerSize
+		}
+		if highAvailability == "enable" {
+			deploymentUpdate.IsHighAvailability = true
+		} else if highAvailability == "disable" {
+			deploymentUpdate.IsHighAvailability = false
+		}
 	}
 
 	if dagDeploy == "enable" {
@@ -769,7 +785,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", schedulerAU, schedulerReplicas, client, coreClient, false, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

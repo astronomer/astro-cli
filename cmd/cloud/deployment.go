@@ -49,7 +49,7 @@ var (
 	cloudProvider                 string
 	region                        string
 	schedulerSize                 string
-	highAvailability              bool
+	highAvailability              string
 	deploymentVariableListExample = `
 		# List a deployment's variables
 		$ astro deployment variable list --deployment-id <deployment-id> --key FOO
@@ -152,7 +152,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
-		cmd.Flags().BoolVarP(&highAvailability, "high-availability", "a", false, "High Availability for the Deployment")
+		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
 	}
 	return cmd
 }
@@ -178,6 +178,10 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
+	if organization.IsOrgHosted() {
+		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
+		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "", "Enables High Availability for the Deployment")
+	}
 	return cmd
 }
 
@@ -332,6 +336,10 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 
+	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
+		return errors.New("Invalid --high-availability value)")
+	}
+
 	// request is to create from a file
 	if inputFile != "" {
 		requestedFlags := cmd.Flags().NFlag()
@@ -363,7 +371,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return errNoRegion
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, highAvailability)
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -396,12 +404,16 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return errors.New("Invalid --dag-deploy value)")
 	}
 
+	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
+		return errors.New("Invalid --high-availability value)")
+	}
+
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
+	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, updateSchedulerAU, updateSchedulerReplicas, []astro.WorkerQueue{}, forceUpdate, astroClient)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {
