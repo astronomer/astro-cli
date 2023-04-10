@@ -483,7 +483,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
@@ -545,7 +545,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		}
 		if highAvailability == "enable" {
 			deploymentUpdate.IsHighAvailability = true
-		} else if highAvailability == "disable" {
+		} else if highAvailability == "disable" { //nolint
 			deploymentUpdate.IsHighAvailability = false
 		}
 	}
