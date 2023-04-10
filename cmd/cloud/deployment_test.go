@@ -385,6 +385,19 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "region must be specified with --cloud-provider")
 	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
 	mockClient.AssertExpectations(t)
 }
 
@@ -584,6 +597,26 @@ deployment:
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorIs(t, err, errFlag)
+	})
+	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
 	mockClient.AssertExpectations(t)
 }

@@ -405,7 +405,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
-		return errors.New("Invalid --high-availability value)")
+		return errors.New("Invalid --high-availability value")
 	}
 
 	// Get release name from args, if passed
