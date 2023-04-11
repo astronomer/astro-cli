@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/astronomer/astro-cli/cmd/registry"
 	"os"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
@@ -112,6 +113,10 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		)
 		softwareCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
+
+	rootCmd.AddCommand( // include all the commands for interacting with the registry
+		registry.AddCmds()...,
+	)
 
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
