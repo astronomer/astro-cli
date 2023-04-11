@@ -103,6 +103,39 @@ func getRegistryURL(domain string) string {
 	return registry
 }
 
+func removeDagsFromDockerIgnore(fullpath string) error {
+	f, err := os.Open(fullpath)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	var bs []byte
+	buf := bytes.NewBuffer(bs)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text != "dags/" {
+			_, err = buf.WriteString(text + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
@@ -258,6 +291,11 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
+		fullpath := filepath.Join(deployInput.Path, ".dockerignore")
+		err := removeDagsFromDockerIgnore(fullpath)
+		if err != nil {
+			return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+		}
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
 		if !envFileExists && deployInput.EnvFile != ".env" {
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
@@ -511,6 +549,10 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	}
 
 	defer func() {
+		// remove dags from .dockerignore file if we set it
+		if dagsIgnoreSet {
+			removeDagsFromDockerIgnore(fullpath)
+		}
 		// remove created docker ignore file
 		if dockerIgnoreCreate {
 			os.Remove(fullpath)
@@ -519,34 +561,7 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
-		f, err := os.Open(fullpath)
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		var bs []byte
-		buf := bytes.NewBuffer(bs)
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			text := scanner.Text()
-			if text != "dags/" {
-				_, err = buf.WriteString(text + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
-		if err != nil {
-			return err
-		}
+		removeDagsFromDockerIgnore(fullpath)
 	}
 
 	return nil
