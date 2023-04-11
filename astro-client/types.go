@@ -57,22 +57,24 @@ type AuthUser struct {
 
 // Deployment defines structure of a astrohub response Deployment object
 type Deployment struct {
-	ID               string         `json:"id"`
-	Label            string         `json:"label"`
-	Description      string         `json:"description"`
-	WebserverStatus  string         `json:"webserverStatus"`
-	Status           string         `json:"status"`
-	ReleaseName      string         `json:"releaseName"`
-	Version          string         `json:"version"`
-	DagDeployEnabled bool           `json:"dagDeployEnabled"`
-	AlertEmails      []string       `json:"alertEmails"`
-	Cluster          Cluster        `json:"cluster"`
-	Workspace        Workspace      `json:"workspace"`
-	RuntimeRelease   RuntimeRelease `json:"runtimeRelease"`
-	DeploymentSpec   DeploymentSpec `json:"deploymentSpec"`
-	WorkerQueues     []WorkerQueue  `json:"workerQueues"`
-	CreatedAt        time.Time      `json:"createdAt"`
-	UpdatedAt        time.Time      `json:"updatedAt"`
+	ID                 string         `json:"id"`
+	Label              string         `json:"label"`
+	Description        string         `json:"description"`
+	WebserverStatus    string         `json:"webserverStatus"`
+	Status             string         `json:"status"`
+	ReleaseName        string         `json:"releaseName"`
+	Version            string         `json:"version"`
+	DagDeployEnabled   bool           `json:"dagDeployEnabled"`
+	AlertEmails        []string       `json:"alertEmails"`
+	Cluster            Cluster        `json:"cluster"`
+	Workspace          Workspace      `json:"workspace"`
+	RuntimeRelease     RuntimeRelease `json:"runtimeRelease"`
+	DeploymentSpec     DeploymentSpec `json:"deploymentSpec"`
+	SchedulerSize      string         `json:"schedulerSize"`
+	IsHighAvailability bool           `json:"isHighAvailability"`
+	WorkerQueues       []WorkerQueue  `json:"workerQueues"`
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
 }
 
 // Cluster contains all components of an Astronomer Cluster
@@ -351,13 +353,15 @@ type DeploymentCreateSpec struct {
 }
 
 type UpdateDeploymentInput struct {
-	ID               string               `json:"id"`
-	ClusterID        string               `json:"clusterId"`
-	Label            string               `json:"label"`
-	Description      string               `json:"description"`
-	DagDeployEnabled bool                 `json:"dagDeployEnabled"`
-	DeploymentSpec   DeploymentCreateSpec `json:"deploymentSpec"`
-	WorkerQueues     []WorkerQueue        `json:"workerQueues"`
+	ID                 string               `json:"id"`
+	ClusterID          string               `json:"clusterId"`
+	Label              string               `json:"label"`
+	Description        string               `json:"description"`
+	DagDeployEnabled   bool                 `json:"dagDeployEnabled"`
+	DeploymentSpec     DeploymentCreateSpec `json:"deploymentSpec"`
+	IsHighAvailability bool                 `json:"isHighAvailability"`
+	SchedulerSize      string               `json:"schedulerSize"`
+	WorkerQueues       []WorkerQueue        `json:"workerQueues"`
 }
 
 type DeleteDeploymentInput struct {
