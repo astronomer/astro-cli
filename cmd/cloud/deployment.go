@@ -337,7 +337,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
-		return errors.New("Invalid --high-availability value)")
+		return errors.New("Invalid --high-availability value")
 	}
 
 	// request is to create from a file
@@ -401,7 +401,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
-		return errors.New("Invalid --dag-deploy value)")
+		return errors.New("Invalid --dag-deploy value")
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
