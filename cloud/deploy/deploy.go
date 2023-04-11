@@ -515,6 +515,17 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	defer func() {
+		// remove dags from .dockerignore file if we set it
+		if dagsIgnoreSet {
+			removeDagsFromDockerIgnore(fullpath) //nolint:errcheck
+		}
+		// remove created docker ignore file
+		if dockerIgnoreCreate {
+			os.Remove(fullpath)
+		}
+	}()
+
 	fileExist, _ := fileutil.Exists(fullpath, nil)
 	if !fileExist {
 		// Create a dockerignore file and add the dags folder entry
@@ -548,20 +559,12 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 		return err
 	}
 
-	defer func() {
-		// remove dags from .dockerignore file if we set it
-		if dagsIgnoreSet {
-			removeDagsFromDockerIgnore(fullpath)
-		}
-		// remove created docker ignore file
-		if dockerIgnoreCreate {
-			os.Remove(fullpath)
-		}
-	}()
-
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
-		removeDagsFromDockerIgnore(fullpath)
+		err = removeDagsFromDockerIgnore(fullpath)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

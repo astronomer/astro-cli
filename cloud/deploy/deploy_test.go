@@ -258,6 +258,8 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Mkdir("./testfiles1/", os.ModePerm)
 	fileutil.WriteStringToFile("./testfiles1/Dockerfile", "FROM quay.io/astronomer/astro-runtime:4.2.5")
 	fileutil.WriteStringToFile("./testfiles1/.env", "")
+	fileutil.WriteStringToFile("./testfiles1/.dockerignore", "")
+
 	deployInput = InputDeploy{
 		Path:           "./testfiles1/",
 		RuntimeID:      "",
