@@ -424,6 +424,11 @@ func TestCreate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("success with cloud provider and region", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -451,10 +456,28 @@ func TestCreate(t *testing.T) {
 			Region:        region,
 			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
 		}
-		deploymentCreateInput.DeploymentSpec.Executor = "KubernetesExecutor"
-		defer func() { deploymentCreateInput.DeploymentSpec.Executor = CeleryExecutor }()
+		deploymentCreateInput1 := astro.CreateDeploymentInput{
+			WorkspaceID:           ws,
+			ClusterID:             csID,
+			Label:                 "test-name",
+			Description:           "test-desc",
+			RuntimeReleaseVersion: "4.2.5",
+			DagDeployEnabled:      false,
+			IsHighAvailability:    true,
+			SchedulerSize:         "small",
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor: "KubernetesExecutor",
+				Scheduler: astro.Scheduler{
+					AU:       10,
+					Replicas: 3,
+				},
+			},
+		}
+		defer func() {
+			deploymentCreateInput1.DeploymentSpec.Executor = CeleryExecutor
+		}()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
-		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		mockOKResponse := &astrocore.GetSharedClusterResponse{
@@ -467,7 +490,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", 10, 3, mockClient, mockCoreClient, false)
+		err = Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", 10, 3, mockClient, mockCoreClient, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
@@ -1038,6 +1061,43 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("successfully update schedulerSize and highAvailability", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		deploymentUpdateInput1 := astro.UpdateDeploymentInput{
+			ID:          "test-id",
+			ClusterID:   "",
+			Label:       "",
+			Description: "",
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor:  CeleryExecutor,
+				Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
+			},
+			IsHighAvailability: true,
+			SchedulerSize:      "medium",
+			WorkerQueues: []astro.WorkerQueue{
+				{
+					Name:       "test-queue",
+					IsDefault:  false,
+					NodePoolID: "test-node-pool-id",
+				},
+			},
+		}
+		deploymentUpdateInput2 := astro.UpdateDeploymentInput{
+			ID:                 "test-id",
+			ClusterID:          "",
+			Label:              "test-label",
+			Description:        "test description",
+			IsHighAvailability: false,
+			SchedulerSize:      "small",
+			DeploymentSpec: astro.DeploymentCreateSpec{
+				Executor:  CeleryExecutor,
+				Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
+			},
+			WorkerQueues: nil,
+		}
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1066,7 +1126,7 @@ func TestUpdate(t *testing.T) {
 			},
 		}
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Twice()
-		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("UpdateDeployment", &deploymentUpdateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput2).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
 		// mock os.Stdin

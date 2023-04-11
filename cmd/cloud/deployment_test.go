@@ -359,6 +359,19 @@ deployment:
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
 	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
