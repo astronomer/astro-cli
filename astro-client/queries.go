@@ -21,6 +21,8 @@ var (
 			description
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name
@@ -100,6 +102,8 @@ var (
 			createdAt
 			status
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			runtimeRelease {
 				version
 				airflowVersion
