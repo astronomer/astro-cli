@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +18,18 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
+
+func listenError(network, address string) (net.Listener, error) {
+	return nil, errMock
+}
+
+func listenErrorWebserver(network, address string) (net.Listener, error) {
+	if address == "localhost:8080" {
+		return nil, errMock
+	}
+	var lc net.ListenConfig
+	return lc.Listen(context.Background(), network, address)
+}
 
 var errMock = errors.New("mock error")
 
@@ -436,6 +450,26 @@ func TestAirflowStart(t *testing.T) {
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
 			return nil, errMock
 		}
+
+		err := airflowStart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+
+	t.Run("postgres port in use", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{"test-env-file"}
+
+		listen = listenError
+
+		err := airflowStart(cmd, args)
+		assert.ErrorIs(t, err, errMock)
+	})
+
+	t.Run("webserver port in use", func(t *testing.T) {
+		cmd := newAirflowStartCmd()
+		args := []string{"test-env-file"}
+
+		listen = listenErrorWebserver
 
 		err := airflowStart(cmd, args)
 		assert.ErrorIs(t, err, errMock)
@@ -1157,4 +1191,7 @@ func TestPrepareDefaultAirflowImageTag(t *testing.T) {
 		resp := prepareDefaultAirflowImageTag("", nil)
 		assert.Equal(t, airflowversions.DefaultRuntimeVersion, resp)
 	})
+}
+
+func TestCheckPort(t *testing.T) {
 }
