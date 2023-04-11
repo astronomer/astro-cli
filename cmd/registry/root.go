@@ -209,7 +209,7 @@ func newRegistryAddDagCmd() *cobra.Command {
 			downloadDag(dagId, dagVersion)
 		},
 	}
-	cmd.Flags().StringVar(&dagVersion, "version", "", "Optional DAG Version to Download.")
+	cmd.Flags().StringVar(&dagVersion, "version", "latest", "Optional DAG Version to Download.")
 	return cmd
 }
 
