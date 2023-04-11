@@ -229,7 +229,7 @@ func newRegistryAddProviderCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&providerVersion, "version", "", "Optional Provider Version to add.")
+	cmd.Flags().StringVar(&providerVersion, "version", "latest", "Optional Provider Version to add.")
 	return cmd
 }
 
