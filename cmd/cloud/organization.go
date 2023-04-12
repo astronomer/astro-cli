@@ -25,7 +25,7 @@ var (
 	orgName                            string
 	auditLogsOutputFilePath            string
 	auditLogsEarliestParam             int
-	auditLogsEarliestParamDefaultValue = 90
+	auditLogsEarliestParamDefaultValue = 1
 	shouldDisplayLoginLink             bool
 	role                               string
 	updateRole                         string
@@ -85,11 +85,6 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 		Short:   "Manage your organization audit logs.",
 		Long:    "Manage your organization audit logs.",
 	}
-	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
-	err := cmd.MarkPersistentFlagRequired("organization-name")
-	if err != nil {
-		log.Fatalf("Error marking organization-name flag as required in astro organization audit-logs command: %s", err.Error())
-	}
 	cmd.AddCommand(
 		newOrganizationExportAuditLogs(out),
 	)
@@ -106,9 +101,13 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 			return organizationExportAuditLogs(cmd)
 		},
 	}
+	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
+	err := cmd.MarkPersistentFlagRequired("organization-name")
+	if err != nil {
+		log.Fatalf("Error marking organization-name flag as required in astro organization audit-logs command: %s", err.Error())
+	}
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
-	cmd.Flags().IntVarP(
-		&auditLogsEarliestParam, "earliest", "e", auditLogsEarliestParamDefaultValue,
+	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
 	return cmd
 }
@@ -211,7 +210,7 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 		return err
 	}
 	out := bufio.NewWriter(f)
-
+	fmt.Println("This may take some time depending on how many days are bing exported…")
 	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
 }
 
