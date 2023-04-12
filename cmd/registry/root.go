@@ -97,10 +97,9 @@ func addProviderToRequirementsTxt(name string, version string) {
 	}
 }
 
-func downloadDag(dagId string, dagVersion string) {
-	// TODO - DAG Version Optional
+func downloadDag(dagName string, dagVersion string) {
 	// https://api.astronomer.io/registryV2/v1alpha1/organizations/public/dags?sorts=displayName%3Aasc&limit=1&query=foo
-	filledDagRoute := getDagRoute(dagId, dagVersion)
+	filledDagRoute := getDagRoute(dagName, dagVersion)
 	dagJson := requestAndGetJsonBody(filledDagRoute)
 
 	githubRawSourceUrl, exists := dagJson["githubRawSourceUrl"].(string)
@@ -122,8 +121,8 @@ func downloadDag(dagId string, dagVersion string) {
 	}
 }
 
-func getDagRoute(dagId string, dagVersion string) string {
-	filledDagRoute := fmt.Sprintf(dagRoute, dagId, dagVersion)
+func getDagRoute(dagName string, dagVersion string) string {
+	filledDagRoute := fmt.Sprintf(dagRoute, dagName, dagVersion)
 	getDagUrl := url.URL{
 		Scheme: "https",
 		Host:   registryHost,
@@ -142,18 +141,19 @@ func downloadDagToFile(sourceUrl string, path string) {
 	}
 	resp, err := client.Get(sourceUrl)
 	logFatal(err)
+	//goland:noinspection GoUnhandledErrorResult
 	defer resp.Body.Close()
 	_, err = io.Copy(file, resp.Body)
+	//goland:noinspection GoUnhandledErrorResult
 	defer file.Close()
 	log.Infof("Downloaded file %s from %s", path, sourceUrl)
 }
 
 func newRegistryCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "registry",
-		//Aliases: []string{"r"},
-		Short: "Utilize the Astronomer Registry",
-		Long:  "Utilize the Astronomer Registry to add a DAG or a Provider.",
+		Use:     "registry",
+		Aliases: []string{"r"},
+		Short:   "Utilize the Astronomer Registry",
 	}
 	cmd.AddCommand(
 		newRegistryAddCmd(),
@@ -178,10 +178,8 @@ func newRegistryInitCmd() *cobra.Command {
 
 func newRegistryAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "add",
-		//Aliases: []string{"r"},
-		Short: "Utilize the Astronomer Registry",
-		Long:  "Utilize the Astronomer Registry to add a DAG or a Provider.",
+		Use:     "add",
+		Aliases: []string{"a"},
 	}
 	cmd.AddCommand(
 		newRegistryAddDagCmd(),
@@ -192,21 +190,21 @@ func newRegistryAddCmd() *cobra.Command {
 
 func newRegistryAddDagCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "dag [DAG ID]",
-		//Aliases: []string{"d"},
-		Short: "Utilize the Astronomer Registry to add a DAG",
-		Long:  "Utilize the Astronomer Registry to download a DAG to your local project.",
+		Use:     "dag [DAG ID]",
+		Aliases: []string{"d"},
+		Short:   "Utilize the Astronomer Registry to add a DAG",
+		Long:    "Utilize the Astronomer Registry to download a DAG to your local project.",
 		Run: func(cmd *cobra.Command, args []string) {
-			var dagId string
+			var dagName string
 
-			// if a dagId was provided in the args we use it
+			// if a dagName was provided in the args we use it
 			if len(args) > 0 {
-				dagId = args[0]
+				dagName = args[0]
 			} else {
-				// no dagId was provided so ask the user for it
-				dagId = input.Text("enter DAG ID to download: ")
+				// no dagName was provided so ask the user for it
+				dagName = input.Text("Enter DAG ID to download: ")
 			}
-			downloadDag(dagId, dagVersion)
+			downloadDag(dagName, dagVersion)
 		},
 	}
 	cmd.Flags().StringVar(&dagVersion, "version", "latest", "Optional DAG Version to Download.")
@@ -218,13 +216,13 @@ func newRegistryAddProviderCmd() *cobra.Command {
 		Use: "provider [PROVIDER]",
 		//Aliases: []string{"p"},
 		Short: "Utilize the Astronomer Registry to add a Provider",
-		Long:  "Utilize the Astronomer Registry to download a Provider like Snowflake to your project's dependencies.",
+		Long:  "Utilize the Astronomer Registry to download a Provider like Snowflake or Great Expectations to your project's dependencies.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) > 0 {
 				providerName := args[0]
 				addProviderByName(providerName)
 			} else {
-				providerName := input.Text("enter Provider ID to download: ")
+				providerName := input.Text("Enter Provider ID to download: ")
 				addProviderByName(providerName)
 			}
 		},
@@ -255,7 +253,7 @@ func main() {
 	addProviderByName(providerName)
 
 	log.Info(aurora.Bold(aurora.Cyan("DEMO: ADDING DAG BY NAME AND VERSION")))
-	const dagId = "sagemaker-batch-inference"
+	const dagName = "sagemaker-batch-inference"
 	const dagVersion = "1.0.1"
-	downloadDag(dagId, dagVersion)
+	downloadDag(dagName, dagVersion)
 }
