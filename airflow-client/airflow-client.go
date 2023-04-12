@@ -35,9 +35,7 @@ func NewAirflowClient(c *httputil.HTTPClient) *HTTPClient {
 		c,
 	}
 }
-
 func (c *HTTPClient) GetConnections(airflowURL string) (Response, error) {
-
 	doOpts := &httputil.DoOptions{
 		Path:   "https://" + airflowURL + "/api/v1/connections",
 		Method: http.MethodGet,
@@ -90,9 +88,7 @@ func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error
 
 	return nil
 }
-
 func (c *HTTPClient) GetVariables(airflowURL string) (Response, error) {
-
 	doOpts := &httputil.DoOptions{
 		Path:   "https://" + airflowURL + "/api/v1/variables",
 		Method: http.MethodGet,
@@ -145,9 +141,7 @@ func (c *HTTPClient) UpdateVariable(airflowURL string, variable Variable) error 
 
 	return nil
 }
-
 func (c *HTTPClient) GetPools(airflowURL string) (Response, error) {
-
 	doOpts := &httputil.DoOptions{
 		Path:   "https://" + airflowURL + "/api/v1/pools",
 		Method: http.MethodGet,
@@ -217,10 +211,11 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	// Check the response status code
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Unexpected response status code: %d", response.StatusCode)
+		return nil, fmt.Errorf("Unexpected response status code: %w", fmt.Errorf("%d", response.StatusCode))
 	}
 
 	decode := Response{}
@@ -230,5 +225,4 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	}
 
 	return &decode, nil
-
 }

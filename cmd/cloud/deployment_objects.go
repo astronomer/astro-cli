@@ -392,6 +392,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.ConnectionUpdate(airlfowURL, connID, connType, description, host, login, password, schema, extra, port, airflowAPIClient, out)
 }
 
+//nolint:dupl
 func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {

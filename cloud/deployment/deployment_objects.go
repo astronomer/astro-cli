@@ -97,7 +97,7 @@ func CopyConnection(fromAirflowURL, toAirflowURL string, airflowAPIClient airflo
 	if err != nil {
 		return err
 	}
-	var toConnIds []string
+	toConnIds := make([]string, 0, len(toConnectionResp.Connections))
 	for i := range toConnectionResp.Connections {
 
 		toConnIds = append(toConnIds, toConnectionResp.Connections[i].ConnID)
@@ -118,9 +118,7 @@ func CopyConnection(fromAirflowURL, toAirflowURL string, airflowAPIClient airflo
 				return err
 			}
 		}
-
 	}
-
 	return nil
 }
 
@@ -189,7 +187,7 @@ func CopyVariable(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowc
 	if err != nil {
 		return err
 	}
-	var toVarKeys []string
+	toVarKeys := make([]string, 0, len(toVariableResp.Variables))
 	for i := range toVariableResp.Variables {
 
 		toVarKeys = append(toVarKeys, toVariableResp.Variables[i].Key)
@@ -210,9 +208,7 @@ func CopyVariable(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowc
 				return err
 			}
 		}
-
 	}
-
 	return nil
 }
 
@@ -281,7 +277,7 @@ func CopyPool(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclien
 	if err != nil {
 		return err
 	}
-	var toPoolKeys []string
+	toPoolKeys := make([]string, 0, len(toPoolResp.Pools))
 	for i := range toPoolResp.Pools {
 
 		toPoolKeys = append(toPoolKeys, toPoolResp.Pools[i].Name)
@@ -302,8 +298,6 @@ func CopyPool(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclien
 				return err
 			}
 		}
-
 	}
-
 	return nil
 }
