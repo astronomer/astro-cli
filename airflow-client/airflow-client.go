@@ -219,7 +219,7 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	// Check the response status code
 	if response.StatusCode != http.StatusOK {
 		//nolint:goerr113
-		return nil, fmt.Errorf("Unexpected response status code: %d", response.StatusCode)
+		return nil, fmt.Errorf("unexpected response status code: %d", response.StatusCode)
 	}
 
 	decode := Response{}

@@ -180,6 +180,7 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 		"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 	}
 }
+
 func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, requestedField string) (value any, err error) {
 	var (
 		requestedDeployment                                                        astro.Deployment
