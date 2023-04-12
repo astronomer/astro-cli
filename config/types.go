@@ -27,6 +27,8 @@ type cfgs struct {
 	PostgresPassword      cfg
 	PostgresHost          cfg
 	PostgresPort          cfg
+	PostgresRepository    cfg
+	PostgresTag           cfg
 	ProjectName           cfg
 	ProjectDeployment     cfg
 	ProjectWorkspace      cfg
