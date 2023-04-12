@@ -12,8 +12,8 @@ import (
 type Client interface {
 	// connections
 	GetConnections(airflowURL string) (Response, error)
-	CreateConnection(airflowURL string, conn Connection) error
-	UpdateConnection(airflowURL string, conn Connection) error
+	CreateConnection(airflowURL string, conn *Connection) error
+	UpdateConnection(airflowURL string, conn *Connection) error
 	// variables
 	GetVariables(airflowURL string) (Response, error)
 	CreateVariable(airflowURL string, variable Variable) error
@@ -51,9 +51,9 @@ func (c *HTTPClient) GetConnections(airflowURL string) (Response, error) {
 	return *response, nil
 }
 
-func (c *HTTPClient) CreateConnection(airflowURL string, conn Connection) error {
+func (c *HTTPClient) CreateConnection(airflowURL string, conn *Connection) error {
 	// Convert the connection struct to JSON bytes
-	connJSON, err := json.Marshal(conn)
+	connJSON, err := json.Marshal(&conn)
 	if err != nil {
 		return err
 	}
@@ -70,9 +70,9 @@ func (c *HTTPClient) CreateConnection(airflowURL string, conn Connection) error 
 	return nil
 }
 
-func (c *HTTPClient) UpdateConnection(airflowURL string, conn Connection) error {
+func (c *HTTPClient) UpdateConnection(airflowURL string, conn *Connection) error {
 	// Convert the connection struct to JSON bytes
-	connJSON, err := json.Marshal(conn)
+	connJSON, err := json.Marshal(&conn)
 	if err != nil {
 		return err
 	}

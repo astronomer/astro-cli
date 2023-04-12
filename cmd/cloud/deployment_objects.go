@@ -28,6 +28,8 @@ var (
 	slots              int
 )
 
+const requestString = "metadata.webserver_url"
+
 func newDeploymentConnectionRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "connection",
@@ -60,6 +62,7 @@ func newDeploymentConnectionListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -85,6 +88,7 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -110,6 +114,7 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
@@ -160,6 +165,7 @@ func newDeploymentAirflowVariableListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -179,6 +185,7 @@ func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -198,6 +205,7 @@ func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
@@ -248,6 +256,7 @@ func newDeploymentPoolListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
@@ -267,6 +276,7 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -286,6 +296,7 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+//nolint:dupl
 func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
@@ -313,7 +324,7 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -334,7 +345,7 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -364,7 +375,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -390,7 +401,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get To Airflow URls
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should connections be copied from?")
@@ -423,7 +434,7 @@ func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -444,7 +455,7 @@ func deploymentAirflowVariableCreate(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -474,7 +485,7 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -491,6 +502,7 @@ func deploymentAirflowVariableUpdate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.VariableUpdate(airlfowURL, varValue, key, description, airflowAPIClient, out)
 }
 
+//nolint:dupl
 func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -500,7 +512,7 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get To Airflow URls
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should airflow variables be copied from?")
@@ -533,7 +545,7 @@ func deploymentPoolList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -554,7 +566,7 @@ func deploymentPoolCreate(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -580,7 +592,7 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
@@ -597,6 +609,7 @@ func deploymentPoolUpdate(cmd *cobra.Command, out io.Writer) error {
 	return deployment.PoolUpdate(airlfowURL, name, description, slots, airflowAPIClient, out)
 }
 
+//nolint:dupl
 func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -606,7 +619,7 @@ func deploymentPoolCopy(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	requestedField = "metadata.webserver_url"
+	requestedField = requestString
 	// get To Airflow URls
 	if fromDeploymentName == "" && fromDeploymentID == "" {
 		fmt.Println("Which deployment should pools be copied from?")

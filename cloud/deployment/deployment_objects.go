@@ -54,9 +54,9 @@ func ConnectionCreate(airflowURL, connID, connType, description, host, login, pa
 		Extra:       extra,
 	}
 
-	//create connections
+	// create connections
 	fmt.Printf("Creating connection %s\n", connID)
-	err := airflowAPIClient.CreateConnection(airflowURL, connection)
+	err := airflowAPIClient.CreateConnection(airflowURL, &connection)
 	if err != nil {
 		return err
 	}
@@ -76,17 +76,18 @@ func ConnectionUpdate(airflowURL, connID, connType, description, host, login, pa
 		Extra:       extra,
 	}
 
-	//update connection
+	// update connection
 	fmt.Printf("updating connection %s\n", connID)
-	err := airflowAPIClient.UpdateConnection(airflowURL, connection)
+	err := airflowAPIClient.UpdateConnection(airflowURL, &connection)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+//nolint:dupl
 func CopyConnection(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
-	// get connectons from orginal Deployment
+	// get connectons from original Deployment
 	fromConnectionResp, err := airflowAPIClient.GetConnections(fromAirflowURL)
 	if err != nil {
 		return err
@@ -107,12 +108,12 @@ func CopyConnection(fromAirflowURL, toAirflowURL string, airflowAPIClient airflo
 		fmt.Printf("Copying Connecton %s\n", fromConnectionResp.Connections[i].ConnID)
 		// create or update connection
 		if util.Contains(toConnIds, fromConnectionResp.Connections[i].ConnID) {
-			err = airflowAPIClient.UpdateConnection(toAirflowURL, fromConnectionResp.Connections[i])
+			err = airflowAPIClient.UpdateConnection(toAirflowURL, &fromConnectionResp.Connections[i])
 			if err != nil {
 				return err
 			}
 		} else {
-			err = airflowAPIClient.CreateConnection(toAirflowURL, fromConnectionResp.Connections[i])
+			err = airflowAPIClient.CreateConnection(toAirflowURL, &fromConnectionResp.Connections[i])
 			if err != nil {
 				return err
 			}
@@ -151,7 +152,7 @@ func VariableCreate(airflowURL, value, key, description string, airflowAPIClient
 		Description: description,
 	}
 
-	//create connections
+	// create connections
 	fmt.Printf("Creating variable %s\n", variable.Key)
 	err := airflowAPIClient.CreateVariable(airflowURL, variable)
 	if err != nil {
@@ -167,7 +168,7 @@ func VariableUpdate(airflowURL, value, key, description string, airflowAPIClient
 		Description: description,
 	}
 
-	//update connection
+	// update connection
 	fmt.Printf("updating variable %s\n", variable.Key)
 	err := airflowAPIClient.UpdateVariable(airflowURL, variable)
 	if err != nil {
@@ -176,8 +177,9 @@ func VariableUpdate(airflowURL, value, key, description string, airflowAPIClient
 	return nil
 }
 
+//nolint:dupl
 func CopyVariable(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
-	// get variables from orginal Deployment
+	// get variables from original Deployment
 	fromVariableResp, err := airflowAPIClient.GetVariables(fromAirflowURL)
 	if err != nil {
 		return err
@@ -242,7 +244,7 @@ func PoolCreate(airflowURL, name, description string, slots int, airflowAPIClien
 		Description: description,
 	}
 
-	//create connections
+	// create connections
 	fmt.Printf("Creating pool %s\n", pool.Name)
 	err := airflowAPIClient.CreatePool(airflowURL, pool)
 	if err != nil {
@@ -258,7 +260,7 @@ func PoolUpdate(airflowURL, name, description string, slots int, airflowAPIClien
 		Description: description,
 	}
 
-	//update connection
+	// update connection
 	fmt.Printf("updating pool %s\n", pool.Name)
 	err := airflowAPIClient.UpdatePool(airflowURL, pool)
 	if err != nil {
@@ -267,8 +269,9 @@ func PoolUpdate(airflowURL, name, description string, slots int, airflowAPIClien
 	return nil
 }
 
+//nolint:dupl
 func CopyPool(fromAirflowURL, toAirflowURL string, airflowAPIClient airflowclient.Client, out io.Writer) error {
-	// get Pools from orginal Deployment
+	// get Pools from original Deployment
 	fromPoolResp, err := airflowAPIClient.GetPools(fromAirflowURL)
 	if err != nil {
 		return err

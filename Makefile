@@ -55,6 +55,9 @@ mock_airflow:
 	mockery --filename=DockerCLIClient.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerCLIClient
 
 mock_astro:
+	mockery --filename=Client.go --output=airflow-client/mocks --dir=airflow-client --outpkg=airflow_mocks --name Client
+
+mock_astro:
 	mockery --filename=Client.go --output=astro-client/mocks --dir=astro-client --outpkg=astro_mocks --name Client
 
 mock_astro_core:
