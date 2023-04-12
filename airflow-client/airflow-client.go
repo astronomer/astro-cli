@@ -7,7 +7,6 @@ import (
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/pkg/errors"
 )
 
 type Client interface {
@@ -219,7 +218,8 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 
 	// Check the response status code
 	if response.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(err, "Unexpected response status code : %w", fmt.Errorf("%d", response.StatusCode))
+		//nolint:goerr113
+		return nil, fmt.Errorf("Unexpected response status code: %d", response.StatusCode)
 	}
 
 	decode := Response{}

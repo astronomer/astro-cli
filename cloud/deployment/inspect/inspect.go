@@ -181,7 +181,6 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	}
 }
 func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, requestedField string) (value any, err error) {
-
 	var (
 		requestedDeployment                                                        astro.Deployment
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
