@@ -24,13 +24,12 @@ core_api_gen:
     ifeq (, $(shell which oapi-codegen))
 	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
     endif
-	oapi-codegen -include-tags=User,Organization,Invite -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
+	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
 	make mock_astro_core
 
 test:
-	go mod download
-	go install github.com/onsi/ginkgo/ginkgo@v1.12.0
-	ginkgo --skipPackage=e2e -r -v --cover --covermode atomic --coverprofile=coverage.txt
+	go test -count=1 -cover $(shell go list ./... | grep -v e2e)
+    go test -coverprofile=coverage.txt -covermode=atomic $(shell go list ./... | grep -v e2e)
 
 e2e_test:
 	go test -count=1 $(shell go list ./... | grep e2e)

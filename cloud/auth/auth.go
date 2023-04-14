@@ -269,7 +269,8 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 	}
 	activeOrgID := c.Organization
 	// fetch all orgs that the user can access
-	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background())
+	organizationListParams := &astrocore.ListOrganizationsParams{}
+	orgsResp, err := coreClient.ListOrganizationsWithResponse(http_context.Background(), organizationListParams)
 	if err != nil {
 		return err
 	}
