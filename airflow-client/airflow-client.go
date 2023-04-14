@@ -2,6 +2,7 @@ package airflowclient
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -225,7 +226,7 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	decode := Response{}
 	err = json.NewDecoder(response.Body).Decode(&decode)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to decode response from API")
 	}
 
 	return &decode, nil

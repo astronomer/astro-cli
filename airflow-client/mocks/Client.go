@@ -13,11 +13,11 @@ type Client struct {
 }
 
 // CreateConnection provides a mock function with given fields: airflowURL, conn
-func (_m *Client) CreateConnection(airflowURL string, conn airflowclient.Connection) error {
+func (_m *Client) CreateConnection(airflowURL string, conn *airflowclient.Connection) error {
 	ret := _m.Called(airflowURL, conn)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, airflowclient.Connection) error); ok {
+	if rf, ok := ret.Get(0).(func(string, *airflowclient.Connection) error); ok {
 		r0 = rf(airflowURL, conn)
 	} else {
 		r0 = ret.Error(0)
@@ -127,11 +127,11 @@ func (_m *Client) GetVariables(airflowURL string) (airflowclient.Response, error
 }
 
 // UpdateConnection provides a mock function with given fields: airflowURL, conn
-func (_m *Client) UpdateConnection(airflowURL string, conn airflowclient.Connection) error {
+func (_m *Client) UpdateConnection(airflowURL string, conn *airflowclient.Connection) error {
 	ret := _m.Called(airflowURL, conn)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, airflowclient.Connection) error); ok {
+	if rf, ok := ret.Get(0).(func(string, *airflowclient.Connection) error); ok {
 		r0 = rf(airflowURL, conn)
 	} else {
 		r0 = ret.Error(0)
