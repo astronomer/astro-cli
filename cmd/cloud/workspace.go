@@ -70,8 +70,8 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "create an Astro Workspace",
-		Long:    "create an Astro Workspace",
+		Short:   "Create an Astro Workspace",
+		Long:    "Create an Astro Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceCreate(cmd, out)
 		},
@@ -86,8 +86,8 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [workspace_id]",
 		Aliases: []string{"up"},
-		Short:   "update an Astro Workspace",
-		Long:    "update an Astro Workspace",
+		Short:   "Update an Astro Workspace",
+		Long:    "Update an Astro Workspace",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUpdate(cmd, out, args)
@@ -102,9 +102,9 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [workspace_id]",
-		Aliases: []string{"up"},
-		Short:   "delete an Astro Workspace",
-		Long:    "delete an Astro Workspace",
+		Aliases: []string{"de"},
+		Short:   "Delete an Astro Workspace",
+		Long:    "Delete an Astro Workspace",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(cmd, out, args)

@@ -21,7 +21,6 @@ import (
 var (
 	errInvalidWorkspaceKey = errors.New("invalid workspace selection")
 	ErrInvalidName         = errors.New("no name provided for the workspace. Retry with a valid name")
-	ErrInvalidWorkspaceKey = errors.New("invalid Workspace selected")
 	ErrWorkspaceNotFound   = errors.New("no workspace was found for the ID you provided")
 	ErrWrongEnforceInput   = errors.New("the input to the `--enforce-cicd` flag")
 )
@@ -343,7 +342,7 @@ func selectWorkspace(workspaces []astrocore.Workspace) (astrocore.Workspace, err
 	choice := input.Text("\n> ")
 	selected, ok := workspaceMap[choice]
 	if !ok {
-		return astrocore.Workspace{}, ErrInvalidWorkspaceKey
+		return astrocore.Workspace{}, errInvalidWorkspaceKey
 	}
 	return selected, nil
 }
