@@ -21,6 +21,8 @@ var (
 			description
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name
@@ -100,6 +102,8 @@ var (
 			createdAt
 			status
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			runtimeRelease {
 				version
 				airflowVersion
@@ -203,6 +207,32 @@ var (
 		runtimeReleases {
 			channel
 			version
+		}
+		astroMachines {
+			concurrentTasks
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultAstroMachine {
+			concurrentTasks
+			cpu
+			memory
+			nodePoolType
+			storageSize
+			type
+		}
+		defaultSchedulerSize {
+			cpu
+			memory
+			size
+		}
+		schedulerSizes {
+			cpu
+			memory
+			size
 		}
 	  }
 	}

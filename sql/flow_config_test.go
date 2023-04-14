@@ -99,3 +99,21 @@ func TestGetPythonSDKCompatabilitySuccess(t *testing.T) {
 	assert.Equal(t, ">=8.0.0, <8.1.0", astroRuntime)
 	assert.Equal(t, ">=1.3.0, <1.5", astroSdkPython)
 }
+
+func TestGetPythonSDKCompatabilityNoVersionMatch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"baseDockerImage": "quay.io/astronomer/astro-runtime:6.0.4-base",
+			"compatibility": {
+			  "0.1": {
+				"astroRuntimeVersion": ">=8.0.0, <8.1.0",
+				"astroSDKPythonVersion": ">=1.3.0, <1.5"
+			  }
+			}
+		}`))
+	}))
+	_, _, err := GetPythonSDKComptability(server.URL, "0.1.0")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "could not find a matching SQL CLI compatibility version")
+}

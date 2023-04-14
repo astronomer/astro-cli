@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/organization"
 )
 
 type deploymentMetadata struct {
@@ -78,7 +79,8 @@ var (
 )
 
 const (
-	jsonFormat = "json"
+	jsonFormat    = "json"
+	notApplicable = "N/A"
 )
 
 func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client astro.Client, out io.Writer, requestedField string, template bool) error {
@@ -89,7 +91,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
 	if err != nil {
 		return err
 	}
@@ -133,10 +135,14 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 	if err != nil {
 		return nil, err
 	}
+	clusterID := sourceDeployment.Cluster.ID
+	if organization.IsOrgHosted() {
+		clusterID = notApplicable
+	}
 	return map[string]interface{}{
 		"deployment_id":   sourceDeployment.ID,
 		"workspace_id":    sourceDeployment.Workspace.ID,
-		"cluster_id":      sourceDeployment.Cluster.ID,
+		"cluster_id":      clusterID,
 		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
 		"current_tag":     sourceDeployment.DeploymentSpec.Image.Tag,
 		"release_name":    sourceDeployment.ReleaseName,
@@ -149,11 +155,15 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 }
 
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
+	clusterName := sourceDeployment.Cluster.Name
+	if organization.IsOrgHosted() {
+		clusterName = notApplicable
+	}
 	return map[string]interface{}{
 		"name":               sourceDeployment.Label,
 		"description":        sourceDeployment.Description,
 		"workspace_name":     sourceDeployment.Workspace.Label,
-		"cluster_name":       sourceDeployment.Cluster.Name,
+		"cluster_name":       clusterName,
 		"runtime_version":    sourceDeployment.RuntimeRelease.Version,
 		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
 		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,

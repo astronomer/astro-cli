@@ -10,9 +10,12 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
@@ -119,11 +122,48 @@ func TestDeploymentCreate(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
-	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Times(4)
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(4)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+		Components: astro.Components{
+			Scheduler: astro.SchedulerConfig{
+				AU: astro.AuConfig{
+					Default: 5,
+					Limit:   24,
+				},
+				Replicas: astro.ReplicasConfig{
+					Default: 1,
+					Minimum: 1,
+					Limit:   4,
+				},
+			},
+		},
+		RuntimeReleases: []astro.RuntimeRelease{
+			{
+				Version: "4.2.5",
+			},
+		},
+	}, nil).Times(10)
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Times(5)
 	mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
-	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(3)
+	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(6)
+	deploymentCreateInput2 := astro.CreateDeploymentInput{
+		WorkspaceID:           ws,
+		ClusterID:             csID,
+		Label:                 "test-name",
+		Description:           "",
+		RuntimeReleaseVersion: "4.2.5",
+		DagDeployEnabled:      false,
+		SchedulerSize:         "small",
+		IsHighAvailability:    false,
+		DeploymentSpec: astro.DeploymentCreateSpec{
+			Executor: "CeleryExecutor",
+			Scheduler: astro.Scheduler{
+				AU:       5,
+				Replicas: 1,
+			},
+		},
+	}
+	mockClient.On("CreateDeployment", &deploymentCreateInput2).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
 	mockResponse := &airflowversions.Response{
@@ -296,6 +336,68 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorIs(t, err, errFlag)
 	})
+	t.Run("creates a deployment with cloud provider and region", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		mockOKResponse := &astrocore.GetSharedClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.SharedCluster{Id: csID},
+		}
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		astroCoreClient = mockCoreClient
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(mockOKResponse, nil).Once()
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--cloud-provider", "gcp", "--region", "us-central1",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
+	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "azure",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "azure is not a valid cloud provider. It can only be gcp")
+	})
+	t.Run("returns an error if cloud provider is valid but region was not provided", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "region must be specified with --cloud-provider")
+	})
 	mockClient.AssertExpectations(t)
 }
 
@@ -322,6 +424,26 @@ func TestDeploymentUpdate(t *testing.T) {
 	}
 
 	mockClient := new(astro_mocks.Client)
+	mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+		Components: astro.Components{
+			Scheduler: astro.SchedulerConfig{
+				AU: astro.AuConfig{
+					Default: 5,
+					Limit:   24,
+				},
+				Replicas: astro.ReplicasConfig{
+					Default: 1,
+					Minimum: 1,
+					Limit:   4,
+				},
+			},
+		},
+		RuntimeReleases: []astro.RuntimeRelease{
+			{
+				Version: "4.2.5",
+			},
+		},
+	}, nil).Once()
 	mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
@@ -447,7 +569,6 @@ deployment:
 				Default: 180,
 			},
 		}
-		mockClient = new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return(clusters, nil)
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
@@ -476,6 +597,55 @@ deployment:
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorIs(t, err, errFlag)
+	})
+	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		deploymentResp := astro.Deployment{
+			ID:             "test-id",
+			Label:          "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{Executor: "CeleryExecutor", Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+		}
+
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
 	mockClient.AssertExpectations(t)
 }
@@ -639,6 +809,17 @@ func TestIsValidExecutor(t *testing.T) {
 	})
 	t.Run("returns false for any invalid executor", func(t *testing.T) {
 		actual := isValidExecutor("KubeExecutor")
+		assert.False(t, actual)
+	})
+}
+
+func TestIsValidCloudProvider(t *testing.T) {
+	t.Run("returns true if cloudProvider is GCP", func(t *testing.T) {
+		actual := isValidCloudProvider("gcp")
+		assert.True(t, actual)
+	})
+	t.Run("returns false if cloudProvider is not GCP", func(t *testing.T) {
+		actual := isValidCloudProvider("azure")
 		assert.False(t, actual)
 	})
 }

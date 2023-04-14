@@ -27,6 +27,84 @@ const (
 	USER       BasicSubjectProfileSubjectType = "USER"
 )
 
+// Defines values for ClusterCloudProvider.
+const (
+	ClusterCloudProviderAws   ClusterCloudProvider = "aws"
+	ClusterCloudProviderAzure ClusterCloudProvider = "azure"
+	ClusterCloudProviderGcp   ClusterCloudProvider = "gcp"
+)
+
+// Defines values for ClusterStatus.
+const (
+	ClusterStatusCREATED      ClusterStatus = "CREATED"
+	ClusterStatusCREATEFAILED ClusterStatus = "CREATE_FAILED"
+	ClusterStatusCREATING     ClusterStatus = "CREATING"
+	ClusterStatusDELETED      ClusterStatus = "DELETED"
+	ClusterStatusDELETEFAILED ClusterStatus = "DELETE_FAILED"
+	ClusterStatusDELETING     ClusterStatus = "DELETING"
+	ClusterStatusFORCEDELETED ClusterStatus = "FORCE_DELETED"
+	ClusterStatusUPDATING     ClusterStatus = "UPDATING"
+)
+
+// Defines values for ClusterType.
+const (
+	ClusterTypeBRINGYOUROWNCLOUD ClusterType = "BRING_YOUR_OWN_CLOUD"
+	ClusterTypeHOSTED            ClusterType = "HOSTED"
+	ClusterTypeSHARED            ClusterType = "SHARED"
+	ClusterTypeVIRTUALRUNTIMES   ClusterType = "VIRTUAL_RUNTIMES"
+)
+
+// Defines values for ClusterDetailedCloudProvider.
+const (
+	ClusterDetailedCloudProviderAws   ClusterDetailedCloudProvider = "aws"
+	ClusterDetailedCloudProviderAzure ClusterDetailedCloudProvider = "azure"
+	ClusterDetailedCloudProviderGcp   ClusterDetailedCloudProvider = "gcp"
+)
+
+// Defines values for ClusterDetailedStatus.
+const (
+	ClusterDetailedStatusCREATED      ClusterDetailedStatus = "CREATED"
+	ClusterDetailedStatusCREATEFAILED ClusterDetailedStatus = "CREATE_FAILED"
+	ClusterDetailedStatusCREATING     ClusterDetailedStatus = "CREATING"
+	ClusterDetailedStatusDELETED      ClusterDetailedStatus = "DELETED"
+	ClusterDetailedStatusDELETEFAILED ClusterDetailedStatus = "DELETE_FAILED"
+	ClusterDetailedStatusDELETING     ClusterDetailedStatus = "DELETING"
+	ClusterDetailedStatusFORCEDELETED ClusterDetailedStatus = "FORCE_DELETED"
+	ClusterDetailedStatusUPDATING     ClusterDetailedStatus = "UPDATING"
+)
+
+// Defines values for ClusterDetailedType.
+const (
+	ClusterDetailedTypeBRINGYOUROWNCLOUD ClusterDetailedType = "BRING_YOUR_OWN_CLOUD"
+	ClusterDetailedTypeHOSTED            ClusterDetailedType = "HOSTED"
+	ClusterDetailedTypeSHARED            ClusterDetailedType = "SHARED"
+	ClusterDetailedTypeVIRTUALRUNTIMES   ClusterDetailedType = "VIRTUAL_RUNTIMES"
+)
+
+// Defines values for CreateAwsClusterRequestType.
+const (
+	CreateAwsClusterRequestTypeBRINGYOUROWNCLOUD CreateAwsClusterRequestType = "BRING_YOUR_OWN_CLOUD"
+	CreateAwsClusterRequestTypeHOSTED            CreateAwsClusterRequestType = "HOSTED"
+	CreateAwsClusterRequestTypeSHARED            CreateAwsClusterRequestType = "SHARED"
+	CreateAwsClusterRequestTypeVIRTUALRUNTIMES   CreateAwsClusterRequestType = "VIRTUAL_RUNTIMES"
+)
+
+// Defines values for CreateAzureClusterRequestType.
+const (
+	CreateAzureClusterRequestTypeBRINGYOUROWNCLOUD CreateAzureClusterRequestType = "BRING_YOUR_OWN_CLOUD"
+	CreateAzureClusterRequestTypeHOSTED            CreateAzureClusterRequestType = "HOSTED"
+	CreateAzureClusterRequestTypeSHARED            CreateAzureClusterRequestType = "SHARED"
+	CreateAzureClusterRequestTypeVIRTUALRUNTIMES   CreateAzureClusterRequestType = "VIRTUAL_RUNTIMES"
+)
+
+// Defines values for CreateGcpClusterRequestType.
+const (
+	CreateGcpClusterRequestTypeBRINGYOUROWNCLOUD CreateGcpClusterRequestType = "BRING_YOUR_OWN_CLOUD"
+	CreateGcpClusterRequestTypeHOSTED            CreateGcpClusterRequestType = "HOSTED"
+	CreateGcpClusterRequestTypeSHARED            CreateGcpClusterRequestType = "SHARED"
+	CreateGcpClusterRequestTypeVIRTUALRUNTIMES   CreateGcpClusterRequestType = "VIRTUAL_RUNTIMES"
+)
+
 // Defines values for CreateManagedDomainRequestEnforcedLogins.
 const (
 	CreateManagedDomainRequestEnforcedLoginsGithub   CreateManagedDomainRequestEnforcedLogins = "github"
@@ -64,6 +142,25 @@ const (
 	OrganizationProductTierSTANDARD         OrganizationProductTier = "STANDARD"
 )
 
+// Defines values for SharedClusterCloudProvider.
+const (
+	SharedClusterCloudProviderAws   SharedClusterCloudProvider = "aws"
+	SharedClusterCloudProviderAzure SharedClusterCloudProvider = "azure"
+	SharedClusterCloudProviderGcp   SharedClusterCloudProvider = "gcp"
+)
+
+// Defines values for SharedClusterStatus.
+const (
+	SharedClusterStatusCREATED      SharedClusterStatus = "CREATED"
+	SharedClusterStatusCREATEFAILED SharedClusterStatus = "CREATE_FAILED"
+	SharedClusterStatusCREATING     SharedClusterStatus = "CREATING"
+	SharedClusterStatusDELETED      SharedClusterStatus = "DELETED"
+	SharedClusterStatusDELETEFAILED SharedClusterStatus = "DELETE_FAILED"
+	SharedClusterStatusDELETING     SharedClusterStatus = "DELETING"
+	SharedClusterStatusFORCEDELETED SharedClusterStatus = "FORCE_DELETED"
+	SharedClusterStatusUPDATING     SharedClusterStatus = "UPDATING"
+)
+
 // Defines values for SsoConnectionConfigStrategy.
 const (
 	Samlp SsoConnectionConfigStrategy = "samlp"
@@ -99,6 +196,13 @@ const (
 	UpdateManagedDomainRequestEnforcedLoginsGoogle   UpdateManagedDomainRequestEnforcedLogins = "google"
 	UpdateManagedDomainRequestEnforcedLoginsPassword UpdateManagedDomainRequestEnforcedLogins = "password"
 	UpdateManagedDomainRequestEnforcedLoginsSso      UpdateManagedDomainRequestEnforcedLogins = "sso"
+)
+
+// Defines values for GetSharedClusterParamsCloudProvider.
+const (
+	GetSharedClusterParamsCloudProviderAws   GetSharedClusterParamsCloudProvider = "aws"
+	GetSharedClusterParamsCloudProviderAzure GetSharedClusterParamsCloudProvider = "azure"
+	GetSharedClusterParamsCloudProviderGcp   GetSharedClusterParamsCloudProvider = "gcp"
 )
 
 // Defines values for ListOrganizationsParamsTrialStatus.
@@ -144,6 +248,65 @@ const (
 	ListOrganizationsParamsSortsUpdatedAtDesc     ListOrganizationsParamsSorts = "updatedAt:desc"
 )
 
+// Defines values for ListClustersParamsProvider.
+const (
+	Aws   ListClustersParamsProvider = "aws"
+	Azure ListClustersParamsProvider = "azure"
+	Gcp   ListClustersParamsProvider = "gcp"
+)
+
+// Defines values for ListClustersParamsType.
+const (
+	ListClustersParamsTypeBRINGYOUROWNCLOUD ListClustersParamsType = "BRING_YOUR_OWN_CLOUD"
+	ListClustersParamsTypeHOSTED            ListClustersParamsType = "HOSTED"
+	ListClustersParamsTypeSHARED            ListClustersParamsType = "SHARED"
+	ListClustersParamsTypeVIRTUALRUNTIMES   ListClustersParamsType = "VIRTUAL_RUNTIMES"
+)
+
+// Defines values for ListClustersParamsStatus.
+const (
+	ListClustersParamsStatusCREATED      ListClustersParamsStatus = "CREATED"
+	ListClustersParamsStatusCREATEFAILED ListClustersParamsStatus = "CREATE_FAILED"
+	ListClustersParamsStatusCREATING     ListClustersParamsStatus = "CREATING"
+	ListClustersParamsStatusDELETED      ListClustersParamsStatus = "DELETED"
+	ListClustersParamsStatusDELETEFAILED ListClustersParamsStatus = "DELETE_FAILED"
+	ListClustersParamsStatusDELETING     ListClustersParamsStatus = "DELETING"
+	ListClustersParamsStatusFORCEDELETED ListClustersParamsStatus = "FORCE_DELETED"
+	ListClustersParamsStatusUPDATING     ListClustersParamsStatus = "UPDATING"
+)
+
+// Defines values for ListClustersParamsSorts.
+const (
+	ListClustersParamsSortsCloudProviderAsc        ListClustersParamsSorts = "cloudProvider:asc"
+	ListClustersParamsSortsCloudProviderDesc       ListClustersParamsSorts = "cloudProvider:desc"
+	ListClustersParamsSortsCreatedAtAsc            ListClustersParamsSorts = "createdAt:asc"
+	ListClustersParamsSortsCreatedAtDesc           ListClustersParamsSorts = "createdAt:desc"
+	ListClustersParamsSortsDbInstanceTypeAsc       ListClustersParamsSorts = "dbInstanceType:asc"
+	ListClustersParamsSortsDbInstanceTypeDesc      ListClustersParamsSorts = "dbInstanceType:desc"
+	ListClustersParamsSortsIdAsc                   ListClustersParamsSorts = "id:asc"
+	ListClustersParamsSortsIdDesc                  ListClustersParamsSorts = "id:desc"
+	ListClustersParamsSortsNameAsc                 ListClustersParamsSorts = "name:asc"
+	ListClustersParamsSortsNameDesc                ListClustersParamsSorts = "name:desc"
+	ListClustersParamsSortsOrganizationIdAsc       ListClustersParamsSorts = "organizationId:asc"
+	ListClustersParamsSortsOrganizationIdDesc      ListClustersParamsSorts = "organizationId:desc"
+	ListClustersParamsSortsPodSubnetRangeAsc       ListClustersParamsSorts = "podSubnetRange:asc"
+	ListClustersParamsSortsPodSubnetRangeDesc      ListClustersParamsSorts = "podSubnetRange:desc"
+	ListClustersParamsSortsProviderAccountAsc      ListClustersParamsSorts = "providerAccount:asc"
+	ListClustersParamsSortsProviderAccountDesc     ListClustersParamsSorts = "providerAccount:desc"
+	ListClustersParamsSortsRegionAsc               ListClustersParamsSorts = "region:asc"
+	ListClustersParamsSortsRegionDesc              ListClustersParamsSorts = "region:desc"
+	ListClustersParamsSortsServicePeeringRangeAsc  ListClustersParamsSorts = "servicePeeringRange:asc"
+	ListClustersParamsSortsServicePeeringRangeDesc ListClustersParamsSorts = "servicePeeringRange:desc"
+	ListClustersParamsSortsServiceSubnetRangeAsc   ListClustersParamsSorts = "serviceSubnetRange:asc"
+	ListClustersParamsSortsServiceSubnetRangeDesc  ListClustersParamsSorts = "serviceSubnetRange:desc"
+	ListClustersParamsSortsTemplateVersionAsc      ListClustersParamsSorts = "templateVersion:asc"
+	ListClustersParamsSortsTemplateVersionDesc     ListClustersParamsSorts = "templateVersion:desc"
+	ListClustersParamsSortsUpdatedAtAsc            ListClustersParamsSorts = "updatedAt:asc"
+	ListClustersParamsSortsUpdatedAtDesc           ListClustersParamsSorts = "updatedAt:desc"
+	ListClustersParamsSortsVpcSubnetRangeAsc       ListClustersParamsSorts = "vpcSubnetRange:asc"
+	ListClustersParamsSortsVpcSubnetRangeDesc      ListClustersParamsSorts = "vpcSubnetRange:desc"
+)
+
 // Defines values for ListOrgUsersParamsSorts.
 const (
 	ListOrgUsersParamsSortsCreatedAtAsc  ListOrgUsersParamsSorts = "createdAt:asc"
@@ -180,20 +343,20 @@ const (
 
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	ListWorkspaceUsersParamsSortsIdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
-	ListWorkspaceUsersParamsSortsIdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
-	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	IdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
+	IdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
+	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
@@ -208,6 +371,166 @@ type BasicSubjectProfile struct {
 // BasicSubjectProfileSubjectType defines model for BasicSubjectProfile.SubjectType.
 type BasicSubjectProfileSubjectType string
 
+// Cluster defines model for Cluster.
+type Cluster struct {
+	AppliedTemplateVersion string               `json:"appliedTemplateVersion"`
+	CloudProvider          ClusterCloudProvider `json:"cloudProvider"`
+	CreatedAt              time.Time            `json:"createdAt"`
+	DbInstanceType         string               `json:"dbInstanceType"`
+	DeletedAt              *string              `json:"deletedAt,omitempty"`
+	Id                     string               `json:"id"`
+	IsDryRun               bool                 `json:"isDryRun"`
+	IsLimited              bool                 `json:"isLimited"`
+	K8sTags                []ClusterTag         `json:"k8sTags"`
+	Metadata               ClusterMetadata      `json:"metadata"`
+	Name                   string               `json:"name"`
+	NodePools              []NodePool           `json:"nodePools"`
+	OrganizationId         string               `json:"organizationId"`
+	PodSubnetRange         string               `json:"podSubnetRange"`
+	ProviderAccount        string               `json:"providerAccount"`
+	Region                 string               `json:"region"`
+	ServicePeeringRange    string               `json:"servicePeeringRange"`
+	ServiceSubnetRange     string               `json:"serviceSubnetRange"`
+	Status                 ClusterStatus        `json:"status"`
+	TemplateUrl            string               `json:"templateUrl"`
+	TemplateVersion        string               `json:"templateVersion"`
+	TemporalRunId          string               `json:"temporalRunId"`
+	TenantId               string               `json:"tenantId"`
+	Type                   ClusterType          `json:"type"`
+	UpdatedAt              time.Time            `json:"updatedAt"`
+	VpcSubnetRange         string               `json:"vpcSubnetRange"`
+	Workspaces             []string             `json:"workspaces"`
+}
+
+// ClusterCloudProvider defines model for Cluster.CloudProvider.
+type ClusterCloudProvider string
+
+// ClusterStatus defines model for Cluster.Status.
+type ClusterStatus string
+
+// ClusterType defines model for Cluster.Type.
+type ClusterType string
+
+// ClusterDetailed defines model for ClusterDetailed.
+type ClusterDetailed struct {
+	AppliedTemplateVersion     string                       `json:"appliedTemplateVersion"`
+	CloudProvider              ClusterDetailedCloudProvider `json:"cloudProvider"`
+	CreatedAt                  time.Time                    `json:"createdAt"`
+	CreatedBy                  BasicSubjectProfile          `json:"createdBy"`
+	DbInstanceType             string                       `json:"dbInstanceType"`
+	DeletedAt                  *string                      `json:"deletedAt,omitempty"`
+	Id                         string                       `json:"id"`
+	IsDryRun                   bool                         `json:"isDryRun"`
+	IsLimited                  bool                         `json:"isLimited"`
+	K8sTags                    []ClusterTag                 `json:"k8sTags"`
+	Metadata                   ClusterMetadata              `json:"metadata"`
+	Name                       string                       `json:"name"`
+	NodePools                  []NodePool                   `json:"nodePools"`
+	OrgShortName               string                       `json:"orgShortName"`
+	OrganizationId             string                       `json:"organizationId"`
+	OrganizationName           string                       `json:"organizationName"`
+	OrganizationProductTier    string                       `json:"organizationProductTier"`
+	OrganizationTrialExpiresAt string                       `json:"organizationTrialExpiresAt"`
+	PodSubnetRange             string                       `json:"podSubnetRange"`
+	ProviderAccount            string                       `json:"providerAccount"`
+	Region                     string                       `json:"region"`
+	ServicePeeringRange        string                       `json:"servicePeeringRange"`
+	ServiceSubnetRange         string                       `json:"serviceSubnetRange"`
+	Status                     ClusterDetailedStatus        `json:"status"`
+	TemplateUrl                string                       `json:"templateUrl"`
+	TemplateVersion            string                       `json:"templateVersion"`
+	TemporalRunId              string                       `json:"temporalRunId"`
+	TenantId                   string                       `json:"tenantId"`
+	Type                       ClusterDetailedType          `json:"type"`
+	UpdatedAt                  time.Time                    `json:"updatedAt"`
+	UpdatedBy                  BasicSubjectProfile          `json:"updatedBy"`
+	VpcSubnetRange             string                       `json:"vpcSubnetRange"`
+	Workspaces                 []string                     `json:"workspaces"`
+}
+
+// ClusterDetailedCloudProvider defines model for ClusterDetailed.CloudProvider.
+type ClusterDetailedCloudProvider string
+
+// ClusterDetailedStatus defines model for ClusterDetailed.Status.
+type ClusterDetailedStatus string
+
+// ClusterDetailedType defines model for ClusterDetailed.Type.
+type ClusterDetailedType string
+
+// ClusterMetadata defines model for ClusterMetadata.
+type ClusterMetadata struct {
+	ExternalIPs *[]string `json:"externalIPs,omitempty"`
+}
+
+// ClusterTag defines model for ClusterTag.
+type ClusterTag struct {
+	Key   *string `json:"key,omitempty"`
+	Value *string `json:"value,omitempty"`
+}
+
+// ClustersPaginated defines model for ClustersPaginated.
+type ClustersPaginated struct {
+	Clusters   []Cluster `json:"clusters"`
+	Limit      int       `json:"limit"`
+	Offset     int       `json:"offset"`
+	TotalCount int       `json:"totalCount"`
+}
+
+// CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
+type CreateAwsClusterRequest struct {
+	DbInstanceType  string                      `json:"dbInstanceType"`
+	IsDryRun        *bool                       `json:"isDryRun,omitempty"`
+	K8sTags         *[]ClusterTag               `json:"k8sTags,omitempty"`
+	Name            string                      `json:"name"`
+	NodePools       *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
+	ProviderAccount *string                     `json:"providerAccount,omitempty"`
+	Region          string                      `json:"region"`
+	TemplateVersion string                      `json:"templateVersion"`
+	Type            CreateAwsClusterRequestType `json:"type"`
+	VpcSubnetRange  string                      `json:"vpcSubnetRange"`
+}
+
+// CreateAwsClusterRequestType defines model for CreateAwsClusterRequest.Type.
+type CreateAwsClusterRequestType string
+
+// CreateAzureClusterRequest defines model for CreateAzureClusterRequest.
+type CreateAzureClusterRequest struct {
+	DbInstanceType  string                        `json:"dbInstanceType"`
+	IsDryRun        *bool                         `json:"isDryRun,omitempty"`
+	K8sTags         *[]ClusterTag                 `json:"k8sTags,omitempty"`
+	Name            string                        `json:"name"`
+	NodePools       *[]CreateNodePoolRequest      `json:"nodePools,omitempty"`
+	ProviderAccount string                        `json:"providerAccount"`
+	Region          string                        `json:"region"`
+	TemplateVersion string                        `json:"templateVersion"`
+	TenantId        string                        `json:"tenantId"`
+	Type            CreateAzureClusterRequestType `json:"type"`
+	VpcSubnetRange  string                        `json:"vpcSubnetRange"`
+}
+
+// CreateAzureClusterRequestType defines model for CreateAzureClusterRequest.Type.
+type CreateAzureClusterRequestType string
+
+// CreateGcpClusterRequest defines model for CreateGcpClusterRequest.
+type CreateGcpClusterRequest struct {
+	DbInstanceType      string                      `json:"dbInstanceType"`
+	IsDryRun            *bool                       `json:"isDryRun,omitempty"`
+	K8sTags             *[]ClusterTag               `json:"k8sTags,omitempty"`
+	Name                string                      `json:"name"`
+	NodePools           *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
+	PodSubnetRange      string                      `json:"podSubnetRange"`
+	ProviderAccount     string                      `json:"providerAccount"`
+	Region              string                      `json:"region"`
+	ServicePeeringRange string                      `json:"servicePeeringRange"`
+	ServiceSubnetRange  string                      `json:"serviceSubnetRange"`
+	TemplateVersion     string                      `json:"templateVersion"`
+	Type                CreateGcpClusterRequestType `json:"type"`
+	VpcSubnetRange      string                      `json:"vpcSubnetRange"`
+}
+
+// CreateGcpClusterRequestType defines model for CreateGcpClusterRequest.Type.
+type CreateGcpClusterRequestType string
+
 // CreateManagedDomainRequest defines model for CreateManagedDomainRequest.
 type CreateManagedDomainRequest struct {
 	EnforcedLogins *[]CreateManagedDomainRequestEnforcedLogins `json:"enforcedLogins,omitempty"`
@@ -216,6 +539,14 @@ type CreateManagedDomainRequest struct {
 
 // CreateManagedDomainRequestEnforcedLogins defines model for CreateManagedDomainRequest.EnforcedLogins.
 type CreateManagedDomainRequestEnforcedLogins string
+
+// CreateNodePoolRequest defines model for CreateNodePoolRequest.
+type CreateNodePoolRequest struct {
+	IsDefault        bool   `json:"isDefault"`
+	MaxNodeCount     int    `json:"maxNodeCount"`
+	Name             string `json:"name"`
+	NodeInstanceType string `json:"nodeInstanceType"`
+}
 
 // CreateSsoConnectionRequest defines model for CreateSsoConnectionRequest.
 type CreateSsoConnectionRequest struct {
@@ -368,6 +699,19 @@ type MutateWorkspaceUserRoleRequest struct {
 	Role string `json:"role"`
 }
 
+// NodePool defines model for NodePool.
+type NodePool struct {
+	CloudProvider    string    `json:"cloudProvider"`
+	ClusterId        string    `json:"clusterId"`
+	CreatedAt        time.Time `json:"createdAt"`
+	Id               string    `json:"id"`
+	IsDefault        bool      `json:"isDefault"`
+	MaxNodeCount     int       `json:"maxNodeCount"`
+	Name             string    `json:"name"`
+	NodeInstanceType string    `json:"nodeInstanceType"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
 // Organization defines model for Organization.
 type Organization struct {
 	AuthServiceId    string                  `json:"authServiceId"`
@@ -439,6 +783,31 @@ type Self struct {
 	UpdatedAt           time.Time      `json:"updatedAt"`
 	Username            string         `json:"username"`
 }
+
+// SharedCluster defines model for SharedCluster.
+type SharedCluster struct {
+	CloudProvider       SharedClusterCloudProvider `json:"cloudProvider"`
+	CreatedAt           time.Time                  `json:"createdAt"`
+	DbInstanceType      string                     `json:"dbInstanceType"`
+	Id                  string                     `json:"id"`
+	IsDryRun            bool                       `json:"isDryRun"`
+	Metadata            ClusterMetadata            `json:"metadata"`
+	Name                string                     `json:"name"`
+	PodSubnetRange      string                     `json:"podSubnetRange"`
+	Region              string                     `json:"region"`
+	ServicePeeringRange string                     `json:"servicePeeringRange"`
+	ServiceSubnetRange  string                     `json:"serviceSubnetRange"`
+	Status              SharedClusterStatus        `json:"status"`
+	TemplateVersion     string                     `json:"templateVersion"`
+	UpdatedAt           time.Time                  `json:"updatedAt"`
+	VpcSubnetRange      string                     `json:"vpcSubnetRange"`
+}
+
+// SharedClusterCloudProvider defines model for SharedCluster.CloudProvider.
+type SharedClusterCloudProvider string
+
+// SharedClusterStatus defines model for SharedCluster.Status.
+type SharedClusterStatus string
 
 // SsoBypassKey defines model for SsoBypassKey.
 type SsoBypassKey struct {
@@ -526,6 +895,33 @@ type TaskInstance struct {
 // TaskInstanceState defines model for TaskInstance.State.
 type TaskInstanceState string
 
+// UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
+type UpdateAwsClusterRequest struct {
+	DbInstanceType  string                  `json:"dbInstanceType"`
+	K8sTags         *[]ClusterTag           `json:"k8sTags,omitempty"`
+	Name            string                  `json:"name"`
+	NodePools       []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion string                  `json:"templateVersion"`
+}
+
+// UpdateAzureClusterRequest defines model for UpdateAzureClusterRequest.
+type UpdateAzureClusterRequest struct {
+	DbInstanceType  string                  `json:"dbInstanceType"`
+	K8sTags         *[]ClusterTag           `json:"k8sTags,omitempty"`
+	Name            string                  `json:"name"`
+	NodePools       []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion string                  `json:"templateVersion"`
+}
+
+// UpdateGcpClusterRequest defines model for UpdateGcpClusterRequest.
+type UpdateGcpClusterRequest struct {
+	DbInstanceType  string                  `json:"dbInstanceType"`
+	K8sTags         *[]ClusterTag           `json:"k8sTags,omitempty"`
+	Name            string                  `json:"name"`
+	NodePools       []UpdateNodePoolRequest `json:"nodePools"`
+	TemplateVersion string                  `json:"templateVersion"`
+}
+
 // UpdateInviteRequest defines model for UpdateInviteRequest.
 type UpdateInviteRequest struct {
 	InviteStatus UpdateInviteRequestInviteStatus `json:"inviteStatus"`
@@ -541,6 +937,15 @@ type UpdateManagedDomainRequest struct {
 
 // UpdateManagedDomainRequestEnforcedLogins defines model for UpdateManagedDomainRequest.EnforcedLogins.
 type UpdateManagedDomainRequestEnforcedLogins string
+
+// UpdateNodePoolRequest defines model for UpdateNodePoolRequest.
+type UpdateNodePoolRequest struct {
+	Id               *string `json:"id,omitempty"`
+	IsDefault        bool    `json:"isDefault"`
+	MaxNodeCount     int     `json:"maxNodeCount"`
+	Name             string  `json:"name"`
+	NodeInstanceType string  `json:"nodeInstanceType"`
+}
 
 // UpdateSsoConnectionRequest defines model for UpdateSsoConnectionRequest.
 type UpdateSsoConnectionRequest struct {
@@ -642,6 +1047,18 @@ type WorkspacesPaginated struct {
 	Workspaces []Workspace `json:"workspaces"`
 }
 
+// GetSharedClusterParams defines parameters for GetSharedCluster.
+type GetSharedClusterParams struct {
+	// Region region
+	Region string `form:"region" json:"region"`
+
+	// CloudProvider cloud provider
+	CloudProvider GetSharedClusterParamsCloudProvider `form:"cloudProvider" json:"cloudProvider"`
+}
+
+// GetSharedClusterParamsCloudProvider defines parameters for GetSharedCluster.
+type GetSharedClusterParamsCloudProvider string
+
 // ListOrganizationAuthIdsParams defines parameters for ListOrganizationAuthIds.
 type ListOrganizationAuthIdsParams struct {
 	// Email User email to retrieve organization auth IDs for
@@ -689,6 +1106,42 @@ type GetOrganizationAuditLogsParams struct {
 	// Earliest starting point in days for audit logs
 	Earliest *string `form:"earliest,omitempty" json:"earliest,omitempty"`
 }
+
+// ListClustersParams defines parameters for ListClusters.
+type ListClustersParams struct {
+	// Provider cloud provider to filter clusters on
+	Provider *ListClustersParamsProvider `form:"provider,omitempty" json:"provider,omitempty"`
+
+	// Type type to filter clusters on
+	Type *[]ListClustersParamsType `form:"type,omitempty" json:"type,omitempty"`
+
+	// Status status to filter clusters on
+	Status *ListClustersParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Search string to search for when listing clusters
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListClustersParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListClustersParamsProvider defines parameters for ListClusters.
+type ListClustersParamsProvider string
+
+// ListClustersParamsType defines parameters for ListClusters.
+type ListClustersParamsType string
+
+// ListClustersParamsStatus defines parameters for ListClusters.
+type ListClustersParamsStatus string
+
+// ListClustersParamsSorts defines parameters for ListClusters.
+type ListClustersParamsSorts string
 
 // ListOrgUsersParams defines parameters for ListOrgUsers.
 type ListOrgUsersParams struct {
@@ -764,6 +1217,24 @@ type CreateOrganizationJSONRequestBody = MutateOrganizationRequest
 
 // UpdateOrganizationJSONRequestBody defines body for UpdateOrganization for application/json ContentType.
 type UpdateOrganizationJSONRequestBody = MutateOrganizationRequest
+
+// CreateAwsClusterJSONRequestBody defines body for CreateAwsCluster for application/json ContentType.
+type CreateAwsClusterJSONRequestBody = CreateAwsClusterRequest
+
+// UpdateAwsClusterJSONRequestBody defines body for UpdateAwsCluster for application/json ContentType.
+type UpdateAwsClusterJSONRequestBody = UpdateAwsClusterRequest
+
+// CreateAzureClusterJSONRequestBody defines body for CreateAzureCluster for application/json ContentType.
+type CreateAzureClusterJSONRequestBody = CreateAzureClusterRequest
+
+// UpdateAzureClusterJSONRequestBody defines body for UpdateAzureCluster for application/json ContentType.
+type UpdateAzureClusterJSONRequestBody = UpdateAzureClusterRequest
+
+// CreateGcpClusterJSONRequestBody defines body for CreateGcpCluster for application/json ContentType.
+type CreateGcpClusterJSONRequestBody = CreateGcpClusterRequest
+
+// UpdateGcpClusterJSONRequestBody defines body for UpdateGcpCluster for application/json ContentType.
+type UpdateGcpClusterJSONRequestBody = UpdateGcpClusterRequest
 
 // CreateManagedDomainJSONRequestBody defines body for CreateManagedDomain for application/json ContentType.
 type CreateManagedDomainJSONRequestBody = CreateManagedDomainRequest
@@ -876,6 +1347,9 @@ type ClientInterface interface {
 
 	ValidateSsoLogin(ctx context.Context, body ValidateSsoLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetSharedCluster request
+	GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -897,6 +1371,45 @@ type ClientInterface interface {
 
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListClusters request
+	ListClusters(ctx context.Context, orgShortNameId string, params *ListClustersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAwsCluster request with any body
+	CreateAwsClusterWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAwsCluster(ctx context.Context, orgShortNameId string, body CreateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAwsCluster request with any body
+	UpdateAwsClusterWithBody(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAwsCluster(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAzureCluster request with any body
+	CreateAzureClusterWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAzureCluster(ctx context.Context, orgShortNameId string, body CreateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAzureCluster request with any body
+	UpdateAzureClusterWithBody(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAzureCluster(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGcpCluster request with any body
+	CreateGcpClusterWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateGcpCluster(ctx context.Context, orgShortNameId string, body CreateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateGcpCluster request with any body
+	UpdateGcpClusterWithBody(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateGcpCluster(ctx context.Context, orgShortNameId string, clusterId string, body UpdateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteCluster request
+	DeleteCluster(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCluster request
+	GetCluster(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListManagedDomains request
 	ListManagedDomains(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1048,6 +1561,18 @@ func (c *Client) ValidateSsoLogin(ctx context.Context, body ValidateSsoLoginJSON
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSharedClusterRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListOrganizationAuthIdsRequest(c.Server, params)
 	if err != nil {
@@ -1134,6 +1659,186 @@ func (c *Client) UpdateOrganization(ctx context.Context, orgShortNameId string, 
 
 func (c *Client) GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetOrganizationAuditLogsRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListClusters(ctx context.Context, orgShortNameId string, params *ListClustersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListClustersRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAwsClusterWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAwsClusterRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAwsCluster(ctx context.Context, orgShortNameId string, body CreateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAwsClusterRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAwsClusterWithBody(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAwsClusterRequestWithBody(c.Server, orgShortNameId, clusterId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAwsCluster(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAwsClusterRequest(c.Server, orgShortNameId, clusterId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAzureClusterWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAzureClusterRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAzureCluster(ctx context.Context, orgShortNameId string, body CreateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAzureClusterRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAzureClusterWithBody(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAzureClusterRequestWithBody(c.Server, orgShortNameId, clusterId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAzureCluster(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAzureClusterRequest(c.Server, orgShortNameId, clusterId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateGcpClusterWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGcpClusterRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateGcpCluster(ctx context.Context, orgShortNameId string, body CreateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGcpClusterRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateGcpClusterWithBody(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGcpClusterRequestWithBody(c.Server, orgShortNameId, clusterId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateGcpCluster(ctx context.Context, orgShortNameId string, clusterId string, body UpdateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGcpClusterRequest(c.Server, orgShortNameId, clusterId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteCluster(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteClusterRequest(c.Server, orgShortNameId, clusterId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetCluster(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetClusterRequest(c.Server, orgShortNameId, clusterId)
 	if err != nil {
 		return nil, err
 	}
@@ -1710,6 +2415,61 @@ func NewValidateSsoLoginRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewGetSharedClusterRequest generates requests for GetSharedCluster
+func NewGetSharedClusterRequest(server string, params *GetSharedClusterParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/clusters/shared")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "region", runtime.ParamLocationQuery, params.Region); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cloudProvider", runtime.ParamLocationQuery, params.CloudProvider); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListOrganizationAuthIdsRequest generates requests for ListOrganizationAuthIds
 func NewListOrganizationAuthIdsRequest(server string, params *ListOrganizationAuthIdsParams) (*http.Request, error) {
 	var err error
@@ -2050,6 +2810,541 @@ func NewGetOrganizationAuditLogsRequest(server string, orgShortNameId string, pa
 	}
 
 	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListClustersRequest generates requests for ListClusters
+func NewListClustersRequest(server string, orgShortNameId string, params *ListClustersParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Provider != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "provider", runtime.ParamLocationQuery, *params.Provider); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Type != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "type", runtime.ParamLocationQuery, *params.Type); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Status != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "status", runtime.ParamLocationQuery, *params.Status); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAwsClusterRequest calls the generic CreateAwsCluster builder with application/json body
+func NewCreateAwsClusterRequest(server string, orgShortNameId string, body CreateAwsClusterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAwsClusterRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateAwsClusterRequestWithBody generates requests for CreateAwsCluster with any type of body
+func NewCreateAwsClusterRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/aws", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateAwsClusterRequest calls the generic UpdateAwsCluster builder with application/json body
+func NewUpdateAwsClusterRequest(server string, orgShortNameId string, clusterId string, body UpdateAwsClusterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAwsClusterRequestWithBody(server, orgShortNameId, clusterId, "application/json", bodyReader)
+}
+
+// NewUpdateAwsClusterRequestWithBody generates requests for UpdateAwsCluster with any type of body
+func NewUpdateAwsClusterRequestWithBody(server string, orgShortNameId string, clusterId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/aws/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreateAzureClusterRequest calls the generic CreateAzureCluster builder with application/json body
+func NewCreateAzureClusterRequest(server string, orgShortNameId string, body CreateAzureClusterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAzureClusterRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateAzureClusterRequestWithBody generates requests for CreateAzureCluster with any type of body
+func NewCreateAzureClusterRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/azure", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateAzureClusterRequest calls the generic UpdateAzureCluster builder with application/json body
+func NewUpdateAzureClusterRequest(server string, orgShortNameId string, clusterId string, body UpdateAzureClusterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAzureClusterRequestWithBody(server, orgShortNameId, clusterId, "application/json", bodyReader)
+}
+
+// NewUpdateAzureClusterRequestWithBody generates requests for UpdateAzureCluster with any type of body
+func NewUpdateAzureClusterRequestWithBody(server string, orgShortNameId string, clusterId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/azure/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreateGcpClusterRequest calls the generic CreateGcpCluster builder with application/json body
+func NewCreateGcpClusterRequest(server string, orgShortNameId string, body CreateGcpClusterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGcpClusterRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateGcpClusterRequestWithBody generates requests for CreateGcpCluster with any type of body
+func NewCreateGcpClusterRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/gcp", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateGcpClusterRequest calls the generic UpdateGcpCluster builder with application/json body
+func NewUpdateGcpClusterRequest(server string, orgShortNameId string, clusterId string, body UpdateGcpClusterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateGcpClusterRequestWithBody(server, orgShortNameId, clusterId, "application/json", bodyReader)
+}
+
+// NewUpdateGcpClusterRequestWithBody generates requests for UpdateGcpCluster with any type of body
+func NewUpdateGcpClusterRequestWithBody(server string, orgShortNameId string, clusterId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/gcp/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteClusterRequest generates requests for DeleteCluster
+func NewDeleteClusterRequest(server string, orgShortNameId string, clusterId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetClusterRequest generates requests for GetCluster
+func NewGetClusterRequest(server string, orgShortNameId string, clusterId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "clusterId", runtime.ParamLocationPath, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/clusters/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -3683,6 +4978,9 @@ type ClientWithResponsesInterface interface {
 
 	ValidateSsoLoginWithResponse(ctx context.Context, body ValidateSsoLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateSsoLoginResponse, error)
 
+	// GetSharedCluster request
+	GetSharedClusterWithResponse(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*GetSharedClusterResponse, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error)
 
@@ -3704,6 +5002,45 @@ type ClientWithResponsesInterface interface {
 
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogsWithResponse(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error)
+
+	// ListClusters request
+	ListClustersWithResponse(ctx context.Context, orgShortNameId string, params *ListClustersParams, reqEditors ...RequestEditorFn) (*ListClustersResponse, error)
+
+	// CreateAwsCluster request with any body
+	CreateAwsClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAwsClusterResponse, error)
+
+	CreateAwsClusterWithResponse(ctx context.Context, orgShortNameId string, body CreateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAwsClusterResponse, error)
+
+	// UpdateAwsCluster request with any body
+	UpdateAwsClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAwsClusterResponse, error)
+
+	UpdateAwsClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAwsClusterResponse, error)
+
+	// CreateAzureCluster request with any body
+	CreateAzureClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAzureClusterResponse, error)
+
+	CreateAzureClusterWithResponse(ctx context.Context, orgShortNameId string, body CreateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAzureClusterResponse, error)
+
+	// UpdateAzureCluster request with any body
+	UpdateAzureClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAzureClusterResponse, error)
+
+	UpdateAzureClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAzureClusterResponse, error)
+
+	// CreateGcpCluster request with any body
+	CreateGcpClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGcpClusterResponse, error)
+
+	CreateGcpClusterWithResponse(ctx context.Context, orgShortNameId string, body CreateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGcpClusterResponse, error)
+
+	// UpdateGcpCluster request with any body
+	UpdateGcpClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGcpClusterResponse, error)
+
+	UpdateGcpClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body UpdateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGcpClusterResponse, error)
+
+	// DeleteCluster request
+	DeleteClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*DeleteClusterResponse, error)
+
+	// GetCluster request
+	GetClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*GetClusterResponse, error)
 
 	// ListManagedDomains request
 	ListManagedDomainsWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*ListManagedDomainsResponse, error)
@@ -3873,6 +5210,33 @@ func (r ValidateSsoLoginResponse) StatusCode() int {
 	return 0
 }
 
+type GetSharedClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SharedCluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSharedClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSharedClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListOrganizationAuthIdsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4026,6 +5390,250 @@ func (r GetOrganizationAuditLogsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetOrganizationAuditLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListClustersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClustersPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListClustersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListClustersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAwsClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON412      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAwsClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAwsClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateAwsClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON412      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAwsClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAwsClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAzureClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON412      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAzureClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAzureClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateAzureClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON412      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAzureClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAzureClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateGcpClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON412      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateGcpClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateGcpClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateGcpClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Cluster
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON412      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateGcpClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateGcpClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetClusterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClusterDetailed
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetClusterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetClusterResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4890,6 +6498,15 @@ func (c *ClientWithResponses) ValidateSsoLoginWithResponse(ctx context.Context, 
 	return ParseValidateSsoLoginResponse(rsp)
 }
 
+// GetSharedClusterWithResponse request returning *GetSharedClusterResponse
+func (c *ClientWithResponses) GetSharedClusterWithResponse(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*GetSharedClusterResponse, error) {
+	rsp, err := c.GetSharedCluster(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSharedClusterResponse(rsp)
+}
+
 // ListOrganizationAuthIdsWithResponse request returning *ListOrganizationAuthIdsResponse
 func (c *ClientWithResponses) ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error) {
 	rsp, err := c.ListOrganizationAuthIds(ctx, params, reqEditors...)
@@ -4958,6 +6575,135 @@ func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseGetOrganizationAuditLogsResponse(rsp)
+}
+
+// ListClustersWithResponse request returning *ListClustersResponse
+func (c *ClientWithResponses) ListClustersWithResponse(ctx context.Context, orgShortNameId string, params *ListClustersParams, reqEditors ...RequestEditorFn) (*ListClustersResponse, error) {
+	rsp, err := c.ListClusters(ctx, orgShortNameId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListClustersResponse(rsp)
+}
+
+// CreateAwsClusterWithBodyWithResponse request with arbitrary body returning *CreateAwsClusterResponse
+func (c *ClientWithResponses) CreateAwsClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAwsClusterResponse, error) {
+	rsp, err := c.CreateAwsClusterWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAwsClusterResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAwsClusterWithResponse(ctx context.Context, orgShortNameId string, body CreateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAwsClusterResponse, error) {
+	rsp, err := c.CreateAwsCluster(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAwsClusterResponse(rsp)
+}
+
+// UpdateAwsClusterWithBodyWithResponse request with arbitrary body returning *UpdateAwsClusterResponse
+func (c *ClientWithResponses) UpdateAwsClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAwsClusterResponse, error) {
+	rsp, err := c.UpdateAwsClusterWithBody(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAwsClusterResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAwsClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAwsClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAwsClusterResponse, error) {
+	rsp, err := c.UpdateAwsCluster(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAwsClusterResponse(rsp)
+}
+
+// CreateAzureClusterWithBodyWithResponse request with arbitrary body returning *CreateAzureClusterResponse
+func (c *ClientWithResponses) CreateAzureClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAzureClusterResponse, error) {
+	rsp, err := c.CreateAzureClusterWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAzureClusterResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAzureClusterWithResponse(ctx context.Context, orgShortNameId string, body CreateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAzureClusterResponse, error) {
+	rsp, err := c.CreateAzureCluster(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAzureClusterResponse(rsp)
+}
+
+// UpdateAzureClusterWithBodyWithResponse request with arbitrary body returning *UpdateAzureClusterResponse
+func (c *ClientWithResponses) UpdateAzureClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAzureClusterResponse, error) {
+	rsp, err := c.UpdateAzureClusterWithBody(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAzureClusterResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAzureClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body UpdateAzureClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAzureClusterResponse, error) {
+	rsp, err := c.UpdateAzureCluster(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAzureClusterResponse(rsp)
+}
+
+// CreateGcpClusterWithBodyWithResponse request with arbitrary body returning *CreateGcpClusterResponse
+func (c *ClientWithResponses) CreateGcpClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGcpClusterResponse, error) {
+	rsp, err := c.CreateGcpClusterWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGcpClusterResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateGcpClusterWithResponse(ctx context.Context, orgShortNameId string, body CreateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGcpClusterResponse, error) {
+	rsp, err := c.CreateGcpCluster(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGcpClusterResponse(rsp)
+}
+
+// UpdateGcpClusterWithBodyWithResponse request with arbitrary body returning *UpdateGcpClusterResponse
+func (c *ClientWithResponses) UpdateGcpClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGcpClusterResponse, error) {
+	rsp, err := c.UpdateGcpClusterWithBody(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateGcpClusterResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateGcpClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body UpdateGcpClusterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGcpClusterResponse, error) {
+	rsp, err := c.UpdateGcpCluster(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateGcpClusterResponse(rsp)
+}
+
+// DeleteClusterWithResponse request returning *DeleteClusterResponse
+func (c *ClientWithResponses) DeleteClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*DeleteClusterResponse, error) {
+	rsp, err := c.DeleteCluster(ctx, orgShortNameId, clusterId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteClusterResponse(rsp)
+}
+
+// GetClusterWithResponse request returning *GetClusterResponse
+func (c *ClientWithResponses) GetClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...RequestEditorFn) (*GetClusterResponse, error) {
+	rsp, err := c.GetCluster(ctx, orgShortNameId, clusterId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetClusterResponse(rsp)
 }
 
 // ListManagedDomainsWithResponse request returning *ListManagedDomainsResponse
@@ -5441,6 +7187,67 @@ func ParseValidateSsoLoginResponse(rsp *http.Response) (*ValidateSsoLoginRespons
 	return response, nil
 }
 
+// ParseGetSharedClusterResponse parses an HTTP response from a GetSharedClusterWithResponse call
+func ParseGetSharedClusterResponse(rsp *http.Response) (*GetSharedClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSharedClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SharedCluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListOrganizationAuthIdsResponse parses an HTTP response from a ListOrganizationAuthIdsWithResponse call
 func ParseListOrganizationAuthIdsResponse(rsp *http.Response) (*ListOrganizationAuthIdsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5773,6 +7580,562 @@ func ParseGetOrganizationAuditLogsResponse(rsp *http.Response) (*GetOrganization
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListClustersResponse parses an HTTP response from a ListClustersWithResponse call
+func ParseListClustersResponse(rsp *http.Response) (*ListClustersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListClustersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClustersPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAwsClusterResponse parses an HTTP response from a CreateAwsClusterWithResponse call
+func ParseCreateAwsClusterResponse(rsp *http.Response) (*CreateAwsClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAwsClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAwsClusterResponse parses an HTTP response from a UpdateAwsClusterWithResponse call
+func ParseUpdateAwsClusterResponse(rsp *http.Response) (*UpdateAwsClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAwsClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAzureClusterResponse parses an HTTP response from a CreateAzureClusterWithResponse call
+func ParseCreateAzureClusterResponse(rsp *http.Response) (*CreateAzureClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAzureClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAzureClusterResponse parses an HTTP response from a UpdateAzureClusterWithResponse call
+func ParseUpdateAzureClusterResponse(rsp *http.Response) (*UpdateAzureClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAzureClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateGcpClusterResponse parses an HTTP response from a CreateGcpClusterWithResponse call
+func ParseCreateGcpClusterResponse(rsp *http.Response) (*CreateGcpClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateGcpClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateGcpClusterResponse parses an HTTP response from a UpdateGcpClusterWithResponse call
+func ParseUpdateGcpClusterResponse(rsp *http.Response) (*UpdateGcpClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateGcpClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Cluster
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteClusterResponse parses an HTTP response from a DeleteClusterWithResponse call
+func ParseDeleteClusterResponse(rsp *http.Response) (*DeleteClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetClusterResponse parses an HTTP response from a GetClusterWithResponse call
+func ParseGetClusterResponse(rsp *http.Response) (*GetClusterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetClusterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClusterDetailed
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

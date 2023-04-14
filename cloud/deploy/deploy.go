@@ -103,6 +103,39 @@ func getRegistryURL(domain string) string {
 	return registry
 }
 
+func removeDagsFromDockerIgnore(fullpath string) error {
+	f, err := os.Open(fullpath)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	var bs []byte
+	buf := bytes.NewBuffer(bs)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		text := scanner.Text()
+		if text != "dags/" {
+			_, err = buf.WriteString(text + "\n")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, error) {
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
@@ -258,6 +291,14 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
+		fullpath := filepath.Join(deployInput.Path, ".dockerignore")
+		fileExist, _ := fileutil.Exists(fullpath, nil)
+		if fileExist {
+			err := removeDagsFromDockerIgnore(fullpath)
+			if err != nil {
+				return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+			}
+		}
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
 		if !envFileExists && deployInput.EnvFile != ".env" {
 			return fmt.Errorf("%w %s", envFileMissing, deployInput.EnvFile)
@@ -323,8 +364,8 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 
 		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Access your Deployment: \n" +
-			fmt.Sprintf("\n Deployment View: %s", ansi.Bold(deploymentURL)) +
-			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
+			fmt.Sprintf("\n Deployment View: %s", ansi.Bold("https://"+deploymentURL)) +
+			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold("https://"+deployInfo.webserverURL)))
 	}
 
 	return nil
@@ -345,7 +386,7 @@ func getDeploymentInfo(deploymentID, wsID, deploymentName string, prompt bool, c
 
 	// check if deploymentID or if force prompt was requested was given by user
 	if deploymentID == "" || prompt {
-		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, client)
+		currentDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
 		if err != nil {
 			return deploymentInfo{}, err
 		}
@@ -477,6 +518,17 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 	dockerIgnoreCreate := false
 	fullpath := filepath.Join(path, ".dockerignore")
 
+	defer func() {
+		// remove dags from .dockerignore file if we set it
+		if dagsIgnoreSet {
+			removeDagsFromDockerIgnore(fullpath) //nolint:errcheck
+		}
+		// remove created docker ignore file
+		if dockerIgnoreCreate {
+			os.Remove(fullpath)
+		}
+	}()
+
 	fileExist, _ := fileutil.Exists(fullpath, nil)
 	if !fileExist {
 		// Create a dockerignore file and add the dags folder entry
@@ -510,40 +562,9 @@ func buildImageWithoutDags(path string, imageHandler airflow.ImageHandler) error
 		return err
 	}
 
-	defer func() {
-		// remove created docker ignore file
-		if dockerIgnoreCreate {
-			os.Remove(fullpath)
-		}
-	}()
-
 	// remove dags from .dockerignore file if we set it
 	if dagsIgnoreSet {
-		f, err := os.Open(fullpath)
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		var bs []byte
-		buf := bytes.NewBuffer(bs)
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			text := scanner.Text()
-			if text != "dags/" {
-				_, err = buf.WriteString(text + "\n")
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return err
-		}
-		err = os.WriteFile(fullpath, bytes.Trim(buf.Bytes(), "\n"), 0o666) //nolint:gosec, gomnd
+		err = removeDagsFromDockerIgnore(fullpath)
 		if err != nil {
 			return err
 		}

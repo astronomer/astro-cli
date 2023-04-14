@@ -44,6 +44,8 @@ var (
 			label
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name
@@ -86,6 +88,8 @@ var (
 			label
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name

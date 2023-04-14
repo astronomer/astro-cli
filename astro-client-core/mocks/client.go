@@ -17,6 +17,204 @@ type ClientWithResponsesInterface struct {
 	mock.Mock
 }
 
+// CreateAwsClusterWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateAwsClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateAwsClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateAwsClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreateAwsClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreateAwsClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateAwsClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateAwsClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateAwsClusterWithResponse(ctx context.Context, orgShortNameId string, body astrocore.CreateAwsClusterRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateAwsClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateAwsClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateAwsClusterRequest, ...astrocore.RequestEditorFn) (*astrocore.CreateAwsClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateAwsClusterRequest, ...astrocore.RequestEditorFn) *astrocore.CreateAwsClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateAwsClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.CreateAwsClusterRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateAzureClusterWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateAzureClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateAzureClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateAzureClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreateAzureClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreateAzureClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateAzureClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateAzureClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateAzureClusterWithResponse(ctx context.Context, orgShortNameId string, body astrocore.CreateAzureClusterRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateAzureClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateAzureClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateAzureClusterRequest, ...astrocore.RequestEditorFn) (*astrocore.CreateAzureClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateAzureClusterRequest, ...astrocore.RequestEditorFn) *astrocore.CreateAzureClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateAzureClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.CreateAzureClusterRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateGcpClusterWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateGcpClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateGcpClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateGcpClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.CreateGcpClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.CreateGcpClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateGcpClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CreateGcpClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, body, reqEditors
+func (_m *ClientWithResponsesInterface) CreateGcpClusterWithResponse(ctx context.Context, orgShortNameId string, body astrocore.CreateGcpClusterRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateGcpClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.CreateGcpClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateGcpClusterRequest, ...astrocore.RequestEditorFn) (*astrocore.CreateGcpClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, astrocore.CreateGcpClusterRequest, ...astrocore.RequestEditorFn) *astrocore.CreateGcpClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.CreateGcpClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, astrocore.CreateGcpClusterRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateManagedDomainWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, contentType, body, reqEditors
 func (_m *ClientWithResponsesInterface) CreateManagedDomainWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.CreateManagedDomainResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -347,6 +545,39 @@ func (_m *ClientWithResponsesInterface) CreateWorkspaceWithResponse(ctx context.
 	return r0, r1
 }
 
+// DeleteClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, reqEditors
+func (_m *ClientWithResponsesInterface) DeleteClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.DeleteClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.DeleteClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.DeleteClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.DeleteClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteManagedDomainWithResponse provides a mock function with given fields: ctx, orgShortNameId, domainId, reqEditors
 func (_m *ClientWithResponsesInterface) DeleteManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.DeleteManagedDomainResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -578,6 +809,39 @@ func (_m *ClientWithResponsesInterface) DeleteWorkspaceWithResponse(ctx context.
 	return r0, r1
 }
 
+// GetClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, reqEditors
+func (_m *ClientWithResponsesInterface) GetClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.GetClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) (*astrocore.GetClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, ...astrocore.RequestEditorFn) *astrocore.GetClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.GetClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetManagedDomainWithResponse provides a mock function with given fields: ctx, orgShortNameId, domainId, reqEditors
 func (_m *ClientWithResponsesInterface) GetManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetManagedDomainResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -702,6 +966,39 @@ func (_m *ClientWithResponsesInterface) GetSelfUserWithResponse(ctx context.Cont
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, *astrocore.GetSelfUserParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetSharedClusterWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *ClientWithResponsesInterface) GetSharedClusterWithResponse(ctx context.Context, params *astrocore.GetSharedClusterParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.GetSharedClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.GetSharedClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *astrocore.GetSharedClusterParams, ...astrocore.RequestEditorFn) (*astrocore.GetSharedClusterResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *astrocore.GetSharedClusterParams, ...astrocore.RequestEditorFn) *astrocore.GetSharedClusterResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.GetSharedClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *astrocore.GetSharedClusterParams, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -868,6 +1165,39 @@ func (_m *ClientWithResponsesInterface) GetWorkspaceWithResponse(ctx context.Con
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, workspaceId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListClustersWithResponse provides a mock function with given fields: ctx, orgShortNameId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListClustersWithResponse(ctx context.Context, orgShortNameId string, params *astrocore.ListClustersParams, reqEditors ...astrocore.RequestEditorFn) (*astrocore.ListClustersResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.ListClustersResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListClustersParams, ...astrocore.RequestEditorFn) (*astrocore.ListClustersResponse, error)); ok {
+		return rf(ctx, orgShortNameId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *astrocore.ListClustersParams, ...astrocore.RequestEditorFn) *astrocore.ListClustersResponse); ok {
+		r0 = rf(ctx, orgShortNameId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.ListClustersResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *astrocore.ListClustersParams, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1264,6 +1594,204 @@ func (_m *ClientWithResponsesInterface) MutateWorkspaceUserRoleWithResponse(ctx 
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrocore.MutateWorkspaceUserRoleRequest, ...astrocore.RequestEditorFn) error); ok {
 		r1 = rf(ctx, orgShortNameId, workspaceId, userId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateAwsClusterWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateAwsClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateAwsClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateAwsClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.UpdateAwsClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.UpdateAwsClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateAwsClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateAwsClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateAwsClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body astrocore.UpdateAwsClusterRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateAwsClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateAwsClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateAwsClusterRequest, ...astrocore.RequestEditorFn) (*astrocore.UpdateAwsClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateAwsClusterRequest, ...astrocore.RequestEditorFn) *astrocore.UpdateAwsClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateAwsClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.UpdateAwsClusterRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateAzureClusterWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateAzureClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateAzureClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateAzureClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.UpdateAzureClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.UpdateAzureClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateAzureClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateAzureClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateAzureClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body astrocore.UpdateAzureClusterRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateAzureClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateAzureClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateAzureClusterRequest, ...astrocore.RequestEditorFn) (*astrocore.UpdateAzureClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateAzureClusterRequest, ...astrocore.RequestEditorFn) *astrocore.UpdateAzureClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateAzureClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.UpdateAzureClusterRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateGcpClusterWithBodyWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateGcpClusterWithBodyWithResponse(ctx context.Context, orgShortNameId string, clusterId string, contentType string, body io.Reader, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateGcpClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateGcpClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) (*astrocore.UpdateGcpClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) *astrocore.UpdateGcpClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateGcpClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, io.Reader, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateGcpClusterWithResponse provides a mock function with given fields: ctx, orgShortNameId, clusterId, body, reqEditors
+func (_m *ClientWithResponsesInterface) UpdateGcpClusterWithResponse(ctx context.Context, orgShortNameId string, clusterId string, body astrocore.UpdateGcpClusterRequest, reqEditors ...astrocore.RequestEditorFn) (*astrocore.UpdateGcpClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, orgShortNameId, clusterId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *astrocore.UpdateGcpClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateGcpClusterRequest, ...astrocore.RequestEditorFn) (*astrocore.UpdateGcpClusterResponse, error)); ok {
+		return rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, astrocore.UpdateGcpClusterRequest, ...astrocore.RequestEditorFn) *astrocore.UpdateGcpClusterResponse); ok {
+		r0 = rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrocore.UpdateGcpClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, astrocore.UpdateGcpClusterRequest, ...astrocore.RequestEditorFn) error); ok {
+		r1 = rf(ctx, orgShortNameId, clusterId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
