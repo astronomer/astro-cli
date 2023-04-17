@@ -10,6 +10,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
+var (
+	errDecode = errors.New("failed to decode response from API")
+)
+
 type Client interface {
 	// connections
 	GetConnections(airflowURL string) (Response, error)
@@ -226,7 +230,7 @@ func (c *HTTPClient) DoAirflowClient(doOpts *httputil.DoOptions) (*Response, err
 	decode := Response{}
 	err = json.NewDecoder(response.Body).Decode(&decode)
 	if err != nil {
-		return nil, errors.New("failed to decode response from API")
+		return nil, errDecode
 	}
 
 	return &decode, nil

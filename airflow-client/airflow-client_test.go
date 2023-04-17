@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -133,6 +132,7 @@ func TestGetConnections(t *testing.T) {
 func TestUpdateConnection(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	connJSON, err := json.Marshal(mockConn)
+	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockConnResponse)
 	assert.NoError(t, err)
 
@@ -144,7 +144,7 @@ func TestUpdateConnection(t *testing.T) {
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
 			// Check request body
-			reqBody, err := ioutil.ReadAll(req.Body)
+			reqBody, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
 			assert.Equal(t, connJSON, reqBody)
 
@@ -210,18 +210,19 @@ func TestUpdateConnection(t *testing.T) {
 func TestCreateConnection(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	connJSON, err := json.Marshal(mockConn)
+	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockConnResponse)
 	assert.NoError(t, err)
 
 	t.Run("success", func(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			assert.Equal(t, "POST", req.Method)
-			expectedURL := fmt.Sprintf("https://test-airflow-url/api/v1/connections")
+			expectedURL := "https://test-airflow-url/api/v1/connections"
 			assert.Equal(t, expectedURL, req.URL.String())
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
 			// Check request body
-			reqBody, err := ioutil.ReadAll(req.Body)
+			reqBody, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
 			assert.Equal(t, connJSON, reqBody)
 
@@ -294,7 +295,7 @@ func TestCreateVariable(t *testing.T) {
 			assert.Equal(t, expectedURL, req.URL.String())
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
-			reqBody, err := ioutil.ReadAll(req.Body)
+			reqBody, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
 			expectedReqBody, err := json.Marshal(mockVar)
 			assert.NoError(t, err)
@@ -349,7 +350,6 @@ func TestCreateVariable(t *testing.T) {
 func TestGetVariables(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	expectedURL := "https://test-airflow-url/api/v1/variables"
-	// mockVarJSON, err := json.Marshal(mockVar)
 
 	t.Run("success", func(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -399,7 +399,7 @@ func TestUpdateVariable(t *testing.T) {
 			assert.Equal(t, expectedURL, req.URL.String())
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
-			reqBody, err := ioutil.ReadAll(req.Body)
+			reqBody, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
 			expectedReqBody, err := json.Marshal(mockVar)
 			assert.NoError(t, err)
@@ -471,18 +471,19 @@ func TestCreatePool(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	poolJSON, err := json.Marshal(mockPool)
+	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockPoolResponse)
 	assert.NoError(t, err)
 
 	t.Run("success", func(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			assert.Equal(t, "POST", req.Method)
-			expectedURL := fmt.Sprintf("https://test-airflow-url/api/v1/pools")
+			expectedURL := "https://test-airflow-url/api/v1/pools"
 			assert.Equal(t, expectedURL, req.URL.String())
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
 			// Check request body
-			reqBody, err := ioutil.ReadAll(req.Body)
+			reqBody, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
 			assert.Equal(t, poolJSON, reqBody)
 
@@ -548,6 +549,7 @@ func TestCreatePool(t *testing.T) {
 func TestUpdatePool(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockPoolJSON, err := json.Marshal(mockPool)
+	assert.NoError(t, err)
 	jsonResponse, err := json.Marshal(mockPoolResponse)
 	assert.NoError(t, err)
 
@@ -559,7 +561,7 @@ func TestUpdatePool(t *testing.T) {
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
 			// Check request body
-			reqBody, err := ioutil.ReadAll(req.Body)
+			reqBody, err := io.ReadAll(req.Body)
 			assert.NoError(t, err)
 			assert.Equal(t, mockPoolJSON, reqBody)
 
@@ -630,7 +632,7 @@ func TestGetPools(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			assert.Equal(t, "GET", req.Method)
-			expectedURL := fmt.Sprintf("https://test-airflow-url/api/v1/pools")
+			expectedURL := "https://test-airflow-url/api/v1/pools"
 			assert.Equal(t, expectedURL, req.URL.String())
 			assert.Equal(t, "token", req.Header.Get("authorization"))
 
