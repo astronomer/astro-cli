@@ -10,9 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-var (
-	errDecode = errors.New("failed to decode response from API")
-)
+var errDecode = errors.New("failed to decode response from API")
 
 type Client interface {
 	// connections

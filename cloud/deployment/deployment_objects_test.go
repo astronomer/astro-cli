@@ -51,6 +51,7 @@ func TestConnectionList(t *testing.T) {
 		assert.Equal(t, "error", err.Error())
 	})
 }
+
 func TestConnectionCreate(t *testing.T) {
 	t.Run("happy path TestConnectionCreate", func(t *testing.T) {
 		out := new(bytes.Buffer)
@@ -64,9 +65,9 @@ func TestConnectionCreate(t *testing.T) {
 	t.Run("error path when CreateConnection returns an error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
-		mockClient.On("CreateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(errors.New("test error")).Once()
+		mockClient.On("CreateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
 		err := ConnectionCreate(testAirflowURL, testConnID, testConnType, testDescription, testHost, testLogin, testPassword, testSchema, testExtra, testPort, mockClient, out)
-		assert.EqualError(t, err, "test error")
+		assert.EqualError(t, err, "error")
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -84,9 +85,9 @@ func TestConnectionUpdate(t *testing.T) {
 	t.Run("error path when UpdateConnection returns an error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
-		mockClient.On("UpdateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(errors.New("test error")).Once()
+		mockClient.On("UpdateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
 		err := ConnectionUpdate(testAirflowURL, testConnID, testConnType, testDescription, testHost, testLogin, testPassword, testSchema, testExtra, testPort, mockClient, out)
-		assert.EqualError(t, err, "test error")
+		assert.EqualError(t, err, "error")
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -128,10 +129,10 @@ func TestCopyConnection(t *testing.T) {
 		mockClient := new(airflowclient_mocks.Client)
 
 		// Mock GetConnections for source deployment
-		mockClient.On("GetConnections", fromAirflowURL).Return(airflowclient.Response{Connections: fromConnections}, errors.New("test error")).Once()
+		mockClient.On("GetConnections", fromAirflowURL).Return(airflowclient.Response{Connections: fromConnections}, errTest).Once()
 
 		err := CopyConnection(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.EqualError(t, err, "test error")
+		assert.EqualError(t, err, "error")
 
 		mockClient.AssertExpectations(t)
 	})
