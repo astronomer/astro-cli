@@ -396,7 +396,16 @@ func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
 	}
 	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
-	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
+	orgShortName := strings.Replace(claims.Permissions[3], "orgShortName:", "", 1)
+
+	orgs, err := organization.ListOrganizations(coreClient)
+	if err != nil {
+		return false, err
+	}
+
+	org := orgs[0]
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
+
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
 		err := c.SetContextKey("workspace", workspaceID) // c.Workspace

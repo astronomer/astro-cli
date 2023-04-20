@@ -344,7 +344,7 @@ func TestCheckAPIToken(t *testing.T) {
 			"",
 			"workspaceId:workspace-id",
 			"organizationId:org-ID",
-			"orgShortNameId:org-short-name",
+			"orgShortName:org-short-name",
 		}
 		mockClaims := util.CustomClaims{
 			Permissions: permissions,
