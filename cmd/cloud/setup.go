@@ -104,7 +104,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, args)
+	apiToken, err := checkAPIToken(isDeploymentFile, coreClient, args)
 	if err != nil {
 		return err
 	}
@@ -321,6 +321,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	org := orgs[0]
 	orgID := org.Id
 	orgShortName := org.ShortName
+	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
 	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
 	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
@@ -336,14 +337,14 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetOrganizationContext(orgID, orgShortName)
+	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args []string) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -413,7 +414,7 @@ func checkAPIToken(isDeploymentFile bool, args []string) (bool, error) {
 			fmt.Println("no workspace set")
 		}
 	}
-	err = c.SetOrganizationContext(orgID, orgShortName)
+	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
 	}

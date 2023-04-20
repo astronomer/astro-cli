@@ -151,7 +151,7 @@ func Switch(id string, client astro.Client, out io.Writer) error {
 		return err
 	}
 
-	err = c.SetOrganizationContext(c.Organization, c.OrganizationShortName)
+	err = c.SetOrganizationContext(c.Organization, c.OrganizationShortName, c.OrganizationProduct)
 	if err != nil {
 		return err
 	}

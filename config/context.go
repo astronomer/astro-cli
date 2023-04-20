@@ -28,6 +28,7 @@ type Context struct {
 	Domain                string `mapstructure:"domain"`
 	Organization          string `mapstructure:"organization"`
 	OrganizationShortName string `mapstructure:"organization_short_name"`
+	OrganizationProduct   string `mapstructure:"organization_product"`
 	Workspace             string `mapstructure:"workspace"`
 	LastUsedWorkspace     string `mapstructure:"last_used_workspace"`
 	Token                 string `mapstructure:"token"`
@@ -151,12 +152,17 @@ func (c *Context) SetContextKey(key, value string) error {
 }
 
 // set organization id and short name in context config
-func (c *Context) SetOrganizationContext(orgID, orgShortName string) error {
+func (c *Context) SetOrganizationContext(orgID, orgShortName, orgProduct string) error {
 	err := c.SetContextKey("organization", orgID) // c.Organization
 	if err != nil {
 		return err
 	}
 	err = c.SetContextKey("organization_short_name", orgShortName)
+	if err != nil {
+		return err
+	}
+
+	err = c.SetContextKey("organization_product", orgProduct)
 	if err != nil {
 		return err
 	}

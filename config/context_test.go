@@ -165,7 +165,7 @@ func TestGetContexts(t *testing.T) {
 	initTestConfig()
 	ctxs, err := GetContexts()
 	assert.NoError(t, err)
-	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "test-org-short-name", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "test-org-short-name", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
+	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
 }
 
 func TestSetContextKey(t *testing.T) {
@@ -181,7 +181,7 @@ func TestSetOrganizationContext(t *testing.T) {
 	initTestConfig()
 	t.Run("set organization context", func(t *testing.T) {
 		ctx := Context{Domain: "localhost"}
-		ctx.SetOrganizationContext("org1", "org_short_name_1")
+		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
 		outCtx, err := ctx.GetContext()
 		assert.NoError(t, err)
 		assert.Equal(t, "org1", outCtx.Organization)
@@ -191,7 +191,7 @@ func TestSetOrganizationContext(t *testing.T) {
 	t.Run("set organization context error", func(t *testing.T) {
 		ctx := Context{Domain: ""}
 		assert.NoError(t, err)
-		err = ctx.SetOrganizationContext("org1", "org_short_name_1")
+		err = ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "context config invalid, no domain specified")
 	})
