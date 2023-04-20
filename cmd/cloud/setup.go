@@ -398,7 +398,7 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args 
 
 	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
 	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
-	orgShortName := strings.Replace(claims.Permissions[3], "orgShortNameId:", "", 1)
+	orgShortName := strings.Replace(claims.Permissions[3], "orgShortName:", "", 1)
 
 	orgs, err := organization.ListOrganizations(coreClient)
 	if err != nil {
