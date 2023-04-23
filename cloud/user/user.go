@@ -27,7 +27,6 @@ var (
 	ErrUserNotFound         = errors.New("no user was found for the email you provided")
 )
 
-// CreateInvite calls the CreateUserInvite mutation to create a user invite
 func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient) error {
 	var (
 		userInviteInput astrocore.CreateUserInviteRequest
