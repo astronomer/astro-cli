@@ -252,6 +252,36 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	return nil
 }
 
+func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
+	// Get project containers
+	_, err := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{
+		All: true,
+	})
+	if err != nil {
+		return errors.Wrap(err, composeCreateErrMsg)
+	}
+
+	// get image lables
+	imageLabels, err := d.imageHandler.ListLabels()
+	if err != nil {
+		return err
+	}
+
+	// Generate the docker-compose yaml
+	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
+	if err != nil {
+		return errors.Wrap(err, "failed to create compose file")
+	}
+
+	// write the yaml to a file
+	err = os.WriteFile(composeFile, []byte(yaml), 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to write compose file")
+	}
+
+	return nil
+}
+
 // Stop a running docker project
 func (d *DockerCompose) Stop() error {
 	imageLabels, err := d.imageHandler.ListLabels()
