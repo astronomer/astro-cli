@@ -274,7 +274,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 	}
 
 	// write the yaml to a file
-	err = os.WriteFile(composeFile, []byte(yaml), 0o777)
+	err = os.WriteFile(composeFile, []byte(yaml), 0o666)
 	if err != nil {
 		return errors.Wrap(err, "failed to write compose file")
 	}
