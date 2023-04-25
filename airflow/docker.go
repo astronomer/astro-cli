@@ -838,7 +838,7 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 // next it checks if the runtime version of the image building is above 6.0.4
 // if the image is M1 architecture and runtime version is less than or equal to 6.0.4 it will print true
 var CheckM1Image = func(imageLabels map[string]string) bool {
-	if runtime.GOARCH != "arm64" {
+	if !isM1(runtime.GOOS, runtime.GOARCH) {
 		// the architecture is not arm64 no need to print message
 		return false
 	}
