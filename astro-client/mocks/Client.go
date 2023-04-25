@@ -263,32 +263,6 @@ func (_m *Client) GetOrganizations() ([]astro.Organization, error) {
 	return r0, r1
 }
 
-// GetUserInfo provides a mock function with given fields:
-func (_m *Client) GetUserInfo() (*astro.Self, error) {
-	ret := _m.Called()
-
-	var r0 *astro.Self
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*astro.Self, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() *astro.Self); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*astro.Self)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetWorkerQueueOptions provides a mock function with given fields:
 func (_m *Client) GetWorkerQueueOptions() (astro.WorkerQueueDefaultOptions, error) {
 	ret := _m.Called()
