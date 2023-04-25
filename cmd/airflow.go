@@ -116,8 +116,6 @@ func newDevRootCmd() *cobra.Command {
 		newAirflowUpgradeCheckCmd(),
 		newAirflowBashCmd(),
 		newAirflowObjectRootCmd(),
-		newObjectImportCmd(),
-		newObjectExportCmd(),
 	)
 	return cmd
 }
@@ -180,6 +178,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
+	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Provide the location of compose file if you wish to use a custom compose file with the start command")
 
 	return cmd
 }
@@ -358,11 +357,10 @@ func newAirflowBashCmd() *cobra.Command {
 
 func newAirflowObjectRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:        "object",
-		Aliases:    []string{"obj"},
-		Deprecated: "WARNING: 'astro dev object export/import' will be deprecated in Astro CLI v1.17.0. Any use of this command in your projects or automation needs to be updated to 'astro dev export/import' before Astro CLI v1.17.0 is released.\n",
-		Short:      "Manage local Airflow Connections, Variables, and Pools",
-		Long:       "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings file",
+		Use:     "object",
+		Aliases: []string{"obj"},
+		Short:   "Manage local Airflow Connections, Variables, Pools and compose file.",
+		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings file. Export compose file used in 'astro dev start'",
 	}
 	cmd.AddCommand(
 		newObjectImportCmd(),
@@ -514,7 +512,7 @@ func airflowStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser, waitTime)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
 }
 
 // airflowRun
@@ -624,7 +622,7 @@ func airflowRestart(cmd *cobra.Command, args []string) error {
 	// don't startup browser on restart
 	noBrowser = true
 
-	return containerHandler.Start(customImageName, settingsFile, noCache, noBrowser, waitTime)
+	return containerHandler.Start(customImageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
 }
 
 // run pytest on an airflow project

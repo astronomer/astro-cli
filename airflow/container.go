@@ -20,7 +20,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error
+	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error
 	Stop() error
 	PS() error
 	Kill() error

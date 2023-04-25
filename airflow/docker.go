@@ -154,7 +154,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 // Start starts a local airflow development cluster
 //
 //nolint:gocognit
-func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error {
+func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
 	if runtime.GOOS == "darwin" {
 		err := startDocker()
@@ -213,7 +213,7 @@ func (d *DockerCompose) Start(imageName, settingsFile string, noCache, noBrowser
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", settingsFile, composeFile, imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -290,7 +290,7 @@ func (d *DockerCompose) Stop() error {
 	}
 
 	// Create a compose project
-	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", imageLabels)
+	project, err := createDockerProject(d.projectName, d.airflowHome, d.envFile, "", "", "", imageLabels)
 	if err != nil {
 		return errors.Wrap(err, composeCreateErrMsg)
 	}
@@ -700,11 +700,20 @@ func (d *DockerCompose) checkAiflowVersion() (uint64, error) {
 }
 
 // createProject creates project with yaml config as context
-var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string) (*types.Project, error) {
+var createDockerProject = func(projectName, airflowHome, envFile, buildImage, settingsFile, composeFile string, imageLabels map[string]string) (*types.Project, error) {
 	// Generate the docker-compose yaml
-	yaml, err := generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create project")
+	var yaml string
+	var err error
+	if composeFile == "" {
+		yaml, err = generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile, imageLabels)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create project")
+		}
+	} else {
+		yaml, err = fileutil.ReadFileToString(composeFile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read compose file")
+		}
 	}
 
 	var configs []types.ConfigFile
