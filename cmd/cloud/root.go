@@ -22,6 +22,5 @@ func AddCmds(client astro.Client, coreClient astrocore.CoreClient, out io.Writer
 		newDeploymentRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
-		newUserCmd(out),
 	}
 }
