@@ -16,7 +16,6 @@ type ResponseData struct {
 	GetWorkspaces             []Workspace                  `json:"workspaces,omitempty"`
 	GetWorkspace              Workspace                    `json:"workspace,omitempty"`
 	GetClusters               []Cluster                    `json:"clusters,omitempty"`
-	SelfQuery                 *Self                        `json:"self,omitempty"`
 	RuntimeReleases           []RuntimeRelease             `json:"runtimeReleases,omitempty"`
 	CreateDeployment          Deployment                   `json:"CreateDeployment,omitempty"`
 	GetDeploymentConfig       DeploymentConfig             `json:"deploymentConfigOptions,omitempty"`
@@ -24,17 +23,10 @@ type ResponseData struct {
 	DeleteDeployment          Deployment                   `json:"DeleteDeployment,omitempty"`
 	UpdateDeployment          Deployment                   `json:"UpdateDeployment,omitempty"`
 	UpdateDeploymentVariables []EnvironmentVariablesObject `json:"UpdateDeploymentVariables,omitempty"`
-	CreateUserInvite          UserInvite                   `json:"createUserInvite,omitempty"`
 	InitiateDagDeployment     InitiateDagDeployment        `json:"initiateDagDeployment,omitempty"`
 	ReportDagDeploymentStatus DagDeploymentStatus          `json:"reportDagDeploymentStatus,omitempty"`
 	GetWorkerQueueOptions     WorkerQueueDefaultOptions    `json:"workerQueueOptions,omitempty"`
-	GetOrganizations          []Organization               `json:"organizations,omitempty"`
 	DeploymentAlerts          DeploymentAlerts             `json:"alertEmails,omitempty"`
-}
-
-type Self struct {
-	User                        User   `json:"user"`
-	AuthenticatedOrganizationID string `json:"authenticatedOrganizationId"`
 }
 
 type AuthProvider struct {

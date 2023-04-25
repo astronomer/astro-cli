@@ -42,6 +42,7 @@ const (
 	defaultAirflowVersion          = uint64(0x2) //nolint:gomnd
 	triggererAllowedRuntimeVersion = "4.0.0"
 	triggererAllowedAirflowVersion = "2.2.0"
+	M1ImageRuntimeVersion          = "6.0.4"
 	pytestDirectory                = "tests"
 	OpenCmd                        = "open"
 
@@ -225,8 +226,14 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCac
 	if err != nil {
 		return errors.Wrap(err, composeRecreateErrMsg)
 	}
+	var airflowMessage string
+	if CheckM1Image(imageLabels) {
+		airflowMessage = " This might take a few minutes…"
+	} else {
+		airflowMessage = ""
+	}
 
-	fmt.Println("\n\nAirflow is starting up! This might take a few minutes…")
+	fmt.Println("\n\nAirflow is starting up!" + airflowMessage)
 
 	airflowDockerVersion, err := d.checkAiflowVersion()
 	if err != nil {
@@ -864,6 +871,23 @@ var CheckTriggererEnabled = func(imageLabels map[string]string) (bool, error) {
 	}
 
 	return versions.GreaterThanOrEqualTo(runtimeVersion, triggererAllowedRuntimeVersion), nil
+}
+
+// CheckM1Image checks if the CLI is currently running on M1 architecture
+// next it checks if the runtime version of the image building is above 6.0.4
+// if the image is M1 architecture and runtime version is less than or equal to 6.0.4 it will print true
+var CheckM1Image = func(imageLabels map[string]string) bool {
+	if !isM1(runtime.GOOS, runtime.GOARCH) {
+		// the architecture is not arm64 no need to print message
+		return false
+	}
+	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
+	if !ok {
+		// cannot determine runtime version print message by default
+		return true
+	}
+
+	return versions.LessThanOrEqualTo(runtimeVersion, M1ImageRuntimeVersion)
 }
 
 func checkServiceState(serviceState, expectedState string) bool {

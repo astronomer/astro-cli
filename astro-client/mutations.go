@@ -120,16 +120,6 @@ var (
 	  }
 	}
   `
-	CreateUserInvite = `
-  	mutation createUserInvite($input: CreateUserInviteInput!) {
-	  createUserInvite(input: $input) {
-			userId
-			organizationId
-			oauthInviteId
-			expiresAt
-	  }
-  	}
-  `
 	DagDeploymentInitiate = `
 	mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {
 		initiateDagDeployment(input: $input) {

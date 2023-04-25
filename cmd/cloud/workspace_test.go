@@ -89,7 +89,7 @@ func TestWorkspaceSwitch(t *testing.T) {
 func TestWorkspaceUserRootCommand(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
-	cmd := newUserCmd(os.Stdout)
+	cmd := newWorkspaceCmd(os.Stdout)
 	cmd.SetOut(buf)
 	cmdArgs := []string{"user", "-h"}
 	_, err := execWorkspaceCmd(cmdArgs...)
