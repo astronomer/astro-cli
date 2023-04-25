@@ -184,7 +184,7 @@ func ExportAuditLogs(client astro.Client, out io.Writer, orgName string, earlies
 		return err
 	}
 	logStreamBuffer.Close()
-	fmt.Println("Done")
+	fmt.Println("Finished exporting logs to local GZIP file")
 	return nil
 }
 

@@ -210,7 +210,7 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 		return err
 	}
 	out := bufio.NewWriter(f)
-	fmt.Println("This may take some time depending on how many days are bing exported…")
+	fmt.Println("This may take some time depending on how many days are being exported.")
 	return orgExportAuditLogs(astroClient, out, orgName, auditLogsEarliestParam)
 }
 
