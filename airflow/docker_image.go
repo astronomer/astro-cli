@@ -389,7 +389,12 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		cmd := "echo \"" + authConfig.Password[len("Bearer "):] + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
+		pass := authConfig.Password
+		prefix := "Bearer "
+		if strings.HasPrefix(pass, prefix) {
+			pass = pass[len(prefix):]
+		}
+		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
 	}
 	if err != nil {
