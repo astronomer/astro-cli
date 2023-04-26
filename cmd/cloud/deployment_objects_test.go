@@ -29,7 +29,7 @@ func TestDeploymentConnectionRootCommand(t *testing.T) {
 	cmd := newDeploymentRootCmd(os.Stdout)
 	cmd.SetOut(buf)
 	cmdArgs := []string{"connection", "-h"}
-	_, err := execWorkspaceCmd(cmdArgs...)
+	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 }
 
