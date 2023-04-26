@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	docker_types "github.com/docker/docker/api/types"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -624,6 +624,76 @@ func TestDockerComposeStart(t *testing.T) {
 
 		err := mockDockerCompose.Start("", "", "", noCache, false, waitTime)
 		assert.ErrorIs(t, err, errMockDocker)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+}
+
+func TestDockerComposeExport(t *testing.T) {
+	testUtils.InitTestConfig(testUtils.LocalPlatform)
+	mockDockerCompose := DockerCompose{projectName: "test", airflowHome: "/home/airflow", envFile: "/home/airflow/.env"}
+
+	t.Run("success", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("settings.yaml", "docker-compose.yaml")
+		assert.NoError(t, err)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("compose ps failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return(nil, errMockDocker).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("settings.yaml", "docker-compose.yaml")
+		assert.ErrorIs(t, err, errMockDocker)
+
+		imageHandler.AssertExpectations(t)
+		composeMock.AssertExpectations(t)
+	})
+
+	t.Run("list label failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{}, errMockDocker).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("settings.yaml", "docker-compose.yaml")
+		assert.ErrorIs(t, err, errMockDocker)
+
+		imageHandler.AssertExpectations(t)
+	})
+
+	t.Run("generate yaml failure", func(t *testing.T) {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()
+
+		composeMock := new(mocks.DockerComposeAPI)
+		composeMock.On("Ps", mock.Anything, mock.Anything, api.PsOptions{All: true}).Return([]api.ContainerSummary{}, nil).Once()
+
+		mockDockerCompose.composeService = composeMock
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ComposeExport("", "")
+		assert.ErrorContains(t, err, "failed to write to compose file")
 
 		imageHandler.AssertExpectations(t)
 		composeMock.AssertExpectations(t)

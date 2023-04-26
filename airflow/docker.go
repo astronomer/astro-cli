@@ -265,7 +265,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 		All: true,
 	})
 	if err != nil {
-		return errors.Wrap(err, composeCreateErrMsg)
+		return err
 	}
 
 	// get image lables
@@ -283,7 +283,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 	// write the yaml to a file
 	err = os.WriteFile(composeFile, []byte(yaml), 0o666) //nolint:gosec, gomnd
 	if err != nil {
-		return errors.Wrap(err, "failed to write compose file")
+		return errors.Wrap(err, "failed to write to compose file")
 	}
 
 	return nil
