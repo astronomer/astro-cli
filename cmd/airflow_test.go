@@ -1096,6 +1096,23 @@ func TestAirflowObjectExport(t *testing.T) {
 		mockContainerHandler.AssertExpectations(t)
 	})
 
+	t.Run("success compose export", func(t *testing.T) {
+		cmd := newObjectExportCmd()
+		cmd.Flag("compose").Value.Set("true")
+
+		args := []string{}
+
+		mockContainerHandler := new(mocks.ContainerHandler)
+		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
+			mockContainerHandler.On("ComposeExport", "airflow_settings.yaml", composeFile).Return(nil).Once()
+			return mockContainerHandler, nil
+		}
+
+		err := airflowSettingsExport(cmd, args)
+		assert.NoError(t, err)
+		mockContainerHandler.AssertExpectations(t)
+	})
+
 	t.Run("without any object flag", func(t *testing.T) {
 		cmd := newObjectExportCmd()
 		args := []string{}
