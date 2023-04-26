@@ -12,10 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewDeploymentInspectCmd(t *testing.T) {
-	expectedHelp := "Inspect an Astro Deployment."
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	deploymentResponse := []astro.Deployment{
+var (
+	deploymentResponse = []astro.Deployment{
 		{
 			ID:          "test-deployment-id",
 			Label:       "test-deployment-label",
@@ -102,6 +100,11 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 			},
 		},
 	}
+)
+
+func TestNewDeploymentInspectCmd(t *testing.T) {
+	expectedHelp := "Inspect an Astro Deployment."
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
 	t.Run("-h prints help", func(t *testing.T) {
