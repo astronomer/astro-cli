@@ -1104,7 +1104,7 @@ func TestAirflowObjectExport(t *testing.T) {
 
 		mockContainerHandler := new(mocks.ContainerHandler)
 		containerHandlerInit = func(airflowHome, envFile, dockerfile, imageName string) (airflow.ContainerHandler, error) {
-			mockContainerHandler.On("ComposeExport", "airflow_settings.yaml", composeFile).Return(nil).Once()
+			mockContainerHandler.On("ComposeExport", "airflow_settings.yaml", exportComposeFile).Return(nil).Once()
 			return mockContainerHandler, nil
 		}
 
