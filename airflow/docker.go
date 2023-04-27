@@ -277,7 +277,7 @@ func (d *DockerCompose) ComposeExport(settingsFile, composeFile string) error {
 	// Generate the docker-compose yaml
 	yaml, err := generateConfig(d.projectName, d.airflowHome, d.envFile, "", settingsFile, imageLabels)
 	if err != nil {
-		return errors.Wrap(err, "failed to create compose file")
+		return errors.Wrap(err, "failed to create Compose file")
 	}
 
 	// write the yaml to a file

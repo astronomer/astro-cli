@@ -32,6 +32,7 @@ var (
 	customImageName        string
 	settingsFile           string
 	composeFile            string
+	exportComposeFile      string
 	pytestArgs             []string
 	followLogs             bool
 	schedulerLogs          bool
@@ -359,8 +360,8 @@ func newAirflowObjectRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "object",
 		Aliases: []string{"obj"},
-		Short:   "Manage local Airflow Connections, Variables, Pools and compose file.",
-		Long:    "Manage local Airflow Connections, Variables, and Pools. You can export and import this objects from a local Airflow environment to an Airflow settings file. Export compose file used in 'astro dev start'",
+		Short:   "Configure your local Airflow environment.",
+		Long:    "Manage local Airflow connections, variables, and pools. Import or export your objects to your Airflow settings file. Configure Airflow's startup behavior using a Compose file.",
 	}
 	cmd.AddCommand(
 		newObjectImportCmd(),
@@ -391,8 +392,8 @@ func newObjectImportCmd() *cobra.Command {
 func newObjectExportCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export all Airflow connections, variables, pools, or compose file to a YAML or env file",
-		Long:  "This command exports all Airflow connections, variables, and pools to a settings YAML file or env file. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the compose file used in 'astro dev start'",
+		Short: "Export local Airflow connections, variables, pools, and startup configurations as YAML or environment variables.",
+		Long:  "Export local Airflow connections, variables, or pools as YAML or environment variables. Airflow must be running locally to export Airflow objects. Use the '--compose' flag to export the Compose file used to start up Airflow.",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -406,9 +407,9 @@ func newObjectExportCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&pools, "pools", "p", false, "Export pools to a settings file. Note pools cannot be exported to a env file ")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "The location of the file to store exported Airflow objects as YAML. Default is 'airflow_settings.yaml'")
 	cmd.Flags().BoolVarP(&envExport, "env-export", "n", false, "Export Airflow objects as Astro environment variables.")
-	cmd.Flags().BoolVarP(&compose, "compose", "", false, "Export compose file used in 'astro dev start'")
+	cmd.Flags().BoolVarP(&compose, "compose", "", false, "Export the Compose file used to start Airflow locally.")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "The location of the file to store exported Airflow objects as Astro environment variables. Default is '.env'.")
-	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "compose.yaml", "The location to export the compose file used in 'astro dev start' to")
+	cmd.Flags().StringVarP(&exportComposeFile, "compose-file", "", "compose.yaml", "The location to export the Compose file used to start Airflow locally.")
 	return cmd
 }
 
@@ -757,8 +758,8 @@ func airflowSettingsExport(cmd *cobra.Command, args []string) error {
 	}
 
 	if compose {
-		fmt.Println("Exporting compose file to " + composeFile)
-		return containerHandler.ComposeExport(settingsFile, composeFile)
+		fmt.Println("Exporting compose file to " + exportComposeFile)
+		return containerHandler.ComposeExport(settingsFile, exportComposeFile)
 	}
 
 	return containerHandler.ExportSettings(settingsFile, envFile, connections, variables, pools, envExport)
