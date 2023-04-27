@@ -56,7 +56,7 @@ func TestDeploymentList(t *testing.T) {
 	resp, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	assert.Contains(t, resp, "test-id-1")
-	assert.Contains(t, resp, "test-id-3")
+	assert.Contains(t, resp, "test-id-2")
 	mockClient.AssertExpectations(t)
 }
 
