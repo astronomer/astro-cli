@@ -28,12 +28,7 @@ core_api_gen:
 	make mock_astro_core
 
 test:
-	go mod download
-	go install github.com/onsi/ginkgo/ginkgo@v1.12.0
-	ginkgo --skipPackage=e2e -r -v --cover --covermode atomic --coverprofile=coverage.txt
-
-e2e_test:
-	go test -count=1 $(shell go list ./... | grep e2e)
+	go test -count=1 -cover -coverprofile=coverage.txt -covermode=atomic ./...
 
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
@@ -41,7 +36,7 @@ temp-astro:
 temp-astro-flow:
 	./astro flow init $(shell mktemp -d)
 
-mock: mock_airflow mock_houston mock_astro mock_pkg mock_sql_cli mock_astro_core
+mock: mock_airflow mock_houston mock_astro mock_pkg mock_astro_core
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
@@ -62,11 +57,6 @@ mock_astro_core:
 
 mock_pkg:
 	mockery --filename=Azure.go --output=pkg/azure/mocks --dir=pkg/azure --outpkg=azure_mocks --name Azure
-
-mock_sql_cli:
-	mockery --filename="docker_interface.go" --output="sql/mocks" --dir=sql/ --outpkg=mocks --name DockerBind
-	mockery --filename="io_interface.go" --output="sql/mocks" --dir=sql/ --outpkg=mocks --name IoBind
-	mockery --filename="os_interface.go" --output="sql/mocks" --dir=sql/ --outpkg=mocks --name OsBind
 
 codecov:
 	@eval $$(curl -s https://codecov.io/bash)

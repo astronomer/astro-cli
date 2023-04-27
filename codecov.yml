@@ -1,7 +1,6 @@
 ---
 ignore:
   - "astro-client-core/api.gen.go"
-  - "sql/docker_interface.go"
 coverage:
   range: 87..100
   round: down
