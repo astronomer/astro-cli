@@ -56,8 +56,8 @@ func newDeploymentConnectionListCmd(out io.Writer) *cobra.Command {
 			return deploymentConnectionList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to list connections from.")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to list connections from")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
 
 	return cmd
 }
@@ -68,22 +68,22 @@ func newDeploymentConnectionCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create connections for a Deployment",
-		Long:    "Create connections for an Astro Deployment",
+		Long:    "Create Airflow connections for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to create connections for")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to create connections for")
-	cmd.Flags().StringVarP(&connID, "conn-id", "i", "", "The connection's connection ID. Required to create a connection")
-	cmd.Flags().StringVarP(&connType, "conn-type", "t", "", "The connection's connection type. Required to create a connection")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The connection's description")
-	cmd.Flags().StringVarP(&host, "host", "", "", "The connection's host")
-	cmd.Flags().StringVarP(&login, "login", "l", "", "The connection's login or username")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "The connection's password")
-	cmd.Flags().StringVarP(&schema, "schema", "s", "", "The connection's schema")
-	cmd.Flags().IntVarP(&port, "port", "o", 0, "The connection's port")
-	cmd.Flags().StringVarP(&extra, "extra", "e", "", "The connection's extra field. Pass a stringified json object to this flag")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&connID, "conn-id", "i", "", "The connection ID. Required.")
+	cmd.Flags().StringVarP(&connType, "conn-type", "t", "", "The connection type. Required.")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The connection description.")
+	cmd.Flags().StringVarP(&host, "host", "", "", "The connection host.")
+	cmd.Flags().StringVarP(&login, "login", "l", "", "The connection login or username.")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "The connection password.")
+	cmd.Flags().StringVarP(&schema, "schema", "s", "", "The connection schema.")
+	cmd.Flags().IntVarP(&port, "port", "o", 0, "The connection port.")
+	cmd.Flags().StringVarP(&extra, "extra", "e", "", "The extra field configuration, defined as a stringified JSON object.")
 
 	return cmd
 }
@@ -94,22 +94,22 @@ func newDeploymentConnectionUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update connections for a Deployment",
-		Long:    "Update connections for an Astro Deployment",
+		Long:    "Update existing Airflow connections for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionUpdate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to update connections for")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to update connections for")
-	cmd.Flags().StringVarP(&connID, "conn-id", "i", "", "The connection's connection ID. Required to update a connection")
-	cmd.Flags().StringVarP(&connType, "conn-type", "t", "", "The connection's connection type")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The connection's description")
-	cmd.Flags().StringVarP(&host, "host", "", "", "The connection's host")
-	cmd.Flags().StringVarP(&login, "login", "l", "", "The connection's login or username")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "The connection's password")
-	cmd.Flags().StringVarP(&schema, "schema", "s", "", "The connection's schema")
-	cmd.Flags().IntVarP(&port, "port", "o", 0, "The connection's port")
-	cmd.Flags().StringVarP(&extra, "extra", "e", "", "The connection's extra field. Pass a stringified json object to this flag")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&connID, "conn-id", "i", "", "The connection ID. Required.")
+	cmd.Flags().StringVarP(&connType, "conn-type", "t", "", "The connection type. Required.")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The connection description.")
+	cmd.Flags().StringVarP(&host, "host", "", "", "The connection host.")
+	cmd.Flags().StringVarP(&login, "login", "l", "", "The connection login or username.")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "The connection password.")
+	cmd.Flags().StringVarP(&schema, "schema", "s", "", "The connection schema.")
+	cmd.Flags().IntVarP(&port, "port", "o", 0, "The connection port.")
+	cmd.Flags().StringVarP(&extra, "extra", "e", "", "The extra field configuration, defined as a stringified JSON object.")
 
 	return cmd
 }
@@ -119,16 +119,16 @@ func newDeploymentConnectionCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
 		Aliases: []string{"cp"},
-		Short:   "Copy the connections from one Deployment to another",
-		Long:    "Copy connections from one Astro Deployment to another Astro Deployment. The password and extra fields will not copy over. If a connection already exits with same connection ID it will be updated",
+		Short:   "Copy connections from one Deployment to another",
+		Long:    "Copy Airflow connections from one Astro Deployment to another. Passwords and extra configurations will not copy over. If a connection already exits with same connection ID in the target Deployment, that connection will be updated",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentConnectionCopy(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The deployment id to copy connections from.")
-	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "Name of the deployment to copy connections from")
-	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The id of the deployment where copied connnections are created or updated")
-	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "Name of the deployment where copied connections are created or updated")
+	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The ID of the Deployment to copy connections from.")
+	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy connections from")
+	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied connections")
+	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied connections")
 
 	return cmd
 }
@@ -137,8 +137,8 @@ func newDeploymentAirflowVariableRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "airflow-variable",
 		Aliases: []string{"var"},
-		Short:   "Manage deployment's airflow variables",
-		Long:    "Manage airflow variables stored in an Astro Deployment's metadata database.",
+		Short:   "Manage Airflow variables in an Astro Deployment",
+		Long:    "Manage Airflow variables stored in an Astro Deployment's metadata database.",
 	}
 	cmd.AddCommand(
 		newDeploymentAirflowVariableListCmd(out),
@@ -153,14 +153,14 @@ func newDeploymentAirflowVariableListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"li"},
-		Short:   "list a Deployment's airflow variables",
-		Long:    "list airflow variables stored in an Astro Deployment's Airflow metadata database",
+		Short:   "list a Deployment's Airflow variables",
+		Long:    "list Airflow variables stored in an Astro Deployment's metadata database",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to list airflow variables from.")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to list airflow variables from")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
 
 	return cmd
 }
@@ -170,17 +170,17 @@ func newDeploymentAirflowVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create airflow variables for a Deployment",
-		Long:    "Create airflow variables for an Astro Deployment",
+		Short:   "Create Airflow variables for a Deployment",
+		Long:    "Create Airflow variables for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to create airflow variables for")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to create airflow variables for")
-	cmd.Flags().StringVarP(&varValue, "value", "v", "", "The airflow variables's value. Required to create an airflow variable")
-	cmd.Flags().StringVarP(&key, "key", "k", "", "The airflow variables's key. Required to create an airflow variable")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The airflow variable's description")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&varValue, "value", "v", "", "The Airflow variable value. Required.")
+	cmd.Flags().StringVarP(&key, "key", "k", "", "The Airflow variable key. Required.")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The Airflow variable description.")
 
 	return cmd
 }
@@ -190,17 +190,17 @@ func newDeploymentAirflowVariableUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update airflow variables for a Deployment",
-		Long:    "Update airflow variables for an Astro Deployment",
+		Short:   "Update Airflow variables for a Deployment",
+		Long:    "Update Airflow variables for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableUpdate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to update airflow variables for")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to update airflow variables for")
-	cmd.Flags().StringVarP(&varValue, "value", "v", "", "The airflow variables's value")
-	cmd.Flags().StringVarP(&key, "key", "k", "", "The airflow variables's key. Required to update an airflow variable")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The airflow variable's description")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&varValue, "value", "v", "", "The Airflow variable value. Required.")
+	cmd.Flags().StringVarP(&key, "key", "k", "", "The Airflow variable key. Required.")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The Airflow variable description.")
 
 	return cmd
 }
@@ -216,10 +216,10 @@ func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 			return deploymentAirflowVariableCopy(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The deployment id to copy airflow variables from.")
-	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "Name of the deployment to copy airflow variables from")
-	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The id of the deployment where copied airflow variables are created or updated")
-	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "Name of the deployment where copied airflow variables are created or updated")
+	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The ID of the Deployment to copy Airflow variables from.")
+	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy Airflow variables from")
+	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied Airflow variables")
+	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied Airflow variables")
 
 	return cmd
 }
@@ -287,11 +287,11 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentPoolUpdate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to update pools for")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to update pools for")
-	cmd.Flags().StringVarP(&name, "name", "", "", "The pools's value")
-	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The pools's key. Required to update an pool")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The pool's description")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment,")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&name, "name", "", "", "The pool value.  Required.")
+	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The pool slots.")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The pool description.")
 
 	return cmd
 }
@@ -328,7 +328,7 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
+		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
@@ -339,7 +339,7 @@ func deploymentConnectionList(cmd *cobra.Command, out io.Writer) error {
 func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
 	// Silence Usage as we have now validated command input
@@ -349,7 +349,7 @@ func deploymentConnectionCreate(cmd *cobra.Command, out io.Writer) error {
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
+		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
@@ -379,7 +379,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 	// get Airflow URl
 	value, err := inspect.ReturnSpecifiedValue(ws, deploymentName, deploymentID, astroClient, requestedField)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
+		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
 	airlfowURL := fmt.Sprintf("%v", value)
@@ -396,7 +396,7 @@ func deploymentConnectionUpdate(cmd *cobra.Command, out io.Writer) error {
 func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
 	// Silence Usage as we have now validated command input
@@ -405,20 +405,20 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	requestedField = requestString
 	// get To Airflow URls
 	if fromDeploymentName == "" && fromDeploymentID == "" {
-		fmt.Println("Which deployment should connections be copied from?")
+		fmt.Println("Which Deployment should connections be copied from?")
 	}
 	fromValue, err := inspect.ReturnSpecifiedValue(ws, fromDeploymentName, fromDeploymentID, astroClient, requestedField)
 	if err != nil {
-		return errors.Wrap(err, "failed to find the source deployments airflow webserver URL")
+		return errors.Wrap(err, "failed to find the source Deployment Airflow webserver URL")
 	}
 
 	fromAirlfowURL := fmt.Sprintf("%v", fromValue)
 	if toDeploymentName == "" && toDeploymentID == "" {
-		fmt.Println("Which deployment should connections be pasted to?")
+		fmt.Println("Which Deployment should receive the connections?")
 	}
 	value, err := inspect.ReturnSpecifiedValue(ws, toDeploymentName, toDeploymentID, astroClient, requestedField)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a deployments airflow webserver URL")
+		return errors.Wrap(err, "failed to find the Deployment Airflow webserver URL")
 	}
 
 	toAirlfowURL := fmt.Sprintf("%v", value)
@@ -429,7 +429,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 func deploymentAirflowVariableList(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return errors.Wrap(err, "failed to find a valid Workspace")
 	}
 
 	// Silence Usage as we have now validated command input
