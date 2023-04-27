@@ -62,7 +62,7 @@ type CustomClaims struct {
 }
 
 //nolint:gocognit
-func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient astrocore.CoreClient) error {
+func Setup(cmd *cobra.Command, client astro.Client, coreClient astrocore.CoreClient) error {
 	// If the user is trying to login or logout no need to go through auth setup.
 	if cmd.CalledAs() == "login" || cmd.CalledAs() == "logout" {
 		return nil
@@ -104,7 +104,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, coreClient, args)
+	apiToken, err := checkAPIToken(isDeploymentFile, coreClient)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func Setup(cmd *cobra.Command, args []string, client astro.Client, coreClient as
 	}
 
 	// run auth setup for any command that requires auth
-	apiKey, err := checkAPIKeys(client, coreClient, isDeploymentFile, args)
+	apiKey, err := checkAPIKeys(client, coreClient, isDeploymentFile)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func refresh(refreshToken string, authConfig astro.AuthConfig) (TokenResponse, e
 	return tokenRes, nil
 }
 
-func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isDeploymentFile bool, args []string) (bool, error) {
+func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isDeploymentFile bool) (bool, error) {
 	// check os variables
 	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
 	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
@@ -323,20 +323,18 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	orgShortName := org.ShortName
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
-	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
-	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
-		// get workspace ID
-		deployments, err := astroClient.ListDeployments(orgID, "")
-		if err != nil {
-			return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-		}
-		workspaceID = deployments[0].Workspace.ID
-
-		err = c.SetContextKey("workspace", workspaceID) // c.Workspace
-		if err != nil {
-			fmt.Println("no workspace set")
-		}
+	// get workspace ID
+	deployments, err := astroClient.ListDeployments(orgID, "")
+	if err != nil {
+		return false, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
+	workspaceID = deployments[0].Workspace.ID
+
+	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+	if err != nil {
+		fmt.Println("no workspace set")
+	}
+
 	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
 	if err != nil {
 		fmt.Println("no organization context set")
@@ -344,7 +342,7 @@ func checkAPIKeys(astroClient astro.Client, coreClient astrocore.CoreClient, isD
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args []string) (bool, error) {
+func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
@@ -408,12 +406,9 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient, args 
 	org := orgs[0]
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
-	// If using api keys for virtual runtimes, we dont need to look up for this endpoint
-	if !(len(args) > 0 && strings.HasPrefix(args[0], "vr-")) {
-		err := c.SetContextKey("workspace", workspaceID) // c.Workspace
-		if err != nil {
-			fmt.Println("no workspace set")
-		}
+	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+	if err != nil {
+		fmt.Println("no workspace set")
 	}
 	err = c.SetOrganizationContext(orgID, orgShortName, orgProduct)
 	if err != nil {
