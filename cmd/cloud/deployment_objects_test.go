@@ -94,6 +94,14 @@ func TestConnectionCreate(t *testing.T) {
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
+	t.Run("successful airflow variable create", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("CreateConnection", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"connection", "create", "-d", "test-deployment-id", "--conn-id", "conn-id", "--conn-type", "conn-type"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
 }
 
 func TestConnectionUpdate(t *testing.T) {
@@ -235,7 +243,7 @@ func TestVariableUpdate(t *testing.T) {
 		assert.EqualError(t, err, "error")
 	})
 
-	t.Run("any context errors from api are returned and variables are not updated", func(t *testing.T) {
+	t.Run("any context errors from api are returned and airflow variables are not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
@@ -244,7 +252,7 @@ func TestVariableUpdate(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("successful connection update", func(t *testing.T) {
+	t.Run("successful airflow variable update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
@@ -282,6 +290,15 @@ func TestVaraibleCreate(t *testing.T) {
 		cmdArgs := []string{"airflow-variable", "create"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
+	})
+
+	t.Run("successful airflow variable create", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("CreateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"airflow-variable", "create", "-d", "test-deployment-id", "--key", "KEY", "--value", "VAR"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
 	})
 }
 
@@ -391,7 +408,7 @@ func TestPoolUpdate(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("successful connection update", func(t *testing.T) {
+	t.Run("successful pool update", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		mockClient.On("UpdatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
@@ -429,6 +446,15 @@ func TestPoolCreate(t *testing.T) {
 		cmdArgs := []string{"pool", "create"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
+	})
+
+	t.Run("successful pool create", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("CreatePool", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"pool", "create", "-d", "test-deployment-id", "--name", "name"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
 	})
 }
 
