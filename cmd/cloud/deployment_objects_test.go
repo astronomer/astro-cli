@@ -175,8 +175,154 @@ func TestConnectionCopy(t *testing.T) {
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, nil).Twice()
 		mockClient.On("UpdateConnection", mock.AnythingOfType("string"), mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Twice()
 		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
-		// mockClient.On("CopyConnections", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Once()
 		cmdArgs := []string{"connection", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestVariableList(t *testing.T) {
+	expectedHelp := "list airflow variables stored in an Astro Deployment's Airflow metadata database"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(airflowclient_mocks.Client)
+	airflowAPIClient = mockClient
+	mockAstroClient := new(astro_mocks.Client)
+	astroClient = mockAstroClient
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"airflow-variable", "list", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and variables are not listed", func(t *testing.T) {
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("GetVariables", mock.Anything).Return(mockResp, errTest).Once()
+		cmdArgs := []string{"airflow-variable", "list", "-d", "test-deployment-id"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "error")
+	})
+	t.Run("any context errors from api are returned and variables are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("GetVariables", mock.Anything).Return(mockResp, nil).Once()
+		cmdArgs := []string{"airflow-variable", "list", "-d", "test-deployment-id"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+}
+
+func TestVariableUpdate(t *testing.T) {
+	expectedHelp := "Update airflow variables for an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(airflowclient_mocks.Client)
+	airflowAPIClient = mockClient
+	mockAstroClient := new(astro_mocks.Client)
+	astroClient = mockAstroClient
+
+	t.Run("-h prints update help", func(t *testing.T) {
+		cmdArgs := []string{"airflow-variable", "update", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+
+	t.Run("any errors from api are returned and variables are not updated", func(t *testing.T) {
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
+		cmdArgs := []string{"airflow-variable", "update", "-d", "test-deployment-id", "--key", "KEY"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "error")
+	})
+
+	t.Run("any context errors from api are returned and variables are not updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"airflow-variable", "update"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+
+	t.Run("successful connection update", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"airflow-variable", "update", "-d", "test-deployment-id", "--key", "KEY"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestVaraibleCreate(t *testing.T) {
+	expectedHelp := "Create airflow variables for an Astro Deployment"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(airflowclient_mocks.Client)
+	airflowAPIClient = mockClient
+	mockAstroClient := new(astro_mocks.Client)
+	astroClient = mockAstroClient
+
+	t.Run("-h prints create  help", func(t *testing.T) {
+		cmdArgs := []string{"airflow-variable", "create", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and variables are not created", func(t *testing.T) {
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("CreateVariable", mock.AnythingOfType("string"), mock.Anything).Return(errTest).Once()
+		cmdArgs := []string{"airflow-variable", "create", "-d", "test-deployment-id", "--key", "KEY", "--value", "VAR"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "error")
+	})
+	t.Run("any context errors from api are returned and variables are not created", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
+		mockClient.On("CreateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Once()
+		cmdArgs := []string{"airflow-variable", "create"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+}
+
+func TestVariableCopy(t *testing.T) {
+	expectedHelp := "Copy airflow variables from one Astro Deployment to another Astro Deployment."
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mockClient := new(airflowclient_mocks.Client)
+	airflowAPIClient = mockClient
+	mockAstroClient := new(astro_mocks.Client)
+	astroClient = mockAstroClient
+
+	t.Run("-h prints copy help", func(t *testing.T) {
+		cmdArgs := []string{"airflow-variable", "copy", "-h"}
+		resp, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+
+	t.Run("any errors from api are returned and variables are not copied", func(t *testing.T) {
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockClient.On("GetVariables", mock.Anything).Return(mockResp, errTest).Once()
+		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.EqualError(t, err, "error")
+	})
+
+	t.Run("any context errors from api are returned and variables are not copied", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		mockClient.On("Copyvariables", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Once()
+		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+
+	t.Run("successful variable copy", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient.On("GetVariables", mock.Anything).Return(mockResp, nil).Twice()
+		mockClient.On("UpdateVariable", mock.AnythingOfType("string"), mock.Anything).Return(nil).Twice()
+		mockAstroClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Twice()
+		cmdArgs := []string{"airflow-variable", "copy", "--source-id", "test-deployment-id", "--target-id", "test-deployment-id-1"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
