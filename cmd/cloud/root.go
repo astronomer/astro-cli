@@ -25,6 +25,5 @@ func AddCmds(client astro.Client, coreClient astrocore.CoreClient, airflowClient
 		newDeploymentRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
-		newUserCmd(out),
 	}
 }

@@ -1,6 +1,5 @@
 package astro
 
-// TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
 	WorkspacesGetRequest = `
 	query GetWorkspaces($organizationId: Id!) {
@@ -144,19 +143,6 @@ var (
 		}
 	}`
 
-	SelfQuery = `
-	query selfQuery {
-		self {
-		user {
-			roleBindings {
-			role
-			}
-		}
-		authenticatedOrganizationId
-		}
-	}
-	`
-
 	DeploymentHistoryQuery = `
 	query deploymentHistory(
 		$deploymentId: Id!
@@ -266,13 +252,4 @@ var (
 			}
 		}
 	}`
-
-	GetOrganizations = `
-	query Query {
-		organizations {
-		  id
-		  name
-		}
-	  }
-	`
 )

@@ -12,6 +12,9 @@ release:
     name: astro-cli
   # If set to auto, will mark the release as not ready for production
   prerelease: true
+changelog:
+  sort: asc
+  use: github
 builds:
   - main: main.go
     binary: astro

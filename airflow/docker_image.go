@@ -72,7 +72,7 @@ func (d *DockerImage) Build(buildConfig airflowTypes.ImageBuildConfig) error {
 	}
 	err = cmdExec(dockerCommand, stdout, stderr, args...)
 	if err != nil {
-		return fmt.Errorf("command 'docker build -t %s failed: %w", d.imageName, err)
+		return fmt.Errorf("command '%s build -t %s failed: %w", dockerCommand, d.imageName, err)
 	}
 	return err
 }
@@ -154,7 +154,7 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	dockerCommand := config.CFG.DockerCommand.GetString()
 	err := cmdExec(dockerCommand, nil, nil, "tag", d.imageName, remoteImage)
 	if err != nil {
-		return fmt.Errorf("command 'docker tag %s %s' failed: %w", d.imageName, remoteImage, err)
+		return fmt.Errorf("command '%s tag %s %s' failed: %w", dockerCommand, d.imageName, remoteImage, err)
 	}
 
 	// Push image to registry
@@ -173,7 +173,7 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 		creds := configFile.GetCredentialsStore(registryDomain)
 		authConfig, err = creds.Get(registryDomain)
 		if err != nil {
-			log.Debugf("Error reading credentials for domain: %s from docker credentials store: %v", registryDomain, err)
+			log.Debugf("Error reading credentials for domain: %s from %s credentials store: %v", dockerCommand, registryDomain, err)
 		}
 	} else {
 		if username != "" {
@@ -183,7 +183,7 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 		authConfig.ServerAddress = registry
 	}
 
-	log.Debugf("Exec Push docker creds %v \n", authConfig)
+	log.Debugf("Exec Push %s creds %v \n", dockerCommand, authConfig)
 
 	ctx := context.Background()
 
@@ -214,7 +214,7 @@ func (d *DockerImage) Push(registry, username, token, remoteImage string) error 
 	// Delete the image tags we just generated
 	err = cmdExec(dockerCommand, nil, nil, "rmi", remoteImage)
 	if err != nil {
-		return fmt.Errorf("command 'docker rmi %s' failed: %w", remoteImage, err)
+		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, remoteImage, err)
 	}
 	return nil
 }
@@ -273,7 +273,7 @@ func (d *DockerImage) TagLocalImage(localImage string) error {
 
 	err := cmdExec(dockerCommand, nil, nil, "tag", localImage, d.imageName)
 	if err != nil {
-		return fmt.Errorf("command 'docker tag %s %s' failed: %w", localImage, d.imageName, err)
+		return fmt.Errorf("command '%s tag %s %s' failed: %w", dockerCommand, localImage, d.imageName, err)
 	}
 	return nil
 }
@@ -389,7 +389,10 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 
 	var err error
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		cmd := "echo \"" + authConfig.Password + "\"" + " | docker login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
+		pass := authConfig.Password
+		prefix := "Bearer "
+		pass = strings.TrimPrefix(pass, prefix)
+		cmd := "echo \"" + pass + "\"" + " | " + dockerCommand + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
 	}
 	if err != nil {
@@ -403,7 +406,7 @@ func useBash(authConfig *cliTypes.AuthConfig, image string) error {
 	// Delete the image tags we just generated
 	err = cmdExec(dockerCommand, nil, nil, "rmi", image)
 	if err != nil {
-		return fmt.Errorf("command 'docker rmi %s' failed: %w", image, err)
+		return fmt.Errorf("command '%s rmi %s' failed: %w", dockerCommand, image, err)
 	}
 	return nil
 }

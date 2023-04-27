@@ -1,7 +1,6 @@
 package astro
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,7 +13,6 @@ import (
 var organizationShortNameRegex = regexp.MustCompile("[^a-z0-9-]")
 
 type Client interface {
-	GetUserInfo() (*Self, error)
 	// Workspace
 	ListWorkspaces(organizationID string) ([]Workspace, error)
 	GetWorkspace(workspaceID string) (Workspace, error)
@@ -34,33 +32,12 @@ type Client interface {
 	DeployImage(input DeployImageInput) (*Image, error)
 	// Cluster
 	ListClusters(organizationID string) ([]Cluster, error)
-	// UserInvite
-	CreateUserInvite(input CreateUserInviteInput) (UserInvite, error)
 	// WorkerQueues
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
-	GetOrganizations() ([]Organization, error)
 	GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error)
 	// Alert Emails
 	UpdateAlertEmails(input UpdateDeploymentAlertsInput) (DeploymentAlerts, error)
-}
-
-func (c *HTTPClient) GetUserInfo() (*Self, error) {
-	req := Request{
-		Query: SelfQuery,
-	}
-
-	resp, err := req.DoWithPublicClient(c)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Data.SelfQuery == nil {
-		fmt.Printf("Something went wrong! Try again or contact Astronomer Support")
-		return nil, errors.New("something went wrong! Try again or contact Astronomer Support") //nolint:goerr113
-	}
-
-	return resp.Data.SelfQuery, nil
 }
 
 func (c *HTTPClient) ListWorkspaces(organizationID string) ([]Workspace, error) {
@@ -244,20 +221,6 @@ func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
 	return resp.Data.GetClusters, nil
 }
 
-// CreateUserInvite create a user invite request
-func (c *HTTPClient) CreateUserInvite(input CreateUserInviteInput) (UserInvite, error) {
-	req := Request{
-		Query:     CreateUserInvite,
-		Variables: map[string]interface{}{"input": input},
-	}
-
-	resp, err := req.DoWithPublicClient(c)
-	if err != nil {
-		return UserInvite{}, err
-	}
-	return resp.Data.CreateUserInvite, nil
-}
-
 // GetWorkspace returns information about the workspace
 func (c *HTTPClient) GetWorkspace(workspaceID string) (Workspace, error) {
 	wsReq := Request{
@@ -283,19 +246,6 @@ func (c *HTTPClient) GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error) 
 		return WorkerQueueDefaultOptions{}, err
 	}
 	return wqResp.Data.GetWorkerQueueOptions, nil
-}
-
-// Gets a list of Organizations
-func (c *HTTPClient) GetOrganizations() ([]Organization, error) {
-	req := Request{
-		Query: GetOrganizations,
-	}
-
-	resp, err := req.DoWithPublicClient(c)
-	if err != nil {
-		return []Organization{}, err
-	}
-	return resp.Data.GetOrganizations, nil
 }
 
 func (c *HTTPClient) GetOrganizationAuditLogs(orgName string, earliest int) (io.ReadCloser, error) {

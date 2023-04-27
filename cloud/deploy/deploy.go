@@ -292,9 +292,12 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold(deployInfo.webserverURL)))
 	} else {
 		fullpath := filepath.Join(deployInput.Path, ".dockerignore")
-		err := removeDagsFromDockerIgnore(fullpath)
-		if err != nil {
-			return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+		fileExist, _ := fileutil.Exists(fullpath, nil)
+		if fileExist {
+			err := removeDagsFromDockerIgnore(fullpath)
+			if err != nil {
+				return errors.New("Found dags entry in .dockerignore file. Remove this entry and try again")
+			}
 		}
 		envFileExists, _ := fileutil.Exists(deployInput.EnvFile, nil)
 		if !envFileExists && deployInput.EnvFile != ".env" {
@@ -359,7 +362,7 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 			}
 		}
 
-		fmt.Println("Successfully pushed Docker image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
+		fmt.Println("Successfully pushed image to Astronomer registry. Navigate to the Astronomer UI for confirmation that your deploy was successful." +
 			"\n\n Access your Deployment: \n" +
 			fmt.Sprintf("\n Deployment View: %s", ansi.Bold("https://"+deploymentURL)) +
 			fmt.Sprintf("\n Airflow UI: %s", ansi.Bold("https://"+deployInfo.webserverURL)))
