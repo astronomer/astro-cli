@@ -41,7 +41,6 @@ type cfgs struct {
 	SkipParse             cfg
 	Interactive           cfg
 	PageSize              cfg
-	SQLCLI                cfg
 	AuditLogs             cfg
 	UpgradeMessage        cfg
 	DisableAstroRun       cfg

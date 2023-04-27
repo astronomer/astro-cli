@@ -81,7 +81,6 @@ var (
 		SkipParse:             newCfg("skip_parse", "false"),
 		Interactive:           newCfg("interactive", "false"),
 		PageSize:              newCfg("page_size", "20"),
-		SQLCLI:                newCfg("beta.sql_cli", "false"),
 		AuditLogs:             newCfg("beta.audit_logs", "false"),
 		UpgradeMessage:        newCfg("upgrade_message", "true"),
 		DisableAstroRun:       newCfg("disable_astro_run", "false"),
