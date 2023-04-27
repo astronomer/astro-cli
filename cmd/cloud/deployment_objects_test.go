@@ -360,7 +360,7 @@ func TestPoolList(t *testing.T) {
 }
 
 func TestPoolUpdate(t *testing.T) {
-	expectedHelp := "Update airflow pool for an Astro Deployment"
+	expectedHelp := "Update pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
