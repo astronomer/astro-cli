@@ -66,7 +66,7 @@ func TestConnectionList(t *testing.T) {
 }
 
 func TestConnectionCreate(t *testing.T) {
-	expectedHelp := "Create connections for an Astro Deployment"
+	expectedHelp := "Create Airflow connections for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -105,7 +105,7 @@ func TestConnectionCreate(t *testing.T) {
 }
 
 func TestConnectionUpdate(t *testing.T) {
-	expectedHelp := "Update connections for an Astro Deployment"
+	expectedHelp := "Update existing Airflow connections for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -147,7 +147,7 @@ func TestConnectionUpdate(t *testing.T) {
 }
 
 func TestConnectionCopy(t *testing.T) {
-	expectedHelp := "Copy connections from one Astro Deployment to another"
+	expectedHelp := "Copy Airflow connections from one Astro Deployment to another"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -190,7 +190,7 @@ func TestConnectionCopy(t *testing.T) {
 }
 
 func TestVariableList(t *testing.T) {
-	expectedHelp := "list airflow variables stored in an Astro Deployment's Airflow metadata database"
+	expectedHelp := "list Airflow variables stored in an Astro Deployment's metadata database"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -221,7 +221,7 @@ func TestVariableList(t *testing.T) {
 }
 
 func TestVariableUpdate(t *testing.T) {
-	expectedHelp := "Update airflow variables for an Astro Deployment"
+	expectedHelp := "Update Airflow variables for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -263,7 +263,7 @@ func TestVariableUpdate(t *testing.T) {
 }
 
 func TestVaraibleCreate(t *testing.T) {
-	expectedHelp := "Create airflow variables for an Astro Deployment"
+	expectedHelp := "Create Airflow variables for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -303,7 +303,7 @@ func TestVaraibleCreate(t *testing.T) {
 }
 
 func TestVariableCopy(t *testing.T) {
-	expectedHelp := "Copy airflow variables from one Astro Deployment to another Astro Deployment."
+	expectedHelp := "Copy Airflow variables from one Astro Deployment to another Astro Deployment."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -346,7 +346,7 @@ func TestVariableCopy(t *testing.T) {
 }
 
 func TestPoolList(t *testing.T) {
-	expectedHelp := "list pools for an Astro Deployment"
+	expectedHelp := "list Airflow pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -377,7 +377,7 @@ func TestPoolList(t *testing.T) {
 }
 
 func TestPoolUpdate(t *testing.T) {
-	expectedHelp := "Update pools for an Astro Deployment"
+	expectedHelp := "Update Airflow pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -419,7 +419,7 @@ func TestPoolUpdate(t *testing.T) {
 }
 
 func TestPoolCreate(t *testing.T) {
-	expectedHelp := "Create pools for an Astro Deployment"
+	expectedHelp := "Create Airflow pools for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient
@@ -459,7 +459,7 @@ func TestPoolCreate(t *testing.T) {
 }
 
 func TestPoolCopy(t *testing.T) {
-	expectedHelp := "Copy pools from one Astro Deployment to another Astro Deployment."
+	expectedHelp := "Copy Airflow pools from one Astro Deployment to another Astro Deployment."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(airflowclient_mocks.Client)
 	airflowAPIClient = mockClient

@@ -210,8 +210,8 @@ func newDeploymentAirflowVariableCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
 		Aliases: []string{"cp"},
-		Short:   "Copy the airflow variables from one Deployment to another",
-		Long:    "Copy airflow variables from one Astro Deployment to another Astro Deployment. If a variable already exits with same Key it will be updated",
+		Short:   "Copy the Airflow variables from one Deployment to another",
+		Long:    "Copy Airflow variables from one Astro Deployment to another Astro Deployment. If a variable already exits with same Key it will be updated",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentAirflowVariableCopy(cmd, out)
 		},
@@ -228,8 +228,8 @@ func newDeploymentPoolRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pool",
 		Aliases: []string{"pl"},
-		Short:   "Manage deployment's pools",
-		Long:    "Manage pools stored for an Astro Deployment",
+		Short:   "Manage Deployment's Airflow pools",
+		Long:    "Manage Airflow pools stored for an Astro Deployment",
 	}
 	cmd.AddCommand(
 		newDeploymentPoolListCmd(out),
@@ -244,14 +244,14 @@ func newDeploymentPoolListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"li"},
-		Short:   "list a Deployment's Pools",
-		Long:    "list pools for an Astro Deployment",
+		Short:   "list a Deployment's Airflow pools",
+		Long:    "list Airflow pools for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to list pools from.")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to list pools from")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
 
 	return cmd
 }
@@ -261,17 +261,17 @@ func newDeploymentPoolCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create pools for a Deployment",
-		Long:    "Create pools for an Astro Deployment",
+		Short:   "Create Airflow pools for an Astro Deployment",
+		Long:    "Create Airflow pools for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment id to create pools for")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to create pools for")
-	cmd.Flags().StringVarP(&name, "name", "", "", "The pools's value. Required to create an pool")
-	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The pools's key. Required to create an pool")
-	cmd.Flags().StringVarP(&description, "description", "", "", "The pool's description")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
+	cmd.Flags().StringVarP(&name, "name", "", "", "The Airflow pool value. Required")
+	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The Airflow pool key. Required")
+	cmd.Flags().StringVarP(&description, "description", "", "", "The Airflow pool description")
 
 	return cmd
 }
@@ -281,13 +281,13 @@ func newDeploymentPoolUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"up"},
-		Short:   "Update pools for a Deployment",
-		Long:    "Update pools for an Astro Deployment",
+		Short:   "Update Airflow pools for an Astro Deployment",
+		Long:    "Update Airflow pools for an Astro Deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolUpdate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment,")
+	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The ID of the Deployment.")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "The name of the Deployment.")
 	cmd.Flags().StringVarP(&name, "name", "", "", "The pool value.  Required.")
 	cmd.Flags().IntVarP(&slots, "slots", "s", 0, "The pool slots.")
@@ -301,16 +301,16 @@ func newDeploymentPoolCopyCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "copy",
 		Aliases: []string{"cp"},
-		Short:   "Copy the pools from one Deployment to another",
-		Long:    "Copy pools from one Astro Deployment to another Astro Deployment. If a pool already exits with same name it will be updated",
+		Short:   "Copy Airflow pools from one Astro Deployment to another",
+		Long:    "Copy Airflow pools from one Astro Deployment to another Astro Deployment. If a pool already exits with same name it will be updated",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentPoolCopy(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The deployment id to copy pools from.")
-	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "Name of the deployment to copy pools from")
-	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The id of the deployment where copied pools are created or updated")
-	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "Name of the deployment where copied pools are created or updated")
+	cmd.Flags().StringVarP(&fromDeploymentID, "source-id", "s", "", "The ID of the Deployment to copy Airflow pools from.")
+	cmd.Flags().StringVarP(&fromDeploymentName, "source-name", "n", "", "The name of the Deployment to copy Airflow pools from")
+	cmd.Flags().StringVarP(&toDeploymentID, "target-id", "t", "", "The ID of the Deployment to receive the copied Airflow pools")
+	cmd.Flags().StringVarP(&toDeploymentName, "target-name", "", "", "The name of the Deployment to receive the copied Airflow pools")
 
 	return cmd
 }
