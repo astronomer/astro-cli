@@ -27,6 +27,20 @@ func (_m *ContainerHandler) Bash(container string) error {
 	return r0
 }
 
+// ComposeExport provides a mock function with given fields: settingsFile, composeFile
+func (_m *ContainerHandler) ComposeExport(settingsFile string, composeFile string) error {
+	ret := _m.Called(settingsFile, composeFile)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(settingsFile, composeFile)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ExportSettings provides a mock function with given fields: settingsFile, envFile, connections, variables, pools, envExport
 func (_m *ContainerHandler) ExportSettings(settingsFile string, envFile string, connections bool, variables bool, pools bool, envExport bool) error {
 	ret := _m.Called(settingsFile, envFile, connections, variables, pools, envExport)
@@ -170,13 +184,13 @@ func (_m *ContainerHandler) RunDAG(dagID string, settingsFile string, dagFile st
 	return r0
 }
 
-// Start provides a mock function with given fields: imageName, settingsFile, noCache, noBrowser, waitTime
-func (_m *ContainerHandler) Start(imageName string, settingsFile string, noCache bool, noBrowser bool, waitTime time.Duration) error {
-	ret := _m.Called(imageName, settingsFile, noCache, noBrowser, waitTime)
+// Start provides a mock function with given fields: imageName, settingsFile, composeFile, noCache, noBrowser, waitTime
+func (_m *ContainerHandler) Start(imageName string, settingsFile string, composeFile string, noCache bool, noBrowser bool, waitTime time.Duration) error {
+	ret := _m.Called(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, bool, bool, time.Duration) error); ok {
-		r0 = rf(imageName, settingsFile, noCache, noBrowser, waitTime)
+	if rf, ok := ret.Get(0).(func(string, string, string, bool, bool, time.Duration) error); ok {
+		r0 = rf(imageName, settingsFile, composeFile, noCache, noBrowser, waitTime)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -9,7 +9,6 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	cloudCmd "github.com/astronomer/astro-cli/cmd/cloud"
 	softwareCmd "github.com/astronomer/astro-cli/cmd/software"
-	"github.com/astronomer/astro-cli/cmd/sql"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/houston"
@@ -78,7 +77,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 				}
 			}
 			if isCloudCtx {
-				err = cloudCmd.Setup(cmd, args, astroClient, astroCoreClient)
+				err = cloudCmd.Setup(cmd, astroClient, astroCoreClient)
 				if err != nil {
 					softwareCmd.InitDebugLogs = append(softwareCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 				}
@@ -102,12 +101,6 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		newConfigRootCmd(os.Stdout),
 		newRunCommand(),
 	)
-
-	if config.CFG.SQLCLI.GetBool() {
-		rootCmd.AddCommand(
-			sql.NewFlowCommand(),
-		)
-	}
 
 	if context.IsCloudContext() { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(

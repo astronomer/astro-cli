@@ -58,7 +58,4 @@ func TestDeployImage(t *testing.T) {
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse", "--pytest"}...)
 	assert.NoError(t, err)
-
-	err = execDeployCmd([]string{"vr-Id"}...)
-	assert.NoError(t, err)
 }

@@ -217,26 +217,6 @@ func Deploy(deployInput InputDeploy, client astro.Client) error { //nolint
 
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
-	// Deploy dags if deployInput runtimeId is virtual runtime
-	if strings.HasPrefix(deployInput.RuntimeID, "vr-") {
-		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
-
-			if !i {
-				fmt.Println("Canceling deploy...")
-				return nil
-			}
-		}
-		fmt.Println("Initiating DAG deploy for: " + deployInput.RuntimeID)
-		versionID, err := deployDags(deployInput.Path, dagsPath, deployInput.RuntimeID, client)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("\nSuccessfully uploaded DAGs with version " + ansi.Bold(versionID) + " to Astro. Go to the Astro UI to view your data pipeline. The Astro UI takes about 1 minute to update.")
-		return nil
-	}
-
 	deployInfo, err := getDeploymentInfo(deployInput.RuntimeID, deployInput.WsID, deployInput.DeploymentName, deployInput.Prompt, domain, client)
 	if err != nil {
 		return err

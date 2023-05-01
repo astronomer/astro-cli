@@ -20,7 +20,7 @@ import (
 )
 
 type ContainerHandler interface {
-	Start(imageName, settingsFile string, noCache, noBrowser bool, waitTime time.Duration) error
+	Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error
 	Stop() error
 	PS() error
 	Kill() error
@@ -30,6 +30,7 @@ type ContainerHandler interface {
 	RunDAG(dagID, settingsFile, dagFile string, noCache, taskLogs bool) error
 	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
 	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
+	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error)
 	Parse(customImageName, deployImageName string) error
 }
