@@ -492,6 +492,7 @@ func TestCreate(t *testing.T) {
 
 		err = Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", 10, 3, mockClient, mockCoreClient, false)
 		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HYBRID")
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -748,14 +749,43 @@ func TestCreate(t *testing.T) {
 			},
 		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
-		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
+			Provider: &provider,
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+		}
+
+		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &[]astrocore.ClusterOptions{
+				{Regions: []astrocore.ProviderRegion{{Name: "us-central-1"}}},
+			},
+		}
+
+		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
+
+		getSharedClusterParams := &astrocore.GetSharedClusterParams{
+			Region:        region,
+			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
+		}
+		mockOKResponse := &astrocore.GetSharedClusterResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.SharedCluster{Id: csID},
+		}
+		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
+
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "gcp", "us-central1", "", "", 10, 3, mockClient, mockCoreClient, false)
 		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HYBRID")
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("success with default config", func(t *testing.T) {

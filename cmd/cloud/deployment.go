@@ -72,7 +72,6 @@ var (
 	errFlag                 = errors.New("--deployment-file can not be used with other arguments")
 	errInvalidExecutor      = errors.New("not a valid executor")
 	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp")
-	errNoRegion             = errors.New("region must be specified with --cloud-provider")
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -139,7 +138,6 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&label, "name", "n", "", "The Deployment's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "Workspace to create the Deployment in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "disable", "Enables DAG-only deploys for the deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor or KubernetesExecutor.")
@@ -149,10 +147,12 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
+		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
+	} else {
+		cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	}
 	return cmd
 }
@@ -366,9 +366,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	if cloudProvider != "" {
 		if !isValidCloudProvider(astrocore.SharedClusterCloudProvider(cloudProvider)) {
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
-		}
-		if region == "" {
-			return errNoRegion
 		}
 	}
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus)
