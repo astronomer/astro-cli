@@ -153,6 +153,14 @@ func Read(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
+func ReadFileToString(filename string) (string, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func Contains(elems []string, param string) (exist bool, position int) {
 	for index, elem := range elems {
 		if param == elem {

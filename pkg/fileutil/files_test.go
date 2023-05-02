@@ -254,6 +254,46 @@ func TestRead(t *testing.T) {
 	}
 }
 
+func TestReadFileToString(t *testing.T) {
+	filePath := "./test.out"
+	content := "testing"
+	WriteStringToFile(filePath, content)
+	defer afero.NewOsFs().Remove(filePath)
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		expectedResp string
+		errResp      string
+	}{
+		{
+			name:         "should read file contents successfully",
+			args:         args{path: filePath},
+			expectedResp: content,
+			errResp:      "",
+		},
+		{
+			name:         "error on read file content",
+			args:         args{path: "incorrect-file"},
+			expectedResp: "",
+			errResp:      "no such file or directory",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualResp, actualErr := ReadFileToString(tt.args.path)
+			if tt.errResp != "" && actualErr != nil {
+				assert.Contains(t, actualErr.Error(), tt.errResp)
+			} else {
+				assert.NoError(t, actualErr)
+			}
+			assert.Equal(t, tt.expectedResp, actualResp)
+		})
+	}
+}
+
 func TestGetFilesWithSpecificExtension(t *testing.T) {
 	filePath := "./test.py"
 	content := "testing"
