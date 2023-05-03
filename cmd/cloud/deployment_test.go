@@ -385,19 +385,6 @@ deployment:
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "azure is not a valid cloud provider. It can only be gcp")
 	})
-	t.Run("returns an error if cloud provider is valid but region was not provided", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "",
-		}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "region must be specified with --cloud-provider")
-	})
 	mockClient.AssertExpectations(t)
 }
 

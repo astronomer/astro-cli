@@ -205,6 +205,21 @@ const (
 	GetSharedClusterParamsCloudProviderGcp   GetSharedClusterParamsCloudProvider = "gcp"
 )
 
+// Defines values for GetClusterOptionsParamsProvider.
+const (
+	GetClusterOptionsParamsProviderAws   GetClusterOptionsParamsProvider = "aws"
+	GetClusterOptionsParamsProviderAzure GetClusterOptionsParamsProvider = "azure"
+	GetClusterOptionsParamsProviderGcp   GetClusterOptionsParamsProvider = "gcp"
+)
+
+// Defines values for GetClusterOptionsParamsType.
+const (
+	GetClusterOptionsParamsTypeBRINGYOUROWNCLOUD GetClusterOptionsParamsType = "BRING_YOUR_OWN_CLOUD"
+	GetClusterOptionsParamsTypeHOSTED            GetClusterOptionsParamsType = "HOSTED"
+	GetClusterOptionsParamsTypeSHARED            GetClusterOptionsParamsType = "SHARED"
+	GetClusterOptionsParamsTypeVIRTUALRUNTIMES   GetClusterOptionsParamsType = "VIRTUAL_RUNTIMES"
+)
+
 // Defines values for ListOrganizationsParamsTrialStatus.
 const (
 	ListOrganizationsParamsTrialStatusActive  ListOrganizationsParamsTrialStatus = "active"
@@ -250,17 +265,17 @@ const (
 
 // Defines values for ListClustersParamsProvider.
 const (
-	Aws   ListClustersParamsProvider = "aws"
-	Azure ListClustersParamsProvider = "azure"
-	Gcp   ListClustersParamsProvider = "gcp"
+	ListClustersParamsProviderAws   ListClustersParamsProvider = "aws"
+	ListClustersParamsProviderAzure ListClustersParamsProvider = "azure"
+	ListClustersParamsProviderGcp   ListClustersParamsProvider = "gcp"
 )
 
 // Defines values for ListClustersParamsType.
 const (
-	ListClustersParamsTypeBRINGYOUROWNCLOUD ListClustersParamsType = "BRING_YOUR_OWN_CLOUD"
-	ListClustersParamsTypeHOSTED            ListClustersParamsType = "HOSTED"
-	ListClustersParamsTypeSHARED            ListClustersParamsType = "SHARED"
-	ListClustersParamsTypeVIRTUALRUNTIMES   ListClustersParamsType = "VIRTUAL_RUNTIMES"
+	BRINGYOUROWNCLOUD ListClustersParamsType = "BRING_YOUR_OWN_CLOUD"
+	HOSTED            ListClustersParamsType = "HOSTED"
+	SHARED            ListClustersParamsType = "SHARED"
+	VIRTUALRUNTIMES   ListClustersParamsType = "VIRTUAL_RUNTIMES"
 )
 
 // Defines values for ListClustersParamsStatus.
@@ -358,6 +373,19 @@ const (
 	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
 	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
+
+// AstroBaseUnit defines model for AstroBaseUnit.
+type AstroBaseUnit struct {
+	Cpu    int `json:"cpu"`
+	Memory int `json:"memory"`
+}
+
+// AuConfigs defines model for AuConfigs.
+type AuConfigs struct {
+	Default int  `json:"default"`
+	Limit   int  `json:"limit"`
+	Request *int `json:"request,omitempty"`
+}
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
 type BasicSubjectProfile struct {
@@ -462,6 +490,25 @@ type ClusterMetadata struct {
 	ExternalIPs *[]string `json:"externalIPs,omitempty"`
 }
 
+// ClusterOptions defines model for ClusterOptions.
+type ClusterOptions struct {
+	DatabaseInstances          []ProviderInstanceType `json:"databaseInstances"`
+	DefaultDatabaseInstance    ProviderInstanceType   `json:"defaultDatabaseInstance"`
+	DefaultNodeInstance        ProviderInstanceType   `json:"defaultNodeInstance"`
+	DefaultPodSubnetRange      *string                `json:"defaultPodSubnetRange,omitempty"`
+	DefaultRegion              ProviderRegion         `json:"defaultRegion"`
+	DefaultServicePeeringRange *string                `json:"defaultServicePeeringRange,omitempty"`
+	DefaultServiceSubnetRange  *string                `json:"defaultServiceSubnetRange,omitempty"`
+	DefaultVpcSubnetRange      string                 `json:"defaultVpcSubnetRange"`
+	NodeCountDefault           int                    `json:"nodeCountDefault"`
+	NodeCountMax               int                    `json:"nodeCountMax"`
+	NodeCountMin               int                    `json:"nodeCountMin"`
+	NodeInstances              []ProviderInstanceType `json:"nodeInstances"`
+	Provider                   string                 `json:"provider"`
+	Regions                    []ProviderRegion       `json:"regions"`
+	TemplateVersions           []TemplateVersion      `json:"templateVersions"`
+}
+
 // ClusterTag defines model for ClusterTag.
 type ClusterTag struct {
 	Key   *string `json:"key,omitempty"`
@@ -474,6 +521,17 @@ type ClustersPaginated struct {
 	Limit      int       `json:"limit"`
 	Offset     int       `json:"offset"`
 	TotalCount int       `json:"totalCount"`
+}
+
+// ComponentsOptions defines model for ComponentsOptions.
+type ComponentsOptions struct {
+	Scheduler ContainerOptions `json:"scheduler"`
+	Workers   ContainerOptions `json:"workers"`
+}
+
+// ContainerOptions defines model for ContainerOptions.
+type ContainerOptions struct {
+	Au AuConfigs `json:"au"`
 }
 
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
@@ -519,7 +577,7 @@ type CreateGcpClusterRequest struct {
 	Name                string                      `json:"name"`
 	NodePools           *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
 	PodSubnetRange      string                      `json:"podSubnetRange"`
-	ProviderAccount     string                      `json:"providerAccount"`
+	ProviderAccount     *string                     `json:"providerAccount,omitempty"`
 	Region              string                      `json:"region"`
 	ServicePeeringRange string                      `json:"servicePeeringRange"`
 	ServiceSubnetRange  string                      `json:"serviceSubnetRange"`
@@ -561,6 +619,13 @@ type CreateSsoConnectionRequest struct {
 type CreateUserInviteRequest struct {
 	InviteeEmail string `json:"inviteeEmail"`
 	Role         string `json:"role"`
+}
+
+// DeploymentOptions defines model for DeploymentOptions.
+type DeploymentOptions struct {
+	AstroUnit       AstroBaseUnit     `json:"astroUnit"`
+	Components      ComponentsOptions `json:"components"`
+	RuntimeReleases []RuntimeRelease  `json:"runtimeReleases"`
 }
 
 // Entitlement defines model for Entitlement.
@@ -662,6 +727,13 @@ type JitPolicy struct {
 	DefaultWorkspaceRoles *[]WorkspaceRole `json:"defaultWorkspaceRoles,omitempty"`
 }
 
+// ListWorkspacePipelines defines model for ListWorkspacePipelines.
+type ListWorkspacePipelines struct {
+	Items      []WorkspacePipeline `json:"items"`
+	NextCursor *string             `json:"nextCursor,omitempty"`
+	Warnings   *[]string           `json:"warnings,omitempty"`
+}
+
 // ManagedDomain defines model for ManagedDomain.
 type ManagedDomain struct {
 	CreatedAt      time.Time           `json:"createdAt"`
@@ -749,6 +821,20 @@ type PostLoginEvent struct {
 	User         EventUser               `json:"user"`
 }
 
+// ProviderInstanceType defines model for ProviderInstanceType.
+type ProviderInstanceType struct {
+	Cpu  int    `json:"cpu"`
+	Name string `json:"name"`
+	Ram  string `json:"ram"`
+}
+
+// ProviderRegion defines model for ProviderRegion.
+type ProviderRegion struct {
+	BannedInstances *[]string `json:"bannedInstances,omitempty"`
+	Limited         *bool     `json:"limited,omitempty"`
+	Name            string    `json:"name"`
+}
+
 // RunGroup defines model for RunGroup.
 type RunGroup struct {
 	Children          *[]RunGroup     `json:"children,omitempty"`
@@ -759,6 +845,16 @@ type RunGroup struct {
 	Label             *string         `json:"label,omitempty"`
 	Operator          *string         `json:"operator,omitempty"`
 	TaskInstances     *[]TaskInstance `json:"taskInstances,omitempty"`
+}
+
+// RuntimeRelease defines model for RuntimeRelease.
+type RuntimeRelease struct {
+	AirflowDatabaseMigration bool   `json:"airflowDatabaseMigration"`
+	AirflowVersion           string `json:"airflowVersion"`
+	Channel                  string `json:"channel"`
+	ReleaseDate              string `json:"releaseDate"`
+	StellarDatabaseMigration bool   `json:"stellarDatabaseMigration"`
+	Version                  string `json:"version"`
 }
 
 // Scope defines model for Scope.
@@ -873,6 +969,7 @@ type TaskInstance struct {
 	ExecutionDate  *string                 `json:"executionDate,omitempty"`
 	ExecutorConfig *string                 `json:"executorConfig,omitempty"`
 	Hostname       *string                 `json:"hostname,omitempty"`
+	MapIndex       *int                    `json:"mapIndex,omitempty"`
 	MaxTries       *int                    `json:"maxTries,omitempty"`
 	Note           *string                 `json:"note,omitempty"`
 	Operator       *string                 `json:"operator,omitempty"`
@@ -894,6 +991,12 @@ type TaskInstance struct {
 
 // TaskInstanceState defines model for TaskInstance.State.
 type TaskInstanceState string
+
+// TemplateVersion defines model for TemplateVersion.
+type TemplateVersion struct {
+	Url     *string `json:"url,omitempty"`
+	Version string  `json:"version"`
+}
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
@@ -1033,6 +1136,28 @@ type Workspace struct {
 	UserCount                    *int                 `json:"userCount,omitempty"`
 }
 
+// WorkspacePipeline defines model for WorkspacePipeline.
+type WorkspacePipeline struct {
+	DagId        string                  `json:"dagId"`
+	DeploymentId string                  `json:"deploymentId"`
+	IsActive     *bool                   `json:"isActive,omitempty"`
+	IsPaused     bool                    `json:"isPaused"`
+	NextRunAt    *string                 `json:"nextRunAt,omitempty"`
+	Owners       *[]string               `json:"owners,omitempty"`
+	PipelineRuns *[]WorkspacePipelineRun `json:"pipelineRuns,omitempty"`
+	Schedule     string                  `json:"schedule"`
+	Tags         *[]string               `json:"tags,omitempty"`
+}
+
+// WorkspacePipelineRun defines model for WorkspacePipelineRun.
+type WorkspacePipelineRun struct {
+	EndDate     *string `json:"endDate,omitempty"`
+	LogicalDate string  `json:"logicalDate"`
+	RunId       string  `json:"runId"`
+	StartDate   *string `json:"startDate,omitempty"`
+	State       string  `json:"state"`
+}
+
 // WorkspaceRole defines model for WorkspaceRole.
 type WorkspaceRole struct {
 	WorkspaceId   string `json:"workspaceId"`
@@ -1047,6 +1172,30 @@ type WorkspacesPaginated struct {
 	Workspaces []Workspace `json:"workspaces"`
 }
 
+// InternalTask defines model for internal_Task.
+type InternalTask struct {
+	ExtraLinks        *[]string `json:"extraLinks,omitempty"`
+	HasOutletDatasets *bool     `json:"hasOutletDatasets,omitempty"`
+	Id                *string   `json:"id,omitempty"`
+	IsMapped          *bool     `json:"isMapped,omitempty"`
+	Label             *string   `json:"label,omitempty"`
+	Operator          *string   `json:"operator,omitempty"`
+}
+
+// InternalTaskGroup defines model for internal_TaskGroup.
+type InternalTaskGroup struct {
+	Children *[]InternalTaskGroupChildrenInner `json:"children,omitempty"`
+	Id       *string                           `json:"id,omitempty"`
+	Label    *string                           `json:"label,omitempty"`
+	Tooltip  *string                           `json:"tooltip,omitempty"`
+}
+
+// InternalTaskGroupChildrenInner defines model for internal_TaskGroupChildrenInner.
+type InternalTaskGroupChildrenInner struct {
+	Task      *InternalTask      `json:"task,omitempty"`
+	TaskGroup *InternalTaskGroup `json:"taskGroup,omitempty"`
+}
+
 // GetSharedClusterParams defines parameters for GetSharedCluster.
 type GetSharedClusterParams struct {
 	// Region region
@@ -1058,6 +1207,21 @@ type GetSharedClusterParams struct {
 
 // GetSharedClusterParamsCloudProvider defines parameters for GetSharedCluster.
 type GetSharedClusterParamsCloudProvider string
+
+// GetClusterOptionsParams defines parameters for GetClusterOptions.
+type GetClusterOptionsParams struct {
+	// Provider cloud provider
+	Provider *GetClusterOptionsParamsProvider `form:"provider,omitempty" json:"provider,omitempty"`
+
+	// Type cluster type
+	Type GetClusterOptionsParamsType `form:"type" json:"type"`
+}
+
+// GetClusterOptionsParamsProvider defines parameters for GetClusterOptions.
+type GetClusterOptionsParamsProvider string
+
+// GetClusterOptionsParamsType defines parameters for GetClusterOptions.
+type GetClusterOptionsParamsType string
 
 // ListOrganizationAuthIdsParams defines parameters for ListOrganizationAuthIds.
 type ListOrganizationAuthIdsParams struct {
@@ -1184,6 +1348,51 @@ type ListWorkspacesParams struct {
 
 // ListWorkspacesParamsSorts defines parameters for ListWorkspaces.
 type ListWorkspacesParamsSorts string
+
+// ListWorkspacePipelinesParams defines parameters for ListWorkspacePipelines.
+type ListWorkspacePipelinesParams struct {
+	// PageSize page size, default of 20
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// OrderBy order-by fields, comma separated
+	OrderBy *[]string `form:"orderBy,omitempty" json:"orderBy,omitempty"`
+
+	// Cursor pagination cursor
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// NumRuns number of runs to include per pipeline, default of 0
+	NumRuns *int `form:"numRuns,omitempty" json:"numRuns,omitempty"`
+
+	// Name filter by name of DAG (dagId)
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// NameLike filter by pattern for name of DAG (dagId),  SQL  syntax
+	NameLike *string `form:"name__like,omitempty" json:"name__like,omitempty"`
+
+	// Owner filter by an owner of the pipeline
+	Owner *string `form:"owner,omitempty" json:"owner,omitempty"`
+
+	// IsPaused filter by paused pipelines
+	IsPaused *bool `form:"isPaused,omitempty" json:"isPaused,omitempty"`
+
+	// IsActive filter by active pipelines
+	IsActive *bool `form:"isActive,omitempty" json:"isActive,omitempty"`
+
+	// LastRunStateIn filter by pipeline runs with any of these run states for its last run
+	LastRunStateIn *[]string `form:"lastRunState__in,omitempty" json:"lastRunState__in,omitempty"`
+
+	// RunStateIn filter by pipeline runs with any of these run states
+	RunStateIn *[]string `form:"runState__in,omitempty" json:"runState__in,omitempty"`
+
+	// RunAfter filter by pipeline run after specified datetime (RFC3339 format)
+	RunAfter *time.Time `form:"runAfter,omitempty" json:"runAfter,omitempty"`
+
+	// TagIn filter by any of these tags
+	TagIn *[]string `form:"tag__in,omitempty" json:"tag__in,omitempty"`
+
+	// DeploymentIdIn filter by any of these deployment IDs
+	DeploymentIdIn *[]string `form:"deploymentId__in,omitempty" json:"deploymentId__in,omitempty"`
+}
 
 // ListWorkspaceUsersParams defines parameters for ListWorkspaceUsers.
 type ListWorkspaceUsersParams struct {
@@ -1350,6 +1559,12 @@ type ClientInterface interface {
 	// GetSharedCluster request
 	GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetClusterOptions request
+	GetClusterOptions(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploymentOptions request
+	GetDeploymentOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1503,7 +1718,7 @@ type ClientInterface interface {
 	UpdateWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspacePipelines request
-	ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceUsers request
 	ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1563,6 +1778,30 @@ func (c *Client) ValidateSsoLogin(ctx context.Context, body ValidateSsoLoginJSON
 
 func (c *Client) GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSharedClusterRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetClusterOptions(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetClusterOptionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploymentOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeploymentOptionsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2245,8 +2484,8 @@ func (c *Client) UpdateWorkspace(ctx context.Context, orgShortNameId string, wor
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListWorkspacePipelinesRequest(c.Server, orgShortNameId, workspaceId)
+func (c *Client) ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspacePipelinesRequest(c.Server, orgShortNameId, workspaceId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2461,6 +2700,92 @@ func NewGetSharedClusterRequest(server string, params *GetSharedClusterParams) (
 	}
 
 	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetClusterOptionsRequest generates requests for GetClusterOptions
+func NewGetClusterOptionsRequest(server string, params *GetClusterOptionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/options/cluster")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Provider != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "provider", runtime.ParamLocationQuery, *params.Provider); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "type", runtime.ParamLocationQuery, params.Type); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDeploymentOptionsRequest generates requests for GetDeploymentOptions
+func NewGetDeploymentOptionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/options/deployment")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -4575,7 +4900,7 @@ func NewUpdateWorkspaceRequestWithBody(server string, orgShortNameId string, wor
 }
 
 // NewListWorkspacePipelinesRequest generates requests for ListWorkspacePipelines
-func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, workspaceId string) (*http.Request, error) {
+func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -4606,6 +4931,234 @@ func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, work
 	if err != nil {
 		return nil, err
 	}
+
+	queryValues := queryURL.Query()
+
+	if params.PageSize != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.OrderBy != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "orderBy", runtime.ParamLocationQuery, *params.OrderBy); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Cursor != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cursor", runtime.ParamLocationQuery, *params.Cursor); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.NumRuns != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "numRuns", runtime.ParamLocationQuery, *params.NumRuns); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Name != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name", runtime.ParamLocationQuery, *params.Name); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.NameLike != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name__like", runtime.ParamLocationQuery, *params.NameLike); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Owner != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "owner", runtime.ParamLocationQuery, *params.Owner); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IsPaused != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "isPaused", runtime.ParamLocationQuery, *params.IsPaused); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IsActive != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "isActive", runtime.ParamLocationQuery, *params.IsActive); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.LastRunStateIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "lastRunState__in", runtime.ParamLocationQuery, *params.LastRunStateIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.RunStateIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runState__in", runtime.ParamLocationQuery, *params.RunStateIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.RunAfter != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runAfter", runtime.ParamLocationQuery, *params.RunAfter); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.TagIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tag__in", runtime.ParamLocationQuery, *params.TagIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.DeploymentIdIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId__in", runtime.ParamLocationQuery, *params.DeploymentIdIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -4981,6 +5534,12 @@ type ClientWithResponsesInterface interface {
 	// GetSharedCluster request
 	GetSharedClusterWithResponse(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*GetSharedClusterResponse, error)
 
+	// GetClusterOptions request
+	GetClusterOptionsWithResponse(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error)
+
+	// GetDeploymentOptions request
+	GetDeploymentOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error)
 
@@ -5134,7 +5693,7 @@ type ClientWithResponsesInterface interface {
 	UpdateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error)
 
 	// ListWorkspacePipelines request
-	ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error)
+	ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error)
 
 	// ListWorkspaceUsers request
 	ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error)
@@ -5231,6 +5790,59 @@ func (r GetSharedClusterResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetSharedClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetClusterOptionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]ClusterOptions
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetClusterOptionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetClusterOptionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeploymentOptionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentOptions
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeploymentOptionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeploymentOptionsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -6314,7 +6926,7 @@ func (r UpdateWorkspaceResponse) StatusCode() int {
 type ListWorkspacePipelinesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *string
+	JSON200      *ListWorkspacePipelines
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
@@ -6505,6 +7117,24 @@ func (c *ClientWithResponses) GetSharedClusterWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseGetSharedClusterResponse(rsp)
+}
+
+// GetClusterOptionsWithResponse request returning *GetClusterOptionsResponse
+func (c *ClientWithResponses) GetClusterOptionsWithResponse(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error) {
+	rsp, err := c.GetClusterOptions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetClusterOptionsResponse(rsp)
+}
+
+// GetDeploymentOptionsWithResponse request returning *GetDeploymentOptionsResponse
+func (c *ClientWithResponses) GetDeploymentOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error) {
+	rsp, err := c.GetDeploymentOptions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeploymentOptionsResponse(rsp)
 }
 
 // ListOrganizationAuthIdsWithResponse request returning *ListOrganizationAuthIdsResponse
@@ -6996,8 +7626,8 @@ func (c *ClientWithResponses) UpdateWorkspaceWithResponse(ctx context.Context, o
 }
 
 // ListWorkspacePipelinesWithResponse request returning *ListWorkspacePipelinesResponse
-func (c *ClientWithResponses) ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error) {
-	rsp, err := c.ListWorkspacePipelines(ctx, orgShortNameId, workspaceId, reqEditors...)
+func (c *ClientWithResponses) ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error) {
+	rsp, err := c.ListWorkspacePipelines(ctx, orgShortNameId, workspaceId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -7235,6 +7865,121 @@ func ParseGetSharedClusterResponse(rsp *http.Response) (*GetSharedClusterRespons
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetClusterOptionsResponse parses an HTTP response from a GetClusterOptionsWithResponse call
+func ParseGetClusterOptionsResponse(rsp *http.Response) (*GetClusterOptionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetClusterOptionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ClusterOptions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeploymentOptionsResponse parses an HTTP response from a GetDeploymentOptionsWithResponse call
+func ParseGetDeploymentOptionsResponse(rsp *http.Response) (*GetDeploymentOptionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeploymentOptionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentOptions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -9661,7 +10406,7 @@ func ParseListWorkspacePipelinesResponse(rsp *http.Response) (*ListWorkspacePipe
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
+		var dest ListWorkspacePipelines
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

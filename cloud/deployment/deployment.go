@@ -28,6 +28,7 @@ import (
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	ErrInvalidRegionKey     = errors.New("invalid Region selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	// Monkey patched to write unit tests
 	createDeployment = Create
@@ -39,6 +40,7 @@ const (
 	KubeExecutor   = "KubernetesExecutor"
 	CeleryExecutor = "CeleryExecutor"
 	notApplicable  = "N/A"
+	gcpCloud       = "gcp"
 )
 
 var (
@@ -228,6 +230,14 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
+	if region == "" && organization.IsOrgHosted() {
+		// select and validate region
+		region, err = selectRegion(cloudProvider, region, coreClient)
+		if err != nil {
+			return err
+		}
+	}
+
 	// select and validate cluster
 	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID, client, coreClient)
 	if err != nil {
@@ -359,6 +369,77 @@ func GetRuntimeReleases(client astro.Client) ([]string, error) {
 	}
 
 	return runtimeReleases, nil
+}
+
+func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) ([]astrocore.ClusterOptions, error) {
+	var provider astrocore.GetClusterOptionsParamsProvider
+	if cloudProvider == gcpCloud {
+		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+	}
+	optionsParams := &astrocore.GetClusterOptionsParams{
+		Provider: &provider,
+		Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+	}
+	clusterOptions, err := coreClient.GetClusterOptionsWithResponse(context.Background(), optionsParams)
+	if err != nil {
+		return nil, err
+	}
+	err = astrocore.NormalizeAPIError(clusterOptions.HTTPResponse, clusterOptions.Body)
+	if err != nil {
+		return nil, err
+	}
+	options := *clusterOptions.JSON200
+
+	return options, nil
+}
+
+func selectRegion(cloudProvider, region string, coreClient astrocore.CoreClient) (newRegion string, err error) {
+	regionsTab := printutil.Table{
+		Padding:        []int{5, 30},
+		DynamicPadding: true,
+		Header:         []string{"#", "REGION"},
+	}
+
+	// get all regions for the cloud provider
+	options, err := ListClusterOptions(cloudProvider, coreClient)
+	if err != nil {
+		return "", err
+	}
+	regions := options[0].Regions
+
+	if region == "" {
+		fmt.Println("\nPlease select a Region for your Deployment:")
+
+		regionMap := map[string]astrocore.ProviderRegion{}
+
+		for i := range regions {
+			index := i + 1
+			regionsTab.AddRow([]string{strconv.Itoa(index), regions[i].Name}, false)
+
+			regionMap[strconv.Itoa(index)] = regions[i]
+		}
+
+		regionsTab.Print(os.Stdout)
+		choice := input.Text("\n> ")
+		selected, ok := regionMap[choice]
+		if !ok {
+			return "", ErrInvalidRegionKey
+		}
+
+		region = selected.Name
+	}
+
+	// validate region
+	reg := ""
+	for i := range regions {
+		if region == regions[i].Name {
+			reg = regions[i].Name
+		}
+	}
+	if reg == "" {
+		return "", errors.New("unable to find specified Region")
+	}
+	return region, nil
 }
 
 func selectCluster(clusterID, organizationID string, client astro.Client) (newClusterID string, err error) {
