@@ -206,7 +206,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 
 	value, err = getSpecificField(printableDeployment, requestedField)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 	return value, nil
 }

@@ -28,13 +28,13 @@ func ConnectionList(airflowURL string, airflowAPIClient airflowclient.Client, ou
 	}
 
 	// get connectons
-	Resp, err := airflowAPIClient.GetConnections(airflowURL)
+	resp, err := airflowAPIClient.GetConnections(airflowURL)
 	if err != nil {
 		return err
 	}
 	// Print Connections
-	for i := range Resp.Connections {
-		conn := Resp.Connections[i]
+	for i := range resp.Connections {
+		conn := resp.Connections[i]
 		conTab.AddRow([]string{conn.ConnID, conn.ConnType}, false)
 	}
 

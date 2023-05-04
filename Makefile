@@ -36,7 +36,7 @@ temp-astro:
 temp-astro-flow:
 	./astro flow init $(shell mktemp -d)
 
-mock: mock_airflow mock_houston mock_astro mock_pkg mock_astro_core
+mock: mock_airflow mock_houston mock_astro mock_pkg mock_astro_core mock_airflow_api
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
