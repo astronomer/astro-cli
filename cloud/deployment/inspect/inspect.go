@@ -181,6 +181,36 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 	}
 }
 
+func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, requestedField string) (value any, err error) {
+	var (
+		requestedDeployment                                                        astro.Deployment
+		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
+	)
+	// get or select the deployment
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// create a map for deployment.information
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment)
+	if err != nil {
+		return nil, err
+	}
+	// create a map for deployment.configuration
+	deploymentConfigMap = getDeploymentConfig(&requestedDeployment)
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
+	additionalMap = getAdditional(&requestedDeployment)
+	// create a map for the entire deployment
+	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
+
+	value, err = getSpecificField(printableDeployment, requestedField)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
 func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))

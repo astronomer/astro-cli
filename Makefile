@@ -36,7 +36,7 @@ temp-astro:
 temp-astro-flow:
 	./astro flow init $(shell mktemp -d)
 
-mock: mock_airflow mock_houston mock_astro mock_pkg mock_astro_core
+mock: mock_airflow mock_houston mock_astro mock_pkg mock_astro_core mock_airflow_api
 
 mock_houston:
 	mockery --filename=ClientInterface.go --output=houston/mocks --dir=houston --outpkg=houston_mocks --name ClientInterface
@@ -48,6 +48,9 @@ mock_airflow:
 	mockery --filename=DockerComposeAPI.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerComposeAPI
 	mockery --filename=DockerRegistryAPI.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerRegistryAPI
 	mockery --filename=DockerCLIClient.go --output=airflow/mocks --dir=airflow --outpkg=mocks --name DockerCLIClient
+
+mock_airflow_api:
+	mockery --filename=Client.go --output=airflow-client/mocks --dir=airflow-client --outpkg=airflow_mocks --name Client
 
 mock_astro:
 	mockery --filename=Client.go --output=astro-client/mocks --dir=astro-client --outpkg=astro_mocks --name Client
