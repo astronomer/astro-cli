@@ -547,14 +547,6 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		return err
 	}
 
-	fileState, err := fileutil.Exists(settingsFile, nil)
-	if err != nil {
-		return errors.Wrap(err, errSettingsPath)
-	}
-	if !fileState {
-		return errNoFile
-	}
-
 	if envExport {
 		err = envExportSettings(containerID, envFile, airflowDockerVersion, connections, variables)
 		if err != nil {
@@ -562,6 +554,14 @@ func (d *DockerCompose) ExportSettings(settingsFile, envFile string, connections
 		}
 		fmt.Println("\nAirflow objects exported to env file")
 		return nil
+	}
+
+	fileState, err := fileutil.Exists(settingsFile, nil)
+	if err != nil {
+		return errors.Wrap(err, errSettingsPath)
+	}
+	if !fileState {
+		return errNoFile
 	}
 
 	err = exportSettings(containerID, settingsFile, airflowDockerVersion, connections, variables, pools)
