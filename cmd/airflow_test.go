@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/airflow"
@@ -14,36 +13,35 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("mock error")
 
-func TestDevRootCommand(t *testing.T) {
+func (s *Suite) TestDevRootCommand() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("dev")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro dev", output)
+	s.NoError(err)
+	s.Contains(output, "astro dev", output)
 }
 
-func TestDevInitCommand(t *testing.T) {
+func (s *Suite) TestDevInitCommand() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	output, err := executeCommand("dev", "init", "--help")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro dev", output)
-	assert.NotContains(t, output, "--use-astronomer-certified")
+	s.NoError(err)
+	s.Contains(output, "astro dev", output)
+	s.NotContains(output, "--use-astronomer-certified")
 
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	output, err = executeCommand("dev", "init", "--help")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro dev", output)
-	assert.Contains(t, output, "--use-astronomer-certified")
+	s.NoError(err)
+	s.Contains(output, "astro dev", output)
+	s.Contains(output, "--use-astronomer-certified")
 }
 
-func TestDevInitCommandSoftware(t *testing.T) {
+func (s *Suite) TestDevInitCommandSoftware() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-	t.Run("unknown software version", func(t *testing.T) {
+	s.Run("unknown software version", func() {
 		houstonVersion = ""
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -52,13 +50,13 @@ func TestDevInitCommandSoftware(t *testing.T) {
 		testUtil.SetupOSArgsForGinkgo()
 		_, err := cmd.ExecuteC()
 		output := buf.String()
-		assert.NoError(t, err)
-		assert.Contains(t, output, "astro dev", output)
-		assert.Contains(t, output, "--use-astronomer-certified")
-		assert.Contains(t, output, "--runtime-version string")
+		s.NoError(err)
+		s.Contains(output, "astro dev", output)
+		s.Contains(output, "--use-astronomer-certified")
+		s.Contains(output, "--runtime-version string")
 	})
 
-	t.Run("0.28.0 software version", func(t *testing.T) {
+	s.Run("0.28.0 software version", func() {
 		houstonVersion = "0.28.0"
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -67,13 +65,13 @@ func TestDevInitCommandSoftware(t *testing.T) {
 		testUtil.SetupOSArgsForGinkgo()
 		_, err := cmd.ExecuteC()
 		output := buf.String()
-		assert.NoError(t, err)
-		assert.Contains(t, output, "astro dev", output)
-		assert.NotContains(t, output, "--use-astronomer-certified")
-		assert.NotContains(t, output, "--runtime-version string")
+		s.NoError(err)
+		s.Contains(output, "astro dev", output)
+		s.NotContains(output, "--use-astronomer-certified")
+		s.NotContains(output, "--runtime-version string")
 	})
 
-	t.Run("0.29.0 software version", func(t *testing.T) {
+	s.Run("0.29.0 software version", func() {
 		houstonVersion = "0.29.0"
 		cmd := newAirflowInitCmd()
 		buf := new(bytes.Buffer)
@@ -82,84 +80,84 @@ func TestDevInitCommandSoftware(t *testing.T) {
 		testUtil.SetupOSArgsForGinkgo()
 		_, err := cmd.ExecuteC()
 		output := buf.String()
-		assert.NoError(t, err)
-		assert.Contains(t, output, "astro dev", output)
-		assert.Contains(t, output, "--use-astronomer-certified")
-		assert.Contains(t, output, "--runtime-version string")
+		s.NoError(err)
+		s.Contains(output, "astro dev", output)
+		s.Contains(output, "--use-astronomer-certified")
+		s.Contains(output, "--runtime-version string")
 	})
 }
 
-func TestNewAirflowInitCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowInitCmd() {
 	cmd := newAirflowInitCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestNewAirflowStartCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowStartCmd() {
 	cmd := newAirflowStartCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestNewAirflowRunCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowRunCmd() {
 	cmd := newAirflowRunCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestNewAirflowPSCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowPSCmd() {
 	cmd := newAirflowPSCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestNewAirflowLogsCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowLogsCmd() {
 	cmd := newAirflowLogsCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestNewAirflowKillCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowKillCmd() {
 	cmd := newAirflowKillCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func TestNewAirflowUpgradeCheckCmd(t *testing.T) {
+func (s *Suite) TestNewAirflowUpgradeCheckCmd() {
 	cmd := newAirflowUpgradeCheckCmd()
-	assert.Nil(t, cmd.PersistentPreRunE(new(cobra.Command), []string{}))
+	s.Nil(cmd.PersistentPreRunE(new(cobra.Command), []string{}))
 }
 
-func Test_airflowInitNonEmptyDir(t *testing.T) {
+func (s *Suite) Test_airflowInitNonEmptyDir() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cmd := newAirflowInitCmd()
 	var args []string
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(s.T(), "y")()
 	err := airflowInit(cmd, args)
-	assert.Nil(t, err)
+	s.NoError(err)
 
 	b, _ := os.ReadFile("Dockerfile")
 	dockerfileContents := string(b)
-	assert.True(t, strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+	s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 
 	// Clean up init files after test
-	cleanUpInitFiles(t)
+	s.cleanUpInitFiles()
 }
 
-func Test_airflowInitNoDefaultImageTag(t *testing.T) {
+func (s *Suite) Test_airflowInitNoDefaultImageTag() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	cmd := newAirflowInitCmd()
 	var args []string
 
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(s.T(), "y")()
 
 	err := airflowInit(cmd, args)
-	assert.Nil(t, err)
+	s.NoError(err)
 	// assert contents of Dockerfile
 	b, _ := os.ReadFile("Dockerfile")
 	dockerfileContents := string(b)
-	assert.True(t, strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+	s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 
 	// Clean up init files after test
-	cleanUpInitFiles(t)
+	s.cleanUpInitFiles()
 }
 
-func cleanUpInitFiles(t *testing.T) {
+func (s *Suite) cleanUpInitFiles() {
 	files := []string{
 		".dockerignore",
 		".gitignore",
@@ -184,111 +182,80 @@ func cleanUpInitFiles(t *testing.T) {
 	for _, f := range files {
 		e := os.Remove(f)
 		if e != nil {
-			t.Log(e)
+			s.T().Log(e)
 		}
 	}
 }
 
-func mockUserInput(t *testing.T, i string) (r, stdin *os.File) {
-	input := []byte(i)
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
-	w.Close()
-	stdin = os.Stdin
-	return r, stdin
-}
-
-func TestAirflowInit(t *testing.T) {
+func (s *Suite) TestAirflowInit() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		var args []string
 
-		r, stdin := mockUserInput(t, "y")
+		defer testUtil.MockUserInput(s.T(), "y")()
 
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
-		assert.Nil(t, err)
+		defer s.cleanUpInitFiles()
+		s.NoError(err)
 
 		b, _ := os.ReadFile("Dockerfile")
 		dockerfileContents := string(b)
-		assert.True(t, strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
+		s.True(strings.Contains(dockerfileContents, "FROM quay.io/astronomer/astro-runtime:"))
 	})
 
-	t.Run("invalid args", func(t *testing.T) {
+	s.Run("invalid args", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{"invalid-arg"}
 
-		r, stdin := mockUserInput(t, "y")
+		defer testUtil.MockUserInput(s.T(), "y")()
 
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
-		assert.ErrorIs(t, err, errProjectNameSpaces)
+		defer s.cleanUpInitFiles()
+		s.ErrorIs(err, errProjectNameSpaces)
 	})
 
-	t.Run("invalid project name", func(t *testing.T) {
+	s.Run("invalid project name", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test@project-name")
 		args := []string{}
 
-		r, stdin := mockUserInput(t, "y")
+		defer testUtil.MockUserInput(s.T(), "y")()
 
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
-		assert.ErrorIs(t, err, errConfigProjectName)
+		defer s.cleanUpInitFiles()
+		s.ErrorIs(err, errConfigProjectName)
 	})
 
-	t.Run("both runtime & AC version passed", func(t *testing.T) {
+	s.Run("both runtime & AC version passed", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("airflow-version").Value.Set("2.2.5")
 		cmd.Flag("runtime-version").Value.Set("4.2.4")
 		args := []string{}
 
-		r, stdin := mockUserInput(t, "y")
+		defer testUtil.MockUserInput(s.T(), "y")()
 
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
-		assert.ErrorIs(t, err, errInvalidBothAirflowAndRuntimeVersions)
+		defer s.cleanUpInitFiles()
+		s.ErrorIs(err, errInvalidBothAirflowAndRuntimeVersions)
 	})
 
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	t.Run("runtime version passed alongside AC flag", func(t *testing.T) {
+	s.Run("runtime version passed alongside AC flag", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("use-astronomer-certified").Value.Set("true")
 		cmd.Flag("runtime-version").Value.Set("4.2.4")
 		args := []string{}
 
-		r, stdin := mockUserInput(t, "y")
-
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
@@ -297,26 +264,22 @@ func TestAirflowInit(t *testing.T) {
 
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
+		defer s.cleanUpInitFiles()
 
 		w.Close()
 		out, _ := io.ReadAll(r)
 
-		assert.NoError(t, err)
-		assert.Contains(t, string(out), "You provided a runtime version with the --use-astronomer-certified flag. Thus, this command will ignore the --runtime-version value you provided.")
+		s.NoError(err)
+		s.Contains(string(out), "You provided a runtime version with the --use-astronomer-certified flag. Thus, this command will ignore the --runtime-version value you provided.")
 	})
 
-	t.Run("use AC flag", func(t *testing.T) {
+	s.Run("use AC flag", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		cmd.Flag("use-astronomer-certified").Value.Set("true")
 		args := []string{}
 
-		r, stdin := mockUserInput(t, "y")
-
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
@@ -325,25 +288,21 @@ func TestAirflowInit(t *testing.T) {
 
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
+		defer s.cleanUpInitFiles()
 
 		w.Close()
 		out, _ := io.ReadAll(r)
 
-		assert.NoError(t, err)
-		assert.Contains(t, string(out), "Pulling Airflow development files from Astronomer Certified Airflow Version")
+		s.NoError(err)
+		s.Contains(string(out), "Pulling Airflow development files from Astronomer Certified Airflow Version")
 	})
 
-	t.Run("cancel non empty dir warning", func(t *testing.T) {
+	s.Run("cancel non empty dir warning", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
 
-		r, stdin := mockUserInput(t, "n")
-
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
+		defer testUtil.MockUserInput(s.T(), "n")()
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
@@ -352,34 +311,26 @@ func TestAirflowInit(t *testing.T) {
 
 		err := airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
+		defer s.cleanUpInitFiles()
 
 		w.Close()
 		out, _ := io.ReadAll(r)
 
-		assert.NoError(t, err)
-		assert.Contains(t, string(out), "Canceling project initialization...")
+		s.NoError(err)
+		s.Contains(string(out), "Canceling project initialization...")
 	})
 
-	t.Run("reinitialize the same project", func(t *testing.T) {
+	s.Run("reinitialize the same project", func() {
 		cmd := newAirflowInitCmd()
 		cmd.Flag("name").Value.Set("test-project-name")
 		args := []string{}
 
-		r, stdin := mockUserInput(t, "y")
-
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		err := airflowInit(cmd, args)
-		assert.NoError(t, err)
+		s.NoError(err)
 
-		r, stdin = mockUserInput(t, "y")
-
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
+		defer testUtil.MockUserInput(s.T(), "y")()
 
 		orgStdout := os.Stdout
 		defer func() { os.Stdout = orgStdout }()
@@ -388,18 +339,18 @@ func TestAirflowInit(t *testing.T) {
 
 		err = airflowInit(cmd, args)
 		// Clean up init files after test
-		defer func() { cleanUpInitFiles(t) }()
+		defer s.cleanUpInitFiles()
 
 		w.Close()
 		out, _ := io.ReadAll(r)
 
-		assert.NoError(t, err)
-		assert.Contains(t, string(out), "Reinitialized existing Astro project in")
+		s.NoError(err)
+		s.Contains(string(out), "Reinitialized existing Astro project in")
 	})
 }
 
-func TestAirflowStart(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowStart() {
+	s.Run("success", func() {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
@@ -410,11 +361,11 @@ func TestAirflowStart(t *testing.T) {
 		}
 
 		err := airflowStart(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowStartCmd()
 		args := []string{"test-env-file"}
 
@@ -425,11 +376,11 @@ func TestAirflowStart(t *testing.T) {
 		}
 
 		err := airflowStart(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowStartCmd()
 		args := []string{}
 
@@ -438,12 +389,12 @@ func TestAirflowStart(t *testing.T) {
 		}
 
 		err := airflowStart(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowRun(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowRun() {
+	s.Run("success", func() {
 		cmd := newAirflowRunCmd()
 		args := []string{"test", "command"}
 
@@ -454,11 +405,11 @@ func TestAirflowRun(t *testing.T) {
 		}
 
 		err := airflowRun(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowRunCmd()
 		args := []string{"test", "command"}
 
@@ -469,11 +420,11 @@ func TestAirflowRun(t *testing.T) {
 		}
 
 		err := airflowRun(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowRunCmd()
 		args := []string{}
 
@@ -482,12 +433,12 @@ func TestAirflowRun(t *testing.T) {
 		}
 
 		err := airflowRun(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowPS(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowPS() {
+	s.Run("success", func() {
 		cmd := newAirflowPSCmd()
 		args := []string{}
 
@@ -498,11 +449,11 @@ func TestAirflowPS(t *testing.T) {
 		}
 
 		err := airflowPS(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowPSCmd()
 		args := []string{}
 
@@ -513,11 +464,11 @@ func TestAirflowPS(t *testing.T) {
 		}
 
 		err := airflowPS(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowPSCmd()
 		args := []string{}
 
@@ -526,12 +477,12 @@ func TestAirflowPS(t *testing.T) {
 		}
 
 		err := airflowPS(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowLogs(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowLogs() {
+	s.Run("success", func() {
 		cmd := newAirflowLogsCmd()
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
@@ -545,11 +496,11 @@ func TestAirflowLogs(t *testing.T) {
 		}
 
 		err := airflowLogs(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("without any component flag", func(t *testing.T) {
+	s.Run("without any component flag", func() {
 		cmd := newAirflowLogsCmd()
 		cmd.Flag("follow").Value.Set("true")
 		args := []string{}
@@ -561,11 +512,11 @@ func TestAirflowLogs(t *testing.T) {
 		}
 
 		err := airflowLogs(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowLogsCmd()
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
@@ -579,11 +530,11 @@ func TestAirflowLogs(t *testing.T) {
 		}
 
 		err := airflowLogs(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowLogsCmd()
 		args := []string{}
 
@@ -592,12 +543,12 @@ func TestAirflowLogs(t *testing.T) {
 		}
 
 		err := airflowLogs(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowKill(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowKill() {
+	s.Run("success", func() {
 		cmd := newAirflowKillCmd()
 		args := []string{}
 
@@ -608,11 +559,11 @@ func TestAirflowKill(t *testing.T) {
 		}
 
 		err := airflowKill(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowKillCmd()
 		args := []string{}
 
@@ -623,11 +574,11 @@ func TestAirflowKill(t *testing.T) {
 		}
 
 		err := airflowKill(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowKillCmd()
 		args := []string{}
 
@@ -636,12 +587,12 @@ func TestAirflowKill(t *testing.T) {
 		}
 
 		err := airflowKill(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowStop(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowStop() {
+	s.Run("success", func() {
 		cmd := newAirflowStopCmd()
 		args := []string{}
 
@@ -652,11 +603,11 @@ func TestAirflowStop(t *testing.T) {
 		}
 
 		err := airflowStop(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowStopCmd()
 		args := []string{}
 
@@ -667,11 +618,11 @@ func TestAirflowStop(t *testing.T) {
 		}
 
 		err := airflowStop(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowStopCmd()
 		args := []string{}
 
@@ -680,12 +631,12 @@ func TestAirflowStop(t *testing.T) {
 		}
 
 		err := airflowStop(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowRestart(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowRestart() {
+	s.Run("success", func() {
 		cmd := newAirflowRestartCmd()
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
@@ -698,11 +649,11 @@ func TestAirflowRestart(t *testing.T) {
 		}
 
 		err := airflowRestart(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("stop failure", func(t *testing.T) {
+	s.Run("stop failure", func() {
 		cmd := newAirflowRestartCmd()
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
@@ -714,11 +665,11 @@ func TestAirflowRestart(t *testing.T) {
 		}
 
 		err := airflowRestart(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("start failure", func(t *testing.T) {
+	s.Run("start failure", func() {
 		cmd := newAirflowRestartCmd()
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
@@ -731,11 +682,11 @@ func TestAirflowRestart(t *testing.T) {
 		}
 
 		err := airflowRestart(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowRestartCmd()
 		cmd.Flag("no-cache").Value.Set("true")
 		args := []string{"test-env-file"}
@@ -745,12 +696,12 @@ func TestAirflowRestart(t *testing.T) {
 		}
 
 		err := airflowRestart(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowPytest(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowPytest() {
+	s.Run("success", func() {
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -762,11 +713,11 @@ func TestAirflowPytest(t *testing.T) {
 		}
 
 		err := airflowPytest(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("exit code 1", func(t *testing.T) {
+	s.Run("exit code 1", func() {
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -778,11 +729,11 @@ func TestAirflowPytest(t *testing.T) {
 		}
 
 		err := airflowPytest(cmd, args)
-		assert.Contains(t, err.Error(), "pytests failed")
-		mockContainerHandler.AssertExpectations(t)
+		s.Contains(err.Error(), "pytests failed")
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("pytest file doesnot exists", func(t *testing.T) {
+	s.Run("pytest file doesnot exists", func() {
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = "/testfile-not-exists"
@@ -794,11 +745,11 @@ func TestAirflowPytest(t *testing.T) {
 		}
 
 		err := airflowPytest(cmd, args)
-		assert.Contains(t, err.Error(), "directory does not exist, please run `astro dev init` to create it")
-		mockContainerHandler.AssertExpectations(t)
+		s.Contains(err.Error(), "directory does not exist, please run `astro dev init` to create it")
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -810,11 +761,11 @@ func TestAirflowPytest(t *testing.T) {
 		}
 
 		err := airflowPytest(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowPytestCmd()
 		args := []string{"test-pytest-file"}
 		pytestDir = ""
@@ -824,10 +775,10 @@ func TestAirflowPytest(t *testing.T) {
 		}
 
 		err := airflowPytest(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 
-	t.Run("projectNameUnique failure", func(t *testing.T) {
+	s.Run("projectNameUnique failure", func() {
 		cmd := newAirflowParseCmd()
 		args := []string{}
 
@@ -837,12 +788,12 @@ func TestAirflowPytest(t *testing.T) {
 		defer func() { projectNameUnique = airflow.ProjectNameUnique }()
 
 		err := airflowPytest(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowParse(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowParse() {
+	s.Run("success", func() {
 		cmd := newAirflowParseCmd()
 		args := []string{}
 
@@ -853,11 +804,11 @@ func TestAirflowParse(t *testing.T) {
 		}
 
 		err := airflowParse(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowParseCmd()
 		args := []string{}
 
@@ -868,11 +819,11 @@ func TestAirflowParse(t *testing.T) {
 		}
 
 		err := airflowParse(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowParseCmd()
 		args := []string{}
 
@@ -881,10 +832,10 @@ func TestAirflowParse(t *testing.T) {
 		}
 
 		err := airflowParse(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 
-	t.Run("projectNameUnique failure", func(t *testing.T) {
+	s.Run("projectNameUnique failure", func() {
 		cmd := newAirflowParseCmd()
 		args := []string{}
 
@@ -894,12 +845,12 @@ func TestAirflowParse(t *testing.T) {
 		defer func() { projectNameUnique = airflow.ProjectNameUnique }()
 
 		err := airflowParse(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowUpgradeCheck(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowUpgradeCheck() {
+	s.Run("success", func() {
 		cmd := newAirflowUpgradeCheckCmd()
 		args := []string{}
 
@@ -910,11 +861,11 @@ func TestAirflowUpgradeCheck(t *testing.T) {
 		}
 
 		err := airflowUpgradeCheck(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowUpgradeCheckCmd()
 		args := []string{}
 
@@ -925,11 +876,11 @@ func TestAirflowUpgradeCheck(t *testing.T) {
 		}
 
 		err := airflowUpgradeCheck(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowUpgradeCheckCmd()
 		args := []string{}
 
@@ -938,12 +889,12 @@ func TestAirflowUpgradeCheck(t *testing.T) {
 		}
 
 		err := airflowUpgradeCheck(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowBash(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowBash() {
+	s.Run("success", func() {
 		cmd := newAirflowBashCmd()
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
@@ -959,11 +910,11 @@ func TestAirflowBash(t *testing.T) {
 		}
 
 		err := airflowBash(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("without any component flag", func(t *testing.T) {
+	s.Run("without any component flag", func() {
 		cmd := newAirflowBashCmd()
 		args := []string{}
 
@@ -974,11 +925,11 @@ func TestAirflowBash(t *testing.T) {
 		}
 
 		err := airflowBash(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newAirflowBashCmd()
 		cmd.Flag("webserver").Value.Set("true")
 		cmd.Flag("scheduler").Value.Set("true")
@@ -993,11 +944,11 @@ func TestAirflowBash(t *testing.T) {
 		}
 
 		err := airflowBash(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newAirflowBashCmd()
 		args := []string{}
 
@@ -1006,12 +957,12 @@ func TestAirflowBash(t *testing.T) {
 		}
 
 		err := airflowBash(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowObjectImport(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowObjectImport() {
+	s.Run("success", func() {
 		cmd := newObjectImportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
@@ -1026,11 +977,11 @@ func TestAirflowObjectImport(t *testing.T) {
 		}
 
 		err := airflowSettingsImport(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("without any object flag", func(t *testing.T) {
+	s.Run("without any object flag", func() {
 		cmd := newObjectImportCmd()
 		args := []string{}
 
@@ -1041,11 +992,11 @@ func TestAirflowObjectImport(t *testing.T) {
 		}
 
 		err := airflowSettingsImport(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newObjectImportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
@@ -1059,11 +1010,11 @@ func TestAirflowObjectImport(t *testing.T) {
 		}
 
 		err := airflowSettingsImport(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newObjectImportCmd()
 		args := []string{}
 
@@ -1072,12 +1023,12 @@ func TestAirflowObjectImport(t *testing.T) {
 		}
 
 		err := airflowSettingsImport(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestAirflowObjectExport(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAirflowObjectExport() {
+	s.Run("success", func() {
 		cmd := newObjectExportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
@@ -1092,11 +1043,11 @@ func TestAirflowObjectExport(t *testing.T) {
 		}
 
 		err := airflowSettingsExport(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("success compose export", func(t *testing.T) {
+	s.Run("success compose export", func() {
 		cmd := newObjectExportCmd()
 		cmd.Flag("compose").Value.Set("true")
 
@@ -1109,11 +1060,11 @@ func TestAirflowObjectExport(t *testing.T) {
 		}
 
 		err := airflowSettingsExport(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("without any object flag", func(t *testing.T) {
+	s.Run("without any object flag", func() {
 		cmd := newObjectExportCmd()
 		args := []string{}
 
@@ -1124,11 +1075,11 @@ func TestAirflowObjectExport(t *testing.T) {
 		}
 
 		err := airflowSettingsExport(cmd, args)
-		assert.NoError(t, err)
-		mockContainerHandler.AssertExpectations(t)
+		s.NoError(err)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		cmd := newObjectExportCmd()
 		cmd.Flag("connections").Value.Set("true")
 		cmd.Flag("pools").Value.Set("true")
@@ -1142,11 +1093,11 @@ func TestAirflowObjectExport(t *testing.T) {
 		}
 
 		err := airflowSettingsExport(cmd, args)
-		assert.ErrorIs(t, err, errMock)
-		mockContainerHandler.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockContainerHandler.AssertExpectations(s.T())
 	})
 
-	t.Run("containerHandlerInit failure", func(t *testing.T) {
+	s.Run("containerHandlerInit failure", func() {
 		cmd := newObjectExportCmd()
 		args := []string{}
 
@@ -1155,23 +1106,23 @@ func TestAirflowObjectExport(t *testing.T) {
 		}
 
 		err := airflowSettingsExport(cmd, args)
-		assert.ErrorIs(t, err, errMock)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func TestPrepareDefaultAirflowImageTag(t *testing.T) {
+func (s *Suite) TestPrepareDefaultAirflowImageTag() {
 	getDefaultImageTag = func(httpClient *airflowversions.Client, airflowVersion string) (string, error) {
 		return "", nil
 	}
-	t.Run("default airflow version", func(t *testing.T) {
+	s.Run("default airflow version", func() {
 		useAstronomerCertified = true
 		resp := prepareDefaultAirflowImageTag("", nil)
-		assert.Equal(t, airflowversions.DefaultAirflowVersion, resp)
+		s.Equal(airflowversions.DefaultAirflowVersion, resp)
 	})
 
-	t.Run("default runtime version", func(t *testing.T) {
+	s.Run("default runtime version", func() {
 		useAstronomerCertified = false
 		resp := prepareDefaultAirflowImageTag("", nil)
-		assert.Equal(t, airflowversions.DefaultRuntimeVersion, resp)
+		s.Equal(airflowversions.DefaultRuntimeVersion, resp)
 	})
 }

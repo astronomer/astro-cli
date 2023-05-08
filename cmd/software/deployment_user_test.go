@@ -1,15 +1,12 @@
 package software
 
 import (
-	"testing"
-
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestDeploymentUserAddCommand(t *testing.T) {
+func (s *Suite) TestDeploymentUserAddCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` DEPLOYMENT ID                 USER                       ROLE                  
  ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.io     DEPLOYMENT_VIEWER     
@@ -33,11 +30,11 @@ func TestDeploymentUserAddCommand(t *testing.T) {
 		"--deployment-id="+mockDeploymentUserRole.Deployment.ID,
 		"--email="+mockDeploymentUserRole.User.Username,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
+	s.NoError(err)
+	s.Equal(expectedOut, output)
 }
 
-func TestDeploymentUserDeleteCommand(t *testing.T) {
+func (s *Suite) TestDeploymentUserDeleteCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` DEPLOYMENT ID                 USER                       ROLE                  
  ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.io     DEPLOYMENT_VIEWER     
@@ -57,11 +54,11 @@ func TestDeploymentUserDeleteCommand(t *testing.T) {
 		"--deployment-id="+mockDeploymentUserRole.Deployment.ID,
 		mockDeploymentUserRole.User.Username,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
+	s.NoError(err)
+	s.Equal(expectedOut, output)
 }
 
-func TestDeploymentUserList(t *testing.T) {
+func (s *Suite) TestDeploymentUserList() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	mockUser := []houston.DeploymentUser{
 		{
@@ -76,13 +73,13 @@ func TestDeploymentUserList(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("user", "list", "--deployment-id", "test-id", "-u", "test-user-id", "-e", "test-email", "-n", "test-name")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "test-id")
-	assert.Contains(t, output, "test-name")
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, "test-id")
+	s.Contains(output, "test-name")
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentUserUpdateCommand(t *testing.T) {
+func (s *Suite) TestDeploymentUserUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedNewRole := houston.DeploymentAdminRole
 	expectedOut := `Successfully updated somebody@astronomer.io to a ` + expectedNewRole
@@ -107,6 +104,6 @@ func TestDeploymentUserUpdateCommand(t *testing.T) {
 		"--role="+expectedNewRole,
 		mockResponseUserRole.User.Username,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }

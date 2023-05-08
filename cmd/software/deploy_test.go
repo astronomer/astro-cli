@@ -6,8 +6,16 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
+
+type Suite struct {
+	suite.Suite
+}
+
+func TestCmdSoftwareSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 func execDeployCmd(args ...string) error {
 	cmd := NewDeployCmd()
@@ -17,7 +25,7 @@ func execDeployCmd(args ...string) error {
 	return err
 }
 
-func TestDeploy(t *testing.T) {
+func (s *Suite) TestDeploy() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		BYORegistryDomain: "test.registry.io",
@@ -33,11 +41,11 @@ func TestDeploy(t *testing.T) {
 	}
 
 	err := execDeployCmd([]string{"-f"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 }

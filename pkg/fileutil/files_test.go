@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 var errMock = errors.New("mock error")
@@ -23,7 +23,15 @@ func readFileError(name string) ([]byte, error) {
 	return nil, errMock
 }
 
-func TestExists(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestPkgFileUtilSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestExists() {
 	filePath := "test.yaml"
 	fs := afero.NewMemMapFs()
 	_ = afero.WriteFile(fs, filePath, []byte(`test`), 0o777)
@@ -99,15 +107,15 @@ func TestExists(t *testing.T) {
 	for _, tt := range tests {
 		actualResp, actualErr := Exists(tt.args.path, tt.args.fs)
 		if tt.errResp != "" && actualErr != nil {
-			assert.Contains(t, actualErr.Error(), tt.errResp)
+			s.Contains(actualErr.Error(), tt.errResp)
 		} else {
-			assert.NoError(t, actualErr)
+			s.NoError(actualErr)
 		}
-		assert.Equal(t, tt.expectedResp, actualResp)
+		s.Equal(tt.expectedResp, actualResp)
 	}
 }
 
-func TestWriteStringToFile(t *testing.T) {
+func (s *Suite) TestWriteStringToFile() {
 	type args struct {
 		path string
 		s    string
@@ -125,18 +133,17 @@ func TestWriteStringToFile(t *testing.T) {
 	}
 	defer afero.NewOsFs().Remove("./test.out")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if err := WriteStringToFile(tt.args.path, tt.args.s); (err != nil) != tt.wantErr {
-				t.Errorf("WriteStringToFile() error = %v, wantErr %v", err, tt.wantErr)
+				s.Error(err)
 			}
-			if _, err := os.Open(tt.args.path); err != nil {
-				t.Errorf("Error opening file %s", tt.args.path)
-			}
+			_, err := os.Open(tt.args.path)
+			s.NoError(err)
 		})
 	}
 }
 
-func TestTar(t *testing.T) {
+func (s *Suite) TestTar() {
 	os.Mkdir("./test", os.ModePerm)
 
 	path := "./test/test.txt"
@@ -162,25 +169,22 @@ func TestTar(t *testing.T) {
 	defer afero.NewOsFs().Remove("./test")
 	defer afero.NewOsFs().Remove("/tmp/test.tar")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if err := Tar(tt.args.source, tt.args.target); (err != nil) != tt.wantErr {
-				t.Errorf("Tar() error = %v, wantErr %v", err, tt.wantErr)
+				s.Error(err)
 			}
 			filePath := "/tmp/test.tar"
-			if _, err := os.Create(filePath); err != nil {
-				t.Errorf("Error creating file %s", filePath)
-			}
-			if _, err := os.Stat(tt.args.source); err != nil {
-				t.Errorf("Error getting file stats %s", tt.args.source)
-			}
-			if _, err := os.Open(tt.args.source); err != nil {
-				t.Errorf("Error opening file %s", tt.args.source)
-			}
+			_, err := os.Create(filePath)
+			s.NoError(err)
+			_, err = os.Stat(tt.args.source)
+			s.NoError(err)
+			_, err = os.Open(tt.args.source)
+			s.NoError(err)
 		})
 	}
 }
 
-func TestContains(t *testing.T) {
+func (s *Suite) TestContains() {
 	type args struct {
 		elems []string
 		param string
@@ -206,15 +210,15 @@ func TestContains(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			exist, index := Contains(tt.args.elems, tt.args.param)
-			assert.Equal(t, exist, tt.expectedResp)
-			assert.Equal(t, index, tt.expectedPos)
+			s.Equal(exist, tt.expectedResp)
+			s.Equal(index, tt.expectedPos)
 		})
 	}
 }
 
-func TestRead(t *testing.T) {
+func (s *Suite) TestRead() {
 	filePath := "./test.out"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -242,19 +246,19 @@ func TestRead(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			actualResp, actualErr := Read(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
-				assert.Contains(t, actualErr.Error(), tt.errResp)
+				s.Contains(actualErr.Error(), tt.errResp)
 			} else {
-				assert.NoError(t, actualErr)
+				s.NoError(actualErr)
 			}
-			assert.Equal(t, tt.expectedResp, actualResp)
+			s.Equal(tt.expectedResp, actualResp)
 		})
 	}
 }
 
-func TestReadFileToString(t *testing.T) {
+func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -282,19 +286,19 @@ func TestReadFileToString(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			actualResp, actualErr := ReadFileToString(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
-				assert.Contains(t, actualErr.Error(), tt.errResp)
+				s.Contains(actualErr.Error(), tt.errResp)
 			} else {
-				assert.NoError(t, actualErr)
+				s.NoError(actualErr)
 			}
-			assert.Equal(t, tt.expectedResp, actualResp)
+			s.Equal(tt.expectedResp, actualResp)
 		})
 	}
 }
 
-func TestGetFilesWithSpecificExtension(t *testing.T) {
+func (s *Suite) TestGetFilesWithSpecificExtension() {
 	filePath := "./test.py"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -315,14 +319,14 @@ func TestGetFilesWithSpecificExtension(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			files := GetFilesWithSpecificExtension(tt.args.folderPath, tt.args.ext)
-			assert.Equal(t, expectedFiles, files)
+			s.Equal(expectedFiles, files)
 		})
 	}
 }
 
-func TestAddLineToFile(t *testing.T) {
+func (s *Suite) TestAddLineToFile() {
 	filePath := "./test.py"
 	content := "testing"
 
@@ -352,29 +356,29 @@ func TestAddLineToFile(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = os.ReadFile
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.NoError(t, err)
+			s.NoError(err)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = openFileError
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.Contains(t, err.Error(), errMock.Error())
+			s.Contains(err.Error(), errMock.Error())
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = readFileError
 			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.Contains(t, err.Error(), errMock.Error())
+			s.Contains(err.Error(), errMock.Error())
 		})
 	}
 }
 
-func TestRemoveLineFromFile(t *testing.T) {
+func (s *Suite) TestRemoveLineFromFile() {
 	filePath := "./test.py"
 	content := "testing\nremove this"
 
@@ -404,24 +408,24 @@ func TestRemoveLineFromFile(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = os.ReadFile
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.NoError(t, err)
+			s.NoError(err)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = openFileError
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.ErrorIs(t, err, errMock)
+			s.ErrorIs(err, errMock)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			openFile = os.OpenFile
 			readFile = readFileError
 			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			assert.ErrorIs(t, err, errMock)
+			s.ErrorIs(err, errMock)
 		})
 	}
 }

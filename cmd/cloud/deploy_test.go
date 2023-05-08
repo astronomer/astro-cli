@@ -7,8 +7,16 @@ import (
 	cloud "github.com/astronomer/astro-cli/cloud/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
+
+type Suite struct {
+	suite.Suite
+}
+
+func TestCmdCloudSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 func execDeployCmd(args ...string) error {
 	testUtil.SetupOSArgsForGinkgo()
@@ -18,7 +26,7 @@ func execDeployCmd(args ...string) error {
 	return err
 }
 
-func TestDeployImage(t *testing.T) {
+func (s *Suite) TestDeployImage() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
@@ -30,32 +38,32 @@ func TestDeployImage(t *testing.T) {
 	}
 
 	err := execDeployCmd([]string{"-f"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--save"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--pytest"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--parse"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--parse", "--pytest"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--parse", "--pytest"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"test-deployment-id", "--dags"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--pytest"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = execDeployCmd([]string{"-f", "test-deployment-id", "--dags", "--parse", "--pytest"}...)
-	assert.NoError(t, err)
+	s.NoError(err)
 }

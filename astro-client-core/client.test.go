@@ -4,10 +4,18 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNewCoreClient(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestAirflowClientSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestNewCoreClient() {
 	client := NewCoreClient(httputil.NewHTTPClient())
-	assert.NotNil(t, client, "Can't create new Astro Core client")
+	s.NotNil(client, "Can't create new Astro Core client")
 }

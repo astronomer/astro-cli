@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestListWorkspaces(t *testing.T) {
+func (s *Suite) TestListWorkspaces() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -26,9 +24,9 @@ func TestListWorkspaces(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -39,11 +37,11 @@ func TestListWorkspaces(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		workspaces, err := astroClient.ListWorkspaces("organization-id")
-		assert.NoError(t, err)
-		assert.Equal(t, workspaces, mockResponse.Data.GetWorkspaces)
+		s.NoError(err)
+		s.Equal(workspaces, mockResponse.Data.GetWorkspaces)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -54,11 +52,11 @@ func TestListWorkspaces(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ListWorkspaces("organization-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestCreateDeployment(t *testing.T) {
+func (s *Suite) TestCreateDeployment() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -72,9 +70,9 @@ func TestCreateDeployment(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -85,11 +83,11 @@ func TestCreateDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deployment, err := astroClient.CreateDeployment(&CreateDeploymentInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.CreateDeployment)
+		s.NoError(err)
+		s.Equal(deployment, mockResponse.Data.CreateDeployment)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -100,11 +98,11 @@ func TestCreateDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.CreateDeployment(&CreateDeploymentInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestUpdateDeployment(t *testing.T) {
+func (s *Suite) TestUpdateDeployment() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -118,9 +116,9 @@ func TestUpdateDeployment(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -131,11 +129,11 @@ func TestUpdateDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deployment, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.UpdateDeployment)
+		s.NoError(err)
+		s.Equal(deployment, mockResponse.Data.UpdateDeployment)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -146,11 +144,11 @@ func TestUpdateDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.UpdateDeployment(&UpdateDeploymentInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListDeployments(t *testing.T) {
+func (s *Suite) TestListDeployments() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	org := "test-org-id"
 	mockResponse := &Response{
@@ -167,9 +165,9 @@ func TestListDeployments(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -180,11 +178,11 @@ func TestListDeployments(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deployments, err := astroClient.ListDeployments(org, "")
-		assert.NoError(t, err)
-		assert.Equal(t, deployments, mockResponse.Data.GetDeployments)
+		s.NoError(err)
+		s.Equal(deployments, mockResponse.Data.GetDeployments)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -195,11 +193,11 @@ func TestListDeployments(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ListDeployments(org, "")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetDeployment(t *testing.T) {
+func (s *Suite) TestGetDeployment() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	deployment := "test-deployment-id"
 	mockResponse := &Response{
@@ -216,9 +214,9 @@ func TestGetDeployment(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -229,11 +227,11 @@ func TestGetDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deployments, err := astroClient.GetDeployment(deployment)
-		assert.NoError(t, err)
-		assert.Equal(t, deployments, mockResponse.Data.GetDeployment)
+		s.NoError(err)
+		s.Equal(deployments, mockResponse.Data.GetDeployment)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -244,11 +242,11 @@ func TestGetDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.GetDeployment(deployment)
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteDeployment(t *testing.T) {
+func (s *Suite) TestDeleteDeployment() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -262,9 +260,9 @@ func TestDeleteDeployment(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -275,11 +273,11 @@ func TestDeleteDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deployment, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, deployment, mockResponse.Data.DeleteDeployment)
+		s.NoError(err)
+		s.Equal(deployment, mockResponse.Data.DeleteDeployment)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -290,11 +288,11 @@ func TestDeleteDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.DeleteDeployment(DeleteDeploymentInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetDeploymentHistory(t *testing.T) {
+func (s *Suite) TestGetDeploymentHistory() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -312,9 +310,9 @@ func TestGetDeploymentHistory(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -325,11 +323,11 @@ func TestGetDeploymentHistory(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deploymentHistory, err := astroClient.GetDeploymentHistory(map[string]interface{}{})
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentHistory, mockResponse.Data.GetDeploymentHistory)
+		s.NoError(err)
+		s.Equal(deploymentHistory, mockResponse.Data.GetDeploymentHistory)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -340,11 +338,11 @@ func TestGetDeploymentHistory(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.GetDeploymentHistory(map[string]interface{}{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetDeploymentConfig(t *testing.T) {
+func (s *Suite) TestGetDeploymentConfig() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -363,9 +361,9 @@ func TestGetDeploymentConfig(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -376,11 +374,11 @@ func TestGetDeploymentConfig(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		deploymentConfig, err := astroClient.GetDeploymentConfig()
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentConfig, mockResponse.Data.GetDeploymentConfig)
+		s.NoError(err)
+		s.Equal(deploymentConfig, mockResponse.Data.GetDeploymentConfig)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -391,11 +389,11 @@ func TestGetDeploymentConfig(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.GetDeploymentConfig()
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestModifyDeploymentVariable(t *testing.T) {
+func (s *Suite) TestModifyDeploymentVariable() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -409,9 +407,9 @@ func TestModifyDeploymentVariable(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -422,11 +420,11 @@ func TestModifyDeploymentVariable(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		envVars, err := astroClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, envVars, mockResponse.Data.UpdateDeploymentVariables)
+		s.NoError(err)
+		s.Equal(envVars, mockResponse.Data.UpdateDeploymentVariables)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -437,11 +435,11 @@ func TestModifyDeploymentVariable(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ModifyDeploymentVariable(EnvironmentVariablesInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestInitiateDagDeployment(t *testing.T) {
+func (s *Suite) TestInitiateDagDeployment() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -452,9 +450,9 @@ func TestInitiateDagDeployment(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -465,11 +463,11 @@ func TestInitiateDagDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		envVars, err := astroClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, envVars, mockResponse.Data.InitiateDagDeployment)
+		s.NoError(err)
+		s.Equal(envVars, mockResponse.Data.InitiateDagDeployment)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -480,11 +478,11 @@ func TestInitiateDagDeployment(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.InitiateDagDeployment(InitiateDagDeploymentInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestReportDagDeploymentStatus(t *testing.T) {
+func (s *Suite) TestReportDagDeploymentStatus() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -502,9 +500,9 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -515,11 +513,11 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		image, err := astroClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, image, mockResponse.Data.ReportDagDeploymentStatus)
+		s.NoError(err)
+		s.Equal(image, mockResponse.Data.ReportDagDeploymentStatus)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -530,11 +528,11 @@ func TestReportDagDeploymentStatus(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ReportDagDeploymentStatus(&ReportDagDeploymentStatusInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestCreateImage(t *testing.T) {
+func (s *Suite) TestCreateImage() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -549,9 +547,9 @@ func TestCreateImage(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -562,11 +560,11 @@ func TestCreateImage(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		image, err := astroClient.CreateImage(CreateImageInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, image, mockResponse.Data.CreateImage)
+		s.NoError(err)
+		s.Equal(image, mockResponse.Data.CreateImage)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -577,11 +575,11 @@ func TestCreateImage(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.CreateImage(CreateImageInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeployImage(t *testing.T) {
+func (s *Suite) TestDeployImage() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -596,9 +594,9 @@ func TestDeployImage(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -609,11 +607,11 @@ func TestDeployImage(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		image, err := astroClient.DeployImage(DeployImageInput{})
-		assert.NoError(t, err)
-		assert.Equal(t, image, mockResponse.Data.DeployImage)
+		s.NoError(err)
+		s.Equal(image, mockResponse.Data.DeployImage)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -624,11 +622,11 @@ func TestDeployImage(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.DeployImage(DeployImageInput{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListClusters(t *testing.T) {
+func (s *Suite) TestListClusters() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := &Response{
 		Data: ResponseData{
@@ -642,9 +640,9 @@ func TestListClusters(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -655,11 +653,11 @@ func TestListClusters(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		resp, err := astroClient.ListClusters("test-org-id")
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.GetClusters)
+		s.NoError(err)
+		s.Equal(resp, mockResponse.Data.GetClusters)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -670,11 +668,11 @@ func TestListClusters(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.ListClusters("test-org-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetWorkspace(t *testing.T) {
+func (s *Suite) TestGetWorkspace() {
 	expectedWorkspace := Response{
 		Data: ResponseData{
 			GetWorkspace: Workspace{
@@ -686,9 +684,9 @@ func TestGetWorkspace(t *testing.T) {
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	jsonResponse, err := json.Marshal(expectedWorkspace)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("happy path", func(t *testing.T) {
+	s.Run("happy path", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -699,10 +697,10 @@ func TestGetWorkspace(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		workspace, err := astroClient.GetWorkspace("test-workspace")
-		assert.NoError(t, err)
-		assert.Equal(t, workspace, expectedWorkspace.Data.GetWorkspace)
+		s.NoError(err)
+		s.Equal(workspace, expectedWorkspace.Data.GetWorkspace)
 	})
-	t.Run("error path", func(t *testing.T) {
+	s.Run("error path", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -712,11 +710,11 @@ func TestGetWorkspace(t *testing.T) {
 		})
 		astroClient := NewAstroClient(client)
 		_, err := astroClient.GetWorkspace("test-workspace")
-		assert.Error(t, err, "API error")
+		s.Error(err, "API error")
 	})
 }
 
-func TestWorkerQueueOptions(t *testing.T) {
+func (s *Suite) TestWorkerQueueOptions() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockResponse := Response{
 		Data: ResponseData{
@@ -740,9 +738,9 @@ func TestWorkerQueueOptions(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("happy path", func(t *testing.T) {
+	s.Run("happy path", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -753,11 +751,11 @@ func TestWorkerQueueOptions(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		resp, err := astroClient.GetWorkerQueueOptions()
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.GetWorkerQueueOptions)
+		s.NoError(err)
+		s.Equal(resp, mockResponse.Data.GetWorkerQueueOptions)
 	})
 
-	t.Run("error path", func(t *testing.T) {
+	s.Run("error path", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -768,14 +766,14 @@ func TestWorkerQueueOptions(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.GetWorkerQueueOptions()
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetOrganizationAuditLogs(t *testing.T) {
+func (s *Suite) TestGetOrganizationAuditLogs() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("Can export organization audit logs", func(t *testing.T) {
+	s.Run("Can export organization audit logs", func() {
 		mockResponse := "A lot of audit logs entries"
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
@@ -787,16 +785,16 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		resp, err := astroClient.GetOrganizationAuditLogs("test-org-id", 50)
-		assert.NoError(t, err)
+		s.NoError(err)
 		output := new(bytes.Buffer)
 		io.Copy(output, resp)
-		assert.Equal(t, mockResponse, output.String())
+		s.Equal(mockResponse, output.String())
 	})
 
-	t.Run("Permission denied", func(t *testing.T) {
+	s.Run("Permission denied", func() {
 		errorMessage := "Invalid authorization token."
 		errorResponse, err := json.Marshal(map[string]string{"message": errorMessage})
-		assert.NoError(t, err)
+		s.NoError(err)
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 401,
@@ -807,13 +805,13 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err = astroClient.GetOrganizationAuditLogs("test-org-id", 50)
-		assert.Contains(t, err.Error(), errorMessage)
+		s.Contains(err.Error(), errorMessage)
 	})
 
-	t.Run("Invalid earliest parameter", func(t *testing.T) {
+	s.Run("Invalid earliest parameter", func() {
 		errorMessage := "Invalid query parameter values: field earliest failed check on min;"
 		errorResponse, err := json.Marshal(map[string]string{"message": errorMessage})
-		assert.NoError(t, err)
+		s.NoError(err)
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 400,
@@ -824,14 +822,14 @@ func TestGetOrganizationAuditLogs(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err = astroClient.GetOrganizationAuditLogs("test-org-id", 50)
-		assert.Contains(t, err.Error(), errorMessage)
+		s.Contains(err.Error(), errorMessage)
 	})
 }
 
-func TestUpdateAlertEmails(t *testing.T) {
+func (s *Suite) TestUpdateAlertEmails() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("updates a deployments alert emails", func(t *testing.T) {
+	s.Run("updates a deployments alert emails", func() {
 		emails := []string{"test1@email.com", "test2@meail.com"}
 		mockResponse := &Response{
 			Data: ResponseData{
@@ -844,7 +842,7 @@ func TestUpdateAlertEmails(t *testing.T) {
 			AlertEmails:  emails,
 		}
 		jsonResponse, err := json.Marshal(mockResponse)
-		assert.NoError(t, err)
+		s.NoError(err)
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -855,10 +853,10 @@ func TestUpdateAlertEmails(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		resp, err := astroClient.UpdateAlertEmails(input)
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.DeploymentAlerts)
+		s.NoError(err)
+		s.Equal(resp, mockResponse.Data.DeploymentAlerts)
 	})
-	t.Run("returns api error", func(t *testing.T) {
+	s.Run("returns api error", func() {
 		emails := []string{"test1@email.com", "test2@meail.com"}
 		input := UpdateDeploymentAlertsInput{
 			DeploymentID: "test-deployment-id",
@@ -874,6 +872,6 @@ func TestUpdateAlertEmails(t *testing.T) {
 		astroClient := NewAstroClient(client)
 
 		_, err := astroClient.UpdateAlertEmails(input)
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

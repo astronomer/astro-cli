@@ -15,8 +15,8 @@ import (
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 var (
@@ -53,56 +53,60 @@ var (
 	errNetwork = errors.New("network error")
 )
 
-func TestList(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestCloudOrganizationSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestList() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("organization list success", func(t *testing.T) {
+	s.Run("organization list success", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("organization network error", func(t *testing.T) {
+	s.Run("organization network error", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(nil, errNetwork).Once()
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
-		assert.Contains(t, err.Error(), "network error")
-		mockClient.AssertExpectations(t)
+		s.Contains(err.Error(), "network error")
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("organization list error", func(t *testing.T) {
+	s.Run("organization list error", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockErrorResponse, nil).Once()
 		buf := new(bytes.Buffer)
 		err := List(buf, mockClient)
-		assert.Contains(t, err.Error(), "failed to fetch organizations")
-		mockClient.AssertExpectations(t)
+		s.Contains(err.Error(), "failed to fetch organizations")
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestGetOrganizationSelection(t *testing.T) {
+func (s *Suite) TestGetOrganizationSelection() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	t.Run("get organiation selection success", func(t *testing.T) {
+	s.Run("get organiation selection success", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -111,34 +115,30 @@ func TestGetOrganizationSelection(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		_, err = getOrganizationSelection(buf, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("get organization selection list error", func(t *testing.T) {
+	s.Run("get organization selection list error", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockErrorResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
 		_, err := getOrganizationSelection(buf, mockClient)
-		assert.Contains(t, err.Error(), "failed to fetch organizations")
-		mockClient.AssertExpectations(t)
+		s.Contains(err.Error(), "failed to fetch organizations")
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("get organization selection select error", func(t *testing.T) {
+	s.Run("get organization selection select error", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("3")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -147,15 +147,15 @@ func TestGetOrganizationSelection(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		_, err = getOrganizationSelection(buf, mockClient)
-		assert.ErrorIs(t, err, errInvalidOrganizationKey)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidOrganizationKey)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestSwitch(t *testing.T) {
+func (s *Suite) TestSwitch() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("successful switch with name", func(t *testing.T) {
+	s.Run("successful switch with name", func() {
 		mockGQLClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
@@ -164,12 +164,12 @@ func TestSwitch(t *testing.T) {
 		}
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
-		assert.NoError(t, err)
-		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("successful switch without name", func(t *testing.T) {
+	s.Run("successful switch without name", func() {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
@@ -179,13 +179,9 @@ func TestSwitch(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -193,11 +189,11 @@ func TestSwitch(t *testing.T) {
 		os.Stdin = r
 		buf := new(bytes.Buffer)
 		err = Switch("", mockClient, mockCoreClient, buf, false)
-		assert.NoError(t, err)
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failed switch wrong name", func(t *testing.T) {
+	s.Run("failed switch wrong name", func() {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
@@ -206,11 +202,11 @@ func TestSwitch(t *testing.T) {
 		}
 		buf := new(bytes.Buffer)
 		err := Switch("name-wrong", mockClient, mockCoreClient, buf, false)
-		assert.ErrorIs(t, err, errInvalidOrganizationName)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidOrganizationName)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failed switch bad selection", func(t *testing.T) {
+	s.Run("failed switch bad selection", func() {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
@@ -220,13 +216,9 @@ func TestSwitch(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("3")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -234,11 +226,11 @@ func TestSwitch(t *testing.T) {
 		os.Stdin = r
 		buf := new(bytes.Buffer)
 		err = Switch("", mockClient, mockCoreClient, buf, false)
-		assert.ErrorIs(t, err, errInvalidOrganizationKey)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidOrganizationKey)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("successful switch with name and set default product", func(t *testing.T) {
+	s.Run("successful switch with name and set default product", func() {
 		mockOKResponse = astrocore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -255,28 +247,28 @@ func TestSwitch(t *testing.T) {
 		}
 		buf := new(bytes.Buffer)
 		err := Switch("org1", mockGQLClient, mockCoreClient, buf, false)
-		assert.NoError(t, err)
-		assert.Equal(t, "\nSuccessfully switched organization\n", buf.String())
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		mockCoreClient.AssertExpectations(s.T())
 	})
 }
 
-func TestIsOrgHosted(t *testing.T) {
+func (s *Suite) TestIsOrgHosted() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("org product is hosted", func(t *testing.T) {
+	s.Run("org product is hosted", func() {
 		ctx := config.Context{Domain: "localhost"}
 		ctx.SetOrganizationContext("org1", "org_short_name_1", "HOSTED")
 
 		isHosted := IsOrgHosted()
-		assert.Equal(t, isHosted, true)
+		s.Equal(isHosted, true)
 	})
 
-	t.Run("org product is hybrid", func(t *testing.T) {
+	s.Run("org product is hybrid", func() {
 		ctx := config.Context{Domain: "localhost"}
 		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
 
 		isHosted := IsOrgHosted()
-		assert.Equal(t, isHosted, false)
+		s.Equal(isHosted, false)
 	})
 }

@@ -3,17 +3,15 @@ package software
 import (
 	"bytes"
 	"fmt"
-	"testing"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAddCmds(t *testing.T) {
+func (s *Suite) TestAddCmds() {
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags: houston.FeatureFlags{
@@ -26,25 +24,25 @@ func TestAddCmds(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
-	houstonMock.AssertExpectations(t)
+	houstonMock.AssertExpectations(s.T())
 }
 
-func TestAppConfigFailure(t *testing.T) {
+func (s *Suite) TestAppConfigFailure() {
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetAppConfig", nil).Return(nil, errMock)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
-	houstonMock.AssertExpectations(t)
-	assert.Contains(t, InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
+	houstonMock.AssertExpectations(s.T())
+	s.Contains(InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
 }
 
-func TestPlatformVersionFailure(t *testing.T) {
+func (s *Suite) TestPlatformVersionFailure() {
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
 		Flags: houston.FeatureFlags{
@@ -57,38 +55,38 @@ func TestPlatformVersionFailure(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		assert.Contains(t, []string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
-	houstonMock.AssertExpectations(t)
-	assert.Contains(t, InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", errMock))
+	houstonMock.AssertExpectations(s.T())
+	s.Contains(InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", errMock))
 }
 
-func TestSetupLogs(t *testing.T) {
+func (s *Suite) TestSetupLogs() {
 	buf := new(bytes.Buffer)
 	err := SetUpLogs(buf, "info")
-	assert.NoError(t, err)
-	assert.Equal(t, "info", logrus.GetLevel().String())
+	s.NoError(err)
+	s.Equal("info", logrus.GetLevel().String())
 
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	err = config.CFG.Verbosity.SetHomeString("error")
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	err = SetUpLogs(buf, "warning")
-	assert.NoError(t, err)
-	assert.Equal(t, "error", logrus.GetLevel().String())
+	s.NoError(err)
+	s.Equal("error", logrus.GetLevel().String())
 
 	err = SetUpLogs(buf, "invalid-level")
-	assert.EqualError(t, err, "not a valid logrus Level: \"invalid-level\"")
+	s.EqualError(err, "not a valid logrus Level: \"invalid-level\"")
 }
 
-func TestPrintDebugLogs(t *testing.T) {
+func (s *Suite) TestPrintDebugLogs() {
 	buf := new(bytes.Buffer)
 	err := SetUpLogs(buf, "debug")
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	InitDebugLogs = []string{"test log line"}
 
 	PrintDebugLogs()
-	assert.Nil(t, InitDebugLogs)
-	assert.Contains(t, buf.String(), "test log line")
+	s.Nil(InitDebugLogs)
+	s.Contains(buf.String(), "test log line")
 }

@@ -1,12 +1,6 @@
 package houston
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-)
-
-func TestGetValidTagsSimpleSemVer(t *testing.T) {
+func (s *Suite) TestGetValidTagsSimpleSemVer() {
 	dCfg := DeploymentConfig{
 		AirflowImages: []AirflowImage{
 			{Tag: "1.10.5-11-alpine3.10-onbuild", Version: "1.10.5-11"},
@@ -28,7 +22,7 @@ func TestGetValidTagsSimpleSemVer(t *testing.T) {
 		},
 	}
 
-	t.Run("tag uses semver", func(t *testing.T) {
+	s.Run("tag uses semver", func() {
 		validTags := dCfg.GetValidTags("1.10.7")
 		expectedTags := []string{
 			"1.10.7-7-buster-onbuild",
@@ -40,15 +34,15 @@ func TestGetValidTagsSimpleSemVer(t *testing.T) {
 			"1.10.7-8-alpine3.10",
 			"1.10.7-8-buster",
 		}
-		assert.Equal(t, expectedTags, validTags)
+		s.Equal(expectedTags, validTags)
 	})
 
-	t.Run("tag does not use semver", func(t *testing.T) {
+	s.Run("tag does not use semver", func() {
 		validTags := dCfg.GetValidTags("buster-1.10.2")
-		assert.Equal(t, 0, len(validTags))
+		s.Equal(0, len(validTags))
 	})
 
-	t.Run("get valid tag with pre-release tag", func(t *testing.T) {
+	s.Run("get valid tag with pre-release tag", func() {
 		dCfg = DeploymentConfig{
 			AirflowImages: []AirflowImage{
 				{Tag: "1.10.5-11-alpine3.10-onbuild", Version: "1.10.5-11"},
@@ -75,11 +69,11 @@ func TestGetValidTagsSimpleSemVer(t *testing.T) {
 
 		validTags := dCfg.GetValidTags("1.10.12-1-alpine3.10")
 		expectedTags := []string{"1.10.12-buster", "1.10.12-buster-onbuild", "1.10.12-1-buster-onbuild"}
-		assert.Equal(t, expectedTags, validTags)
+		s.Equal(expectedTags, validTags)
 	})
 }
 
-func TestIsValidTag(t *testing.T) {
+func (s *Suite) TestIsValidTag() {
 	dCfg := DeploymentConfig{
 		AirflowImages: []AirflowImage{
 			{Tag: "1.10.5-11-alpine3.10-onbuild", Version: "1.10.5-11"},
@@ -101,18 +95,18 @@ func TestIsValidTag(t *testing.T) {
 		},
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		resp := dCfg.IsValidTag("1.10.5-11-buster-onbuild")
-		assert.True(t, resp)
+		s.True(resp)
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		resp := dCfg.IsValidTag("2.2.5-onbuild")
-		assert.False(t, resp)
+		s.False(resp)
 	})
 }
 
-func Test_coerce(t *testing.T) {
+func (s *Suite) Test_coerce() {
 	tests := []struct {
 		tag             string
 		expectedVersion string
@@ -127,43 +121,43 @@ func Test_coerce(t *testing.T) {
 	for _, tt := range tests {
 		test, err := coerce(tt.tag)
 		if tt.expectError {
-			assert.Error(t, err)
+			s.Error(err)
 		} else {
-			assert.Equal(t, tt.expectedVersion, test.String())
-			assert.NoError(t, err)
+			s.Equal(tt.expectedVersion, test.String())
+			s.NoError(err)
 		}
 	}
 }
 
-func TestRuntimeReleasesIsValidVersion(t *testing.T) {
+func (s *Suite) TestRuntimeReleasesIsValidVersion() {
 	r := RuntimeReleases{
 		RuntimeRelease{Version: "5.0.1", AirflowVersion: "2.2.5", AirflowDBMigraion: false},
 		RuntimeRelease{Version: "5.0.2", AirflowVersion: "2.2.6", AirflowDBMigraion: false},
 	}
-	t.Run("valid", func(t *testing.T) {
+	s.Run("valid", func() {
 		out := r.IsValidVersion("5.0.1")
-		assert.True(t, out)
+		s.True(out)
 	})
 
-	t.Run("invalid", func(t *testing.T) {
+	s.Run("invalid", func() {
 		out := r.IsValidVersion("5.0.0")
-		assert.False(t, out)
+		s.False(out)
 	})
 }
 
-func TestRuntimeReleasesGreaterVersions(t *testing.T) {
+func (s *Suite) TestRuntimeReleasesGreaterVersions() {
 	r := RuntimeReleases{
 		RuntimeRelease{Version: "5.0.1", AirflowVersion: "2.2.5", AirflowDBMigraion: false},
 		RuntimeRelease{Version: "5.0.2", AirflowVersion: "2.2.6", AirflowDBMigraion: false},
 	}
 
-	t.Run("valid version", func(t *testing.T) {
+	s.Run("valid version", func() {
 		out := r.GreaterVersions("5.0.0")
-		assert.Equal(t, []string{"5.0.1", "5.0.2"}, out)
+		s.Equal([]string{"5.0.1", "5.0.2"}, out)
 	})
 
-	t.Run("invalid version", func(t *testing.T) {
+	s.Run("invalid version", func() {
 		out := r.GreaterVersions("invalid version")
-		assert.Empty(t, out)
+		s.Empty(out)
 	})
 }

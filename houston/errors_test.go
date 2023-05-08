@@ -2,9 +2,6 @@ package houston
 
 import (
 	"errors"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -12,14 +9,14 @@ var (
 	errQuery  = errors.New("error: Cannot query field \"triggererEnabled\" on AppConfig")
 )
 
-func TestHandleAPIError(t *testing.T) {
-	t.Run("should return same error", func(t *testing.T) {
+func (s *Suite) TestHandleAPIError() {
+	s.Run("should return same error", func() {
 		gotErr := handleAPIErr(errServer)
-		assert.EqualError(t, gotErr, errServer.Error())
+		s.EqualError(gotErr, errServer.Error())
 	})
 
-	t.Run("should return query fields error", func(t *testing.T) {
+	s.Run("should return query fields error", func() {
 		gotErr := handleAPIErr(errQuery)
-		assert.EqualError(t, gotErr, ErrFieldsNotAvailable{}.Error())
+		s.EqualError(gotErr, ErrFieldsNotAvailable{}.Error())
 	})
 }

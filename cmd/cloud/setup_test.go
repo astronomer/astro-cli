@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -16,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -25,101 +23,101 @@ var (
 	mockOrganizationProduct = astrocore.OrganizationProductHYBRID
 )
 
-func TestSetup(t *testing.T) {
+func (s *Suite) TestSetup() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("login cmd", func(t *testing.T) {
+	s.Run("login cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "login"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("dev cmd", func(t *testing.T) {
+	s.Run("dev cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "dev"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("flow cmd", func(t *testing.T) {
+	s.Run("flow cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "flow"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("help cmd", func(t *testing.T) {
+	s.Run("help cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "help"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("version cmd", func(t *testing.T) {
+	s.Run("version cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "version"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("context cmd", func(t *testing.T) {
+	s.Run("context cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "list"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "context"}
 		rootCmd.AddCommand(cmd)
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("completion cmd", func(t *testing.T) {
+	s.Run("completion cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "generate"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "completion"}
 		rootCmd.AddCommand(cmd)
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("deployment cmd", func(t *testing.T) {
+	s.Run("deployment cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "inspect"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "deployment"}
 		rootCmd.AddCommand(cmd)
@@ -129,14 +127,14 @@ func TestSetup(t *testing.T) {
 		}
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("deploy cmd", func(t *testing.T) {
+	s.Run("deploy cmd", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		cmd := &cobra.Command{Use: "deploy"}
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
@@ -146,10 +144,10 @@ func TestSetup(t *testing.T) {
 		}
 
 		err = Setup(cmd, nil, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("use API token", func(t *testing.T) {
+	s.Run("use API token", func() {
 		mockDeplyResp := []astro.Deployment{
 			{
 				ID:        "test-id",
@@ -172,7 +170,7 @@ func TestSetup(t *testing.T) {
 		cmd := &cobra.Command{Use: "deploy"}
 		testUtil.SetupOSArgsForGinkgo()
 		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
@@ -181,15 +179,15 @@ func TestSetup(t *testing.T) {
 			return nil
 		}
 
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
+		s.T().Setenv("ASTRONOMER_KEY_ID", "key")
+		s.T().Setenv("ASTRONOMER_KEY_SECRET", "secret")
 
 		mockResp := TokenResponse{
 			AccessToken: "test-token",
 			IDToken:     "test-id",
 		}
 		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
@@ -200,14 +198,14 @@ func TestSetup(t *testing.T) {
 		})
 
 		err = Setup(cmd, mockClient, mockCoreClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestCheckAPIKeys(t *testing.T) {
+func (s *Suite) TestCheckAPIKeys() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	t.Run("test context switch", func(t *testing.T) {
+	s.Run("test context switch", func() {
 		mockDeplyResp := []astro.Deployment{
 			{
 				ID:        "test-id",
@@ -232,15 +230,15 @@ func TestCheckAPIKeys(t *testing.T) {
 			return nil
 		}
 
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
+		s.T().Setenv("ASTRONOMER_KEY_ID", "key")
+		s.T().Setenv("ASTRONOMER_KEY_SECRET", "secret")
 
 		mockResp := TokenResponse{
 			AccessToken: "test-token",
 			IDToken:     "test-id",
 		}
 		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
@@ -253,17 +251,17 @@ func TestCheckAPIKeys(t *testing.T) {
 		// Switch context
 		domain := "astronomer-dev.io"
 		err = context.Switch(domain)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// run CheckAPIKeys
 		_, err = checkAPIKeys(mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 }
 
-func TestCheckToken(t *testing.T) {
+func (s *Suite) TestCheckToken() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	t.Run("test check token", func(t *testing.T) {
+	s.Run("test check token", func() {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
@@ -272,10 +270,10 @@ func TestCheckToken(t *testing.T) {
 		}
 		// run checkToken
 		err := checkToken(mockClient, mockCoreClient, nil)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("trigger login when no token is found", func(t *testing.T) {
+	s.Run("trigger login when no token is found", func() {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
@@ -284,15 +282,15 @@ func TestCheckToken(t *testing.T) {
 		}
 
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("token", "")
 		// run checkToken
 		err = checkToken(mockClient, mockCoreClient, nil)
-		assert.Contains(t, err.Error(), "failed to login")
+		s.Contains(err.Error(), "failed to login")
 	})
 }
 
-func TestCheckAPIToken(t *testing.T) {
+func (s *Suite) TestCheckAPIToken() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	mockOrgsResponse := astrocore.ListOrganizationsResponse{
@@ -304,7 +302,7 @@ func TestCheckAPIToken(t *testing.T) {
 		},
 	}
 
-	t.Run("test context switch", func(t *testing.T) {
+	s.Run("test context switch", func() {
 		permissions := []string{
 			"",
 			"workspaceId:workspace-id",
@@ -325,19 +323,19 @@ func TestCheckAPIToken(t *testing.T) {
 
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		s.T().Setenv("ASTRO_API_TOKEN", "token")
 
 		// Switch context
 		domain := "astronomer-dev.io"
 		err := context.Switch(domain)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// run CheckAPIKeys
 		_, err = checkAPIToken(true, mockCoreClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("bad claims", func(t *testing.T) {
+	s.Run("bad claims", func() {
 		permissions := []string{}
 		mockClaims := util.CustomClaims{
 			Permissions: permissions,
@@ -353,15 +351,15 @@ func TestCheckAPIToken(t *testing.T) {
 
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		s.T().Setenv("ASTRO_API_TOKEN", "token")
 
 		// Switch context
 		domain := "astronomer-dev.io"
 		err := context.Switch(domain)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// run CheckAPIKeys
 		_, err = checkAPIToken(true, mockCoreClient)
-		assert.ErrorIs(t, err, errNotAPIToken)
+		s.ErrorIs(err, errNotAPIToken)
 	})
 }

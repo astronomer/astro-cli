@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/astro-client"
@@ -15,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -29,18 +27,18 @@ func execWorkspaceCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestWorkspaceRootCommand(t *testing.T) {
+func (s *Suite) TestWorkspaceRootCommand() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceCmd(os.Stdout)
 	cmd.SetOut(buf)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "workspace")
+	s.NoError(err)
+	s.Contains(buf.String(), "workspace")
 }
 
-func TestWorkspaceList(t *testing.T) {
+func (s *Suite) TestWorkspaceList() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockClient := new(astro_mocks.Client)
@@ -49,13 +47,13 @@ func TestWorkspaceList(t *testing.T) {
 
 	cmdArgs := []string{"list"}
 	resp, err := execWorkspaceCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-id-1")
-	assert.Contains(t, resp, "test-label-1")
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(resp, "test-id-1")
+	s.Contains(resp, "test-label-1")
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestWorkspaceSwitch(t *testing.T) {
+func (s *Suite) TestWorkspaceSwitch() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockClient := new(astro_mocks.Client)
@@ -65,13 +63,9 @@ func TestWorkspaceSwitch(t *testing.T) {
 	// mock os.Stdin
 	input := []byte("1")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -80,20 +74,20 @@ func TestWorkspaceSwitch(t *testing.T) {
 
 	cmdArgs := []string{"switch"}
 	resp, err := execWorkspaceCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-id-1")
-	assert.Contains(t, resp, "test-label-1")
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(resp, "test-id-1")
+	s.Contains(resp, "test-label-1")
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestWorkspaceUserRootCommand(t *testing.T) {
+func (s *Suite) TestWorkspaceUserRootCommand() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	cmd := newWorkspaceCmd(os.Stdout)
 	cmd.SetOut(buf)
 	cmdArgs := []string{"user", "-h"}
 	_, err := execWorkspaceCmd(cmdArgs...)
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
 var (
@@ -156,46 +150,46 @@ var (
 	}
 )
 
-func TestWorkspaceUserList(t *testing.T) {
+func (s *Suite) TestWorkspaceUserList() {
 	expectedHelp := "List all the users in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints list help", func(t *testing.T) {
+	s.Run("-h prints list help", func() {
 		cmdArgs := []string{"user", "list", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("any errors from api are returned and users are not listed", func(t *testing.T) {
+	s.Run("any errors from api are returned and users are not listed", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to list users")
+		s.EqualError(err, "failed to list users")
 	})
-	t.Run("any context errors from api are returned and users are not listed", func(t *testing.T) {
+	s.Run("any context errors from api are returned and users are not listed", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "list"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
 }
 
-func TestWorkspacUserUpdate(t *testing.T) {
+func (s *Suite) TestWorkspacUserUpdate() {
 	expectedHelp := "astro workspace user update [email] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints update help", func(t *testing.T) {
+	s.Run("-h prints update help", func() {
 		cmdArgs := []string{"user", "update", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("valid email with valid role updates user", func(t *testing.T) {
+	s.Run("valid email with valid role updates user", func() {
 		expectedOut := "The workspace user user@1.com role was successfully updated to WORKSPACE_MEMBER"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
@@ -203,29 +197,29 @@ func TestWorkspacUserUpdate(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("valid email with invalid role returns an error and role is not update", func(t *testing.T) {
+	s.Run("valid email with invalid role returns an error and role is not update", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "invalid"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.ErrorIs(t, err, user.ErrInvalidWorkspaceRole)
+		s.ErrorIs(err, user.ErrInvalidWorkspaceRole)
 	})
-	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
+	s.Run("any errors from api are returned and role is not updated", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to update user")
+		s.EqualError(err, "failed to update user")
 	})
 
-	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
+	s.Run("any context errors from api are returned and role is not updated", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
@@ -233,9 +227,9 @@ func TestWorkspacUserUpdate(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "update", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+	s.Run("command asks for input when no email is passed in as an arg", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -243,9 +237,9 @@ func TestWorkspacUserUpdate(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -257,22 +251,22 @@ func TestWorkspacUserUpdate(t *testing.T) {
 
 		cmdArgs := []string{"user", "update", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
 }
 
-func TestWorkspaceUserAdd(t *testing.T) {
+func (s *Suite) TestWorkspaceUserAdd() {
 	expectedHelp := "astro workspace user add [email] --role [WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
+	s.Run("-h prints add help", func() {
 		cmdArgs := []string{"user", "add", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("valid email with valid role adds user", func(t *testing.T) {
+	s.Run("valid email with valid role adds user", func() {
 		expectedOut := "The user user@1.com was successfully added to the workspace with the role WORKSPACE_MEMBER\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
@@ -280,29 +274,29 @@ func TestWorkspaceUserAdd(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "add", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("valid email with invalid role returns an error and user is not added", func(t *testing.T) {
+	s.Run("valid email with invalid role returns an error and user is not added", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "add", "user@1.com", "--role", "invalid"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.ErrorIs(t, err, user.ErrInvalidWorkspaceRole)
+		s.ErrorIs(err, user.ErrInvalidWorkspaceRole)
 	})
-	t.Run("any errors from api are returned and user is not added", func(t *testing.T) {
+	s.Run("any errors from api are returned and user is not added", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceUserRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceUserRoleResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "add", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to update user")
+		s.EqualError(err, "failed to update user")
 	})
 
-	t.Run("any context errors from api are returned and role is not added", func(t *testing.T) {
+	s.Run("any context errors from api are returned and role is not added", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
@@ -310,9 +304,9 @@ func TestWorkspaceUserAdd(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "add", "user@1.com", "--role", "WORKSPACE_MEMBER"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+	s.Run("command asks for input when no email is passed in as an arg", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -320,9 +314,9 @@ func TestWorkspaceUserAdd(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -334,22 +328,22 @@ func TestWorkspaceUserAdd(t *testing.T) {
 
 		cmdArgs := []string{"user", "add", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
 }
 
-func TestWorkspacUserRemove(t *testing.T) {
+func (s *Suite) TestWorkspacUserRemove() {
 	expectedHelp := "Remove a user from an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints remove help", func(t *testing.T) {
+	s.Run("-h prints remove help", func() {
 		cmdArgs := []string{"user", "remove", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("valid email removes user", func(t *testing.T) {
+	s.Run("valid email removes user", func() {
 		expectedOut := "The user user@1.com was successfully removed from the workspace"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
@@ -357,19 +351,19 @@ func TestWorkspacUserRemove(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "remove", "user@1.com"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("any errors from api are returned and user is not removed", func(t *testing.T) {
+	s.Run("any errors from api are returned and user is not removed", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceUserWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "remove", "user@1.com"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to update user")
+		s.EqualError(err, "failed to update user")
 	})
-	t.Run("any context errors from api are returned and the user is not removed", func(t *testing.T) {
+	s.Run("any context errors from api are returned and the user is not removed", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceUsersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceUsersResponseOK, nil).Twice()
@@ -377,9 +371,9 @@ func TestWorkspacUserRemove(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "remove", "user@1.com"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+	s.Run("command asks for input when no email is passed in as an arg", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -387,9 +381,9 @@ func TestWorkspacUserRemove(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -401,8 +395,8 @@ func TestWorkspacUserRemove(t *testing.T) {
 
 		cmdArgs := []string{"user", "remove"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
 }
 
@@ -429,51 +423,51 @@ var (
 	}
 )
 
-func TestWorkspaceCreate(t *testing.T) {
+func (s *Suite) TestWorkspaceCreate() {
 	expectedHelp := "workspace create [flags]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
+	s.Run("-h prints add help", func() {
 		cmdArgs := []string{"create", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("valid name with valid enforce", func(t *testing.T) {
+	s.Run("valid name with valid enforce", func() {
 		expectedOut := "Astro Workspace workspace-test was successfully created\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"create", "--name", "workspace-test", "--enforce-cicd", "ON"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("valid name with invalid enforce returns an error and workspace is not created", func(t *testing.T) {
+	s.Run("valid name with invalid enforce returns an error and workspace is not created", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"create", "--name", "workspace-test", "--enforce-cicd", "on"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.ErrorIs(t, err, workspace.ErrWrongEnforceInput)
+		s.ErrorIs(err, workspace.ErrWrongEnforceInput)
 	})
-	t.Run("any errors from api are returned and workspace is not created", func(t *testing.T) {
+	s.Run("any errors from api are returned and workspace is not created", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"create", "--name", "workspace-test"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to create workspace")
+		s.EqualError(err, "failed to create workspace")
 	})
 
-	t.Run("any context errors from api are returned and workspace is not created", func(t *testing.T) {
+	s.Run("any context errors from api are returned and workspace is not created", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"create", "--name", "workspace-test"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
 }
 
@@ -523,17 +517,17 @@ var (
 	}
 )
 
-func TestWorkspaceDelete(t *testing.T) {
+func (s *Suite) TestWorkspaceDelete() {
 	expectedHelp := "workspace delete [workspace_id] [flags]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
+	s.Run("-h prints add help", func() {
 		cmdArgs := []string{"delete", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("valid id and successful delete", func(t *testing.T) {
+	s.Run("valid id and successful delete", func() {
 		expectedOut := "Astro Workspace test-workspace was successfully deleted\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
@@ -541,28 +535,28 @@ func TestWorkspaceDelete(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"delete", "workspace-id"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("invalid id returns workspace not found", func(t *testing.T) {
+	s.Run("invalid id returns workspace not found", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"delete", "workspace-test"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.ErrorIs(t, err, workspace.ErrWorkspaceNotFound)
+		s.ErrorIs(err, workspace.ErrWorkspaceNotFound)
 	})
-	t.Run("any errors from api are returned and workspace is not deleted", func(t *testing.T) {
+	s.Run("any errors from api are returned and workspace is not deleted", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"delete", "workspace-id"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to delete workspace")
+		s.EqualError(err, "failed to delete workspace")
 	})
 
-	t.Run("any context errors from api are returned and workspace is not deleted", func(t *testing.T) {
+	s.Run("any context errors from api are returned and workspace is not deleted", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
@@ -570,10 +564,10 @@ func TestWorkspaceDelete(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"delete", "workspace-id"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
 
-	t.Run("command asks for input when no workspace id is passed in as an arg", func(t *testing.T) {
+	s.Run("command asks for input when no workspace id is passed in as an arg", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -582,9 +576,9 @@ func TestWorkspaceDelete(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -596,8 +590,8 @@ func TestWorkspaceDelete(t *testing.T) {
 
 		cmdArgs := []string{"delete"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
 }
 
@@ -624,17 +618,17 @@ var (
 	}
 )
 
-func TestWorkspaceUpdate(t *testing.T) {
+func (s *Suite) TestWorkspaceUpdate() {
 	expectedHelp := "workspace update [workspace_id] [flags]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("-h prints add help", func(t *testing.T) {
+	s.Run("-h prints add help", func() {
 		cmdArgs := []string{"update", "-h"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("valid id and successful update", func(t *testing.T) {
+	s.Run("valid id and successful update", func() {
 		expectedOut := "Astro Workspace test-workspace was successfully updated\n"
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
@@ -642,28 +636,28 @@ func TestWorkspaceUpdate(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"update", "workspace-id"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("invalid id returns workspace not found", func(t *testing.T) {
+	s.Run("invalid id returns workspace not found", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"update", "workspace-test"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.ErrorIs(t, err, workspace.ErrWorkspaceNotFound)
+		s.ErrorIs(err, workspace.ErrWorkspaceNotFound)
 	})
-	t.Run("any errors from api are returned and workspace is not updated", func(t *testing.T) {
+	s.Run("any errors from api are returned and workspace is not updated", func() {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"update", "workspace-id"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to update workspace")
+		s.EqualError(err, "failed to update workspace")
 	})
 
-	t.Run("any context errors from api are returned and workspace is not updated", func(t *testing.T) {
+	s.Run("any context errors from api are returned and workspace is not updated", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
@@ -671,10 +665,10 @@ func TestWorkspaceUpdate(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"update", "workspace-id"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
 
-	t.Run("command asks for input when no workspace id is passed in as an arg", func(t *testing.T) {
+	s.Run("command asks for input when no workspace id is passed in as an arg", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -683,9 +677,9 @@ func TestWorkspaceUpdate(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -697,7 +691,7 @@ func TestWorkspaceUpdate(t *testing.T) {
 
 		cmdArgs := []string{"update"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOut)
+		s.NoError(err)
+		s.Contains(resp, expectedOut)
 	})
 }

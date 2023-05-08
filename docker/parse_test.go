@@ -2,26 +2,23 @@ package docker
 
 import (
 	"bytes"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAllCmds(t *testing.T) {
+func (s *Suite) TestAllCmds() {
 	ret := AllCmds()
-	assert.Equal(t, ret[:3], []string{"add", "arg", "cmd"})
+	s.Equal(ret[:3], []string{"add", "arg", "cmd"})
 }
 
-func TestParseReaderParseError(t *testing.T) {
+func (s *Suite) TestParseReaderParseError() {
 	dockerfile := "FROM quay.io/astronomer/astro-runtime:3.0.2\nCMD [\"echo\", 1]"
 	_, err := ParseReader(bytes.NewBufferString(dockerfile))
-	assert.IsType(t, ParseError{}, err)
+	s.IsType(ParseError{}, err)
 }
 
-func TestParseReader(t *testing.T) {
+func (s *Suite) TestParseReader() {
 	dockerfile := `FROM quay.io/astronomer/astro-runtime:3.0.2`
 	cmds, err := ParseReader(bytes.NewBufferString(dockerfile))
-	assert.Nil(t, err)
+	s.NoError(err)
 	expected := []Command{
 		{
 			Cmd:       "from",
@@ -32,18 +29,18 @@ func TestParseReader(t *testing.T) {
 			Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
 		},
 	}
-	assert.Equal(t, expected, cmds)
+	s.Equal(expected, cmds)
 }
 
-func TestParseFileIOError(t *testing.T) {
+func (s *Suite) TestParseFileIOError() {
 	_, err := ParseFile("Dockerfile.dne")
-	assert.IsType(t, IOError{}, err)
-	assert.Regexp(t, "^.*Dockerfile.dne.*$", err.Error())
+	s.IsType(IOError{}, err)
+	s.Regexp("^.*Dockerfile.dne.*$", err.Error())
 }
 
-func TestParseFile(t *testing.T) {
+func (s *Suite) TestParseFile() {
 	cmds, err := ParseFile("testfiles/Dockerfile.ok")
-	assert.Nil(t, err)
+	s.NoError(err)
 	expected := []Command{
 		{
 			Cmd:       "from",
@@ -54,11 +51,11 @@ func TestParseFile(t *testing.T) {
 			Value:     []string{"quay.io/astronomer/astro-runtime:3.0.2"},
 		},
 	}
-	assert.Equal(t, expected, cmds)
+	s.Equal(expected, cmds)
 }
 
-func TestGetImageFromParsedFile(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestGetImageFromParsedFile() {
+	s.Run("success", func() {
 		cmds := []Command{
 			{
 				Cmd:       "from",
@@ -70,10 +67,10 @@ func TestGetImageFromParsedFile(t *testing.T) {
 			},
 		}
 		image := GetImageFromParsedFile(cmds)
-		assert.Equal(t, "quay.io/astronomer/astro-runtime:3.0.2", image)
+		s.Equal("quay.io/astronomer/astro-runtime:3.0.2", image)
 	})
 
-	t.Run("no image name found", func(t *testing.T) {
+	s.Run("no image name found", func() {
 		cmds := []Command{
 			{
 				Cmd:       "echo",
@@ -85,12 +82,12 @@ func TestGetImageFromParsedFile(t *testing.T) {
 			},
 		}
 		image := GetImageFromParsedFile(cmds)
-		assert.Equal(t, "", image)
+		s.Equal("", image)
 	})
 }
 
-func TestGetImageTagFromParsedFile(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestGetImageTagFromParsedFile() {
+	s.Run("success", func() {
 		cmds := []Command{
 			{
 				Cmd:       "from",
@@ -102,11 +99,11 @@ func TestGetImageTagFromParsedFile(t *testing.T) {
 			},
 		}
 		image, tag := GetImageTagFromParsedFile(cmds)
-		assert.Equal(t, "quay.io/astronomer/astro-runtime", image)
-		assert.Equal(t, "3.0.2", tag)
+		s.Equal("quay.io/astronomer/astro-runtime", image)
+		s.Equal("3.0.2", tag)
 	})
 
-	t.Run("no image name found", func(t *testing.T) {
+	s.Run("no image name found", func() {
 		cmds := []Command{
 			{
 				Cmd:       "echo",
@@ -118,12 +115,12 @@ func TestGetImageTagFromParsedFile(t *testing.T) {
 			},
 		}
 		image, tag := GetImageTagFromParsedFile(cmds)
-		assert.Equal(t, "", image)
-		assert.Equal(t, "", tag)
+		s.Equal("", image)
+		s.Equal("", tag)
 	})
 }
 
-func TestParseImageName(t *testing.T) {
+func (s *Suite) TestParseImageName() {
 	tests := []struct {
 		imageName         string
 		expectedBaseImage string
@@ -138,7 +135,7 @@ func TestParseImageName(t *testing.T) {
 
 	for _, tt := range tests {
 		baseImage, tag := parseImageName(tt.imageName)
-		assert.Equal(t, tt.expectedBaseImage, baseImage)
-		assert.Equal(t, tt.expectedTag, tag)
+		s.Equal(tt.expectedBaseImage, baseImage)
+		s.Equal(tt.expectedTag, tag)
 	}
 }

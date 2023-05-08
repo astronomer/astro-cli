@@ -3,10 +3,8 @@ package cloud
 import (
 	"bytes"
 	"os"
-	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/astro-client"
@@ -14,29 +12,29 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-func TestNewDeploymentWorkerQueueRootCmd(t *testing.T) {
+func (s *Suite) TestNewDeploymentWorkerQueueRootCmd() {
 	expectedHelp := "Manage worker queues for an Astro Deployment."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 
-	t.Run("worker-queue command runs", func(t *testing.T) {
+	s.Run("worker-queue command runs", func() {
 		testUtil.SetupOSArgsForGinkgo()
 		wQueueCmd := newDeploymentWorkerQueueRootCmd(os.Stdout)
 		wQueueCmd.SetOut(buf)
 		_, err := wQueueCmd.ExecuteC()
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "worker-queue")
+		s.NoError(err)
+		s.Contains(buf.String(), "worker-queue")
 	})
 
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
+	s.Run("-h prints worker-queue help", func() {
 		cmdArgs := []string{"worker-queue", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
 }
 
-func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
+func (s *Suite) TestNewDeploymentWorkerQueueCreateCmd() {
 	expectedHelp := "Create a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
@@ -157,21 +155,21 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		},
 		WorkerQueues: listToCreate,
 	}
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
+	s.Run("-h prints worker-queue help", func() {
 		cmdArgs := []string{"worker-queue", "create", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
 
-	t.Run("create worker queue when no deployment id was provided", func(t *testing.T) {
+	s.Run("create worker queue when no deployment id was provided", func() {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -202,18 +200,18 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-n", "test-queue", "-t", "test-instance-type"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedoutput, actualOut)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expectedoutput, actualOut)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("create worker queue when deployment id was provided", func(t *testing.T) {
+	s.Run("create worker queue when deployment id was provided", func() {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -244,18 +242,18 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedoutput, actualOut)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expectedoutput, actualOut)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("create worker queue when deployment name was provided", func(t *testing.T) {
+	s.Run("create worker queue when deployment name was provided", func() {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -286,18 +284,18 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test-deployment-label", "-t", "test-instance-type", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedoutput, actualOut)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expectedoutput, actualOut)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("create worker queue when no name was provided", func(t *testing.T) {
+	s.Run("create worker queue when no name was provided", func() {
 		expectedoutput := "worker queue test-queue for test-deployment-label in ck05r3bor07h40d02y2hw4n4v workspace created\n"
 		// mock os.Stdin
 		expectedInput := []byte("test-queue")
 		r, w, err := os.Pipe()
-		assert.NoError(t, err)
+		s.NoError(err)
 		_, err = w.Write(expectedInput)
-		assert.NoError(t, err)
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -328,33 +326,33 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespDefaultQueue[0], nil).Once()
 		cmdArgs := []string{"worker-queue", "create", "-d", "test-deployment-id", "-t", "test-instance-type"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedoutput, actualOut)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expectedoutput, actualOut)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+	s.Run("returns an error when getting workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"worker-queue", "create"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-		assert.NotContains(t, resp, expectedOut)
+		s.Error(err)
+		s.NotContains(resp, expectedOut)
 	})
 }
 
-func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
+func (s *Suite) TestNewDeploymentWorkerQueueDeleteCmd() {
 	expectedHelp := "Delete a worker queue from an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
 
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
+	s.Run("-h prints worker-queue help", func() {
 		cmdArgs := []string{"worker-queue", "delete", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("happy path delete worker queue", func(t *testing.T) {
+	s.Run("happy path delete worker queue", func() {
 		deploymentRespWithQueues := []astro.Deployment{
 			{
 				ID:    "test-deployment-id",
@@ -435,32 +433,32 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 
 		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOutMessage)
+		s.NoError(err)
+		s.Contains(resp, expectedOutMessage)
 	})
-	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+	s.Run("returns an error when getting workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"worker-queue", "delete"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-		assert.NotContains(t, resp, expectedOut)
+		s.Error(err)
+		s.NotContains(resp, expectedOut)
 	})
 }
 
-func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
+func (s *Suite) TestNewDeploymentWorkerQueueUpdateCmd() {
 	expectedHelp := "Update a worker queue for an Astro Deployment"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
 
-	t.Run("-h prints worker-queue help", func(t *testing.T) {
+	s.Run("-h prints worker-queue help", func() {
 		cmdArgs := []string{"worker-queue", "update", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("happy path update worker queue", func(t *testing.T) {
+	s.Run("happy path update worker queue", func() {
 		deploymentRespWithQueues := []astro.Deployment{
 			{
 				ID:             "test-deployment-id",
@@ -586,15 +584,15 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		// updating min count
 		cmdArgs := []string{"worker-queue", "update", "-n", "test-queue-1", "-t", "test-instance-type", "--min-count", "0", "-f"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedOutMessage)
+		s.NoError(err)
+		s.Contains(resp, expectedOutMessage)
 	})
-	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+	s.Run("returns an error when getting workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"worker-queue", "update"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-		assert.NotContains(t, resp, expectedOut)
+		s.Error(err)
+		s.NotContains(resp, expectedOut)
 	})
 }

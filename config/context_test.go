@@ -2,16 +2,14 @@ package config
 
 import (
 	"bytes"
-	"testing"
 	"time"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
 
 var err error
 
-func TestGetCurrentContextError(t *testing.T) {
+func (s *Suite) TestGetCurrentContextError() {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:
@@ -25,10 +23,10 @@ local:
 	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
 	InitConfig(fs)
 	_, err = GetCurrentContext()
-	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 }
 
-func TestPrintContext(t *testing.T) {
+func (s *Suite) TestPrintContext() {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:
@@ -57,12 +55,12 @@ contexts:
 	}
 	buf := new(bytes.Buffer)
 	err = ctx.PrintCloudContext(buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := " CONTROLPLANE                        WORKSPACE                           \n example.com                         ck05r3bor07h40d02y2hw4n4v           \n"
-	assert.Equal(t, expected, buf.String())
+	s.Equal(expected, buf.String())
 }
 
-func TestPrintContextNA(t *testing.T) {
+func (s *Suite) TestPrintContextNA() {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:
@@ -91,12 +89,12 @@ contexts:
 	}
 	buf := new(bytes.Buffer)
 	err = ctx.PrintCloudContext(buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := " CONTROLPLANE                        WORKSPACE                           \n example.com                         N/A                                 \n"
-	assert.Equal(t, expected, buf.String())
+	s.Equal(expected, buf.String())
 }
 
-func TestGetCurrentContext(t *testing.T) {
+func (s *Suite) TestGetCurrentContext() {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:
@@ -117,13 +115,13 @@ contexts:
 	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
 	InitConfig(fs)
 	ctx, err := GetCurrentContext()
-	assert.NoError(t, err)
-	assert.Equal(t, "example.com", ctx.Domain)
-	assert.Equal(t, "token", ctx.Token)
-	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", ctx.Workspace)
+	s.NoError(err)
+	s.Equal("example.com", ctx.Domain)
+	s.Equal("token", ctx.Token)
+	s.Equal("ck05r3bor07h40d02y2hw4n4v", ctx.Workspace)
 }
 
-func TestDeleteContext(t *testing.T) {
+func (s *Suite) TestDeleteContext() {
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`
 context: test_com
@@ -145,81 +143,81 @@ contexts:
 	InitConfig(fs)
 	ctx := Context{Domain: "exmaple.com"}
 	err := ctx.DeleteContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	ctx = Context{}
 	err = ctx.DeleteContext()
-	assert.ErrorIs(t, err, ErrCtxConfigErr)
+	s.ErrorIs(err, ErrCtxConfigErr)
 }
 
-func TestResetCurrentContext(t *testing.T) {
+func (s *Suite) TestResetCurrentContext() {
 	initTestConfig()
 	err := ResetCurrentContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 	ctx, err := GetCurrentContext()
-	assert.Equal(t, "", ctx.Domain)
-	assert.ErrorIs(t, err, ErrGetHomeString)
+	s.Equal("", ctx.Domain)
+	s.ErrorIs(err, ErrGetHomeString)
 }
 
-func TestGetContexts(t *testing.T) {
+func (s *Suite) TestGetContexts() {
 	initTestConfig()
 	ctxs, err := GetContexts()
-	assert.NoError(t, err)
-	assert.Equal(t, Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
+	s.NoError(err)
+	s.Equal(Contexts{Contexts: map[string]Context{"test_com": {"test.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}, "example_com": {"example.com", "test-org-id", "test-org-short-name", "", "ck05r3bor07h40d02y2hw4n4v", "ck05r3bor07h40d02y2hw4n4v", "token", "", ""}}}, ctxs)
 }
 
-func TestSetContextKey(t *testing.T) {
+func (s *Suite) TestSetContextKey() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
 	ctx.SetContextKey("token", "test")
 	outCtx, err := ctx.GetContext()
-	assert.NoError(t, err)
-	assert.Equal(t, "test", outCtx.Token)
+	s.NoError(err)
+	s.Equal("test", outCtx.Token)
 }
 
-func TestSetOrganizationContext(t *testing.T) {
+func (s *Suite) TestSetOrganizationContext() {
 	initTestConfig()
-	t.Run("set organization context", func(t *testing.T) {
+	s.Run("set organization context", func() {
 		ctx := Context{Domain: "localhost"}
 		ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
 		outCtx, err := ctx.GetContext()
-		assert.NoError(t, err)
-		assert.Equal(t, "org1", outCtx.Organization)
-		assert.Equal(t, "org_short_name_1", outCtx.OrganizationShortName)
-		assert.Equal(t, "HYBRID", outCtx.OrganizationProduct)
+		s.NoError(err)
+		s.Equal("org1", outCtx.Organization)
+		s.Equal("org_short_name_1", outCtx.OrganizationShortName)
+		s.Equal("HYBRID", outCtx.OrganizationProduct)
 	})
 
-	t.Run("set organization context error", func(t *testing.T) {
+	s.Run("set organization context error", func() {
 		ctx := Context{Domain: ""}
-		assert.NoError(t, err)
+		s.NoError(err)
 		err = ctx.SetOrganizationContext("org1", "org_short_name_1", "HYBRID")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "context config invalid, no domain specified")
+		s.Error(err)
+		s.Contains(err.Error(), "context config invalid, no domain specified")
 	})
 }
 
-func TestExpiresIn(t *testing.T) {
+func (s *Suite) TestExpiresIn() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
 	err := ctx.SetExpiresIn(12)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	outCtx, err := ctx.GetContext()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	val, err := outCtx.GetExpiresIn()
-	assert.NoError(t, err)
-	assert.Equal(t, "localhost", outCtx.Domain)
-	assert.True(t, time.Now().Add(time.Duration(12)*time.Second).After(val)) // now + 12 seconds will always be after expire time, since that is set before
+	s.NoError(err)
+	s.Equal("localhost", outCtx.Domain)
+	s.True(time.Now().Add(time.Duration(12) * time.Second).After(val)) // now + 12 seconds will always be after expire time, since that is set before
 }
 
-func TestExpiresInFailure(t *testing.T) {
+func (s *Suite) TestExpiresInFailure() {
 	initTestConfig()
 	ctx := Context{}
 	err := ctx.SetExpiresIn(1)
-	assert.ErrorIs(t, err, ErrCtxConfigErr)
+	s.ErrorIs(err, ErrCtxConfigErr)
 
 	val, err := ctx.GetExpiresIn()
-	assert.ErrorIs(t, err, ErrCtxConfigErr)
-	assert.Equal(t, time.Time{}, val)
+	s.ErrorIs(err, ErrCtxConfigErr)
+	s.Equal(time.Time{}, val)
 }

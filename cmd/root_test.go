@@ -7,8 +7,16 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/version"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
+
+type Suite struct {
+	suite.Suite
+}
+
+func TestCmdSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
 
 func executeCommandC(args ...string) (c *cobra.Command, output string, err error) {
 	testUtil.SetupOSArgsForGinkgo()
@@ -25,51 +33,51 @@ func executeCommand(args ...string) (output string, err error) {
 	return output, err
 }
 
-func TestRootCommandLocal(t *testing.T) {
+func (s *Suite) TestRootCommandLocal() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand()
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro [command]")
+	s.NoError(err)
+	s.Contains(output, "astro [command]")
 	//
 	//// Software root command
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	output, err = executeCommand()
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro [command]")
-	assert.Contains(t, output, "--verbosity")
+	s.NoError(err)
+	s.Contains(output, "astro [command]")
+	s.Contains(output, "--verbosity")
 }
 
-func TestRootCommandCloudContext(t *testing.T) {
+func (s *Suite) TestRootCommandCloudContext() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	version.CurrVersion = "1.0.0"
 	output, err := executeCommand("help")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro [command]")
-	assert.Contains(t, output, "completion")
-	assert.Contains(t, output, "deploy")
-	assert.Contains(t, output, "deployment")
-	assert.Contains(t, output, "dev")
-	assert.Contains(t, output, "help")
-	assert.Contains(t, output, "version")
-	assert.Contains(t, output, "workspace")
-	assert.Contains(t, output, "run")
-	assert.NotContains(t, output, "Run flow commands")
+	s.NoError(err)
+	s.Contains(output, "astro [command]")
+	s.Contains(output, "completion")
+	s.Contains(output, "deploy")
+	s.Contains(output, "deployment")
+	s.Contains(output, "dev")
+	s.Contains(output, "help")
+	s.Contains(output, "version")
+	s.Contains(output, "workspace")
+	s.Contains(output, "run")
+	s.NotContains(output, "Run flow commands")
 }
 
-func TestRootCommandSoftwareContext(t *testing.T) {
+func (s *Suite) TestRootCommandSoftwareContext() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	version.CurrVersion = "1.0.0"
 	output, err := executeCommand("help")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro [command]")
-	assert.Contains(t, output, "completion")
-	assert.Contains(t, output, "dev")
-	assert.Contains(t, output, "help")
-	assert.Contains(t, output, "version")
-	assert.Contains(t, output, "workspace")
-	assert.Contains(t, output, "user")
-	assert.Contains(t, output, "deploy")
-	assert.Contains(t, output, "deployment")
-	assert.Contains(t, output, "run")
-	assert.NotContains(t, output, "Run flow commands")
+	s.NoError(err)
+	s.Contains(output, "astro [command]")
+	s.Contains(output, "completion")
+	s.Contains(output, "dev")
+	s.Contains(output, "help")
+	s.Contains(output, "version")
+	s.Contains(output, "workspace")
+	s.Contains(output, "user")
+	s.Contains(output, "deploy")
+	s.Contains(output, "deployment")
+	s.Contains(output, "run")
+	s.NotContains(output, "Run flow commands")
 }

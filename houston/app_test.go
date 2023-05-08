@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestGetAppConfig(t *testing.T) {
+func (s *Suite) TestGetAppConfig() {
 	testUtil.InitTestConfig("software")
 
 	mockAppConfig := &AppConfig{
@@ -35,9 +33,9 @@ func TestGetAppConfig(t *testing.T) {
 		},
 	}
 	jsonResponse, jsonErr := json.Marshal(mockResponse)
-	assert.NoError(t, jsonErr)
+	s.NoError(jsonErr)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		countCalls := 0
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			countCalls++
@@ -50,17 +48,17 @@ func TestGetAppConfig(t *testing.T) {
 		api := NewClient(client)
 
 		config, err := api.GetAppConfig(nil)
-		assert.NoError(t, err)
-		assert.Equal(t, config, mockAppConfig)
+		s.NoError(err)
+		s.Equal(config, mockAppConfig)
 
 		config, err = api.GetAppConfig(nil)
-		assert.NoError(t, err)
-		assert.Equal(t, config, mockAppConfig)
+		s.NoError(err)
+		s.Equal(config, mockAppConfig)
 
-		assert.Equal(t, 1, countCalls)
+		s.Equal(1, countCalls)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		countCalls := 0
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			countCalls++
@@ -77,17 +75,17 @@ func TestGetAppConfig(t *testing.T) {
 		appConfigErr = nil
 
 		config, err := api.GetAppConfig(nil)
-		assert.Contains(t, err.Error(), "Internal Server Error")
-		assert.Nil(t, config)
+		s.Contains(err.Error(), "Internal Server Error")
+		s.Nil(config)
 
 		config, err = api.GetAppConfig(nil)
-		assert.Contains(t, err.Error(), "Internal Server Error")
-		assert.Nil(t, config)
+		s.Contains(err.Error(), "Internal Server Error")
+		s.Nil(config)
 
-		assert.Equal(t, 1, countCalls)
+		s.Equal(1, countCalls)
 	})
 
-	t.Run("unavailable fields error", func(t *testing.T) {
+	s.Run("unavailable fields error", func() {
 		// reset the local variables
 		appConfig = nil
 		appConfigErr = nil
@@ -103,11 +101,11 @@ func TestGetAppConfig(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetAppConfig(nil)
-		assert.EqualError(t, err, ErrFieldsNotAvailable{}.Error())
+		s.EqualError(err, ErrFieldsNotAvailable{}.Error())
 	})
 }
 
-func TestGetAvailableNamespaces(t *testing.T) {
+func (s *Suite) TestGetAvailableNamespaces() {
 	testUtil.InitTestConfig("software")
 
 	mockNamespaces := &Response{
@@ -119,9 +117,9 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockNamespaces)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -132,11 +130,11 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		api := NewClient(client)
 
 		namespaces, err := api.GetAvailableNamespaces(nil)
-		assert.NoError(t, err)
-		assert.Equal(t, namespaces, mockNamespaces.Data.GetDeploymentNamespaces)
+		s.NoError(err)
+		s.Equal(namespaces, mockNamespaces.Data.GetDeploymentNamespaces)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -147,11 +145,11 @@ func TestGetAvailableNamespaces(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetAvailableNamespaces(nil)
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetPlatformVersion(t *testing.T) {
+func (s *Suite) TestGetPlatformVersion() {
 	testUtil.InitTestConfig("software")
 
 	mockNamespaces := &Response{
@@ -160,9 +158,9 @@ func TestGetPlatformVersion(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockNamespaces)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("non empty version", func(t *testing.T) {
+	s.Run("non empty version", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -174,11 +172,11 @@ func TestGetPlatformVersion(t *testing.T) {
 		version = "0.30.0"
 		versionErr = nil
 		resp, err := api.GetPlatformVersion(nil)
-		assert.NoError(t, err)
-		assert.Equal(t, version, resp)
+		s.NoError(err)
+		s.Equal(version, resp)
 	})
 
-	t.Run("non empty version error", func(t *testing.T) {
+	s.Run("non empty version error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -190,11 +188,11 @@ func TestGetPlatformVersion(t *testing.T) {
 		version = ""
 		versionErr = errMockHouston
 		resp, err := api.GetPlatformVersion(nil)
-		assert.ErrorIs(t, err, errMockHouston)
-		assert.Equal(t, version, resp)
+		s.ErrorIs(err, errMockHouston)
+		s.Equal(version, resp)
 	})
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -206,11 +204,11 @@ func TestGetPlatformVersion(t *testing.T) {
 		version = ""
 		versionErr = nil
 		platformVersion, err := api.GetPlatformVersion(nil)
-		assert.NoError(t, err)
-		assert.Equal(t, platformVersion, mockNamespaces.Data.GetAppConfig.Version)
+		s.NoError(err)
+		s.Equal(platformVersion, mockNamespaces.Data.GetAppConfig.Version)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -222,6 +220,6 @@ func TestGetPlatformVersion(t *testing.T) {
 		version = ""
 		versionErr = nil
 		_, err := api.GetPlatformVersion(nil)
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

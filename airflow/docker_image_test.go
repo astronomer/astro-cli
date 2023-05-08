@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"testing"
 
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -13,12 +12,11 @@ import (
 	"github.com/docker/cli/cli/config/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("build error")
 
-func TestDockerImageBuild(t *testing.T) {
+func (s *Suite) TestDockerImageBuild() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	handler := DockerImage{
@@ -26,7 +24,7 @@ func TestDockerImageBuild(t *testing.T) {
 	}
 
 	cwd, err := os.Getwd()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	dockerIgnoreFile := cwd + "/.dockerignore"
 	fileutil.WriteStringToFile(dockerIgnoreFile, "")
@@ -41,34 +39,34 @@ func TestDockerImageBuild(t *testing.T) {
 
 	previousCmdExec := cmdExec
 
-	t.Run("build success", func(t *testing.T) {
+	s.Run("build success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 		err = handler.Build(options)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("build --no-cache", func(t *testing.T) {
+	s.Run("build --no-cache", func() {
 		options.NoCache = true
 		options.Output = false
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args, "--no-cache")
+			s.Contains(args, "--no-cache")
 			return nil
 		}
 		err = handler.Build(options)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("build error", func(t *testing.T) {
+	s.Run("build error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
 		err = handler.Build(options)
-		assert.Contains(t, err.Error(), errMock.Error())
+		s.Contains(err.Error(), errMock.Error())
 	})
 
-	t.Run("unable to read file error", func(t *testing.T) {
+	s.Run("unable to read file error", func() {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
 			TargetPlatforms: []string{"linux/amd64"},
@@ -77,19 +75,19 @@ func TestDockerImageBuild(t *testing.T) {
 		}
 
 		err = handler.Build(options)
-		assert.Error(t, err)
+		s.Error(err)
 	})
 
 	cmdExec = previousCmdExec
 }
 
-func TestDockerImagePytest(t *testing.T) {
+func (s *Suite) TestDockerImagePytest() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
 
 	cwd, err := os.Getwd()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	dockerIgnoreFile := cwd + "/.dockerignore"
 	fileutil.WriteStringToFile(dockerIgnoreFile, "")
@@ -104,15 +102,15 @@ func TestDockerImagePytest(t *testing.T) {
 
 	previousCmdExec := cmdExec
 
-	t.Run("pytest success", func(t *testing.T) {
+	s.Run("pytest success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 		_, err = handler.Pytest("", "", "", []string{}, options)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("pytest error", func(t *testing.T) {
+	s.Run("pytest error", func() {
 		options = airflowTypes.ImageBuildConfig{
 			Path:            cwd,
 			TargetPlatforms: []string{"linux/amd64"},
@@ -124,10 +122,10 @@ func TestDockerImagePytest(t *testing.T) {
 			return errMock
 		}
 		_, err = handler.Pytest("", "", "", []string{}, options)
-		assert.Contains(t, err.Error(), errMock.Error())
+		s.Contains(err.Error(), errMock.Error())
 	})
 
-	t.Run("unable to read file error", func(t *testing.T) {
+	s.Run("unable to read file error", func() {
 		options := airflowTypes.ImageBuildConfig{
 			Path:            "incorrect-path",
 			TargetPlatforms: []string{"linux/amd64"},
@@ -135,13 +133,13 @@ func TestDockerImagePytest(t *testing.T) {
 		}
 
 		_, err = handler.Pytest("", "", "", []string{}, options)
-		assert.Error(t, err)
+		s.Error(err)
 	})
 
 	cmdExec = previousCmdExec
 }
 
-func TestDockerImagePush(t *testing.T) {
+func (s *Suite) TestDockerImagePush() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -149,17 +147,17 @@ func TestDockerImagePush(t *testing.T) {
 	previousCmdExec := cmdExec
 	defer func() { cmdExec = previousCmdExec }()
 
-	t.Run("docker tag failure", func(t *testing.T) {
+	s.Run("docker tag failure", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args, "tag")
+			s.Contains(args, "tag")
 			return errMockDocker
 		}
 
 		err := handler.Push("test", "", "test", "test")
-		assert.ErrorIs(t, err, errMockDocker)
+		s.ErrorIs(err, errMockDocker)
 	})
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
@@ -169,10 +167,10 @@ func TestDockerImagePush(t *testing.T) {
 		}
 
 		err := handler.Push("test", "test-username", "test", "test")
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("success with docker cred store", func(t *testing.T) {
+	s.Run("success with docker cred store", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
@@ -182,11 +180,11 @@ func TestDockerImagePush(t *testing.T) {
 		}
 
 		err := handler.Push("test", "", "", "test")
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 }
 
-func TestDockerImageGetLabel(t *testing.T) {
+func (s *Suite) TestDockerImageGetLabel() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -194,46 +192,46 @@ func TestDockerImageGetLabel(t *testing.T) {
 	previousCmdExec := cmdExec
 	defer func() { cmdExec = previousCmdExec }()
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockLabel := "test-label"
 		mockResp := "test-response"
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args[2], mockLabel)
+			s.Contains(args[2], mockLabel)
 			io.WriteString(stdout, mockResp)
 			return nil
 		}
 
 		resp, err := handler.GetLabel(mockLabel)
-		assert.NoError(t, err)
-		assert.Equal(t, mockResp, resp)
+		s.NoError(err)
+		s.Equal(mockResp, resp)
 	})
 
-	t.Run("cmdExec error", func(t *testing.T) {
+	s.Run("cmdExec error", func() {
 		mockLabel := "test-label"
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args[2], mockLabel)
+			s.Contains(args[2], mockLabel)
 			return errMockDocker
 		}
 
 		_, err := handler.GetLabel(mockLabel)
-		assert.ErrorIs(t, err, errMockDocker)
+		s.ErrorIs(err, errMockDocker)
 	})
 
-	t.Run("cmdExec failure", func(t *testing.T) {
+	s.Run("cmdExec failure", func() {
 		mockLabel := "test-label"
 		mockErrResp := "test-err-response"
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args[2], mockLabel)
+			s.Contains(args[2], mockLabel)
 			io.WriteString(stderr, mockErrResp)
 			return nil
 		}
 
 		_, err := handler.GetLabel(mockLabel)
-		assert.ErrorIs(t, err, errGetImageLabel)
+		s.ErrorIs(err, errGetImageLabel)
 	})
 }
 
-func TestDockerImageListLabel(t *testing.T) {
+func (s *Suite) TestDockerImageListLabel() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
@@ -241,125 +239,125 @@ func TestDockerImageListLabel(t *testing.T) {
 	previousCmdExec := cmdExec
 	defer func() { cmdExec = previousCmdExec }()
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockResp := `{"test-label": "test-val"}`
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args, "inspect")
+			s.Contains(args, "inspect")
 			io.WriteString(stdout, mockResp)
 			return nil
 		}
 
 		resp, err := handler.ListLabels()
-		assert.NoError(t, err)
-		assert.Equal(t, map[string]string{"test-label": "test-val"}, resp)
+		s.NoError(err)
+		s.Equal(map[string]string{"test-label": "test-val"}, resp)
 	})
 
-	t.Run("cmdExec error", func(t *testing.T) {
+	s.Run("cmdExec error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args, "inspect")
+			s.Contains(args, "inspect")
 			return errMockDocker
 		}
 
 		_, err := handler.ListLabels()
-		assert.ErrorIs(t, err, errMockDocker)
+		s.ErrorIs(err, errMockDocker)
 	})
 
-	t.Run("cmdExec failure", func(t *testing.T) {
+	s.Run("cmdExec failure", func() {
 		mockErrResp := "test-err-response"
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args, "inspect")
+			s.Contains(args, "inspect")
 			io.WriteString(stderr, mockErrResp)
 			return nil
 		}
 
 		_, err := handler.ListLabels()
-		assert.ErrorIs(t, err, errGetImageLabel)
+		s.ErrorIs(err, errGetImageLabel)
 	})
 }
 
-func TestDockerTagLocalImage(t *testing.T) {
+func (s *Suite) TestDockerTagLocalImage() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
 
 	previousCmdExec := cmdExec
 
-	t.Run("rename local image success", func(t *testing.T) {
+	s.Run("rename local image success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 		err := handler.TagLocalImage("custom-image")
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("rename local image error", func(t *testing.T) {
+	s.Run("rename local image error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
 		err := handler.TagLocalImage("custom-image")
-		assert.Contains(t, err.Error(), errMock.Error())
+		s.Contains(err.Error(), errMock.Error())
 	})
 
 	cmdExec = previousCmdExec
 }
 
-func TestExecCmd(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestExecCmd() {
+	s.Run("success", func() {
 		stdout := new(bytes.Buffer)
 		stderr := new(bytes.Buffer)
 		err := cmdExec("test", stdout, stderr, "-f", "docker_image_test.go")
-		assert.NoError(t, err)
-		assert.Empty(t, stdout.String())
-		assert.Empty(t, stderr.String())
+		s.NoError(err)
+		s.Empty(stdout.String())
+		s.Empty(stderr.String())
 	})
 
-	t.Run("invalid cmd", func(t *testing.T) {
+	s.Run("invalid cmd", func() {
 		stdout := new(bytes.Buffer)
 		stderr := new(bytes.Buffer)
 		err := cmdExec("invalid-cmd", stdout, stderr)
-		assert.Contains(t, err.Error(), "failed to find the invalid-cmd command")
+		s.Contains(err.Error(), "failed to find the invalid-cmd command")
 	})
 }
 
-func TestUseBash(t *testing.T) {
+func (s *Suite) TestUseBash() {
 	previousCmdExec := cmdExec
 	defer func() { cmdExec = previousCmdExec }()
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, []string{"-c", "push", "rmi"}, args[0])
+			s.Contains([]string{"-c", "push", "rmi"}, args[0])
 			return nil
 		}
 		err := useBash(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("exec failure", func(t *testing.T) {
+	s.Run("exec failure", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, args[0], "push")
+			s.Contains(args[0], "push")
 			return errMockDocker
 		}
 		err := useBash(&types.AuthConfig{}, "test")
-		assert.ErrorIs(t, err, errMockDocker)
+		s.ErrorIs(err, errMockDocker)
 	})
 
-	t.Run("login exec failure", func(t *testing.T) {
+	s.Run("login exec failure", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			assert.Contains(t, cmd, "bash")
+			s.Contains(cmd, "bash")
 			return errMockDocker
 		}
 		err := useBash(&types.AuthConfig{Username: "testing"}, "test")
-		assert.ErrorIs(t, err, errMockDocker)
+		s.ErrorIs(err, errMockDocker)
 	})
 }
 
-func TestDockerImageRun(t *testing.T) {
+func (s *Suite) TestDockerImageRun() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
 
 	cwd, err := os.Getwd()
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	dockerIgnoreFile := cwd + "/.dockerignore"
 	fileutil.WriteStringToFile(dockerIgnoreFile, "")
@@ -367,31 +365,31 @@ func TestDockerImageRun(t *testing.T) {
 
 	previousCmdExec := cmdExec
 
-	t.Run("run success without container", func(t *testing.T) {
+	s.Run("run success without container", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 
 		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", true)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("run success with container", func(t *testing.T) {
+	s.Run("run success with container", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
 
 		err = handler.Run("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", "", true)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("run error without container", func(t *testing.T) {
+	s.Run("run error without container", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errExecMock
 		}
 
 		err = handler.Run("", "./testfiles/airflow_settings.yaml", "", "", "", true)
-		assert.Contains(t, err.Error(), errExecMock.Error())
+		s.Contains(err.Error(), errExecMock.Error())
 	})
 
 	cmdExec = previousCmdExec

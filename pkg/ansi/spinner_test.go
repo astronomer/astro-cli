@@ -2,12 +2,11 @@ package ansi
 
 import (
 	"errors"
-	"testing"
 )
 
 var errMock = errors.New("mock error")
 
-func TestSpinner(t *testing.T) {
+func (s *Suite) TestSpinner() {
 	type args struct {
 		text string
 		fn   func() error
@@ -29,9 +28,9 @@ func TestSpinner(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if err := Spinner(tt.args.text, tt.args.fn); (err != nil) != tt.wantErr && !errors.Is(err, errMock) {
-				t.Errorf("Spinner() error = %v, wantErr %v", err, tt.wantErr)
+				s.FailNowf("Spinner()", "error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

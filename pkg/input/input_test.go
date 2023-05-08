@@ -7,9 +7,18 @@ import (
 	"testing"
 
 	"github.com/manifoldco/promptui"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestText(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestPkgInputSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestText() {
 	type args struct {
 		promptText string
 	}
@@ -27,24 +36,18 @@ func TestText(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			// mock os.Stdin
 			input := []byte(tt.inputString)
 			r, w, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
-			}
+			s.Require().NoError(err)
 			_, err = w.Write(input)
-			if err != nil {
-				t.Error(err)
-			}
+			s.NoError(err)
 			w.Close()
 			stdin := os.Stdin
 			os.Stdin = r
 
-			if got := Text(tt.args.promptText); got != tt.want {
-				t.Errorf("Text() = %v, want %v", got, tt.want)
-			}
+			s.Equal(Text(tt.args.promptText), tt.want)
 
 			// Restore stdin right after the test.
 			os.Stdin = stdin
@@ -52,7 +55,7 @@ func TestText(t *testing.T) {
 	}
 }
 
-func TestConfirm(t *testing.T) {
+func (s *Suite) TestConfirm() {
 	type args struct {
 		promptText string
 	}
@@ -86,29 +89,23 @@ func TestConfirm(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			// mock os.Stdin
 			input := []byte(tt.inputString)
 			r, w, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
-			}
+			s.Require().NoError(err)
 			_, err = w.Write(input)
-			if err != nil {
-				t.Error(err)
-			}
+			s.NoError(err)
 			w.Close()
 			stdin := os.Stdin
 			os.Stdin = r
 
 			got, err := Confirm(tt.args.promptText)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Confirm() error = %v, wantErr %v", err, tt.wantErr)
+				s.Error(err)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("Confirm() = %v, want %v", got, tt.want)
-			}
+			s.Equal(got, tt.want)
 
 			// Restore stdin right after the test.
 			os.Stdin = stdin
@@ -116,7 +113,7 @@ func TestConfirm(t *testing.T) {
 	}
 }
 
-func TestPassword(t *testing.T) {
+func (s *Suite) TestPassword() {
 	type args struct {
 		promptText string
 	}
@@ -136,29 +133,23 @@ func TestPassword(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			// mock os.Stdin
 			input := []byte(tt.inputString)
 			r, w, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
-			}
+			s.Require().NoError(err)
 			_, err = w.Write(input)
-			if err != nil {
-				t.Error(err)
-			}
+			s.NoError(err)
 			w.Close()
 			stdin := os.Stdin
 			os.Stdin = r
 
 			got, err := Password(tt.args.promptText)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Password() error = %v, wantErr %v", err, tt.wantErr)
+				s.Errorf(err, "Password() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("Password() = %v, want %v", got, tt.want)
-			}
+			s.Equal(got, tt.want)
 
 			// Restore stdin right after the test.
 			os.Stdin = stdin
@@ -166,7 +157,7 @@ func TestPassword(t *testing.T) {
 	}
 }
 
-func TestPromptGetConfirmation(t *testing.T) {
+func (s *Suite) TestPromptGetConfirmation() {
 	runner := GetYesNoSelector(PromptContent{Label: "test label, enter y/n"})
 	runner.Keys = &promptui.SelectKeys{Next: promptui.Key{Code: rune('S')}, Prev: promptui.Key{Code: rune('W')}, PageUp: promptui.Key{Code: rune('D')}, PageDown: promptui.Key{Code: rune('A')}}
 	tests := []struct {
@@ -195,16 +186,14 @@ func TestPromptGetConfirmation(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			runner.Stdin = io.NopCloser(strings.NewReader(tt.inputString))
 			got, err := PromptGetConfirmation(runner)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("PromptGetConfirmation() error = %v, wantErr %v", err, tt.wantErr)
+				s.Errorf(err, "PromptGetConfirmation() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("PromptGetConfirmation() = %v, want %v", got, tt.want)
-			}
+			s.Equal(got, tt.want)
 		})
 	}
 }

@@ -4,42 +4,47 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/Masterminds/semver"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestCoerce(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestPkgUtilSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestCoerce() {
 	type args struct {
 		version string
 	}
 	tests := []struct {
 		name string
 		args args
-		want string
+		want *semver.Version
 	}{
 		{
 			name: "valid case",
 			args: args{version: "2.2.2"},
-			want: "2.2.2",
+			want: semver.MustParse("2.2.2"),
 		},
 		{
 			name: "invalid case",
 			args: args{version: "test"},
-			want: "",
+			want: nil,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got := Coerce(tt.args.version)
-			if tt.want != "" && tt.want != got.String() {
-				t.Errorf("Coerce() = %v, want %v", got, tt.want)
-			} else if tt.want == "" && got != nil {
-				t.Errorf("Coerce() = %v, want nil", got)
-			}
+			s.Equal(got, tt.want)
 		})
 	}
 }
 
-func TestContains(t *testing.T) {
+func (s *Suite) TestContains() {
 	type args struct {
 		elems []string
 		v     string
@@ -61,15 +66,13 @@ func TestContains(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := Contains(tt.args.elems, tt.args.v); got != tt.want {
-				t.Errorf("Contains() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(Contains(tt.args.elems, tt.args.v), tt.want)
 		})
 	}
 }
 
-func TestGetStringInBetweenTwoString(t *testing.T) {
+func (s *Suite) TestGetStringInBetweenTwoString() {
 	type args struct {
 		str    string
 		startS string
@@ -101,19 +104,15 @@ func TestGetStringInBetweenTwoString(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			gotResult, gotFound := GetStringInBetweenTwoString(tt.args.str, tt.args.startS, tt.args.endS)
-			if gotResult != tt.wantResult {
-				t.Errorf("GetStringInBetweenTwoString() gotResult = %v, want %v", gotResult, tt.wantResult)
-			}
-			if gotFound != tt.wantFound {
-				t.Errorf("GetStringInBetweenTwoString() gotFound = %v, want %v", gotFound, tt.wantFound)
-			}
+			s.Equal(gotResult, tt.wantResult)
+			s.Equal(gotFound, tt.wantFound)
 		})
 	}
 }
 
-func TestExists(t *testing.T) {
+func (s *Suite) TestExists() {
 	type args struct {
 		path string
 	}
@@ -137,20 +136,18 @@ func TestExists(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			got, err := Exists(tt.args.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Exists() error = %v, wantErr %v", err, tt.wantErr)
+				s.Error(err)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("Exists() = %v, want %v", got, tt.want)
-			}
+			s.Equal(got, tt.want)
 		})
 	}
 }
 
-func TestBase64URLEncode(t *testing.T) {
+func (s *Suite) TestBase64URLEncode() {
 	type args struct {
 		arg []byte
 	}
@@ -166,15 +163,13 @@ func TestBase64URLEncode(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := Base64URLEncode(tt.args.arg); got != tt.want {
-				t.Errorf("Base64URLEncode() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(Base64URLEncode(tt.args.arg), tt.want)
 		})
 	}
 }
 
-func TestCheckEnvBool(t *testing.T) {
+func (s *Suite) TestCheckEnvBool() {
 	type args struct {
 		arg string
 	}
@@ -210,23 +205,21 @@ func TestCheckEnvBool(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := CheckEnvBool(tt.args.arg); got != tt.want {
-				t.Errorf("CheckEnvBool() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(CheckEnvBool(tt.args.arg), tt.want)
 		})
 	}
 }
 
-func TestIsM1(t *testing.T) {
-	t.Run("returns true if running on arm architecture", func(t *testing.T) {
-		assert.True(t, IsM1("darwin", "arm64"))
+func (s *Suite) TestIsM1() {
+	s.Run("returns true if running on arm architecture", func() {
+		s.True(IsM1("darwin", "arm64"))
 	})
-	t.Run("returns false if not running on arm architecture", func(t *testing.T) {
-		assert.False(t, IsM1("darwin", "x86_64"))
+	s.Run("returns false if not running on arm architecture", func() {
+		s.False(IsM1("darwin", "x86_64"))
 	})
-	t.Run("returns false if running on windows", func(t *testing.T) {
-		assert.False(t, IsM1("windows", "amd64"))
+	s.Run("returns false if running on windows", func() {
+		s.False(IsM1("windows", "amd64"))
 	})
 }
 
@@ -235,7 +228,7 @@ var (
 	errMalformedConstraint     = errors.New("Malformed constraint: invalid constraint")   //nolint:stylecheck
 )
 
-func TestIsRequiredVersionMet(t *testing.T) {
+func (s *Suite) TestIsRequiredVersionMet() {
 	type args struct {
 		currentVersion  string
 		requiredVersion string
@@ -272,9 +265,11 @@ func TestIsRequiredVersionMet(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if versionMet, err := IsRequiredVersionMet(tt.args.currentVersion, tt.args.requiredVersion); versionMet != tt.want.valid || (err != nil && err.Error() != tt.want.err.Error()) {
-				t.Errorf("IsRequiredVersionMet() = %v, %v; want %v, %v", versionMet, err, tt.want.valid, tt.want.err)
+		s.Run(tt.name, func() {
+			versionMet, err := IsRequiredVersionMet(tt.args.currentVersion, tt.args.requiredVersion)
+			s.Equal(versionMet, tt.want.valid)
+			if err != nil && err.Error() != tt.want.err.Error() {
+				s.Errorf(err, "IsRequiredVersionMet() = %v; want %v, %v", versionMet, tt.want.valid, tt.want.err)
 			}
 		})
 	}

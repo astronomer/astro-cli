@@ -3,15 +3,12 @@ package software
 import (
 	"errors"
 	"fmt"
-	"testing"
 
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var errMock = errors.New("test error")
@@ -33,7 +30,7 @@ func getTestLogs(component string) []houston.DeploymentLog {
 	}
 }
 
-func TestDeploymentLogsRootCommandTriggererEnabled(t *testing.T) {
+func (s *Suite) TestDeploymentLogsRootCommandTriggererEnabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	appConfig = &houston.AppConfig{
@@ -44,12 +41,12 @@ func TestDeploymentLogsRootCommandTriggererEnabled(t *testing.T) {
 	}
 
 	output, err := execDeploymentCmd("logs")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro deployment logs")
-	assert.Contains(t, output, "triggerer")
+	s.NoError(err)
+	s.Contains(output, "astro deployment logs")
+	s.Contains(output, "triggerer")
 }
 
-func TestDeploymentLogsRootCommandTriggererDisabled(t *testing.T) {
+func (s *Suite) TestDeploymentLogsRootCommandTriggererDisabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: false,
@@ -59,12 +56,12 @@ func TestDeploymentLogsRootCommandTriggererDisabled(t *testing.T) {
 	}
 
 	output, err := execDeploymentCmd("logs")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "astro deployment logs")
-	assert.NotContains(t, output, "triggerer")
+	s.NoError(err)
+	s.Contains(output, "astro deployment logs")
+	s.NotContains(output, "triggerer")
 }
 
-func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
+func (s *Suite) TestDeploymentLogsWebServerRemoteLogs() {
 	for _, test := range []struct {
 		component string
 	}{
@@ -81,25 +78,25 @@ func TestDeploymentLogsWebServerRemoteLogs(t *testing.T) {
 			},
 		}
 
-		t.Run(fmt.Sprintf("list %s logs success", test.component), func(t *testing.T) {
+		s.Run(fmt.Sprintf("list %s logs success", test.component), func() {
 			api := new(mocks.ClientInterface)
 			// Have to use mock.Anything because since is computed in the function by using time.Now()
 			api.On("ListDeploymentLogs", mock.Anything).Return(mockLogs, nil)
 
 			houstonClient = api
 			output, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
-			assert.NoError(t, err)
-			assert.Contains(t, output, mockLogs[0].Log)
-			assert.Contains(t, output, mockLogs[1].Log)
+			s.NoError(err)
+			s.Contains(output, mockLogs[0].Log)
+			s.Contains(output, mockLogs[1].Log)
 		})
 
-		t.Run(fmt.Sprintf("list %s logs error", test.component), func(t *testing.T) {
+		s.Run(fmt.Sprintf("list %s logs error", test.component), func() {
 			api := new(mocks.ClientInterface)
 			api.On("ListDeploymentLogs", mock.Anything).Return(nil, errMock)
 
 			houstonClient = api
 			_, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
-			assert.ErrorIs(t, errMock, err)
+			s.ErrorIs(errMock, err)
 		})
 	}
 }

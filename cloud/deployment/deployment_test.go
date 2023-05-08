@@ -15,8 +15,8 @@ import (
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 var errMock = errors.New("mock error")
@@ -28,49 +28,57 @@ const (
 	region    = "us-central1"
 )
 
-func TestList(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestCloudDeploymentSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestList() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := List(ws, false, mockClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-id-1")
-		assert.Contains(t, buf.String(), "test-id-2")
+		s.NoError(err)
+		s.Contains(buf.String(), "test-id-1")
+		s.Contains(buf.String(), "test-id-2")
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("success with all true", func(t *testing.T) {
+	s.Run("success with all true", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, "").Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := List("", true, mockClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-id-1")
-		assert.Contains(t, buf.String(), "test-id-2")
+		s.NoError(err)
+		s.Contains(buf.String(), "test-id-1")
+		s.Contains(buf.String(), "test-id-2")
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		buf := new(bytes.Buffer)
 		err := List(ws, false, mockClient, buf)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("success with hidden cluster information", func(t *testing.T) {
+	s.Run("success with hidden cluster information", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
 
@@ -79,68 +87,64 @@ func TestList(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = List(ws, false, mockClient, buf)
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "test-id-1")
-		assert.Contains(t, buf.String(), "test-id-2")
-		assert.Contains(t, buf.String(), "N/A")
+		s.NoError(err)
+		s.Contains(buf.String(), "test-id-1")
+		s.Contains(buf.String(), "test-id-2")
+		s.Contains(buf.String(), "N/A")
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestGetDeployment(t *testing.T) {
+func (s *Suite) TestGetDeployment() {
 	deploymentID := "test-id-wrong"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 
-	t.Run("invalid deployment ID", func(t *testing.T) {
+	s.Run("invalid deployment ID", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		_, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
-		assert.ErrorIs(t, err, errInvalidDeployment)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidDeployment)
+		mockClient.AssertExpectations(s.T())
 	})
 	deploymentName := "test-wrong"
 	deploymentID = "test-id"
-	t.Run("error after invalid deployment Name", func(t *testing.T) {
+	s.Run("error after invalid deployment Name", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}}, nil).Once()
 
 		_, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
-		assert.ErrorIs(t, err, errInvalidDeployment)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidDeployment)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("correct deployment ID", func(t *testing.T) {
+	s.Run("correct deployment ID", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentID, deployment.ID)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(deploymentID, deployment.ID)
+		mockClient.AssertExpectations(s.T())
 	})
 	deploymentName = "test"
-	t.Run("correct deployment Name", func(t *testing.T) {
+	s.Run("correct deployment Name", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentName, deployment.Label)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(deploymentName, deployment.Label)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("two deployments with the same name", func(t *testing.T) {
+	s.Run("two deployments with the same name", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{Label: "test", ID: "test-id"}, {Label: "test", ID: "test-id2"}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -148,29 +152,29 @@ func TestGetDeployment(t *testing.T) {
 		os.Stdin = r
 
 		deployment, err := GetDeployment(ws, "", deploymentName, mockClient, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentName, deployment.Label)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(deploymentName, deployment.Label)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("deployment name and deployment id", func(t *testing.T) {
+	s.Run("deployment name and deployment id", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
 		deployment, err := GetDeployment(ws, deploymentID, deploymentName, mockClient, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentID, deployment.ID)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(deploymentID, deployment.ID)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("bad deployment call", func(t *testing.T) {
+	s.Run("bad deployment call", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		_, err := GetDeployment(ws, deploymentID, "", mockClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("create deployment error", func(t *testing.T) {
+	s.Run("create deployment error", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
@@ -195,13 +199,9 @@ func TestGetDeployment(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -209,11 +209,11 @@ func TestGetDeployment(t *testing.T) {
 		os.Stdin = r
 
 		_, err = GetDeployment(ws, "", "", mockClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("get deployments after creation error", func(t *testing.T) {
+	s.Run("get deployments after creation error", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
@@ -238,13 +238,9 @@ func TestGetDeployment(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -252,11 +248,11 @@ func TestGetDeployment(t *testing.T) {
 		os.Stdin = r
 
 		_, err = GetDeployment(ws, "", "", mockClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("test automatic deployment creation", func(t *testing.T) {
+	s.Run("test automatic deployment creation", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
@@ -282,13 +278,9 @@ func TestGetDeployment(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -296,25 +288,25 @@ func TestGetDeployment(t *testing.T) {
 		os.Stdin = r
 
 		deployment, err := GetDeployment(ws, "", "", mockClient, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, deploymentID, deployment.ID)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(deploymentID, deployment.ID)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("failed to validate resources", func(t *testing.T) {
+	s.Run("failed to validate resources", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
 		_, err := GetDeployment(ws, "", "", mockClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestSelectRegion(t *testing.T) {
+func (s *Suite) TestSelectRegion() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-	t.Run("list regions failure", func(t *testing.T) {
+	s.Run("list regions failure", func() {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
@@ -324,11 +316,11 @@ func TestSelectRegion(t *testing.T) {
 		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(nil, errMock).Once()
 
 		_, err := selectRegion("gcp", "", mockCoreClient)
-		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 
-	t.Run("region via selection", func(t *testing.T) {
+	s.Run("region via selection", func() {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
@@ -349,13 +341,9 @@ func TestSelectRegion(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -363,11 +351,11 @@ func TestSelectRegion(t *testing.T) {
 		os.Stdin = r
 
 		resp, err := selectRegion("gcp", "", mockCoreClient)
-		assert.NoError(t, err)
-		assert.Equal(t, region, resp)
+		s.NoError(err)
+		s.Equal(region, resp)
 	})
 
-	t.Run("region invalid selection", func(t *testing.T) {
+	s.Run("region invalid selection", func() {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
@@ -388,13 +376,9 @@ func TestSelectRegion(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("4")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -402,10 +386,10 @@ func TestSelectRegion(t *testing.T) {
 		os.Stdin = r
 
 		_, err = selectRegion("gcp", "", mockCoreClient)
-		assert.ErrorIs(t, err, ErrInvalidRegionKey)
+		s.ErrorIs(err, ErrInvalidRegionKey)
 	})
 
-	t.Run("not able to find region", func(t *testing.T) {
+	s.Run("not able to find region", func() {
 		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
@@ -424,12 +408,12 @@ func TestSelectRegion(t *testing.T) {
 		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
 
 		_, err := selectRegion("gcp", "test-invalid-region", mockCoreClient)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unable to find specified Region")
+		s.Error(err)
+		s.Contains(err.Error(), "unable to find specified Region")
 	})
 }
 
-func TestLogs(t *testing.T) {
+func (s *Suite) TestLogs() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	deploymentID := "test-id"
 	logCount := 1
@@ -440,18 +424,18 @@ func TestLogs(t *testing.T) {
 		"start":         "-24hrs",
 		"logLevels":     logLevels,
 	}
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{{Raw: "test log line"}}}, nil).Once()
 
 		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("success without deployment", func(t *testing.T) {
+	s.Run("success without deployment", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}, {ID: "test-id-1"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{DeploymentID: deploymentID, SchedulerLogs: []astro.SchedulerLog{}}, nil).Once()
@@ -459,13 +443,9 @@ func TestLogs(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -473,23 +453,23 @@ func TestLogs(t *testing.T) {
 		os.Stdin = r
 
 		err = Logs("", ws, "", false, false, false, logCount, mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	s.Run("failure", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 		mockClient.On("GetDeploymentHistory", mockInput).Return(astro.DeploymentHistory{}, errMock).Once()
 
 		err := Logs(deploymentID, ws, "", true, true, true, logCount, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestCreate(t *testing.T) {
+func (s *Suite) TestCreate() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	csID := "test-cluster-id"
@@ -511,7 +491,7 @@ func TestCreate(t *testing.T) {
 			},
 		},
 	}
-	t.Run("success with Celery Executor", func(t *testing.T) {
+	s.Run("success with Celery Executor", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -537,15 +517,15 @@ func TestCreate(t *testing.T) {
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("success with cloud provider and region", func(t *testing.T) {
+	s.Run("success with cloud provider and region", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -608,17 +588,17 @@ func TestCreate(t *testing.T) {
 		}
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		err = Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", 10, 3, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HYBRID")
-		mockClient.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("select region", func(t *testing.T) {
+	s.Run("select region", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -697,15 +677,15 @@ func TestCreate(t *testing.T) {
 			JSON200: &astrocore.SharedCluster{Id: csID},
 		}
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 
 		err = Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", "", "small", "enable", 10, 3, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HYBRID")
-		mockClient.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("success with Kube Executor", func(t *testing.T) {
+	s.Run("success with Kube Executor", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -733,14 +713,14 @@ func TestCreate(t *testing.T) {
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "KubeExecutor", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("success and wait for status", func(t *testing.T) {
+	s.Run("success and wait for status", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -765,7 +745,7 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Twice()
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		// setup wait for test
 		sleepTime = 1
@@ -773,19 +753,19 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "HEALTHY"}}, nil).Once()
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, true)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		// timeout
 		timeoutNum = 1
 		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, true)
-		assert.ErrorIs(t, err, errTimedOut)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errTimedOut)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error when creating a deployment fails", func(t *testing.T) {
+	s.Run("returns an error when creating a deployment fails", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -811,20 +791,20 @@ func TestCreate(t *testing.T) {
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{}, errMock).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("failed to validate resources", func(t *testing.T) {
+	s.Run("failed to validate resources", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error if cluster choice is not valid", func(t *testing.T) {
+	s.Run("returns an error if cluster choice is not valid", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -848,10 +828,10 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{}, errMock).Once()
 		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("invalid resources", func(t *testing.T) {
+	s.Run("invalid resources", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -873,9 +853,9 @@ func TestCreate(t *testing.T) {
 			},
 		}, nil).Times(1)
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 5, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
-	t.Run("list workspace failure", func(t *testing.T) {
+	s.Run("list workspace failure", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -899,10 +879,10 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("invalid workspace failure", func(t *testing.T) {
+	s.Run("invalid workspace failure", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -926,14 +906,14 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 
 		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no workspaces with id")
-		mockClient.AssertExpectations(t)
+		s.Error(err)
+		s.Contains(err.Error(), "no workspaces with id")
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("success with hidden cluster information", func(t *testing.T) {
+	s.Run("success with hidden cluster information", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
 
@@ -990,14 +970,14 @@ func TestCreate(t *testing.T) {
 		}
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "gcp", region, "", "", 10, 3, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HYBRID")
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("success with default config", func(t *testing.T) {
+	s.Run("success with default config", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1038,16 +1018,16 @@ func TestCreate(t *testing.T) {
 		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "test-name")()
+		defer testUtil.MockUserInput(s.T(), "test-name")()
 
 		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 0, 0, mockClient, mockCoreClient, false)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestValidateResources(t *testing.T) {
-	t.Run("invalid schedulerAU", func(t *testing.T) {
+func (s *Suite) TestValidateResources() {
+	s.Run("invalid schedulerAU", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
@@ -1079,48 +1059,44 @@ func TestValidateResources(t *testing.T) {
 				},
 			},
 		})
-		assert.False(t, resp)
+		s.False(resp)
 	})
 
-	t.Run("invalid runtime version", func(t *testing.T) {
+	s.Run("invalid runtime version", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{RuntimeReleases: []astro.RuntimeRelease{{Version: "4.2.5"}}}, nil).Once()
 
 		resp, err := validateRuntimeVersion("4.2.4", mockClient)
-		assert.NoError(t, err)
-		assert.False(t, resp)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.False(resp)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestSelectCluster(t *testing.T) {
+func (s *Suite) TestSelectCluster() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	orgID := "test-org-id"
 	csID := "test-cluster-id"
-	t.Run("list cluster failure", func(t *testing.T) {
+	s.Run("list cluster failure", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errMock).Once()
 
 		_, err := selectCluster("", orgID, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("cluster id via selection", func(t *testing.T) {
+	s.Run("cluster id via selection", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1128,24 +1104,20 @@ func TestSelectCluster(t *testing.T) {
 		os.Stdin = r
 
 		resp, err := selectCluster("", orgID, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, csID, resp)
+		s.NoError(err)
+		s.Equal(csID, resp)
 	})
 
-	t.Run("cluster id invalid selection", func(t *testing.T) {
+	s.Run("cluster id invalid selection", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("4")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1153,20 +1125,20 @@ func TestSelectCluster(t *testing.T) {
 		os.Stdin = r
 
 		_, err = selectCluster("", orgID, mockClient)
-		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
+		s.ErrorIs(err, ErrInvalidDeploymentKey)
 	})
 
-	t.Run("not able to find cluster", func(t *testing.T) {
+	s.Run("not able to find cluster", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{{ID: csID}}, nil).Once()
 
 		_, err := selectCluster("test-invalid-id", orgID, mockClient)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unable to find specified Cluster")
+		s.Error(err)
+		s.Contains(err.Error(), "unable to find specified Cluster")
 	})
 }
 
-func TestUpdate(t *testing.T) {
+func (s *Suite) TestUpdate() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 
@@ -1227,7 +1199,7 @@ func TestUpdate(t *testing.T) {
 		WorkerQueues: nil,
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1262,13 +1234,9 @@ func TestUpdate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1276,7 +1244,7 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 0, 0, expectedQueue, false, mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// mock os.Stdin
 		input = []byte("y")
@@ -1295,13 +1263,13 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("successfully update schedulerSize and highAvailability", func(t *testing.T) {
+	s.Run("successfully update schedulerSize and highAvailability", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -1371,13 +1339,9 @@ func TestUpdate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1385,7 +1349,7 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "medium", "enable", 0, 0, expectedQueue, false, mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// mock os.Stdin
 		input = []byte("y")
@@ -1404,22 +1368,22 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "small", "disable", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("failed to validate resources", func(t *testing.T) {
+	s.Run("failed to validate resources", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
 		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("success with hidden cluster information", func(t *testing.T) {
+	s.Run("success with hidden cluster information", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", org)
 
@@ -1456,13 +1420,9 @@ func TestUpdate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1470,31 +1430,27 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 0, 0, expectedQueue, false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("list deployments failure", func(t *testing.T) {
+	s.Run("list deployments failure", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("invalid deployment id", func(t *testing.T) {
+	s.Run("invalid deployment id", func() {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}, {ID: "test-id-2", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
 
 		// mock os.Stdin
 		input := []byte("0")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1502,14 +1458,14 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
+		s.ErrorIs(err, ErrInvalidDeploymentKey)
 
 		err = Update("test-invalid-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeployment)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidDeployment)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("invalid resources", func(t *testing.T) {
+	s.Run("invalid resources", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1532,11 +1488,11 @@ func TestUpdate(t *testing.T) {
 		}, nil).Times(1)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		err := Update("test-id", "test-label", ws, "test-description", "", "", CeleryExecutor, "", "", 10, 5, []astro.WorkerQueue{}, true, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("cancel update", func(t *testing.T) {
+	s.Run("cancel update", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1562,13 +1518,9 @@ func TestUpdate(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("n")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -1576,11 +1528,11 @@ func TestUpdate(t *testing.T) {
 		os.Stdin = r
 
 		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("update deployment failure", func(t *testing.T) {
+	s.Run("update deployment failure", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1605,12 +1557,12 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
 		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 0, 0, []astro.WorkerQueue{}, true, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		assert.NotContains(t, err.Error(), astro.AstronomerConnectionErrMsg)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		s.NotContains(err.Error(), astro.AstronomerConnectionErrMsg)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("update deployment to enable dag deploy", func(t *testing.T) {
+	s.Run("update deployment to enable dag deploy", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1648,11 +1600,11 @@ func TestUpdate(t *testing.T) {
 
 		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
 
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("do not update deployment to enable dag deploy if already enabled", func(t *testing.T) {
+	s.Run("do not update deployment to enable dag deploy if already enabled", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1684,11 +1636,11 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
 
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("update deployment to disable dag deploy", func(t *testing.T) {
+	s.Run("update deployment to disable dag deploy", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1757,22 +1709,22 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 
 		// force is false so we will confirm with the user
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// force is false so we will confirm with the user
-		defer testUtil.MockUserInput(t, "n")()
+		defer testUtil.MockUserInput(s.T(), "n")()
 		err = Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// force is true so no confirmation is needed
 		err = Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("do not update deployment to disable dag deploy if already disabled", func(t *testing.T) {
+	s.Run("do not update deployment to disable dag deploy if already disabled", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1804,11 +1756,11 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
 
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("update deployment to change executor to KubernetesExecutor", func(t *testing.T) {
+	s.Run("update deployment to change executor to KubernetesExecutor", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1875,13 +1827,13 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 		err := Update("test-id", "", ws, "", "", "", KubeExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("update deployment to change executor to CeleryExecutor", func(t *testing.T) {
+	s.Run("update deployment to change executor to CeleryExecutor", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -1948,13 +1900,13 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
-		defer testUtil.MockUserInput(t, "y")()
+		defer testUtil.MockUserInput(s.T(), "y")()
 		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("do not update deployment if user says no to the executor change", func(t *testing.T) {
+	s.Run("do not update deployment if user says no to the executor change", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -2007,13 +1959,13 @@ func TestUpdate(t *testing.T) {
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		defer testUtil.MockUserInput(t, "n")()
+		defer testUtil.MockUserInput(s.T(), "n")()
 		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("do not update deployment with executor if deployment already has it", func(t *testing.T) {
+	s.Run("do not update deployment with executor if deployment already has it", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -2044,11 +1996,11 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
 
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("do not update deployment with executor if user did not request it", func(t *testing.T) {
+	s.Run("do not update deployment with executor if user did not request it", func() {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
 			Components: astro.Components{
 				Scheduler: astro.SchedulerConfig{
@@ -2079,12 +2031,12 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		err := Update("test-id", "", ws, "", "", "disable", "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
 
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestDelete(t *testing.T) {
+func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	deploymentResp := astro.Deployment{
@@ -2093,7 +2045,7 @@ func TestDelete(t *testing.T) {
 		DeploymentSpec: astro.DeploymentSpec{Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
 	}
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("DeleteDeployment", mock.Anything).Return(astro.Deployment{ID: "test-id"}, nil).Once()
@@ -2101,13 +2053,9 @@ func TestDelete(t *testing.T) {
 		// mock os.Stdin
 		input := []byte("y")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -2115,33 +2063,29 @@ func TestDelete(t *testing.T) {
 		os.Stdin = r
 
 		err = Delete("test-id", ws, "", false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("list deployments failure", func(t *testing.T) {
+	s.Run("list deployments failure", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
 		err := Delete("test-id", ws, "", false, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("invalid deployment id", func(t *testing.T) {
+	s.Run("invalid deployment id", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}, {ID: "test-id-2", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Twice()
 
 		// mock os.Stdin
 		input := []byte("0")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -2149,27 +2093,23 @@ func TestDelete(t *testing.T) {
 		os.Stdin = r
 
 		err = Delete("", ws, "", false, mockClient)
-		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
+		s.ErrorIs(err, ErrInvalidDeploymentKey)
 
 		err = Delete("test-invalid-id", ws, "", false, mockClient)
-		assert.ErrorIs(t, err, errInvalidDeployment)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errInvalidDeployment)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("cancel update", func(t *testing.T) {
+	s.Run("cancel update", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"}}}, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("n")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -2177,78 +2117,78 @@ func TestDelete(t *testing.T) {
 		os.Stdin = r
 
 		err = Delete("test-id", ws, "", false, mockClient)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("delete deployment failure", func(t *testing.T) {
+	s.Run("delete deployment failure", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("DeleteDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
 		err := Delete("test-id", ws, "", true, mockClient)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestGetDeploymentURL(t *testing.T) {
+func (s *Suite) TestGetDeploymentURL() {
 	deploymentID := "deployment-id"
 	workspaceID := "workspace-id"
 
-	t.Run("returns deploymentURL for dev environment", func(t *testing.T) {
+	s.Run("returns deploymentURL for dev environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudDevPlatform)
 		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedURL, actualURL)
+		s.NoError(err)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns deploymentURL for stage environment", func(t *testing.T) {
+	s.Run("returns deploymentURL for stage environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudStagePlatform)
 		expectedURL := "cloud.astronomer-stage.io/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedURL, actualURL)
+		s.NoError(err)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns deploymentURL for perf environment", func(t *testing.T) {
+	s.Run("returns deploymentURL for perf environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPerfPlatform)
 		expectedURL := "cloud.astronomer-perf.io/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedURL, actualURL)
+		s.NoError(err)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns deploymentURL for cloud (prod) environment", func(t *testing.T) {
+	s.Run("returns deploymentURL for cloud (prod) environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedURL := "cloud.astronomer.io/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedURL, actualURL)
+		s.NoError(err)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns deploymentURL for pr preview environment", func(t *testing.T) {
+	s.Run("returns deploymentURL for pr preview environment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPrPreview)
 		expectedURL := "cloud.astronomer-dev.io/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedURL, actualURL)
+		s.NoError(err)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns deploymentURL for local environment", func(t *testing.T) {
+	s.Run("returns deploymentURL for local environment", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		expectedURL := "localhost:5000/workspace-id/deployments/deployment-id/analytics"
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedURL, actualURL)
+		s.NoError(err)
+		s.Equal(expectedURL, actualURL)
 	})
-	t.Run("returns an error if getting current context fails", func(t *testing.T) {
+	s.Run("returns an error if getting current context fails", func() {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		expectedURL := ""
 		actualURL, err := GetDeploymentURL(deploymentID, workspaceID)
-		assert.ErrorContains(t, err, "no context set")
-		assert.Equal(t, expectedURL, actualURL)
+		s.ErrorContains(err, "no context set")
+		s.Equal(expectedURL, actualURL)
 	})
 }
 
-func TestMutateExecutor(t *testing.T) {
-	t.Run("returns true and updates executor from CE -> KE", func(t *testing.T) {
+func (s *Suite) TestMutateExecutor() {
+	s.Run("returns true and updates executor from CE -> KE", func() {
 		existingSpec := astro.DeploymentCreateSpec{
 			Executor: CeleryExecutor,
 		}
@@ -2256,10 +2196,10 @@ func TestMutateExecutor(t *testing.T) {
 			Executor: KubeExecutor,
 		}
 		actual, actualSpec := mutateExecutor(KubeExecutor, existingSpec, 2)
-		assert.True(t, actual) // we printed a warning
-		assert.Equal(t, expectedSpec, actualSpec)
+		s.True(actual) // we printed a warning
+		s.Equal(expectedSpec, actualSpec)
 	})
-	t.Run("returns true and updates executor from KE -> CE", func(t *testing.T) {
+	s.Run("returns true and updates executor from KE -> CE", func() {
 		existingSpec := astro.DeploymentCreateSpec{
 			Executor: KubeExecutor,
 		}
@@ -2267,18 +2207,18 @@ func TestMutateExecutor(t *testing.T) {
 			Executor: CeleryExecutor,
 		}
 		actual, actualSpec := mutateExecutor(CeleryExecutor, existingSpec, 2)
-		assert.True(t, actual) // we printed a warning
-		assert.Equal(t, expectedSpec, actualSpec)
+		s.True(actual) // we printed a warning
+		s.Equal(expectedSpec, actualSpec)
 	})
-	t.Run("returns false and does not update executor if no executor change is requested", func(t *testing.T) {
+	s.Run("returns false and does not update executor if no executor change is requested", func() {
 		existingSpec := astro.DeploymentCreateSpec{
 			Executor: CeleryExecutor,
 		}
 		actual, actualSpec := mutateExecutor("", existingSpec, 0)
-		assert.False(t, actual) // no warning was printed
-		assert.Equal(t, existingSpec, actualSpec)
+		s.False(actual) // no warning was printed
+		s.Equal(existingSpec, actualSpec)
 	})
-	t.Run("returns false and updates executor if user does not confirms change", func(t *testing.T) {
+	s.Run("returns false and updates executor if user does not confirms change", func() {
 		existingSpec := astro.DeploymentCreateSpec{
 			Executor: CeleryExecutor,
 		}
@@ -2286,41 +2226,41 @@ func TestMutateExecutor(t *testing.T) {
 			Executor: KubeExecutor,
 		}
 		actual, actualSpec := mutateExecutor(KubeExecutor, existingSpec, 1)
-		assert.False(t, actual) // no warning was printed
-		assert.Equal(t, expectedSpec, actualSpec)
+		s.False(actual) // no warning was printed
+		s.Equal(expectedSpec, actualSpec)
 	})
-	t.Run("returns false and does not update executor if requested and existing executors are the same", func(t *testing.T) {
+	s.Run("returns false and does not update executor if requested and existing executors are the same", func() {
 		existingSpec := astro.DeploymentCreateSpec{
 			Executor: CeleryExecutor,
 		}
 		actual, actualSpec := mutateExecutor(CeleryExecutor, existingSpec, 0)
-		assert.False(t, actual) // no warning was printed
-		assert.Equal(t, existingSpec, actualSpec)
+		s.False(actual) // no warning was printed
+		s.Equal(existingSpec, actualSpec)
 	})
 }
 
-func TestPrintWarning(t *testing.T) {
-	t.Run("when KubernetesExecutor is requested", func(t *testing.T) {
-		t.Run("returns true > 1 queues exist", func(t *testing.T) {
+func (s *Suite) TestPrintWarning() {
+	s.Run("when KubernetesExecutor is requested", func() {
+		s.Run("returns true > 1 queues exist", func() {
 			actual := printWarning(KubeExecutor, 3)
-			assert.True(t, actual)
+			s.True(actual)
 		})
-		t.Run("returns false if only 1 queue exists", func(t *testing.T) {
+		s.Run("returns false if only 1 queue exists", func() {
 			actual := printWarning(KubeExecutor, 1)
-			assert.False(t, actual)
+			s.False(actual)
 		})
 	})
-	t.Run("returns true when CeleryExecutor is requested", func(t *testing.T) {
+	s.Run("returns true when CeleryExecutor is requested", func() {
 		actual := printWarning(CeleryExecutor, 2)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false for any other executor is requested", func(t *testing.T) {
+	s.Run("returns false for any other executor is requested", func() {
 		actual := printWarning("non-existent", 2)
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestUseSharedCluster(t *testing.T) {
+func (s *Suite) TestUseSharedCluster() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	csID := "test-cluster-id"
 	region := "us-central1"
@@ -2328,7 +2268,7 @@ func TestUseSharedCluster(t *testing.T) {
 		Region:        region,
 		CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(astrocore.SharedClusterCloudProviderGcp),
 	}
-	t.Run("returns a cluster id", func(t *testing.T) {
+	s.Run("returns a cluster id", func() {
 		mockOKResponse := &astrocore.GetSharedClusterResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
@@ -2338,11 +2278,11 @@ func TestUseSharedCluster(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 		actual, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
-		assert.NoError(t, err)
-		assert.Equal(t, csID, actual)
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(csID, actual)
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("returns a 404 error if a cluster is not found in the region", func(t *testing.T) {
+	s.Run("returns a 404 error if a cluster is not found in the region", func() {
 		errorBody, _ := json.Marshal(astrocore.Error{
 			Message: "Unable to find shared cluster",
 		})
@@ -2356,25 +2296,25 @@ func TestUseSharedCluster(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockErrorResponse, nil).Once()
 		_, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
-		assert.Error(t, err)
-		mockCoreClient.AssertExpectations(t)
+		s.Error(err)
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error if calling api fails", func(t *testing.T) {
+	s.Run("returns an error if calling api fails", func() {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(nil, errMock).Once()
 		_, err := useSharedCluster(astrocore.SharedClusterCloudProviderGcp, region, mockCoreClient)
-		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockCoreClient.AssertExpectations(s.T())
 	})
 }
 
-func TestUseSharedClusterOrSelectCluster(t *testing.T) {
+func (s *Suite) TestUseSharedClusterOrSelectCluster() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	orgID := "test-org-id"
 	csID := "test-cluster-id"
 
-	t.Run("uses shared cluster if cloud provider and region are provided", func(t *testing.T) {
+	s.Run("uses shared cluster if cloud provider and region are provided", func() {
 		cloudProvider := "gcp"
 		region := "us-central1"
 		getSharedClusterParams := &astrocore.GetSharedClusterParams{
@@ -2390,33 +2330,33 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 		}
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 		actual, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", nil, mockCoreClient)
-		assert.NoError(t, err)
-		assert.Equal(t, csID, actual)
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(csID, actual)
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("returns error if using shared cluster fails", func(t *testing.T) {
+	s.Run("returns error if using shared cluster fails", func() {
 		cloudProvider := "gcp"
 		region := "us-central1"
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		_, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", nil, mockCoreClient)
-		assert.ErrorIs(t, err, errMock)
-		mockCoreClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("uses select cluster if cloud provider and region are not provided", func(t *testing.T) {
+	s.Run("uses select cluster if cloud provider and region are not provided", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{{ID: csID}}, nil).Once()
-		defer testUtil.MockUserInput(t, "1")()
+		defer testUtil.MockUserInput(s.T(), "1")()
 		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", orgID, "", mockClient, nil)
-		assert.NoError(t, err)
-		assert.Equal(t, csID, actual)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(csID, actual)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns error if selecting cluster fails", func(t *testing.T) {
+	s.Run("returns error if selecting cluster fails", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errMock).Once()
 		_, err := useSharedClusterOrSelectDedicatedCluster("", "", orgID, "", mockClient, nil)
-		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mockClient.AssertExpectations(s.T())
 	})
 }

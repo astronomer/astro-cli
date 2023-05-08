@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
 var mockDeploymentTeamRole = &houston.RoleBinding{
@@ -25,7 +23,7 @@ var mockDeploymentTeamRole = &houston.RoleBinding{
 	},
 }
 
-func TestDeploymentTeamAddCommand(t *testing.T) {
+func (s *Suite) TestDeploymentTeamAddCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       ROLE                  
  cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
@@ -45,11 +43,11 @@ Successfully added team cl0evnxfl0120dxxu1s4nbnk7 to deployment cknz133ra49758zr
 		"--team-id="+mockDeploymentTeamRole.Team.ID,
 		"--role="+mockDeploymentTeamRole.Role,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
+	s.NoError(err)
+	s.Equal(expectedOut, output)
 }
 
-func TestDeploymentTeamRm(t *testing.T) {
+func (s *Suite) TestDeploymentTeamRm() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       
  cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     
@@ -69,11 +67,11 @@ func TestDeploymentTeamRm(t *testing.T) {
 		"--deployment-id="+mockDeployment.ID,
 	)
 
-	assert.NoError(t, err)
-	assert.Equal(t, expectedOut, output)
+	s.NoError(err)
+	s.Equal(expectedOut, output)
 }
 
-func TestDeploymentTeamUpdateCommand(t *testing.T) {
+func (s *Suite) TestDeploymentTeamUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	api := new(mocks.ClientInterface)
@@ -88,10 +86,10 @@ func TestDeploymentTeamUpdateCommand(t *testing.T) {
 		"--deployment-id="+mockDeployment.ID,
 		"--role="+mockDeploymentTeamRole.Role,
 	)
-	assert.NoError(t, err)
+	s.NoError(err)
 }
 
-func TestDeploymentTeamsListCmd(t *testing.T) {
+func (s *Suite) TestDeploymentTeamsListCmd() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -103,6 +101,6 @@ func TestDeploymentTeamsListCmd(t *testing.T) {
 	houstonClient = houston.NewClient(client)
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentTeamListCmd(buf)
-	assert.NotNil(t, cmd)
-	assert.Nil(t, cmd.Args)
+	s.NotNil(cmd)
+	s.Nil(cmd.Args)
 }

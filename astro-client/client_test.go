@@ -8,15 +8,23 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNewAstroClient(t *testing.T) {
-	client := NewAstroClient(httputil.NewHTTPClient())
-	assert.NotNil(t, client, "Can't create new Astro client")
+type Suite struct {
+	suite.Suite
 }
 
-func TestPrepareRESTRequest(t *testing.T) {
+func TestAstroClientSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestNewAstroClient() {
+	client := NewAstroClient(httputil.NewHTTPClient())
+	s.NotNil(client, "Can't create new Astro client")
+}
+
+func (s *Suite) TestPrepareRESTRequest() {
 	client := NewAstroClient(httputil.NewHTTPClient())
 	doOpts := &httputil.DoOptions{
 		Path: "/test",
@@ -25,13 +33,13 @@ func TestPrepareRESTRequest(t *testing.T) {
 		},
 	}
 	err := client.prepareRESTRequest(doOpts)
-	assert.NoError(t, err)
-	assert.Equal(t, "test", doOpts.Headers["test"])
+	s.NoError(err)
+	s.Equal("test", doOpts.Headers["test"])
 	// Test context has no token
-	assert.Equal(t, "", doOpts.Headers["Authorization"])
+	s.Equal("", doOpts.Headers["Authorization"])
 }
 
-func TestDoPublicRESTQuery(t *testing.T) {
+func (s *Suite) TestDoPublicRESTQuery() {
 	mockResponse := "A REST query response"
 	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -48,6 +56,6 @@ func TestDoPublicRESTQuery(t *testing.T) {
 		},
 	}
 	resp, err := astroClient.DoPublicRESTQuery(doOpts)
-	assert.NoError(t, err)
-	assert.Equal(t, mockResponse, resp.Body)
+	s.NoError(err)
+	s.Equal(mockResponse, resp.Body)
 }

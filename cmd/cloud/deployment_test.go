@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"testing"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
@@ -20,7 +19,6 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -34,18 +32,18 @@ func execDeploymentCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestDeploymentRootCommand(t *testing.T) {
+func (s *Suite) TestDeploymentRootCommand() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	buf := new(bytes.Buffer)
 	deplyCmd := newDeploymentRootCmd(os.Stdout)
 	deplyCmd.SetOut(buf)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := deplyCmd.ExecuteC()
-	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "deployment")
+	s.NoError(err)
+	s.Contains(buf.String(), "deployment")
 }
 
-func TestDeploymentList(t *testing.T) {
+func (s *Suite) TestDeploymentList() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockClient := new(astro_mocks.Client)
@@ -54,13 +52,13 @@ func TestDeploymentList(t *testing.T) {
 
 	cmdArgs := []string{"list", "-a"}
 	resp, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-id-1")
-	assert.Contains(t, resp, "test-id-2")
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(resp, "test-id-1")
+	s.Contains(resp, "test-id-2")
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentLogs(t *testing.T) {
+func (s *Suite) TestDeploymentLogs() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	deploymentID := "test-id"
@@ -79,11 +77,11 @@ func TestDeploymentLogs(t *testing.T) {
 
 	cmdArgs := []string{"logs", "test-id", "-w", "-e", "-i"}
 	_, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentCreate(t *testing.T) {
+func (s *Suite) TestDeploymentCreate() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	ws := "test-ws-id"
@@ -172,7 +170,7 @@ func TestDeploymentCreate(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -182,39 +180,39 @@ func TestDeploymentCreate(t *testing.T) {
 		}
 	})
 
-	t.Run("creates a deployment when dag-deploy is disabled", func(t *testing.T) {
+	s.Run("creates a deployment when dag-deploy is disabled", func() {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
-	t.Run("creates a deployment when dag deploy is enabled", func(t *testing.T) {
+	s.Run("creates a deployment when dag deploy is enabled", func() {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
-	t.Run("creates a deployment when executor is specified", func(t *testing.T) {
+	s.Run("creates a deployment when executor is specified", func() {
 		deploymentCreateInput1.DeploymentSpec.Executor = "KubernetesExecutor"
 		defer func() { deploymentCreateInput1.DeploymentSpec.Executor = "CeleryExecutor" }()
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubernetesExecutor"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
-	t.Run("creates a deployment with default executor", func(t *testing.T) {
+	s.Run("creates a deployment with default executor", func() {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
-	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
+	s.Run("returns an error if dag-deploy flag has an incorrect value", func() {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
-	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
+	s.Run("returns an error if executor has an incorrect value", func() {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
+		s.ErrorContains(err, "KubeExecutor is not a valid executor")
 	})
-	t.Run("creates a deployment from file", func(t *testing.T) {
+	s.Run("creates a deployment from file", func() {
 		orgID := "test-org-id"
 		filePath := "./test-deployment.yaml"
 		data := `
@@ -323,22 +321,22 @@ deployment:
 		}()
 		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error if creating a deployment from file fails", func(t *testing.T) {
+	s.Run("returns an error if creating a deployment from file fails", func() {
 		cmdArgs := []string{"create", "--deployment-file", "test-file-name.json"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
+		s.ErrorContains(err, "open test-file-name.json: no such file or directory")
 	})
-	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
+	s.Run("returns an error if from-file is specified with any other flags", func() {
 		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorIs(t, err, errFlag)
+		s.ErrorIs(err, errFlag)
 	})
-	t.Run("creates a deployment with cloud provider and region", func(t *testing.T) {
+	s.Run("creates a deployment with cloud provider and region", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -356,12 +354,12 @@ deployment:
 			"--cloud-provider", "gcp", "--region", "us-central1",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockCoreClient.AssertExpectations(t)
+		s.NoError(err)
+		mockCoreClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+	s.Run("returns an error with incorrect high-availability value", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -370,11 +368,11 @@ deployment:
 			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "Invalid --high-availability value")
+		s.ErrorContains(err, "Invalid --high-availability value")
 	})
-	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
+	s.Run("returns an error if cloud provider is not valid", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -383,12 +381,12 @@ deployment:
 			"--executor", "KubernetesExecutor", "--cloud-provider", "azure",
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "azure is not a valid cloud provider. It can only be gcp")
+		s.ErrorContains(err, "azure is not a valid cloud provider. It can only be gcp")
 	})
-	mockClient.AssertExpectations(t)
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentUpdate(t *testing.T) {
+func (s *Suite) TestDeploymentUpdate() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	ws := "test-ws-id"
@@ -435,36 +433,36 @@ func TestDeploymentUpdate(t *testing.T) {
 	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 	astroClient = mockClient
 
-	t.Run("updates the deployment successfully", func(t *testing.T) {
+	s.Run("updates the deployment successfully", func() {
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
-	t.Run("returns an error if dag-deploy has an incorrect value", func(t *testing.T) {
+	s.Run("returns an error if dag-deploy has an incorrect value", func() {
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--dag-deploy", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		s.Error(err)
 	})
-	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
+	s.Run("returns an error if executor has an incorrect value", func() {
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--executor", "KubeExecutor"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
+		s.ErrorContains(err, "KubeExecutor is not a valid executor")
 	})
-	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+	s.Run("returns an error when getting workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.Workspace = ""
 		err = ctx.SetContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		defer testUtil.InitTestConfig(testUtil.CloudPlatform)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"update", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "failed to find a valid workspace")
-		assert.Contains(t, resp, expectedOut)
+		s.ErrorContains(err, "failed to find a valid workspace")
+		s.Contains(resp, expectedOut)
 	})
-	t.Run("updates a deployment from file", func(t *testing.T) {
+	s.Run("updates a deployment from file", func() {
 		orgID := "test-org-id"
 		filePath := "./test-deployment.yaml"
 		data := `
@@ -572,22 +570,22 @@ deployment:
 		}()
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error if updating a deployment from file fails", func(t *testing.T) {
+	s.Run("returns an error if updating a deployment from file fails", func() {
 		cmdArgs := []string{"update", "--deployment-file", "test-file-name.json"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
+		s.ErrorContains(err, "open test-file-name.json: no such file or directory")
 	})
-	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
+	s.Run("returns an error if from-file is specified with any other flags", func() {
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
 		_, err := execDeploymentCmd(cmdArgs...)
-		assert.ErrorIs(t, err, errFlag)
+		s.ErrorIs(err, errFlag)
 	})
-	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
+	s.Run("updates a deployment with small scheduler size", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
@@ -621,23 +619,23 @@ deployment:
 		mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--force"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+	s.Run("returns an error with incorrect high-availability value", func() {
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
 		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "Invalid --high-availability value")
+		s.ErrorContains(err, "Invalid --high-availability value")
 	})
-	mockClient.AssertExpectations(t)
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentDelete(t *testing.T) {
+func (s *Suite) TestDeploymentDelete() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	deploymentResp := astro.Deployment{
@@ -653,11 +651,11 @@ func TestDeploymentDelete(t *testing.T) {
 
 	cmdArgs := []string{"delete", "test-id", "--force"}
 	_, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentVariableList(t *testing.T) {
+func (s *Suite) TestDeploymentVariableList() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockResponse := []astro.Deployment{
@@ -681,13 +679,13 @@ func TestDeploymentVariableList(t *testing.T) {
 
 	cmdArgs := []string{"variable", "list", "--deployment-id", "test-id-1"}
 	resp, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-key-1")
-	assert.Contains(t, resp, "test-value-1")
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(resp, "test-key-1")
+	s.Contains(resp, "test-value-1")
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentVariableModify(t *testing.T) {
+func (s *Suite) TestDeploymentVariableModify() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockListResponse := []astro.Deployment{
@@ -727,17 +725,17 @@ func TestDeploymentVariableModify(t *testing.T) {
 
 	cmdArgs := []string{"variable", "create", "test-key-3=test-value-3", "--deployment-id", "test-id-1", "--key", "test-key-2", "--value", "test-value-2"}
 	resp, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-key-1")
-	assert.Contains(t, resp, "test-value-1")
-	assert.Contains(t, resp, "test-key-2")
-	assert.Contains(t, resp, "test-value-2")
-	assert.Contains(t, resp, "test-key-3")
-	assert.Contains(t, resp, "test-value-3")
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(resp, "test-key-1")
+	s.Contains(resp, "test-value-1")
+	s.Contains(resp, "test-key-2")
+	s.Contains(resp, "test-value-2")
+	s.Contains(resp, "test-key-3")
+	s.Contains(resp, "test-value-3")
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestDeploymentVariableUpdate(t *testing.T) {
+func (s *Suite) TestDeploymentVariableUpdate() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	mockListResponse := []astro.Deployment{
@@ -773,40 +771,40 @@ func TestDeploymentVariableUpdate(t *testing.T) {
 
 	cmdArgs := []string{"variable", "update", "test-key-2=test-value-2-update", "--deployment-id", "test-id-1", "--key", "test-key-1", "--value", "test-value-update"}
 	resp, err := execDeploymentCmd(cmdArgs...)
-	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-key-1")
-	assert.Contains(t, resp, "test-value-update")
-	assert.Contains(t, resp, "test-key-2")
-	assert.Contains(t, resp, "test-value-2-update")
-	mockClient.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(resp, "test-key-1")
+	s.Contains(resp, "test-value-update")
+	s.Contains(resp, "test-key-2")
+	s.Contains(resp, "test-value-2-update")
+	mockClient.AssertExpectations(s.T())
 }
 
-func TestIsValidExecutor(t *testing.T) {
-	t.Run("returns true for Kubernetes Executor", func(t *testing.T) {
+func (s *Suite) TestIsValidExecutor() {
+	s.Run("returns true for Kubernetes Executor", func() {
 		actual := isValidExecutor(deployment.KubeExecutor)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns true for Celery Executor", func(t *testing.T) {
+	s.Run("returns true for Celery Executor", func() {
 		actual := isValidExecutor(deployment.CeleryExecutor)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns true when no Executor is requested", func(t *testing.T) {
+	s.Run("returns true when no Executor is requested", func() {
 		actual := isValidExecutor("")
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false for any invalid executor", func(t *testing.T) {
+	s.Run("returns false for any invalid executor", func() {
 		actual := isValidExecutor("KubeExecutor")
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestIsValidCloudProvider(t *testing.T) {
-	t.Run("returns true if cloudProvider is GCP", func(t *testing.T) {
+func (s *Suite) TestIsValidCloudProvider() {
+	s.Run("returns true if cloudProvider is GCP", func() {
 		actual := isValidCloudProvider("gcp")
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if cloudProvider is not GCP", func(t *testing.T) {
+	s.Run("returns false if cloudProvider is not GCP", func() {
 		actual := isValidCloudProvider("azure")
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }

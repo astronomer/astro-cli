@@ -1,7 +1,6 @@
 package cloud
 
 import (
-	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/astro-client"
@@ -9,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
 var deploymentResponse = []astro.Deployment{
@@ -100,61 +98,61 @@ var deploymentResponse = []astro.Deployment{
 	},
 }
 
-func TestNewDeploymentInspectCmd(t *testing.T) {
+func (s *Suite) TestNewDeploymentInspectCmd() {
 	expectedHelp := "Inspect an Astro Deployment."
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockClient := new(astro_mocks.Client)
 	astroClient = mockClient
-	t.Run("-h prints help", func(t *testing.T) {
+	s.Run("-h prints help", func() {
 		cmdArgs := []string{"inspect", "-h"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, expectedHelp)
+		s.NoError(err)
+		s.Contains(resp, expectedHelp)
 	})
-	t.Run("returns deployment in yaml format when a deployment name was provided", func(t *testing.T) {
+	s.Run("returns deployment in yaml format when a deployment name was provided", func() {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		cmdArgs := []string{"inspect", "-n", "test-deployment-label"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, deploymentResponse[0].ReleaseName)
-		assert.Contains(t, resp, deploymentResponse[0].Label)
-		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(resp, deploymentResponse[0].ReleaseName)
+		s.Contains(resp, deploymentResponse[0].Label)
+		s.Contains(resp, deploymentResponse[0].RuntimeRelease.Version)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns deployment in yaml format when a deployment id was provided", func(t *testing.T) {
+	s.Run("returns deployment in yaml format when a deployment id was provided", func() {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		cmdArgs := []string{"inspect", "test-deployment-id"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, deploymentResponse[0].ReleaseName)
-		assert.Contains(t, resp, deploymentResponse[0].Label)
-		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(resp, deploymentResponse[0].ReleaseName)
+		s.Contains(resp, deploymentResponse[0].Label)
+		s.Contains(resp, deploymentResponse[0].RuntimeRelease.Version)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns deployment template in yaml format when a deployment id was provided", func(t *testing.T) {
+	s.Run("returns deployment template in yaml format when a deployment id was provided", func() {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		cmdArgs := []string{"inspect", "test-deployment-id", "--template"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, deploymentResponse[0].RuntimeRelease.Version)
-		assert.NotContains(t, resp, deploymentResponse[0].ReleaseName)
-		assert.NotContains(t, resp, deploymentResponse[0].Label)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(resp, deploymentResponse[0].RuntimeRelease.Version)
+		s.NotContains(resp, deploymentResponse[0].ReleaseName)
+		s.NotContains(resp, deploymentResponse[0].Label)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns a deployment's specific field", func(t *testing.T) {
+	s.Run("returns a deployment's specific field", func() {
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentResponse, nil).Once()
 		cmdArgs := []string{"inspect", "-n", "test-deployment-label", "-k", "metadata.cluster_id"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, deploymentResponse[0].Cluster.ID)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(resp, deploymentResponse[0].Cluster.ID)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+	s.Run("returns an error when getting workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"inspect", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-		assert.NotContains(t, resp, expectedOut)
+		s.Error(err)
+		s.NotContains(resp, expectedOut)
 	})
 }

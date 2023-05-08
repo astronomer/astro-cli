@@ -3,17 +3,15 @@ package cloud
 import (
 	"encoding/json"
 	"net/http"
-	"testing"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestMigrateOrgShortName(t *testing.T) {
+func (s *Suite) TestMigrateOrgShortName() {
 	var (
 		mockOKResponse = astrocore.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
@@ -37,39 +35,39 @@ func TestMigrateOrgShortName(t *testing.T) {
 	)
 	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-	t.Run("can successfully backfill org shortname", func(t *testing.T) {
+	s.Run("can successfully backfill org shortname", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("organization_short_name", "")
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 		err = migrateCloudConfig(mockClient)
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx, err = context.GetCurrentContext()
-		assert.NoError(t, err)
-		assert.Equal(t, "testorg", ctx.OrganizationShortName)
+		s.NoError(err)
+		s.Equal("testorg", ctx.OrganizationShortName)
 	})
 
-	t.Run("throw error when ListOrganizations failed", func(t *testing.T) {
+	s.Run("throw error when ListOrganizations failed", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("organization_short_name", "")
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockErrorResponse, nil).Once()
 		err = migrateCloudConfig(mockClient)
-		assert.Contains(t, err.Error(), "failed to fetch organizations")
+		s.Contains(err.Error(), "failed to fetch organizations")
 	})
 
-	t.Run("throw error when no organization matched", func(t *testing.T) {
+	s.Run("throw error when no organization matched", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		s.NoError(err)
 		ctx.SetContextKey("organization", "test-org-id3")
 		ctx.SetContextKey("organization_short_name", "")
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOKResponse, nil).Once()
 		err = migrateCloudConfig(mockClient)
-		assert.Contains(t, err.Error(), "cannot find organization shortname")
+		s.Contains(err.Error(), "cannot find organization shortname")
 	})
 }

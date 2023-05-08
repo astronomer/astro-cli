@@ -2,9 +2,19 @@ package git
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
-func TestIsGitRepository(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestPkgGitSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestIsGitRepository() {
 	tests := []struct {
 		name string
 		want bool
@@ -15,10 +25,8 @@ func TestIsGitRepository(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := IsGitRepository(); got != tt.want {
-				t.Errorf("IsGitRepository() = %v, want %v", got, tt.want)
-			}
+		s.Run(tt.name, func() {
+			s.Equal(IsGitRepository(), tt.want)
 		})
 	}
 }

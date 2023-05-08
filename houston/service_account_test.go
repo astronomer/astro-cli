@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateDeploymentServiceAccount(t *testing.T) {
+func (s *Suite) TestCreateDeploymentServiceAccount() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -31,9 +29,9 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -44,11 +42,11 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.CreateDeploymentServiceAccount(&CreateServiceAccountRequest{})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.CreateDeploymentServiceAccount)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.CreateDeploymentServiceAccount)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -59,11 +57,11 @@ func TestCreateDeploymentServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.CreateDeploymentServiceAccount(&CreateServiceAccountRequest{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestCreateWorkspaceServiceAccount(t *testing.T) {
+func (s *Suite) TestCreateWorkspaceServiceAccount() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -83,9 +81,9 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -96,11 +94,11 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.CreateWorkspaceServiceAccount(&CreateServiceAccountRequest{})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.CreateWorkspaceServiceAccount)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.CreateWorkspaceServiceAccount)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -111,11 +109,11 @@ func TestCreateWorkspaceServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.CreateWorkspaceServiceAccount(&CreateServiceAccountRequest{})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteDeploymentServiceAccount(t *testing.T) {
+func (s *Suite) TestDeleteDeploymentServiceAccount() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -133,9 +131,9 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -146,11 +144,11 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.DeleteDeploymentServiceAccount(DeleteServiceAccountRequest{"", "deployment-id", "sa-id"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.DeleteDeploymentServiceAccount)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.DeleteDeploymentServiceAccount)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -161,11 +159,11 @@ func TestDeleteDeploymentServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.DeleteDeploymentServiceAccount(DeleteServiceAccountRequest{"", "deployment-id", "sa-id"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteWorkspaceServiceAccount(t *testing.T) {
+func (s *Suite) TestDeleteWorkspaceServiceAccount() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -183,9 +181,9 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -196,11 +194,11 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.DeleteWorkspaceServiceAccount(DeleteServiceAccountRequest{"workspace-id", "", "sa-id"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.DeleteWorkspaceServiceAccount)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.DeleteWorkspaceServiceAccount)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -211,11 +209,11 @@ func TestDeleteWorkspaceServiceAccount(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.DeleteWorkspaceServiceAccount(DeleteServiceAccountRequest{"workspace-id", "", "sa-id"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListDeploymentServiceAccounts(t *testing.T) {
+func (s *Suite) TestListDeploymentServiceAccounts() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -245,9 +243,9 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -258,11 +256,11 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListDeploymentServiceAccounts("deployment-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetDeploymentServiceAccounts)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetDeploymentServiceAccounts)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -273,11 +271,11 @@ func TestListDeploymentServiceAccounts(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListDeploymentServiceAccounts("deployment-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListWorkspaceServiceAccounts(t *testing.T) {
+func (s *Suite) TestListWorkspaceServiceAccounts() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -307,9 +305,9 @@ func TestListWorkspaceServiceAccounts(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -320,11 +318,11 @@ func TestListWorkspaceServiceAccounts(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListWorkspaceServiceAccounts("workspace-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.GetWorkspaceServiceAccounts)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.GetWorkspaceServiceAccounts)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -335,6 +333,6 @@ func TestListWorkspaceServiceAccounts(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListWorkspaceServiceAccounts("workspace-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

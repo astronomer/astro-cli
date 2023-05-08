@@ -2,67 +2,65 @@ package workspace
 
 import (
 	"bytes"
-	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	houston_mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAddTeam(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestAddTeam() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role"}).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("workspace-id", "team-id", "role", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "workspace-id")
-		assert.Contains(t, buf.String(), "team-id")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "workspace-id")
+		s.Contains(buf.String(), "team-id")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := AddTeam("workspace-id", "team-id", "role", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestRemoveTeam(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestRemoveTeam() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("workspace-id", "team-id", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "workspace-id")
-		assert.Contains(t, buf.String(), "team-id")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "workspace-id")
+		s.Contains(buf.String(), "team-id")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := RemoveTeam("workspace-id", "team-id", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestListTeamRoles(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestListTeamRoles() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListWorkspaceTeamsAndRoles", "workspace-id").Return(
 			[]houston.Team{
@@ -73,27 +71,27 @@ func TestListTeamRoles(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := ListTeamRoles("workspace-id", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "workspace-id")
-		assert.Contains(t, buf.String(), "test-id-1")
-		assert.Contains(t, buf.String(), "test-id-2")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "workspace-id")
+		s.Contains(buf.String(), "test-id-1")
+		s.Contains(buf.String(), "test-id-2")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("houston failure", func(t *testing.T) {
+	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListWorkspaceTeamsAndRoles", "workspace-id").Return([]houston.Team{}, errMock)
 
 		buf := new(bytes.Buffer)
 		err := ListTeamRoles("workspace-id", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestUpdateTeamRole(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+func (s *Suite) TestUpdateTeamRole() {
+	s.Run("success", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
 		mock.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role-id"}).Return("role-id", nil)
@@ -101,46 +99,46 @@ func TestUpdateTeamRole(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
 
-		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "team-id")
-		assert.Contains(t, buf.String(), "role-id")
-		mock.AssertExpectations(t)
+		s.NoError(err)
+		s.Contains(buf.String(), "team-id")
+		s.Contains(buf.String(), "role-id")
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("teams not in workspace", func(t *testing.T) {
+	s.Run("teams not in workspace", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
 
-		assert.ErrorIs(t, err, errTeamNotInWorkspace)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errTeamNotInWorkspace)
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("GetWorkspaceTeamRole failure", func(t *testing.T) {
+	s.Run("GetWorkspaceTeamRole failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
 
-		assert.ErrorIs(t, err, errTeamNotInWorkspace)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errTeamNotInWorkspace)
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("rolebinding not present", func(t *testing.T) {
+	s.Run("rolebinding not present", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{}}, nil)
 
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
 
-		assert.ErrorIs(t, err, errTeamNotInWorkspace)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errTeamNotInWorkspace)
+		mock.AssertExpectations(s.T())
 	})
 
-	t.Run("UpdateWorkspaceTeamRole failure", func(t *testing.T) {
+	s.Run("UpdateWorkspaceTeamRole failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
 		mock.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role-id"}).Return("", errMock)
@@ -148,12 +146,12 @@ func TestUpdateTeamRole(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
 
-		assert.ErrorIs(t, err, errMock)
-		mock.AssertExpectations(t)
+		s.ErrorIs(err, errMock)
+		mock.AssertExpectations(s.T())
 	})
 }
 
-func TestGetWorkspaceLevelRole(t *testing.T) {
+func (s *Suite) TestGetWorkspaceLevelRole() {
 	tests := []struct {
 		roleBinding []houston.RoleBinding
 		workspaceID string
@@ -180,6 +178,6 @@ func TestGetWorkspaceLevelRole(t *testing.T) {
 
 	for _, tt := range tests {
 		resp := getWorkspaceLevelRole(tt.roleBinding, tt.workspaceID)
-		assert.Equal(t, tt.result, resp, "expected: %v, actual: %v", tt.result, resp)
+		s.Equal(tt.result, resp, "expected: %v, actual: %v", tt.result, resp)
 	}
 }

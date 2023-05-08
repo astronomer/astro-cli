@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAddWorkspaceUser(t *testing.T) {
+func (s *Suite) TestAddWorkspaceUser() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -35,9 +33,9 @@ func TestAddWorkspaceUser(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -48,11 +46,11 @@ func TestAddWorkspaceUser(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.AddWorkspaceUser(AddWorkspaceUserRequest{"workspace-id", "email", "role"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.AddWorkspaceUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.AddWorkspaceUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -63,11 +61,11 @@ func TestAddWorkspaceUser(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.AddWorkspaceUser(AddWorkspaceUserRequest{"workspace-id", "email", "role"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestDeleteWorkspaceUser(t *testing.T) {
+func (s *Suite) TestDeleteWorkspaceUser() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -91,9 +89,9 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -104,11 +102,11 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.DeleteWorkspaceUser(DeleteWorkspaceUserRequest{"workspace-id", "user-id"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.RemoveWorkspaceUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.RemoveWorkspaceUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -119,11 +117,11 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.DeleteWorkspaceUser(DeleteWorkspaceUserRequest{"workspace-id", "user-id"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListWorkspaceUserAndRoles(t *testing.T) {
+func (s *Suite) TestListWorkspaceUserAndRoles() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -144,9 +142,9 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -157,11 +155,11 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListWorkspaceUserAndRoles("workspace-id")
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspaceGetUsers)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.WorkspaceGetUsers)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -172,11 +170,11 @@ func TestListWorkspaceUserAndRoles(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListWorkspaceUserAndRoles("workspace-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
+func (s *Suite) TestListWorkspacePaginatedUserAndRoles() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -197,9 +195,9 @@ func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -210,11 +208,11 @@ func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspacePaginatedGetUsers)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.WorkspacePaginatedGetUsers)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -225,11 +223,11 @@ func TestListWorkspacePaginatedUserAndRoles(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.ListWorkspacePaginatedUserAndRoles(PaginatedWorkspaceUserRolesRequest{"workspace-id", "cursor-id", 100})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestUpdateWorkspaceUserAndRole(t *testing.T) {
+func (s *Suite) TestUpdateWorkspaceUserAndRole() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -238,9 +236,9 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -251,11 +249,11 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.UpdateWorkspaceUserRole(UpdateWorkspaceUserRoleRequest{"workspace-id", "test@test.com", WorkspaceAdminRole})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspaceUpsertUserRole)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.WorkspaceUpsertUserRole)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -266,11 +264,11 @@ func TestUpdateWorkspaceUserAndRole(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.UpdateWorkspaceUserRole(UpdateWorkspaceUserRoleRequest{"workspace-id", "test@test.com", WorkspaceAdminRole})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }
 
-func TestGetWorkspaceUserRole(t *testing.T) {
+func (s *Suite) TestGetWorkspaceUserRole() {
 	testUtil.InitTestConfig("software")
 
 	mockResponse := &Response{
@@ -288,9 +286,9 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	s.NoError(err)
 
-	t.Run("success", func(t *testing.T) {
+	s.Run("success", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 200,
@@ -301,11 +299,11 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 		api := NewClient(client)
 
 		response, err := api.GetWorkspaceUserRole(GetWorkspaceUserRoleRequest{"workspace-id", "email"})
-		assert.NoError(t, err)
-		assert.Equal(t, response, mockResponse.Data.WorkspaceGetUser)
+		s.NoError(err)
+		s.Equal(response, mockResponse.Data.WorkspaceGetUser)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	s.Run("error", func() {
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{
 				StatusCode: 500,
@@ -316,6 +314,6 @@ func TestGetWorkspaceUserRole(t *testing.T) {
 		api := NewClient(client)
 
 		_, err := api.GetWorkspaceUserRole(GetWorkspaceUserRoleRequest{"workspace-id", "email"})
-		assert.Contains(t, err.Error(), "Internal Server Error")
+		s.Contains(err.Error(), "Internal Server Error")
 	})
 }

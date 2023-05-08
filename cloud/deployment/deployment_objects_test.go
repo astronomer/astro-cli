@@ -3,11 +3,9 @@ package deployment
 import (
 	"bytes"
 	"errors"
-	"testing"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	airflowclient_mocks "github.com/astronomer/astro-cli/airflow-client/mocks"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -33,62 +31,62 @@ var (
 	errCreate       = errors.New("create error")
 )
 
-func TestConnectionList(t *testing.T) {
-	t.Run("happy path TestConnectionList", func(t *testing.T) {
+func (s *Suite) TestConnectionList() {
+	s.Run("happy path TestConnectionList", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("GetConnections", mock.Anything).Return(mockResp, nil).Once()
 		err := ConnectionList(testAirflowURL, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when GetConnections returns an error", func(t *testing.T) {
+	s.Run("error path when GetConnections returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("GetConnections", mock.AnythingOfType("string")).Return(mockResp, errTest).Once()
 		err := ConnectionList(testAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
-func TestConnectionCreate(t *testing.T) {
-	t.Run("happy path TestConnectionCreate", func(t *testing.T) {
+func (s *Suite) TestConnectionCreate() {
+	s.Run("happy path TestConnectionCreate", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("CreateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Once()
 		err := ConnectionCreate(testAirflowURL, testConnID, testConnType, testDescription, testHost, testLogin, testPassword, testSchema, testExtra, testPort, mockClient, out)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("error path when CreateConnection returns an error", func(t *testing.T) {
+	s.Run("error path when CreateConnection returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("CreateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
 		err := ConnectionCreate(testAirflowURL, testConnID, testConnType, testDescription, testHost, testLogin, testPassword, testSchema, testExtra, testPort, mockClient, out)
-		assert.EqualError(t, err, "error")
-		mockClient.AssertExpectations(t)
+		s.EqualError(err, "error")
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestConnectionUpdate(t *testing.T) {
-	t.Run("happy path TestConnectionUpdate", func(t *testing.T) {
+func (s *Suite) TestConnectionUpdate() {
+	s.Run("happy path TestConnectionUpdate", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("UpdateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(nil).Once()
 		err := ConnectionUpdate(testAirflowURL, testConnID, testConnType, testDescription, testHost, testLogin, testPassword, testSchema, testExtra, testPort, mockClient, out)
-		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("error path when UpdateConnection returns an error", func(t *testing.T) {
+	s.Run("error path when UpdateConnection returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("UpdateConnection", testAirflowURL, mock.AnythingOfType("*airflowclient.Connection")).Return(errTest).Once()
 		err := ConnectionUpdate(testAirflowURL, testConnID, testConnType, testDescription, testHost, testLogin, testPassword, testSchema, testExtra, testPort, mockClient, out)
-		assert.EqualError(t, err, "error")
-		mockClient.AssertExpectations(t)
+		s.EqualError(err, "error")
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
@@ -106,8 +104,8 @@ var (
 	}
 )
 
-func TestCopyConnection(t *testing.T) {
-	t.Run("happy path TestCopyConnection", func(t *testing.T) {
+func (s *Suite) TestCopyConnection() {
+	s.Run("happy path TestCopyConnection", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -119,12 +117,12 @@ func TestCopyConnection(t *testing.T) {
 		mockClient.On("CreateConnection", toAirflowURL, &fromConnections[0]).Return(nil).Once()
 
 		err := CopyConnection(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("error path when GetConnections returns an error", func(t *testing.T) {
+	s.Run("error path when GetConnections returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -132,12 +130,12 @@ func TestCopyConnection(t *testing.T) {
 		mockClient.On("GetConnections", fromAirflowURL).Return(airflowclient.Response{Connections: fromConnections}, errTest).Once()
 
 		err := CopyConnection(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.EqualError(t, err, "error")
+		s.EqualError(err, "error")
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("error path when UpdateConnection returns an error", func(t *testing.T) {
+	s.Run("error path when UpdateConnection returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -149,12 +147,12 @@ func TestCopyConnection(t *testing.T) {
 		mockClient.On("CreateConnection", toAirflowURL, &fromConnections[0]).Return(nil).Once()
 
 		err := CopyConnection(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.EqualError(t, err, "update error")
+		s.EqualError(err, "update error")
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 
-	t.Run("error path when UpdateConnection returns an error", func(t *testing.T) {
+	s.Run("error path when UpdateConnection returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -165,9 +163,9 @@ func TestCopyConnection(t *testing.T) {
 		mockClient.On("CreateConnection", toAirflowURL, &fromConnections[0]).Return(errCreate).Once()
 
 		err := CopyConnection(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.EqualError(t, err, "create error")
+		s.EqualError(err, "create error")
 
-		mockClient.AssertExpectations(t)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
@@ -178,66 +176,66 @@ var mockVarResp = &airflowclient.Response{
 	},
 }
 
-func TestAirflowVariableList(t *testing.T) {
-	t.Run("happy path TestAirflowVariableList", func(t *testing.T) {
+func (s *Suite) TestAirflowVariableList() {
+	s.Run("happy path TestAirflowVariableList", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("GetVariables", testAirflowURL).Return(*mockVarResp, nil).Once()
 
 		err := AirflowVariableList(testAirflowURL, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when GetVariables returns an error", func(t *testing.T) {
+	s.Run("error path when GetVariables returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("GetVariables", testAirflowURL).Return(*mockVarResp, errTest).Once()
 
 		err := AirflowVariableList(testAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
-func TestVariableCreate(t *testing.T) {
-	t.Run("happy path TestVariableCreate", func(t *testing.T) {
+func (s *Suite) TestVariableCreate() {
+	s.Run("happy path TestVariableCreate", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("CreateVariable", testAirflowURL, mock.AnythingOfType("airflowclient.Variable")).Return(nil).Once()
 
 		err := VariableCreate(testAirflowURL, "value1", "key1", "desc1", mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when CreateVariable returns an error", func(t *testing.T) {
+	s.Run("error path when CreateVariable returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("CreateVariable", testAirflowURL, mock.AnythingOfType("airflowclient.Variable")).Return(errTest).Once()
 
 		err := VariableCreate(testAirflowURL, "value2", "key2", "desc2", mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
-func TestVariableUpdate(t *testing.T) {
-	t.Run("happy path TestVariableUpdate", func(t *testing.T) {
+func (s *Suite) TestVariableUpdate() {
+	s.Run("happy path TestVariableUpdate", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("UpdateVariable", testAirflowURL, mock.AnythingOfType("airflowclient.Variable")).Return(nil).Once()
 
 		err := VariableUpdate(testAirflowURL, "new_value1", "key1", "desc1", mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when UpdateVariable returns an error", func(t *testing.T) {
+	s.Run("error path when UpdateVariable returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("UpdateVariable", testAirflowURL, mock.AnythingOfType("airflowclient.Variable")).Return(errTest).Once()
 
 		err := VariableUpdate(testAirflowURL, "new_value2", "key2", "desc2", mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
@@ -252,8 +250,8 @@ var (
 	}
 )
 
-func TestCopyVariable(t *testing.T) {
-	t.Run("happy path TestCopyVariable", func(t *testing.T) {
+func (s *Suite) TestCopyVariable() {
+	s.Run("happy path TestCopyVariable", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -263,21 +261,21 @@ func TestCopyVariable(t *testing.T) {
 		mockClient.On("CreateVariable", toAirflowURL, fromVaraibles[0]).Return(nil).Once()
 
 		err := CopyVariable(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when GetVariables returns an error", func(t *testing.T) {
+	s.Run("error path when GetVariables returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
 		mockClient.On("GetVariables", fromAirflowURL).Return(airflowclient.Response{}, errTest).Once()
 
 		err := CopyVariable(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 
-	t.Run("error path when UpdateVariable returns an error", func(t *testing.T) {
+	s.Run("error path when UpdateVariable returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -287,11 +285,11 @@ func TestCopyVariable(t *testing.T) {
 		mockClient.On("UpdateVariable", toAirflowURL, fromVaraibles[1]).Return(errTest).Once()
 
 		err := CopyVariable(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 
-	t.Run("error path when CreateVariable returns an error", func(t *testing.T) {
+	s.Run("error path when CreateVariable returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -300,8 +298,8 @@ func TestCopyVariable(t *testing.T) {
 		mockClient.On("CreateVariable", toAirflowURL, fromVaraibles[0]).Return(errTest).Once()
 
 		err := CopyVariable(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
@@ -312,29 +310,29 @@ var mockPoolsResp = &airflowclient.Response{
 	},
 }
 
-func TestPoolList(t *testing.T) {
-	t.Run("happy path TestPoolList", func(t *testing.T) {
+func (s *Suite) TestPoolList() {
+	s.Run("happy path TestPoolList", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("GetPools", testAirflowURL).Return(*mockPoolsResp, nil).Once()
 
 		err := PoolList(testAirflowURL, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when GetPools returns an error", func(t *testing.T) {
+	s.Run("error path when GetPools returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		mockClient.On("GetPools", testAirflowURL).Return(*mockPoolsResp, errTest).Once()
 
 		err := PoolList(testAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
-func TestPoolCreate(t *testing.T) {
-	t.Run("happy path TestPoolCreate", func(t *testing.T) {
+func (s *Suite) TestPoolCreate() {
+	s.Run("happy path TestPoolCreate", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		poolName := "test_pool"
@@ -347,10 +345,10 @@ func TestPoolCreate(t *testing.T) {
 		}).Return(nil).Once()
 
 		err := PoolCreate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when CreatePool returns an error", func(t *testing.T) {
+	s.Run("error path when CreatePool returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		poolName := "test_pool"
@@ -363,13 +361,13 @@ func TestPoolCreate(t *testing.T) {
 		}).Return(errTest).Once()
 
 		err := PoolCreate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
-func TestPoolUpdate(t *testing.T) {
-	t.Run("happy path TestPoolUpdate", func(t *testing.T) {
+func (s *Suite) TestPoolUpdate() {
+	s.Run("happy path TestPoolUpdate", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		poolName := "test_pool"
@@ -382,10 +380,10 @@ func TestPoolUpdate(t *testing.T) {
 		}).Return(nil).Once()
 
 		err := PoolUpdate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when UpdatePool returns an error", func(t *testing.T) {
+	s.Run("error path when UpdatePool returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 		poolName := "test_pool"
@@ -398,8 +396,8 @@ func TestPoolUpdate(t *testing.T) {
 		}).Return(errTest).Once()
 
 		err := PoolUpdate(testAirflowURL, poolName, poolDescription, poolSlots, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }
 
@@ -414,8 +412,8 @@ var (
 	}
 )
 
-func TestCopyPool(t *testing.T) {
-	t.Run("happy path TestCopyPool", func(t *testing.T) {
+func (s *Suite) TestCopyPool() {
+	s.Run("happy path TestCopyPool", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -425,21 +423,21 @@ func TestCopyPool(t *testing.T) {
 		mockClient.On("CreatePool", toAirflowURL, fromPools[0]).Return(nil).Once()
 
 		err := CopyPool(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 
-	t.Run("error path when GetPools returns an error", func(t *testing.T) {
+	s.Run("error path when GetPools returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
 		mockClient.On("GetPools", fromAirflowURL).Return(airflowclient.Response{}, errTest).Once()
 
 		err := CopyPool(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 
-	t.Run("error path when UpdatePool returns an error", func(t *testing.T) {
+	s.Run("error path when UpdatePool returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -449,11 +447,11 @@ func TestCopyPool(t *testing.T) {
 		mockClient.On("UpdatePool", toAirflowURL, fromPools[1]).Return(errTest).Once()
 
 		err := CopyPool(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 
-	t.Run("error path when CreatePool returns an error", func(t *testing.T) {
+	s.Run("error path when CreatePool returns an error", func() {
 		out := new(bytes.Buffer)
 		mockClient := new(airflowclient_mocks.Client)
 
@@ -462,7 +460,7 @@ func TestCopyPool(t *testing.T) {
 		mockClient.On("CreatePool", toAirflowURL, fromPools[0]).Return(errTest).Once()
 
 		err := CopyPool(fromAirflowURL, toAirflowURL, mockClient, out)
-		assert.Error(t, err)
-		assert.Equal(t, "error", err.Error())
+		s.Error(err)
+		s.Equal("error", err.Error())
 	})
 }

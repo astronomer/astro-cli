@@ -1,14 +1,10 @@
 package software
 
 import (
-	"testing"
-
 	"github.com/astronomer/astro-cli/houston"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateDagDeploymentArgs(t *testing.T) {
+func (s *Suite) TestValidateDagDeploymentArgs() {
 	myTests := []struct {
 		dagDeploymentType, nfsLocation, gitRepoURL string
 		acceptEmptyArgs                            bool
@@ -28,11 +24,11 @@ func TestValidateDagDeploymentArgs(t *testing.T) {
 
 	for _, tt := range myTests {
 		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL, tt.acceptEmptyArgs)
-		assert.NoError(t, actualError, "optional message here")
+		s.NoError(actualError, "optional message here")
 	}
 }
 
-func TestValidateDagDeploymentArgsErrors(t *testing.T) {
+func (s *Suite) TestValidateDagDeploymentArgsErrors() {
 	myTests := []struct {
 		dagDeploymentType, nfsLocation, gitRepoURL string
 		acceptEmptyArgs                            bool
@@ -50,14 +46,14 @@ func TestValidateDagDeploymentArgsErrors(t *testing.T) {
 	for _, tt := range myTests {
 		actualError := validateDagDeploymentArgs(tt.dagDeploymentType, tt.nfsLocation, tt.gitRepoURL, tt.acceptEmptyArgs)
 		if tt.expectedError != "" {
-			assert.EqualError(t, actualError, tt.expectedError, "optional message here")
+			s.EqualError(actualError, tt.expectedError, "optional message here")
 		} else {
-			assert.NoError(t, actualError)
+			s.NoError(actualError)
 		}
 	}
 }
 
-func Test_validateWorkspaceRole(t *testing.T) {
+func (s *Suite) Test_validateWorkspaceRole() {
 	type args struct {
 		role string
 	}
@@ -82,15 +78,15 @@ func Test_validateWorkspaceRole(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if err := validateWorkspaceRole(tt.args.role); (err != nil) != tt.wantErr {
-				t.Errorf("validateWorkspaceRole() error = %v, wantErr %v", err, tt.wantErr)
+				s.Failf("validateWorkspaceRole()", "error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_validateDeploymentRole(t *testing.T) {
+func (s *Suite) Test_validateDeploymentRole() {
 	type args struct {
 		role string
 	}
@@ -115,15 +111,15 @@ func Test_validateDeploymentRole(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			if err := validateDeploymentRole(tt.args.role); (err != nil) != tt.wantErr {
-				t.Errorf("validateDeploymentRole() error = %v, wantErr %v", err, tt.wantErr)
+				s.Failf("validateDeploymentRole()", "error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_ErrParsingKV(t *testing.T) {
+func (s *Suite) Test_ErrParsingKV() {
 	type args struct {
 		kv string
 	}
@@ -139,16 +135,14 @@ func Test_ErrParsingKV(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			err := ErrParsingKV{kv: tt.args.kv}
-			if err.Error() != tt.result {
-				t.Errorf("ErrParsingKV invalid error string error = %v, wantErr %v", err.Error(), tt.result)
-			}
+			s.Equal(err.Error(), tt.result)
 		})
 	}
 }
 
-func Test_ErrInvalidArg(t *testing.T) {
+func (s *Suite) Test_ErrInvalidArg() {
 	type args struct {
 		key string
 	}
@@ -164,16 +158,14 @@ func Test_ErrInvalidArg(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			err := ErrInvalidArg{key: tt.args.key}
-			if err.Error() != tt.result {
-				t.Errorf("ErrParsingKV invalid error string error = %v, wantErr %v", err.Error(), tt.result)
-			}
+			s.Equal(err.Error(), tt.result)
 		})
 	}
 }
 
-func TestValidateExecutorArg(t *testing.T) {
+func (s *Suite) TestValidateExecutorArg() {
 	type args struct {
 		executor string
 	}
@@ -216,11 +208,11 @@ func TestValidateExecutorArg(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			executorType, err := validateExecutorArg(tt.args.executor)
-			assert.Equal(t, tt.result, executorType)
+			s.Equal(tt.result, executorType)
 			if tt.expectedErr != "" {
-				assert.EqualError(t, err, tt.expectedErr)
+				s.EqualError(err, tt.expectedErr)
 			}
 		})
 	}

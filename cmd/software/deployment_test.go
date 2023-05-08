@@ -3,13 +3,11 @@ package software
 import (
 	"bytes"
 	"os"
-	"testing"
 	"time"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -71,14 +69,14 @@ func execDeploymentCmd(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestDeploymentRootCommand(t *testing.T) {
+func (s *Suite) TestDeploymentRootCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	output, err := execDeploymentCmd()
-	assert.NoError(t, err)
-	assert.Contains(t, output, "deployment [command]")
+	s.NoError(err)
+	s.Contains(output, "deployment [command]")
 }
 
-func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
+func (s *Suite) TestDeploymentCreateCommandNfsMountDisabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: false,
@@ -102,15 +100,15 @@ func TestDeploymentCreateCommandNfsMountDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
+func (s *Suite) TestDeploymentCreateCommandTriggererDisabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{TriggererEnabled: false}
 
@@ -130,15 +128,15 @@ func TestDeploymentCreateCommandTriggererDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
+func (s *Suite) TestDeploymentCreateCommandTriggererEnabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
@@ -161,15 +159,15 @@ func TestDeploymentCreateCommandTriggererEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
+func (s *Suite) TestDeploymentCreateCommandNfsMountEnabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
@@ -195,15 +193,15 @@ func TestDeploymentCreateCommandNfsMountEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
+func (s *Suite) TestDeploymentCreateCommandGitSyncEnabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{
@@ -231,15 +229,15 @@ func TestDeploymentCreateCommandGitSyncEnabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
+func (s *Suite) TestDeploymentCreateCommandGitSyncDisabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		Flags: houston.FeatureFlags{GitSyncEnabled: false},
@@ -261,15 +259,15 @@ func TestDeploymentCreateCommandGitSyncDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
+func (s *Suite) TestDeploymentUpdateTriggererEnabledCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,
@@ -292,15 +290,15 @@ func TestDeploymentUpdateTriggererEnabledCommand(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentUpdateCommand(t *testing.T) {
+func (s *Suite) TestDeploymentUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
@@ -333,15 +331,15 @@ func TestDeploymentUpdateCommand(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
+func (s *Suite) TestDeploymentUpdateCommandGitSyncDisabled() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		NfsMountDagDeployment: true,
@@ -367,15 +365,15 @@ func TestDeploymentUpdateCommandGitSyncDisabled(t *testing.T) {
 		houstonClient = api
 		output, err := execDeploymentCmd(tt.cmdArgs...)
 		if tt.expectedError != "" {
-			assert.EqualError(t, err, tt.expectedError)
+			s.EqualError(err, tt.expectedError)
 		} else {
-			assert.NoError(t, err)
+			s.NoError(err)
 		}
-		assert.Contains(t, output, tt.expectedOutput)
+		s.Contains(output, tt.expectedOutput)
 	}
 }
 
-func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
+func (s *Suite) TestDeploymentAirflowUpgradeCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to Astronomer.`
 
@@ -400,11 +398,11 @@ func TestDeploymentAirflowUpgradeCommand(t *testing.T) {
 		"--deployment-id="+mockDeploymentResponse.ID,
 		"--desired-airflow-version="+mockDeploymentResponse.DesiredAirflowVersion,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
+func (s *Suite) TestDeploymentAirflowUpgradeCancelCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
 
@@ -432,11 +430,11 @@ func TestDeploymentAirflowUpgradeCancelCommand(t *testing.T) {
 		"--cancel",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentDelete(t *testing.T) {
+func (s *Suite) TestDeploymentDelete() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := `Successfully deleted deployment`
 
@@ -446,11 +444,11 @@ func TestDeploymentDelete(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", mockDeployment.ID)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentList(t *testing.T) {
+func (s *Suite) TestDeploymentList() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	api := new(mocks.ClientInterface)
 	api.On("ListDeployments", houston.ListDeploymentsRequest{}).Return([]houston.Deployment{*mockDeployment}, nil)
@@ -458,12 +456,12 @@ func TestDeploymentList(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("list", "--all")
-	assert.NoError(t, err)
-	assert.Contains(t, output, mockDeployment.ID)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, mockDeployment.ID)
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentDeleteHardResponseNo(t *testing.T) {
+func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
@@ -478,13 +476,9 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 	// mock os.Stdin
 	input := []byte("n")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -493,10 +487,10 @@ func TestDeploymentDeleteHardResponseNo(t *testing.T) {
 
 	houstonClient = api
 	_, err = execDeploymentCmd("delete", "--hard", mockDeployment.ID)
-	assert.Nil(t, err)
+	s.NoError(err)
 }
 
-func TestDeploymentDeleteHardResponseYes(t *testing.T) {
+func (s *Suite) TestDeploymentDeleteHardResponseYes() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := `Successfully deleted deployment`
 	appConfig = &houston.AppConfig{
@@ -513,13 +507,9 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 	// mock os.Stdin
 	input := []byte("y")
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	_, err = w.Write(input)
-	if err != nil {
-		t.Error(err)
-	}
+	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
 	// Restore stdin right after the test.
@@ -528,11 +518,11 @@ func TestDeploymentDeleteHardResponseYes(t *testing.T) {
 
 	houstonClient = api
 	output, err := execDeploymentCmd("delete", "--hard", mockDeployment.ID)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
+func (s *Suite) TestDeploymentRuntimeUpgradeCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	appConfig = &houston.AppConfig{
@@ -566,11 +556,11 @@ func TestDeploymentRuntimeUpgradeCommand(t *testing.T) {
 		"--deployment-id="+mockDeploymentResponse.ID,
 		"--desired-runtime-version="+mockDeploymentResponse.DesiredRuntimeVersion,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
 }
 
-func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
+func (s *Suite) TestDeploymentRuntimeUpgradeCancelCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	appConfig = &houston.AppConfig{
@@ -606,12 +596,12 @@ func TestDeploymentRuntimeUpgradeCancelCommand(t *testing.T) {
 		"--cancel",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
+func (s *Suite) TestDeploymentRuntimeMigrateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	appConfig = &houston.AppConfig{
@@ -644,12 +634,12 @@ func TestDeploymentRuntimeMigrateCommand(t *testing.T) {
 		"migrate",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
 }
 
-func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
+func (s *Suite) TestDeploymentRuntimeMigrateCancelCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
 	appConfig = &houston.AppConfig{
@@ -681,7 +671,7 @@ func TestDeploymentRuntimeMigrateCancelCommand(t *testing.T) {
 		"--cancel",
 		"--deployment-id="+mockDeploymentResponse.ID,
 	)
-	assert.NoError(t, err)
-	assert.Contains(t, output, expectedOut)
-	api.AssertExpectations(t)
+	s.NoError(err)
+	s.Contains(output, expectedOut)
+	api.AssertExpectations(s.T())
 }

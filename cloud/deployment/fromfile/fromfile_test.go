@@ -11,15 +11,23 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 var errTest = errors.New("test error")
 
-func TestCreateOrUpdate(t *testing.T) {
+type Suite struct {
+	suite.Suite
+}
+
+func TestCloudDeploymentFromFileSuite(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (s *Suite) TestCreateOrUpdate() {
 	var (
 		err                           error
 		filePath, data, orgID         string
@@ -31,38 +39,38 @@ func TestCreateOrUpdate(t *testing.T) {
 		createdDeployment             astro.Deployment
 	)
 
-	t.Run("common across create or update", func(t *testing.T) {
-		t.Run("returns an error if file does not exist", func(t *testing.T) {
+	s.Run("common across create or update", func() {
+		s.Run("returns an error if file does not exist", func() {
 			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
-			assert.ErrorContains(t, err, "open deployment.yaml: no such file or directory")
+			s.ErrorContains(err, "open deployment.yaml: no such file or directory")
 		})
-		t.Run("returns an error if file exists but user provides incorrect path", func(t *testing.T) {
+		s.Run("returns an error if file exists but user provides incorrect path", func() {
 			filePath = "./2/deployment.yaml"
 			data = "test"
 			err = fileutil.WriteStringToFile(filePath, data)
-			assert.NoError(t, err)
+			s.NoError(err)
 			defer afero.NewOsFs().RemoveAll("./2")
 			err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil)
-			assert.ErrorContains(t, err, "open 1/deployment.yaml: no such file or directory")
+			s.ErrorContains(err, "open 1/deployment.yaml: no such file or directory")
 		})
-		t.Run("returns an error if file is empty", func(t *testing.T) {
+		s.Run("returns an error if file is empty", func() {
 			filePath = "./deployment.yaml"
 			data = ""
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
-			assert.ErrorIs(t, err, errEmptyFile)
-			assert.ErrorContains(t, err, "deployment.yaml has no content")
+			s.ErrorIs(err, errEmptyFile)
+			s.ErrorContains(err, "deployment.yaml has no content")
 		})
-		t.Run("returns an error if unmarshalling fails", func(t *testing.T) {
+		s.Run("returns an error if unmarshalling fails", func() {
 			filePath = "./deployment.yaml"
 			data = "test"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
-			assert.ErrorContains(t, err, "error unmarshaling JSON:")
+			s.ErrorContains(err, "error unmarshaling JSON:")
 		})
-		t.Run("returns an error if required fields are missing", func(t *testing.T) {
+		s.Run("returns an error if required fields are missing", func() {
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -113,9 +121,9 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
-			assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
+			s.ErrorContains(err, "missing required field: deployment.configuration.name")
 		})
-		t.Run("returns an error if getting context fails", func(t *testing.T) {
+		s.Run("returns an error if getting context fails", func() {
 			testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -172,10 +180,10 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorContains(t, err, "no context set")
-			mockClient.AssertExpectations(t)
+			s.ErrorContains(err, "no context set")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if cluster does not exist", func(t *testing.T) {
+		s.Run("returns an error if cluster does not exist", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -253,10 +261,10 @@ deployment:
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errNotFound)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errNotFound)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if listing cluster fails", func(t *testing.T) {
+		s.Run("returns an error if listing cluster fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -324,10 +332,10 @@ deployment:
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errTest)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errTest)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if listing deployment fails", func(t *testing.T) {
+		s.Run("returns an error if listing deployment fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -406,10 +414,10 @@ deployment:
 			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errTest)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errTest)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("does not update environment variables if input is empty", func(t *testing.T) {
+		s.Run("does not update environment variables if input is empty", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			out := new(bytes.Buffer)
@@ -528,11 +536,11 @@ deployment:
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
-			assert.NoError(t, err)
-			assert.NotNil(t, out)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.NotNil(out)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("does not update alert emails if input is empty", func(t *testing.T) {
+		s.Run("does not update alert emails if input is empty", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			out := new(bytes.Buffer)
@@ -648,11 +656,11 @@ deployment:
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
-			assert.NoError(t, err)
-			assert.NotNil(t, out)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.NotNil(out)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error from the api if creating environment variables fails", func(t *testing.T) {
+		s.Run("returns an error from the api if creating environment variables fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -778,11 +786,11 @@ deployment:
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errTest)
-			assert.ErrorContains(t, err, "\n failed to create alert emails")
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errTest)
+			s.ErrorContains(err, "\n failed to create alert emails")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error from the api if creating alert emails fails", func(t *testing.T) {
+		s.Run("returns an error from the api if creating alert emails fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -909,12 +917,12 @@ deployment:
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errTest)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errTest)
+			mockClient.AssertExpectations(s.T())
 		})
 	})
-	t.Run("when action is create", func(t *testing.T) {
-		t.Run("reads the yaml file and creates a deployment", func(t *testing.T) {
+	s.Run("when action is create", func() {
+		s.Run("reads the yaml file and creates a deployment", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
@@ -1049,12 +1057,12 @@ deployment:
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
-			assert.NoError(t, err)
-			assert.Contains(t, out.String(), "configuration:\n        name: "+createdDeployment.Label)
-			assert.Contains(t, out.String(), "metadata:\n        deployment_id: "+createdDeployment.ID)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Contains(out.String(), "configuration:\n        name: "+createdDeployment.Label)
+			s.Contains(out.String(), "metadata:\n        deployment_id: "+createdDeployment.ID)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("reads the json file and creates a deployment", func(t *testing.T) {
+		s.Run("reads the json file and creates a deployment", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
@@ -1203,12 +1211,12 @@ deployment:
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
-			assert.NoError(t, err)
-			assert.Contains(t, out.String(), "\"configuration\": {\n            \"name\": \""+createdDeployment.Label+"\"")
-			assert.Contains(t, out.String(), "\"metadata\": {\n            \"deployment_id\": \""+createdDeployment.ID+"\"")
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Contains(out.String(), "\"configuration\": {\n            \"name\": \""+createdDeployment.Label+"\"")
+			s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \""+createdDeployment.ID+"\"")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if workspace does not exist", func(t *testing.T) {
+		s.Run("returns an error if workspace does not exist", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -1290,10 +1298,10 @@ deployment:
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{}, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errNotFound)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errNotFound)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if listing workspace fails", func(t *testing.T) {
+		s.Run("returns an error if listing workspace fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -1375,10 +1383,10 @@ deployment:
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errTest)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errTest)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if deployment already exists", func(t *testing.T) {
+		s.Run("returns an error if deployment already exists", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			existingDeployments := []astro.Deployment{
 				{
@@ -1468,10 +1476,10 @@ deployment:
 			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 			mockClient.On("ListDeployments", orgID, "").Return(existingDeployments, nil)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorContains(t, err, "deployment: test-deployment-label already exists: use deployment update --deployment-file deployment.yaml instead")
-			mockClient.AssertExpectations(t)
+			s.ErrorContains(err, "deployment: test-deployment-label already exists: use deployment update --deployment-file deployment.yaml instead")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if creating deployment input fails", func(t *testing.T) {
+		s.Run("returns an error if creating deployment input fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -1595,11 +1603,11 @@ deployment:
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.Error(t, err)
-			assert.ErrorContains(t, err, "worker queue option is invalid: worker concurrency")
-			mockClient.AssertExpectations(t)
+			s.Error(err)
+			s.ErrorContains(err, "worker queue option is invalid: worker concurrency")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error from the api if create deployment fails", func(t *testing.T) {
+		s.Run("returns an error from the api if create deployment fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -1724,13 +1732,13 @@ deployment:
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
-			assert.ErrorIs(t, err, errCreateFailed)
-			assert.ErrorContains(t, err, "test error: failed to create deployment with input")
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errCreateFailed)
+			s.ErrorContains(err, "test error: failed to create deployment with input")
+			mockClient.AssertExpectations(s.T())
 		})
 	})
-	t.Run("when action is update", func(t *testing.T) {
-		t.Run("reads the yaml file and updates an existing deployment", func(t *testing.T) {
+	s.Run("when action is update", func() {
+		s.Run("reads the yaml file and updates an existing deployment", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
@@ -1886,13 +1894,13 @@ deployment:
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, out)
-			assert.NoError(t, err)
-			assert.Contains(t, out.String(), "configuration:\n        name: "+existingDeployment.Label)
-			assert.Contains(t, out.String(), "\n        description: "+updatedDeployment.Description)
-			assert.Contains(t, out.String(), "metadata:\n        deployment_id: "+existingDeployment.ID)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Contains(out.String(), "configuration:\n        name: "+existingDeployment.Label)
+			s.Contains(out.String(), "\n        description: "+updatedDeployment.Description)
+			s.Contains(out.String(), "metadata:\n        deployment_id: "+existingDeployment.ID)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("reads the json file and updates an existing deployment", func(t *testing.T) {
+		s.Run("reads the json file and updates an existing deployment", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
@@ -2062,13 +2070,13 @@ deployment:
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, out)
-			assert.NoError(t, err)
-			assert.Contains(t, out.String(), "\"configuration\": {\n            \"name\": \""+existingDeployment.Label+"\"")
-			assert.Contains(t, out.String(), "\n            \"description\": \""+updatedDeployment.Description+"\"")
-			assert.Contains(t, out.String(), "\"metadata\": {\n            \"deployment_id\": \""+existingDeployment.ID+"\"")
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Contains(out.String(), "\"configuration\": {\n            \"name\": \""+existingDeployment.Label+"\"")
+			s.Contains(out.String(), "\n            \"description\": \""+updatedDeployment.Description+"\"")
+			s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \""+existingDeployment.ID+"\"")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if deployment does not exist", func(t *testing.T) {
+		s.Run("returns an error if deployment does not exist", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			existingWorkspaces = []astro.Workspace{
 				{
@@ -2147,10 +2155,10 @@ deployment:
 			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
-			assert.ErrorContains(t, err, "deployment: test-deployment-label does not exist: use deployment create --deployment-file deployment.yaml instead")
-			mockClient.AssertExpectations(t)
+			s.ErrorContains(err, "deployment: test-deployment-label does not exist: use deployment create --deployment-file deployment.yaml instead")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if creating update deployment input fails", func(t *testing.T) {
+		s.Run("returns an error if creating update deployment input fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -2278,11 +2286,11 @@ deployment:
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
-			assert.Error(t, err)
-			assert.ErrorContains(t, err, "worker queue option is invalid: worker concurrency")
-			mockClient.AssertExpectations(t)
+			s.Error(err)
+			s.ErrorContains(err, "worker queue option is invalid: worker concurrency")
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error from the api if update deployment fails", func(t *testing.T) {
+		s.Run("returns an error from the api if update deployment fails", func() {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
 			filePath = "./deployment.yaml"
@@ -2427,14 +2435,14 @@ deployment:
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errTest)
 			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
-			assert.ErrorIs(t, err, errUpdateFailed)
-			assert.ErrorContains(t, err, "test error: failed to update deployment with input")
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errUpdateFailed)
+			s.ErrorContains(err, "test error: failed to update deployment with input")
+			mockClient.AssertExpectations(s.T())
 		})
 	})
 }
 
-func TestGetCreateOrUpdateInput(t *testing.T) {
+func (s *Suite) TestGetCreateOrUpdateInput() {
 	var (
 		expectedDeploymentInput, actualCreateInput       astro.CreateDeploymentInput
 		expectedUpdateDeploymentInput, actualUpdateInput astro.UpdateDeploymentInput
@@ -2448,8 +2456,8 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 	)
 	clusterID = "test-cluster-id"
 	workspaceID = "test-workspace-id"
-	t.Run("common across create and update", func(t *testing.T) {
-		t.Run("returns error if worker type does not match existing pools", func(t *testing.T) {
+	s.Run("common across create and update", func() {
+		s.Run("returns error if worker type does not match existing pools", func() {
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedDeploymentInput = astro.CreateDeploymentInput{}
 			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2510,12 +2518,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			expectedDeploymentInput = astro.CreateDeploymentInput{}
 			mockClient := new(astro_mocks.Client)
 			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-			assert.ErrorContains(t, err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
-			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-			mockClient.AssertExpectations(t)
+			s.ErrorContains(err, "worker_type: test-worker-8 does not exist in cluster: test-cluster")
+			s.Equal(expectedDeploymentInput, actualCreateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("when executor is Celery", func(t *testing.T) {
-			t.Run("returns error if queue options are invalid", func(t *testing.T) {
+		s.Run("when executor is Celery", func() {
+			s.Run("returns error if queue options are invalid", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2578,11 +2586,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				mockClient := new(astro_mocks.Client)
 				mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "worker queue option is invalid: min worker count")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "worker queue option is invalid: min worker count")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
-			t.Run("returns error if getting worker queue options fails", func(t *testing.T) {
+			s.Run("returns error if getting worker queue options fails", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2627,11 +2635,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				mockClient := new(astro_mocks.Client)
 				mockClient.On("GetWorkerQueueOptions").Return(astro.WorkerQueueDefaultOptions{}, errTest).Once()
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "failed to get worker queue default options")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "failed to get worker queue default options")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
-			t.Run("sets default queue options if none were requested", func(t *testing.T) {
+			s.Run("sets default queue options if none were requested", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2722,13 +2730,13 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				mockClient := new(astro_mocks.Client)
 				mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.NoError(t, err)
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.NoError(err)
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
 		})
-		t.Run("when executor is Kubernetes", func(t *testing.T) {
-			t.Run("returns an error if more than one worker queue are requested", func(t *testing.T) {
+		s.Run("when executor is Kubernetes", func() {
+			s.Run("returns an error if more than one worker queue are requested", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2764,11 +2772,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support more than one worker queue. (2) were requested")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "KubernetesExecutor does not support more than one worker queue. (2) were requested")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
-			t.Run("returns an error if Celery queue property min_worker_count is requested", func(t *testing.T) {
+			s.Run("returns an error if Celery queue property min_worker_count is requested", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2802,11 +2810,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "KubernetesExecutor does not support minimum worker count in the request. It can only be used with CeleryExecutor")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
-			t.Run("returns an error if Celery queue property max_worker_count is requested", func(t *testing.T) {
+			s.Run("returns an error if Celery queue property max_worker_count is requested", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2839,11 +2847,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
-			t.Run("returns an error if Celery queue property worker_concurrency is requested", func(t *testing.T) {
+			s.Run("returns an error if Celery queue property worker_concurrency is requested", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2876,11 +2884,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
-			t.Run("returns an error if invalid input is requested", func(t *testing.T) {
+			s.Run("returns an error if invalid input is requested", func() {
 				deploymentFromFile = inspect.FormattedDeployment{}
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2913,14 +2921,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				expectedDeploymentInput = astro.CreateDeploymentInput{}
 				mockClient := new(astro_mocks.Client)
 				actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-				assert.ErrorContains(t, err, "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
-				assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-				mockClient.AssertExpectations(t)
+				s.ErrorContains(err, "KubernetesExecutor does not support pod ram in the request. It will be calculated based on the requested worker type")
+				s.Equal(expectedDeploymentInput, actualCreateInput)
+				mockClient.AssertExpectations(s.T())
 			})
 		})
 	})
-	t.Run("when action is to create", func(t *testing.T) {
-		t.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func(t *testing.T) {
+	s.Run("when action is to create", func() {
+		s.Run("transforms formattedDeployment to CreateDeploymentInput if no queues were requested", func() {
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedDeploymentInput = astro.CreateDeploymentInput{}
 			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -2949,11 +2957,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, nil, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedDeploymentInput, actualCreateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("transforms formattedDeployment to CreateDeploymentInput if Kubernetes executor was requested", func(t *testing.T) {
+		s.Run("transforms formattedDeployment to CreateDeploymentInput if Kubernetes executor was requested", func() {
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedDeploymentInput = astro.CreateDeploymentInput{}
 			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -3007,11 +3015,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedDeploymentInput, actualCreateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns correct deployment input when multiple queues are requested", func(t *testing.T) {
+		s.Run("returns correct deployment input when multiple queues are requested", func() {
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedDeploymentInput = astro.CreateDeploymentInput{}
 			deploymentFromFile.Deployment.Configuration.ClusterName = "test-cluster"
@@ -3106,13 +3114,13 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			mockClient := new(astro_mocks.Client)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			actualCreateInput, _, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "create", &astro.Deployment{}, existingPools, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedDeploymentInput, actualCreateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedDeploymentInput, actualCreateInput)
+			mockClient.AssertExpectations(s.T())
 		})
 	})
-	t.Run("when action is to update", func(t *testing.T) {
-		t.Run("transforms formattedDeployment to UpdateDeploymentInput if no queues were requested", func(t *testing.T) {
+	s.Run("when action is to update", func() {
+		s.Run("transforms formattedDeployment to UpdateDeploymentInput if no queues were requested", func() {
 			deploymentID = "test-deployment-id"
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
@@ -3148,11 +3156,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns an error if the cluster is being changed", func(t *testing.T) {
+		s.Run("returns an error if the cluster is being changed", func() {
 			deploymentID = "test-deployment-id"
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
@@ -3174,12 +3182,12 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
 			mockClient := new(astro_mocks.Client)
 			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, "diff-cluster", workspaceID, "update", &existingDeployment, nil, mockClient)
-			assert.ErrorIs(t, err, errNotPermitted)
-			assert.ErrorContains(t, err, "changing an existing deployment's cluster is not permitted")
-			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
-			mockClient.AssertExpectations(t)
+			s.ErrorIs(err, errNotPermitted)
+			s.ErrorContains(err, "changing an existing deployment's cluster is not permitted")
+			s.Equal(expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with no queues", func(t *testing.T) {
+		s.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with no queues", func() {
 			deploymentID = "test-deployment-id"
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
@@ -3233,11 +3241,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, nil, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue", func(t *testing.T) {
+		s.Run("transforms formattedDeployment to UpdateDeploymentInput if Kubernetes executor was requested with a queue", func() {
 			deploymentID = "test-deployment-id"
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
@@ -3305,11 +3313,11 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			}
 			mockClient := new(astro_mocks.Client)
 			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(s.T())
 		})
-		t.Run("returns correct update deployment input when multiple queues are requested", func(t *testing.T) {
+		s.Run("returns correct update deployment input when multiple queues are requested", func() {
 			deploymentID = "test-deployment-id"
 			deploymentFromFile = inspect.FormattedDeployment{}
 			expectedUpdateDeploymentInput = astro.UpdateDeploymentInput{}
@@ -3412,56 +3420,56 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			mockClient := new(astro_mocks.Client)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			_, actualUpdateInput, err = getCreateOrUpdateInput(&deploymentFromFile, clusterID, workspaceID, "update", &existingDeployment, existingPools, mockClient)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedUpdateDeploymentInput, actualUpdateInput)
-			mockClient.AssertExpectations(t)
+			s.NoError(err)
+			s.Equal(expectedUpdateDeploymentInput, actualUpdateInput)
+			mockClient.AssertExpectations(s.T())
 		})
 	})
 }
 
-func TestCheckRequiredFields(t *testing.T) {
+func (s *Suite) TestCheckRequiredFields() {
 	var (
 		err   error
 		input inspect.FormattedDeployment
 	)
 	input.Deployment.Configuration.Description = "test-description"
-	t.Run("returns an error if name is missing", func(t *testing.T) {
+	s.Run("returns an error if name is missing", func() {
 		err = checkRequiredFields(&input, "")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.configuration.name")
 	})
-	t.Run("returns an error if cluster_name is missing", func(t *testing.T) {
+	s.Run("returns an error if cluster_name is missing", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		err = checkRequiredFields(&input, "")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.configuration.cluster_name")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.configuration.cluster_name")
 	})
-	t.Run("returns an error if executor is missing", func(t *testing.T) {
+	s.Run("returns an error if executor is missing", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
 		err = checkRequiredFields(&input, "")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.configuration.executor")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.configuration.executor")
 	})
-	t.Run("returns an error if executor value is invalid", func(t *testing.T) {
+	s.Run("returns an error if executor value is invalid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
 		input.Deployment.Configuration.Executor = "test-executor"
 		err = checkRequiredFields(&input, "")
-		assert.ErrorIs(t, err, errInvalidValue)
-		assert.ErrorContains(t, err, "is not valid. It can either be CeleryExecutor or KubernetesExecutor")
+		s.ErrorIs(err, errInvalidValue)
+		s.ErrorContains(err, "is not valid. It can either be CeleryExecutor or KubernetesExecutor")
 	})
-	t.Run("returns an error if alert email is invalid", func(t *testing.T) {
+	s.Run("returns an error if alert email is invalid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
 		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		list := []string{"test@test.com", "testing@testing.com", "not-an-email"}
 		input.Deployment.AlertEmails = list
 		err = checkRequiredFields(&input, "")
-		assert.ErrorIs(t, err, errInvalidEmail)
-		assert.ErrorContains(t, err, "invalid email: not-an-email")
+		s.ErrorIs(err, errInvalidEmail)
+		s.ErrorContains(err, "invalid email: not-an-email")
 	})
-	t.Run("returns an error if env var keys are missing on create", func(t *testing.T) {
+	s.Run("returns an error if env var keys are missing on create", func() {
 		input = inspect.FormattedDeployment{}
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
@@ -3482,10 +3490,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		}
 		input.Deployment.EnvVars = list
 		err = checkRequiredFields(&input, "create")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[0].key")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.environment_variables[0].key")
 	})
-	t.Run("if queues were requested, it returns an error if queue name is missing", func(t *testing.T) {
+	s.Run("if queues were requested, it returns an error if queue name is missing", func() {
 		input = inspect.FormattedDeployment{}
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
@@ -3502,10 +3510,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		}
 		input.Deployment.WorkerQs = qList
 		err = checkRequiredFields(&input, "create")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.worker_queues[0].name")
 	})
-	t.Run("if queues were requested, it returns an error if default queue is missing", func(t *testing.T) {
+	s.Run("if queues were requested, it returns an error if default queue is missing", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
 		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
@@ -3521,10 +3529,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		}
 		input.Deployment.WorkerQs = qList
 		err = checkRequiredFields(&input, "create")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name = default")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.worker_queues[0].name = default")
 	})
-	t.Run("if queues were requested, it returns an error if worker type is missing", func(t *testing.T) {
+	s.Run("if queues were requested, it returns an error if worker type is missing", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
 		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
@@ -3539,10 +3547,10 @@ func TestCheckRequiredFields(t *testing.T) {
 		}
 		input.Deployment.WorkerQs = qList
 		err = checkRequiredFields(&input, "create")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].worker_type")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.worker_queues[0].worker_type")
 	})
-	t.Run("returns nil if there are no missing fields", func(t *testing.T) {
+	s.Run("returns nil if there are no missing fields", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster"
 		input.Deployment.Configuration.Executor = deployment.CeleryExecutor
@@ -3558,11 +3566,11 @@ func TestCheckRequiredFields(t *testing.T) {
 		}
 		input.Deployment.WorkerQs = qList
 		err = checkRequiredFields(&input, "create")
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 }
 
-func TestDeploymentExists(t *testing.T) {
+func (s *Suite) TestDeploymentExists() {
 	var (
 		existingDeployments []astro.Deployment
 		deploymentToCreate  string
@@ -3581,18 +3589,18 @@ func TestDeploymentExists(t *testing.T) {
 		},
 	}
 	deploymentToCreate = "test-deployment-2"
-	t.Run("returns true if deployment already exists", func(t *testing.T) {
+	s.Run("returns true if deployment already exists", func() {
 		actual = deploymentExists(existingDeployments, deploymentToCreate)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if deployment does not exist", func(t *testing.T) {
+	s.Run("returns false if deployment does not exist", func() {
 		deploymentToCreate = "test-d-2"
 		actual = deploymentExists(existingDeployments, deploymentToCreate)
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestGetClusterFromName(t *testing.T) {
+func (s *Suite) TestGetClusterFromName() {
 	var (
 		clusterName, expectedClusterID, actualClusterID, orgID string
 		existingPools, actualNodePools                         []astro.NodePool
@@ -3614,7 +3622,7 @@ func TestGetClusterFromName(t *testing.T) {
 		},
 	}
 	orgID = "test-org-id"
-	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
+	s.Run("returns a cluster id if cluster exists in organization", func() {
 		mockClient := new(astro_mocks.Client)
 		existingClusters := []astro.Cluster{
 			{
@@ -3629,32 +3637,32 @@ func TestGetClusterFromName(t *testing.T) {
 		}
 		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
 		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedClusterID, actualClusterID)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expectedClusterID, actualClusterID)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns error from api if listing cluster fails", func(t *testing.T) {
+	s.Run("returns error from api if listing cluster fails", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errTest)
 		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
-		assert.ErrorIs(t, err, errTest)
-		assert.Equal(t, "", actualClusterID)
-		assert.Equal(t, []astro.NodePool(nil), actualNodePools)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errTest)
+		s.Equal("", actualClusterID)
+		s.Equal([]astro.NodePool(nil), actualNodePools)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error if cluster does not exist in organization", func(t *testing.T) {
+	s.Run("returns an error if cluster does not exist in organization", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, nil)
 		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
-		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization: test-org-id")
-		assert.Equal(t, "", actualClusterID)
-		assert.Equal(t, []astro.NodePool(nil), actualNodePools)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errNotFound)
+		s.ErrorContains(err, "cluster_name: test-cluster does not exist in organization: test-org-id")
+		s.Equal("", actualClusterID)
+		s.Equal([]astro.NodePool(nil), actualNodePools)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestGetWorkspaceIDFromName(t *testing.T) {
+func (s *Suite) TestGetWorkspaceIDFromName() {
 	var (
 		workspaceName, expectedWorkspaceID, actualWorkspaceID, orgID string
 		existingWorkspaces                                           []astro.Workspace
@@ -3674,34 +3682,34 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 			Label: "test-workspace-1",
 		},
 	}
-	t.Run("returns a workspace id if workspace exists in organization", func(t *testing.T) {
+	s.Run("returns a workspace id if workspace exists in organization", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
 		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedWorkspaceID, actualWorkspaceID)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expectedWorkspaceID, actualWorkspaceID)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns error from api if listing workspace fails", func(t *testing.T) {
+	s.Run("returns error from api if listing workspace fails", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{}, errTest)
 		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockClient)
-		assert.ErrorIs(t, err, errTest)
-		assert.Equal(t, "", actualWorkspaceID)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errTest)
+		s.Equal("", actualWorkspaceID)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns an error if workspace does not exist in organization", func(t *testing.T) {
+	s.Run("returns an error if workspace does not exist in organization", func() {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{}, nil)
 		actualWorkspaceID, err = getWorkspaceIDFromName(workspaceName, orgID, mockClient)
-		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "workspace_name: test-workspace does not exist in organization: test-org-id")
-		assert.Equal(t, "", actualWorkspaceID)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errNotFound)
+		s.ErrorContains(err, "workspace_name: test-workspace does not exist in organization: test-org-id")
+		s.Equal("", actualWorkspaceID)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestGetNodePoolIDFromName(t *testing.T) {
+func (s *Suite) TestGetNodePoolIDFromName() {
 	var (
 		workerType, expectedPoolID, actualPoolID, clusterID string
 		existingPools                                       []astro.NodePool
@@ -3723,22 +3731,22 @@ func TestGetNodePoolIDFromName(t *testing.T) {
 			NodeInstanceType: "worker-2",
 		},
 	}
-	t.Run("returns a nodepool id from cluster for pool with matching worker type", func(t *testing.T) {
+	s.Run("returns a nodepool id from cluster for pool with matching worker type", func() {
 		actualPoolID, err = getNodePoolIDFromWorkerType(workerType, clusterID, existingPools)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedPoolID, actualPoolID)
+		s.NoError(err)
+		s.Equal(expectedPoolID, actualPoolID)
 	})
-	t.Run("returns an error if no pool with matching worker type exists in the cluster", func(t *testing.T) {
+	s.Run("returns an error if no pool with matching worker type exists in the cluster", func() {
 		workerType = "worker-3"
 		actualPoolID, err = getNodePoolIDFromWorkerType(workerType, clusterID, existingPools)
-		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "worker_type: worker-3 does not exist in cluster: test-cluster")
-		assert.Equal(t, "", actualPoolID)
+		s.ErrorIs(err, errNotFound)
+		s.ErrorContains(err, "worker_type: worker-3 does not exist in cluster: test-cluster")
+		s.Equal("", actualPoolID)
 	})
 }
 
-func TestHasEnvVars(t *testing.T) {
-	t.Run("returns true if there are env vars in the deployment", func(t *testing.T) {
+func (s *Suite) TestHasEnvVars() {
+	s.Run("returns true if there are env vars in the deployment", func() {
 		var deploymentFromFile inspect.FormattedDeployment
 		list := []inspect.EnvironmentVariable{
 			{
@@ -3756,23 +3764,23 @@ func TestHasEnvVars(t *testing.T) {
 		}
 		deploymentFromFile.Deployment.EnvVars = list
 		actual := hasEnvVars(&deploymentFromFile)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if there are no env vars in the deployment", func(t *testing.T) {
+	s.Run("returns false if there are no env vars in the deployment", func() {
 		var deploymentFromFile inspect.FormattedDeployment
 		actual := hasEnvVars(&deploymentFromFile)
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestCreateEnvVars(t *testing.T) {
+func (s *Suite) TestCreateEnvVars() {
 	var (
 		expectedEnvVarsInput astro.EnvironmentVariablesInput
 		actualEnvVars        []astro.EnvironmentVariablesObject
 		deploymentFromFile   inspect.FormattedDeployment
 		err                  error
 	)
-	t.Run("creates env vars if they were requested in a formatted deployment", func(t *testing.T) {
+	s.Run("creates env vars if they were requested in a formatted deployment", func() {
 		mockClient := new(astro_mocks.Client)
 		deploymentFromFile = inspect.FormattedDeployment{}
 		list := []inspect.EnvironmentVariable{
@@ -3822,11 +3830,11 @@ func TestCreateEnvVars(t *testing.T) {
 		}
 		mockClient.On("ModifyDeploymentVariable", expectedEnvVarsInput).Return(mockResponse, nil)
 		actualEnvVars, err = createEnvVars(&deploymentFromFile, "test-deployment-id", mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, mockResponse, actualEnvVars)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(mockResponse, actualEnvVars)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns api error if modifyDeploymentVariable fails", func(t *testing.T) {
+	s.Run("returns api error if modifyDeploymentVariable fails", func() {
 		var mockResponse []astro.EnvironmentVariablesObject
 		mockClient := new(astro_mocks.Client)
 		deploymentFromFile = inspect.FormattedDeployment{}
@@ -3863,14 +3871,14 @@ func TestCreateEnvVars(t *testing.T) {
 		}
 		mockClient.On("ModifyDeploymentVariable", expectedEnvVarsInput).Return(mockResponse, errTest)
 		actualEnvVars, err = createEnvVars(&deploymentFromFile, "test-deployment-id", mockClient)
-		assert.ErrorIs(t, err, errTest)
-		assert.Equal(t, mockResponse, actualEnvVars)
-		mockClient.AssertExpectations(t)
+		s.ErrorIs(err, errTest)
+		s.Equal(mockResponse, actualEnvVars)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestHasQueues(t *testing.T) {
-	t.Run("returns true if there are worker queues in the deployment", func(t *testing.T) {
+func (s *Suite) TestHasQueues() {
+	s.Run("returns true if there are worker queues in the deployment", func() {
 		var deploymentFromFile inspect.FormattedDeployment
 		minCount := 3
 		qList := []inspect.Workerq{
@@ -3891,24 +3899,24 @@ func TestHasQueues(t *testing.T) {
 		}
 		deploymentFromFile.Deployment.WorkerQs = qList
 		actual := hasQueues(&deploymentFromFile)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if there are no worker queues in the deployment", func(t *testing.T) {
+	s.Run("returns false if there are no worker queues in the deployment", func() {
 		var deploymentFromFile inspect.FormattedDeployment
 		actual := hasQueues(&deploymentFromFile)
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestGetQueues(t *testing.T) {
+func (s *Suite) TestGetQueues() {
 	var (
 		deploymentFromFile           inspect.FormattedDeployment
 		actualWQList, existingWQList []astro.WorkerQueue
 		existingPools                []astro.NodePool
 		err                          error
 	)
-	t.Run("when the executor is celery", func(t *testing.T) {
-		t.Run("returns list of queues for the requested deployment", func(t *testing.T) {
+	s.Run("when the executor is celery", func() {
+		s.Run("returns list of queues for the requested deployment", func() {
 			expectedWQList := []astro.WorkerQueue{
 				{
 					Name:              "default",
@@ -3960,10 +3968,10 @@ func TestGetQueues(t *testing.T) {
 			deploymentFromFile.Deployment.WorkerQs = qList
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 			actualWQList, err = getQueues(&deploymentFromFile, existingPools, []astro.WorkerQueue(nil))
-			assert.NoError(t, err)
-			assert.Equal(t, expectedWQList, actualWQList)
+			s.NoError(err)
+			s.Equal(expectedWQList, actualWQList)
 		})
-		t.Run("returns updated list of existing and queues being added", func(t *testing.T) {
+		s.Run("returns updated list of existing and queues being added", func() {
 			existingWQList = []astro.WorkerQueue{
 				{
 					ID:                "q-id",
@@ -4028,10 +4036,10 @@ func TestGetQueues(t *testing.T) {
 			deploymentFromFile.Deployment.WorkerQs = qList
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 			actualWQList, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedWQList, actualWQList)
+			s.NoError(err)
+			s.Equal(expectedWQList, actualWQList)
 		})
-		t.Run("returns updated list when multiple queue operations are requested", func(t *testing.T) {
+		s.Run("returns updated list when multiple queue operations are requested", func() {
 			existingWQList = []astro.WorkerQueue{
 				{
 					ID:                "q-id",
@@ -4105,12 +4113,12 @@ func TestGetQueues(t *testing.T) {
 			deploymentFromFile.Deployment.WorkerQs = qList
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 			actualWQList, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedWQList, actualWQList)
+			s.NoError(err)
+			s.Equal(expectedWQList, actualWQList)
 		})
 	})
-	t.Run("when the executor is kubernetes", func(t *testing.T) {
-		t.Run("returns one default queue regardless of any existing queues", func(t *testing.T) {
+	s.Run("when the executor is kubernetes", func() {
+		s.Run("returns one default queue regardless of any existing queues", func() {
 			existingWQList = []astro.WorkerQueue{
 				{
 					ID:                "q-id",
@@ -4163,11 +4171,11 @@ func TestGetQueues(t *testing.T) {
 			deploymentFromFile.Deployment.WorkerQs = qList
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 			actualWQList, err = getQueues(&deploymentFromFile, existingPools, existingWQList)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedWQList, actualWQList)
+			s.NoError(err)
+			s.Equal(expectedWQList, actualWQList)
 		})
 	})
-	t.Run("returns an error if unable to determine nodepool id", func(t *testing.T) {
+	s.Run("returns an error if unable to determine nodepool id", func() {
 		minCount := 3
 		qList := []inspect.Workerq{
 			{
@@ -4202,27 +4210,27 @@ func TestGetQueues(t *testing.T) {
 		deploymentFromFile.Deployment.WorkerQs = qList
 		deploymentFromFile.Deployment.Configuration.Executor = deployment.CeleryExecutor
 		actualWQList, err = getQueues(&deploymentFromFile, existingPools, []astro.WorkerQueue(nil))
-		assert.ErrorContains(t, err, "worker_type: test-worker-4 does not exist in cluster: test-cluster")
-		assert.Equal(t, []astro.WorkerQueue(nil), actualWQList)
+		s.ErrorContains(err, "worker_type: test-worker-4 does not exist in cluster: test-cluster")
+		s.Equal([]astro.WorkerQueue(nil), actualWQList)
 	})
 }
 
-func TestHasAlertEmails(t *testing.T) {
-	t.Run("returns true if there are env vars in the deployment", func(t *testing.T) {
+func (s *Suite) TestHasAlertEmails() {
+	s.Run("returns true if there are env vars in the deployment", func() {
 		var deploymentFromFile inspect.FormattedDeployment
 		list := []string{"test@test.com", "testing@testing.com"}
 		deploymentFromFile.Deployment.AlertEmails = list
 		actual := hasAlertEmails(&deploymentFromFile)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if there are no env vars in the deployment", func(t *testing.T) {
+	s.Run("returns false if there are no env vars in the deployment", func() {
 		var deploymentFromFile inspect.FormattedDeployment
 		actual := hasAlertEmails(&deploymentFromFile)
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestCreateAlertEmails(t *testing.T) {
+func (s *Suite) TestCreateAlertEmails() {
 	var (
 		deploymentFromFile     inspect.FormattedDeployment
 		expectedInput          astro.UpdateDeploymentAlertsInput
@@ -4231,7 +4239,7 @@ func TestCreateAlertEmails(t *testing.T) {
 		deploymentID           string
 		err                    error
 	)
-	t.Run("updates alert emails for a deployment when no alert emails exist", func(t *testing.T) {
+	s.Run("updates alert emails for a deployment when no alert emails exist", func() {
 		emails = []string{"test1@email.com", "test2@email.com"}
 		deploymentFromFile.Deployment.AlertEmails = emails
 		expected = astro.DeploymentAlerts{AlertEmails: emails}
@@ -4243,11 +4251,11 @@ func TestCreateAlertEmails(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("UpdateAlertEmails", expectedInput).Return(expected, nil)
 		actual, err = createAlertEmails(&deploymentFromFile, deploymentID, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expected, actual)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expected, actual)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("updates alert emails for a deployment with new and existing alert emails", func(t *testing.T) {
+	s.Run("updates alert emails for a deployment with new and existing alert emails", func() {
 		existingEmails = []string{
 			"test1@email.com",
 			"test2@email.com", // this is getting deleted
@@ -4266,11 +4274,11 @@ func TestCreateAlertEmails(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("UpdateAlertEmails", expectedInput).Return(expected, nil)
 		actual, err = createAlertEmails(&deploymentFromFile, deploymentID, mockClient)
-		assert.NoError(t, err)
-		assert.Equal(t, expected, actual)
-		mockClient.AssertExpectations(t)
+		s.NoError(err)
+		s.Equal(expected, actual)
+		mockClient.AssertExpectations(s.T())
 	})
-	t.Run("returns api error if updating deployment alert email fails", func(t *testing.T) {
+	s.Run("returns api error if updating deployment alert email fails", func() {
 		emails = []string{"test1@email.com", "test2@meail.com"}
 		deploymentFromFile.Deployment.AlertEmails = emails
 		expected = astro.DeploymentAlerts{}
@@ -4282,30 +4290,30 @@ func TestCreateAlertEmails(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("UpdateAlertEmails", expectedInput).Return(expected, errTest)
 		actual, err = createAlertEmails(&deploymentFromFile, deploymentID, mockClient)
-		assert.Error(t, err)
-		assert.Equal(t, expected, actual)
-		mockClient.AssertExpectations(t)
+		s.Error(err)
+		s.Equal(expected, actual)
+		mockClient.AssertExpectations(s.T())
 	})
 }
 
-func TestIsJSON(t *testing.T) {
+func (s *Suite) TestIsJSON() {
 	var (
 		valid, invalid string
 		actual         bool
 	)
-	t.Run("returns true for valid json", func(t *testing.T) {
+	s.Run("returns true for valid json", func() {
 		valid = `{"test":"yay"}`
 		actual = isJSON([]byte(valid))
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false for invalid json", func(t *testing.T) {
+	s.Run("returns false for invalid json", func() {
 		invalid = `-{"test":"yay",{}`
 		actual = isJSON([]byte(invalid))
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestDeploymentFromName(t *testing.T) {
+func (s *Suite) TestDeploymentFromName() {
 	var (
 		existingDeployments       []astro.Deployment
 		deploymentToCreate        string
@@ -4329,65 +4337,65 @@ func TestDeploymentFromName(t *testing.T) {
 		Description: "deployment 2",
 	}
 	deploymentToCreate = "test-deployment-2"
-	t.Run("returns the deployment id for the matching deployment name", func(t *testing.T) {
+	s.Run("returns the deployment id for the matching deployment name", func() {
 		actual = deploymentFromName(existingDeployments, deploymentToCreate)
-		assert.Equal(t, expectedeployment, actual)
+		s.Equal(expectedeployment, actual)
 	})
-	t.Run("returns empty string if deployment name does not match", func(t *testing.T) {
+	s.Run("returns empty string if deployment name does not match", func() {
 		deploymentToCreate = "test-d-2"
 		expectedeployment = astro.Deployment{}
 		actual = deploymentFromName(existingDeployments, deploymentToCreate)
-		assert.Equal(t, expectedeployment, actual)
+		s.Equal(expectedeployment, actual)
 	})
 }
 
-func TestIsValidEmail(t *testing.T) {
+func (s *Suite) TestIsValidEmail() {
 	var (
 		actual     bool
 		emailInput string
 	)
-	t.Run("returns true if email is valid", func(t *testing.T) {
+	s.Run("returns true if email is valid", func() {
 		emailInput = "test123@superomain.cool.com"
 		actual = isValidEmail(emailInput)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if email is invalid", func(t *testing.T) {
+	s.Run("returns false if email is invalid", func() {
 		emailInput = "invalid-email.com"
 		actual = isValidEmail(emailInput)
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }
 
-func TestValidateAlertEmails(t *testing.T) {
+func (s *Suite) TestValidateAlertEmails() {
 	var (
 		err   error
 		input inspect.FormattedDeployment
 	)
-	t.Run("returns an error if alert email is invalid", func(t *testing.T) {
+	s.Run("returns an error if alert email is invalid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []string{"test@test.com", "testing@testing.com", "not-an-email"}
 		input.Deployment.AlertEmails = list
 		err = checkAlertEmails(&input)
-		assert.ErrorIs(t, err, errInvalidEmail)
-		assert.ErrorContains(t, err, "invalid email: not-an-email")
+		s.ErrorIs(err, errInvalidEmail)
+		s.ErrorContains(err, "invalid email: not-an-email")
 	})
-	t.Run("returns nil if alert email is valid", func(t *testing.T) {
+	s.Run("returns nil if alert email is valid", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []string{"test@test.com", "testing@testing.com"}
 		input.Deployment.AlertEmails = list
 		err = checkAlertEmails(&input)
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 }
 
-func TestCheckEnvVars(t *testing.T) {
+func (s *Suite) TestCheckEnvVars() {
 	var (
 		err   error
 		input inspect.FormattedDeployment
 	)
-	t.Run("returns an error if env var keys are missing on create", func(t *testing.T) {
+	s.Run("returns an error if env var keys are missing on create", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []inspect.EnvironmentVariable{
@@ -4406,10 +4414,10 @@ func TestCheckEnvVars(t *testing.T) {
 		}
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "create")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[0].key")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.environment_variables[0].key")
 	})
-	t.Run("returns an error if env var values are missing on create", func(t *testing.T) {
+	s.Run("returns an error if env var values are missing on create", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []inspect.EnvironmentVariable{
@@ -4428,10 +4436,10 @@ func TestCheckEnvVars(t *testing.T) {
 		}
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "create")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[1].value")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.environment_variables[1].value")
 	})
-	t.Run("returns an error if env var keys are missing on update", func(t *testing.T) {
+	s.Run("returns an error if env var keys are missing on update", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []inspect.EnvironmentVariable{
@@ -4450,10 +4458,10 @@ func TestCheckEnvVars(t *testing.T) {
 		}
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "update")
-		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.environment_variables[1].key")
+		s.ErrorIs(err, errRequiredField)
+		s.ErrorContains(err, "missing required field: deployment.environment_variables[1].key")
 	})
-	t.Run("returns nil if env var values are missing on update", func(t *testing.T) {
+	s.Run("returns nil if env var values are missing on update", func() {
 		input.Deployment.Configuration.Name = "test-deployment"
 		input.Deployment.Configuration.ClusterName = "test-cluster-id"
 		list := []inspect.EnvironmentVariable{
@@ -4472,21 +4480,21 @@ func TestCheckEnvVars(t *testing.T) {
 		}
 		input.Deployment.EnvVars = list
 		err = checkEnvVars(&input, "update")
-		assert.NoError(t, err)
+		s.NoError(err)
 	})
 }
 
-func TestIsValidExecutor(t *testing.T) {
-	t.Run("returns true if executor is Celery", func(t *testing.T) {
+func (s *Suite) TestIsValidExecutor() {
+	s.Run("returns true if executor is Celery", func() {
 		actual := isValidExecutor(deployment.CeleryExecutor)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns true if executor is Kubernetes", func(t *testing.T) {
+	s.Run("returns true if executor is Kubernetes", func() {
 		actual := isValidExecutor(deployment.KubeExecutor)
-		assert.True(t, actual)
+		s.True(actual)
 	})
-	t.Run("returns false if executor is neither Celery nor Kubernetes", func(t *testing.T) {
+	s.Run("returns false if executor is neither Celery nor Kubernetes", func() {
 		actual := isValidExecutor("test-executor")
-		assert.False(t, actual)
+		s.False(actual)
 	})
 }

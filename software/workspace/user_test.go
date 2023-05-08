@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"testing"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 
 	"github.com/astronomer/astro-cli/houston"
 	mocks "github.com/astronomer/astro-cli/houston/mocks"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -32,7 +30,7 @@ var (
 	errMock = errors.New("api error")
 )
 
-func TestAdd(t *testing.T) {
+func (s *Suite) TestAdd() {
 	testUtil.InitTestConfig("software")
 
 	id := "ck1qg6whg001r08691y117hub"
@@ -44,16 +42,16 @@ func TestAdd(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` NAME     WORKSPACE ID                  EMAIL             ROLE          
           ckc0eir8e01gj07608ajmvia1     test@test.com     test-role     
 Successfully added test@test.com to 
 `
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestAddError(t *testing.T) {
+func (s *Suite) TestAddError() {
 	testUtil.InitTestConfig("software")
 
 	id := "ck1qg6whg001r08691y117hub"
@@ -65,11 +63,11 @@ func TestAddError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Add(id, email, role, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestRemove(t *testing.T) {
+func (s *Suite) TestRemove() {
 	testUtil.InitTestConfig("software")
 
 	id := "ck1qg6whg001r08691y117hub"
@@ -80,16 +78,16 @@ func TestRemove(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Remove(id, userID, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
                                ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
 Successfully removed user from workspace
 `
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestRemoveError(t *testing.T) {
+func (s *Suite) TestRemoveError() {
 	testUtil.InitTestConfig("software")
 
 	id := "ck1qg6whg001r08691y117hub"
@@ -100,11 +98,11 @@ func TestRemoveError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := Remove(id, email, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestListRoles(t *testing.T) {
+func (s *Suite) TestListRoles() {
 	wsID := "ck1qg6whg001r08691y117hub"
 
 	mockResponse := []houston.WorkspaceUserRoleBindings{
@@ -129,15 +127,15 @@ func TestListRoles(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsID, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` USERNAME          ID                            ROLE                
  test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestListRolesWithServiceAccounts(t *testing.T) {
+func (s *Suite) TestListRolesWithServiceAccounts() {
 	testUtil.InitTestConfig("software")
 
 	wsID := "ck1qg6whg001r08691y117hub"
@@ -163,15 +161,15 @@ func TestListRolesWithServiceAccounts(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsID, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := ` USERNAME          ID                            ROLE                
  test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestListRolesError(t *testing.T) {
+func (s *Suite) TestListRolesError() {
 	testUtil.InitTestConfig("software")
 
 	wsID := "ck1qg6whg001r08691y117hub"
@@ -181,12 +179,12 @@ func TestListRolesError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := ListRoles(wsID, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestPaginatedListRoles(t *testing.T) {
-	t.Run("user should not be prompted for pagination options if api returns less then page size", func(t *testing.T) {
+func (s *Suite) TestPaginatedListRoles() {
+	s.Run("user should not be prompted for pagination options if api returns less then page size", func() {
 		wsID := "ck1qg6whg001r08691y117hub"
 		paginationPageSize := 100
 
@@ -213,13 +211,9 @@ func TestPaginatedListRoles(t *testing.T) {
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -228,14 +222,14 @@ func TestPaginatedListRoles(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` USERNAME          ID                            ROLE                
  test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
-	t.Run("user should be prompted for pagination options if return record is same as page size", func(t *testing.T) {
+	s.Run("user should be prompted for pagination options if return record is same as page size", func() {
 		wsID := "ck1qg6whg001r08691y117hub"
 		paginationPageSize := 1
 
@@ -262,13 +256,9 @@ func TestPaginatedListRoles(t *testing.T) {
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -277,14 +267,14 @@ func TestPaginatedListRoles(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` USERNAME          ID                            ROLE                
  test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
-	t.Run("user should not see previous option if no record return if last action was next", func(t *testing.T) {
+	s.Run("user should not see previous option if no record return if last action was next", func() {
 		wsID := "ck1qg6whg001r08691y117hub"
 		paginationPageSize := 10
 
@@ -296,13 +286,9 @@ func TestPaginatedListRoles(t *testing.T) {
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -311,13 +297,13 @@ func TestPaginatedListRoles(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = PaginatedListRoles(wsID, "", paginationPageSize, 10, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` USERNAME     ID     ROLE     
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
-	t.Run("user should not see next option if no record return if last action was previous", func(t *testing.T) {
+	s.Run("user should not see next option if no record return if last action was previous", func() {
 		wsID := "ck1qg6whg001r08691y117hub"
 		paginationPageSize := -10
 
@@ -329,13 +315,9 @@ func TestPaginatedListRoles(t *testing.T) {
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -344,15 +326,15 @@ func TestPaginatedListRoles(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-		assert.NoError(t, err)
+		s.NoError(err)
 		expected := ` USERNAME     ID     ROLE     
 `
-		assert.Equal(t, expected, buf.String())
-		api.AssertExpectations(t)
+		s.Equal(expected, buf.String())
+		api.AssertExpectations(s.T())
 	})
 }
 
-func TestPaginatedListRolesError(t *testing.T) {
+func (s *Suite) TestPaginatedListRolesError() {
 	testUtil.InitTestConfig("software")
 
 	wsID := "ck1qg6whg001r08691y117hub"
@@ -363,25 +345,21 @@ func TestPaginatedListRolesError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestShowListRolesPaginatedOption(t *testing.T) {
+func (s *Suite) TestShowListRolesPaginatedOption() {
 	wsID := "ck1qg6whg001r08691y117hub"
 	paginationPageSize := 100
 
-	t.Run("total record less then page size", func(t *testing.T) {
+	s.Run("total record less then page size", func() {
 		// mock os.Stdin for when prompted by PromptPaginatedOption
 		input := []byte("q")
 		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.Require().NoError(err)
 		_, err = w.Write(input)
-		if err != nil {
-			t.Error(err)
-		}
+		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
 		// Restore stdin right after the test.
@@ -389,11 +367,11 @@ func TestShowListRolesPaginatedOption(t *testing.T) {
 		os.Stdin = r
 
 		value := promptPaginatedOption(wsID, wsID, paginationPageSize, 10, 0, false)
-		assert.Equal(t, value.Quit, true)
+		s.Equal(value.Quit, true)
 	})
 }
 
-func TestUpdateRole(t *testing.T) {
+func (s *Suite) TestUpdateRole() {
 	testUtil.InitTestConfig("software")
 
 	id := "ckoixo6o501496qemiwsja1tl"
@@ -406,13 +384,13 @@ func TestUpdateRole(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
-	assert.NoError(t, err)
+	s.NoError(err)
 	expected := `Role has been changed from WORKSPACE_VIEWER to test-role for user test@test.com`
-	assert.Equal(t, expected, buf.String())
-	api.AssertExpectations(t)
+	s.Equal(expected, buf.String())
+	api.AssertExpectations(s.T())
 }
 
-func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
+func (s *Suite) TestUpdateRoleNoAccessDeploymentOnly() {
 	testUtil.InitTestConfig("software")
 
 	id := "ckg6sfddu30911pc0n1o0e97e"
@@ -424,11 +402,11 @@ func TestUpdateRoleNoAccessDeploymentOnly(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
-	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
-	api.AssertExpectations(t)
+	s.Equal("the user you are trying to change is not part of this workspace", err.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestUpdateRoleErrorGetRoles(t *testing.T) {
+func (s *Suite) TestUpdateRoleErrorGetRoles() {
 	testUtil.InitTestConfig("software")
 
 	id := "ck1qg6whg001r08691y117hub"
@@ -440,11 +418,11 @@ func TestUpdateRoleErrorGetRoles(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestUpdateRoleError(t *testing.T) {
+func (s *Suite) TestUpdateRoleError() {
 	testUtil.InitTestConfig("software")
 
 	id := "ckoixo6o501496qemiwsja1tl"
@@ -457,11 +435,11 @@ func TestUpdateRoleError(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
-	assert.EqualError(t, err, errMock.Error())
-	api.AssertExpectations(t)
+	s.EqualError(err, errMock.Error())
+	api.AssertExpectations(s.T())
 }
 
-func TestUpdateRoleNoAccess(t *testing.T) {
+func (s *Suite) TestUpdateRoleNoAccess() {
 	testUtil.InitTestConfig("software")
 
 	mockRoles.RoleBindings = []houston.RoleBinding{}
@@ -475,6 +453,6 @@ func TestUpdateRoleNoAccess(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
-	assert.Equal(t, "the user you are trying to change is not part of this workspace", err.Error())
-	api.AssertExpectations(t)
+	s.Equal("the user you are trying to change is not part of this workspace", err.Error())
+	api.AssertExpectations(s.T())
 }

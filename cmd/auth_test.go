@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"testing"
 
 	astro "github.com/astronomer/astro-cli/astro-client"
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
@@ -12,28 +11,27 @@ import (
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthRootCommand(t *testing.T) {
+func (s *Suite) TestAuthRootCommand() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("login", "--help")
-	assert.NoError(t, err)
-	assert.Contains(t, output, "Authenticate to Astro or Astronomer Software")
+	s.NoError(err)
+	s.Contains(output, "Authenticate to Astro or Astronomer Software")
 }
 
-func TestLogin(t *testing.T) {
+func (s *Suite) TestLogin() {
 	buf := new(bytes.Buffer)
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
 	cloudLogin = func(domain, token string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer, shouldDisplayLoginLink bool) error {
-		assert.Equal(t, cloudDomain, domain)
+		s.Equal(cloudDomain, domain)
 		return nil
 	}
 
 	softwareLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
-		assert.Equal(t, softwareDomain, domain)
+		s.Equal(softwareDomain, domain)
 		return nil
 	}
 
@@ -57,49 +55,49 @@ func TestLogin(t *testing.T) {
 	login(&cobra.Command{}, []string{}, nil, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	defer testUtil.MockUserInput(t, "n")()
+	defer testUtil.MockUserInput(s.T(), "n")()
 	login(&cobra.Command{}, []string{"fail.astronomer.io"}, nil, nil, buf)
-	assert.Contains(t, buf.String(), "fail.astronomer.io is an invalid domain to login into Astro.\n")
+	s.Contains(buf.String(), "fail.astronomer.io is an invalid domain to login into Astro.\n")
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	softwareDomain = "software.astronomer.io"
 	buf = new(bytes.Buffer)
-	defer testUtil.MockUserInput(t, "y")()
+	defer testUtil.MockUserInput(s.T(), "y")()
 	login(&cobra.Command{}, []string{"software.astronomer.io"}, nil, nil, buf)
-	assert.Contains(t, buf.String(), "software.astronomer.io is an invalid domain to login into Astro.\n")
+	s.Contains(buf.String(), "software.astronomer.io is an invalid domain to login into Astro.\n")
 }
 
-func TestLogout(t *testing.T) {
+func (s *Suite) TestLogout() {
 	cloudDomain := "astronomer.io"
 	softwareDomain := "astronomer_dev.com"
 
 	cloudLogout = func(domain string, out io.Writer) {
-		assert.Equal(t, cloudDomain, domain)
+		s.Equal(cloudDomain, domain)
 	}
 	softwareLogout = func(domain string) {
-		assert.Equal(t, softwareDomain, domain)
+		s.Equal(softwareDomain, domain)
 	}
 
 	// cloud logout success
 	err := logout(&cobra.Command{}, []string{cloudDomain}, os.Stdout)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	// software logout success
 	err = logout(&cobra.Command{}, []string{softwareDomain}, os.Stdout)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	// no domain, cloud logout
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	// no domain, software logout
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
-	assert.NoError(t, err)
+	s.NoError(err)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
-	assert.EqualError(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 }
