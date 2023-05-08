@@ -417,7 +417,7 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 	org := orgs[0]
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
-	if workspaceID == "" {
+	if wsID == "" {
 		wsID = c.Workspace
 	}
 
