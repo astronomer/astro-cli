@@ -394,9 +394,20 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 		return false, errNotAPIToken
 	}
 
-	workspaceID = strings.Replace(claims.Permissions[1], "workspaceId:", "", 1)
-	orgID := strings.Replace(claims.Permissions[2], "organizationId:", "", 1)
-	orgShortName := strings.Replace(claims.Permissions[3], "orgShortName:", "", 1)
+	var wsID, orgID, orgShortName string
+	for _, permission := range claims.Permissions {
+		splitPermission := strings.Split(permission, ":")
+		permissionType := splitPermission[0]
+		id := splitPermission[1]
+		switch permissionType {
+		case "workspaceId":
+			wsID = id
+		case "organizationId":
+			orgID = id
+		case "orgShortName":
+			orgShortName = id
+		}
+	}
 
 	orgs, err := organization.ListOrganizations(coreClient)
 	if err != nil {
@@ -406,7 +417,11 @@ func checkAPIToken(isDeploymentFile bool, coreClient astrocore.CoreClient) (bool
 	org := orgs[0]
 	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint
 
-	err = c.SetContextKey("workspace", workspaceID) // c.Workspace
+	if workspaceID == "" {
+		wsID = c.Workspace
+	}
+
+	err = c.SetContextKey("workspace", wsID)
 	if err != nil {
 		fmt.Println("no workspace set")
 	}
