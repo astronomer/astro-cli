@@ -8,6 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/houston"
 	houstonMocks "github.com/astronomer/astro-cli/houston/mocks"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -22,29 +23,28 @@ func TestCreateSuccess(t *testing.T) {
 		password string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantOut string
-		wantErr bool
+		name         string
+		args         args
+		wantOut      string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "test with email & password provided",
-			args:    args{email: "test@test.com", password: "test"},
-			wantOut: "Successfully created user test@test.com",
-			wantErr: false,
+			name:         "test with email & password provided",
+			args:         args{email: "test@test.com", password: "test"},
+			wantOut:      "Successfully created user test@test.com",
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "test with email & password not provided",
-			args:    args{},
-			wantOut: "Successfully created user",
-			wantErr: false,
+			name:         "test with email & password not provided",
+			args:         args{},
+			wantOut:      "Successfully created user",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := &bytes.Buffer{}
-			if err := Create(tt.args.email, tt.args.password, houstonMock, out); (err != nil) != tt.wantErr {
-				t.Errorf("Create() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.errAssertion(t, Create(tt.args.email, tt.args.password, houstonMock, out)) {
 				return
 			}
 			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
@@ -60,8 +60,7 @@ func TestCreateFailure(t *testing.T) {
 	houstonMock.On("CreateUser", mock.Anything).Return(nil, errMockHouston)
 
 	out := &bytes.Buffer{}
-	if err := Create("test@test.com", "test", houstonMock, out); !errors.Is(err, errUserCreationDisabled) {
-		t.Errorf("Create() error = %v, wantErr %v", err, errUserCreationDisabled)
+	if !assert.ErrorIs(t, Create("test@test.com", "test", houstonMock, out), errUserCreationDisabled) {
 		return
 	}
 
@@ -73,8 +72,7 @@ func TestCreatePending(t *testing.T) {
 	houstonMock.On("CreateUser", mock.Anything).Return(&houston.AuthUser{User: houston.User{Status: "pending"}}, nil)
 
 	out := &bytes.Buffer{}
-	if err := Create("test@test.com", "test", houstonMock, out); err != nil {
-		t.Errorf("Create() error = %v, wantErr %v", err, nil)
+	if !assert.NoError(t, Create("test@test.com", "test", houstonMock, out)) {
 		return
 	}
 	if gotOut := out.String(); !strings.Contains(gotOut, "Check your email for a verification.") && !strings.Contains(gotOut, "Successfully created user") {

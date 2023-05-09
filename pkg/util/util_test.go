@@ -118,31 +118,31 @@ func TestExists(t *testing.T) {
 		path string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
+		name         string
+		args         args
+		want         bool
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "valid case",
-			args:    args{"./util_test.go"},
-			want:    true,
-			wantErr: false,
+			name:         "valid case",
+			args:         args{"./util_test.go"},
+			want:         true,
+			errAssertion: assert.NoError,
 		},
 		{
-			name:    "invalid case",
-			args:    args{"./test.go"},
-			want:    false,
-			wantErr: false,
+			name:         "invalid case",
+			args:         args{"./test.go"},
+			want:         false,
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := Exists(tt.args.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Exists() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("Exists() = %v, want %v", got, tt.want)
 			}
