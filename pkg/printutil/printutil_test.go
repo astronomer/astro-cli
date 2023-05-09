@@ -3,7 +3,6 @@ package printutil
 import (
 	"bytes"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
