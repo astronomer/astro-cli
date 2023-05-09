@@ -306,7 +306,6 @@ func TestCheckAPIToken(t *testing.T) {
 
 	t.Run("test context switch", func(t *testing.T) {
 		permissions := []string{
-			"",
 			"workspaceId:workspace-id",
 			"organizationId:org-ID",
 			"orgShortName:org-short-name",
