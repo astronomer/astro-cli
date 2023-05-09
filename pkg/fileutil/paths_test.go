@@ -26,9 +26,7 @@ func TestGetWorkingDir(t *testing.T) {
 				return
 			}
 
-			if !strings.Contains(got, tt.want) {
-				t.Errorf("GetWorkingDir() = %v, want %v", got, tt.want)
-			}
+			assert.Contains(t, got, tt.want)
 		})
 	}
 }
@@ -52,9 +50,7 @@ func TestGetHomeDir(t *testing.T) {
 				return
 			}
 
-			if !strings.Contains(got, tt.want) {
-				t.Errorf("GetHomeDir() = %v, want %v", got, tt.want)
-			}
+			assert.Contains(t, got, tt.want)
 		})
 	}
 }

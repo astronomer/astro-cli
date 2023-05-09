@@ -3,7 +3,6 @@ package user
 import (
 	"bytes"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/houston"
@@ -47,9 +46,7 @@ func TestCreateSuccess(t *testing.T) {
 			if tt.errAssertion(t, Create(tt.args.email, tt.args.password, houstonMock, out)) {
 				return
 			}
-			if gotOut := out.String(); !strings.Contains(gotOut, tt.wantOut) {
-				t.Errorf("Create() = %v, want %v", gotOut, tt.wantOut)
-			}
+			assert.Contains(t, out.String(), tt.wantOut)
 		})
 	}
 	houstonMock.AssertExpectations(t)
@@ -75,9 +72,8 @@ func TestCreatePending(t *testing.T) {
 	if !assert.NoError(t, Create("test@test.com", "test", houstonMock, out)) {
 		return
 	}
-	if gotOut := out.String(); !strings.Contains(gotOut, "Check your email for a verification.") && !strings.Contains(gotOut, "Successfully created user") {
-		t.Errorf("Create() = %v, want %v, %v", gotOut, "Check your email for a verification.", "Successfully created user")
-	}
+	assert.Contains(t, out.String(), "Check your email for a verification.")
+	assert.Contains(t, out.String(), "Successfully created user")
 
 	houstonMock.AssertExpectations(t)
 }
