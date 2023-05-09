@@ -136,8 +136,10 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		return nil, err
 	}
 	clusterID := sourceDeployment.Cluster.ID
+	releaseName := sourceDeployment.ReleaseName
 	if organization.IsOrgHosted() {
-		clusterID = notApplicable
+		clusterID = sourceDeployment.Cluster.Region
+		releaseName = notApplicable
 	}
 	return map[string]interface{}{
 		"deployment_id":   sourceDeployment.ID,
@@ -145,7 +147,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		"cluster_id":      clusterID,
 		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
 		"current_tag":     sourceDeployment.DeploymentSpec.Image.Tag,
-		"release_name":    sourceDeployment.ReleaseName,
+		"release_name":    releaseName,
 		"deployment_url":  deploymentURL,
 		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,
 		"created_at":      sourceDeployment.CreatedAt,
@@ -157,7 +159,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
 	clusterName := sourceDeployment.Cluster.Name
 	if organization.IsOrgHosted() {
-		clusterName = notApplicable
+		clusterName = sourceDeployment.Cluster.Region
 	}
 	return map[string]interface{}{
 		"name":               sourceDeployment.Label,

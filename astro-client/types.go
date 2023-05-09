@@ -74,6 +74,7 @@ type Cluster struct {
 	ID            string     `json:"id"`
 	Name          string     `json:"name"`
 	CloudProvider string     `json:"cloudProvider"`
+	Region        string     `json:"region"`
 	NodePools     []NodePool `json:"nodePools"`
 }
 
