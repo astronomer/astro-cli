@@ -62,30 +62,28 @@ func Test_validateWorkspaceRole(t *testing.T) {
 		role string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
 			name: "basic valid case",
 			args: args{
 				role: houston.WorkspaceAdminRole,
 			},
-			wantErr: false,
+			errAssertion: assert.NoError,
 		},
 		{
 			name: "basic invalid case",
 			args: args{
 				role: "ADMIN",
 			},
-			wantErr: true,
+			errAssertion: assert.Error,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateWorkspaceRole(tt.args.role); (err != nil) != tt.wantErr {
-				t.Errorf("validateWorkspaceRole() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			tt.errAssertion(t, validateWorkspaceRole(tt.args.role))
 		})
 	}
 }
@@ -95,30 +93,28 @@ func Test_validateDeploymentRole(t *testing.T) {
 		role string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
 			name: "basic valid case",
 			args: args{
 				role: houston.DeploymentAdminRole,
 			},
-			wantErr: false,
+			errAssertion: assert.NoError,
 		},
 		{
 			name: "basic invalid case",
 			args: args{
 				role: "ADMIN",
 			},
-			wantErr: true,
+			errAssertion: assert.Error,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateDeploymentRole(tt.args.role); (err != nil) != tt.wantErr {
-				t.Errorf("validateDeploymentRole() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			tt.errAssertion(t, validateDeploymentRole(tt.args.role))
 		})
 	}
 }
@@ -141,9 +137,8 @@ func Test_ErrParsingKV(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ErrParsingKV{kv: tt.args.kv}
-			if err.Error() != tt.result {
-				t.Errorf("ErrParsingKV invalid error string error = %v, wantErr %v", err.Error(), tt.result)
-			}
+			assert.Error(t, err)
+			assert.Equal(t, err.Error(), tt.result)
 		})
 	}
 }
@@ -166,9 +161,8 @@ func Test_ErrInvalidArg(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ErrInvalidArg{key: tt.args.key}
-			if err.Error() != tt.result {
-				t.Errorf("ErrParsingKV invalid error string error = %v, wantErr %v", err.Error(), tt.result)
-			}
+			assert.Error(t, err)
+			assert.Equal(t, err.Error(), tt.result)
 		})
 	}
 }

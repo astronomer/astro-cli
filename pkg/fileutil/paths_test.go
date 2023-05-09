@@ -3,27 +3,29 @@ package fileutil
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetWorkingDir(t *testing.T) {
 	tests := []struct {
-		name    string
-		want    string
-		wantErr bool
+		name         string
+		want         string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "basic case",
-			want:    "fileutil",
-			wantErr: false,
+			name:         "basic case",
+			want:         "fileutil",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetWorkingDir()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetWorkingDir() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
+
 			if !strings.Contains(got, tt.want) {
 				t.Errorf("GetWorkingDir() = %v, want %v", got, tt.want)
 			}
@@ -33,23 +35,23 @@ func TestGetWorkingDir(t *testing.T) {
 
 func TestGetHomeDir(t *testing.T) {
 	tests := []struct {
-		name    string
-		want    string
-		wantErr bool
+		name         string
+		want         string
+		errAssertion assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "basic case",
-			want:    "/",
-			wantErr: false,
+			name:         "basic case",
+			want:         "/",
+			errAssertion: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetHomeDir()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetHomeDir() error = %v, wantErr %v", err, tt.wantErr)
+			if !tt.errAssertion(t, err) {
 				return
 			}
+
 			if !strings.Contains(got, tt.want) {
 				t.Errorf("GetHomeDir() = %v, want %v", got, tt.want)
 			}
