@@ -45,6 +45,7 @@ const (
 	M1ImageRuntimeVersion          = "6.0.4"
 	pytestDirectory                = "tests"
 	OpenCmd                        = "open"
+	dockerCmd                      = "docker"
 
 	composeCreateErrMsg      = "error creating docker-compose project"
 	composeStatusCheckErrMsg = "error checking docker-compose status"
@@ -157,7 +158,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == dockerCmd {
 		err := startDocker()
 		if err != nil {
 			return err
@@ -245,7 +246,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCac
 	// default is 1 minute
 	if waitTime != 1*time.Minute {
 		startupTimeout = waitTime
-	} else if isM1(runtime.GOOS, runtime.GOARCH) {
+	} else if CheckM1Image(imageLabels) {
 		// user did not provide a waitTime
 		// if running darwin/M1 architecture
 		// we wait for a longer startup time
@@ -903,7 +904,7 @@ func startDocker() error {
 	if err != nil {
 		// open docker
 		fmt.Println("\nDocker is not running. Starting up the Docker engine…")
-		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", "docker")
+		err = cmdExec(OpenCmd, buf, os.Stderr, "-a", dockerCmd)
 		if err != nil {
 			return err
 		}
