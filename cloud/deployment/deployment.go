@@ -87,14 +87,17 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	for i := range deployments {
 		d := deployments[i]
 		clusterName := d.Cluster.Name
-		if organization.IsOrgHosted() {
-			clusterName = notApplicable
-		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
+		releaseName := d.ReleaseName
+		if organization.IsOrgHosted() {
+			clusterName = d.Cluster.Region
+			releaseName = notApplicable
+		}
+
 		if all {
-			tab.AddRow([]string{d.Label, d.Workspace.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+			tab.AddRow([]string{d.Label, d.Workspace.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		} else {
-			tab.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+			tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		}
 	}
 
@@ -308,10 +311,12 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 	clusterName := d.Cluster.Name
+	releaseName := d.ReleaseName
 	if organization.IsOrgHosted() {
-		clusterName = notApplicable
+		clusterName = d.Cluster.Region
+		releaseName = notApplicable
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+	tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
 	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
@@ -692,10 +697,12 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		clusterName := d.Cluster.Name
+		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = notApplicable
+			clusterName = d.Cluster.Region
+			releaseName = notApplicable
 		}
-		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
