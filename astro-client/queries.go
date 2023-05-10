@@ -26,6 +26,7 @@ var (
 				id
 				name
 				cloudProvider
+				region
 				nodePools {
 					id
 					isDefault
