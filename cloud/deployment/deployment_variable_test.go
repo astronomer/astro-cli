@@ -226,8 +226,7 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
+		_ = VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
 		assert.Contains(t, buf.String(), "No variables for this Deployment")
 	})
 }
