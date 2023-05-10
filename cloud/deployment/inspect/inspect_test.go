@@ -59,7 +59,8 @@ func TestInspect(t *testing.T) {
 			ReleaseName: "great-release-name",
 			Workspace:   astro.Workspace{ID: workspaceID},
 			Cluster: astro.Cluster{
-				ID: "cluster-id",
+				ID:     "cluster-id",
+				Region: "us-central1",
 				NodePools: []astro.NodePool{
 					{
 						ID:               "test-pool-id",
@@ -238,7 +239,7 @@ func TestInspect(t *testing.T) {
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astronomer Software? Run astro login and try again")
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("Hide Cluster Info if an org is hosted", func(t *testing.T) {
+	t.Run("Display Cluster Region and hide Release Name if an org is hosted", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
@@ -248,10 +249,10 @@ func TestInspect(t *testing.T) {
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
 		err = Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "", false)
 		assert.NoError(t, err)
-		assert.Contains(t, out.String(), deploymentResponse[0].ReleaseName)
+		assert.Contains(t, out.String(), "N/A")
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse[0].RuntimeRelease.Version)
-		assert.Contains(t, out.String(), "N/A")
+		assert.Contains(t, out.String(), "us-central1")
 		mockClient.AssertExpectations(t)
 	})
 }

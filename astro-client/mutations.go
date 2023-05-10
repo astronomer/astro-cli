@@ -49,6 +49,7 @@ var (
 			cluster {
 				id
 				name
+				region
 			}
 			runtimeRelease {
 				version
@@ -93,6 +94,7 @@ var (
 			cluster {
 				id
 				name
+				region
 			}
 			runtimeRelease {
 				version
