@@ -157,7 +157,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 //nolint:gocognit
 func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCache, noBrowser bool, waitTime time.Duration) error {
 	// check if docker is up for macOS
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "darwin" && config.CFG.DockerCommand.GetString() == "docker" {
 		err := startDocker()
 		if err != nil {
 			return err
@@ -245,7 +245,7 @@ func (d *DockerCompose) Start(imageName, settingsFile, composeFile string, noCac
 	// default is 1 minute
 	if waitTime != 1*time.Minute {
 		startupTimeout = waitTime
-	} else if isM1(runtime.GOOS, runtime.GOARCH) {
+	} else if CheckM1Image(imageLabels) {
 		// user did not provide a waitTime
 		// if running darwin/M1 architecture
 		// we wait for a longer startup time
