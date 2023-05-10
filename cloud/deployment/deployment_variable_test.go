@@ -227,6 +227,7 @@ func TestVariableModify(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		_ = VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
+
 		assert.Contains(t, buf.String(), "No variables for this Deployment")
 	})
 }
