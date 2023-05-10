@@ -198,13 +198,14 @@ func TestVariableModify(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable key")
+		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
 
 		buf = new(bytes.Buffer)
 		err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable value")
+		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
+
 		mockClient.AssertExpectations(t)
 	})
 
