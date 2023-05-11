@@ -417,7 +417,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 
 // Pytest creates and runs a container containing the users airflow image, requirments, packages, and volumes(DAGs folder, etc...)
 // These containers runs pytest on a specified pytest file (pytestFile). This function is used in the dev parse and dev pytest commands
-func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImageName string) (string, error) {
+func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string) (string, error) {
 	// deployImageName may be provided to the function if it is being used in the deploy command
 	if deployImageName == "" {
 		// build image
@@ -436,16 +436,18 @@ func (d *DockerCompose) Pytest(pytestArgs []string, customImageName, deployImage
 	}
 
 	// determine pytest args and file
-	var pytestFile string
-	if len(pytestArgs) > 0 {
-		pytestFile = pytestArgs[0]
-	}
-	if len(strings.Fields(pytestFile)) > 1 {
-		pytestArgs = strings.Fields(pytestFile)
-		pytestFile = ""
-	} else if len(pytestArgs) > 1 {
-		pytestArgs = strings.Fields(pytestArgs[1])
-	}
+	// var pytestFile string
+	// if len(pytestArgs) > 0 {
+	// 	pytestFile = pytestArgs[0]
+	// }
+	// if len(strings.Fields(pytestFile)) > 1 {
+	// 	pytestArgs = strings.Fields(pytestFile)
+	// 	pytestFile = ""
+	// } else if len(pytestArgs) > 1 {
+	// 	pytestArgs = strings.Fields(pytestArgs[1])
+	// }
+
+	pytestArgs := strings.Fields(pytestArgsString)
 
 	// Determine pytest file
 	if pytestFile != ".astro/test_dag_integrity_default.py" {
@@ -484,8 +486,7 @@ func (d *DockerCompose) Parse(customImageName, deployImageName string) error {
 	fmt.Println("\nChecking your DAGs for errors,\nthis might take a minute if you haven't run this command before…")
 
 	pytestFile := DefaultTestPath
-	pytestArgs := []string{pytestFile}
-	exitCode, err := d.Pytest(pytestArgs, customImageName, deployImageName)
+	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("See above for errors detected in your DAGs")

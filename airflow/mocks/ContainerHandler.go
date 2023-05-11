@@ -132,23 +132,23 @@ func (_m *ContainerHandler) Parse(customImageName string, deployImageName string
 	return r0
 }
 
-// Pytest provides a mock function with given fields: pytestArgs, customImageName, deployImageName
-func (_m *ContainerHandler) Pytest(pytestArgs []string, customImageName string, deployImageName string) (string, error) {
-	ret := _m.Called(pytestArgs, customImageName, deployImageName)
+// Pytest provides a mock function with given fields: pytestFile, customImageName, deployImageName, pytestArgsString
+func (_m *ContainerHandler) Pytest(pytestFile string, customImageName string, deployImageName string, pytestArgsString string) (string, error) {
+	ret := _m.Called(pytestFile, customImageName, deployImageName, pytestArgsString)
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]string, string, string) (string, error)); ok {
-		return rf(pytestArgs, customImageName, deployImageName)
+	if rf, ok := ret.Get(0).(func(string, string, string, string) (string, error)); ok {
+		return rf(pytestFile, customImageName, deployImageName, pytestArgsString)
 	}
-	if rf, ok := ret.Get(0).(func([]string, string, string) string); ok {
-		r0 = rf(pytestArgs, customImageName, deployImageName)
+	if rf, ok := ret.Get(0).(func(string, string, string, string) string); ok {
+		r0 = rf(pytestFile, customImageName, deployImageName, pytestArgsString)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func([]string, string, string) error); ok {
-		r1 = rf(pytestArgs, customImageName, deployImageName)
+	if rf, ok := ret.Get(1).(func(string, string, string, string) error); ok {
+		r1 = rf(pytestFile, customImageName, deployImageName, pytestArgsString)
 	} else {
 		r1 = ret.Error(1)
 	}
