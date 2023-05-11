@@ -299,7 +299,7 @@ func newAirflowPytestCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowPytest,
 	}
-	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"–-cov-config path\"'")
+	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"--cov-config path\"'")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run pytest with")
 	return cmd
