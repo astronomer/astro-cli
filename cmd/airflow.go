@@ -33,7 +33,8 @@ var (
 	settingsFile           string
 	composeFile            string
 	exportComposeFile      string
-	pytestArgs             []string
+	pytestArgs             string
+	pytestFile             []string
 	followLogs             bool
 	schedulerLogs          bool
 	webserverLogs          bool
@@ -297,6 +298,7 @@ func newAirflowPytestCmd() *cobra.Command {
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowPytest,
 	}
+	cmd.Flags().StringVarP(&pytestArgs, "args", "a", "", "pytest arguments you'd like passed to the pytest command. Surround the args in quotes. For example 'astro dev pytest --args \"–-cov-config path\"'")
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().StringVarP(&customImageName, "image-name", "i", "", "Name of a custom built image to run pytest with")
 	return cmd
@@ -633,7 +635,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
-		pytestArgs = args
+		pytestFile = args
 	}
 
 	// Check if tests directory exists
@@ -658,7 +660,7 @@ func airflowPytest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestArgs, customImageName, "")
+	exitCode, err := containerHandler.Pytest(pytestFile, customImageName, "")
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("pytests failed")
