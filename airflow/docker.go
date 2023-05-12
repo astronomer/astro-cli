@@ -436,17 +436,6 @@ func (d *DockerCompose) Pytest(pytestFile, customImageName, deployImageName, pyt
 	}
 
 	// determine pytest args and file
-	// var pytestFile string
-	// if len(pytestArgs) > 0 {
-	// 	pytestFile = pytestArgs[0]
-	// }
-	// if len(strings.Fields(pytestFile)) > 1 {
-	// 	pytestArgs = strings.Fields(pytestFile)
-	// 	pytestFile = ""
-	// } else if len(pytestArgs) > 1 {
-	// 	pytestArgs = strings.Fields(pytestArgs[1])
-	// }
-
 	pytestArgs := strings.Fields(pytestArgsString)
 
 	// Determine pytest file
