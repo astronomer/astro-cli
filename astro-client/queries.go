@@ -1,6 +1,5 @@
 package astro
 
-// TODO: @adam2k Reorganize based on this issue - https://github.com/astronomer/issues/issues/1991
 var (
 	WorkspacesGetRequest = `
 	query GetWorkspaces($organizationId: Id!) {
@@ -21,10 +20,13 @@ var (
 			description
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name
 				cloudProvider
+				region
 				nodePools {
 					id
 					isDefault
@@ -100,6 +102,8 @@ var (
 			createdAt
 			status
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			runtimeRelease {
 				version
 				airflowVersion
@@ -139,19 +143,6 @@ var (
 			}
 		}
 	}`
-
-	SelfQuery = `
-	query selfQuery {
-		self {
-		user {
-			roleBindings {
-			role
-			}
-		}
-		authenticatedOrganizationId
-		}
-	}
-	`
 
 	DeploymentHistoryQuery = `
 	query deploymentHistory(
@@ -262,13 +253,4 @@ var (
 			}
 		}
 	}`
-
-	GetOrganizations = `
-	query Query {
-		organizations {
-		  id
-		  name
-		}
-	  }
-	`
 )

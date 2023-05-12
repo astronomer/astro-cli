@@ -205,6 +205,21 @@ const (
 	GetSharedClusterParamsCloudProviderGcp   GetSharedClusterParamsCloudProvider = "gcp"
 )
 
+// Defines values for GetClusterOptionsParamsProvider.
+const (
+	GetClusterOptionsParamsProviderAws   GetClusterOptionsParamsProvider = "aws"
+	GetClusterOptionsParamsProviderAzure GetClusterOptionsParamsProvider = "azure"
+	GetClusterOptionsParamsProviderGcp   GetClusterOptionsParamsProvider = "gcp"
+)
+
+// Defines values for GetClusterOptionsParamsType.
+const (
+	GetClusterOptionsParamsTypeBRINGYOUROWNCLOUD GetClusterOptionsParamsType = "BRING_YOUR_OWN_CLOUD"
+	GetClusterOptionsParamsTypeHOSTED            GetClusterOptionsParamsType = "HOSTED"
+	GetClusterOptionsParamsTypeSHARED            GetClusterOptionsParamsType = "SHARED"
+	GetClusterOptionsParamsTypeVIRTUALRUNTIMES   GetClusterOptionsParamsType = "VIRTUAL_RUNTIMES"
+)
+
 // Defines values for ListOrganizationsParamsTrialStatus.
 const (
 	ListOrganizationsParamsTrialStatusActive  ListOrganizationsParamsTrialStatus = "active"
@@ -250,17 +265,17 @@ const (
 
 // Defines values for ListClustersParamsProvider.
 const (
-	Aws   ListClustersParamsProvider = "aws"
-	Azure ListClustersParamsProvider = "azure"
-	Gcp   ListClustersParamsProvider = "gcp"
+	ListClustersParamsProviderAws   ListClustersParamsProvider = "aws"
+	ListClustersParamsProviderAzure ListClustersParamsProvider = "azure"
+	ListClustersParamsProviderGcp   ListClustersParamsProvider = "gcp"
 )
 
 // Defines values for ListClustersParamsType.
 const (
-	ListClustersParamsTypeBRINGYOUROWNCLOUD ListClustersParamsType = "BRING_YOUR_OWN_CLOUD"
-	ListClustersParamsTypeHOSTED            ListClustersParamsType = "HOSTED"
-	ListClustersParamsTypeSHARED            ListClustersParamsType = "SHARED"
-	ListClustersParamsTypeVIRTUALRUNTIMES   ListClustersParamsType = "VIRTUAL_RUNTIMES"
+	BRINGYOUROWNCLOUD ListClustersParamsType = "BRING_YOUR_OWN_CLOUD"
+	HOSTED            ListClustersParamsType = "HOSTED"
+	SHARED            ListClustersParamsType = "SHARED"
+	VIRTUALRUNTIMES   ListClustersParamsType = "VIRTUAL_RUNTIMES"
 )
 
 // Defines values for ListClustersParamsStatus.
@@ -325,23 +340,52 @@ const (
 	ListOrgUsersParamsSortsUsernameDesc  ListOrgUsersParamsSorts = "username:desc"
 )
 
+// Defines values for ListWorkspacesParamsSorts.
+const (
+	ListWorkspacesParamsSortsCreatedAtAsc       ListWorkspacesParamsSorts = "createdAt:asc"
+	ListWorkspacesParamsSortsCreatedAtDesc      ListWorkspacesParamsSorts = "createdAt:desc"
+	ListWorkspacesParamsSortsDescriptionAsc     ListWorkspacesParamsSorts = "description:asc"
+	ListWorkspacesParamsSortsDescriptionDesc    ListWorkspacesParamsSorts = "description:desc"
+	ListWorkspacesParamsSortsIdAsc              ListWorkspacesParamsSorts = "id:asc"
+	ListWorkspacesParamsSortsIdDesc             ListWorkspacesParamsSorts = "id:desc"
+	ListWorkspacesParamsSortsNameAsc            ListWorkspacesParamsSorts = "name:asc"
+	ListWorkspacesParamsSortsNameDesc           ListWorkspacesParamsSorts = "name:desc"
+	ListWorkspacesParamsSortsOrganizationIdAsc  ListWorkspacesParamsSorts = "organizationId:asc"
+	ListWorkspacesParamsSortsOrganizationIdDesc ListWorkspacesParamsSorts = "organizationId:desc"
+	ListWorkspacesParamsSortsUpdatedAtAsc       ListWorkspacesParamsSorts = "updatedAt:asc"
+	ListWorkspacesParamsSortsUpdatedAtDesc      ListWorkspacesParamsSorts = "updatedAt:desc"
+)
+
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
-	ListWorkspaceUsersParamsSortsCreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
-	ListWorkspaceUsersParamsSortsCreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
-	ListWorkspaceUsersParamsSortsFullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
-	ListWorkspaceUsersParamsSortsFullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
-	ListWorkspaceUsersParamsSortsIdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
-	ListWorkspaceUsersParamsSortsIdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
-	ListWorkspaceUsersParamsSortsStatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
-	ListWorkspaceUsersParamsSortsStatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
-	ListWorkspaceUsersParamsSortsUpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
-	ListWorkspaceUsersParamsSortsUpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
-	ListWorkspaceUsersParamsSortsUsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
-	ListWorkspaceUsersParamsSortsUsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
-	ListWorkspaceUsersParamsSortsWorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
+	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
+	CreatedAtDesc     ListWorkspaceUsersParamsSorts = "createdAt:desc"
+	FullNameAsc       ListWorkspaceUsersParamsSorts = "fullName:asc"
+	FullNameDesc      ListWorkspaceUsersParamsSorts = "fullName:desc"
+	IdAsc             ListWorkspaceUsersParamsSorts = "id:asc"
+	IdDesc            ListWorkspaceUsersParamsSorts = "id:desc"
+	StatusAsc         ListWorkspaceUsersParamsSorts = "status:asc"
+	StatusDesc        ListWorkspaceUsersParamsSorts = "status:desc"
+	UpdatedAtAsc      ListWorkspaceUsersParamsSorts = "updatedAt:asc"
+	UpdatedAtDesc     ListWorkspaceUsersParamsSorts = "updatedAt:desc"
+	UsernameAsc       ListWorkspaceUsersParamsSorts = "username:asc"
+	UsernameDesc      ListWorkspaceUsersParamsSorts = "username:desc"
+	WorkspaceRoleAsc  ListWorkspaceUsersParamsSorts = "workspaceRole:asc"
+	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
+
+// AstroBaseUnit defines model for AstroBaseUnit.
+type AstroBaseUnit struct {
+	Cpu    int `json:"cpu"`
+	Memory int `json:"memory"`
+}
+
+// AuConfigs defines model for AuConfigs.
+type AuConfigs struct {
+	Default int  `json:"default"`
+	Limit   int  `json:"limit"`
+	Request *int `json:"request,omitempty"`
+}
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
 type BasicSubjectProfile struct {
@@ -446,6 +490,25 @@ type ClusterMetadata struct {
 	ExternalIPs *[]string `json:"externalIPs,omitempty"`
 }
 
+// ClusterOptions defines model for ClusterOptions.
+type ClusterOptions struct {
+	DatabaseInstances          []ProviderInstanceType `json:"databaseInstances"`
+	DefaultDatabaseInstance    ProviderInstanceType   `json:"defaultDatabaseInstance"`
+	DefaultNodeInstance        ProviderInstanceType   `json:"defaultNodeInstance"`
+	DefaultPodSubnetRange      *string                `json:"defaultPodSubnetRange,omitempty"`
+	DefaultRegion              ProviderRegion         `json:"defaultRegion"`
+	DefaultServicePeeringRange *string                `json:"defaultServicePeeringRange,omitempty"`
+	DefaultServiceSubnetRange  *string                `json:"defaultServiceSubnetRange,omitempty"`
+	DefaultVpcSubnetRange      string                 `json:"defaultVpcSubnetRange"`
+	NodeCountDefault           int                    `json:"nodeCountDefault"`
+	NodeCountMax               int                    `json:"nodeCountMax"`
+	NodeCountMin               int                    `json:"nodeCountMin"`
+	NodeInstances              []ProviderInstanceType `json:"nodeInstances"`
+	Provider                   string                 `json:"provider"`
+	Regions                    []ProviderRegion       `json:"regions"`
+	TemplateVersions           []TemplateVersion      `json:"templateVersions"`
+}
+
 // ClusterTag defines model for ClusterTag.
 type ClusterTag struct {
 	Key   *string `json:"key,omitempty"`
@@ -458,6 +521,17 @@ type ClustersPaginated struct {
 	Limit      int       `json:"limit"`
 	Offset     int       `json:"offset"`
 	TotalCount int       `json:"totalCount"`
+}
+
+// ComponentsOptions defines model for ComponentsOptions.
+type ComponentsOptions struct {
+	Scheduler ContainerOptions `json:"scheduler"`
+	Workers   ContainerOptions `json:"workers"`
+}
+
+// ContainerOptions defines model for ContainerOptions.
+type ContainerOptions struct {
+	Au AuConfigs `json:"au"`
 }
 
 // CreateAwsClusterRequest defines model for CreateAwsClusterRequest.
@@ -545,6 +619,13 @@ type CreateSsoConnectionRequest struct {
 type CreateUserInviteRequest struct {
 	InviteeEmail string `json:"inviteeEmail"`
 	Role         string `json:"role"`
+}
+
+// DeploymentOptions defines model for DeploymentOptions.
+type DeploymentOptions struct {
+	AstroUnit       AstroBaseUnit     `json:"astroUnit"`
+	Components      ComponentsOptions `json:"components"`
+	RuntimeReleases []RuntimeRelease  `json:"runtimeReleases"`
 }
 
 // Entitlement defines model for Entitlement.
@@ -646,6 +727,13 @@ type JitPolicy struct {
 	DefaultWorkspaceRoles *[]WorkspaceRole `json:"defaultWorkspaceRoles,omitempty"`
 }
 
+// ListWorkspacePipelines defines model for ListWorkspacePipelines.
+type ListWorkspacePipelines struct {
+	Items      []WorkspacePipeline `json:"items"`
+	NextCursor *string             `json:"nextCursor,omitempty"`
+	Warnings   *[]string           `json:"warnings,omitempty"`
+}
+
 // ManagedDomain defines model for ManagedDomain.
 type ManagedDomain struct {
 	CreatedAt      time.Time           `json:"createdAt"`
@@ -669,6 +757,13 @@ type MutateOrgUserRoleRequest struct {
 type MutateOrganizationRequest struct {
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 	Name     string                  `json:"name"`
+}
+
+// MutateWorkspaceRequest defines model for MutateWorkspaceRequest.
+type MutateWorkspaceRequest struct {
+	ApiKeyOnlyDeploymentsDefault *bool   `json:"apiKeyOnlyDeploymentsDefault,omitempty"`
+	Description                  *string `json:"description,omitempty"`
+	Name                         string  `json:"name"`
 }
 
 // MutateWorkspaceUserRoleRequest defines model for MutateWorkspaceUserRoleRequest.
@@ -726,6 +821,20 @@ type PostLoginEvent struct {
 	User         EventUser               `json:"user"`
 }
 
+// ProviderInstanceType defines model for ProviderInstanceType.
+type ProviderInstanceType struct {
+	Cpu  int    `json:"cpu"`
+	Name string `json:"name"`
+	Ram  string `json:"ram"`
+}
+
+// ProviderRegion defines model for ProviderRegion.
+type ProviderRegion struct {
+	BannedInstances *[]string `json:"bannedInstances,omitempty"`
+	Limited         *bool     `json:"limited,omitempty"`
+	Name            string    `json:"name"`
+}
+
 // RunGroup defines model for RunGroup.
 type RunGroup struct {
 	Children          *[]RunGroup     `json:"children,omitempty"`
@@ -736,6 +845,16 @@ type RunGroup struct {
 	Label             *string         `json:"label,omitempty"`
 	Operator          *string         `json:"operator,omitempty"`
 	TaskInstances     *[]TaskInstance `json:"taskInstances,omitempty"`
+}
+
+// RuntimeRelease defines model for RuntimeRelease.
+type RuntimeRelease struct {
+	AirflowDatabaseMigration bool   `json:"airflowDatabaseMigration"`
+	AirflowVersion           string `json:"airflowVersion"`
+	Channel                  string `json:"channel"`
+	ReleaseDate              string `json:"releaseDate"`
+	StellarDatabaseMigration bool   `json:"stellarDatabaseMigration"`
+	Version                  string `json:"version"`
 }
 
 // Scope defines model for Scope.
@@ -873,6 +992,12 @@ type TaskInstance struct {
 // TaskInstanceState defines model for TaskInstance.State.
 type TaskInstanceState string
 
+// TemplateVersion defines model for TemplateVersion.
+type TemplateVersion struct {
+	Url     *string `json:"url,omitempty"`
+	Version string  `json:"version"`
+}
+
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
 type UpdateAwsClusterRequest struct {
 	DbInstanceType  string                  `json:"dbInstanceType"`
@@ -993,10 +1118,82 @@ type ValidateSsoLoginRequest struct {
 	Event PostLoginEvent `json:"event"`
 }
 
+// Workspace defines model for Workspace.
+type Workspace struct {
+	ApiKeyOnlyDeploymentsDefault bool                 `json:"apiKeyOnlyDeploymentsDefault"`
+	CreatedAt                    time.Time            `json:"createdAt"`
+	CreatedBy                    *BasicSubjectProfile `json:"createdBy,omitempty"`
+	DeploymentCount              *int                 `json:"deploymentCount,omitempty"`
+	Description                  *string              `json:"description,omitempty"`
+	Id                           string               `json:"id"`
+	Name                         string               `json:"name"`
+	OrgShortName                 *string              `json:"orgShortName,omitempty"`
+	OrganizationId               string               `json:"organizationId"`
+	OrganizationName             *string              `json:"organizationName,omitempty"`
+	ServerlessRuntimeCount       *int                 `json:"serverlessRuntimeCount,omitempty"`
+	UpdatedAt                    time.Time            `json:"updatedAt"`
+	UpdatedBy                    *BasicSubjectProfile `json:"updatedBy,omitempty"`
+	UserCount                    *int                 `json:"userCount,omitempty"`
+}
+
+// WorkspacePipeline defines model for WorkspacePipeline.
+type WorkspacePipeline struct {
+	DagId        string                  `json:"dagId"`
+	DeploymentId string                  `json:"deploymentId"`
+	IsActive     *bool                   `json:"isActive,omitempty"`
+	IsPaused     bool                    `json:"isPaused"`
+	NextRunAt    *string                 `json:"nextRunAt,omitempty"`
+	Owners       *[]string               `json:"owners,omitempty"`
+	PipelineRuns *[]WorkspacePipelineRun `json:"pipelineRuns,omitempty"`
+	Schedule     string                  `json:"schedule"`
+	Tags         *[]string               `json:"tags,omitempty"`
+}
+
+// WorkspacePipelineRun defines model for WorkspacePipelineRun.
+type WorkspacePipelineRun struct {
+	EndDate     *string `json:"endDate,omitempty"`
+	LogicalDate string  `json:"logicalDate"`
+	RunId       string  `json:"runId"`
+	StartDate   *string `json:"startDate,omitempty"`
+	State       string  `json:"state"`
+}
+
 // WorkspaceRole defines model for WorkspaceRole.
 type WorkspaceRole struct {
 	WorkspaceId   string `json:"workspaceId"`
 	WorkspaceRole string `json:"workspaceRole"`
+}
+
+// WorkspacesPaginated defines model for WorkspacesPaginated.
+type WorkspacesPaginated struct {
+	Limit      int         `json:"limit"`
+	Offset     int         `json:"offset"`
+	TotalCount int         `json:"totalCount"`
+	Workspaces []Workspace `json:"workspaces"`
+}
+
+// InternalTask defines model for internal_Task.
+type InternalTask struct {
+	ExtraLinks        *[]string `json:"extraLinks,omitempty"`
+	HasOutletDatasets *bool     `json:"hasOutletDatasets,omitempty"`
+	Id                *string   `json:"id,omitempty"`
+	IsMapped          *bool     `json:"isMapped,omitempty"`
+	Label             *string   `json:"label,omitempty"`
+	Operator          *string   `json:"operator,omitempty"`
+}
+
+// InternalTaskGroup defines model for internal_TaskGroup.
+type InternalTaskGroup struct {
+	Children *[]InternalTaskGroupChildrenInner `json:"children,omitempty"`
+	Id       *string                           `json:"id,omitempty"`
+	Label    *string                           `json:"label,omitempty"`
+	Tooltip  *string                           `json:"tooltip,omitempty"`
+}
+
+// InternalTaskGroupChildrenInner defines model for internal_TaskGroupChildrenInner.
+type InternalTaskGroupChildrenInner struct {
+	Task      *InternalTask      `json:"task,omitempty"`
+	TaskGroup *InternalTaskGroup `json:"taskGroup,omitempty"`
 }
 
 // GetSharedClusterParams defines parameters for GetSharedCluster.
@@ -1010,6 +1207,21 @@ type GetSharedClusterParams struct {
 
 // GetSharedClusterParamsCloudProvider defines parameters for GetSharedCluster.
 type GetSharedClusterParamsCloudProvider string
+
+// GetClusterOptionsParams defines parameters for GetClusterOptions.
+type GetClusterOptionsParams struct {
+	// Provider cloud provider
+	Provider *GetClusterOptionsParamsProvider `form:"provider,omitempty" json:"provider,omitempty"`
+
+	// Type cluster type
+	Type GetClusterOptionsParamsType `form:"type" json:"type"`
+}
+
+// GetClusterOptionsParamsProvider defines parameters for GetClusterOptions.
+type GetClusterOptionsParamsProvider string
+
+// GetClusterOptionsParamsType defines parameters for GetClusterOptions.
+type GetClusterOptionsParamsType string
 
 // ListOrganizationAuthIdsParams defines parameters for ListOrganizationAuthIds.
 type ListOrganizationAuthIdsParams struct {
@@ -1116,6 +1328,72 @@ type ListOrgUsersParams struct {
 // ListOrgUsersParamsSorts defines parameters for ListOrgUsers.
 type ListOrgUsersParamsSorts string
 
+// ListWorkspacesParams defines parameters for ListWorkspaces.
+type ListWorkspacesParams struct {
+	// WorkspaceIds list of workspace ids to get detail of, separated by comma
+	WorkspaceIds *string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
+
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListWorkspacesParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Search string to search for when listing workspaces
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
+// ListWorkspacesParamsSorts defines parameters for ListWorkspaces.
+type ListWorkspacesParamsSorts string
+
+// ListWorkspacePipelinesParams defines parameters for ListWorkspacePipelines.
+type ListWorkspacePipelinesParams struct {
+	// PageSize page size, default of 20
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// OrderBy order-by fields, comma separated
+	OrderBy *[]string `form:"orderBy,omitempty" json:"orderBy,omitempty"`
+
+	// Cursor pagination cursor
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// NumRuns number of runs to include per pipeline, default of 0
+	NumRuns *int `form:"numRuns,omitempty" json:"numRuns,omitempty"`
+
+	// Name filter by name of DAG (dagId)
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// NameLike filter by pattern for name of DAG (dagId),  SQL  syntax
+	NameLike *string `form:"name__like,omitempty" json:"name__like,omitempty"`
+
+	// Owner filter by an owner of the pipeline
+	Owner *string `form:"owner,omitempty" json:"owner,omitempty"`
+
+	// IsPaused filter by paused pipelines
+	IsPaused *bool `form:"isPaused,omitempty" json:"isPaused,omitempty"`
+
+	// IsActive filter by active pipelines
+	IsActive *bool `form:"isActive,omitempty" json:"isActive,omitempty"`
+
+	// LastRunStateIn filter by pipeline runs with any of these run states for its last run
+	LastRunStateIn *[]string `form:"lastRunState__in,omitempty" json:"lastRunState__in,omitempty"`
+
+	// RunStateIn filter by pipeline runs with any of these run states
+	RunStateIn *[]string `form:"runState__in,omitempty" json:"runState__in,omitempty"`
+
+	// RunAfter filter by pipeline run after specified datetime (RFC3339 format)
+	RunAfter *time.Time `form:"runAfter,omitempty" json:"runAfter,omitempty"`
+
+	// TagIn filter by any of these tags
+	TagIn *[]string `form:"tag__in,omitempty" json:"tag__in,omitempty"`
+
+	// DeploymentIdIn filter by any of these deployment IDs
+	DeploymentIdIn *[]string `form:"deploymentId__in,omitempty" json:"deploymentId__in,omitempty"`
+}
+
 // ListWorkspaceUsersParams defines parameters for ListWorkspaceUsers.
 type ListWorkspaceUsersParams struct {
 	// Offset offset for pagination
@@ -1184,6 +1462,12 @@ type UpdateSsoConnectionJSONRequestBody = UpdateSsoConnectionRequest
 
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
+
+// CreateWorkspaceJSONRequestBody defines body for CreateWorkspace for application/json ContentType.
+type CreateWorkspaceJSONRequestBody = MutateWorkspaceRequest
+
+// UpdateWorkspaceJSONRequestBody defines body for UpdateWorkspace for application/json ContentType.
+type UpdateWorkspaceJSONRequestBody = MutateWorkspaceRequest
 
 // MutateWorkspaceUserRoleJSONRequestBody defines body for MutateWorkspaceUserRole for application/json ContentType.
 type MutateWorkspaceUserRoleJSONRequestBody = MutateWorkspaceUserRoleRequest
@@ -1274,6 +1558,12 @@ type ClientInterface interface {
 
 	// GetSharedCluster request
 	GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetClusterOptions request
+	GetClusterOptions(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeploymentOptions request
+	GetDeploymentOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIds(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1408,6 +1698,28 @@ type ClientInterface interface {
 
 	MutateOrgUserRole(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListWorkspaces request
+	ListWorkspaces(ctx context.Context, orgShortNameId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWorkspace request with any body
+	CreateWorkspaceWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateWorkspace(ctx context.Context, orgShortNameId string, body CreateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteWorkspace request
+	DeleteWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetWorkspace request
+	GetWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWorkspace request with any body
+	UpdateWorkspaceWithBody(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkspacePipelines request
+	ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListWorkspaceUsers request
 	ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1466,6 +1778,30 @@ func (c *Client) ValidateSsoLogin(ctx context.Context, body ValidateSsoLoginJSON
 
 func (c *Client) GetSharedCluster(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSharedClusterRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetClusterOptions(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetClusterOptionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDeploymentOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeploymentOptionsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2064,6 +2400,102 @@ func (c *Client) MutateOrgUserRole(ctx context.Context, orgShortNameId string, u
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListWorkspaces(ctx context.Context, orgShortNameId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspacesRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkspaceWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkspaceRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkspace(ctx context.Context, orgShortNameId string, body CreateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkspaceRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWorkspaceRequest(c.Server, orgShortNameId, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetWorkspaceRequest(c.Server, orgShortNameId, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkspaceWithBody(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkspaceRequestWithBody(c.Server, orgShortNameId, workspaceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkspaceRequest(c.Server, orgShortNameId, workspaceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspacePipelinesRequest(c.Server, orgShortNameId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWorkspaceUsersRequest(c.Server, orgShortNameId, workspaceId, params)
 	if err != nil {
@@ -2268,6 +2700,92 @@ func NewGetSharedClusterRequest(server string, params *GetSharedClusterParams) (
 	}
 
 	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetClusterOptionsRequest generates requests for GetClusterOptions
+func NewGetClusterOptionsRequest(server string, params *GetClusterOptionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/options/cluster")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Provider != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "provider", runtime.ParamLocationQuery, *params.Provider); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if queryFrag, err := runtime.StyleParamWithLocation("form", true, "type", runtime.ParamLocationQuery, params.Type); err != nil {
+		return nil, err
+	} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+		return nil, err
+	} else {
+		for k, v := range parsed {
+			for _, v2 := range v {
+				queryValues.Add(k, v2)
+			}
+		}
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDeploymentOptionsRequest generates requests for GetDeploymentOptions
+func NewGetDeploymentOptionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/options/deployment")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -4080,6 +4598,576 @@ func NewMutateOrgUserRoleRequestWithBody(server string, orgShortNameId string, u
 	return req, nil
 }
 
+// NewListWorkspacesRequest generates requests for ListWorkspaces
+func NewListWorkspacesRequest(server string, orgShortNameId string, params *ListWorkspacesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.WorkspaceIds != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "workspaceIds", runtime.ParamLocationQuery, *params.WorkspaceIds); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateWorkspaceRequest calls the generic CreateWorkspace builder with application/json body
+func NewCreateWorkspaceRequest(server string, orgShortNameId string, body CreateWorkspaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateWorkspaceRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateWorkspaceRequestWithBody generates requests for CreateWorkspace with any type of body
+func NewCreateWorkspaceRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteWorkspaceRequest generates requests for DeleteWorkspace
+func NewDeleteWorkspaceRequest(server string, orgShortNameId string, workspaceId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetWorkspaceRequest generates requests for GetWorkspace
+func NewGetWorkspaceRequest(server string, orgShortNameId string, workspaceId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateWorkspaceRequest calls the generic UpdateWorkspace builder with application/json body
+func NewUpdateWorkspaceRequest(server string, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateWorkspaceRequestWithBody(server, orgShortNameId, workspaceId, "application/json", bodyReader)
+}
+
+// NewUpdateWorkspaceRequestWithBody generates requests for UpdateWorkspace with any type of body
+func NewUpdateWorkspaceRequestWithBody(server string, orgShortNameId string, workspaceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListWorkspacePipelinesRequest generates requests for ListWorkspacePipelines
+func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/pipelines", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.PageSize != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.OrderBy != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "orderBy", runtime.ParamLocationQuery, *params.OrderBy); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Cursor != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cursor", runtime.ParamLocationQuery, *params.Cursor); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.NumRuns != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "numRuns", runtime.ParamLocationQuery, *params.NumRuns); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Name != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name", runtime.ParamLocationQuery, *params.Name); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.NameLike != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name__like", runtime.ParamLocationQuery, *params.NameLike); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Owner != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "owner", runtime.ParamLocationQuery, *params.Owner); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IsPaused != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "isPaused", runtime.ParamLocationQuery, *params.IsPaused); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IsActive != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "isActive", runtime.ParamLocationQuery, *params.IsActive); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.LastRunStateIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "lastRunState__in", runtime.ParamLocationQuery, *params.LastRunStateIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.RunStateIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runState__in", runtime.ParamLocationQuery, *params.RunStateIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.RunAfter != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runAfter", runtime.ParamLocationQuery, *params.RunAfter); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.TagIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tag__in", runtime.ParamLocationQuery, *params.TagIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.DeploymentIdIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId__in", runtime.ParamLocationQuery, *params.DeploymentIdIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListWorkspaceUsersRequest generates requests for ListWorkspaceUsers
 func NewListWorkspaceUsersRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams) (*http.Request, error) {
 	var err error
@@ -4446,6 +5534,12 @@ type ClientWithResponsesInterface interface {
 	// GetSharedCluster request
 	GetSharedClusterWithResponse(ctx context.Context, params *GetSharedClusterParams, reqEditors ...RequestEditorFn) (*GetSharedClusterResponse, error)
 
+	// GetClusterOptions request
+	GetClusterOptionsWithResponse(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error)
+
+	// GetDeploymentOptions request
+	GetDeploymentOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error)
+
 	// ListOrganizationAuthIds request
 	ListOrganizationAuthIdsWithResponse(ctx context.Context, params *ListOrganizationAuthIdsParams, reqEditors ...RequestEditorFn) (*ListOrganizationAuthIdsResponse, error)
 
@@ -4579,6 +5673,28 @@ type ClientWithResponsesInterface interface {
 
 	MutateOrgUserRoleWithResponse(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
 
+	// ListWorkspaces request
+	ListWorkspacesWithResponse(ctx context.Context, orgShortNameId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error)
+
+	// CreateWorkspace request with any body
+	CreateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkspaceResponse, error)
+
+	CreateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, body CreateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkspaceResponse, error)
+
+	// DeleteWorkspace request
+	DeleteWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceResponse, error)
+
+	// GetWorkspace request
+	GetWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*GetWorkspaceResponse, error)
+
+	// UpdateWorkspace request with any body
+	UpdateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error)
+
+	UpdateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error)
+
+	// ListWorkspacePipelines request
+	ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error)
+
 	// ListWorkspaceUsers request
 	ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error)
 
@@ -4674,6 +5790,59 @@ func (r GetSharedClusterResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetSharedClusterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetClusterOptionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]ClusterOptions
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetClusterOptionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetClusterOptionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDeploymentOptionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentOptions
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeploymentOptionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeploymentOptionsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -5620,6 +6789,167 @@ func (r MutateOrgUserRoleResponse) StatusCode() int {
 	return 0
 }
 
+type ListWorkspacesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *WorkspacesPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkspacesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkspacesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateWorkspaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Workspace
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateWorkspaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateWorkspaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteWorkspaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Workspace
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteWorkspaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteWorkspaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetWorkspaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Workspace
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetWorkspaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetWorkspaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateWorkspaceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Workspace
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWorkspaceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWorkspaceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListWorkspacePipelinesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListWorkspacePipelines
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkspacePipelinesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkspacePipelinesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspaceUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -5787,6 +7117,24 @@ func (c *ClientWithResponses) GetSharedClusterWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseGetSharedClusterResponse(rsp)
+}
+
+// GetClusterOptionsWithResponse request returning *GetClusterOptionsResponse
+func (c *ClientWithResponses) GetClusterOptionsWithResponse(ctx context.Context, params *GetClusterOptionsParams, reqEditors ...RequestEditorFn) (*GetClusterOptionsResponse, error) {
+	rsp, err := c.GetClusterOptions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetClusterOptionsResponse(rsp)
+}
+
+// GetDeploymentOptionsWithResponse request returning *GetDeploymentOptionsResponse
+func (c *ClientWithResponses) GetDeploymentOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDeploymentOptionsResponse, error) {
+	rsp, err := c.GetDeploymentOptions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeploymentOptionsResponse(rsp)
 }
 
 // ListOrganizationAuthIdsWithResponse request returning *ListOrganizationAuthIdsResponse
@@ -6216,6 +7564,76 @@ func (c *ClientWithResponses) MutateOrgUserRoleWithResponse(ctx context.Context,
 	return ParseMutateOrgUserRoleResponse(rsp)
 }
 
+// ListWorkspacesWithResponse request returning *ListWorkspacesResponse
+func (c *ClientWithResponses) ListWorkspacesWithResponse(ctx context.Context, orgShortNameId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error) {
+	rsp, err := c.ListWorkspaces(ctx, orgShortNameId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkspacesResponse(rsp)
+}
+
+// CreateWorkspaceWithBodyWithResponse request with arbitrary body returning *CreateWorkspaceResponse
+func (c *ClientWithResponses) CreateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkspaceResponse, error) {
+	rsp, err := c.CreateWorkspaceWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkspaceResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, body CreateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkspaceResponse, error) {
+	rsp, err := c.CreateWorkspace(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkspaceResponse(rsp)
+}
+
+// DeleteWorkspaceWithResponse request returning *DeleteWorkspaceResponse
+func (c *ClientWithResponses) DeleteWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceResponse, error) {
+	rsp, err := c.DeleteWorkspace(ctx, orgShortNameId, workspaceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteWorkspaceResponse(rsp)
+}
+
+// GetWorkspaceWithResponse request returning *GetWorkspaceResponse
+func (c *ClientWithResponses) GetWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*GetWorkspaceResponse, error) {
+	rsp, err := c.GetWorkspace(ctx, orgShortNameId, workspaceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetWorkspaceResponse(rsp)
+}
+
+// UpdateWorkspaceWithBodyWithResponse request with arbitrary body returning *UpdateWorkspaceResponse
+func (c *ClientWithResponses) UpdateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error) {
+	rsp, err := c.UpdateWorkspaceWithBody(ctx, orgShortNameId, workspaceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkspaceResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error) {
+	rsp, err := c.UpdateWorkspace(ctx, orgShortNameId, workspaceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkspaceResponse(rsp)
+}
+
+// ListWorkspacePipelinesWithResponse request returning *ListWorkspacePipelinesResponse
+func (c *ClientWithResponses) ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspacePipelinesParams, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error) {
+	rsp, err := c.ListWorkspacePipelines(ctx, orgShortNameId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkspacePipelinesResponse(rsp)
+}
+
 // ListWorkspaceUsersWithResponse request returning *ListWorkspaceUsersResponse
 func (c *ClientWithResponses) ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error) {
 	rsp, err := c.ListWorkspaceUsers(ctx, orgShortNameId, workspaceId, params, reqEditors...)
@@ -6447,6 +7865,121 @@ func ParseGetSharedClusterResponse(rsp *http.Response) (*GetSharedClusterRespons
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetClusterOptionsResponse parses an HTTP response from a GetClusterOptionsWithResponse call
+func ParseGetClusterOptionsResponse(rsp *http.Response) (*GetClusterOptionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetClusterOptionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ClusterOptions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeploymentOptionsResponse parses an HTTP response from a GetDeploymentOptionsWithResponse call
+func ParseGetDeploymentOptionsResponse(rsp *http.Response) (*GetDeploymentOptionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeploymentOptionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentOptions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
@@ -8515,6 +10048,365 @@ func ParseMutateOrgUserRoleResponse(rsp *http.Response) (*MutateOrgUserRoleRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest UserRole
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkspacesResponse parses an HTTP response from a ListWorkspacesWithResponse call
+func ParseListWorkspacesResponse(rsp *http.Response) (*ListWorkspacesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkspacesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkspacesPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateWorkspaceResponse parses an HTTP response from a CreateWorkspaceWithResponse call
+func ParseCreateWorkspaceResponse(rsp *http.Response) (*CreateWorkspaceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateWorkspaceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Workspace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteWorkspaceResponse parses an HTTP response from a DeleteWorkspaceWithResponse call
+func ParseDeleteWorkspaceResponse(rsp *http.Response) (*DeleteWorkspaceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteWorkspaceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Workspace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetWorkspaceResponse parses an HTTP response from a GetWorkspaceWithResponse call
+func ParseGetWorkspaceResponse(rsp *http.Response) (*GetWorkspaceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetWorkspaceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Workspace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateWorkspaceResponse parses an HTTP response from a UpdateWorkspaceWithResponse call
+func ParseUpdateWorkspaceResponse(rsp *http.Response) (*UpdateWorkspaceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateWorkspaceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Workspace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkspacePipelinesResponse parses an HTTP response from a ListWorkspacePipelinesWithResponse call
+func ParseListWorkspacePipelinesResponse(rsp *http.Response) (*ListWorkspacePipelinesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkspacePipelinesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListWorkspacePipelines
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

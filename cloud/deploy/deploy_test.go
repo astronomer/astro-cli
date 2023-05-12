@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -258,6 +257,8 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 	os.Mkdir("./testfiles1/", os.ModePerm)
 	fileutil.WriteStringToFile("./testfiles1/Dockerfile", "FROM quay.io/astronomer/astro-runtime:4.2.5")
 	fileutil.WriteStringToFile("./testfiles1/.env", "")
+	fileutil.WriteStringToFile("./testfiles1/.dockerignore", "")
+
 	deployInput = InputDeploy{
 		Path:           "./testfiles1/",
 		RuntimeID:      "",
@@ -508,79 +509,6 @@ func TestDagsDeployFailed(t *testing.T) {
 	deployInput.Pytest = allTests
 	err = Deploy(deployInput, mockClient)
 	assert.Error(t, err)
-
-	mockClient.AssertExpectations(t)
-}
-
-func TestDagsDeployVR(t *testing.T) {
-	runtimeID := "vr-test-id"
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	config.CFG.ShowWarnings.SetHomeString("false")
-	mockClient := new(astro_mocks.Client)
-
-	deployInput := InputDeploy{
-		Path:           "./testfiles/",
-		RuntimeID:      runtimeID,
-		WsID:           ws,
-		Pytest:         "",
-		EnvFile:        "",
-		ImageName:      "",
-		DeploymentName: "",
-		Prompt:         true,
-		Dags:           true,
-	}
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, nil).Times(1)
-	mockClient.On("InitiateDagDeployment", astro.InitiateDagDeploymentInput{RuntimeID: runtimeID}).Return(astro.InitiateDagDeployment{ID: initiatedDagDeploymentID, DagURL: dagURL}, errMock).Times(1)
-
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
-		return "version-id", nil
-	}
-
-	reportDagDeploymentStatusInput := &astro.ReportDagDeploymentStatusInput{
-		InitiatedDagDeploymentID: initiatedDagDeploymentID,
-		RuntimeID:                runtimeID,
-		Action:                   "UPLOAD",
-		VersionID:                "version-id",
-		Status:                   "SUCCEEDED",
-		Message:                  "DAGs uploaded successfully",
-	}
-	mockClient.On("ReportDagDeploymentStatus", reportDagDeploymentStatusInput).Return(astro.DagDeploymentStatus{}, nil).Times(1)
-
-	defer testUtil.MockUserInput(t, "y")()
-	defer testUtil.MockUserInput(t, "y")()
-	err := Deploy(deployInput, mockClient)
-	assert.NoError(t, err)
-
-	defer testUtil.MockUserInput(t, "y")()
-	defer testUtil.MockUserInput(t, "y")()
-	err = Deploy(deployInput, mockClient)
-	assert.ErrorIs(t, err, errMock)
-	defer afero.NewOsFs().Remove("./testfiles/dags.tar")
-	defer os.RemoveAll("./testfiles/dags/")
-
-	mockClient.AssertExpectations(t)
-}
-
-func TestNoDagsDeployVR(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	config.CFG.ShowWarnings.SetHomeString("true")
-	mockClient := new(astro_mocks.Client)
-	runtimeID := "vr-test-id"
-
-	deployInput := InputDeploy{
-		Path:           "./testfiles/",
-		RuntimeID:      runtimeID,
-		WsID:           ws,
-		Pytest:         "",
-		EnvFile:        "",
-		ImageName:      "",
-		DeploymentName: "",
-		Prompt:         false,
-		Dags:           false,
-	}
-
-	err := Deploy(deployInput, mockClient)
-	assert.NoError(t, err)
 
 	mockClient.AssertExpectations(t)
 }

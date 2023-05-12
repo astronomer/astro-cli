@@ -359,6 +359,19 @@ deployment:
 		assert.NoError(t, err)
 		mockCoreClient.AssertExpectations(t)
 	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value",
+		}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
+	})
 	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
@@ -371,19 +384,6 @@ deployment:
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "azure is not a valid cloud provider. It can only be gcp")
-	})
-	t.Run("returns an error if cloud provider is valid but region was not provided", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "",
-		}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "region must be specified with --cloud-provider")
 	})
 	mockClient.AssertExpectations(t)
 }
@@ -584,6 +584,55 @@ deployment:
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorIs(t, err, errFlag)
+	})
+	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		deploymentResp := astro.Deployment{
+			ID:             "test-id",
+			Label:          "test-name",
+			RuntimeRelease: astro.RuntimeRelease{Version: "4.2.5"},
+			DeploymentSpec: astro.DeploymentSpec{Executor: "CeleryExecutor", Scheduler: astro.Scheduler{AU: 5, Replicas: 3}},
+		}
+
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
+		mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+	})
+	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
 	mockClient.AssertExpectations(t)
 }

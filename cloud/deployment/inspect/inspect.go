@@ -136,8 +136,10 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		return nil, err
 	}
 	clusterID := sourceDeployment.Cluster.ID
+	releaseName := sourceDeployment.ReleaseName
 	if organization.IsOrgHosted() {
-		clusterID = notApplicable
+		clusterID = sourceDeployment.Cluster.Region
+		releaseName = notApplicable
 	}
 	return map[string]interface{}{
 		"deployment_id":   sourceDeployment.ID,
@@ -145,7 +147,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 		"cluster_id":      clusterID,
 		"airflow_version": sourceDeployment.RuntimeRelease.AirflowVersion,
 		"current_tag":     sourceDeployment.DeploymentSpec.Image.Tag,
-		"release_name":    sourceDeployment.ReleaseName,
+		"release_name":    releaseName,
 		"deployment_url":  deploymentURL,
 		"webserver_url":   sourceDeployment.DeploymentSpec.Webserver.URL,
 		"created_at":      sourceDeployment.CreatedAt,
@@ -157,7 +159,7 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
 	clusterName := sourceDeployment.Cluster.Name
 	if organization.IsOrgHosted() {
-		clusterName = notApplicable
+		clusterName = sourceDeployment.Cluster.Region
 	}
 	return map[string]interface{}{
 		"name":               sourceDeployment.Label,
@@ -179,6 +181,36 @@ func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
 		"worker_queues":         qList,
 		"environment_variables": getVariablesMap(sourceDeployment.DeploymentSpec.EnvironmentVariablesObjects), // API only returns values when !EnvironmentVariablesObject.isSecret
 	}
+}
+
+func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astro.Client, requestedField string) (value any, err error) {
+	var (
+		requestedDeployment                                                        astro.Deployment
+		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
+	)
+	// get or select the deployment
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// create a map for deployment.information
+	deploymentInfoMap, err = getDeploymentInfo(&requestedDeployment)
+	if err != nil {
+		return nil, err
+	}
+	// create a map for deployment.configuration
+	deploymentConfigMap = getDeploymentConfig(&requestedDeployment)
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
+	additionalMap = getAdditional(&requestedDeployment)
+	// create a map for the entire deployment
+	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
+
+	value, err = getSpecificField(printableDeployment, requestedField)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
 }
 
 func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {

@@ -44,9 +44,12 @@ var (
 			label
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name
+				region
 			}
 			runtimeRelease {
 				version
@@ -86,9 +89,12 @@ var (
 			label
 			releaseName
 			dagDeployEnabled
+			schedulerSize
+			isHighAvailability
 			cluster {
 				id
 				name
+				region
 			}
 			runtimeRelease {
 				version
@@ -115,16 +121,6 @@ var (
 		updatedAt
 	  }
 	}
-  `
-	CreateUserInvite = `
-  	mutation createUserInvite($input: CreateUserInviteInput!) {
-	  createUserInvite(input: $input) {
-			userId
-			organizationId
-			oauthInviteId
-			expiresAt
-	  }
-  	}
   `
 	DagDeploymentInitiate = `
 	mutation initiateDagDeployment($input: InitiateDagDeploymentInput!) {

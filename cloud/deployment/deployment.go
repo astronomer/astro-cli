@@ -28,6 +28,7 @@ import (
 var (
 	errInvalidDeployment    = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
+	ErrInvalidRegionKey     = errors.New("invalid Region selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
 	// Monkey patched to write unit tests
 	createDeployment = Create
@@ -39,6 +40,7 @@ const (
 	KubeExecutor   = "KubernetesExecutor"
 	CeleryExecutor = "CeleryExecutor"
 	notApplicable  = "N/A"
+	gcpCloud       = "gcp"
 )
 
 var (
@@ -85,14 +87,17 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 	for i := range deployments {
 		d := deployments[i]
 		clusterName := d.Cluster.Name
-		if organization.IsOrgHosted() {
-			clusterName = notApplicable
-		}
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
+		releaseName := d.ReleaseName
+		if organization.IsOrgHosted() {
+			clusterName = d.Cluster.Region
+			releaseName = notApplicable
+		}
+
 		if all {
-			tab.AddRow([]string{d.Label, d.Workspace.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+			tab.AddRow([]string{d.Label, d.Workspace.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		} else {
-			tab.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+			tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		}
 	}
 
@@ -149,7 +154,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus, highAvailability bool) error { //nolint
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -228,6 +233,14 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
+	if region == "" && organization.IsOrgHosted() {
+		// select and validate region
+		region, err = selectRegion(cloudProvider, region, coreClient)
+		if err != nil {
+			return err
+		}
+	}
+
 	// select and validate cluster
 	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID, client, coreClient)
 	if err != nil {
@@ -262,7 +275,10 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 
 	if organization.IsOrgHosted() {
 		createInput.SchedulerSize = schedulerSize
-		createInput.IsHighAvailability = highAvailability
+		createInput.IsHighAvailability = false
+		if highAvailability == "enable" { //nolint: goconst
+			createInput.IsHighAvailability = true
+		}
 	}
 
 	// Create request
@@ -295,10 +311,12 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 	clusterName := d.Cluster.Name
+	releaseName := d.ReleaseName
 	if organization.IsOrgHosted() {
-		clusterName = notApplicable
+		clusterName = d.Cluster.Region
+		releaseName = notApplicable
 	}
-	tab.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+	tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 
 	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
@@ -356,6 +374,77 @@ func GetRuntimeReleases(client astro.Client) ([]string, error) {
 	}
 
 	return runtimeReleases, nil
+}
+
+func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) ([]astrocore.ClusterOptions, error) {
+	var provider astrocore.GetClusterOptionsParamsProvider
+	if cloudProvider == gcpCloud {
+		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+	}
+	optionsParams := &astrocore.GetClusterOptionsParams{
+		Provider: &provider,
+		Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+	}
+	clusterOptions, err := coreClient.GetClusterOptionsWithResponse(context.Background(), optionsParams)
+	if err != nil {
+		return nil, err
+	}
+	err = astrocore.NormalizeAPIError(clusterOptions.HTTPResponse, clusterOptions.Body)
+	if err != nil {
+		return nil, err
+	}
+	options := *clusterOptions.JSON200
+
+	return options, nil
+}
+
+func selectRegion(cloudProvider, region string, coreClient astrocore.CoreClient) (newRegion string, err error) {
+	regionsTab := printutil.Table{
+		Padding:        []int{5, 30},
+		DynamicPadding: true,
+		Header:         []string{"#", "REGION"},
+	}
+
+	// get all regions for the cloud provider
+	options, err := ListClusterOptions(cloudProvider, coreClient)
+	if err != nil {
+		return "", err
+	}
+	regions := options[0].Regions
+
+	if region == "" {
+		fmt.Println("\nPlease select a Region for your Deployment:")
+
+		regionMap := map[string]astrocore.ProviderRegion{}
+
+		for i := range regions {
+			index := i + 1
+			regionsTab.AddRow([]string{strconv.Itoa(index), regions[i].Name}, false)
+
+			regionMap[strconv.Itoa(index)] = regions[i]
+		}
+
+		regionsTab.Print(os.Stdout)
+		choice := input.Text("\n> ")
+		selected, ok := regionMap[choice]
+		if !ok {
+			return "", ErrInvalidRegionKey
+		}
+
+		region = selected.Name
+	}
+
+	// validate region
+	reg := ""
+	for i := range regions {
+		if region == regions[i].Name {
+			reg = regions[i].Name
+		}
+	}
+	if reg == "" {
+		return "", errors.New("unable to find specified Region")
+	}
+	return region, nil
 }
 
 func selectCluster(clusterID, organizationID string, client astro.Client) (newClusterID string, err error) {
@@ -480,7 +569,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error {
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
@@ -532,6 +621,19 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		deploymentUpdate.Description = description
 	} else {
 		deploymentUpdate.Description = currentDeployment.Description
+	}
+
+	if organization.IsOrgHosted() {
+		if schedulerSize != "" {
+			deploymentUpdate.SchedulerSize = schedulerSize
+		} else {
+			deploymentUpdate.SchedulerSize = currentDeployment.SchedulerSize
+		}
+		if highAvailability == "enable" {
+			deploymentUpdate.IsHighAvailability = true
+		} else if highAvailability == "disable" { //nolint
+			deploymentUpdate.IsHighAvailability = false
+		}
 	}
 
 	if dagDeploy == "enable" {
@@ -595,10 +697,12 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		clusterName := d.Cluster.Name
+		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = notApplicable
+			clusterName = d.Cluster.Region
+			releaseName = notApplicable
 		}
-		tabDeployment.AddRow([]string{d.Label, d.ReleaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
@@ -769,7 +873,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
 
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", schedulerAU, schedulerReplicas, client, coreClient, false, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

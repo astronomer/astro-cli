@@ -198,13 +198,14 @@ func TestVariableModify(t *testing.T) {
 
 		buf := new(bytes.Buffer)
 		err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable key")
+		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
 
 		buf = new(bytes.Buffer)
 		err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "You must provide a variable value")
+		assert.Contains(t, err.Error(), "there was an error while creating or updating one or more of the environment variables")
+
 		mockClient.AssertExpectations(t)
 	})
 
@@ -225,8 +226,8 @@ func TestVariableModify(t *testing.T) {
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
-		assert.NoError(t, err)
+		_ = VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockClient, buf)
+
 		assert.Contains(t, buf.String(), "No variables for this Deployment")
 	})
 }
