@@ -938,7 +938,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest([]string{}, "", "")
+		resp, err := mockDockerCompose.Pytest("", "", "", "")
 
 		assert.NoError(t, err)
 		assert.Equal(t, "", resp)
@@ -953,7 +953,7 @@ func TestDockerComposePytest(t *testing.T) {
 		mockResponse := "1"
 		mockDockerCompose.imageHandler = imageHandler
 
-		resp, err := mockDockerCompose.Pytest([]string{}, "", "")
+		resp, err := mockDockerCompose.Pytest("", "", "", "")
 		assert.Contains(t, err.Error(), "something went wrong while Pytesting your DAGs")
 		assert.Equal(t, mockResponse, resp)
 		imageHandler.AssertExpectations(t)
@@ -965,7 +965,7 @@ func TestDockerComposePytest(t *testing.T) {
 
 		mockDockerCompose.imageHandler = imageHandler
 
-		_, err := mockDockerCompose.Pytest([]string{}, "", "")
+		_, err := mockDockerCompose.Pytest("", "", "", "")
 		assert.ErrorIs(t, err, errMockDocker)
 		imageHandler.AssertExpectations(t)
 	})
