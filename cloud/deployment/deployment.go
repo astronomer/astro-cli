@@ -745,16 +745,16 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 	return nil
 }
 
-var GetDeployments = func(ws, orgId string, client astro.Client) ([]astro.Deployment, error) {
-	if orgId == "" {
+var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployment, error) {
+	if org == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
 			return []astro.Deployment{}, err
 		}
-		orgId = c.Organization
+		org = c.Organization
 	}
 
-	deployments, err := client.ListDeployments(orgId, ws)
+	deployments, err := client.ListDeployments(org, ws)
 	if err != nil {
 		return deployments, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
