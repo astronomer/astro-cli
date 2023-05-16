@@ -76,7 +76,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		ws = ""
 		tab = newTableOutAll()
 	}
-	deployments, err := client.ListDeployments(c.Organization, ws)
+	deployments, err := GetDeployments(ws, c.Organization, client)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
