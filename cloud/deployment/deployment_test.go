@@ -543,6 +543,49 @@ func TestCreate(t *testing.T) {
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
+	t.Run("success with enabling ci-cd enforcement", func(t *testing.T) {
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Times(2)
+		deploymentCreateInput.APIKeyOnlyDeployments = true
+		defer func() { deploymentCreateInput.APIKeyOnlyDeployments = false }()
+		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
+		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{{ID: csID}}, nil).Once()
+		mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "CeleryExecutor", "", "", "", "", "ON", 10, 3, mockClient, mockCoreClient, false)
+		assert.NoError(t, err)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("fails when incorrect ci-cd enforcement value is passed", func(t *testing.T) {
+		defer testUtil.MockUserInput(t, "test-name")()
+
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "CeleryExecutor", "", "", "", "", "WRONG-VALUE", 10, 3, mockClient, mockCoreClient, false)
+		assert.ErrorIs(t, err, ErrWrongEnforceInput)
+		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
+	})
 	t.Run("success with cloud provider and region", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
@@ -1414,6 +1457,33 @@ func TestUpdate(t *testing.T) {
 
 		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
 		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("fails when incorrect ci-cd enforcement value is passed", func(t *testing.T) {
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
+			Components: astro.Components{
+				Scheduler: astro.SchedulerConfig{
+					AU: astro.AuConfig{
+						Default: 5,
+						Limit:   24,
+					},
+					Replicas: astro.ReplicasConfig{
+						Default: 1,
+						Minimum: 1,
+						Limit:   4,
+					},
+				},
+			},
+			RuntimeReleases: []astro.RuntimeRelease{
+				{
+					Version: "4.2.5",
+				},
+			},
+		}, nil).Once()
+		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "WRONG-VALUE", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		assert.ErrorIs(t, err, ErrWrongEnforceInput)
 		mockClient.AssertExpectations(t)
 	})
 
