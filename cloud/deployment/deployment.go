@@ -76,7 +76,7 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		ws = ""
 		tab = newTableOutAll()
 	}
-	deployments, err := client.ListDeployments(c.Organization, ws)
+	deployments, err := GetDeployments(ws, c.Organization, client)
 	if err != nil {
 		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -221,7 +221,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		if label == "" {
 			return errors.New("you must give your Deployment a name")
 		}
-		deployments, err := GetDeployments(workspaceID, client)
+		deployments, err := GetDeployments(workspaceID, organizationID, client)
 		if err != nil {
 			return errors.Wrap(err, errInvalidDeployment.Error())
 		}
@@ -549,7 +549,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 		// Got a tick, we should check if deployment is healthy
 		case <-ticker.C:
 			buf.Reset()
-			deployments, err := GetDeployments(ws, client)
+			deployments, err := GetDeployments(ws, "", client)
 			if err != nil {
 				return err
 			}
@@ -745,13 +745,16 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 	return nil
 }
 
-var GetDeployments = func(ws string, client astro.Client) ([]astro.Deployment, error) {
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return []astro.Deployment{}, err
+var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployment, error) {
+	if org == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return []astro.Deployment{}, err
+		}
+		org = c.Organization
 	}
 
-	deployments, err := client.ListDeployments(c.Organization, ws)
+	deployments, err := client.ListDeployments(org, ws)
 	if err != nil {
 		return deployments, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
@@ -805,7 +808,7 @@ var SelectDeployment = func(deployments []astro.Deployment, message string) (ast
 }
 
 func GetDeployment(ws, deploymentID, deploymentName string, client astro.Client, coreClient astrocore.CoreClient) (astro.Deployment, error) {
-	deployments, err := GetDeployments(ws, client)
+	deployments, err := GetDeployments(ws, "", client)
 	if err != nil {
 		return astro.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
@@ -879,7 +882,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		}
 
 		// get a new deployment list
-		deployments, err = GetDeployments(ws, client)
+		deployments, err = GetDeployments(ws, "", client)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
