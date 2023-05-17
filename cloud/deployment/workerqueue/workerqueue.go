@@ -124,7 +124,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 
 	// update the deployment with the new list of worker queues
-	err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", "", "", "", 0, 0, listToCreate, true, client)
+	err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", "", "", 0, 0, listToCreate, true, nil, client)
 	if err != nil {
 		return err
 	}
@@ -365,7 +365,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 			}
 		}
 		// update the deployment with the new list
-		err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", "", "", "", 0, 0, listToDelete, true, client)
+		err = deployment.Update(requestedDeployment.ID, "", ws, "", "", "", "", "", "", 0, 0, listToDelete, true, nil, client)
 		if err != nil {
 			return err
 		}

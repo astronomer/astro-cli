@@ -19,7 +19,11 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var errMock = errors.New("mock error")
+var (
+	enableCiCdEnforcement  = true
+	disableCiCdEnforcement = false
+	errMock                = errors.New("mock error")
+)
 
 const (
 	org       = "test-org-id"
@@ -188,7 +192,7 @@ func TestGetDeployment(t *testing.T) {
 			},
 		}, nil).Once()
 		// mock createDeployment
-		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, apiKeyOnlyDeployments string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error {
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, apiKeyOnlyDeployments *bool) error {
 			return errMock
 		}
 
@@ -231,7 +235,7 @@ func TestGetDeployment(t *testing.T) {
 			},
 		}, nil).Once()
 		// mock createDeployment
-		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, apiKeyOnlyDeployments string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error {
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, apiKeyOnlyDeployments *bool) error {
 			return nil
 		}
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, errMock).Once()
@@ -274,7 +278,7 @@ func TestGetDeployment(t *testing.T) {
 			},
 		}, nil).Once()
 		// mock createDeployment
-		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, apiKeyOnlyDeployments string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error {
+		createDeployment = func(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, apiKeyOnlyDeployments *bool) error {
 			return nil
 		}
 
@@ -539,7 +543,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -573,16 +577,8 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "CeleryExecutor", "", "", "", "", "ON", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "CeleryExecutor", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &enableCiCdEnforcement)
 		assert.NoError(t, err)
-		mockClient.AssertExpectations(t)
-		mockCoreClient.AssertExpectations(t)
-	})
-	t.Run("fails when incorrect ci-cd enforcement value is passed", func(t *testing.T) {
-		defer testUtil.MockUserInput(t, "test-name")()
-
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "CeleryExecutor", "", "", "", "", "WRONG-VALUE", 10, 3, mockClient, mockCoreClient, false)
-		assert.ErrorIs(t, err, ErrWrongEnforceInput)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -653,7 +649,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err = Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", "", 10, 3, mockClient, mockCoreClient, false)
+		err = Create("", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", region, "small", "enable", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HYBRID")
 		mockClient.AssertExpectations(t)
@@ -742,7 +738,7 @@ func TestCreate(t *testing.T) {
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
 		defer testUtil.MockUserInput(t, "1")()
 
-		err = Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", "", "small", "enable", "", 10, 3, mockClient, mockCoreClient, false)
+		err = Create("test-name", ws, "test-desc", "", "4.2.5", dagDeploy, "KubernetesExecutor", "gcp", "", "small", "enable", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HYBRID")
 		mockClient.AssertExpectations(t)
@@ -778,7 +774,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "KubeExecutor", "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, "KubeExecutor", "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 		mockCoreClient.AssertExpectations(t)
@@ -815,7 +811,7 @@ func TestCreate(t *testing.T) {
 		tickNum = 2
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "UNHEALTHY"}}, nil).Once()
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id", Status: "HEALTHY"}}, nil).Once()
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, true)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, true, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{}}, nil).Once()
@@ -824,7 +820,7 @@ func TestCreate(t *testing.T) {
 
 		// timeout
 		timeoutNum = 1
-		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, true)
+		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, true, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errTimedOut)
 		mockClient.AssertExpectations(t)
 	})
@@ -856,14 +852,14 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
 	t.Run("failed to validate resources", func(t *testing.T) {
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -890,7 +886,7 @@ func TestCreate(t *testing.T) {
 		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("ListClusters", "test-org-id").Return([]astro.Cluster{}, errMock).Once()
-		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("test-name", ws, "test-desc", "invalid-cluster-id", "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -915,7 +911,7 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		}, nil).Times(1)
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 5, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 5, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 	})
 	t.Run("list workspace failure", func(t *testing.T) {
@@ -941,7 +937,7 @@ func TestCreate(t *testing.T) {
 		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -968,7 +964,7 @@ func TestCreate(t *testing.T) {
 		}, nil).Times(2)
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 
-		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err := Create("", "test-invalid-id", "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no workspaces with id")
 		mockClient.AssertExpectations(t)
@@ -1035,7 +1031,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "gcp", region, "", "", "", 10, 3, mockClient, mockCoreClient, false)
+		err = Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "gcp", region, "", "", 10, 3, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HYBRID")
 		mockClient.AssertExpectations(t)
@@ -1083,7 +1079,7 @@ func TestCreate(t *testing.T) {
 
 		defer testUtil.MockUserInput(t, "test-name")()
 
-		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", 0, 0, mockClient, mockCoreClient, false)
+		err := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", 0, 0, mockClient, mockCoreClient, false, &disableCiCdEnforcement)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1318,7 +1314,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", "", 0, 0, expectedQueue, false, mockClient)
+		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 0, 0, expectedQueue, false, nil, mockClient)
 		assert.NoError(t, err)
 
 		// mock os.Stdin
@@ -1337,7 +1333,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1427,7 +1423,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "medium", "enable", "", 0, 0, expectedQueue, false, mockClient)
+		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "medium", "enable", 0, 0, expectedQueue, false, nil, mockClient)
 		assert.NoError(t, err)
 
 		// mock os.Stdin
@@ -1446,7 +1442,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "small", "disable", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "small", "disable", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1455,35 +1451,8 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errMock).Once()
 
-		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.ErrorIs(t, err, errMock)
-		mockClient.AssertExpectations(t)
-	})
-
-	t.Run("fails when incorrect ci-cd enforcement value is passed", func(t *testing.T) {
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{
-			Components: astro.Components{
-				Scheduler: astro.SchedulerConfig{
-					AU: astro.AuConfig{
-						Default: 5,
-						Limit:   24,
-					},
-					Replicas: astro.ReplicasConfig{
-						Default: 1,
-						Minimum: 1,
-						Limit:   4,
-					},
-				},
-			},
-			RuntimeReleases: []astro.RuntimeRelease{
-				{
-					Version: "4.2.5",
-				},
-			},
-		}, nil).Once()
-		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "WRONG-VALUE", 5, 3, []astro.WorkerQueue{}, false, mockClient)
-		assert.ErrorIs(t, err, ErrWrongEnforceInput)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -1539,7 +1508,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", "", 0, 0, expectedQueue, false, mockClient)
+		err = Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 0, 0, expectedQueue, false, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1547,7 +1516,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("list deployments failure", func(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err := Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		mockClient.AssertExpectations(t)
 	})
@@ -1571,10 +1540,10 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 
-		err = Update("test-invalid-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("test-invalid-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 		mockClient.AssertExpectations(t)
 	})
@@ -1601,7 +1570,7 @@ func TestUpdate(t *testing.T) {
 			},
 		}, nil).Times(1)
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		err := Update("test-id", "test-label", ws, "test-description", "", "", CeleryExecutor, "", "", "", 10, 5, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "test-label", ws, "test-description", "", "", CeleryExecutor, "", "", 10, 5, []astro.WorkerQueue{}, true, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1645,7 +1614,7 @@ func TestUpdate(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("test-id", "test-label", ws, "test description", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1674,7 +1643,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errMock).Once()
 
-		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", "", 0, 0, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 0, 0, []astro.WorkerQueue{}, true, nil, mockClient)
 		assert.ErrorIs(t, err, errMock)
 		assert.NotContains(t, err.Error(), astro.AstronomerConnectionErrMsg)
 		mockClient.AssertExpectations(t)
@@ -1716,7 +1685,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
-		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -1752,7 +1721,7 @@ func TestUpdate(t *testing.T) {
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "enable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -1828,16 +1797,16 @@ func TestUpdate(t *testing.T) {
 
 		// force is false so we will confirm with the user
 		defer testUtil.MockUserInput(t, "y")()
-		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 
 		// force is false so we will confirm with the user
 		defer testUtil.MockUserInput(t, "n")()
-		err = Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err = Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 
 		// force is true so no confirmation is needed
-		err = Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err = Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -1872,7 +1841,7 @@ func TestUpdate(t *testing.T) {
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -1946,7 +1915,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
 		defer testUtil.MockUserInput(t, "y")()
-		err := Update("test-id", "", ws, "", "", "", KubeExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "", KubeExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -2019,7 +1988,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
 		defer testUtil.MockUserInput(t, "y")()
-		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -2078,7 +2047,7 @@ func TestUpdate(t *testing.T) {
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
 		defer testUtil.MockUserInput(t, "n")()
-		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, false, mockClient)
+		err := Update("test-id", "", ws, "", "", "", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, false, nil, mockClient)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
@@ -2112,7 +2081,7 @@ func TestUpdate(t *testing.T) {
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "disable", CeleryExecutor, "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -2147,7 +2116,7 @@ func TestUpdate(t *testing.T) {
 		}
 
 		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-		err := Update("test-id", "", ws, "", "", "disable", "", "", "", "", 5, 3, []astro.WorkerQueue{}, true, mockClient)
+		err := Update("test-id", "", ws, "", "", "disable", "", "", "", 5, 3, []astro.WorkerQueue{}, true, nil, mockClient)
 
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)

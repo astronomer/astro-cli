@@ -155,30 +155,12 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func validateEnforceCD(enforceCD string) (bool, error) {
-	var enforce bool
-	switch {
-	case enforceCD == "OFF" || enforceCD == "":
-		enforce = false
-	case enforceCD == "ON":
-		enforce = true
-	default:
-		return false, ErrWrongEnforceInput
-	}
-	return enforce, nil
-}
-
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, enforceCD string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
 
 	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	enforce, err := validateEnforceCD(enforceCD)
 	if err != nil {
 		return err
 	}
@@ -290,7 +272,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		DagDeployEnabled:      dagDeployEnabled,
 		RuntimeReleaseVersion: runtimeVersion,
 		DeploymentSpec:        spec,
-		APIKeyOnlyDeployments: enforce,
+		APIKeyOnlyDeployments: *enforceCD,
 	}
 
 	if organization.IsOrgHosted() {
@@ -588,7 +570,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, enforceCD string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error { //nolint
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, enforceCD *bool, client astro.Client) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
@@ -642,14 +624,10 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		deploymentUpdate.Description = currentDeployment.Description
 	}
 
-	if enforceCD == "" {
+	if enforceCD == nil {
 		deploymentUpdate.APIKeyOnlyDeployments = currentDeployment.APIKeyOnlyDeployments
 	} else {
-		enforce, err := validateEnforceCD(enforceCD)
-		if err != nil {
-			return err
-		}
-		deploymentUpdate.APIKeyOnlyDeployments = enforce
+		deploymentUpdate.APIKeyOnlyDeployments = *enforceCD
 	}
 
 	if organization.IsOrgHosted() {
@@ -903,9 +881,9 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 
 		schedulerAU := configOption.Components.Scheduler.AU.Default
 		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
-
+		cicdEnforcement := false
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", "", schedulerAU, schedulerReplicas, client, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false, &cicdEnforcement)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
