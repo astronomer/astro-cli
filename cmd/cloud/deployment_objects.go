@@ -30,7 +30,7 @@ var (
 
 const (
 	requestString            = "metadata.webserver_url"
-	warningConnectionCopyCMD = "WARNING! The passoword and extra field are not copied over. You will need to manually add these values"
+	warningConnectionCopyCMD = "WARNING! The password and extra field are not copied over. You will need to manually add these values"
 	warningVariableCopyCMD   = "WARNING! Secret values are not copied over. You will need to manually add these values"
 )
 
