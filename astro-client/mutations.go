@@ -46,6 +46,7 @@ var (
 			dagDeployEnabled
 			schedulerSize
 			isHighAvailability
+			apiKeyOnlyDeployments
 			cluster {
 				id
 				name
@@ -91,6 +92,7 @@ var (
 			dagDeployEnabled
 			schedulerSize
 			isHighAvailability
+			apiKeyOnlyDeployments
 			cluster {
 				id
 				name

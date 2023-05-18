@@ -407,7 +407,8 @@ func TestDeploymentUpdate(t *testing.T) {
 			Executor:  "CeleryExecutor",
 			Scheduler: astro.Scheduler{AU: 5, Replicas: 3},
 		},
-		WorkerQueues: nil,
+		APIKeyOnlyDeployments: false,
+		WorkerQueues:          nil,
 	}
 
 	mockClient := new(astro_mocks.Client)
@@ -430,13 +431,25 @@ func TestDeploymentUpdate(t *testing.T) {
 				Version: "4.2.5",
 			},
 		},
-	}, nil).Once()
-	mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Once()
-	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Once()
+	}, nil).Times(3)
+	mockClient.On("ListDeployments", mock.Anything, ws).Return([]astro.Deployment{deploymentResp}, nil).Times(3)
+	mockClient.On("UpdateDeployment", &deploymentUpdateInput).Return(astro.Deployment{ID: "test-id"}, nil).Times(3)
 	astroClient = mockClient
 
 	t.Run("updates the deployment successfully", func(t *testing.T) {
 		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("updates the deployment successfully to enable ci-cd enforcement", func(t *testing.T) {
+		deploymentUpdateInput.APIKeyOnlyDeployments = true
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd"}
+		_, err := execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("updates the deployment successfully to disable ci-cd enforcement", func(t *testing.T) {
+		deploymentUpdateInput.APIKeyOnlyDeployments = false
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--enforce-cicd=false"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})

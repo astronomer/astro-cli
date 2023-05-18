@@ -732,8 +732,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
 				},
 			},
 		},
-		DagDeployEnabled: true,
-		RuntimeRelease:   astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
+		DagDeployEnabled:      true,
+		APIKeyOnlyDeployments: true,
+		RuntimeRelease:        astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
 		DeploymentSpec: astro.DeploymentSpec{
 			Executor: "CeleryExecutor",
 			Scheduler: astro.Scheduler{
@@ -839,6 +840,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         release_name: great-release-name
         airflow_version: 2.4.0
         dag_deploy_enabled: true
+		ci_cd_enforcement: true
         status: UNHEALTHY
         created_at: 2022-11-17T13:25:55.275697-08:00
         updated_at: 2022-11-17T13:25:55.275697-08:00
@@ -891,6 +893,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         description: description
         runtime_version: 6.0.0
         dag_deploy_enabled: true
+        ci_cd_enforcement: true
         executor: CeleryExecutor
         scheduler_au: 5
         scheduler_count: 3
@@ -983,6 +986,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "release_name": "great-release-name",
             "airflow_version": "2.4.0",
             "dag_deploy_enabled": true,
+            "ci_cd_enforcement": true,
             "status": "UNHEALTHY",
             "created_at": "2022-11-17T12:26:45.362983-08:00",
             "updated_at": "2022-11-17T12:26:45.362983-08:00",
@@ -1042,6 +1046,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "description": "description",
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
+            "ci_cd_enforcement": true,
             "executor": "KubernetesExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
