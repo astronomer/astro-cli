@@ -28,7 +28,11 @@ var (
 	slots              int
 )
 
-const requestString = "metadata.webserver_url"
+const (
+	requestString            = "metadata.webserver_url"
+	warningConnectionCopyCMD = "WARNING! The password and extra field are not copied over. You will need to manually add these values"
+	warningVariableCopyCMD   = "WARNING! Secret values are not copied over. You will need to manually add these values"
+)
 
 func newDeploymentConnectionRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -422,7 +426,7 @@ func deploymentConnectionCopy(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	toAirlfowURL := fmt.Sprintf("%v", value)
-
+	fmt.Println(warningConnectionCopyCMD)
 	return deployment.CopyConnection(fromAirlfowURL, toAirlfowURL, airflowAPIClient, out)
 }
 
@@ -534,6 +538,7 @@ func deploymentAirflowVariableCopy(cmd *cobra.Command, out io.Writer) error {
 
 	toAirlfowURL := fmt.Sprintf("%v", value)
 
+	fmt.Println(warningVariableCopyCMD)
 	return deployment.CopyVariable(fromAirlfowURL, toAirlfowURL, airflowAPIClient, out)
 }
 
