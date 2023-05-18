@@ -786,9 +786,9 @@ var SelectDeployment = func(deployments []astro.Deployment, message string) (ast
 	}
 
 	tab := printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
+		Padding:        []int{5, 30, 30, 30, 50},
 		DynamicPadding: true,
-		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
+		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID", "DAG DEPLOY ENABLED"},
 	}
 
 	fmt.Println(message)
@@ -800,7 +800,7 @@ var SelectDeployment = func(deployments []astro.Deployment, message string) (ast
 	deployMap := map[string]astro.Deployment{}
 	for i := range deployments {
 		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID}, false)
+		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID, strconv.FormatBool(deployments[i].DagDeployEnabled)}, false)
 
 		deployMap[strconv.Itoa(index)] = deployments[i]
 	}
