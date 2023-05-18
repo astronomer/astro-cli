@@ -31,15 +31,16 @@ type deploymentMetadata struct {
 }
 
 type deploymentConfig struct {
-	Name             string `mapstructure:"name" yaml:"name" json:"name"`
-	Description      string `mapstructure:"description" yaml:"description" json:"description"`
-	RunTimeVersion   string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
-	DagDeployEnabled bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
-	Executor         string `mapstructure:"executor" yaml:"executor" json:"executor"`
-	SchedulerAU      int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
-	SchedulerCount   int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
-	ClusterName      string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
-	WorkspaceName    string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
+	Name                  string `mapstructure:"name" yaml:"name" json:"name"`
+	Description           string `mapstructure:"description" yaml:"description" json:"description"`
+	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
+	DagDeployEnabled      bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
+	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
+	Executor              string `mapstructure:"executor" yaml:"executor" json:"executor"`
+	SchedulerAU           int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
+	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
+	ClusterName           string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
+	WorkspaceName         string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
 }
 
 type Workerq struct {
@@ -168,6 +169,7 @@ func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interfac
 		"cluster_name":       clusterName,
 		"runtime_version":    sourceDeployment.RuntimeRelease.Version,
 		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
+		"ci_cd_enforcement":  sourceDeployment.APIKeyOnlyDeployments,
 		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
 		"scheduler_count":    sourceDeployment.DeploymentSpec.Scheduler.Replicas,
 		"executor":           sourceDeployment.DeploymentSpec.Executor,

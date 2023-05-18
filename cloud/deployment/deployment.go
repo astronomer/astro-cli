@@ -30,6 +30,7 @@ var (
 	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
 	ErrInvalidRegionKey     = errors.New("invalid Region selected")
 	errTimedOut             = errors.New("timed out waiting for the deployment to become healthy")
+	ErrWrongEnforceInput    = errors.New("the input to the `--enforce-cicd` flag")
 	// Monkey patched to write unit tests
 	createDeployment = Create
 	CleanOutput      = false
@@ -53,7 +54,7 @@ func newTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED"},
+		Header:         []string{"NAME", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT"},
 	}
 }
 
@@ -61,7 +62,7 @@ func newTableOutAll() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED"},
+		Header:         []string{"NAME", "WORKSPACE", "NAMESPACE", "CLUSTER", "DEPLOYMENT ID", "RUNTIME VERSION", "DAG DEPLOY ENABLED", "CI-CD ENFORCEMENT"},
 	}
 }
 
@@ -95,9 +96,9 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		}
 
 		if all {
-			tab.AddRow([]string{d.Label, d.Workspace.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+			tab.AddRow([]string{d.Label, d.Workspace.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
 		} else {
-			tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+			tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
 		}
 	}
 
@@ -154,7 +155,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool) error { //nolint
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -271,6 +272,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		DagDeployEnabled:      dagDeployEnabled,
 		RuntimeReleaseVersion: runtimeVersion,
 		DeploymentSpec:        spec,
+		APIKeyOnlyDeployments: *enforceCD,
 	}
 
 	if organization.IsOrgHosted() {
@@ -316,8 +318,7 @@ func createOutput(workspaceID string, d *astro.Deployment) error {
 		clusterName = d.Cluster.Region
 		releaseName = notApplicable
 	}
-	tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
-
+	tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
 	deploymentURL, err := GetDeploymentURL(d.ID, workspaceID)
 	if err != nil {
 		return err
@@ -569,7 +570,7 @@ func healthPoll(deploymentID, ws string, client astro.Client) error {
 	}
 }
 
-func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, client astro.Client) error { //nolint
+func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, wQueueList []astro.WorkerQueue, forceDeploy bool, enforceCD *bool, client astro.Client) error { //nolint
 	var queueCreateUpdate, confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, client, nil)
@@ -621,6 +622,12 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		deploymentUpdate.Description = description
 	} else {
 		deploymentUpdate.Description = currentDeployment.Description
+	}
+
+	if enforceCD == nil {
+		deploymentUpdate.APIKeyOnlyDeployments = currentDeployment.APIKeyOnlyDeployments
+	} else {
+		deploymentUpdate.APIKeyOnlyDeployments = *enforceCD
 	}
 
 	if organization.IsOrgHosted() {
@@ -702,7 +709,7 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 			clusterName = d.Cluster.Region
 			releaseName = notApplicable
 		}
-		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled)}, false)
+		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
 		tabDeployment.SuccessMsg = "\n Successfully updated Deployment"
 		tabDeployment.Print(os.Stdout)
 	}
@@ -874,9 +881,9 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 
 		schedulerAU := configOption.Components.Scheduler.AU.Default
 		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
-
+		cicdEnforcement := false
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false, &cicdEnforcement)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

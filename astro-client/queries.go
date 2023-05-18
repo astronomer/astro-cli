@@ -20,6 +20,7 @@ var (
 			description
 			releaseName
 			dagDeployEnabled
+			apiKeyOnlyDeployments
 			schedulerSize
 			isHighAvailability
 			cluster {
