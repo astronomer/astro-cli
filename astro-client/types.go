@@ -56,6 +56,7 @@ type Deployment struct {
 	Status                string         `json:"status"`
 	ReleaseName           string         `json:"releaseName"`
 	Version               string         `json:"version"`
+	Type                  string         `json:"type"`
 	DagDeployEnabled      bool           `json:"dagDeployEnabled"`
 	APIKeyOnlyDeployments bool           `json:"apiKeyOnlyDeployments"`
 	AlertEmails           []string       `json:"alertEmails"`
@@ -244,17 +245,8 @@ type CeleryExecutorConfig struct {
 	Name string `json:"name"`
 }
 
-type KubernetesExecutorDefaultPodConfig struct {
-	CPU           int `json:"cpu"`
-	CPULimitCores int `json:"cpuLimitCores"`
-	Memory        int `json:"memory"`
-	MinPodCount   int `json:"minPodCount"`
-	Concurrency   int `json:"concurrency"`
-}
-
 type KubernetesExecutorConfig struct {
-	Name       string                             `json:"name"`
-	DefaultPod KubernetesExecutorDefaultPodConfig `json:"defaultPod"`
+	Name string `json:"name"`
 }
 
 type ExecutorConfig struct {
