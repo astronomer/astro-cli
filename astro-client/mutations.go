@@ -45,6 +45,7 @@ var (
 			releaseName
 			dagDeployEnabled
 			schedulerSize
+			type
 			isHighAvailability
 			apiKeyOnlyDeployments
 			cluster {
@@ -59,6 +60,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				workerConcurrency
 				minWorkerCount
@@ -91,6 +93,7 @@ var (
 			releaseName
 			dagDeployEnabled
 			schedulerSize
+			type
 			isHighAvailability
 			apiKeyOnlyDeployments
 			cluster {
@@ -101,6 +104,18 @@ var (
 			runtimeRelease {
 				version
 				airflowVersion
+			}
+			workerQueues {
+				id
+				name
+				astroMachine
+				isDefault
+				workerConcurrency
+				minWorkerCount
+				maxWorkerCount
+				nodePoolId
+				podCpu
+				podRam
 			}
 			deploymentSpec {
 				image {

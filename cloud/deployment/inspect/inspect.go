@@ -218,7 +218,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
-	for _, queue := range sourceDeploymentQs {
+	for _, queue := range sourceDeploymentQs { //nolint
 		if sourceExecutor == "CeleryExecutor" {
 			resources = map[string]interface{}{
 				"max_worker_count":   queue.MaxWorkerCount,

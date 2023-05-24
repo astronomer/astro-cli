@@ -22,6 +22,7 @@ var (
 			dagDeployEnabled
 			apiKeyOnlyDeployments
 			schedulerSize
+			type
 			isHighAvailability
 			cluster {
 				id
@@ -38,6 +39,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				nodePoolId
 				podCpu
@@ -104,6 +106,7 @@ var (
 			status
 			dagDeployEnabled
 			schedulerSize
+			type
 			isHighAvailability
 			runtimeRelease {
 				version
@@ -136,6 +139,7 @@ var (
 			workerQueues {
 				id
 				name
+				astroMachine
 				isDefault
 				nodePoolId
 				workerConcurrency
