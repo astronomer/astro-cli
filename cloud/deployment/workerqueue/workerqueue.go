@@ -35,7 +35,7 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error {
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error { //nolint
 	var (
 		requestedDeployment                  astro.Deployment
 		err                                  error
@@ -53,8 +53,13 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 
 	if deployment.IsDeploymentHosted(requestedDeployment.Type) {
 		nodePoolID = requestedDeployment.Cluster.NodePools[0].ID
+		configOptions, err := client.GetDeploymentConfig()
+		if err != nil {
+			return err
+		}
+		astroMachines := configOptions.AstroMachines
 		// get the machine to use
-		astroMachine, err = selectAstroMachine(workerType, client, out)
+		astroMachine, err = selectAstroMachine(workerType, astroMachines, out)
 		if err != nil {
 			return err
 		}
@@ -265,17 +270,11 @@ func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.Worker
 	return false
 }
 
-func selectAstroMachine(workerType string, client astro.Client, out io.Writer) (astro.Machine, error) {
+func selectAstroMachine(workerType string, astroMachines []astro.Machine, out io.Writer) (astro.Machine, error) {
 	var (
 		machine     astro.Machine
 		errToReturn error
 	)
-
-	configOptions, err := client.GetDeploymentConfig()
-	if err != nil {
-		return astro.Machine{}, err
-	}
-	astroMachines := configOptions.AstroMachines
 
 	switch workerType {
 	case "":
