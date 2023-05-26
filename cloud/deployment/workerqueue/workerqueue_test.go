@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	errGetDeployment    = errors.New("test get deployment error")
-	errUpdateDeployment = errors.New("test deployment update error")
+	errGetDeployment           = errors.New("test get deployment error")
+	errUpdateDeployment        = errors.New("test deployment update error")
+	errDeploymentConfigOptions = errors.New("test get deployment error")
 )
 
 func TestCreate(t *testing.T) {
@@ -496,7 +497,6 @@ func TestCreateHostedShared(t *testing.T) {
 		NodePoolID:        "",
 	}
 	expectedOutMessage := "worker queue " + expectedWorkerQueue.Name + " for test-deployment-label in test-ws-id workspace created\n"
-	defer testUtil.MockUserInput(t, "test-worker-queue")()
 	out := new(bytes.Buffer)
 	mockClient := new(astro_mocks.Client)
 	mockWorkerQueueDefaultOptions := astro.WorkerQueueDefaultOptions{
@@ -630,14 +630,63 @@ func TestCreateHostedShared(t *testing.T) {
 				},
 			},
 		},
-	}, nil).Times(2)
+	}, nil).Times(6)
 	t.Run("for hosted shared deployments", func(t *testing.T) {
+		defer testUtil.MockUserInput(t, "test-worker-queue")()
 		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
 		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "a5", -1, 0, 0, true, mockClient, out)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), expectedOutMessage)
+	})
+	t.Run("select machine for hosted shared deployments", func(t *testing.T) {
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err = CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-worker-queue", createAction, "", -1, 0, 0, true, mockClient, out)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), expectedOutMessage)
+	})
+	t.Run("failed to select astro machines for hosted shared deployments", func(t *testing.T) {
+		// mock os.Stdin
+		expectedInput := []byte("4") // there is no queue with this index
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err = CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-worker-queue", createAction, "", -1, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errInvalidAstroMachine)
+	})
+	t.Run("failed to get deployment config options for hosted shared deployments", func(t *testing.T) {
+		defer testUtil.MockUserInput(t, "test-worker-queue")()
+		mockClient.On("GetDeploymentConfig").Return(astro.DeploymentConfig{}, errDeploymentConfigOptions)
+		mockClient.On("ListDeployments", mock.Anything, mock.Anything).Return(deploymentRespWithQueues, nil).Twice()
+		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
+		mockClient.On("UpdateDeployment", &updateDeploymentInput).Return(deploymentRespWithQueues[0], nil).Once()
+		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "a5", -1, 0, 0, true, mockClient, out)
+		assert.ErrorIs(t, err, errDeploymentConfigOptions)
 	})
 }
 
