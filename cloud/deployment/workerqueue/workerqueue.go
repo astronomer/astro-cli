@@ -27,6 +27,7 @@ var (
 	errCannotUpdateExistingQueue = errors.New("worker queue already exists")
 	errCannotCreateNewQueue      = errors.New("worker queue does not exist")
 	errInvalidNodePool           = errors.New("node pool selection failed")
+	errInvalidAstroMachine       = errors.New("invalid astro machine selection failed")
 	errQueueDoesNotExist         = errors.New("worker queue does not exist")
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
@@ -34,11 +35,12 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error {
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, client astro.Client, out io.Writer) error { //nolint
 	var (
 		requestedDeployment                  astro.Deployment
 		err                                  error
 		errHelp, succeededAction, nodePoolID string
+		astroMachine                         astro.Machine
 		queueToCreateOrUpdate                *astro.WorkerQueue
 		listToCreate, existingQueues         []astro.WorkerQueue
 		defaultOptions                       astro.WorkerQueueDefaultOptions
@@ -49,15 +51,31 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		return err
 	}
 
-	// get the node poolID to use
-	nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
-	if err != nil {
-		return err
+	if deployment.IsDeploymentHosted(requestedDeployment.Type) {
+		nodePoolID = requestedDeployment.Cluster.NodePools[0].ID
+		configOptions, err := client.GetDeploymentConfig()
+		if err != nil {
+			return err
+		}
+		astroMachines := configOptions.AstroMachines
+		// get the machine to use
+		astroMachine, err = selectAstroMachine(workerType, astroMachines, out)
+		if err != nil {
+			return err
+		}
+		wQueueConcurrency = astroMachine.ConcurrentTasks // This is set based on the machine type the user chooses
+	} else {
+		// get the node poolID to use
+		nodePoolID, err = selectNodePool(workerType, requestedDeployment.Cluster.NodePools, out)
+		if err != nil {
+			return err
+		}
 	}
 
 	queueToCreateOrUpdate = &astro.WorkerQueue{
 		Name:              name,
 		IsDefault:         false, // cannot create a default queue
+		AstroMachine:      astroMachine.Type,
 		NodePoolID:        nodePoolID,
 		MinWorkerCount:    wQueueMin,         // use the value from the user input
 		MaxWorkerCount:    wQueueMax,         // use the value from the user input
@@ -239,7 +257,7 @@ func IsKubernetesWorkerQueueInputValid(requestedWorkerQueue *astro.WorkerQueue) 
 // It returns true if queueToCreate exists in []existingQueues
 // It returns false if queueToCreate does not exist in []existingQueues
 func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.WorkerQueue) bool {
-	for _, queue := range existingQueues {
+	for _, queue := range existingQueues { //nolint
 		if queue.ID == queueToCreate.ID {
 			// queueToCreate exists
 			return true
@@ -250,6 +268,52 @@ func QueueExists(existingQueues []astro.WorkerQueue, queueToCreate *astro.Worker
 		}
 	}
 	return false
+}
+
+func selectAstroMachine(workerType string, astroMachines []astro.Machine, out io.Writer) (astro.Machine, error) {
+	var (
+		machine     astro.Machine
+		errToReturn error
+	)
+
+	switch workerType {
+	case "":
+		tab := printutil.Table{
+			Padding:        []int{5, 30, 20, 50},
+			DynamicPadding: true,
+			Header:         []string{"#", "WORKER TYPE", "CPU", "Memory"},
+		}
+
+		fmt.Println("No worker type was specified. Select the worker type to use")
+
+		machineMap := map[string]astro.Machine{}
+
+		for i := range astroMachines {
+			index := i + 1
+			tab.AddRow([]string{strconv.Itoa(index), astroMachines[i].Type, astroMachines[i].CPU + " vCPU", astroMachines[i].Memory}, false)
+
+			machineMap[strconv.Itoa(index)] = astroMachines[i]
+		}
+
+		tab.Print(out)
+		choice := input.Text("\n> ")
+		selectedPool, ok := machineMap[choice]
+		if !ok {
+			// returning an error as choice was not in nodePoolMap
+			errToReturn = fmt.Errorf("%w: invalid worker type: %s selected", errInvalidAstroMachine, choice)
+			return astro.Machine{}, errToReturn
+		}
+		return selectedPool, nil
+	default:
+		for _, machine = range astroMachines {
+			if machine.Type == workerType {
+				return machine, nil
+			}
+		}
+		// did not find a matching workerType in any node pool
+		errToReturn = fmt.Errorf("%w: workerType %s is not available for this deployment", errInvalidAstroMachine, workerType)
+		return astro.Machine{}, errToReturn
+	}
 }
 
 // selectNodePool takes workerType and []NodePool as arguments
@@ -359,7 +423,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		}
 
 		// create a new listToDelete without queueToDelete in it
-		for _, queue = range existingQueues {
+		for _, queue = range existingQueues { //nolint
 			if queue.Name != queueToDelete.Name {
 				listToDelete = append(listToDelete, queue)
 			}
@@ -421,7 +485,7 @@ func selectQueue(queueList []astro.WorkerQueue, out io.Writer) (string, error) {
 // sets the resources for CeleryExecutor and removes all resources for KubernetesExecutor as they get calculated based
 // on the worker type.
 func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.WorkerQueue, executor string, wQueueMin, wQueueMax, wQueueConcurrency int) []astro.WorkerQueue {
-	for i, queue := range existingQueues {
+	for i, queue := range existingQueues { //nolint
 		if queue.Name != queueToUpdate.Name {
 			continue
 		}
@@ -447,6 +511,7 @@ func updateQueueList(existingQueues []astro.WorkerQueue, queueToUpdate *astro.Wo
 			queue.PodCPU = ""
 		}
 		queue.NodePoolID = queueToUpdate.NodePoolID
+		queue.AstroMachine = queueToUpdate.AstroMachine
 		existingQueues[i] = queue
 		return existingQueues
 	}

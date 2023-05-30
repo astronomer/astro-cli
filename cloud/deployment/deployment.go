@@ -752,6 +752,10 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, client as
 	return nil
 }
 
+func IsDeploymentHosted(deploymentType string) bool {
+	return deploymentType == "HOSTED_SHARED"
+}
+
 var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployment, error) {
 	if org == "" {
 		c, err := config.GetCurrentContext()

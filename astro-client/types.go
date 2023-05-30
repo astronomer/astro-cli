@@ -385,6 +385,7 @@ type UserInvite struct {
 type WorkerQueue struct {
 	ID                string `json:"id,omitempty"` // Empty when creating new WorkerQueues
 	Name              string `json:"name"`
+	AstroMachine      string `json:"astroMachine"`
 	IsDefault         bool   `json:"isDefault"`
 	MaxWorkerCount    int    `json:"maxWorkerCount,omitempty"`
 	MinWorkerCount    int    `json:"minWorkerCount"`

@@ -314,6 +314,18 @@ func TestGetDeployment(t *testing.T) {
 	})
 }
 
+func TestIsDeploymentHosted(t *testing.T) {
+	t.Run("if deployment type is hosted", func(t *testing.T) {
+		out := IsDeploymentHosted("HOSTED_SHARED")
+		assert.Equal(t, out, true)
+	})
+
+	t.Run("if deployment type is hybrid", func(t *testing.T) {
+		out := IsDeploymentHosted("")
+		assert.Equal(t, out, false)
+	})
+}
+
 func TestSelectRegion(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
