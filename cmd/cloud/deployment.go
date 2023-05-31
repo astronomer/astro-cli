@@ -47,6 +47,7 @@ var (
 	executor                      string
 	inputFile                     string
 	cloudProvider                 string
+	clusterType                   string
 	region                        string
 	schedulerSize                 string
 	highAvailability              string
@@ -151,15 +152,16 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	if organization.IsOrgHosted() {
+		cmd.Flags().StringVarP(&clusterType, "cluster-type", "", "standard", "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
 		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
 	} else {
-		cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
 		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	}
+	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in")
 	return cmd
 }
 
@@ -375,7 +377,8 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
 		}
 	}
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
+
+	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
