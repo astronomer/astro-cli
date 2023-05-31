@@ -1171,13 +1171,12 @@ func TestValidateResources(t *testing.T) {
 func TestSelectCluster(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	orgID := "test-org-id"
 	csID := "test-cluster-id"
 	t.Run("list cluster failure", func(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
 
-		_, err := selectCluster("", orgID, mockCoreClient)
+		_, err := selectCluster("", mockOrgShortName, mockCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -1202,7 +1201,7 @@ func TestSelectCluster(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		resp, err := selectCluster("", orgID, mockCoreClient)
+		resp, err := selectCluster("", mockOrgShortName, mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, csID, resp)
 	})
@@ -1227,7 +1226,7 @@ func TestSelectCluster(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = selectCluster("", orgID, mockCoreClient)
+		_, err = selectCluster("", mockOrgShortName, mockCoreClient)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 	})
 
@@ -1235,7 +1234,7 @@ func TestSelectCluster(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 
-		_, err := selectCluster("test-invalid-id", orgID, mockCoreClient)
+		_, err := selectCluster("test-invalid-id", mockOrgShortName, mockCoreClient)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to find specified Cluster")
 	})
@@ -2446,7 +2445,6 @@ func TestUseSharedCluster(t *testing.T) {
 func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	orgID := "test-org-id"
 	csID := "test-cluster-id"
 
 	t.Run("uses shared cluster if cloud provider and region are provided", func(t *testing.T) {
@@ -2482,7 +2480,7 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		defer testUtil.MockUserInput(t, "1")()
-		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", orgID, "", mockCoreClient)
+		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, csID, actual)
 		mockCoreClient.AssertExpectations(t)
@@ -2490,7 +2488,7 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 	t.Run("returns error if selecting cluster fails", func(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
-		_, err := useSharedClusterOrSelectDedicatedCluster("", "", orgID, "", mockCoreClient)
+		_, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", mockCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
