@@ -355,7 +355,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return errFlag
 		}
 
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, astroCoreClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
@@ -402,7 +402,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 			// other flags were requested
 			return errFlag
 		}
-		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, out)
+		return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroClient, astroCoreClient, out)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
