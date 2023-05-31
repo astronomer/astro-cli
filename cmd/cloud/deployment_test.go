@@ -33,6 +33,18 @@ var mockListClustersResponse = astrocore.ListClustersResponse{
 			{
 				Id:   "test-cluster-id",
 				Name: "test-cluster",
+				NodePools: []astrocore.NodePool{
+					{
+						Id:               "test-pool-id",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-1",
+					},
+					{
+						Id:               "test-pool-id-2",
+						IsDefault:        false,
+						NodeInstanceType: "test-worker-2",
+					},
+				},
 			},
 			{
 				Id:   "test-cluster-id-1",
@@ -203,6 +215,7 @@ func TestDeploymentCreate(t *testing.T) {
 
 	t.Run("creates a deployment when dag-deploy is disabled", func(t *testing.T) {
 		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
+		astroCoreClient = mockCoreClient
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})
@@ -285,24 +298,6 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-		clusters := []astro.Cluster{
-			{
-				ID:   "test-cluster-id",
-				Name: "test-cluster",
-				NodePools: []astro.NodePool{
-					{
-						ID:               "test-pool-id",
-						IsDefault:        false,
-						NodeInstanceType: "test-worker-1",
-					},
-					{
-						ID:               "test-pool-id-2",
-						IsDefault:        false,
-						NodeInstanceType: "test-worker-2",
-					},
-				},
-			},
-		}
 		createdDeployment := astro.Deployment{
 			ID:    "test-deployment-id",
 			Label: "test-deployment-label",
@@ -326,7 +321,7 @@ deployment:
 		}
 		mockClient = new(astro_mocks.Client)
 		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: orgID, Label: "test-workspace"}}, nil)
-		mockClient.On("ListClusters", orgID).Return(clusters, nil)
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
@@ -341,6 +336,7 @@ deployment:
 			afero.NewOsFs().Remove(filePath)
 		}()
 		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml"}
+		astroCoreClient = mockCoreClient
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -409,7 +405,7 @@ deployment:
 
 func TestDeploymentUpdate(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 	ws := "test-ws-id"
 	deploymentResp := astro.Deployment{
 		ID:             "test-id",
@@ -548,24 +544,6 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-		clusters := []astro.Cluster{
-			{
-				ID:   "test-cluster-id",
-				Name: "test-cluster",
-				NodePools: []astro.NodePool{
-					{
-						ID:               "test-pool-id",
-						IsDefault:        false,
-						NodeInstanceType: "test-worker-1",
-					},
-					{
-						ID:               "test-pool-id-2",
-						IsDefault:        false,
-						NodeInstanceType: "test-worker-2",
-					},
-				},
-			},
-		}
 		updatedDeployment := astro.Deployment{
 			ID:      "test-deployment-id",
 			Label:   "test-deployment-label",
@@ -588,7 +566,7 @@ deployment:
 				Default: 180,
 			},
 		}
-		mockClient.On("ListClusters", orgID).Return(clusters, nil)
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
@@ -603,6 +581,7 @@ deployment:
 			afero.NewOsFs().Remove(filePath)
 		}()
 		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml"}
+		astroCoreClient = mockCoreClient
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
