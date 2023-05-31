@@ -455,23 +455,10 @@ func selectCluster(clusterID, organizationShortName string, coreClient astrocore
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
 
-	clusterType := []astrocore.ListClustersParamsType{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
-	limit := 1000
-	clusterListParams := &astrocore.ListClustersParams{
-		Type:  &clusterType,
-		Limit: &limit,
-	}
-	resp, err := coreClient.ListClustersWithResponse(context.Background(), organizationShortName, clusterListParams)
+	cs, err := organization.ListClusters(organizationShortName, coreClient)
 	if err != nil {
 		return "", err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return "", err
-	}
-	csPaginated := *resp.JSON200
-	cs := csPaginated.Clusters
-
 	// select cluster
 	if clusterID == "" {
 		fmt.Println("\nPlease select a Cluster for your Deployment:")

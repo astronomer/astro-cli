@@ -1,7 +1,6 @@
 package fromfile
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
 	"github.com/astronomer/astro-cli/cloud/deployment/workerqueue"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/ghodss/yaml"
 )
@@ -81,7 +81,7 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 		return err
 	}
 	// map cluster name to id and collect node pools for cluster
-	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.Organization, coreClient)
+	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
 	if err != nil {
 		return err
 	}
@@ -335,43 +335,26 @@ func deploymentFromName(existingDeployments []astro.Deployment, deploymentName s
 	return astro.Deployment{}
 }
 
-// getClusterInfoFromName takes clusterName and organizationID as its arguments.
+// getClusterInfoFromName takes clusterName and organizationShortName as its arguments.
 // It returns the clusterID and list of nodepools if the cluster is found in the organization.
 // It returns an errClusterNotFound if the cluster does not exist in the organization.
-func getClusterInfoFromName(clusterName, organizationID string, coreClient astrocore.CoreClient) (string, []astrocore.NodePool, error) {
+func getClusterInfoFromName(clusterName, organizationShortName string, coreClient astrocore.CoreClient) (string, []astrocore.NodePool, error) {
 	var (
 		existingClusters []astrocore.Cluster
 		err              error
 	)
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return "", nil, err
-	}
 
-	clusterType := []astrocore.ListClustersParamsType{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
-	limit := 1000
-	clusterListParams := &astrocore.ListClustersParams{
-		Type:  &clusterType,
-		Limit: &limit,
-	}
-
-	resp, err := coreClient.ListClustersWithResponse(context.Background(), c.OrganizationShortName, clusterListParams)
+	existingClusters, err = organization.ListClusters(organizationShortName, coreClient)
 	if err != nil {
 		return "", nil, err
 	}
-	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return "", nil, err
-	}
-	csPaginated := *resp.JSON200
-	existingClusters = csPaginated.Clusters
 
 	for _, cluster := range existingClusters { //nolint
 		if cluster.Name == clusterName {
 			return cluster.Id, cluster.NodePools, nil
 		}
 	}
-	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, organizationID)
+	err = fmt.Errorf("cluster_name: %s %w in organization: %s", clusterName, errNotFound, organizationShortName)
 	return "", nil, err
 }
 
