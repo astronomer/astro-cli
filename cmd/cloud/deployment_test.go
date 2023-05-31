@@ -24,6 +24,26 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var (
+	mockListClustersResponse = astrocore.ListClustersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ClustersPaginated{
+			Clusters: []astrocore.Cluster{
+				{
+					Id:   "test-cluster-id",
+					Name: "test-cluster",
+				},
+				{
+					Id:   "test-cluster-id-1",
+					Name: "test-cluster-1",
+				},
+			},
+		},
+	}
+)
+
 func execDeploymentCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(buf)
@@ -90,26 +110,6 @@ func TestDeploymentCreate(t *testing.T) {
 	csID := "test-cluster-id"
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-	// var (
-	// 	mockListClustersResponse = astrocore.ListClustersResponse{
-	// 		HTTPResponse: &http.Response{
-	// 			StatusCode: 200,
-	// 		},
-	// 		JSON200: &astrocore.ClustersPaginated{
-	// 			Clusters: []astrocore.Cluster{
-	// 				{
-	// 					Id:   "test-cluster-id",
-	// 					Name: "test-cluster",
-	// 				},
-	// 				{
-	// 					Id:   "test-cluster-id-1",
-	// 					Name: "test-cluster-1",
-	// 				},
-	// 			},
-	// 		},
-	// 	}
-	// )
-
 	deploymentCreateInput := astro.CreateDeploymentInput{
 		WorkspaceID:           ws,
 		ClusterID:             csID,
@@ -164,23 +164,6 @@ func TestDeploymentCreate(t *testing.T) {
 		},
 	}, nil).Times(10)
 	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-ws"}}, nil).Times(5)
-	mockListClustersResponse := astrocore.ListClustersResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.ClustersPaginated{
-			Clusters: []astrocore.Cluster{
-				{
-					Id:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					Id:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			},
-		},
-	}
 	mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(6)
