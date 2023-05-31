@@ -243,7 +243,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	// select and validate cluster
-	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID, client, coreClient)
+	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, c.OrganizationShortName, clusterID, coreClient)
 	if err != nil {
 		return err
 	}
@@ -448,26 +448,25 @@ func selectRegion(cloudProvider, region string, coreClient astrocore.CoreClient)
 	return region, nil
 }
 
-func selectCluster(clusterID, organizationID string, client astro.Client) (newClusterID string, err error) {
+func selectCluster(clusterID, organizationShortName string, coreClient astrocore.CoreClient) (newClusterID string, err error) {
 	clusterTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
-	// cluster request
-	cs, err := client.ListClusters(organizationID)
-	if err != nil {
-		return "", errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
 
+	cs, err := organization.ListClusters(organizationShortName, coreClient)
+	if err != nil {
+		return "", err
+	}
 	// select cluster
 	if clusterID == "" {
 		fmt.Println("\nPlease select a Cluster for your Deployment:")
 
-		clusterMap := map[string]astro.Cluster{}
+		clusterMap := map[string]astrocore.Cluster{}
 		for i := range cs {
 			index := i + 1
-			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, cs[i].CloudProvider, cs[i].ID}, false)
+			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, string(cs[i].CloudProvider), cs[i].Id}, false)
 
 			clusterMap[strconv.Itoa(index)] = cs[i]
 		}
@@ -479,14 +478,14 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 			return "", ErrInvalidDeploymentKey
 		}
 
-		clusterID = selected.ID
+		clusterID = selected.Id
 	}
 
 	// validate cluster
 	csID := ""
 	for i := range cs {
-		if clusterID == cs[i].ID {
-			csID = cs[i].ID
+		if clusterID == cs[i].Id {
+			csID = cs[i].Id
 		}
 	}
 	if csID == "" {
@@ -518,7 +517,7 @@ func useSharedCluster(cloudProvider astrocore.SharedClusterCloudProvider, region
 // useSharedClusterOrSelectDedicatedCluster decides how to derive the clusterID to use for a deployment.
 // if cloudProvider and region are provided, it uses a useSharedCluster to get the ClusterID.
 // if not, it uses selectCluster to get the ClusterID.
-func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID string, client astro.Client, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
+func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationShortName, clusterID string, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
 	// if cloud provider and region are requested
 	if cloudProvider != "" && region != "" {
 		// use a shared cluster for the deployment
@@ -528,7 +527,7 @@ func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizatio
 		}
 	} else {
 		// select and validate cluster
-		derivedClusterID, err = selectCluster(clusterID, organizationID, client)
+		derivedClusterID, err = selectCluster(clusterID, organizationShortName, coreClient)
 		if err != nil {
 			return "", err
 		}
