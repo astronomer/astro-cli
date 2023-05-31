@@ -3377,7 +3377,7 @@ func TestGetClusterFromName(t *testing.T) {
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockCoreClient)
 		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization: test-org-id")
+		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization: test-org-short-name")
 		assert.Equal(t, "", actualClusterID)
 		assert.Equal(t, []astrocore.NodePool(nil), actualNodePools)
 		mockCoreClient.AssertExpectations(t)
