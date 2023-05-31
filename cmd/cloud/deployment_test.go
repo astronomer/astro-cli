@@ -24,25 +24,23 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var (
-	mockListClustersResponse = astrocore.ListClustersResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.ClustersPaginated{
-			Clusters: []astrocore.Cluster{
-				{
-					Id:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					Id:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
+var mockListClustersResponse = astrocore.ListClustersResponse{
+	HTTPResponse: &http.Response{
+		StatusCode: 200,
+	},
+	JSON200: &astrocore.ClustersPaginated{
+		Clusters: []astrocore.Cluster{
+			{
+				Id:   "test-cluster-id",
+				Name: "test-cluster",
+			},
+			{
+				Id:   "test-cluster-id-1",
+				Name: "test-cluster-1",
 			},
 		},
-	}
-)
+	},
+}
 
 func execDeploymentCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
@@ -369,7 +367,6 @@ deployment:
 			},
 			JSON200: &astrocore.SharedCluster{Id: csID},
 		}
-		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		astroCoreClient = mockCoreClient
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(mockOKResponse, nil).Once()
 		cmdArgs := []string{
