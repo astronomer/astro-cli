@@ -332,9 +332,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	}
 	workspaceID = ws
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	// clean output
 	deployment.CleanOutput = cleanOutput
 
@@ -383,6 +380,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
 		}
 	}
+
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
 
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType, schedulerAU, schedulerReplicas, astroClient, astroCoreClient, waitForStatus, &deploymentCreateEnforceCD)
 }
