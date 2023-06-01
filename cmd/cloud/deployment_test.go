@@ -172,8 +172,8 @@ func TestDeploymentCreate(t *testing.T) {
 				Version: "4.2.5",
 			},
 		},
-	}, nil).Times(10)
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-ws"}}, nil).Times(5)
+	}, nil).Times(14)
+	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id", Label: "test-ws"}}, nil).Times(7)
 	mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(4)
 	mockClient.On("CreateDeployment", &deploymentCreateInput).Return(astro.Deployment{ID: "test-id"}, nil).Twice()
 	mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Times(6)
@@ -398,6 +398,53 @@ deployment:
 		}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "azure is not a valid cloud provider. It can only be gcp")
+	})
+	t.Run("creates a hosted dedicated deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		astroCoreClient = mockCoreClient
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--cluster-type", "dedicated",
+		}
+
+		// mock os.Stdin
+		input := []byte("1")
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = w.Write(input)
+		if err != nil {
+			t.Error(err)
+		}
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.NoError(t, err)
+		mockCoreClient.AssertExpectations(t)
+	})
+	t.Run("returns an error if incorrect cluster type is passed for a hosted dedicated deployment", func(t *testing.T) {
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		ctx.SetContextKey("organization_product", "HOSTED")
+		ctx.SetContextKey("organization", "test-org-id")
+		ctx.SetContextKey("workspace", ws)
+		astroCoreClient = mockCoreClient
+		cmdArgs := []string{
+			"create", "--name", "test-name", "--workspace-id", ws, "--cluster-type", "wrong-value",
+		}
+
+		_, err = execDeploymentCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "Invalid --cluster-type value")
+		mockCoreClient.AssertExpectations(t)
 	})
 	mockClient.AssertExpectations(t)
 	mockCoreClient.AssertExpectations(t)

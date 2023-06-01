@@ -42,6 +42,7 @@ const (
 	CeleryExecutor = "CeleryExecutor"
 	notApplicable  = "N/A"
 	gcpCloud       = "gcp"
+	standard       = "standard"
 )
 
 var (
@@ -91,7 +92,9 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = d.Cluster.Region
+			if IsDeploymentHosted(d.Type) {
+				clusterName = d.Cluster.Region
+			}
 			releaseName = notApplicable
 		}
 
@@ -155,7 +158,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -234,7 +237,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
-	if region == "" && organization.IsOrgHosted() {
+	if region == "" && organization.IsOrgHosted() && clusterType == standard {
 		// select and validate region
 		region, err = selectRegion(cloudProvider, region, coreClient)
 		if err != nil {
@@ -292,7 +295,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	if waitForStatus {
 		err = healthPoll(d.ID, workspaceID, client)
 		if err != nil {
-			errOutput := createOutput(workspaceID, &d)
+			errOutput := createOutput(workspaceID, clusterType, &d)
 			if errOutput != nil {
 				return errOutput
 			}
@@ -300,7 +303,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
-	err = createOutput(workspaceID, &d)
+	err = createOutput(workspaceID, clusterType, &d)
 	if err != nil {
 		return err
 	}
@@ -308,14 +311,16 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	return nil
 }
 
-func createOutput(workspaceID string, d *astro.Deployment) error {
+func createOutput(workspaceID, clusterType string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 	clusterName := d.Cluster.Name
 	releaseName := d.ReleaseName
 	if organization.IsOrgHosted() {
-		clusterName = d.Cluster.Region
+		if clusterType == standard {
+			clusterName = d.Cluster.Region
+		}
 		releaseName = notApplicable
 	}
 	tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
@@ -705,7 +710,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		clusterName := d.Cluster.Name
 		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = d.Cluster.Region
+			if IsDeploymentHosted(d.Type) {
+				clusterName = d.Cluster.Region
+			}
 			releaseName = notApplicable
 		}
 		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
@@ -886,7 +893,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
 		cicdEnforcement := false
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false, &cicdEnforcement)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", "", schedulerAU, schedulerReplicas, client, coreClient, false, &cicdEnforcement)
 		if err != nil {
 			return astro.Deployment{}, err
 		}
