@@ -107,7 +107,7 @@ func TestList(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("success with hidden cluster information", func(t *testing.T) {
+	t.Run("success with hidden namespace information", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
@@ -115,7 +115,24 @@ func TestList(t *testing.T) {
 		ctx.SetContextKey("organization", org)
 
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{
+			{
+				ID:   "test-id-1",
+				Type: "HOSTED_SHARED",
+				Cluster: astro.Cluster{
+					ID:     "cluster-id",
+					Region: "us-central1",
+				},
+			},
+			{
+				ID:   "test-id-2",
+				Type: "HOSTED_DEDICATED",
+				Cluster: astro.Cluster{
+					ID:   "cluster-id",
+					Name: "cluster-name",
+				},
+			},
+		}, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err = List(ws, false, mockClient, buf)
@@ -123,7 +140,8 @@ func TestList(t *testing.T) {
 		assert.Contains(t, buf.String(), "test-id-1")
 		assert.Contains(t, buf.String(), "test-id-2")
 		assert.Contains(t, buf.String(), "N/A")
-
+		assert.Contains(t, buf.String(), "us-central1")
+		assert.Contains(t, buf.String(), "cluster-name")
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -1020,7 +1038,7 @@ func TestCreate(t *testing.T) {
 		assert.Contains(t, err.Error(), "no workspaces with id")
 		mockClient.AssertExpectations(t)
 	})
-	t.Run("success with hidden cluster information", func(t *testing.T) {
+	t.Run("success with hidden namespace information", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
@@ -1491,7 +1509,7 @@ func TestUpdate(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
-	t.Run("success with hidden cluster information", func(t *testing.T) {
+	t.Run("success with hidden namespace information", func(t *testing.T) {
 		ctx, err := context.GetCurrentContext()
 		assert.NoError(t, err)
 		ctx.SetContextKey("organization_product", "HOSTED")
