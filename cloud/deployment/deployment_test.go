@@ -703,7 +703,24 @@ func TestCreate(t *testing.T) {
 		}()
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
-		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{{ID: "test-id"}}, nil).Once()
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{
+			{
+				ID:   "test-id-1",
+				Type: "HOSTED_SHARED",
+				Cluster: astro.Cluster{
+					ID:     "cluster-id",
+					Region: "us-central1",
+				},
+			},
+			{
+				ID:   "test-id-2",
+				Type: "HOSTED_DEDICATED",
+				Cluster: astro.Cluster{
+					ID:   "cluster-id",
+					Name: "cluster-name",
+				},
+			},
+		}, nil).Once()
 
 		mockOKResponse := &astrocore.GetSharedClusterResponse{
 			HTTPResponse: &http.Response{
