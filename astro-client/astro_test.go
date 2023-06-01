@@ -628,52 +628,6 @@ func TestDeployImage(t *testing.T) {
 	})
 }
 
-func TestListClusters(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	mockResponse := &Response{
-		Data: ResponseData{
-			GetClusters: []Cluster{
-				{
-					ID:            "test-id",
-					Name:          "test-name",
-					CloudProvider: "test-cloud-provider",
-				},
-			},
-		},
-	}
-	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
-
-	t.Run("success", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		resp, err := astroClient.ListClusters("test-org-id")
-		assert.NoError(t, err)
-		assert.Equal(t, resp, mockResponse.Data.GetClusters)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 500,
-				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-				Header:     make(http.Header),
-			}
-		})
-		astroClient := NewAstroClient(client)
-
-		_, err := astroClient.ListClusters("test-org-id")
-		assert.Contains(t, err.Error(), "Internal Server Error")
-	})
-}
-
 func TestGetWorkspace(t *testing.T) {
 	expectedWorkspace := Response{
 		Data: ResponseData{

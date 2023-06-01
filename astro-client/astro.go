@@ -30,8 +30,6 @@ type Client interface {
 	// Image
 	CreateImage(input CreateImageInput) (*Image, error)
 	DeployImage(input DeployImageInput) (*Image, error)
-	// Cluster
-	ListClusters(organizationID string) ([]Cluster, error)
 	// WorkerQueues
 	GetWorkerQueueOptions() (WorkerQueueDefaultOptions, error)
 	// Organizations
@@ -206,19 +204,6 @@ func (c *HTTPClient) DeployImage(input DeployImageInput) (*Image, error) {
 		return nil, err
 	}
 	return resp.Data.DeployImage, nil
-}
-
-func (c *HTTPClient) ListClusters(organizationID string) ([]Cluster, error) {
-	req := Request{
-		Query:     GetClusters,
-		Variables: map[string]interface{}{"organizationId": organizationID},
-	}
-
-	resp, err := req.DoWithPublicClient(c)
-	if err != nil {
-		return []Cluster{}, err
-	}
-	return resp.Data.GetClusters, nil
 }
 
 // GetWorkspace returns information about the workspace
