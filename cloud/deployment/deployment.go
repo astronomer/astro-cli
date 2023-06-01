@@ -92,7 +92,9 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = d.Cluster.Region
+			if IsDeploymentHosted(d.Type) {
+				clusterName = d.Cluster.Region
+			}
 			releaseName = notApplicable
 		}
 
@@ -708,7 +710,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		clusterName := d.Cluster.Name
 		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = d.Cluster.Region
+			if IsDeploymentHosted(d.Type) {
+				clusterName = d.Cluster.Region
+			}
 			releaseName = notApplicable
 		}
 		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
