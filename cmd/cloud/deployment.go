@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	enable  = "enable"
-	disable = "disable"
+	enable    = "enable"
+	disable   = "disable"
+	standard  = "standard"
+	dedicated = "dedicated"
 )
 
 var (
@@ -152,7 +154,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().BoolVarP(&deploymentCreateEnforceCD, "enforce-cicd", "", false, "Provide this flag means deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&clusterType, "cluster-type", "", "standard", "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
+		cmd.Flags().StringVarP(&clusterType, "cluster-type", "", standard, "The Cluster Type to use for the Deployment. Possible values can be standard or dedicated.")
 		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "gcp", "The Cloud Provider to use for the Deployment. Possible values can be gcp.")
 		cmd.Flags().StringVarP(&region, "region", "", "", "The Cloud Provider region to use for the deployment.")
 		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large")
@@ -347,6 +349,10 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error {
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
 		return errors.New("Invalid --high-availability value")
+	}
+
+	if organization.IsOrgHosted() && !(clusterType == standard || clusterType == dedicated) {
+		return errors.New("Invalid --cluster-type value")
 	}
 
 	// request is to create from a file
