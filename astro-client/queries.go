@@ -28,6 +28,7 @@ var (
 				id
 				name
 				cloudProvider
+				providerAccount
 				region
 				nodePools {
 					id
@@ -105,6 +106,7 @@ var (
 			createdAt
 			status
 			dagDeployEnabled
+			workloadIdentity
 			schedulerSize
 			type
 			isHighAvailability
