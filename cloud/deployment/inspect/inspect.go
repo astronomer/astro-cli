@@ -362,21 +362,21 @@ func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
 	return template
 }
 
-func getWorkloadIdentity(deployment *astro.Deployment) string {
+func getWorkloadIdentity(de *astro.Deployment) string {
 	// deployment workload identity only applies to AWS and GCP for now
-	fmt.Println(deployment.Cluster.CloudProvider)
-	if deployment.Cluster.CloudProvider == "gcp" {
-		return fmt.Sprintf("%s@%s.iam.gserviceaccount.com", getGCPServiceAccountName(deployment), deployment.Cluster.ProviderAccount)
+	fmt.Println(de.Cluster.CloudProvider)
+	if de.Cluster.CloudProvider == "gcp" {
+		return fmt.Sprintf("%s@%s.iam.gserviceaccount.com", getGCPServiceAccountName(de), de.Cluster.ProviderAccount)
 	}
-	if deployment.Cluster.CloudProvider == "aws" {
-		return fmt.Sprintf("arn:aws:iam::%s:role/AirflowS3Logs-%s", deployment.Cluster.ProviderAccount, deployment.Cluster.ID)
+	if de.Cluster.CloudProvider == "aws" {
+		return fmt.Sprintf("arn:aws:iam::%s:role/AirflowS3Logs-%s", de.Cluster.ProviderAccount, de.Cluster.ID)
 	}
 	return ""
 }
 
 func getGCPServiceAccountName(d *astro.Deployment) string {
 	name := fmt.Sprintf("astro-%s", d.ReleaseName)
-	if len(name) > 30 { // GCP service accounts can only have a max of 30 characters
+	if len(name) > gcpMax { // GCP service accounts can only have a max of 30 characters
 		truncated := name[:gcpMax]
 		return strings.TrimRight(truncated, "-") // for cosmetics, ensure the last character isn't a hyphen
 	}
