@@ -3,6 +3,7 @@ package cloud
 import (
 	"bufio"
 	"fmt"
+	"github.com/astronomer/astro-cli/cloud/team"
 	"io"
 	"io/fs"
 	"log"
@@ -29,6 +30,8 @@ var (
 	shouldDisplayLoginLink             bool
 	role                               string
 	updateRole                         string
+	teamDescription                    string
+	teamName                           string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -42,6 +45,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
 		newOrganizationUserRootCmd(out),
+		newOrganizationTeamRootCmd(out),
 	)
 	if config.CFG.AuditLogs.GetBool() {
 		cmd.AddCommand(newOrganizationAuditLogs(out))
@@ -251,4 +255,113 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	cmd.SilenceUsage = true
 	return user.UpdateUserRole(email, updateRole, out, astroCoreClient)
+}
+
+func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "team",
+		Aliases: []string{"te"},
+		Short:   "Manage teams in your Astro Organization",
+		Long:    "Manage teams in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newTeamCreateCmd(out),
+		newOrganizationTeamListCmd(out),
+		newTeamUpdateCmd(out),
+		newTeamDeleteCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the users in your Astro Organization",
+		Long:    "List all the users in your Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listTeams(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func listTeams(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.ListOrgTeams(out, astroCoreClient)
+}
+
+func newTeamUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [team_id]",
+		Aliases: []string{"up"},
+		Short:   "Update an Astro team",
+		Long:    "Update an Astro team",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return teamUpdate(cmd, out, args)
+		},
+	}
+	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	return cmd
+}
+
+func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	cmd.SilenceUsage = true
+
+	id := ""
+
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	return team.UpdateTeam(id, teamName, teamDescription, out, astroCoreClient)
+}
+
+func newTeamCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create an Astro Team",
+		Long:    "Create an Astro Team",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return teamCreate(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
+	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
+	return cmd
+}
+
+func teamCreate(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.CreateTeam(teamName, teamDescription, out, astroCoreClient)
+}
+
+func newTeamDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [team_id]",
+		Aliases: []string{"de"},
+		Short:   "Delete an Astro Team",
+		Long:    "Delete an Astro Team",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return teamDelete(cmd, out, args)
+		},
+	}
+	return cmd
+}
+
+func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+	cmd.SilenceUsage = true
+
+	id := ""
+
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	return team.Delete(id, out, astroCoreClient)
 }
