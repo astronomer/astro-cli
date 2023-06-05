@@ -278,8 +278,8 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all the users in your Astro Organization",
-		Long:    "List all the users in your Astro Organization",
+		Short:   "List all the teams in your Astro Organization",
+		Long:    "List all the teams in your Astro Organization",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listTeams(cmd, out)
 		},

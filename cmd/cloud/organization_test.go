@@ -3,6 +3,7 @@ package cloud
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -194,6 +195,13 @@ var (
 		Body:    errorBodyList,
 		JSON200: nil,
 	}
+	ListOrgTeamsResponseError = astrocore.ListOrganizationTeamsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    teamRequestErrorBodyList,
+		JSON200: nil,
+	}
 	MutateOrgUserRoleResponseOK = astrocore.MutateOrgUserRoleResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -202,6 +210,13 @@ var (
 			Role: "ORGANIZATION_MEMBER",
 		},
 	}
+	UpdateTeamResponseOK = astrocore.UpdateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &team1,
+	}
+
 	errorBodyUpdate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update user",
 	})
@@ -214,6 +229,45 @@ var (
 		},
 		Body:    errorBodyUpdate,
 		JSON200: nil,
+	}
+	UpdateTeamResponseError = astrocore.UpdateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    teamRequestErrorBodyUpdate,
+		JSON200: nil,
+	}
+	teamRequestErrorCreate, _ = json.Marshal(astrocore.Error{
+		Message: "failed to create team",
+	})
+	CreateTeamResponseError = astrocore.CreateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    teamRequestErrorCreate,
+		JSON200: nil,
+	}
+	CreateTeamResponseOK = astrocore.CreateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &team1,
+	}
+	teamRequestErrorDelete, _ = json.Marshal(astrocore.Error{
+		Message: "failed to delete team",
+	})
+	DeleteTeamResponseError = astrocore.DeleteTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    teamRequestErrorDelete,
+		JSON200: nil,
+	}
+	DeleteTeamResponseOK = astrocore.DeleteTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &team1,
 	}
 )
 
@@ -422,5 +476,188 @@ func TestUserUpdate(t *testing.T) {
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestTeamList(t *testing.T) {
+	expectedHelp := "List all the teams in your Astro Organization"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"team", "list", "-h"}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and teams are not listed", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "list"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to list teams")
+	})
+	t.Run("any context errors from api are returned and teams are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "list"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+}
+
+func TestTeamUpdate(t *testing.T) {
+	expectedHelp := "organization team update [team_id]"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints update help", func(t *testing.T) {
+		cmdArgs := []string{"team", "update", "-h"}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("valid id with valid name and description updates team", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "update", team1.Id, "--name", team1.Name, "--description", *team1.Description}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
+	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "update", team1.Id, "--name", team1.Name}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"update", team1.Id, "--name", team1.Name}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("command asks for input when no id is passed in as an arg", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+
+		cmdArgs := []string{"team", "update", "--name", team1.Name, "--description", *team1.Description}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+}
+
+func TestTeamCreate(t *testing.T) {
+	expectedHelp := "organization team create"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints update help", func(t *testing.T) {
+		cmdArgs := []string{"team", "create", "-h"}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("valid id with valid name and description updates team", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully created\n", team1.Name)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "create", team1.Id, "--name", team1.Name, "--description", *team1.Description}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
+	t.Run("any errors from api are returned and role is not created", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "create", team1.Id, "--name", team1.Name}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to create team")
+	})
+
+	t.Run("any context errors from api are returned and role is not created", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"create", team1.Id, "--name", team1.Name}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+}
+
+func TestTeamDelete(t *testing.T) {
+	expectedHelp := "organization team delete"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints update help", func(t *testing.T) {
+		cmdArgs := []string{"team", "delete", "-h"}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("valid id with valid name and description updates team", func(t *testing.T) {
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully deleted\n", team1.Name)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "delete", team1.Id}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedOut)
+	})
+
+	t.Run("any errors from api are returned and role is not deleted", func(t *testing.T) {
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteTeamResponseError, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"team", "delete", team1.Id}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.EqualError(t, err, "failed to delete team")
+	})
+
+	t.Run("any context errors from api are returned and role is not deleted", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"delete", team1.Id}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.Error(t, err)
 	})
 }
