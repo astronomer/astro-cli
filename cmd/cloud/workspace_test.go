@@ -156,7 +156,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    teamRequestErrorBodyList,
+		Body:    errorBodyUpdate,
 		JSON200: nil,
 	}
 	ListWorkspaceTeamsResponseOK = astrocore.ListWorkspaceTeamsResponse{
@@ -416,7 +416,7 @@ func TestWorkspacUserRemove(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"user", "remove", "user@1.com"}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to list user")
+		assert.EqualError(t, err, "failed to update user")
 	})
 	t.Run("any context errors from api are returned and the user is not removed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
