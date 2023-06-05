@@ -51,6 +51,15 @@ func TestOrganizationUserRootCommand(t *testing.T) {
 	assert.Contains(t, resp, expectedHelp)
 }
 
+func TestOrganizationTeamRootCommand(t *testing.T) {
+	expectedHelp := "Manage teams in your Astro Organization."
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	cmdArgs := []string{"team"}
+	resp, err := execOrganizationCmd(cmdArgs...)
+	assert.NoError(t, err)
+	assert.Contains(t, resp, expectedHelp)
+}
+
 func TestOrganizationList(t *testing.T) {
 	orgList = func(out io.Writer, coreClient astrocore.CoreClient) error {
 		return nil
@@ -141,6 +150,15 @@ var (
 	users = []astrocore.User{
 		user1,
 	}
+	team1 = astrocore.Team{
+		CreatedAt:   time.Now(),
+		Name:        "team 1",
+		Description: &description,
+		Id:          "team1-id",
+	}
+	teams = []astrocore.Team{
+		team1,
+	}
 	ListOrgUsersResponseOK = astrocore.ListOrgUsersResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
@@ -152,8 +170,22 @@ var (
 			Users:      users,
 		},
 	}
+	ListOrgTeamsResponseOK = astrocore.ListOrganizationTeamsResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.TeamsPaginated{
+			Limit:      1,
+			Offset:     0,
+			TotalCount: 1,
+			Teams:      teams,
+		},
+	}
 	errorBodyList, _ = json.Marshal(astrocore.Error{
 		Message: "failed to list users",
+	})
+	teamRequestErrorBodyList, _ = json.Marshal(astrocore.Error{
+		Message: "failed to list teams",
 	})
 	ListOrgUsersResponseError = astrocore.ListOrgUsersResponse{
 		HTTPResponse: &http.Response{
@@ -172,6 +204,9 @@ var (
 	}
 	errorBodyUpdate, _ = json.Marshal(astrocore.Error{
 		Message: "failed to update user",
+	})
+	teamRequestErrorBodyUpdate, _ = json.Marshal(astrocore.Error{
+		Message: "failed to update team",
 	})
 	MutateOrgUserRoleResponseError = astrocore.MutateOrgUserRoleResponse{
 		HTTPResponse: &http.Response{

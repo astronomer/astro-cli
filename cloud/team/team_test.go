@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"net/http"
 	"os"
@@ -60,7 +61,7 @@ var (
 // workspace teams variables
 var (
 	workspaceRole = "WORKSPACE_MEMBER"
-	workspaceId   = "workspace_cuid"
+	workspaceId   = "ck05r3bor07h40d02y2hw4n4v"
 	roles         = []astrocore.TeamRole{
 		{EntityType: "WORKSPACE", EntityId: workspaceId, Role: workspaceRole},
 	}
@@ -110,139 +111,52 @@ var (
 		Body:    errorBodyUpdate,
 		JSON200: nil,
 	}
-	//DeleteWorkspaceTeamResponseOK = astrocore.DeleteWorkspaceTeamResponse{
-	//	HTTPResponse: &http.Response{
-	//		StatusCode: 200,
-	//	},
-	//	JSON200: &workspaceTeam1,
-	//}
-	//DeleteWorkspaceTeamResponseError = astrocore.DeleteWorkspaceTeamResponse{
-	//	HTTPResponse: &http.Response{
-	//		StatusCode: 500,
-	//	},
-	//	Body:    errorBodyUpdate,
-	//	JSON200: nil,
-	//}
+	DeleteWorkspaceTeamResponseOK = astrocore.DeleteWorkspaceTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	DeleteWorkspaceTeamResponseError = astrocore.DeleteWorkspaceTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: errorBodyUpdate,
+	}
+	DeleteOrganizationTeamResponseOK = astrocore.DeleteTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	DeleteOrganizationTeamResponseError = astrocore.DeleteTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: errorBodyUpdate,
+	}
+	UpdateTeamResponseOK = astrocore.UpdateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	UpdateTeamResponseError = astrocore.UpdateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: errorBodyUpdate,
+	}
+	CreateTeamResponseOK = astrocore.CreateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &workspaceTeam1,
+	}
+	CreateTeamResponseError = astrocore.CreateTeamResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: errorBodyUpdate,
+	}
 )
-
-type testWriter struct {
-	Error error
-}
-
-func (t testWriter) Write(p []byte) (n int, err error) {
-	return 0, t.Error
-}
-
-//func TestCreateInvite(t *testing.T) {
-//	testUtil.InitTestConfig(testUtil.CloudPlatform)
-//	inviteTeamID := "team_cuid"
-//	createInviteResponseOK := astrocore.CreateTeamInviteResponse{
-//		HTTPResponse: &http.Response{
-//			StatusCode: 200,
-//		},
-//		JSON200: &astrocore.Invite{
-//			InviteId: "",
-//			TeamId:   &inviteTeamID,
-//		},
-//	}
-//	errorBody, _ := json.Marshal(astrocore.Error{
-//		Message: "failed to create invite: test-inv-error",
-//	})
-//	createInviteResponseError := astrocore.CreateTeamInviteResponse{
-//		HTTPResponse: &http.Response{
-//			StatusCode: 500,
-//		},
-//		Body:    errorBody,
-//		JSON200: nil,
-//	}
-//	t.Run("happy path", func(t *testing.T) {
-//		expectedOutMessage := "invite for test-email@test.com with role ORGANIZATION_MEMBER created\n"
-//		createInviteRequest := astrocore.CreateTeamInviteRequest{
-//			InviteeEmail: "test-email@test.com",
-//			Role:         "ORGANIZATION_MEMBER",
-//		}
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, createInviteRequest).Return(&createInviteResponseOK, nil).Once()
-//		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-//		assert.NoError(t, err)
-//		assert.Equal(t, expectedOutMessage, out.String())
-//	})
-//
-//	t.Run("error path when CreateTeamInviteWithResponse return network error", func(t *testing.T) {
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		createInviteRequest := astrocore.CreateTeamInviteRequest{
-//			InviteeEmail: "test-email@test.com",
-//			Role:         "ORGANIZATION_MEMBER",
-//		}
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, createInviteRequest).Return(nil, errorNetwork).Once()
-//		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-//		assert.EqualError(t, err, "network error")
-//	})
-//
-//	t.Run("error path when CreateTeamInviteWithResponse returns an error", func(t *testing.T) {
-//		expectedOutMessage := "failed to create invite: test-inv-error"
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		createInviteRequest := astrocore.CreateTeamInviteRequest{
-//			InviteeEmail: "test-email@test.com",
-//			Role:         "ORGANIZATION_MEMBER",
-//		}
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, createInviteRequest).Return(&createInviteResponseError, nil).Once()
-//		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-//		assert.EqualError(t, err, expectedOutMessage)
-//	})
-//	t.Run("error path when isValidRole returns an error", func(t *testing.T) {
-//		expectedOutMessage := ""
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-//		err := CreateInvite("test-email@test.com", "test-role", out, mockClient)
-//		assert.ErrorIs(t, err, ErrInvalidRole)
-//		assert.Equal(t, expectedOutMessage, out.String())
-//	})
-//
-//	t.Run("error path when no organization shortname found", func(t *testing.T) {
-//		testUtil.InitTestConfig(testUtil.CloudPlatform)
-//		c, err := config.GetCurrentContext()
-//		assert.NoError(t, err)
-//		err = c.SetContextKey("organization_short_name", "")
-//		assert.NoError(t, err)
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-//		err = CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-//		assert.ErrorIs(t, err, ErrNoShortName)
-//	})
-//
-//	t.Run("error path when getting current context returns an error", func(t *testing.T) {
-//		testUtil.InitTestConfig(testUtil.Initial)
-//		expectedOutMessage := ""
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-//		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", out, mockClient)
-//		assert.Error(t, err)
-//		assert.Equal(t, expectedOutMessage, out.String())
-//	})
-//	t.Run("error path when email is blank returns an error", func(t *testing.T) {
-//		expectedOutMessage := ""
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseOK, nil).Once()
-//		err := CreateInvite("", "test-role", out, mockClient)
-//		assert.ErrorIs(t, err, ErrInvalidEmail)
-//		assert.Equal(t, expectedOutMessage, out.String())
-//	})
-//	t.Run("error path when writing output returns an error", func(t *testing.T) {
-//		testUtil.InitTestConfig(testUtil.CloudPlatform)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("CreateTeamInviteWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&createInviteResponseError, nil).Once()
-//		err := CreateInvite("test-email@test.com", "ORGANIZATION_MEMBER", testWriter{Error: errorInvite}, mockClient)
-//		assert.EqualError(t, err, "failed to create invite: test-inv-error")
-//	})
-//}
 
 func TestListOrgTeam(t *testing.T) {
 	t.Run("happy path TestListOrgTeam", func(t *testing.T) {
@@ -523,82 +437,215 @@ func TestAddWorkspaceTeam(t *testing.T) {
 	})
 }
 
-//func TestDeleteWorkspaceTeam(t *testing.T) {
-//	testUtil.InitTestConfig(testUtil.CloudPlatform)
-//	t.Run("happy path DeleteWorkspaceTeam", func(t *testing.T) {
-//		expectedOutMessage := "The team team@1.com was successfully removed from the workspace\n"
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
-//		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
-//		err := RemoveWorkspaceTeam("team@1.com", "", out, mockClient)
-//		assert.NoError(t, err)
-//		assert.Equal(t, expectedOutMessage, out.String())
-//	})
-//
-//	t.Run("error path when DeleteWorkspaceTeamWithResponse return network error", func(t *testing.T) {
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
-//		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-//		err := RemoveWorkspaceTeam("team@1.com", "", out, mockClient)
-//		assert.EqualError(t, err, "network error")
-//	})
-//
-//	t.Run("error path when DeleteWorkspaceTeamWithResponse returns an error", func(t *testing.T) {
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
-//		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseError, nil).Once()
-//		err := RemoveWorkspaceTeam("team@1.com", "", out, mockClient)
-//		assert.EqualError(t, err, "failed to update team")
-//	})
-//
-//	t.Run("error path when no organization shortname found", func(t *testing.T) {
-//		testUtil.InitTestConfig(testUtil.CloudPlatform)
-//		c, err := config.GetCurrentContext()
-//		assert.NoError(t, err)
-//		err = c.SetContextKey("organization_short_name", "")
-//		assert.NoError(t, err)
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		err = RemoveWorkspaceTeam("team@1.com", "", out, mockClient)
-//		assert.ErrorIs(t, err, ErrNoShortName)
-//	})
-//
-//	t.Run("error path when getting current context returns an error", func(t *testing.T) {
-//		testUtil.InitTestConfig(testUtil.Initial)
-//		expectedOutMessage := ""
-//		out := new(bytes.Buffer)
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		err := RemoveWorkspaceTeam("team@1.com", "", out, mockClient)
-//		assert.Error(t, err)
-//		assert.Equal(t, expectedOutMessage, out.String())
-//	})
-//
-//	t.Run("DeleteWorkspaceTeam no email passed", func(t *testing.T) {
-//		testUtil.InitTestConfig(testUtil.CloudPlatform)
-//		out := new(bytes.Buffer)
-//
-//		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-//		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
-//		// mock os.Stdin
-//		expectedInput := []byte("1")
-//		r, w, err := os.Pipe()
-//		assert.NoError(t, err)
-//		_, err = w.Write(expectedInput)
-//		assert.NoError(t, err)
-//		w.Close()
-//		stdin := os.Stdin
-//		// Restore stdin right after the test.
-//		defer func() { os.Stdin = stdin }()
-//		os.Stdin = r
-//
-//		expectedOut := "The team team@1.com was successfully removed from the workspace\n"
-//		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
-//
-//		err = RemoveWorkspaceTeam("", "", out, mockClient)
-//		assert.NoError(t, err)
-//		assert.Equal(t, expectedOut, out.String())
-//	})
-//}
+func TestRemoveWorkspaceTeam(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("happy path DeleteWorkspaceTeam", func(t *testing.T) {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully removed from workspace %s\n", team1.Name, workspaceId)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
+		err := RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when DeleteWorkspaceTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+		err := RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
+	t.Run("error path when DeleteWorkspaceTeamWithResponse returns an error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseError, nil).Once()
+		err := RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err = RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
+		assert.EqualError(t, err, "cannot retrieve organization short name from context")
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
+
+func TestDelete(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("happy path Delete", func(t *testing.T) {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully deleted\n", team1.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
+		err := Delete(team1.Id, out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when DeleteTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+		err := Delete(team1.Id, out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
+	t.Run("error path when DeleteTeamWithResponse returns an error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseError, nil).Once()
+		err := Delete(team1.Id, out, mockClient)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err = Delete(team1.Id, out, mockClient)
+		assert.EqualError(t, err, "cannot retrieve organization short name from context")
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := Delete(team1.Id, out, mockClient)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
+
+func TestUpdate(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("happy path Update", func(t *testing.T) {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when UpdateTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
+	t.Run("error path when UpdateTeamWithResponse returns an error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
+		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err = UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		assert.EqualError(t, err, "cannot retrieve organization short name from context")
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
+
+func TestCreate(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	t.Run("happy path Update", func(t *testing.T) {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully created\n", team1.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseOK, nil).Once()
+		err := CreateTeam(team1.Name, *team1.Description, out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when CreateTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
+		err := CreateTeam(team1.Name, *team1.Description, out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
+	t.Run("error path when CreateTeamWithResponse returns an error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateTeamResponseError, nil).Once()
+		err := CreateTeam(team1.Name, *team1.Description, out, mockClient)
+		assert.EqualError(t, err, "failed to update team")
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err = CreateTeam(team1.Name, *team1.Description, out, mockClient)
+		assert.EqualError(t, err, "cannot retrieve organization short name from context")
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := CreateTeam(team1.Name, *team1.Description, out, mockClient)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
