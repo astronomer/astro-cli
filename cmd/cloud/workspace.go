@@ -1,10 +1,10 @@
 package cloud
 
 import (
-	"github.com/astronomer/astro-cli/cloud/team"
 	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"

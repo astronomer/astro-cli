@@ -21,8 +21,6 @@ var (
 	errInvalidTeamKey           = errors.New("invalid team selection")
 	ErrInvalidTeamMemberKey     = errors.New("invalid team member selection")
 	ErrInvalidName              = errors.New("no name provided for the team. Retry with a valid name")
-	ErrInvalidTeamId            = errors.New("no team id provided. Retry with a valid team id")
-	ErrInvalidUserId            = errors.New("no user id provided. Retry with a valid user id")
 	ErrTeamNotFound             = errors.New("no team was found for the ID you provided")
 	ErrWrongEnforceInput        = errors.New("the input to the `--enforce-cicd` flag")
 	ErrNoShortName              = errors.New("cannot retrieve organization short name from context")
@@ -33,7 +31,7 @@ var (
 	teamPagnationLimit          = 100
 )
 
-func CreateTeam(name string, description string, out io.Writer, client astrocore.CoreClient) error {
+func CreateTeam(name, description string, out io.Writer, client astrocore.CoreClient) error {
 	if name == "" {
 		return ErrInvalidName
 	}
@@ -77,7 +75,6 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	}
 
 	teams, err := GetWorkspaceTeams(client, workspace, teamPagnationLimit)
-
 	if err != nil {
 		return err
 	}
@@ -105,7 +102,6 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 
 	teamMutateRequest := astrocore.MutateWorkspaceTeamRoleRequest{Role: role}
 	resp, err := client.MutateWorkspaceTeamRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, teamID, teamMutateRequest)
-
 	if err != nil {
 		return err
 	}
@@ -378,7 +374,6 @@ func GetOrgTeams(client astrocore.CoreClient) ([]astrocore.Team, error) {
 	offset := 0
 	var teams []astrocore.Team
 	ctx, err := context.GetCurrentContext()
-
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +413,6 @@ func ListOrgTeams(out io.Writer, client astrocore.CoreClient) error {
 		Header:         []string{"ID", "Name", "Description", "CREATE DATE"},
 	}
 	teams, err := GetOrgTeams(client)
-
 	if err != nil {
 		return err
 	}
@@ -497,7 +491,7 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	return nil
 }
 
-func RemoveUser(team_id, team_member_id string, out io.Writer, client astrocore.CoreClient) error {
+func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -513,14 +507,14 @@ func RemoveUser(team_id, team_member_id string, out io.Writer, client astrocore.
 		return ErrNoTeamsFoundInOrg
 	}
 	var team astrocore.Team
-	if team_id == "" {
+	if teamID == "" {
 		team, err = selectTeam(teams)
 		if err != nil {
 			return err
 		}
 	} else {
 		for i := range teams {
-			if teams[i].Id == team_id {
+			if teams[i].Id == teamID {
 				team = teams[i]
 			}
 		}
@@ -528,7 +522,7 @@ func RemoveUser(team_id, team_member_id string, out io.Writer, client astrocore.
 			return ErrTeamNotFound
 		}
 	}
-	teamID := team.Id
+	teamID = team.Id
 	if team.Members == nil {
 		return ErrNoTeamMembersFoundInTeam
 	}
@@ -536,14 +530,14 @@ func RemoveUser(team_id, team_member_id string, out io.Writer, client astrocore.
 	teamMembers := *team.Members
 
 	var teamMemberSelection astrocore.TeamMember
-	if team_member_id == "" {
+	if teamMemberID == "" {
 		teamMemberSelection, err = selectTeamMember(teamMembers)
 		if err != nil {
 			return err
 		}
 	} else {
 		for i := range teamMembers {
-			if teamMembers[i].UserId == team_member_id {
+			if teamMembers[i].UserId == teamMemberID {
 				teamMemberSelection = teamMembers[i]
 			}
 		}
@@ -565,7 +559,7 @@ func RemoveUser(team_id, team_member_id string, out io.Writer, client astrocore.
 	return nil
 }
 
-func AddUser(team_id, user_id string, out io.Writer, client astrocore.CoreClient) error {
+func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -581,14 +575,14 @@ func AddUser(team_id, user_id string, out io.Writer, client astrocore.CoreClient
 		return ErrNoTeamsFoundInOrg
 	}
 	var team astrocore.Team
-	if team_id == "" {
+	if teamID == "" {
 		team, err = selectTeam(teams)
 		if err != nil {
 			return err
 		}
 	} else {
 		for i := range teams {
-			if teams[i].Id == team_id {
+			if teams[i].Id == teamID {
 				team = teams[i]
 			}
 		}
@@ -596,7 +590,7 @@ func AddUser(team_id, user_id string, out io.Writer, client astrocore.CoreClient
 			return ErrTeamNotFound
 		}
 	}
-	teamID := team.Id
+	teamID = team.Id
 
 	users, err := user.GetOrgUsers(client)
 	if err != nil {
@@ -606,14 +600,14 @@ func AddUser(team_id, user_id string, out io.Writer, client astrocore.CoreClient
 		return ErrNoUsersFoundInOrg
 	}
 	var userSelection astrocore.User
-	if user_id == "" {
+	if userID == "" {
 		userSelection, err = user.SelectUser(users, false)
 		if err != nil {
 			return err
 		}
 	} else {
 		for i := range users {
-			if users[i].Id == user_id {
+			if users[i].Id == userID {
 				userSelection = users[i]
 			}
 		}
@@ -622,7 +616,7 @@ func AddUser(team_id, user_id string, out io.Writer, client astrocore.CoreClient
 		}
 	}
 
-	userID := userSelection.Id
+	userID = userSelection.Id
 	addTeamMembersRequest := astrocore.AddTeamMembersRequest{
 		MemberIds: []string{userID},
 	}
@@ -670,7 +664,7 @@ func selectTeamMember(teamMembers []astrocore.TeamMember) (astrocore.TeamMember,
 	return selected, nil
 }
 
-func ListTeamUsers(team_id string, out io.Writer, client astrocore.CoreClient) error {
+func ListTeamUsers(teamID string, out io.Writer, client astrocore.CoreClient) error {
 	teams, err := GetOrgTeams(client)
 	if err != nil {
 		return err
@@ -679,14 +673,14 @@ func ListTeamUsers(team_id string, out io.Writer, client astrocore.CoreClient) e
 		return ErrNoTeamsFoundInOrg
 	}
 	var team astrocore.Team
-	if team_id == "" {
+	if teamID == "" {
 		team, err = selectTeam(teams)
 		if err != nil {
 			return err
 		}
 	} else {
 		for i := range teams {
-			if teams[i].Id == team_id {
+			if teams[i].Id == teamID {
 				team = teams[i]
 			}
 		}

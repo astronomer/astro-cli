@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/astronomer/astro-cli/cloud/user"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/cloud/user"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
@@ -23,7 +24,6 @@ import (
 // org team variables
 var (
 	errorNetwork = errors.New("network error")
-	errorInvite  = errors.New("test-inv-error")
 	orgRole      = "ORGANIZATION_MEMBER"
 	description  = "mock description"
 	user1        = astrocore.User{
@@ -74,9 +74,9 @@ var (
 // workspace teams variables
 var (
 	workspaceRole = "WORKSPACE_MEMBER"
-	workspaceId   = "ck05r3bor07h40d02y2hw4n4v"
+	workspaceID   = "ck05r3bor07h40d02y2hw4n4v"
 	roles         = []astrocore.TeamRole{
-		{EntityType: "WORKSPACE", EntityId: workspaceId, Role: workspaceRole},
+		{EntityType: "WORKSPACE", EntityId: workspaceID, Role: workspaceRole},
 	}
 	workspaceTeam1 = astrocore.Team{
 		CreatedAt:   time.Now(),
@@ -492,7 +492,7 @@ func TestAddWorkspaceTeam(t *testing.T) {
 func TestRemoveWorkspaceTeam(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("happy path DeleteWorkspaceTeam", func(t *testing.T) {
-		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully removed from workspace %s\n", team1.Name, workspaceId)
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully removed from workspace %s\n", team1.Name, workspaceID)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
@@ -769,7 +769,7 @@ func TestAddUser(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 
-		//select team
+		// select team
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
@@ -799,7 +799,7 @@ func TestAddUser(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 
-		//select team
+		// select team
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
@@ -887,7 +887,7 @@ func TestRemoveUser(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 
-		//select team
+		// select team
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
@@ -917,7 +917,7 @@ func TestRemoveUser(t *testing.T) {
 		// mock os.Stdin
 		expectedInput := []byte("1")
 
-		//select team
+		// select team
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
