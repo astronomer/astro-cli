@@ -275,7 +275,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	return nil
 }
 
-// Create creates workspaces
+// Delete deletes workspaces
 func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {

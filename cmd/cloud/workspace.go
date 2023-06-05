@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -19,6 +20,11 @@ var (
 	workspaceName        string
 	workspaceDescription string
 	enforceCD            string
+	tokenName            string
+	tokenDescription     string
+	tokenRole            string
+	orgTokenName         string
+	tokenExpiration      int
 )
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
@@ -35,6 +41,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUpdateCmd(out),
 		newWorkspaceDeleteCmd(out),
 		newWorkspaceUserRootCmd(out),
+		newWorkspaceTokenRootCmd(out),
 	)
 	return cmd
 }
@@ -77,7 +84,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire workspace in quotes \"\"")
+	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	return cmd
 }
@@ -94,7 +101,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire workspace in quotes \"\"")
+	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	return cmd
 }
@@ -184,6 +191,121 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 			return removeWorkspaceUser(cmd, args, out)
 		},
 	}
+	return cmd
+}
+
+func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "token",
+		Aliases: []string{"us"},
+		Short:   "Manage tokens in your Astro Workspace",
+		Long:    "Manage tokens in your Astro Workspace.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newWorkspaceTokenListCmd(out),
+		newWorkspaceTokenCreateCmd(out),
+		newWorkspaceTokenUpdateCmd(out),
+		newWorkspaceTokenRotateCmd(out),
+		newWorkspaceTokenDeleteCmd(out),
+		newWorkspaceTokenAddCmd(out),
+	)
+	return cmd
+}
+
+func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the tokens in an Astro Workspace",
+		Long:    "List all the tokens in an Astro Workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listWorkspaceToken(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create a token in an Astro Workspace",
+		Long: "Create a token in an Astro Workspace\n$astro workspace token create --name [token name] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createWorkspaceToken(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The new token's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
+		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER")
+	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days")
+	return cmd
+}
+
+func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update",
+		Aliases: []string{"up"},
+		Short:   "Update a token in an Astro Workspace",
+		Long: "Update a token in an Astro Workspace\n$astro workspace token udpate [token name] --name [new token name] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateWorkspaceToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
+		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	return cmd
+}
+
+func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "rotate [token name]",
+		Aliases: []string{"ro"},
+		Short:   "Rotate a workspace token's key",
+		Long:    "Rotate a workspace token's key",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return rotateWorkspaceToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Rotate workspace token without showing a warning")
+
+	return cmd
+}
+
+func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [token name]",
+		Aliases: []string{"de"},
+		Short:   "Delete a workspace token or remove an organization token from a workspace",
+		Long:    "Delete a workspace token or remove an organization token from a workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return DeleteWorkspaceToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Rotate workspace roken without showing a warning")
+
+	return cmd
+}
+
+func newWorkspaceTokenAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add",
+		Short: "Update a token in an Astro Workspace",
+		Long: "Update a token in an Astro Workspace\n$astro workspace token udpate [token name] --name [new token name] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addOrgTokenToWorkspace(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the organization token you want to add to a workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The workspace role to add to the "+
+		"organization token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
@@ -300,4 +422,67 @@ func coalesceWorkspace() (string, error) {
 	}
 
 	return "", errors.New("no valid workspace source found")
+}
+
+func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return workspace.ListTokens(astroCoreClient, "", out)
+}
+
+func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	if tokenName == "" {
+		// no role was provided so ask the user for it
+		tokenName = input.Text("Enter a name for the new Workspace Token: ")
+	}
+	if tokenRole == "" {
+		// no role was provided so ask the user for it
+		tokenRole = input.Text("Enter a workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) for the new token: ")
+	}
+
+	return workspace.CreateToken(tokenName, tokenDescription, tokenRole, "", tokenExpiration, out, astroCoreClient)
+}
+
+func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	var name string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		name = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return workspace.UpdateToken(tokenName, name, tokenDescription, tokenRole, "", out, astroCoreClient)
+}
+
+func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	var name string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		name = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return workspace.RotateToken(name, "", force, out, astroCoreClient)
+}
+
+func DeleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	var name string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		name = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return workspace.DeleteToken(name, "", force, out, astroCoreClient)
+}
+
+func addOrgTokenToWorkspace(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return organization.AddOrgTokenToWorkspace(tokenName, tokenRole, "", out, astroCoreClient)
 }
