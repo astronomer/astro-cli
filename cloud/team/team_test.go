@@ -361,7 +361,7 @@ func TestUpdateWorkspaceTeamRole(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		err = UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", out, mockClient)
-		assert.ErrorIs(t, err, ErrNoShortName)
+		assert.EqualError(t, err, "cannot retrieve organization short name from context")
 	})
 
 	t.Run("error path when getting current context returns an error", func(t *testing.T) {
