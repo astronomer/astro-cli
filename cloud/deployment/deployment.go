@@ -762,6 +762,10 @@ func IsDeploymentHosted(deploymentType string) bool {
 	return deploymentType == "HOSTED_SHARED"
 }
 
+func IsDeploymentDedicated(deploymentType string) bool {
+	return deploymentType == "HOSTED_DEDICATED"
+}
+
 var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployment, error) {
 	if org == "" {
 		c, err := config.GetCurrentContext()

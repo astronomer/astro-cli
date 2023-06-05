@@ -51,7 +51,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		return err
 	}
 
-	if deployment.IsDeploymentHosted(requestedDeployment.Type) {
+	if deployment.IsDeploymentHosted(requestedDeployment.Type) || deployment.IsDeploymentDedicated(requestedDeployment.Type) {
 		nodePoolID = requestedDeployment.Cluster.NodePools[0].ID
 		configOptions, err := client.GetDeploymentConfig()
 		if err != nil {
