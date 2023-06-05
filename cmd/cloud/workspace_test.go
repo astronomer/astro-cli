@@ -201,7 +201,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body: teamRequestErrorBodyList,
+		Body: teamRequestErrorDelete,
 	}
 )
 
@@ -941,7 +941,7 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 		assert.Contains(t, resp, expectedHelp)
 	})
 	t.Run("valid email removes team", func(t *testing.T) {
-		expectedOut := fmt.Sprintf("The team %s was successfully removed from the workspace", team1.Id)
+		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from workspace ck05r3bor07h40d02y2hw4n4v\n", team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
@@ -958,7 +958,7 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "remove", team1.Id}
 		_, err := execWorkspaceCmd(cmdArgs...)
-		assert.EqualError(t, err, "failed to update team")
+		assert.EqualError(t, err, "failed to delete team")
 	})
 	t.Run("any context errors from api are returned and the team is not removed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
