@@ -65,7 +65,7 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 			return errOrganizationTokenNotFound
 		}
 	}
-	apiTokenId := token.Id
+	apiTokenID := token.Id
 
 	var orgRole string
 	for i := range token.Roles {
@@ -84,17 +84,17 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 	}
 	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRole{apiTokenWorkspaceRole}
 
-	updateOrganizationApiTokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
+	updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
 		Organization: orgRole,
 		Workspace:    &apiTokenWorkspaceRoles,
 	}
-	updateOrganizationApiTokenRequest := astrocore.UpdateOrganizationApiTokenRequest{
+	updateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenRequest{
 		Name:        token.Name,
 		Description: *token.Description,
-		Roles:       updateOrganizationApiTokenRoles,
+		Roles:       updateOrganizationAPITokenRoles,
 	}
 
-	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenId, updateOrganizationApiTokenRequest)
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID, updateOrganizationAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -107,13 +107,10 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 }
 
 func selectTokenForWorkspace(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
-
 	fmt.Println("\nPlease select the organization token you would like to add to the workspace:")
-
 	apiTokensMap := map[string]astrocore.ApiToken{}
 	tab := newTokenSelectionTableOut()
 	for i := range apiTokens {
-
 		name := apiTokens[i].Name
 		description := apiTokens[i].Description
 
@@ -154,7 +151,7 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 		return []astrocore.ApiToken{}, err
 	}
 
-	ApiTokens := resp.JSON200.ApiTokens
+	APITokens := resp.JSON200.ApiTokens
 
-	return ApiTokens, nil
+	return APITokens, nil
 }

@@ -39,9 +39,12 @@ var (
 	ErrWorkspaceTokenNotFound   = errors.New("no workspace token was found for the token name you provided")
 )
 
+const (
+	workspaceConst = "WORKSPACE"
+)
+
 // List all workspace Tokens
 func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) error {
-
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -74,11 +77,8 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 		}
 		created := TimeAgo(apiTokens[i].CreatedAt)
 		createdBy := apiTokens[i].CreatedBy.FullName
-
 		tab.AddRow([]string{token, name, *description, string(scope), role, expires, created, *createdBy}, false)
-
 	}
-
 	tab.Print(out)
 
 	return nil
@@ -103,15 +103,15 @@ func CreateToken(name, description, role, workspace string, expiration int, out 
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	CreateWorkspaceApiTokenRequest := astrocore.CreateWorkspaceApiTokenJSONRequestBody{
+	CreateWorkspaceAPITokenRequest := astrocore.CreateWorkspaceApiTokenJSONRequestBody{
 		Description: &description,
 		Name:        name,
 		Role:        role,
 	}
 	if expiration != 0 {
-		CreateWorkspaceApiTokenRequest.TokenExpiryPeriodInDays = &expiration
+		CreateWorkspaceAPITokenRequest.TokenExpiryPeriodInDays = &expiration
 	}
-	resp, err := client.CreateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, CreateWorkspaceApiTokenRequest)
+	resp, err := client.CreateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, CreateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -160,20 +160,20 @@ func UpdateToken(name, newName, description, role, workspace string, out io.Writ
 			return ErrWorkspaceTokenNotFound
 		}
 	}
-	apiTokenId := token.Id
+	apiTokenID := token.Id
 
-	UpdateWorkspaceApiTokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{}
+	UpdateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{}
 
 	if newName == "" {
-		UpdateWorkspaceApiTokenRequest.Name = token.Name
+		UpdateWorkspaceAPITokenRequest.Name = token.Name
 	} else {
-		UpdateWorkspaceApiTokenRequest.Name = newName
+		UpdateWorkspaceAPITokenRequest.Name = newName
 	}
 
 	if description == "" {
-		UpdateWorkspaceApiTokenRequest.Description = *token.Description
+		UpdateWorkspaceAPITokenRequest.Description = *token.Description
 	} else {
-		UpdateWorkspaceApiTokenRequest.Description = description
+		UpdateWorkspaceAPITokenRequest.Description = description
 	}
 	if role == "" {
 		for i := range token.Roles {
@@ -185,15 +185,15 @@ func UpdateToken(name, newName, description, role, workspace string, out io.Writ
 		if err != nil {
 			return err
 		}
-		UpdateWorkspaceApiTokenRequest.Role = role
+		UpdateWorkspaceAPITokenRequest.Role = role
 	} else {
 		err := user.IsWorkspaceRoleValid(role)
 		if err != nil {
 			return err
 		}
-		UpdateWorkspaceApiTokenRequest.Role = role
+		UpdateWorkspaceAPITokenRequest.Role = role
 	}
-	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenId, UpdateWorkspaceApiTokenRequest)
+	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
 	}
@@ -238,7 +238,7 @@ func RotateToken(name, workspace string, force bool, out io.Writer, client astro
 			return ErrWorkspaceTokenNotFound
 		}
 	}
-	apiTokenId := token.Id
+	apiTokenID := token.Id
 
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
@@ -251,7 +251,7 @@ func RotateToken(name, workspace string, force bool, out io.Writer, client astro
 		}
 	}
 
-	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenId)
+	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -299,8 +299,8 @@ func DeleteToken(id, workspace string, force bool, out io.Writer, client astroco
 			return ErrWorkspaceTokenNotFound
 		}
 	}
-	apiTokenId := token.Id
-	if string(token.Type) == "WORKSPACE" {
+	apiTokenID := token.Id
+	if string(token.Type) == workspaceConst {
 		if !force {
 			fmt.Println("WARNING: API Token deletion cannot be undone.")
 			i, _ := input.Confirm(
@@ -323,7 +323,7 @@ func DeleteToken(id, workspace string, force bool, out io.Writer, client astroco
 		}
 	}
 
-	resp, err := client.DeleteWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenId)
+	resp, err := client.DeleteWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func DeleteToken(id, workspace string, force bool, out io.Writer, client astroco
 	if err != nil {
 		return err
 	}
-	if string(token.Type) == "WORKSPACE" {
+	if string(token.Type) == workspaceConst {
 		fmt.Fprintf(out, "Astro Workspace API token %s was successfully deleted\n", token.Name)
 	} else {
 		fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the workspace\n", token.Name)
@@ -407,24 +407,25 @@ func getWorkspaceTokens(workspace string, client astrocore.CoreClient) ([]astroc
 		return []astrocore.ApiToken{}, err
 	}
 
-	ApiTokens := resp.JSON200.ApiTokens
+	APITokens := resp.JSON200.ApiTokens
 
-	return ApiTokens, nil
+	return APITokens, nil
 }
 
 func TimeAgo(date time.Time) string {
 	duration := time.Since(date)
-	days := int(duration.Hours() / 24)
+	days := int(duration.Hours() / 24) //nolint:gomnd
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes())
 
-	if days > 0 {
+	switch {
+	case days > 0:
 		return fmt.Sprintf("%d days ago", days)
-	} else if hours > 0 {
+	case hours > 0:
 		return fmt.Sprintf("%d hours ago", hours)
-	} else if minutes > 0 {
+	case minutes > 0:
 		return fmt.Sprintf("%d minutes ago", minutes)
-	} else {
+	default:
 		return "Just now"
 	}
 }
