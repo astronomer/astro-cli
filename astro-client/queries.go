@@ -171,22 +171,6 @@ var (
 	}
 	`
 
-	GetClusters = `
-	query clusters($organizationId: Id!) {
-		clusters(organizationId: $organizationId) {
-			id
-			name
-			cloudProvider
-			nodePools {
-				id
-				isDefault
-				maxNodeCount
-				nodeInstanceType
-			}
-		}
-	}
-	`
-
 	GetDeploymentConfigOptions = `
 	query deploymentConfigOptions {
 	  deploymentConfigOptions {

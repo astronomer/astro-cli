@@ -160,7 +160,9 @@ func getDeploymentInfo(sourceDeployment *astro.Deployment) (map[string]interface
 func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interface{} {
 	clusterName := sourceDeployment.Cluster.Name
 	if organization.IsOrgHosted() {
-		clusterName = sourceDeployment.Cluster.Region
+		if deployment.IsDeploymentHosted(sourceDeployment.Type) {
+			clusterName = sourceDeployment.Cluster.Region
+		}
 	}
 	return map[string]interface{}{
 		"name":               sourceDeployment.Label,

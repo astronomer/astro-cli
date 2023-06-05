@@ -280,3 +280,40 @@ func TestIsOrgHosted(t *testing.T) {
 		assert.Equal(t, isHosted, false)
 	})
 }
+
+func TestListClusters(t *testing.T) {
+	// initialize empty config
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	orgShortName := "test-org-name"
+	mockListClustersResponse := astrocore.ListClustersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ClustersPaginated{
+			Clusters: []astrocore.Cluster{
+				{
+					Id:   "test-cluster-id",
+					Name: "test-cluster",
+				},
+				{
+					Id:   "test-cluster-id-1",
+					Name: "test-cluster-1",
+				},
+			},
+		},
+	}
+
+	t.Run("successful list all clusters", func(t *testing.T) {
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		clusters, err := ListClusters(orgShortName, mockCoreClient)
+		assert.NoError(t, err)
+		assert.Equal(t, len(clusters), 2)
+	})
+
+	t.Run("error on listing clusters", func(t *testing.T) {
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrocore.ListClustersResponse{}, errNetwork).Once()
+		_, err := ListClusters(orgShortName, mockCoreClient)
+		assert.ErrorIs(t, err, errNetwork)
+	})
+}

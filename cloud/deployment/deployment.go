@@ -42,6 +42,7 @@ const (
 	CeleryExecutor = "CeleryExecutor"
 	notApplicable  = "N/A"
 	gcpCloud       = "gcp"
+	standard       = "standard"
 )
 
 var (
@@ -91,7 +92,9 @@ func List(ws string, all bool, client astro.Client, out io.Writer) error {
 		runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = d.Cluster.Region
+			if IsDeploymentHosted(d.Type) {
+				clusterName = d.Cluster.Region
+			}
 			releaseName = notApplicable
 		}
 
@@ -155,7 +158,7 @@ func Logs(deploymentID, ws, deploymentName string, warnLogs, errorLogs, infoLogs
 	return nil
 }
 
-func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
+func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, clusterType string, schedulerAU, schedulerReplicas int, client astro.Client, coreClient astrocore.CoreClient, waitForStatus bool, enforceCD *bool) error { //nolint
 	var organizationID string
 	var currentWorkspace astro.Workspace
 	var dagDeployEnabled bool
@@ -234,7 +237,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
-	if region == "" && organization.IsOrgHosted() {
+	if region == "" && organization.IsOrgHosted() && clusterType == standard {
 		// select and validate region
 		region, err = selectRegion(cloudProvider, region, coreClient)
 		if err != nil {
@@ -243,7 +246,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	// select and validate cluster
-	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID, client, coreClient)
+	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, c.OrganizationShortName, clusterID, coreClient)
 	if err != nil {
 		return err
 	}
@@ -292,7 +295,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	if waitForStatus {
 		err = healthPoll(d.ID, workspaceID, client)
 		if err != nil {
-			errOutput := createOutput(workspaceID, &d)
+			errOutput := createOutput(workspaceID, clusterType, &d)
 			if errOutput != nil {
 				return errOutput
 			}
@@ -300,7 +303,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 		}
 	}
 
-	err = createOutput(workspaceID, &d)
+	err = createOutput(workspaceID, clusterType, &d)
 	if err != nil {
 		return err
 	}
@@ -308,14 +311,16 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	return nil
 }
 
-func createOutput(workspaceID string, d *astro.Deployment) error {
+func createOutput(workspaceID, clusterType string, d *astro.Deployment) error {
 	tab := newTableOut()
 
 	runtimeVersionText := d.RuntimeRelease.Version + " (based on Airflow " + d.RuntimeRelease.AirflowVersion + ")"
 	clusterName := d.Cluster.Name
 	releaseName := d.ReleaseName
 	if organization.IsOrgHosted() {
-		clusterName = d.Cluster.Region
+		if clusterType == standard {
+			clusterName = d.Cluster.Region
+		}
 		releaseName = notApplicable
 	}
 	tab.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
@@ -448,26 +453,25 @@ func selectRegion(cloudProvider, region string, coreClient astrocore.CoreClient)
 	return region, nil
 }
 
-func selectCluster(clusterID, organizationID string, client astro.Client) (newClusterID string, err error) {
+func selectCluster(clusterID, organizationShortName string, coreClient astrocore.CoreClient) (newClusterID string, err error) {
 	clusterTab := printutil.Table{
 		Padding:        []int{5, 30, 30, 50},
 		DynamicPadding: true,
 		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 	}
-	// cluster request
-	cs, err := client.ListClusters(organizationID)
-	if err != nil {
-		return "", errors.Wrap(err, astro.AstronomerConnectionErrMsg)
-	}
 
+	cs, err := organization.ListClusters(organizationShortName, coreClient)
+	if err != nil {
+		return "", err
+	}
 	// select cluster
 	if clusterID == "" {
 		fmt.Println("\nPlease select a Cluster for your Deployment:")
 
-		clusterMap := map[string]astro.Cluster{}
+		clusterMap := map[string]astrocore.Cluster{}
 		for i := range cs {
 			index := i + 1
-			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, cs[i].CloudProvider, cs[i].ID}, false)
+			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, string(cs[i].CloudProvider), cs[i].Id}, false)
 
 			clusterMap[strconv.Itoa(index)] = cs[i]
 		}
@@ -479,14 +483,14 @@ func selectCluster(clusterID, organizationID string, client astro.Client) (newCl
 			return "", ErrInvalidDeploymentKey
 		}
 
-		clusterID = selected.ID
+		clusterID = selected.Id
 	}
 
 	// validate cluster
 	csID := ""
 	for i := range cs {
-		if clusterID == cs[i].ID {
-			csID = cs[i].ID
+		if clusterID == cs[i].Id {
+			csID = cs[i].Id
 		}
 	}
 	if csID == "" {
@@ -518,7 +522,7 @@ func useSharedCluster(cloudProvider astrocore.SharedClusterCloudProvider, region
 // useSharedClusterOrSelectDedicatedCluster decides how to derive the clusterID to use for a deployment.
 // if cloudProvider and region are provided, it uses a useSharedCluster to get the ClusterID.
 // if not, it uses selectCluster to get the ClusterID.
-func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationID, clusterID string, client astro.Client, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
+func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationShortName, clusterID string, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
 	// if cloud provider and region are requested
 	if cloudProvider != "" && region != "" {
 		// use a shared cluster for the deployment
@@ -528,7 +532,7 @@ func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizatio
 		}
 	} else {
 		// select and validate cluster
-		derivedClusterID, err = selectCluster(clusterID, organizationID, client)
+		derivedClusterID, err = selectCluster(clusterID, organizationShortName, coreClient)
 		if err != nil {
 			return "", err
 		}
@@ -706,7 +710,9 @@ func Update(deploymentID, label, ws, description, deploymentName, dagDeploy, exe
 		clusterName := d.Cluster.Name
 		releaseName := d.ReleaseName
 		if organization.IsOrgHosted() {
-			clusterName = d.Cluster.Region
+			if IsDeploymentHosted(d.Type) {
+				clusterName = d.Cluster.Region
+			}
 			releaseName = notApplicable
 		}
 		tabDeployment.AddRow([]string{d.Label, releaseName, clusterName, d.ID, runtimeVersionText, strconv.FormatBool(d.DagDeployEnabled), strconv.FormatBool(d.APIKeyOnlyDeployments)}, false)
@@ -887,7 +893,7 @@ func deploymentSelectionProcess(ws string, deployments []astro.Deployment, clien
 		schedulerReplicas := configOption.Components.Scheduler.Replicas.Default
 		cicdEnforcement := false
 		// walk user through creating a deployment
-		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", schedulerAU, schedulerReplicas, client, coreClient, false, &cicdEnforcement)
+		err = createDeployment("", ws, "", "", runtimeVersion, "disable", CeleryExecutor, "", "", "medium", "", "", schedulerAU, schedulerReplicas, client, coreClient, false, &cicdEnforcement)
 		if err != nil {
 			return astro.Deployment{}, err
 		}

@@ -3,9 +3,12 @@ package fromfile
 import (
 	"bytes"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/astronomer/astro-cli/astro-client"
+	astrocore "github.com/astronomer/astro-cli/astro-client-core"
+	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
 	"github.com/astronomer/astro-cli/cloud/deployment"
 	"github.com/astronomer/astro-cli/cloud/deployment/inspect"
@@ -17,13 +20,53 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
-var errTest = errors.New("test error")
+const (
+	mockOrgShortName = "test-org-short-name"
+)
+
+var (
+	errTest           = errors.New("test error")
+	limit             = 1000
+	clusterType       = []astrocore.ListClustersParamsType{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	clusterListParams = &astrocore.ListClustersParams{
+		Type:  &clusterType,
+		Limit: &limit,
+	}
+	mockListClustersResponse = astrocore.ListClustersResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ClustersPaginated{
+			Clusters: []astrocore.Cluster{
+				{
+					Id:   "test-cluster-id",
+					Name: "test-cluster",
+					NodePools: []astrocore.NodePool{
+						{
+							Id:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-1",
+						},
+						{
+							Id:               "test-pool-id-2",
+							IsDefault:        false,
+							NodeInstanceType: "test-worker-2",
+						},
+					},
+				},
+				{
+					Id:   "test-cluster-id-1",
+					Name: "test-cluster-1",
+				},
+			},
+		},
+	}
+)
 
 func TestCreateOrUpdate(t *testing.T) {
 	var (
 		err                           error
 		filePath, data, orgID         string
-		existingClusters              []astro.Cluster
 		existingWorkspaces            []astro.Workspace
 		mockWorkerQueueDefaultOptions astro.WorkerQueueDefaultOptions
 		emails                        []string
@@ -33,7 +76,7 @@ func TestCreateOrUpdate(t *testing.T) {
 
 	t.Run("common across create or update", func(t *testing.T) {
 		t.Run("returns an error if file does not exist", func(t *testing.T) {
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
 			assert.ErrorContains(t, err, "open deployment.yaml: no such file or directory")
 		})
 		t.Run("returns an error if file exists but user provides incorrect path", func(t *testing.T) {
@@ -42,7 +85,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			err = fileutil.WriteStringToFile(filePath, data)
 			assert.NoError(t, err)
 			defer afero.NewOsFs().RemoveAll("./2")
-			err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil)
+			err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, nil)
 			assert.ErrorContains(t, err, "open 1/deployment.yaml: no such file or directory")
 		})
 		t.Run("returns an error if file is empty", func(t *testing.T) {
@@ -50,7 +93,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			data = ""
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
 			assert.ErrorIs(t, err, errEmptyFile)
 			assert.ErrorContains(t, err, "deployment.yaml has no content")
 		})
@@ -59,7 +102,7 @@ func TestCreateOrUpdate(t *testing.T) {
 			data = "test"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
 			assert.ErrorContains(t, err, "error unmarshaling JSON:")
 		})
 		t.Run("returns an error if required fields are missing", func(t *testing.T) {
@@ -112,12 +155,13 @@ deployment:
 `
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", nil, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", nil, nil, nil)
 			assert.ErrorContains(t, err, "missing required field: deployment.configuration.name")
 		})
 		t.Run("returns an error if getting context fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -171,13 +215,14 @@ deployment:
 
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorContains(t, err, "no context set")
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if cluster does not exist", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -228,16 +273,6 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -251,14 +286,16 @@ deployment:
 			orgID = "test-org-id"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errNotFound)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if listing cluster fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -322,14 +359,16 @@ deployment:
 			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errTest).Once()
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errTest)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if listing deployment fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -380,16 +419,6 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -403,15 +432,17 @@ deployment:
 			orgID = "test-org-id"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errTest)
+			mockClient.AssertExpectations(t)
 			mockClient.AssertExpectations(t)
 		})
 		t.Run("does not update environment variables if input is empty", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			out := new(bytes.Buffer)
 			filePath = "./deployment.yaml"
 			data = `{
@@ -464,28 +495,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -521,20 +530,22 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.NotNil(t, out)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("does not update alert emails if input is empty", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			out := new(bytes.Buffer)
 			filePath = "./deployment.yaml"
 			data = `
@@ -584,28 +595,6 @@ deployment:
     webserver_url: some-url
   alert_emails: []
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -641,20 +630,22 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.NotNil(t, out)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if creating environment variables fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -719,28 +710,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -772,19 +741,21 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errTest)
 			assert.ErrorContains(t, err, "\n failed to create alert emails")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if creating alert emails fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -849,28 +820,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -902,15 +851,16 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(astro.DeploymentAlerts{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errTest)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 	})
 	t.Run("when action is create", func(t *testing.T) {
@@ -918,6 +868,7 @@ deployment:
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -968,28 +919,6 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -1041,23 +970,25 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), "configuration:\n        name: "+createdDeployment.Label)
 			assert.Contains(t, out.String(), "metadata:\n        deployment_id: "+createdDeployment.ID)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the json file and creates a deployment", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -1122,28 +1053,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -1195,22 +1104,24 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "test-workspace-id").Return([]astro.Deployment{createdDeployment}, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, out)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), "\"configuration\": {\n            \"name\": \""+createdDeployment.Label+"\"")
 			assert.Contains(t, out.String(), "\"metadata\": {\n            \"deployment_id\": \""+createdDeployment.ID+"\"")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if workspace does not exist", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -1262,40 +1173,20 @@ deployment:
     - test2@test.com
 `
 			orgID = "test-org-id"
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{}, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errNotFound)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if listing workspace fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -1347,39 +1238,19 @@ deployment:
     - test2@test.com
 `
 			orgID = "test-org-id"
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errTest)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if deployment already exists", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			existingDeployments := []astro.Deployment{
 				{
 					Label:       "test-deployment-label",
@@ -1451,29 +1322,21 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			orgID = "test-org-id"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return(existingDeployments, nil)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorContains(t, err, "deployment: test-deployment-label already exists: use deployment update --deployment-file deployment.yaml instead")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if creating deployment input fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -1538,28 +1401,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -1591,17 +1432,19 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "worker queue option is invalid: worker concurrency")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if create deployment fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -1666,28 +1509,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -1719,14 +1540,15 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(astro.Deployment{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "create", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "create", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errCreateFailed)
 			assert.ErrorContains(t, err, "test error: failed to create deployment with input")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 	})
 	t.Run("when action is update", func(t *testing.T) {
@@ -1734,6 +1556,7 @@ deployment:
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -1784,28 +1607,6 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -1878,24 +1679,26 @@ deployment:
 			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
-			err = CreateOrUpdate("deployment.yaml", "update", mockClient, out)
+			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), "configuration:\n        name: "+existingDeployment.Label)
 			assert.Contains(t, out.String(), "\n        description: "+updatedDeployment.Description)
 			assert.Contains(t, out.String(), "metadata:\n        deployment_id: "+existingDeployment.ID)
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("reads the json file and updates an existing deployment", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			out := new(bytes.Buffer)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -1960,28 +1763,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -2054,19 +1835,20 @@ deployment:
 			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
 			mockClient.On("ModifyDeploymentVariable", mock.Anything).Return(mockEnvVarResponse, nil)
 			mockClient.On("UpdateAlertEmails", mock.Anything).Return(mockAlertEmailResponse, nil)
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil)
-			err = CreateOrUpdate("deployment.yaml", "update", mockClient, out)
+			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, out)
 			assert.NoError(t, err)
 			assert.Contains(t, out.String(), "\"configuration\": {\n            \"name\": \""+existingDeployment.Label+"\"")
 			assert.Contains(t, out.String(), "\n            \"description\": \""+updatedDeployment.Description+"\"")
 			assert.Contains(t, out.String(), "\"metadata\": {\n            \"deployment_id\": \""+existingDeployment.ID+"\"")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if deployment does not exist", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -2081,6 +1863,7 @@ deployment:
 				},
 			}
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `
 deployment:
@@ -2131,28 +1914,20 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			orgID = "test-org-id"
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil)
-			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, nil)
 			assert.ErrorContains(t, err, "deployment: test-deployment-label does not exist: use deployment create --deployment-file deployment.yaml instead")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error if creating update deployment input fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -2217,28 +1992,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -2274,17 +2027,19 @@ deployment:
 			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
-			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, nil)
 			assert.Error(t, err)
 			assert.ErrorContains(t, err, "worker queue option is invalid: worker concurrency")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 		t.Run("returns an error from the api if update deployment fails", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			mockClient := new(astro_mocks.Client)
+			mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 			filePath = "./deployment.yaml"
 			data = `{
     "deployment": {
@@ -2349,28 +2104,6 @@ deployment:
         ]
     }
 }`
-			existingClusters = []astro.Cluster{
-				{
-					ID:   "test-cluster-id",
-					Name: "test-cluster",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-1",
-						},
-						{
-							ID:               "test-pool-id-2",
-							IsDefault:        false,
-							NodeInstanceType: "test-worker-2",
-						},
-					},
-				},
-				{
-					ID:   "test-cluster-id-1",
-					Name: "test-cluster-1",
-				},
-			}
 			existingWorkspaces = []astro.Workspace{
 				{
 					ID:    "test-workspace-id",
@@ -2422,14 +2155,15 @@ deployment:
 			}
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
-			mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
+			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{existingDeployment}, nil)
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("UpdateDeployment", mock.Anything).Return(astro.Deployment{}, errTest)
-			err = CreateOrUpdate("deployment.yaml", "update", mockClient, nil)
+			err = CreateOrUpdate("deployment.yaml", "update", mockClient, mockCoreClient, nil)
 			assert.ErrorIs(t, err, errUpdateFailed)
 			assert.ErrorContains(t, err, "test error: failed to update deployment with input")
 			mockClient.AssertExpectations(t)
+			mockCoreClient.AssertExpectations(t)
 		})
 	})
 }
@@ -2440,7 +2174,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 		expectedUpdateDeploymentInput, actualUpdateInput astro.UpdateDeploymentInput
 		deploymentFromFile                               inspect.FormattedDeployment
 		qList                                            []inspect.Workerq
-		existingPools                                    []astro.NodePool
+		existingPools                                    []astrocore.NodePool
 		expectedQList                                    []astro.WorkerQueue
 		clusterID, workspaceID, deploymentID             string
 		err                                              error
@@ -2477,14 +2211,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 			}
 			deploymentFromFile.Deployment.WorkerQs = qList
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -2544,14 +2278,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2611,14 +2345,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2655,14 +2389,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2749,14 +2483,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2787,14 +2521,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2824,14 +2558,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2861,14 +2595,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2898,14 +2632,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					},
 				}
 				deploymentFromFile.Deployment.WorkerQs = qList
-				existingPools = []astro.NodePool{
+				existingPools = []astrocore.NodePool{
 					{
-						ID:               "test-pool-id",
+						Id:               "test-pool-id",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-1",
 					},
 					{
-						ID:               "test-pool-id-2",
+						Id:               "test-pool-id-2",
 						IsDefault:        false,
 						NodeInstanceType: "test-worker-2",
 					},
@@ -2977,14 +2711,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					NodePoolID: "test-pool-id",
 				},
 			}
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -3039,14 +2773,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 			}
 			deploymentFromFile.Deployment.WorkerQs = qList
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -3191,7 +2925,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 			deploymentFromFile.Deployment.Configuration.SchedulerCount = 2
 			deploymentFromFile.Deployment.Configuration.Executor = deployment.KubeExecutor
 
-			existingPools = []astro.NodePool{
+			existingPools := []astro.NodePool{
 				{
 					ID:               "test-pool-id",
 					IsDefault:        false,
@@ -3262,7 +2996,19 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 					NodePoolID: "test-pool-id",
 				},
 			}
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
+				{
+					Id:               "test-pool-id",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-1",
+				},
+				{
+					Id:               "test-pool-id-2",
+					IsDefault:        false,
+					NodeInstanceType: "test-worker-2",
+				},
+			}
+			existingPools1 := []astro.NodePool{
 				{
 					ID:               "test-pool-id",
 					IsDefault:        false,
@@ -3280,7 +3026,7 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				Cluster: astro.Cluster{
 					ID:        "test-cluster-id",
 					Name:      "test-cluster",
-					NodePools: existingPools,
+					NodePools: existingPools1,
 				},
 				DeploymentSpec: astro.DeploymentSpec{
 					Executor: deployment.CeleryExecutor,
@@ -3338,14 +3084,14 @@ func TestGetCreateOrUpdateInput(t *testing.T) {
 				},
 			}
 			deploymentFromFile.Deployment.WorkerQs = qList
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -3594,63 +3340,47 @@ func TestDeploymentExists(t *testing.T) {
 
 func TestGetClusterFromName(t *testing.T) {
 	var (
-		clusterName, expectedClusterID, actualClusterID, orgID string
-		existingPools, actualNodePools                         []astro.NodePool
-		err                                                    error
+		clusterName, expectedClusterID, actualClusterID string
+		actualNodePools                                 []astrocore.NodePool
+		err                                             error
 	)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	expectedClusterID = "test-cluster-id"
 	clusterName = "test-cluster"
-	existingPools = []astro.NodePool{
-		{
-			ID:               "test-pool-id",
-			IsDefault:        false,
-			NodeInstanceType: "worker-1",
-		},
-		{
-			ID:               "test-pool-id",
-			IsDefault:        false,
-			NodeInstanceType: "worker-2",
-		},
-	}
-	orgID = "test-org-id"
 	t.Run("returns a cluster id if cluster exists in organization", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		existingClusters := []astro.Cluster{
-			{
-				ID:        "test-cluster-id",
-				Name:      "test-cluster",
-				NodePools: existingPools,
-			},
-			{
-				ID:   "test-cluster-id-1",
-				Name: "test-cluster-1",
-			},
-		}
-		mockClient.On("ListClusters", orgID).Return(existingClusters, nil)
-		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedClusterID, actualClusterID)
-		mockClient.AssertExpectations(t)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns error from api if listing cluster fails", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, errTest)
-		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errTest).Once()
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockCoreClient)
 		assert.ErrorIs(t, err, errTest)
 		assert.Equal(t, "", actualClusterID)
-		assert.Equal(t, []astro.NodePool(nil), actualNodePools)
-		mockClient.AssertExpectations(t)
+		assert.Equal(t, []astrocore.NodePool(nil), actualNodePools)
+		mockCoreClient.AssertExpectations(t)
 	})
 	t.Run("returns an error if cluster does not exist in organization", func(t *testing.T) {
-		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListClusters", orgID).Return([]astro.Cluster{}, nil)
-		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, orgID, mockClient)
+		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockListClustersResponse = astrocore.ListClustersResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.ClustersPaginated{
+				Clusters: []astrocore.Cluster{},
+			},
+		}
+		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+		actualClusterID, actualNodePools, err = getClusterInfoFromName(clusterName, mockOrgShortName, mockCoreClient)
 		assert.ErrorIs(t, err, errNotFound)
-		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization: test-org-id")
+		assert.ErrorContains(t, err, "cluster_name: test-cluster does not exist in organization: test-org-short-name")
 		assert.Equal(t, "", actualClusterID)
-		assert.Equal(t, []astro.NodePool(nil), actualNodePools)
-		mockClient.AssertExpectations(t)
+		assert.Equal(t, []astrocore.NodePool(nil), actualNodePools)
+		mockCoreClient.AssertExpectations(t)
 	})
 }
 
@@ -3704,21 +3434,21 @@ func TestGetWorkspaceIDFromName(t *testing.T) {
 func TestGetNodePoolIDFromName(t *testing.T) {
 	var (
 		workerType, expectedPoolID, actualPoolID, clusterID string
-		existingPools                                       []astro.NodePool
+		existingPools                                       []astrocore.NodePool
 		err                                                 error
 	)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	expectedPoolID = "test-pool-id"
 	workerType = "worker-1"
 	clusterID = "test-cluster-id"
-	existingPools = []astro.NodePool{
+	existingPools = []astrocore.NodePool{
 		{
-			ID:               "test-pool-id",
+			Id:               "test-pool-id",
 			IsDefault:        false,
 			NodeInstanceType: "worker-1",
 		},
 		{
-			ID:               "test-pool-id",
+			Id:               "test-pool-id",
 			IsDefault:        false,
 			NodeInstanceType: "worker-2",
 		},
@@ -3904,7 +3634,7 @@ func TestGetQueues(t *testing.T) {
 	var (
 		deploymentFromFile           inspect.FormattedDeployment
 		actualWQList, existingWQList []astro.WorkerQueue
-		existingPools                []astro.NodePool
+		existingPools                []astrocore.NodePool
 		err                          error
 	)
 	t.Run("when the executor is celery", func(t *testing.T) {
@@ -3944,14 +3674,14 @@ func TestGetQueues(t *testing.T) {
 					WorkerType:        "test-worker-2",
 				},
 			}
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        true,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -4012,14 +3742,14 @@ func TestGetQueues(t *testing.T) {
 					WorkerType:        "test-worker-2",
 				},
 			}
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        true,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -4089,14 +3819,14 @@ func TestGetQueues(t *testing.T) {
 					WorkerType:        "test-worker-2",
 				},
 			}
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        true,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -4147,14 +3877,14 @@ func TestGetQueues(t *testing.T) {
 					WorkerType: "test-worker-1",
 				},
 			}
-			existingPools = []astro.NodePool{
+			existingPools = []astrocore.NodePool{
 				{
-					ID:               "test-pool-id",
+					Id:               "test-pool-id",
 					IsDefault:        true,
 					NodeInstanceType: "test-worker-1",
 				},
 				{
-					ID:               "test-pool-id-2",
+					Id:               "test-pool-id-2",
 					IsDefault:        false,
 					NodeInstanceType: "test-worker-2",
 				},
@@ -4185,14 +3915,14 @@ func TestGetQueues(t *testing.T) {
 				WorkerType:        "test-worker-4",
 			},
 		}
-		existingPools = []astro.NodePool{
+		existingPools = []astrocore.NodePool{
 			{
-				ID:               "test-pool-id",
+				Id:               "test-pool-id",
 				IsDefault:        true,
 				NodeInstanceType: "test-worker-1",
 			},
 			{
-				ID:               "test-pool-id-2",
+				Id:               "test-pool-id-2",
 				IsDefault:        false,
 				NodeInstanceType: "test-worker-2",
 			},
