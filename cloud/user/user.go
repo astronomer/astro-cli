@@ -95,7 +95,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 			return ErrUserNotFound
 		}
 	} else {
-		user, err := selectUser(users, false)
+		user, err := SelectUser(users, false)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -130,7 +130,7 @@ func IsRoleValid(role string) error {
 	return ErrInvalidRole
 }
 
-func selectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
+func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
 	roleColumn := "ORGANIZATION ROLE"
 	if workspace {
 		roleColumn = "WORKSPACE ROLE"
@@ -433,7 +433,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 
 func getUserID(email string, users []astrocore.User, workspace bool) (userID, newEmail string, err error) {
 	if email == "" {
-		user, err := selectUser(users, workspace)
+		user, err := SelectUser(users, workspace)
 		userID = user.Id
 		email = user.Username
 		if err != nil {

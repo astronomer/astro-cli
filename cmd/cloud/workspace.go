@@ -240,7 +240,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	var id string
 
-	// if an email was provided in the args we use it
+	// if an id was provided in the args we use it
 	if len(args) > 0 {
 		// make sure the email is lowercase
 		id = args[0]

@@ -18,22 +18,20 @@ import (
 )
 
 var (
-	errInvalidTeamKey    = errors.New("invalid team selection")
-	ErrInvalidName       = errors.New("no name provided for the team. Retry with a valid name")
-	ErrTeamNotFound      = errors.New("no team was found for the ID you provided")
-	ErrWrongEnforceInput = errors.New("the input to the `--enforce-cicd` flag")
-	ErrNoShortName       = errors.New("cannot retrieve organization short name from context")
-	teamPagnationLimit   = 100
+	errInvalidTeamKey           = errors.New("invalid team selection")
+	ErrInvalidTeamMemberKey     = errors.New("invalid team member selection")
+	ErrInvalidName              = errors.New("no name provided for the team. Retry with a valid name")
+	ErrInvalidTeamId            = errors.New("no team id provided. Retry with a valid team id")
+	ErrInvalidUserId            = errors.New("no user id provided. Retry with a valid user id")
+	ErrTeamNotFound             = errors.New("no team was found for the ID you provided")
+	ErrWrongEnforceInput        = errors.New("the input to the `--enforce-cicd` flag")
+	ErrNoShortName              = errors.New("cannot retrieve organization short name from context")
+	ErrNoTeamsFoundInOrg        = errors.New("no teams found in your organization")
+	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your workspace")
+	ErrNoTeamMembersFoundInTeam = errors.New("no team members found in team")
+	ErrNoUsersFoundInOrg        = errors.New("no users found in your organization")
+	teamPagnationLimit          = 100
 )
-
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-}
 
 func CreateTeam(name string, description string, out io.Writer, client astrocore.CoreClient) error {
 	if name == "" {
@@ -83,6 +81,9 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	if err != nil {
 		return err
 	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInWorkspace
+	}
 	var team astrocore.Team
 	if id == "" {
 		team, err = selectTeam(teams)
@@ -127,6 +128,9 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 	teams, err := GetOrgTeams(client)
 	if err != nil {
 		return err
+	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInOrg
 	}
 	var team astrocore.Team
 	if id == "" {
@@ -186,6 +190,9 @@ func RemoveWorkspaceTeam(id, workspace string, out io.Writer, client astrocore.C
 	teams, err := GetWorkspaceTeams(client, workspace, teamPagnationLimit)
 	if err != nil {
 		return err
+	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInWorkspace
 	}
 	var team astrocore.Team
 	if id == "" {
@@ -283,7 +290,7 @@ func GetWorkspaceTeams(client astrocore.CoreClient, workspace string, limit int)
 	return teams, nil
 }
 
-// Prints a list of all of an organizations users
+// Prints a list of all of an organizations teams
 func ListWorkspaceTeams(out io.Writer, client astrocore.CoreClient, workspace string) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -338,10 +345,13 @@ func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocor
 		workspace = ctx.Workspace
 	}
 
-	// Get all org team. Setting limit to 1000 for now
+	// Get all org teams. Setting limit to 1000 for now
 	teams, err := GetOrgTeams(client)
 	if err != nil {
 		return err
+	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInOrg
 	}
 	teamID, err := getTeamID(id, teams)
 	if err != nil {
@@ -455,6 +465,9 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	if err != nil {
 		return err
 	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInOrg
+	}
 	var team astrocore.Team
 	if id == "" {
 		team, err = selectTeam(teams)
@@ -481,5 +494,221 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 		return err
 	}
 	fmt.Fprintf(out, "Astro Team %s was successfully deleted\n", team.Name)
+	return nil
+}
+
+func RemoveUser(team_id, team_member_id string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user.ErrNoShortName
+	}
+	teams, err := GetOrgTeams(client)
+	if err != nil {
+		return err
+	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInOrg
+	}
+	var team astrocore.Team
+	if team_id == "" {
+		team, err = selectTeam(teams)
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range teams {
+			if teams[i].Id == team_id {
+				team = teams[i]
+			}
+		}
+		if team.Id == "" {
+			return ErrTeamNotFound
+		}
+	}
+	teamID := team.Id
+	if team.Members == nil {
+		return ErrNoTeamMembersFoundInTeam
+	}
+
+	teamMembers := *team.Members
+
+	var teamMemberSelection astrocore.TeamMember
+	if team_member_id == "" {
+		teamMemberSelection, err = selectTeamMember(teamMembers)
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range teamMembers {
+			if teamMembers[i].UserId == team_member_id {
+				teamMemberSelection = teamMembers[i]
+			}
+		}
+		if teamMemberSelection.UserId == "" {
+			return ErrTeamNotFound
+		}
+	}
+	userID := teamMemberSelection.UserId
+
+	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, userID)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro User %s was successfully removed from team %s \n", teamMemberSelection.UserId, team.Name)
+	return nil
+}
+
+func AddUser(team_id, user_id string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user.ErrNoShortName
+	}
+	teams, err := GetOrgTeams(client)
+	if err != nil {
+		return err
+	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInOrg
+	}
+	var team astrocore.Team
+	if team_id == "" {
+		team, err = selectTeam(teams)
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range teams {
+			if teams[i].Id == team_id {
+				team = teams[i]
+			}
+		}
+		if team.Id == "" {
+			return ErrTeamNotFound
+		}
+	}
+	teamID := team.Id
+
+	users, err := user.GetOrgUsers(client)
+	if err != nil {
+		return err
+	}
+	if len(users) == 0 {
+		return ErrNoUsersFoundInOrg
+	}
+	var userSelection astrocore.User
+	if user_id == "" {
+		userSelection, err = user.SelectUser(users, false)
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range users {
+			if users[i].Id == user_id {
+				userSelection = users[i]
+			}
+		}
+		if userSelection.Id == "" {
+			return ErrTeamNotFound
+		}
+	}
+
+	userID := userSelection.Id
+	addTeamMembersRequest := astrocore.AddTeamMembersRequest{
+		MemberIds: []string{userID},
+	}
+
+	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), ctx.OrganizationShortName, teamID, addTeamMembersRequest)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro User %s was successfully added to team %s \n", userSelection.Id, team.Name)
+	return nil
+}
+
+func selectTeamMember(teamMembers []astrocore.TeamMember) (astrocore.TeamMember, error) {
+	table := printutil.Table{
+		Padding:        []int{30, 50, 10, 50, 10},
+		DynamicPadding: true,
+		Header:         []string{"#", "FULLNAME", "EMAIL", "ID"},
+	}
+
+	fmt.Println("\nPlease select the teamMember who's membership you'd like to modify:")
+
+	teamMemberMap := map[string]astrocore.TeamMember{}
+	for i := range teamMembers {
+		index := i + 1
+
+		table.AddRow([]string{
+			strconv.Itoa(index),
+			*teamMembers[i].FullName,
+			teamMembers[i].Username,
+			teamMembers[i].UserId,
+		}, false)
+		teamMemberMap[strconv.Itoa(index)] = teamMembers[i]
+	}
+
+	table.Print(os.Stdout)
+	choice := input.Text("\n> ")
+	selected, ok := teamMemberMap[choice]
+	if !ok {
+		return astrocore.TeamMember{}, ErrInvalidTeamMemberKey
+	}
+	return selected, nil
+}
+
+func ListTeamUsers(team_id string, out io.Writer, client astrocore.CoreClient) error {
+	teams, err := GetOrgTeams(client)
+	if err != nil {
+		return err
+	}
+	if len(teams) == 0 {
+		return ErrNoTeamsFoundInOrg
+	}
+	var team astrocore.Team
+	if team_id == "" {
+		team, err = selectTeam(teams)
+		if err != nil {
+			return err
+		}
+	} else {
+		for i := range teams {
+			if teams[i].Id == team_id {
+				team = teams[i]
+			}
+		}
+		if team.Id == "" {
+			return ErrTeamNotFound
+		}
+	}
+	table := printutil.Table{
+		Padding:        []int{10, 50, 50, 10, 10, 10},
+		DynamicPadding: true,
+		Header:         []string{"ID", "FullName", "Email"},
+	}
+	members := *team.Members
+
+	for i := range members {
+		table.AddRow([]string{
+			members[i].UserId,
+			*members[i].FullName,
+			members[i].Username,
+		}, false)
+	}
+
+	table.Print(out)
 	return nil
 }
