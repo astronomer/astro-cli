@@ -15,7 +15,6 @@ import (
 
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/user"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -48,10 +47,8 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationSwitchCmd(out),
 		newOrganizationUserRootCmd(out),
 		newOrganizationTeamRootCmd(out),
+		newOrganizationAuditLogs(out),
 	)
-	if config.CFG.AuditLogs.GetBool() {
-		cmd.AddCommand(newOrganizationAuditLogs(out))
-	}
 	return cmd
 }
 
