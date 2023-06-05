@@ -21,11 +21,11 @@ var (
 	errOrgTokenInWorkspace         = errors.New("This organization token has already been added to the workspace")
 )
 
-func newTokenTableOut() *printutil.Table {
+func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"NAME", "DESCRIPTION"},
+		Header:         []string{"#", "NAME", "DESCRIPTION"},
 	}
 }
 
@@ -80,6 +80,7 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 
 	apiTokenWorkspaceRole := astrocore.ApiTokenWorkspaceRole{
 		EntityId: workspace,
+		Role:     role,
 	}
 	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRole{apiTokenWorkspaceRole}
 
@@ -101,7 +102,7 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace Token %s was successfully updated\n", token.Name)
+	fmt.Fprintf(out, "Astro Organization Token %s was successfully added to the Workspace\n", token.Name)
 	return nil
 }
 
@@ -110,7 +111,7 @@ func selectTokenForWorkspace(apiTokens []astrocore.ApiToken) (astrocore.ApiToken
 	fmt.Println("\nPlease select the organization token you would like to add to the workspace:")
 
 	apiTokensMap := map[string]astrocore.ApiToken{}
-	tab := newTokenTableOut()
+	tab := newTokenSelectionTableOut()
 	for i := range apiTokens {
 
 		name := apiTokens[i].Name

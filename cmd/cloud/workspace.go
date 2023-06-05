@@ -1,30 +1,35 @@
 package cloud
 
 import (
+	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var (
-	workspaceID          string
-	addWorkspaceRole     string
-	updateWorkspaceRole  string
-	workspaceName        string
-	workspaceDescription string
-	enforceCD            string
-	tokenName            string
-	tokenDescription     string
-	tokenRole            string
-	orgTokenName         string
-	tokenExpiration      int
+	errInvalidWorkspaceRoleKey = errors.New("invalid workspace role selection")
+	workspaceID                string
+	addWorkspaceRole           string
+	updateWorkspaceRole        string
+	workspaceName              string
+	workspaceDescription       string
+	enforceCD                  string
+	tokenName                  string
+	tokenDescription           string
+	tokenRole                  string
+	orgTokenName               string
+	tokenExpiration            int
 )
 
 func newWorkspaceCmd(out io.Writer) *cobra.Command {
@@ -134,6 +139,8 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserRemoveCmd(out),
 		newWorkspaceUserAddCmd(out),
 	)
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you'd like to manage users")
+
 	return cmd
 }
 
@@ -210,6 +217,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenDeleteCmd(out),
 		newWorkspaceTokenAddCmd(out),
 	)
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you'd like to manage tokens")
 	return cmd
 }
 
@@ -367,12 +375,12 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.AddWorkspaceUser(email, addWorkspaceRole, "", out, astroCoreClient)
+	return user.AddWorkspaceUser(email, addWorkspaceRole, workspaceID, out, astroCoreClient)
 }
 
 func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsers(out, astroCoreClient, "")
+	return user.ListWorkspaceUsers(out, astroCoreClient, workspaceID)
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -390,7 +398,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, "", out, astroCoreClient)
+	return user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, workspaceID, out, astroCoreClient)
 }
 
 func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -403,7 +411,84 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	}
 
 	cmd.SilenceUsage = true
-	return user.RemoveWorkspaceUser(email, "", out, astroCoreClient)
+	return user.RemoveWorkspaceUser(email, workspaceID, out, astroCoreClient)
+}
+
+func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return workspace.ListTokens(astroCoreClient, workspaceID, out)
+}
+
+func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	if tokenName == "" {
+		// no role was provided so ask the user for it
+		tokenName = input.Text("Enter a name for the new Workspace Token: ")
+	}
+	if tokenRole == "" {
+		fmt.Println("select a Workspace Role for the new Token:")
+		// no role was provided so ask the user for it
+		var err error
+		tokenRole, err = selectTokenRole()
+		if err != nil {
+			return err
+		}
+	}
+
+	return workspace.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, out, astroCoreClient)
+}
+
+func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	var name string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		name = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return workspace.UpdateToken(tokenName, name, tokenDescription, tokenRole, workspaceID, out, astroCoreClient)
+}
+
+func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	var name string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		name = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return workspace.RotateToken(name, workspaceID, force, out, astroCoreClient)
+}
+
+func DeleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	var name string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		name = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return workspace.DeleteToken(name, workspaceID, force, out, astroCoreClient)
+}
+
+func addOrgTokenToWorkspace(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	if tokenRole == "" {
+		fmt.Println("select a Workspace Role for the Organization Token:")
+		// no role was provided so ask the user for it
+		var err error
+		tokenRole, err = selectTokenRole()
+		if err != nil {
+			return err
+		}
+	}
+	return organization.AddOrgTokenToWorkspace(tokenName, tokenRole, workspaceID, out, astroCoreClient)
 }
 
 func coalesceWorkspace() (string, error) {
@@ -424,65 +509,28 @@ func coalesceWorkspace() (string, error) {
 	return "", errors.New("no valid workspace source found")
 }
 
-func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
-	return workspace.ListTokens(astroCoreClient, "", out)
-}
-
-func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
-	if tokenName == "" {
-		// no role was provided so ask the user for it
-		tokenName = input.Text("Enter a name for the new Workspace Token: ")
+func selectTokenRole() (string, error) {
+	tokenRolesMap := map[string]string{}
+	tab := &printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "ROLE"},
 	}
-	if tokenRole == "" {
-		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) for the new token: ")
-	}
-
-	return workspace.CreateToken(tokenName, tokenDescription, tokenRole, "", tokenExpiration, out, astroCoreClient)
-}
-
-func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	var name string
-
-	// if an email was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the email is lowercase
-		name = strings.ToLower(args[0])
+	roles := []string{"WORKSPACE_MEMBER", "WORKSPACE_OPERATOR", "WORKSPACE_OWNER"}
+	for i := range roles {
+		index := i + 1
+		tab.AddRow([]string{
+			strconv.Itoa(index),
+			roles[i],
+		}, false)
+		tokenRolesMap[strconv.Itoa(index)] = roles[i]
 	}
 
-	cmd.SilenceUsage = true
-	return workspace.UpdateToken(tokenName, name, tokenDescription, tokenRole, "", out, astroCoreClient)
-}
-
-func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	var name string
-
-	// if an email was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the email is lowercase
-		name = strings.ToLower(args[0])
+	tab.Print(os.Stdout)
+	choice := input.Text("\n> ")
+	selected, ok := tokenRolesMap[choice]
+	if !ok {
+		return "", errInvalidWorkspaceRoleKey
 	}
-
-	cmd.SilenceUsage = true
-	return workspace.RotateToken(name, "", force, out, astroCoreClient)
-}
-
-func DeleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	var name string
-
-	// if an email was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the email is lowercase
-		name = strings.ToLower(args[0])
-	}
-
-	cmd.SilenceUsage = true
-	return workspace.DeleteToken(name, "", force, out, astroCoreClient)
-}
-
-func addOrgTokenToWorkspace(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
-	return organization.AddOrgTokenToWorkspace(tokenName, tokenRole, "", out, astroCoreClient)
+	return selected, nil
 }
