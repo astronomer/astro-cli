@@ -246,6 +246,64 @@ func TestInspect(t *testing.T) {
 		ctx.SetContextKey("organization_product", "HOSTED")
 		out := new(bytes.Buffer)
 		mockClient := new(astro_mocks.Client)
+		deploymentResponse := []astro.Deployment{
+			{
+				ID:          deploymentID,
+				Label:       deploymentName,
+				ReleaseName: "great-release-name",
+				Workspace:   astro.Workspace{ID: workspaceID},
+				Type:        "HOSTED_SHARED",
+				Cluster: astro.Cluster{
+					ID:     "cluster-id",
+					Region: "us-central1",
+					NodePools: []astro.NodePool{
+						{
+							ID:               "test-pool-id",
+							IsDefault:        false,
+							NodeInstanceType: "test-instance-type",
+							CreatedAt:        time.Now(),
+						},
+						{
+							ID:               "test-pool-id-1",
+							IsDefault:        true,
+							NodeInstanceType: "test-instance-type-1",
+							CreatedAt:        time.Now(),
+						},
+					},
+				},
+				RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
+				DeploymentSpec: astro.DeploymentSpec{
+					Executor: "CeleryExecutor",
+					Scheduler: astro.Scheduler{
+						AU:       5,
+						Replicas: 3,
+					},
+					Webserver: astro.Webserver{URL: "some-url"},
+				},
+				WorkerQueues: []astro.WorkerQueue{
+					{
+						ID:                "test-wq-id",
+						Name:              "default",
+						IsDefault:         true,
+						MaxWorkerCount:    130,
+						MinWorkerCount:    12,
+						WorkerConcurrency: 110,
+						NodePoolID:        "test-pool-id",
+					},
+					{
+						ID:                "test-wq-id-1",
+						Name:              "test-queue-1",
+						IsDefault:         false,
+						MaxWorkerCount:    175,
+						MinWorkerCount:    8,
+						WorkerConcurrency: 150,
+						NodePoolID:        "test-pool-id-1",
+					},
+				},
+				UpdatedAt: time.Now(),
+				Status:    "HEALTHY",
+			},
+		}
 		mockClient.On("ListDeployments", mock.Anything, workspaceID).Return(deploymentResponse, nil).Once()
 		err = Inspect(workspaceID, "", deploymentID, "yaml", mockClient, out, "", false)
 		assert.NoError(t, err)
