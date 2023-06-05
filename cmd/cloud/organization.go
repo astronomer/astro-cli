@@ -406,8 +406,8 @@ func removeTeamUser(cmd *cobra.Command, args []string, out io.Writer) error {
 func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
-		Short: "Add a user from an Astro Team",
-		Long:  "Add a user from an Astro Team",
+		Short: "Add a user to an Astro Team",
+		Long:  "Add a user to an Astro Team",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addTeamUser(cmd, args, out)
 		},

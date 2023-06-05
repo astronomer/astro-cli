@@ -272,6 +272,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 		// make sure the email is lowercase
 		id = args[0]
 	}
+	cmd.SilenceUsage = true
 	return team.AddWorkspaceTeam(id, addWorkspaceRole, "", out, astroCoreClient)
 }
 
