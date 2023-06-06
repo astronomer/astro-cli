@@ -448,3 +448,26 @@ func getUserID(email string, users []astrocore.User, workspace bool) (userID, ne
 	}
 	return userID, email, nil
 }
+
+func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, err error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return user, err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user, ErrNoShortName
+	}
+
+	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.OrganizationShortName, userID)
+	if err != nil {
+		return user, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return user, err
+	}
+
+	user = *resp.JSON200
+
+	return user, nil
+}

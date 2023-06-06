@@ -613,27 +613,26 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 	}
 	teamID = team.Id
 
-	users, err := user.GetOrgUsers(client)
-	if err != nil {
-		return err
-	}
-	if len(users) == 0 {
-		return ErrNoUsersFoundInOrg
-	}
 	var userSelection astrocore.User
 	if userID == "" {
+		users, err := user.GetOrgUsers(client)
+		if err != nil {
+			return err
+		}
+		if len(users) == 0 {
+			return ErrNoUsersFoundInOrg
+		}
 		userSelection, err = user.SelectUser(users, false)
 		if err != nil {
 			return err
 		}
 	} else {
-		for i := range users {
-			if users[i].Id == userID {
-				userSelection = users[i]
-			}
+		userSelection, err = user.GetUser(client, userID)
+		if err != nil {
+			return err
 		}
 		if userSelection.Id == "" {
-			return ErrTeamNotFound
+			return user.ErrUserNotFound
 		}
 	}
 
