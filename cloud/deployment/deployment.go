@@ -385,11 +385,11 @@ func GetRuntimeReleases(client astro.Client) ([]string, error) {
 func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) ([]astrocore.ClusterOptions, error) {
 	var provider astrocore.GetClusterOptionsParamsProvider
 	if cloudProvider == gcpCloud {
-		provider = astrocore.GetClusterOptionsParamsProvider(gcpCloud) //nolint
+		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.ClusterCloudProviderGcp)
 	}
 	optionsParams := &astrocore.GetClusterOptionsParams{
 		Provider: &provider,
-		Type:     astrocore.GetClusterOptionsParamsType("shared"), //nolint
+		Type:     astrocore.GetClusterOptionsParamsType(astrocore.ClusterTypeSHARED),
 	}
 	clusterOptions, err := coreClient.GetClusterOptionsWithResponse(context.Background(), optionsParams)
 	if err != nil {

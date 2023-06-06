@@ -16,6 +16,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
+const (
+	BRINGYOUROWNCLOUD = "BRING_YOUR_OWN_CLOUD"
+	HOSTED            = "HOSTED"
+)
+
 var (
 	errInvalidOrganizationKey   = errors.New("invalid organization selection")
 	errInvalidOrganizationName  = errors.New("invalid organization name")
@@ -194,7 +199,7 @@ func IsOrgHosted() bool {
 }
 
 func ListClusters(organizationShortName string, coreClient astrocore.CoreClient) ([]astrocore.Cluster, error) {
-	clusterType := []astrocore.ListClustersParamsType{"BRINGYOUROWNCLOUD", "HOSTED"}
+	clusterType := []astrocore.ListClustersParamsType{BRINGYOUROWNCLOUD, HOSTED}
 	limit := 1000
 	clusterListParams := &astrocore.ListClustersParams{
 		Type:  &clusterType,

@@ -397,10 +397,10 @@ func TestSelectRegion(t *testing.T) {
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
 	t.Run("list regions failure", func(t *testing.T) {
-		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.ClusterCloudProviderGcp)
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.ClusterTypeSHARED),
 		}
 
 		mockCoreClient.On("GetClusterOptionsWithResponse", mock.Anything, getSharedClusterOptionsParams).Return(nil, errMock).Once()
@@ -411,10 +411,10 @@ func TestSelectRegion(t *testing.T) {
 	})
 
 	t.Run("region via selection", func(t *testing.T) {
-		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.ClusterCloudProviderGcp)
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.ClusterTypeSHARED),
 		}
 
 		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
@@ -450,10 +450,10 @@ func TestSelectRegion(t *testing.T) {
 	})
 
 	t.Run("region invalid selection", func(t *testing.T) {
-		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.ClusterCloudProviderGcp)
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.ClusterTypeSHARED),
 		}
 
 		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
@@ -488,10 +488,10 @@ func TestSelectRegion(t *testing.T) {
 	})
 
 	t.Run("not able to find region", func(t *testing.T) {
-		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.ClusterCloudProviderGcp)
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.ClusterTypeSHARED),
 		}
 
 		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
@@ -807,10 +807,10 @@ func TestCreate(t *testing.T) {
 		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: ws, OrganizationID: "test-org-id"}}, nil).Once()
 		mockClient.On("CreateDeployment", &deploymentCreateInput1).Return(astro.Deployment{ID: "test-id"}, nil).Once()
 
-		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		provider := astrocore.GetClusterOptionsParamsProvider(astrocore.ClusterCloudProviderGcp)
 		getSharedClusterOptionsParams := &astrocore.GetClusterOptionsParams{
 			Provider: &provider,
-			Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+			Type:     astrocore.GetClusterOptionsParamsType(astrocore.ClusterTypeSHARED),
 		}
 
 		mockOKRegionResponse := &astrocore.GetClusterOptionsResponse{
