@@ -751,6 +751,28 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
+	t.Run("happy path Update no description passed in", func(t *testing.T) {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		err := UpdateTeam(team1.Id, "name", "", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("happy path Update no name passed in", func(t *testing.T) {
+		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully updated\n", team1.Name)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		err := UpdateTeam(team1.Id, "", "description", out, mockClient)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
 	t.Run("error path no org teams found", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -1282,6 +1304,26 @@ func TestGetTeam(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		_, err := GetTeam(mockClient, team1.Id)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
+}
+
+func TestGetWorkspaceTeams(t *testing.T) {
+	t.Run("happy path get WorkspaceTeams pulls workspace from context", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		_, err := GetWorkspaceTeams(mockClient, "", 10)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		_, err := GetWorkspaceTeams(mockClient, "", 10)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})

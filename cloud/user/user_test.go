@@ -768,6 +768,15 @@ func TestGetUser(t *testing.T) {
 		assert.EqualError(t, err, "failed to get user")
 	})
 
+	t.Run("error path when GetUserWithResponse returns a network error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+
+		_, err := GetUser(mockClient, user1.Id)
+		assert.EqualError(t, err, "network error")
+	})
+
 	t.Run("error path when no organization shortname found", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		c, err := config.GetCurrentContext()
