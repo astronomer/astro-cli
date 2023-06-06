@@ -408,6 +408,14 @@ func TestUpdateWorkspaceTeamRole(t *testing.T) {
 		assert.EqualError(t, err, "no teams found in your workspace")
 	})
 
+	t.Run("error path when GetTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+		err := UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
 	t.Run("error path when MutateWorkspaceTeamRoleWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -494,6 +502,14 @@ func TestAddWorkspaceTeam(t *testing.T) {
 		err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
+	})
+
+	t.Run("error path when GetTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+		err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", out, mockClient)
+		assert.EqualError(t, err, "network error")
 	})
 
 	t.Run("error path when MutateWorkspaceTeamRoleWithResponse return network error", func(t *testing.T) {
@@ -584,6 +600,14 @@ func TestRemoveWorkspaceTeam(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
+	t.Run("error path when GetTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+		err := RemoveWorkspaceTeam(team1.Id, "", out, mockClient)
+		assert.EqualError(t, err, "network error")
+	})
+
 	t.Run("error path when DeleteWorkspaceTeamWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -670,6 +694,14 @@ func TestDelete(t *testing.T) {
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseEmpty, nil).Twice()
 		err := Delete("", out, mockClient)
 		assert.EqualError(t, err, "no teams found in your organization")
+	})
+
+	t.Run("error path when GetTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+		err := Delete(team1.Id, out, mockClient)
+		assert.EqualError(t, err, "network error")
 	})
 
 	t.Run("error path when DeleteTeamWithResponse return network error", func(t *testing.T) {
@@ -779,6 +811,14 @@ func TestUpdate(t *testing.T) {
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseEmpty, nil).Twice()
 		err := UpdateTeam("", "name", "description", out, mockClient)
 		assert.EqualError(t, err, "no teams found in your organization")
+	})
+
+	t.Run("error path when GetTeamWithResponse return network error", func(t *testing.T) {
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+		err := UpdateTeam(team1.Id, "name", "description", out, mockClient)
+		assert.EqualError(t, err, "network error")
 	})
 
 	t.Run("error path when UpdateTeamWithResponse return network error", func(t *testing.T) {
