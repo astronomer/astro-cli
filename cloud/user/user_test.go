@@ -72,6 +72,22 @@ var (
 		Body:    errorBodyUpdate,
 		JSON200: nil,
 	}
+	GetUserWithResponseOK = astrocore.GetUserResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &user1,
+	}
+	errorBodyGet, _ = json.Marshal(astrocore.Error{
+		Message: "failed to get user",
+	})
+	GetUserWithResponseError = astrocore.GetUserResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBodyGet,
+		JSON200: nil,
+	}
 )
 
 // workspace users variables
@@ -731,5 +747,45 @@ func TestDeleteWorkspaceUser(t *testing.T) {
 		err = RemoveWorkspaceUser("", "", out, mockClient)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOut, out.String())
+	})
+}
+
+func TestGetUser(t *testing.T) {
+	t.Run("happy path GetUser", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Twice()
+		_, err := GetUser(mockClient, user1.Id)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path when GetUserWithResponse returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseError, nil).Twice()
+
+		_, err := GetUser(mockClient, user1.Id)
+		assert.EqualError(t, err, "failed to get user")
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		_, err = GetUser(mockClient, user1.Id)
+		assert.ErrorIs(t, err, ErrNoShortName)
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		_, err := GetUser(mockClient, user1.Id)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
 	})
 }
