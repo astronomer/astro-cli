@@ -1180,4 +1180,70 @@ func TestListTeamUsers(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
+
+	t.Run("ListTeamUsers no team-id passed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationTeamsResponseOK, nil).Twice()
+
+		// mock os.Stdin
+		expectedInput := []byte("1")
+
+		// select team
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+
+		err = ListTeamUsers("", out, mockClient)
+		assert.NoError(t, err)
+	})
+}
+
+func TestGetTeam(t *testing.T) {
+	t.Run("happy path GetTeam", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
+		_, err := GetTeam(mockClient, team1.Id)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path when GetTeamWithResponse returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseError, nil).Twice()
+
+		_, err := GetTeam(mockClient, team1.Id)
+		assert.EqualError(t, err, "failed to get team")
+	})
+
+	t.Run("error path when no organization shortname found", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		err = c.SetContextKey("organization_short_name", "")
+		assert.NoError(t, err)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		_, err = GetTeam(mockClient, team1.Id)
+		assert.ErrorIs(t, err, ErrNoShortName)
+	})
+
+	t.Run("error path when getting current context returns an error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		expectedOutMessage := ""
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		_, err := GetTeam(mockClient, team1.Id)
+		assert.Error(t, err)
+		assert.Equal(t, expectedOutMessage, out.String())
+	})
 }
