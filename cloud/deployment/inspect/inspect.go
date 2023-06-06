@@ -240,7 +240,7 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.Nod
 			}
 		}
 		var workerType string
-		if deployment.IsDeploymentDedicated(deploymentType) {
+		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentHosted(deploymentType) {
 			workerType = queue.AstroMachine
 		} else {
 			workerType = getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools)
