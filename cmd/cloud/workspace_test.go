@@ -789,7 +789,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 	t.Run("valid id with valid role updates team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The workspace team %s role was successfully updated to WORKSPACE_MEMBER", team1.Id)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "update", team1.Id, "--role", "WORKSPACE_MEMBER"}
@@ -799,7 +799,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 	})
 	t.Run("valid id with invalid role returns an error and role is not update", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "update", team1.Id, "--role", "invalid"}
@@ -808,7 +808,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and role is not updated", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "update", team1.Id, "--role", "WORKSPACE_MEMBER"}
@@ -819,7 +819,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 	t.Run("any context errors from api are returned and role is not updated", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "update", team1.Id, "--role", "WORKSPACE_MEMBER"}
@@ -845,6 +845,7 @@ func TestWorkspaceTeamUpdate(t *testing.T) {
 
 		expectedOut := fmt.Sprintf("The workspace team %s role was successfully updated to WORKSPACE_MEMBER", team1.Id)
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
 
 		cmdArgs := []string{"team", "update", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
@@ -866,7 +867,7 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 	t.Run("valid id with valid role adds team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("The team %s was successfully added to the workspace with the role WORKSPACE_MEMBER\n", team1.Id)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "add", team1.Id, "--role", "WORKSPACE_MEMBER"}
@@ -876,7 +877,7 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 	})
 	t.Run("valid email with invalid role returns an error and team is not added", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "add", team1.Id, "--role", "invalid"}
@@ -885,7 +886,7 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and team is not added", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "add", team1.Id, "--role", "WORKSPACE_MEMBER"}
@@ -896,7 +897,7 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 	t.Run("any context errors from api are returned and role is not added", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "add", team1.Id, "--role", "WORKSPACE_MEMBER"}
@@ -922,6 +923,7 @@ func TestWorkspaceTeamAdd(t *testing.T) {
 
 		expectedOut := fmt.Sprintf("The team %s was successfully added to the workspace with the role WORKSPACE_MEMBER\n", team1.Id)
 		mockClient.On("MutateWorkspaceTeamRoleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&MutateWorkspaceTeamRoleResponseOK, nil).Once()
+		astroCoreClient = mockClient
 
 		cmdArgs := []string{"team", "add", "--role", "WORKSPACE_MEMBER"}
 		resp, err := execWorkspaceCmd(cmdArgs...)
@@ -940,10 +942,10 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
-	t.Run("valid email removes team", func(t *testing.T) {
+	t.Run("valid id removes team", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from workspace ck05r3bor07h40d02y2hw4n4v\n", team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "remove", team1.Id}
@@ -953,7 +955,7 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 	})
 	t.Run("any errors from api are returned and team is not removed", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseError, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "remove", team1.Id}
@@ -963,14 +965,14 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 	t.Run("any context errors from api are returned and the team is not removed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceTeamsResponseOK, nil).Twice()
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"team", "remove", team1.Id}
 		_, err := execWorkspaceCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
-	t.Run("command asks for input when no email is passed in as an arg", func(t *testing.T) {
+	t.Run("command asks for input when no id is passed in as an arg", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -988,7 +990,8 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 		os.Stdin = r
 
 		expectedOut := fmt.Sprintf("Astro Team %s was successfully removed from workspace %s", team1.Name, "ck05r3bor07h40d02y2hw4n4v")
-		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceUserResponseOK, nil).Once()
+		mockClient.On("DeleteWorkspaceTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceTeamResponseOK, nil).Once()
+		astroCoreClient = mockClient
 
 		cmdArgs := []string{"team", "remove"}
 		resp, err := execWorkspaceCmd(cmdArgs...)

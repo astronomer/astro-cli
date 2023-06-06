@@ -114,7 +114,10 @@ func UpdateWorkspaceTeamRole(id, role, workspace string, out io.Writer, client a
 	} else {
 		team, err = GetTeam(client, id)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -158,7 +161,10 @@ func UpdateTeam(id, name, description string, out io.Writer, client astrocore.Co
 	} else {
 		team, err = GetTeam(client, id)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -218,7 +224,10 @@ func RemoveWorkspaceTeam(id, workspace string, out io.Writer, client astrocore.C
 	} else {
 		team, err = GetTeam(client, id)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -371,7 +380,10 @@ func AddWorkspaceTeam(id, role, workspace string, out io.Writer, client astrocor
 	} else {
 		team, err = GetTeam(client, id)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -478,7 +490,10 @@ func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	} else {
 		team, err = GetTeam(client, id)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -520,7 +535,10 @@ func RemoveUser(teamID, teamMemberID string, out io.Writer, client astrocore.Cor
 	} else {
 		team, err = GetTeam(client, teamID)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -586,7 +604,10 @@ func AddUser(teamID, userID string, out io.Writer, client astrocore.CoreClient) 
 	} else {
 		team, err = GetTeam(client, teamID)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
@@ -685,7 +706,10 @@ func ListTeamUsers(teamID string, out io.Writer, client astrocore.CoreClient) (e
 	} else {
 		team, err = GetTeam(client, teamID)
 
-		if err != nil || team.Id == "" {
+		if err != nil {
+			return err
+		}
+		if team.Id == "" {
 			return ErrTeamNotFound
 		}
 	}
