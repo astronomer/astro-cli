@@ -13,6 +13,7 @@ import (
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	astrocore_mocks "github.com/astronomer/astro-cli/astro-client-core/mocks"
 	astro_mocks "github.com/astronomer/astro-cli/astro-client/mocks"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ var (
 	disableCiCdEnforcement = false
 	errMock                = errors.New("mock error")
 	limit                  = 1000
-	clusterType            = []astrocore.ListClustersParamsType{astrocore.BRINGYOUROWNCLOUD, astrocore.HOSTED}
+	clusterType            = []astrocore.ListClustersParamsType{organization.BRINGYOUROWNCLOUD, organization.HOSTED}
 	clusterListParams      = &astrocore.ListClustersParams{
 		Type:  &clusterType,
 		Limit: &limit,

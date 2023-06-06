@@ -407,9 +407,6 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
-		JSON200: &astrocore.Workspace{
-			Name: "workspace-test",
-		},
 	}
 
 	errorBodyDelete, _ = json.Marshal(astrocore.Error{
@@ -420,8 +417,7 @@ var (
 		HTTPResponse: &http.Response{
 			StatusCode: 500,
 		},
-		Body:    errorBodyDelete,
-		JSON200: nil,
+		Body: errorBodyDelete,
 	}
 	description = "test workspace"
 	workspace1  = astrocore.Workspace{

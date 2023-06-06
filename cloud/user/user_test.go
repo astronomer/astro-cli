@@ -167,7 +167,7 @@ func TestCreateInvite(t *testing.T) {
 	}
 	t.Run("happy path", func(t *testing.T) {
 		expectedOutMessage := "invite for test-email@test.com with role ORGANIZATION_MEMBER created\n"
-		createInviteRequest := astrocore.CreateUserInviteRequest{
+		createInviteRequest := astrocore.CreateUserInviteJSONRequestBody{
 			InviteeEmail: "test-email@test.com",
 			Role:         "ORGANIZATION_MEMBER",
 		}
@@ -182,7 +182,7 @@ func TestCreateInvite(t *testing.T) {
 	t.Run("error path when CreateUserInviteWithResponse return network error", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		createInviteRequest := astrocore.CreateUserInviteRequest{
+		createInviteRequest := astrocore.CreateUserInviteJSONRequestBody{
 			InviteeEmail: "test-email@test.com",
 			Role:         "ORGANIZATION_MEMBER",
 		}
@@ -195,7 +195,7 @@ func TestCreateInvite(t *testing.T) {
 		expectedOutMessage := "failed to create invite: test-inv-error"
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		createInviteRequest := astrocore.CreateUserInviteRequest{
+		createInviteRequest := astrocore.CreateUserInviteJSONRequestBody{
 			InviteeEmail: "test-email@test.com",
 			Role:         "ORGANIZATION_MEMBER",
 		}

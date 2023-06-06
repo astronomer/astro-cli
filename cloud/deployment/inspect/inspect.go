@@ -101,7 +101,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	}
 
 	// get core deployment
-	deployments, err := deployment.CoreGetDeployments(wsID, "", deploymentID, coreClient)
+	deployments, err := deployment.CoreGetDeployments(wsID, "", requestedDeployment.ID, coreClient)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 	return nil
 }
 
-func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astrocore.Deployment) (map[string]interface{}, error) {
+func getDeploymentInfo(sourceDeployment *astro.Deployment, coreDeployment astrocore.Deployment) (map[string]interface{}, error) { //nolint
 	var (
 		deploymentURL string
 		err           error
