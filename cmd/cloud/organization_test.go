@@ -540,7 +540,7 @@ func TestTeamList(t *testing.T) {
 }
 
 func TestTeamUpdate(t *testing.T) {
-	expectedHelp := "organization team update [team_id]"
+	expectedHelp := "organization team update [team-id]"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints update help", func(t *testing.T) {
@@ -703,14 +703,14 @@ func TestAddUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
-	t.Run("valid team_id with valid user_id updates team membership", func(t *testing.T) {
+	t.Run("valid team-id with valid user-id updates team membership", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully added to team %s \n", user1.Id, team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"team", "user", "add", "--team_id", team1.Id, "--user_id", user1.Id}
+		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id, "--user-id", user1.Id}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
@@ -722,7 +722,7 @@ func TestAddUser(t *testing.T) {
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseError, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"team", "user", "add", "--team_id", team1.Id, "--user_id", user1.Id}
+		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id, "--user-id", user1.Id}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to update team membership")
 	})
@@ -734,7 +734,7 @@ func TestAddUser(t *testing.T) {
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"team", "user", "add", "--team_id", team1.Id, "--user_id", user1.Id}
+		cmdArgs := []string{"team", "user", "add", "--team-id", team1.Id, "--user-id", user1.Id}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
@@ -750,14 +750,14 @@ func TestRemoveUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedHelp)
 	})
-	t.Run("valid team_id with valid user_id updates team membership", func(t *testing.T) {
+	t.Run("valid team-id with valid user-id updates team membership", func(t *testing.T) {
 		expectedOut := fmt.Sprintf("Astro User %s was successfully removed from team %s \n", user1.Id, team1.Name)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgTeamsResponseOK, nil).Twice()
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"team", "user", "remove", "--team_id", team1.Id, "--user_id", user1.Id}
+		cmdArgs := []string{"team", "user", "remove", "--team-id", team1.Id, "--user-id", user1.Id}
 		resp, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOut)
@@ -769,7 +769,7 @@ func TestRemoveUser(t *testing.T) {
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseError, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"team", "user", "remove", "--team_id", team1.Id, "--user_id", user1.Id}
+		cmdArgs := []string{"team", "user", "remove", "--team-id", team1.Id, "--user-id", user1.Id}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.EqualError(t, err, "failed to update team membership")
 	})
@@ -781,7 +781,7 @@ func TestRemoveUser(t *testing.T) {
 		mockClient.On("ListOrgUsersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrgUsersResponseOK, nil).Twice()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		astroCoreClient = mockClient
-		cmdArgs := []string{"team", "user", "remove", "--team_id", team1.Id, "--user_id", user1.Id}
+		cmdArgs := []string{"team", "user", "remove", "--team-id", team1.Id, "--user-id", user1.Id}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.Error(t, err)
 	})

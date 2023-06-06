@@ -842,7 +842,7 @@ func TestAddUser(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("AddUser no team_id passed", func(t *testing.T) {
+	t.Run("AddUser no team-id passed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 
@@ -976,7 +976,7 @@ func TestRemoveUser(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 
-	t.Run("RemoveUser no team_id passed", func(t *testing.T) {
+	t.Run("RemoveUser no team-id passed", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 

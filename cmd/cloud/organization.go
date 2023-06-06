@@ -294,7 +294,7 @@ func listTeams(cmd *cobra.Command, out io.Writer) error {
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update [team_id]",
+		Use:     "update [team-id]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro team",
 		Long:    "Update an Astro team",
@@ -342,7 +342,7 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [team_id]",
+		Use:     "delete [team-id]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Team",
 		Long:    "Delete an Astro Team",
@@ -390,8 +390,8 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 			return removeTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team_id", "t", "", "The Team's id \"\" ")
-	cmd.Flags().StringVarP(&userID, "user_id", "u", "", "The User's id \"\"")
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's id \"\" ")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's id \"\"")
 	return cmd
 }
 
@@ -409,8 +409,8 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 			return addTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team_id", "t", "", "The Team's id \"\" ")
-	cmd.Flags().StringVarP(&userID, "user_id", "u", "", "The User's id \"\"")
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's id \"\" ")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's id \"\"")
 	return cmd
 }
 
@@ -428,7 +428,7 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 			return listUsersCmd(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team_id", "t", "", "The Team's id \"\" ")
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's id \"\" ")
 	return cmd
 }
 

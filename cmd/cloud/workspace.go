@@ -192,7 +192,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
-		Aliases: []string{"us"},
+		Aliases: []string{"te"},
 		Short:   "Manage teams in your Astro Workspace",
 		Long:    "Manage teams in your Astro Workspace.",
 	}
