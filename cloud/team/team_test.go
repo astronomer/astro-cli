@@ -874,6 +874,13 @@ func TestCreate(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
+	t.Run("error path no name passed in", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := CreateTeam("", *team1.Description, out, mockClient)
+		assert.EqualError(t, err, "no name provided for the team. Retry with a valid name")
+	})
 }
 
 func TestAddUser(t *testing.T) {
@@ -1238,6 +1245,15 @@ func TestGetTeam(t *testing.T) {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		_, err := GetTeam(mockClient, team1.Id)
 		assert.NoError(t, err)
+	})
+
+	t.Run("error path when GetTeamWithResponse returns a network error", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
+
+		_, err := GetTeam(mockClient, team1.Id)
+		assert.EqualError(t, err, "network error")
 	})
 
 	t.Run("error path when GetTeamWithResponse returns an error", func(t *testing.T) {
