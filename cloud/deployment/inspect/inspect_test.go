@@ -952,6 +952,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
         runtime_version: 6.0.0
         dag_deploy_enabled: true
         ci_cd_enforcement: true
+        scheduler_size: ""
+        is_high_availability: false
         executor: CeleryExecutor
         scheduler_au: 5
         scheduler_count: 3
@@ -1105,6 +1107,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
             "ci_cd_enforcement": true,
+            "scheduler_size": "",
+            "is_high_availability": false,
             "executor": "KubernetesExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
@@ -1331,7 +1335,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor), actual)
+		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor, sourceDeployment.Type), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"

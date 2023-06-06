@@ -36,6 +36,8 @@ type deploymentConfig struct {
 	RunTimeVersion        string `mapstructure:"runtime_version" yaml:"runtime_version" json:"runtime_version"`
 	DagDeployEnabled      bool   `mapstructure:"dag_deploy_enabled" yaml:"dag_deploy_enabled" json:"dag_deploy_enabled"`
 	APIKeyOnlyDeployments bool   `mapstructure:"ci_cd_enforcement" yaml:"ci_cd_enforcement" json:"ci_cd_enforcement"`
+	SchedulerSize         string `mapstructure:"scheduler_size" yaml:"scheduler_size" json:"scheduler_size"`
+	IsHighAvailability    bool   `mapstructure:"is_high_availability" yaml:"is_high_availability" json:"is_high_availability"`
 	Executor              string `mapstructure:"executor" yaml:"executor" json:"executor"`
 	SchedulerAU           int    `mapstructure:"scheduler_au" yaml:"scheduler_au" json:"scheduler_au"`
 	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
@@ -167,21 +169,23 @@ func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interfac
 		}
 	}
 	return map[string]interface{}{
-		"name":               sourceDeployment.Label,
-		"description":        sourceDeployment.Description,
-		"workspace_name":     sourceDeployment.Workspace.Label,
-		"cluster_name":       clusterName,
-		"runtime_version":    sourceDeployment.RuntimeRelease.Version,
-		"dag_deploy_enabled": sourceDeployment.DagDeployEnabled,
-		"ci_cd_enforcement":  sourceDeployment.APIKeyOnlyDeployments,
-		"scheduler_au":       sourceDeployment.DeploymentSpec.Scheduler.AU,
-		"scheduler_count":    sourceDeployment.DeploymentSpec.Scheduler.Replicas,
-		"executor":           sourceDeployment.DeploymentSpec.Executor,
+		"name":                 sourceDeployment.Label,
+		"description":          sourceDeployment.Description,
+		"workspace_name":       sourceDeployment.Workspace.Label,
+		"cluster_name":         clusterName,
+		"runtime_version":      sourceDeployment.RuntimeRelease.Version,
+		"dag_deploy_enabled":   sourceDeployment.DagDeployEnabled,
+		"ci_cd_enforcement":    sourceDeployment.APIKeyOnlyDeployments,
+		"scheduler_size":       sourceDeployment.SchedulerSize,
+		"is_high_availability": sourceDeployment.IsHighAvailability,
+		"scheduler_au":         sourceDeployment.DeploymentSpec.Scheduler.AU,
+		"scheduler_count":      sourceDeployment.DeploymentSpec.Scheduler.Replicas,
+		"executor":             sourceDeployment.DeploymentSpec.Executor,
 	}
 }
 
 func getAdditional(sourceDeployment *astro.Deployment) map[string]interface{} {
-	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor)
+	qList := getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor, sourceDeployment.Type)
 	return map[string]interface{}{
 		"alert_emails":          sourceDeployment.AlertEmails,
 		"worker_queues":         qList,
@@ -219,7 +223,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 	return value, nil
 }
 
-func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor string) []map[string]interface{} {
+func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.NodePool, sourceExecutor, deploymentType string) []map[string]interface{} {
 	var resources map[string]interface{}
 	queueMap := make([]map[string]interface{}, 0, len(sourceDeploymentQs))
 	for _, queue := range sourceDeploymentQs { //nolint
@@ -235,10 +239,16 @@ func getQMap(sourceDeploymentQs []astro.WorkerQueue, sourceNodePools []astro.Nod
 				"pod_ram": queue.PodRAM,
 			}
 		}
+		var workerType string
+		if deployment.IsDeploymentDedicated(deploymentType) {
+			workerType = queue.AstroMachine
+		} else {
+			workerType = getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools)
+		}
 		newQ := map[string]interface{}{
 			"name": queue.Name,
 			// map worker type to node pool id
-			"worker_type": getWorkerTypeFromNodePoolID(queue.NodePoolID, sourceNodePools),
+			"worker_type": workerType,
 		}
 
 		// add resources to queue
