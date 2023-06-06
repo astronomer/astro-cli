@@ -2,13 +2,12 @@ package team
 
 import (
 	httpContext "context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"time"
-
-	"errors"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
@@ -688,7 +687,6 @@ func selectTeamMember(teamMembers []astrocore.TeamMember) (astrocore.TeamMember,
 }
 
 func ListTeamUsers(teamID string, out io.Writer, client astrocore.CoreClient) (err error) {
-
 	var team astrocore.Team
 	if teamID == "" {
 		teams, err := GetOrgTeams(client)

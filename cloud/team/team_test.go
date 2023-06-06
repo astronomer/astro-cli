@@ -1025,7 +1025,6 @@ func TestAddUser(t *testing.T) {
 
 		err = AddUser(team1.Id, "", out, mockClient)
 		assert.EqualError(t, err, "no users found in your organization")
-
 	})
 }
 
