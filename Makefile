@@ -4,7 +4,7 @@ VERSION ?= SNAPSHOT-${GIT_COMMIT_SHORT}
 LDFLAGS_VERSION=-X github.com/astronomer/astro-cli/version.CurrVersion=${VERSION}
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 
-CORE_OPENAPI_SPEC=/Users/kushal/Documents/astronomer/astro/apps/core/docs/public/public_v1alpha1.yaml
+CORE_OPENAPI_SPEC=../astro/apps/core/docs/public/public_v1alpha1.yaml
 
 OUTPUT ?= astro
 # golangci-lint version
@@ -24,7 +24,7 @@ core_api_gen:
     ifeq (, $(shell which oapi-codegen))
 	go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
     endif
-	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options,Deployment -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
+	oapi-codegen -include-tags=User,Organization,Invite,Workspace,Cluster,Options -generate=types,client -package=astrocore "${CORE_OPENAPI_SPEC}" > ./astro-client-core/api.gen.go
 	make mock_astro_core
 
 test:
