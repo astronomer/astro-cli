@@ -385,11 +385,11 @@ func GetRuntimeReleases(client astro.Client) ([]string, error) {
 func ListClusterOptions(cloudProvider string, coreClient astrocore.CoreClient) ([]astrocore.ClusterOptions, error) {
 	var provider astrocore.GetClusterOptionsParamsProvider
 	if cloudProvider == gcpCloud {
-		provider = astrocore.GetClusterOptionsParamsProvider(astrocore.GetClusterOptionsParamsProviderGcp) //nolint
+		provider = astrocore.GetClusterOptionsParamsProvider(gcpCloud) //nolint
 	}
 	optionsParams := &astrocore.GetClusterOptionsParams{
 		Provider: &provider,
-		Type:     astrocore.GetClusterOptionsParamsType(astrocore.GetClusterOptionsParamsTypeSHARED), //nolint
+		Type:     astrocore.GetClusterOptionsParamsType("shared"), //nolint
 	}
 	clusterOptions, err := coreClient.GetClusterOptionsWithResponse(context.Background(), optionsParams)
 	if err != nil {
@@ -780,6 +780,29 @@ var GetDeployments = func(ws, org string, client astro.Client) ([]astro.Deployme
 		return deployments, errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
+	return deployments, nil
+}
+
+var CoreGetDeployments = func(ws, org, deploymentId string, coreClient astrocore.CoreClient) ([]astrocore.Deployment, error) {
+	if org == "" {
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return nil, err
+		}
+		org = c.OrganizationShortName
+	}
+
+	depIds := []string{deploymentId}
+	deploymentListParams := &astrocore.ListDeploymentsParams{
+		DeploymentIds: &depIds,
+	}
+	resp, err := coreClient.ListDeploymentsWithResponse(context.Background(), org, deploymentListParams)
+	if err != nil {
+		return nil, err
+	}
+
+	deploymentResponse := *resp.JSON200
+	deployments := deploymentResponse.Deployments
 	return deployments, nil
 }
 

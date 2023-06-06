@@ -241,7 +241,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	}
 	workspaceID := workspace.Id
 
-	workspaceUpdateRequest := astrocore.CreateWorkspaceJSONRequestBody{}
+	workspaceUpdateRequest := astrocore.UpdateWorkspaceJSONRequestBody{}
 
 	if name == "" {
 		workspaceUpdateRequest.Name = workspace.Name

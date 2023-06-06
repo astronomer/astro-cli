@@ -29,7 +29,7 @@ var (
 
 func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient) error {
 	var (
-		userInviteInput astrocore.CreateUserInviteRequest
+		userInviteInput astrocore.CreateUserInviteJSONRequestBody
 		err             error
 		ctx             config.Context
 	)
@@ -47,7 +47,7 @@ func CreateInvite(email, role string, out io.Writer, client astrocore.CoreClient
 	if ctx.OrganizationShortName == "" {
 		return ErrNoShortName
 	}
-	userInviteInput = astrocore.CreateUserInviteRequest{
+	userInviteInput = astrocore.CreateUserInviteJSONRequestBody{
 		InviteeEmail: email,
 		Role:         role,
 	}
@@ -102,7 +102,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 			return err
 		}
 	}
-	mutateUserInput := astrocore.MutateOrgUserRoleRequest{
+	mutateUserInput := astrocore.MutateOrgUserRoleJSONRequestBody{
 		Role: role,
 	}
 	resp, err := client.MutateOrgUserRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, userID, mutateUserInput)
@@ -264,7 +264,7 @@ func AddWorkspaceUser(email, role, workspace string, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
+	mutateUserInput := astrocore.MutateWorkspaceUserRoleJSONRequestBody{
 		Role: role,
 	}
 	resp, err := client.MutateWorkspaceUserRoleWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, userID, mutateUserInput)
@@ -303,7 +303,7 @@ func UpdateWorkspaceUserRole(email, role, workspace string, out io.Writer, clien
 	if err != nil {
 		return err
 	}
-	mutateUserInput := astrocore.MutateWorkspaceUserRoleRequest{
+	mutateUserInput := astrocore.MutateWorkspaceUserRoleJSONRequestBody{
 		Role: role,
 	}
 	fmt.Println("workspace: " + workspace)
