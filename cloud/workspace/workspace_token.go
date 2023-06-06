@@ -120,8 +120,8 @@ func CreateToken(name, description, role, workspace string, expiration int, out 
 		return err
 	}
 	fmt.Fprintf(out, "Astro Workspace Token %s was successfully created\nCopy and Past this Token for your records.\n\n", name)
-	ApiToken := resp.JSON200
-	fmt.Println(*ApiToken.Token)
+	APIToken := resp.JSON200
+	fmt.Println(*APIToken.Token)
 	fmt.Println("\nYou will not be shown this API Token value again.")
 
 	return nil
@@ -260,8 +260,8 @@ func RotateToken(name, workspace string, force bool, out io.Writer, client astro
 		return err
 	}
 	fmt.Fprintf(out, "Astro Workspace Token %s was successfully rotated\n\n", token.Name)
-	ApiToken := resp.JSON200
-	fmt.Println(*ApiToken.Token)
+	APIToken := resp.JSON200
+	fmt.Println(*APIToken.Token)
 	fmt.Println("\nYou will not be shown this API Token value again.")
 	return nil
 }
@@ -343,7 +343,6 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 	apiTokensMap := map[string]astrocore.ApiToken{}
 	tab := newTokenSelectionTableOut()
 	for i := range apiTokens {
-
 		token := apiTokens[i].ShortToken
 		name := apiTokens[i].Name
 		description := apiTokens[i].Description

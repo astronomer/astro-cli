@@ -18,7 +18,7 @@ import (
 var (
 	errInvalidOrganizationTokenKey = errors.New("invalid organization token selection")
 	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
-	errOrgTokenInWorkspace         = errors.New("This organization token has already been added to the workspace")
+	errOrgTokenInWorkspace         = errors.New("this organization token has already been added to the workspace")
 )
 
 func newTokenSelectionTableOut() *printutil.Table {
