@@ -463,6 +463,11 @@ const (
 	UpdateManagedDomainRequestEnforcedLoginsSso UpdateManagedDomainRequestEnforcedLogins = "sso"
 )
 
+// AddTeamMembersRequest defines model for AddTeamMembersRequest.
+type AddTeamMembersRequest struct {
+	MemberIds []string `json:"memberIds"`
+}
+
 // Address defines model for Address.
 type Address struct {
 	City       string  `json:"city"`
@@ -726,10 +731,23 @@ type CreateSsoConnectionRequest struct {
 	ManagedDomains           []SsoConnectionManagedDomain `json:"managedDomains"`
 }
 
+// CreateTeamRequest defines model for CreateTeamRequest.
+type CreateTeamRequest struct {
+	Description *string   `json:"description,omitempty"`
+	MemberIds   *[]string `json:"memberIds,omitempty"`
+	Name        string    `json:"name"`
+}
+
 // CreateUserInviteRequest defines model for CreateUserInviteRequest.
 type CreateUserInviteRequest struct {
 	InviteeEmail string `json:"inviteeEmail"`
 	Role         string `json:"role"`
+}
+
+// CreditSummary defines model for CreditSummary.
+type CreditSummary struct {
+	TotalCreditsGrantedUSD   float32 `json:"totalCreditsGrantedUSD"`
+	TotalCreditsRemainingUSD float32 `json:"totalCreditsRemainingUSD"`
 }
 
 // CreditType defines model for CreditType.
@@ -1129,6 +1147,11 @@ type MutateWorkspaceRequest struct {
 	Name                         string  `json:"name"`
 }
 
+// MutateWorkspaceTeamRoleRequest defines model for MutateWorkspaceTeamRoleRequest.
+type MutateWorkspaceTeamRoleRequest struct {
+	Role string `json:"role"`
+}
+
 // MutateWorkspaceUserRoleRequest defines model for MutateWorkspaceUserRoleRequest.
 type MutateWorkspaceUserRoleRequest struct {
 	Role string `json:"role"`
@@ -1516,6 +1539,47 @@ type TaskInstance_RenderedFields struct {
 // TaskInstanceState defines model for TaskInstance.State.
 type TaskInstanceState string
 
+// Team defines model for Team.
+type Team struct {
+	CreatedAt      time.Time            `json:"createdAt"`
+	CreatedBy      *BasicSubjectProfile `json:"createdBy,omitempty"`
+	Description    *string              `json:"description,omitempty"`
+	Id             string               `json:"id"`
+	IsIdpManaged   bool                 `json:"isIdpManaged"`
+	Members        *[]TeamMember        `json:"members,omitempty"`
+	MembersCount   *int                 `json:"membersCount,omitempty"`
+	Name           string               `json:"name"`
+	OrganizationId string               `json:"organizationId"`
+	Roles          *[]TeamRole          `json:"roles,omitempty"`
+	RolesCount     *int                 `json:"rolesCount,omitempty"`
+	UpdatedAt      time.Time            `json:"updatedAt"`
+	UpdatedBy      *BasicSubjectProfile `json:"updatedBy,omitempty"`
+}
+
+// TeamMember defines model for TeamMember.
+type TeamMember struct {
+	AvatarUrl *string `json:"avatarUrl,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+	FullName  *string `json:"fullName,omitempty"`
+	UserId    string  `json:"userId"`
+	Username  string  `json:"username"`
+}
+
+// TeamRole defines model for TeamRole.
+type TeamRole struct {
+	EntityId   string `json:"entityId"`
+	EntityType string `json:"entityType"`
+	Role       string `json:"role"`
+}
+
+// TeamsPaginated defines model for TeamsPaginated.
+type TeamsPaginated struct {
+	Limit      int    `json:"limit"`
+	Offset     int    `json:"offset"`
+	Teams      []Team `json:"teams"`
+	TotalCount int    `json:"totalCount"`
+}
+
 // TemplateVersion defines model for TemplateVersion.
 type TemplateVersion struct {
 	Url     *string `json:"url,omitempty"`
@@ -1605,6 +1669,12 @@ type UpdateSsoConnectionRequest struct {
 	IdpInitiatedLoginEnabled *bool                        `json:"idpInitiatedLoginEnabled,omitempty"`
 	JitPolicy                *JitPolicy                   `json:"jitPolicy,omitempty"`
 	ManagedDomains           []SsoConnectionManagedDomain `json:"managedDomains"`
+}
+
+// UpdateTeamRequest defines model for UpdateTeamRequest.
+type UpdateTeamRequest struct {
+	Description string `json:"description"`
+	Name        string `json:"name"`
 }
 
 // User defines model for User.
@@ -1882,7 +1952,7 @@ type ListOrganizationsParams struct {
 	// filter by trial status, null for all orgs
 	TrialStatus *ListOrganizationsParamsTrialStatus `json:"trialStatus,omitempty"`
 
-	// filter by product tier, null for all orgs
+	// filter by product tier, should be one of POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
 	ProductTier *ListOrganizationsParamsProductTier `json:"productTier,omitempty"`
 
 	// filter by product, null for all orgs
@@ -2117,6 +2187,33 @@ type UpdateSsoConnectionJSONBody UpdateSsoConnectionRequest
 // GetStripeClientSecretParamsType defines parameters for GetStripeClientSecret.
 type GetStripeClientSecretParamsType string
 
+// ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
+type ListOrganizationTeamsParams struct {
+	// offset for pagination
+	Offset *int `json:"offset,omitempty"`
+
+	// limit for pagination
+	Limit *int `json:"limit,omitempty"`
+
+	// sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListOrganizationTeamsParamsSorts `json:"sorts,omitempty"`
+
+	// string to search for when listing teams
+	Search *string `json:"search,omitempty"`
+}
+
+// ListOrganizationTeamsParamsSorts defines parameters for ListOrganizationTeams.
+type ListOrganizationTeamsParamsSorts string
+
+// CreateTeamJSONBody defines parameters for CreateTeam.
+type CreateTeamJSONBody CreateTeamRequest
+
+// UpdateTeamJSONBody defines parameters for UpdateTeam.
+type UpdateTeamJSONBody UpdateTeamRequest
+
+// AddTeamMembersJSONBody defines parameters for AddTeamMembers.
+type AddTeamMembersJSONBody AddTeamMembersRequest
+
 // ListOrgUsersParams defines parameters for ListOrgUsers.
 type ListOrgUsersParams struct {
 	// offset for pagination
@@ -2219,6 +2316,27 @@ type ListWorkspaceDagsParams struct {
 // UpdateDeploymentJSONBody defines parameters for UpdateDeployment.
 type UpdateDeploymentJSONBody UpdateDeploymentRequest
 
+// ListWorkspaceTeamsParams defines parameters for ListWorkspaceTeams.
+type ListWorkspaceTeamsParams struct {
+	// offset for pagination
+	Offset *int `json:"offset,omitempty"`
+
+	// limit for pagination
+	Limit *int `json:"limit,omitempty"`
+
+	// sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListWorkspaceTeamsParamsSorts `json:"sorts,omitempty"`
+
+	// string to search for when listing teams
+	Search *string `json:"search,omitempty"`
+}
+
+// ListWorkspaceTeamsParamsSorts defines parameters for ListWorkspaceTeams.
+type ListWorkspaceTeamsParamsSorts string
+
+// MutateWorkspaceTeamRoleJSONBody defines parameters for MutateWorkspaceTeamRole.
+type MutateWorkspaceTeamRoleJSONBody MutateWorkspaceTeamRoleRequest
+
 // ListWorkspaceUsersParams defines parameters for ListWorkspaceUsers.
 type ListWorkspaceUsersParams struct {
 	// offset for pagination
@@ -2291,6 +2409,15 @@ type CreateSsoConnectionJSONRequestBody CreateSsoConnectionJSONBody
 // UpdateSsoConnectionJSONRequestBody defines body for UpdateSsoConnection for application/json ContentType.
 type UpdateSsoConnectionJSONRequestBody UpdateSsoConnectionJSONBody
 
+// CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
+type CreateTeamJSONRequestBody CreateTeamJSONBody
+
+// UpdateTeamJSONRequestBody defines body for UpdateTeam for application/json ContentType.
+type UpdateTeamJSONRequestBody UpdateTeamJSONBody
+
+// AddTeamMembersJSONRequestBody defines body for AddTeamMembers for application/json ContentType.
+type AddTeamMembersJSONRequestBody AddTeamMembersJSONBody
+
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody MutateOrgUserRoleJSONBody
 
@@ -2305,6 +2432,9 @@ type UpdateWorkspaceJSONRequestBody UpdateWorkspaceJSONBody
 
 // UpdateDeploymentJSONRequestBody defines body for UpdateDeployment for application/json ContentType.
 type UpdateDeploymentJSONRequestBody UpdateDeploymentJSONBody
+
+// MutateWorkspaceTeamRoleJSONRequestBody defines body for MutateWorkspaceTeamRole for application/json ContentType.
+type MutateWorkspaceTeamRoleJSONRequestBody MutateWorkspaceTeamRoleJSONBody
 
 // MutateWorkspaceUserRoleJSONRequestBody defines body for MutateWorkspaceUserRole for application/json ContentType.
 type MutateWorkspaceUserRoleJSONRequestBody MutateWorkspaceUserRoleJSONBody
@@ -3518,6 +3648,9 @@ type ClientInterface interface {
 	// DeleteUserInvite request
 	DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetCreditSummary request
+	GetCreditSummary(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetMetronomeDashboard request
 	GetMetronomeDashboard(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -3554,6 +3687,33 @@ type ClientInterface interface {
 
 	// GetStripeClientSecret request
 	GetStripeClientSecret(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListOrganizationTeams request
+	ListOrganizationTeams(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTeam request with any body
+	CreateTeamWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateTeam(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTeam request
+	DeleteTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTeam request
+	GetTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTeam request with any body
+	UpdateTeamWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateTeam(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddTeamMembers request with any body
+	AddTeamMembersWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AddTeamMembers(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveTeamMember request
+	RemoveTeamMember(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrgUsers request
 	ListOrgUsers(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3603,6 +3763,17 @@ type ClientInterface interface {
 	UpdateDeploymentWithBody(ctx context.Context, orgShortNameId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateDeployment(ctx context.Context, orgShortNameId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkspaceTeams request
+	ListWorkspaceTeams(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteWorkspaceTeam request
+	DeleteWorkspaceTeam(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MutateWorkspaceTeamRole request with any body
+	MutateWorkspaceTeamRoleWithBody(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MutateWorkspaceTeamRole(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceUsers request
 	ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4176,6 +4347,18 @@ func (c *Client) DeleteUserInvite(ctx context.Context, orgShortNameId string, in
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetCreditSummary(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCreditSummaryRequest(c.Server, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetMetronomeDashboard(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMetronomeDashboardRequest(c.Server, orgShortNameId, pType, params)
 	if err != nil {
@@ -4322,6 +4505,126 @@ func (c *Client) UpdateSsoConnection(ctx context.Context, orgShortNameId string,
 
 func (c *Client) GetStripeClientSecret(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetStripeClientSecretRequest(c.Server, orgShortNameId, pType)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListOrganizationTeams(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationTeamsRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateTeamWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTeamRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateTeam(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTeamRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTeamRequest(c.Server, orgShortNameId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTeamRequest(c.Server, orgShortNameId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTeamWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTeamRequestWithBody(c.Server, orgShortNameId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTeam(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTeamRequest(c.Server, orgShortNameId, teamId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AddTeamMembersWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMembersRequestWithBody(c.Server, orgShortNameId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AddTeamMembers(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMembersRequest(c.Server, orgShortNameId, teamId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RemoveTeamMember(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveTeamMemberRequest(c.Server, orgShortNameId, teamId, memberId)
 	if err != nil {
 		return nil, err
 	}
@@ -4538,6 +4841,54 @@ func (c *Client) UpdateDeploymentWithBody(ctx context.Context, orgShortNameId st
 
 func (c *Client) UpdateDeployment(ctx context.Context, orgShortNameId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateDeploymentRequest(c.Server, orgShortNameId, workspaceId, deploymentId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkspaceTeams(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspaceTeamsRequest(c.Server, orgShortNameId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteWorkspaceTeam(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWorkspaceTeamRequest(c.Server, orgShortNameId, workspaceId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateWorkspaceTeamRoleWithBody(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateWorkspaceTeamRoleRequestWithBody(c.Server, orgShortNameId, workspaceId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateWorkspaceTeamRole(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateWorkspaceTeamRoleRequest(c.Server, orgShortNameId, workspaceId, teamId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6776,6 +7127,40 @@ func NewDeleteUserInviteRequest(server string, orgShortNameId string, inviteId s
 	return req, nil
 }
 
+// NewGetCreditSummaryRequest generates requests for GetCreditSummary
+func NewGetCreditSummaryRequest(server string, orgShortNameId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/metronome/credit-summary", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetMetronomeDashboardRequest generates requests for GetMetronomeDashboard
 func NewGetMetronomeDashboardRequest(server string, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams) (*http.Request, error) {
 	var err error
@@ -7240,6 +7625,393 @@ func NewGetStripeClientSecretRequest(server string, orgShortNameId string, pType
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListOrganizationTeamsRequest generates requests for ListOrganizationTeams
+func NewListOrganizationTeamsRequest(server string, orgShortNameId string, params *ListOrganizationTeamsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateTeamRequest calls the generic CreateTeam builder with application/json body
+func NewCreateTeamRequest(server string, orgShortNameId string, body CreateTeamJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTeamRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateTeamRequestWithBody generates requests for CreateTeam with any type of body
+func NewCreateTeamRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteTeamRequest generates requests for DeleteTeam
+func NewDeleteTeamRequest(server string, orgShortNameId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetTeamRequest generates requests for GetTeam
+func NewGetTeamRequest(server string, orgShortNameId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateTeamRequest calls the generic UpdateTeam builder with application/json body
+func NewUpdateTeamRequest(server string, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTeamRequestWithBody(server, orgShortNameId, teamId, "application/json", bodyReader)
+}
+
+// NewUpdateTeamRequestWithBody generates requests for UpdateTeam with any type of body
+func NewUpdateTeamRequestWithBody(server string, orgShortNameId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewAddTeamMembersRequest calls the generic AddTeamMembers builder with application/json body
+func NewAddTeamMembersRequest(server string, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAddTeamMembersRequestWithBody(server, orgShortNameId, teamId, "application/json", bodyReader)
+}
+
+// NewAddTeamMembersRequestWithBody generates requests for AddTeamMembers with any type of body
+func NewAddTeamMembersRequestWithBody(server string, orgShortNameId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s/members", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveTeamMemberRequest generates requests for RemoveTeamMember
+func NewRemoveTeamMemberRequest(server string, orgShortNameId string, teamId string, memberId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "memberId", runtime.ParamLocationPath, memberId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s/members/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -8220,6 +8992,224 @@ func NewUpdateDeploymentRequestWithBody(server string, orgShortNameId string, wo
 	return req, nil
 }
 
+// NewListWorkspaceTeamsRequest generates requests for ListWorkspaceTeams
+func NewListWorkspaceTeamsRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/teams", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteWorkspaceTeamRequest generates requests for DeleteWorkspaceTeam
+func NewDeleteWorkspaceTeamRequest(server string, orgShortNameId string, workspaceId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/teams/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewMutateWorkspaceTeamRoleRequest calls the generic MutateWorkspaceTeamRole builder with application/json body
+func NewMutateWorkspaceTeamRoleRequest(server string, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateWorkspaceTeamRoleRequestWithBody(server, orgShortNameId, workspaceId, teamId, "application/json", bodyReader)
+}
+
+// NewMutateWorkspaceTeamRoleRequestWithBody generates requests for MutateWorkspaceTeamRole with any type of body
+func NewMutateWorkspaceTeamRoleRequestWithBody(server string, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/teams/%s/role", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWorkspaceUsersRequest generates requests for ListWorkspaceUsers
 func NewListWorkspaceUsersRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams) (*http.Request, error) {
 	var err error
@@ -8701,6 +9691,9 @@ type ClientWithResponsesInterface interface {
 	// DeleteUserInvite request
 	DeleteUserInviteWithResponse(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*DeleteUserInviteResponse, error)
 
+	// GetCreditSummary request
+	GetCreditSummaryWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error)
+
 	// GetMetronomeDashboard request
 	GetMetronomeDashboardWithResponse(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error)
 
@@ -8737,6 +9730,33 @@ type ClientWithResponsesInterface interface {
 
 	// GetStripeClientSecret request
 	GetStripeClientSecretWithResponse(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*GetStripeClientSecretResponse, error)
+
+	// ListOrganizationTeams request
+	ListOrganizationTeamsWithResponse(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error)
+
+	// CreateTeam request with any body
+	CreateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error)
+
+	CreateTeamWithResponse(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error)
+
+	// DeleteTeam request
+	DeleteTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteTeamResponse, error)
+
+	// GetTeam request
+	GetTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*GetTeamResponse, error)
+
+	// UpdateTeam request with any body
+	UpdateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error)
+
+	UpdateTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error)
+
+	// AddTeamMembers request with any body
+	AddTeamMembersWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error)
+
+	AddTeamMembersWithResponse(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error)
+
+	// RemoveTeamMember request
+	RemoveTeamMemberWithResponse(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*RemoveTeamMemberResponse, error)
 
 	// ListOrgUsers request
 	ListOrgUsersWithResponse(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error)
@@ -8786,6 +9806,17 @@ type ClientWithResponsesInterface interface {
 	UpdateDeploymentWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
 
 	UpdateDeploymentWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, deploymentId string, body UpdateDeploymentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentResponse, error)
+
+	// ListWorkspaceTeams request
+	ListWorkspaceTeamsWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error)
+
+	// DeleteWorkspaceTeam request
+	DeleteWorkspaceTeamWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceTeamResponse, error)
+
+	// MutateWorkspaceTeamRole request with any body
+	MutateWorkspaceTeamRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error)
+
+	MutateWorkspaceTeamRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error)
 
 	// ListWorkspaceUsers request
 	ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error)
@@ -9718,6 +10749,33 @@ func (r DeleteUserInviteResponse) StatusCode() int {
 	return 0
 }
 
+type GetCreditSummaryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreditSummary
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCreditSummaryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCreditSummaryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetMetronomeDashboardResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -10008,6 +11066,193 @@ func (r GetStripeClientSecretResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetStripeClientSecretResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListOrganizationTeamsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamsPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListOrganizationTeamsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListOrganizationTeamsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AddTeamMembersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r AddTeamMembersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AddTeamMembersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RemoveTeamMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveTeamMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveTeamMemberResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -10356,6 +11601,86 @@ func (r UpdateDeploymentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateDeploymentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListWorkspaceTeamsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamsPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkspaceTeamsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkspaceTeamsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteWorkspaceTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteWorkspaceTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteWorkspaceTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MutateWorkspaceTeamRoleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamRole
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MutateWorkspaceTeamRoleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MutateWorkspaceTeamRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -10898,6 +12223,15 @@ func (c *ClientWithResponses) DeleteUserInviteWithResponse(ctx context.Context, 
 	return ParseDeleteUserInviteResponse(rsp)
 }
 
+// GetCreditSummaryWithResponse request returning *GetCreditSummaryResponse
+func (c *ClientWithResponses) GetCreditSummaryWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error) {
+	rsp, err := c.GetCreditSummary(ctx, orgShortNameId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCreditSummaryResponse(rsp)
+}
+
 // GetMetronomeDashboardWithResponse request returning *GetMetronomeDashboardResponse
 func (c *ClientWithResponses) GetMetronomeDashboardWithResponse(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error) {
 	rsp, err := c.GetMetronomeDashboard(ctx, orgShortNameId, pType, params, reqEditors...)
@@ -11011,6 +12345,93 @@ func (c *ClientWithResponses) GetStripeClientSecretWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseGetStripeClientSecretResponse(rsp)
+}
+
+// ListOrganizationTeamsWithResponse request returning *ListOrganizationTeamsResponse
+func (c *ClientWithResponses) ListOrganizationTeamsWithResponse(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error) {
+	rsp, err := c.ListOrganizationTeams(ctx, orgShortNameId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOrganizationTeamsResponse(rsp)
+}
+
+// CreateTeamWithBodyWithResponse request with arbitrary body returning *CreateTeamResponse
+func (c *ClientWithResponses) CreateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error) {
+	rsp, err := c.CreateTeamWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTeamResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateTeamWithResponse(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error) {
+	rsp, err := c.CreateTeam(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTeamResponse(rsp)
+}
+
+// DeleteTeamWithResponse request returning *DeleteTeamResponse
+func (c *ClientWithResponses) DeleteTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteTeamResponse, error) {
+	rsp, err := c.DeleteTeam(ctx, orgShortNameId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTeamResponse(rsp)
+}
+
+// GetTeamWithResponse request returning *GetTeamResponse
+func (c *ClientWithResponses) GetTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*GetTeamResponse, error) {
+	rsp, err := c.GetTeam(ctx, orgShortNameId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTeamResponse(rsp)
+}
+
+// UpdateTeamWithBodyWithResponse request with arbitrary body returning *UpdateTeamResponse
+func (c *ClientWithResponses) UpdateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error) {
+	rsp, err := c.UpdateTeamWithBody(ctx, orgShortNameId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTeamResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error) {
+	rsp, err := c.UpdateTeam(ctx, orgShortNameId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTeamResponse(rsp)
+}
+
+// AddTeamMembersWithBodyWithResponse request with arbitrary body returning *AddTeamMembersResponse
+func (c *ClientWithResponses) AddTeamMembersWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error) {
+	rsp, err := c.AddTeamMembersWithBody(ctx, orgShortNameId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddTeamMembersResponse(rsp)
+}
+
+func (c *ClientWithResponses) AddTeamMembersWithResponse(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error) {
+	rsp, err := c.AddTeamMembers(ctx, orgShortNameId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddTeamMembersResponse(rsp)
+}
+
+// RemoveTeamMemberWithResponse request returning *RemoveTeamMemberResponse
+func (c *ClientWithResponses) RemoveTeamMemberWithResponse(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*RemoveTeamMemberResponse, error) {
+	rsp, err := c.RemoveTeamMember(ctx, orgShortNameId, teamId, memberId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveTeamMemberResponse(rsp)
 }
 
 // ListOrgUsersWithResponse request returning *ListOrgUsersResponse
@@ -11168,6 +12589,41 @@ func (c *ClientWithResponses) UpdateDeploymentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseUpdateDeploymentResponse(rsp)
+}
+
+// ListWorkspaceTeamsWithResponse request returning *ListWorkspaceTeamsResponse
+func (c *ClientWithResponses) ListWorkspaceTeamsWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error) {
+	rsp, err := c.ListWorkspaceTeams(ctx, orgShortNameId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkspaceTeamsResponse(rsp)
+}
+
+// DeleteWorkspaceTeamWithResponse request returning *DeleteWorkspaceTeamResponse
+func (c *ClientWithResponses) DeleteWorkspaceTeamWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceTeamResponse, error) {
+	rsp, err := c.DeleteWorkspaceTeam(ctx, orgShortNameId, workspaceId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteWorkspaceTeamResponse(rsp)
+}
+
+// MutateWorkspaceTeamRoleWithBodyWithResponse request with arbitrary body returning *MutateWorkspaceTeamRoleResponse
+func (c *ClientWithResponses) MutateWorkspaceTeamRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error) {
+	rsp, err := c.MutateWorkspaceTeamRoleWithBody(ctx, orgShortNameId, workspaceId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateWorkspaceTeamRoleResponse(rsp)
+}
+
+func (c *ClientWithResponses) MutateWorkspaceTeamRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error) {
+	rsp, err := c.MutateWorkspaceTeamRole(ctx, orgShortNameId, workspaceId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateWorkspaceTeamRoleResponse(rsp)
 }
 
 // ListWorkspaceUsersWithResponse request returning *ListWorkspaceUsersResponse
@@ -13256,6 +14712,67 @@ func ParseDeleteUserInviteResponse(rsp *http.Response) (*DeleteUserInviteRespons
 	return response, nil
 }
 
+// ParseGetCreditSummaryResponse parses an HTTP response from a GetCreditSummaryWithResponse call
+func ParseGetCreditSummaryResponse(rsp *http.Response) (*GetCreditSummaryResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCreditSummaryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreditSummary
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetMetronomeDashboardResponse parses an HTTP response from a GetMetronomeDashboardWithResponse call
 func ParseGetMetronomeDashboardResponse(rsp *http.Response) (*GetMetronomeDashboardResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
@@ -13880,6 +15397,419 @@ func ParseGetStripeClientSecretResponse(rsp *http.Response) (*GetStripeClientSec
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListOrganizationTeamsResponse parses an HTTP response from a ListOrganizationTeamsWithResponse call
+func ParseListOrganizationTeamsResponse(rsp *http.Response) (*ListOrganizationTeamsResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOrganizationTeamsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateTeamResponse parses an HTTP response from a CreateTeamWithResponse call
+func ParseCreateTeamResponse(rsp *http.Response) (*CreateTeamResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTeamResponse parses an HTTP response from a DeleteTeamWithResponse call
+func ParseDeleteTeamResponse(rsp *http.Response) (*DeleteTeamResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTeamResponse parses an HTTP response from a GetTeamWithResponse call
+func ParseGetTeamResponse(rsp *http.Response) (*GetTeamResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTeamResponse parses an HTTP response from a UpdateTeamWithResponse call
+func ParseUpdateTeamResponse(rsp *http.Response) (*UpdateTeamResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAddTeamMembersResponse parses an HTTP response from a AddTeamMembersWithResponse call
+func ParseAddTeamMembersResponse(rsp *http.Response) (*AddTeamMembersResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AddTeamMembersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveTeamMemberResponse parses an HTTP response from a RemoveTeamMemberWithResponse call
+func ParseRemoveTeamMemberResponse(rsp *http.Response) (*RemoveTeamMemberResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveTeamMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -14647,6 +16577,182 @@ func ParseUpdateDeploymentResponse(rsp *http.Response) (*UpdateDeploymentRespons
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Deployment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkspaceTeamsResponse parses an HTTP response from a ListWorkspaceTeamsWithResponse call
+func ParseListWorkspaceTeamsResponse(rsp *http.Response) (*ListWorkspaceTeamsResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkspaceTeamsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteWorkspaceTeamResponse parses an HTTP response from a DeleteWorkspaceTeamWithResponse call
+func ParseDeleteWorkspaceTeamResponse(rsp *http.Response) (*DeleteWorkspaceTeamResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteWorkspaceTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMutateWorkspaceTeamRoleResponse parses an HTTP response from a MutateWorkspaceTeamRoleWithResponse call
+func ParseMutateWorkspaceTeamRoleResponse(rsp *http.Response) (*MutateWorkspaceTeamRoleResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MutateWorkspaceTeamRoleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamRole
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
