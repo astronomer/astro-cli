@@ -311,7 +311,6 @@ func TestDeleteToken(t *testing.T) {
 }
 
 func TestGetWorkspaceToken(t *testing.T) {
-
 	t.Run("select token by id when name is empty", func(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
