@@ -390,8 +390,8 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 			return removeTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
-	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The unique ID for the team \"\" ")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The unique ID for the user \"\"")
 	return cmd
 }
 
