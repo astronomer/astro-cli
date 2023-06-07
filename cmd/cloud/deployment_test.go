@@ -323,6 +323,7 @@ deployment:
 		mockClient.On("ListWorkspaces", orgID).Return([]astro.Workspace{{ID: ws, OrganizationID: orgID, Label: "test-workspace"}}, nil)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)
@@ -615,6 +616,7 @@ deployment:
 		}
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{updatedDeployment}, nil).Once()
+		mockCoreClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, deploymentListParams).Return(&mockListDeploymentsResponse, nil).Once()
 		mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 		mockClient.On("UpdateDeployment", mock.Anything).Return(updatedDeployment, nil)
 		mockClient.On("ModifyDeploymentVariable", mock.Anything).Return([]astro.EnvironmentVariablesObject{}, nil)

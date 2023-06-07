@@ -214,7 +214,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 	}
 
 	// get core deployment
-	deployments, err := deployment.CoreGetDeployments(wsID, "", deploymentID, coreClient)
+	deployments, err := deployment.CoreGetDeployments(wsID, "", requestedDeployment.ID, coreClient)
 	if err != nil {
 		return nil, err
 	}
