@@ -120,13 +120,14 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 }
 
 func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) {
-	if id == "" && name == "" {
+	switch {
+	case id == "" && name == "":
 		fmt.Println(message)
 		token, err = selectTokens(tokens)
 		if err != nil {
 			return astrocore.ApiToken{}, err
 		}
-	} else if name == "" && id != "" {
+	case name == "" && id != "":
 		for i := range tokens {
 			if tokens[i].Id == id {
 				token = tokens[i]
@@ -135,12 +136,12 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 		if token.Id == "" {
 			return astrocore.ApiToken{}, errOrganizationTokenNotFound
 		}
-	} else if name != "" && id == "" {
+	case name != "" && id == "":
 		var j int
 		for i := range tokens {
 			if tokens[i].Name == name {
 				token = tokens[i]
-				j = +1
+				j++
 			}
 		}
 		if j > 1 {

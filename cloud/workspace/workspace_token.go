@@ -71,10 +71,6 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 				role = apiTokens[i].Roles[j].Role
 			}
 		}
-		// expires := fmt.Sprint(apiTokens[i].ExpiryPeriodInDays)
-		// if expires == "0" {
-		// 	expires = "-"
-		// }
 		created := TimeAgo(apiTokens[i].CreatedAt)
 		createdBy := apiTokens[i].CreatedBy.FullName
 		tab.AddRow([]string{id, name, *description, string(scope), role, created, *createdBy}, false)
@@ -368,13 +364,14 @@ func getWorkspaceTokens(workspace string, client astrocore.CoreClient) ([]astroc
 }
 
 func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) {
-	if id == "" && name == "" {
+	switch {
+	case id == "" && name == "":
 		fmt.Println(message)
 		token, err = selectTokens(workspace, tokens)
 		if err != nil {
 			return astrocore.ApiToken{}, err
 		}
-	} else if name == "" && id != "" {
+	case name == "" && id != "":
 		for i := range tokens {
 			if tokens[i].Id == id {
 				token = tokens[i]
@@ -383,12 +380,12 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 		if token.Id == "" {
 			return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
 		}
-	} else if name != "" && id == "" {
+	case name != "" && id == "":
 		var j int
 		for i := range tokens {
 			if tokens[i].Name == name {
 				token = tokens[i]
-				j = +1
+				j++
 			}
 		}
 		if j > 1 {
