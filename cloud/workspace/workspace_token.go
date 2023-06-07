@@ -115,7 +115,7 @@ func CreateToken(name, description, role, workspace string, expiration int, out 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace Token %s was successfully created\nCopy and Past this Token for your records.\n\n", name)
+	fmt.Fprintf(out, "Astro Workspace Token %s was successfully created\nCopy and paste this Token for your records.\n\n", name)
 	APIToken := resp.JSON200
 	fmt.Println(*APIToken.Token)
 	fmt.Println("\nYou will not be shown this API Token value again.")
@@ -389,7 +389,7 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 			}
 		}
 		if j > 1 {
-			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:", name)
+			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
 			token, err = selectTokens(workspace, tokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err
