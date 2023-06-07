@@ -285,32 +285,6 @@ func (_m *Client) InitiateDagDeployment(input astro.InitiateDagDeploymentInput) 
 	return r0, r1
 }
 
-// ListClusters provides a mock function with given fields: organizationID
-func (_m *Client) ListClusters(organizationID string) ([]astro.Cluster, error) {
-	ret := _m.Called(organizationID)
-
-	var r0 []astro.Cluster
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) ([]astro.Cluster, error)); ok {
-		return rf(organizationID)
-	}
-	if rf, ok := ret.Get(0).(func(string) []astro.Cluster); ok {
-		r0 = rf(organizationID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]astro.Cluster)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(organizationID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ListDeployments provides a mock function with given fields: organizationID, workspaceID
 func (_m *Client) ListDeployments(organizationID string, workspaceID string) ([]astro.Deployment, error) {
 	ret := _m.Called(organizationID, workspaceID)
