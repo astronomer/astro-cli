@@ -131,12 +131,22 @@ const (
 	EntitlementRequiredTierBUSINESSCRITICAL EntitlementRequiredTier = "BUSINESS_CRITICAL"
 	EntitlementRequiredTierPREMIUM          EntitlementRequiredTier = "PREMIUM"
 	EntitlementRequiredTierSTANDARD         EntitlementRequiredTier = "STANDARD"
+	EntitlementRequiredTierTRIAL            EntitlementRequiredTier = "TRIAL"
 )
 
 // Defines values for ManagedDomainStatus.
 const (
 	PENDING  ManagedDomainStatus = "PENDING"
 	VERIFIED ManagedDomainStatus = "VERIFIED"
+)
+
+// Defines values for OrganizationPaymentMethod.
+const (
+	AWSMARKETPLACE   OrganizationPaymentMethod = "AWS_MARKETPLACE"
+	AZUREMARKETPLACE OrganizationPaymentMethod = "AZURE_MARKETPLACE"
+	CREDITCARD       OrganizationPaymentMethod = "CREDIT_CARD"
+	GCPMARKETPLACE   OrganizationPaymentMethod = "GCP_MARKETPLACE"
+	INVOICE          OrganizationPaymentMethod = "INVOICE"
 )
 
 // Defines values for OrganizationProduct.
@@ -152,6 +162,81 @@ const (
 	OrganizationProductTierBUSINESSCRITICAL OrganizationProductTier = "BUSINESS_CRITICAL"
 	OrganizationProductTierPREMIUM          OrganizationProductTier = "PREMIUM"
 	OrganizationProductTierSTANDARD         OrganizationProductTier = "STANDARD"
+	OrganizationProductTierTRIAL            OrganizationProductTier = "TRIAL"
+)
+
+// Defines values for OrganizationStatus.
+const (
+	ACTIVE    OrganizationStatus = "ACTIVE"
+	INACTIVE  OrganizationStatus = "INACTIVE"
+	SUSPENDED OrganizationStatus = "SUSPENDED"
+)
+
+// Defines values for PaymentMethodCardBrand.
+const (
+	PaymentMethodCardBrandAmex       PaymentMethodCardBrand = "amex"
+	PaymentMethodCardBrandDiners     PaymentMethodCardBrand = "diners"
+	PaymentMethodCardBrandDiscover   PaymentMethodCardBrand = "discover"
+	PaymentMethodCardBrandJcb        PaymentMethodCardBrand = "jcb"
+	PaymentMethodCardBrandMastercard PaymentMethodCardBrand = "mastercard"
+	PaymentMethodCardBrandUnionpay   PaymentMethodCardBrand = "unionpay"
+	PaymentMethodCardBrandUnknown    PaymentMethodCardBrand = "unknown"
+	PaymentMethodCardBrandVisa       PaymentMethodCardBrand = "visa"
+)
+
+// Defines values for PaymentMethodCardFunding.
+const (
+	PaymentMethodCardFundingCredit  PaymentMethodCardFunding = "credit"
+	PaymentMethodCardFundingDebit   PaymentMethodCardFunding = "debit"
+	PaymentMethodCardFundingPrepaid PaymentMethodCardFunding = "prepaid"
+	PaymentMethodCardFundingUnknown PaymentMethodCardFunding = "unknown"
+)
+
+// Defines values for PaymentMethodCardChecksAddressLine1Check.
+const (
+	PaymentMethodCardChecksAddressLine1CheckFailed      PaymentMethodCardChecksAddressLine1Check = "failed"
+	PaymentMethodCardChecksAddressLine1CheckPass        PaymentMethodCardChecksAddressLine1Check = "pass"
+	PaymentMethodCardChecksAddressLine1CheckUnavailable PaymentMethodCardChecksAddressLine1Check = "unavailable"
+	PaymentMethodCardChecksAddressLine1CheckUnchecked   PaymentMethodCardChecksAddressLine1Check = "unchecked"
+)
+
+// Defines values for PaymentMethodCardChecksAddressPostalCodeCheck.
+const (
+	PaymentMethodCardChecksAddressPostalCodeCheckFailed      PaymentMethodCardChecksAddressPostalCodeCheck = "failed"
+	PaymentMethodCardChecksAddressPostalCodeCheckPass        PaymentMethodCardChecksAddressPostalCodeCheck = "pass"
+	PaymentMethodCardChecksAddressPostalCodeCheckUnavailable PaymentMethodCardChecksAddressPostalCodeCheck = "unavailable"
+	PaymentMethodCardChecksAddressPostalCodeCheckUnchecked   PaymentMethodCardChecksAddressPostalCodeCheck = "unchecked"
+)
+
+// Defines values for PaymentMethodCardChecksCvcCheck.
+const (
+	PaymentMethodCardChecksCvcCheckFailed      PaymentMethodCardChecksCvcCheck = "failed"
+	PaymentMethodCardChecksCvcCheckPass        PaymentMethodCardChecksCvcCheck = "pass"
+	PaymentMethodCardChecksCvcCheckUnavailable PaymentMethodCardChecksCvcCheck = "unavailable"
+	PaymentMethodCardChecksCvcCheckUnchecked   PaymentMethodCardChecksCvcCheck = "unchecked"
+)
+
+// Defines values for PaymentMethodCardWalletType.
+const (
+	AmexExpressCheckout PaymentMethodCardWalletType = "amexExpressCheckout"
+	ApplePay            PaymentMethodCardWalletType = "applePay"
+	GooglePay           PaymentMethodCardWalletType = "googlePay"
+	Link                PaymentMethodCardWalletType = "link"
+	Masterpass          PaymentMethodCardWalletType = "masterpass"
+	SamsungPay          PaymentMethodCardWalletType = "samsungPay"
+	VisaCheckout        PaymentMethodCardWalletType = "visaCheckout"
+)
+
+// Defines values for PaymentMethodUSBankAccountAccountHolderType.
+const (
+	Company    PaymentMethodUSBankAccountAccountHolderType = "company"
+	Individual PaymentMethodUSBankAccountAccountHolderType = "individual"
+)
+
+// Defines values for PaymentMethodUSBankAccountAccountType.
+const (
+	Checking PaymentMethodUSBankAccountAccountType = "checking"
+	Savings  PaymentMethodUSBankAccountAccountType = "savings"
 )
 
 // Defines values for SharedClusterCloudProvider.
@@ -234,10 +319,10 @@ const (
 
 // Defines values for ListOrganizationsParamsTrialStatus.
 const (
-	ListOrganizationsParamsTrialStatusActive  ListOrganizationsParamsTrialStatus = "active"
-	ListOrganizationsParamsTrialStatusAll     ListOrganizationsParamsTrialStatus = "all"
-	ListOrganizationsParamsTrialStatusExpired ListOrganizationsParamsTrialStatus = "expired"
-	ListOrganizationsParamsTrialStatusNone    ListOrganizationsParamsTrialStatus = "none"
+	Active  ListOrganizationsParamsTrialStatus = "active"
+	All     ListOrganizationsParamsTrialStatus = "all"
+	Expired ListOrganizationsParamsTrialStatus = "expired"
+	None    ListOrganizationsParamsTrialStatus = "none"
 )
 
 // Defines values for ListOrganizationsParamsProductTier.
@@ -354,6 +439,29 @@ const (
 	ListClustersParamsSortsUpdatedAtDesc           ListClustersParamsSorts = "updatedAt:desc"
 	ListClustersParamsSortsVpcSubnetRangeAsc       ListClustersParamsSorts = "vpcSubnetRange:asc"
 	ListClustersParamsSortsVpcSubnetRangeDesc      ListClustersParamsSorts = "vpcSubnetRange:desc"
+)
+
+// Defines values for GetStripeClientSecretParamsType.
+const (
+	SetupIntent GetStripeClientSecretParamsType = "setup-intent"
+)
+
+// Defines values for ListOrganizationTeamsParamsSorts.
+const (
+	ListOrganizationTeamsParamsSortsCreatedAtAsc       ListOrganizationTeamsParamsSorts = "createdAt:asc"
+	ListOrganizationTeamsParamsSortsCreatedAtDesc      ListOrganizationTeamsParamsSorts = "createdAt:desc"
+	ListOrganizationTeamsParamsSortsDescriptionAsc     ListOrganizationTeamsParamsSorts = "description:asc"
+	ListOrganizationTeamsParamsSortsDescriptionDesc    ListOrganizationTeamsParamsSorts = "description:desc"
+	ListOrganizationTeamsParamsSortsIdAsc              ListOrganizationTeamsParamsSorts = "id:asc"
+	ListOrganizationTeamsParamsSortsIdDesc             ListOrganizationTeamsParamsSorts = "id:desc"
+	ListOrganizationTeamsParamsSortsMembersCountAsc    ListOrganizationTeamsParamsSorts = "membersCount:asc"
+	ListOrganizationTeamsParamsSortsMembersCountDesc   ListOrganizationTeamsParamsSorts = "membersCount:desc"
+	ListOrganizationTeamsParamsSortsNameAsc            ListOrganizationTeamsParamsSorts = "name:asc"
+	ListOrganizationTeamsParamsSortsNameDesc           ListOrganizationTeamsParamsSorts = "name:desc"
+	ListOrganizationTeamsParamsSortsUpdatedAtAsc       ListOrganizationTeamsParamsSorts = "updatedAt:asc"
+	ListOrganizationTeamsParamsSortsUpdatedAtDesc      ListOrganizationTeamsParamsSorts = "updatedAt:desc"
+	ListOrganizationTeamsParamsSortsWorkspaceCountAsc  ListOrganizationTeamsParamsSorts = "workspaceCount:asc"
+	ListOrganizationTeamsParamsSortsWorkspaceCountDesc ListOrganizationTeamsParamsSorts = "workspaceCount:desc"
 )
 
 // Defines values for ListOrgUsersParamsSorts.
@@ -555,7 +663,7 @@ type ClusterDetailed struct {
 	OrganizationId             string                       `json:"organizationId"`
 	OrganizationName           string                       `json:"organizationName"`
 	OrganizationProductTier    string                       `json:"organizationProductTier"`
-	OrganizationTrialExpiresAt string                       `json:"organizationTrialExpiresAt"`
+	OrganizationTrialExpiresAt *string                      `json:"organizationTrialExpiresAt,omitempty"`
 	PodSubnetRange             string                       `json:"podSubnetRange"`
 	ProviderAccount            string                       `json:"providerAccount"`
 	Region                     string                       `json:"region"`
@@ -720,6 +828,13 @@ type CreateSsoConnectionRequest struct {
 	ManagedDomains           []SsoConnectionManagedDomain `json:"managedDomains"`
 }
 
+// CreateTeamRequest defines model for CreateTeamRequest.
+type CreateTeamRequest struct {
+	Description *string   `json:"description,omitempty"`
+	MemberIds   *[]string `json:"memberIds,omitempty"`
+	Name        string    `json:"name"`
+}
+
 // CreateUserInviteRequest defines model for CreateUserInviteRequest.
 type CreateUserInviteRequest struct {
 	InviteeEmail string `json:"inviteeEmail"`
@@ -834,6 +949,56 @@ type Invite struct {
 	UserId         *string             `json:"userId,omitempty"`
 }
 
+// Invoice defines model for Invoice.
+type Invoice struct {
+	Adjustments []InvoiceAdjustment `json:"adjustments"`
+	CustomerId  string              `json:"customerId"`
+
+	// EndTimestamp End of the usage period this invoice covers (UTC)
+	EndTimestamp string            `json:"endTimestamp"`
+	Id           string            `json:"id"`
+	LineItems    []InvoiceLineItem `json:"lineItems"`
+	PlanId       *string           `json:"planId,omitempty"`
+	PlanName     *string           `json:"planName,omitempty"`
+
+	// StartTimestamp Beginning of the usage period this invoice covers (UTC)
+	StartTimestamp string  `json:"startTimestamp"`
+	Status         string  `json:"status"`
+	SubtotalUSD    float32 `json:"subtotalUSD"`
+	TotalUSD       float32 `json:"totalUSD"`
+}
+
+// InvoiceAdjustment defines model for InvoiceAdjustment.
+type InvoiceAdjustment struct {
+	Name     string  `json:"name"`
+	TotalUSD float32 `json:"totalUSD"`
+}
+
+// InvoiceLineItem defines model for InvoiceLineItem.
+type InvoiceLineItem struct {
+	CreditType   CreditType           `json:"creditType"`
+	CustomFields map[string]string    `json:"customFields"`
+	GroupKey     *string              `json:"groupKey,omitempty"`
+	GroupValue   *string              `json:"groupValue,omitempty"`
+	Name         string               `json:"name"`
+	ProductId    *string              `json:"productId,omitempty"`
+	Quantity     float32              `json:"quantity"`
+	SubLineItems []InvoiceSubLineItem `json:"subLineItems"`
+	Total        float32              `json:"total"`
+}
+
+// InvoiceSubLineItem defines model for InvoiceSubLineItem.
+type InvoiceSubLineItem struct {
+	ChargeId     *string           `json:"chargeId,omitempty"`
+	CustomFields map[string]string `json:"customFields"`
+	Name         string            `json:"name"`
+
+	// Price the unit price for this charge, present only if the charge is not tiered and the quantity is nonzero
+	Price    *float32 `json:"price,omitempty"`
+	Quantity float32  `json:"quantity"`
+	Subtotal float32  `json:"subtotal"`
+}
+
 // JitPolicy defines model for JitPolicy.
 type JitPolicy struct {
 	DefaultOrgRole        string           `json:"defaultOrgRole"`
@@ -867,17 +1032,16 @@ type MutateOrgUserRoleRequest struct {
 	Role string `json:"role"`
 }
 
-// MutateOrganizationRequest defines model for MutateOrganizationRequest.
-type MutateOrganizationRequest struct {
-	Metadata *map[string]interface{} `json:"metadata,omitempty"`
-	Name     string                  `json:"name"`
-}
-
 // MutateWorkspaceRequest defines model for MutateWorkspaceRequest.
 type MutateWorkspaceRequest struct {
 	ApiKeyOnlyDeploymentsDefault *bool   `json:"apiKeyOnlyDeploymentsDefault,omitempty"`
 	Description                  *string `json:"description,omitempty"`
 	Name                         string  `json:"name"`
+}
+
+// MutateWorkspaceTeamRoleRequest defines model for MutateWorkspaceTeamRoleRequest.
+type MutateWorkspaceTeamRoleRequest struct {
+	Role string `json:"role"`
 }
 
 // MutateWorkspaceUserRoleRequest defines model for MutateWorkspaceUserRoleRequest.
@@ -887,43 +1051,163 @@ type MutateWorkspaceUserRoleRequest struct {
 
 // NodePool defines model for NodePool.
 type NodePool struct {
-	CloudProvider    string    `json:"cloudProvider"`
-	ClusterId        string    `json:"clusterId"`
-	CreatedAt        time.Time `json:"createdAt"`
-	Id               string    `json:"id"`
-	IsDefault        bool      `json:"isDefault"`
-	MaxNodeCount     int       `json:"maxNodeCount"`
-	Name             string    `json:"name"`
-	NodeInstanceType string    `json:"nodeInstanceType"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	CloudProvider          string    `json:"cloudProvider"`
+	ClusterId              string    `json:"clusterId"`
+	CreatedAt              time.Time `json:"createdAt"`
+	Id                     string    `json:"id"`
+	IsDefault              bool      `json:"isDefault"`
+	MaxNodeCount           int       `json:"maxNodeCount"`
+	Name                   string    `json:"name"`
+	NodeInstanceType       string    `json:"nodeInstanceType"`
+	SupportedAstroMachines *[]string `json:"supportedAstroMachines,omitempty"`
+	UpdatedAt              time.Time `json:"updatedAt"`
 }
 
 // Organization defines model for Organization.
 type Organization struct {
-	AuthServiceId    string                  `json:"authServiceId"`
-	CreatedAt        time.Time               `json:"createdAt"`
-	CreatedBy        *string                 `json:"createdBy,omitempty"`
-	CreatedBySubject *BasicSubjectProfile    `json:"createdBySubject,omitempty"`
-	Domains          *[]string               `json:"domains,omitempty"`
-	Entitlements     *map[string]Entitlement `json:"entitlements,omitempty"`
-	Id               string                  `json:"id"`
-	ManagedDomains   *[]ManagedDomain        `json:"managedDomains,omitempty"`
-	MetronomeId      *string                 `json:"metronomeId,omitempty"`
-	Name             string                  `json:"name"`
-	Product          *OrganizationProduct    `json:"product,omitempty"`
-	ProductTier      OrganizationProductTier `json:"productTier"`
-	ShortName        string                  `json:"shortName"`
-	TrialExpiresAt   *time.Time              `json:"trialExpiresAt,omitempty"`
-	UpdatedAt        time.Time               `json:"updatedAt"`
-	UpdatedBy        *string                 `json:"updatedBy,omitempty"`
-	UpdatedBySubject *BasicSubjectProfile    `json:"updatedBySubject,omitempty"`
+	AuthServiceId           string                     `json:"authServiceId"`
+	BillingEmail            *string                    `json:"billingEmail,omitempty"`
+	CreatedAt               time.Time                  `json:"createdAt"`
+	CreatedBy               *string                    `json:"createdBy,omitempty"`
+	CreatedBySubject        *BasicSubjectProfile       `json:"createdBySubject,omitempty"`
+	Domains                 *[]string                  `json:"domains,omitempty"`
+	Entitlements            *map[string]Entitlement    `json:"entitlements,omitempty"`
+	Id                      string                     `json:"id"`
+	IsScimEnabled           bool                       `json:"isScimEnabled"`
+	ManagedDomains          *[]ManagedDomain           `json:"managedDomains,omitempty"`
+	MetronomeId             *string                    `json:"metronomeId,omitempty"`
+	MetronomePlanId         *string                    `json:"metronomePlanId,omitempty"`
+	Name                    string                     `json:"name"`
+	PaymentMethod           *OrganizationPaymentMethod `json:"paymentMethod,omitempty"`
+	Product                 *OrganizationProduct       `json:"product,omitempty"`
+	ProductTier             OrganizationProductTier    `json:"productTier"`
+	SalesforceId            *string                    `json:"salesforceId,omitempty"`
+	ShortName               string                     `json:"shortName"`
+	Status                  *OrganizationStatus        `json:"status,omitempty"`
+	StripeId                *string                    `json:"stripeId,omitempty"`
+	StripePaymentMethodId   *string                    `json:"stripePaymentMethodId,omitempty"`
+	TrialExpiresAt          *time.Time                 `json:"trialExpiresAt,omitempty"`
+	UpdatedAt               time.Time                  `json:"updatedAt"`
+	UpdatedBy               *string                    `json:"updatedBy,omitempty"`
+	UpdatedBySubject        *BasicSubjectProfile       `json:"updatedBySubject,omitempty"`
+	UsesCustomMetronomePlan *bool                      `json:"usesCustomMetronomePlan,omitempty"`
 }
+
+// OrganizationPaymentMethod defines model for Organization.PaymentMethod.
+type OrganizationPaymentMethod string
 
 // OrganizationProduct defines model for Organization.Product.
 type OrganizationProduct string
 
 // OrganizationProductTier defines model for Organization.ProductTier.
 type OrganizationProductTier string
+
+// OrganizationStatus defines model for Organization.Status.
+type OrganizationStatus string
+
+// PaymentMethod defines model for PaymentMethod.
+type PaymentMethod struct {
+	BillingDetails *PaymentMethodBillingDetails `json:"billingDetails,omitempty"`
+	Card           *PaymentMethodCard           `json:"card,omitempty"`
+	CreatedAt      string                       `json:"createdAt"`
+	Id             string                       `json:"id"`
+	Metadata       *map[string]string           `json:"metadata,omitempty"`
+	Type           string                       `json:"type"`
+	UsBankAccount  *PaymentMethodUSBankAccount  `json:"usBankAccount,omitempty"`
+}
+
+// PaymentMethodBillingDetails defines model for PaymentMethodBillingDetails.
+type PaymentMethodBillingDetails struct {
+	Address Address `json:"address"`
+	Email   *string `json:"email,omitempty"`
+	Name    *string `json:"name,omitempty"`
+	Phone   *string `json:"phone,omitempty"`
+}
+
+// PaymentMethodCard defines model for PaymentMethodCard.
+type PaymentMethodCard struct {
+	Brand             PaymentMethodCardBrand   `json:"brand"`
+	Checks            *PaymentMethodCardChecks `json:"checks,omitempty"`
+	Country           string                   `json:"country"`
+	ExpMonth          int                      `json:"expMonth"`
+	ExpYear           int                      `json:"expYear"`
+	Fingerprint       string                   `json:"fingerprint"`
+	Funding           PaymentMethodCardFunding `json:"funding"`
+	Last4             string                   `json:"last4"`
+	PreferredNetwork  string                   `json:"preferredNetwork"`
+	SupportedNetworks []string                 `json:"supportedNetworks"`
+	ThreeDSecureUsage *bool                    `json:"threeDSecureUsage,omitempty"`
+	Wallet            *PaymentMethodCardWallet `json:"wallet,omitempty"`
+}
+
+// PaymentMethodCardBrand defines model for PaymentMethodCard.Brand.
+type PaymentMethodCardBrand string
+
+// PaymentMethodCardFunding defines model for PaymentMethodCard.Funding.
+type PaymentMethodCardFunding string
+
+// PaymentMethodCardChecks defines model for PaymentMethodCardChecks.
+type PaymentMethodCardChecks struct {
+	AddressLine1Check      PaymentMethodCardChecksAddressLine1Check      `json:"addressLine1Check"`
+	AddressPostalCodeCheck PaymentMethodCardChecksAddressPostalCodeCheck `json:"addressPostalCodeCheck"`
+	CvcCheck               PaymentMethodCardChecksCvcCheck               `json:"cvcCheck"`
+}
+
+// PaymentMethodCardChecksAddressLine1Check defines model for PaymentMethodCardChecks.AddressLine1Check.
+type PaymentMethodCardChecksAddressLine1Check string
+
+// PaymentMethodCardChecksAddressPostalCodeCheck defines model for PaymentMethodCardChecks.AddressPostalCodeCheck.
+type PaymentMethodCardChecksAddressPostalCodeCheck string
+
+// PaymentMethodCardChecksCvcCheck defines model for PaymentMethodCardChecks.CvcCheck.
+type PaymentMethodCardChecksCvcCheck string
+
+// PaymentMethodCardWallet defines model for PaymentMethodCardWallet.
+type PaymentMethodCardWallet struct {
+	DynamicLast4 string                               `json:"dynamicLast4"`
+	Masterpass   *PaymentMethodCardWalletMasterpass   `json:"masterpass,omitempty"`
+	Type         PaymentMethodCardWalletType          `json:"type"`
+	VisaCheckout *PaymentMethodCardWalletVisaCheckout `json:"visaCheckout,omitempty"`
+}
+
+// PaymentMethodCardWalletType defines model for PaymentMethodCardWallet.Type.
+type PaymentMethodCardWalletType string
+
+// PaymentMethodCardWalletMasterpass defines model for PaymentMethodCardWalletMasterpass.
+type PaymentMethodCardWalletMasterpass struct {
+	BillingAddress  Address `json:"billingAddress"`
+	Email           *string `json:"email,omitempty"`
+	Name            *string `json:"name,omitempty"`
+	ShippingAddress Address `json:"shippingAddress"`
+}
+
+// PaymentMethodCardWalletVisaCheckout defines model for PaymentMethodCardWalletVisaCheckout.
+type PaymentMethodCardWalletVisaCheckout struct {
+	BillingAddress  *Address `json:"billingAddress,omitempty"`
+	Email           string   `json:"email"`
+	Name            string   `json:"name"`
+	ShippingAddress *Address `json:"shippingAddress,omitempty"`
+}
+
+// PaymentMethodUSBankAccount defines model for PaymentMethodUSBankAccount.
+type PaymentMethodUSBankAccount struct {
+	AccountHolderType           PaymentMethodUSBankAccountAccountHolderType `json:"accountHolderType"`
+	AccountType                 PaymentMethodUSBankAccountAccountType       `json:"accountType"`
+	BankName                    string                                      `json:"bankName"`
+	FinancialConnectionsAccount *string                                     `json:"financialConnectionsAccount,omitempty"`
+	Fingerprint                 string                                      `json:"fingerprint"`
+	Last4                       string                                      `json:"last4"`
+	PreferredNetwork            string                                      `json:"preferredNetwork"`
+	RoutingNumber               string                                      `json:"routingNumber"`
+	StatusDetails               *USBankAccountBlockedStatusDetails          `json:"statusDetails,omitempty"`
+	SupportedNetworks           []string                                    `json:"supportedNetworks"`
+}
+
+// PaymentMethodUSBankAccountAccountHolderType defines model for PaymentMethodUSBankAccount.AccountHolderType.
+type PaymentMethodUSBankAccountAccountHolderType string
+
+// PaymentMethodUSBankAccountAccountType defines model for PaymentMethodUSBankAccount.AccountType.
+type PaymentMethodUSBankAccountAccountType string
 
 // PostLoginEvent defines model for PostLoginEvent.
 type PostLoginEvent struct {
@@ -1076,6 +1360,17 @@ type SsoLoginDeny struct {
 	Reason      string    `json:"reason"`
 }
 
+// StripeClientSecret defines model for StripeClientSecret.
+type StripeClientSecret struct {
+	ClientSecret string `json:"clientSecret"`
+}
+
+// Subject defines model for Subject.
+type Subject struct {
+	EntityId string `json:"entityId"`
+	Type     string `json:"type"`
+}
+
 // TaskInstance defines model for TaskInstance.
 type TaskInstance struct {
 	Duration       *float32                `json:"duration,omitempty"`
@@ -1105,10 +1400,57 @@ type TaskInstance struct {
 // TaskInstanceState defines model for TaskInstance.State.
 type TaskInstanceState string
 
+// Team defines model for Team.
+type Team struct {
+	CreatedAt      time.Time            `json:"createdAt"`
+	CreatedBy      *BasicSubjectProfile `json:"createdBy,omitempty"`
+	Description    *string              `json:"description,omitempty"`
+	Id             string               `json:"id"`
+	IsIdpManaged   bool                 `json:"isIdpManaged"`
+	Members        *[]TeamMember        `json:"members,omitempty"`
+	MembersCount   *int                 `json:"membersCount,omitempty"`
+	Name           string               `json:"name"`
+	OrganizationId string               `json:"organizationId"`
+	Roles          *[]TeamRole          `json:"roles,omitempty"`
+	RolesCount     *int                 `json:"rolesCount,omitempty"`
+	UpdatedAt      time.Time            `json:"updatedAt"`
+	UpdatedBy      *BasicSubjectProfile `json:"updatedBy,omitempty"`
+}
+
+// TeamMember defines model for TeamMember.
+type TeamMember struct {
+	AvatarUrl *string `json:"avatarUrl,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+	FullName  *string `json:"fullName,omitempty"`
+	UserId    string  `json:"userId"`
+	Username  string  `json:"username"`
+}
+
+// TeamRole defines model for TeamRole.
+type TeamRole struct {
+	EntityId   string `json:"entityId"`
+	EntityType string `json:"entityType"`
+	Role       string `json:"role"`
+}
+
+// TeamsPaginated defines model for TeamsPaginated.
+type TeamsPaginated struct {
+	Limit      int    `json:"limit"`
+	Offset     int    `json:"offset"`
+	Teams      []Team `json:"teams"`
+	TotalCount int    `json:"totalCount"`
+}
+
 // TemplateVersion defines model for TemplateVersion.
 type TemplateVersion struct {
 	Url     *string `json:"url,omitempty"`
 	Version string  `json:"version"`
+}
+
+// USBankAccountBlockedStatusDetails defines model for USBankAccountBlockedStatusDetails.
+type USBankAccountBlockedStatusDetails struct {
+	NetworkCode string `json:"networkCode"`
+	Reason      string `json:"reason"`
 }
 
 // UpdateAwsClusterRequest defines model for UpdateAwsClusterRequest.
@@ -1216,6 +1558,9 @@ type User struct {
 	// OrgRole Only shown if listing org users
 	OrgRole *string `json:"orgRole,omitempty"`
 
+	// OrgUserRelationIsIdpManaged Only shown if listing org users
+	OrgUserRelationIsIdpManaged *bool `json:"orgUserRelationIsIdpManaged,omitempty"`
+
 	// Roles Only shown if admin listing users
 	Roles  *[]UserRole `json:"roles,omitempty"`
 	Status string      `json:"status"`
@@ -1234,8 +1579,9 @@ type User struct {
 
 // UserRole defines model for UserRole.
 type UserRole struct {
-	Role  string `json:"role"`
-	Scope Scope  `json:"scope"`
+	Role    string  `json:"role"`
+	Scope   Scope   `json:"scope"`
+	Subject Subject `json:"subject"`
 }
 
 // UsersPaginated defines model for UsersPaginated.
@@ -1244,6 +1590,17 @@ type UsersPaginated struct {
 	Offset     int    `json:"offset"`
 	TotalCount int    `json:"totalCount"`
 	Users      []User `json:"users"`
+}
+
+// ValidateCreditCardPayment defines model for ValidateCreditCardPayment.
+type ValidateCreditCardPayment struct {
+	IsValid               bool    `json:"isValid"`
+	StripePaymentMethodId *string `json:"stripePaymentMethodId,omitempty"`
+}
+
+// ValidateCreditCardPaymentRequest defines model for ValidateCreditCardPaymentRequest.
+type ValidateCreditCardPaymentRequest struct {
+	StripePaymentMethodId string `json:"stripePaymentMethodId"`
 }
 
 // ValidateSsoLoginRequest defines model for ValidateSsoLoginRequest.
@@ -1409,6 +1766,27 @@ type ListClustersParamsStatus string
 // ListClustersParamsSorts defines parameters for ListClusters.
 type ListClustersParamsSorts string
 
+// GetStripeClientSecretParamsType defines parameters for GetStripeClientSecret.
+type GetStripeClientSecretParamsType string
+
+// ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
+type ListOrganizationTeamsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListOrganizationTeamsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Search string to search for when listing teams
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
+// ListOrganizationTeamsParamsSorts defines parameters for ListOrganizationTeams.
+type ListOrganizationTeamsParamsSorts string
+
 // ListOrgUsersParams defines parameters for ListOrgUsers.
 type ListOrgUsersParams struct {
 	// Offset offset for pagination
@@ -1432,8 +1810,8 @@ type ListOrgUsersParamsSorts string
 
 // ListWorkspacesParams defines parameters for ListWorkspaces.
 type ListWorkspacesParams struct {
-	// WorkspaceIds list of workspace ids to get detail of, separated by comma
-	WorkspaceIds *string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
+	// WorkspaceIds list of workspace ids to get detail of
+	WorkspaceIds *[]string `form:"workspaceIds,omitempty" json:"workspaceIds,omitempty"`
 
 	// Offset offset for pagination
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
@@ -1494,10 +1872,10 @@ type GetSelfUserParams struct {
 type ValidateSsoLoginJSONRequestBody = ValidateSsoLoginRequest
 
 // CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
-type CreateOrganizationJSONRequestBody = MutateOrganizationRequest
+type CreateOrganizationJSONRequestBody = CreateOrganizationRequest
 
 // UpdateOrganizationJSONRequestBody defines body for UpdateOrganization for application/json ContentType.
-type UpdateOrganizationJSONRequestBody = MutateOrganizationRequest
+type UpdateOrganizationJSONRequestBody = UpdateOrganizationRequest
 
 // CreateOrganizationApiTokenJSONRequestBody defines body for CreateOrganizationApiToken for application/json ContentType.
 type CreateOrganizationApiTokenJSONRequestBody = CreateOrganizationApiTokenRequest
@@ -1538,8 +1916,20 @@ type CreateSsoConnectionJSONRequestBody = CreateSsoConnectionRequest
 // UpdateSsoConnectionJSONRequestBody defines body for UpdateSsoConnection for application/json ContentType.
 type UpdateSsoConnectionJSONRequestBody = UpdateSsoConnectionRequest
 
+// CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
+type CreateTeamJSONRequestBody = CreateTeamRequest
+
+// UpdateTeamJSONRequestBody defines body for UpdateTeam for application/json ContentType.
+type UpdateTeamJSONRequestBody = UpdateTeamRequest
+
+// AddTeamMembersJSONRequestBody defines body for AddTeamMembers for application/json ContentType.
+type AddTeamMembersJSONRequestBody = AddTeamMembersRequest
+
 // MutateOrgUserRoleJSONRequestBody defines body for MutateOrgUserRole for application/json ContentType.
 type MutateOrgUserRoleJSONRequestBody = MutateOrgUserRoleRequest
+
+// ValidateCreditCardPaymentJSONRequestBody defines body for ValidateCreditCardPayment for application/json ContentType.
+type ValidateCreditCardPaymentJSONRequestBody = ValidateCreditCardPaymentRequest
 
 // CreateWorkspaceJSONRequestBody defines body for CreateWorkspace for application/json ContentType.
 type CreateWorkspaceJSONRequestBody = MutateWorkspaceRequest
@@ -1754,6 +2144,9 @@ type ClientInterface interface {
 	// VerifyManagedDomain request
 	VerifyManagedDomain(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetDraftInvoice request
+	GetDraftInvoice(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateUserInvite request with any body
 	CreateUserInviteWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1761,6 +2154,9 @@ type ClientInterface interface {
 
 	// DeleteUserInvite request
 	DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPaymentMethod request
+	GetPaymentMethod(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSsoBypassKey request
 	DeleteSsoBypassKey(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1790,6 +2186,36 @@ type ClientInterface interface {
 
 	UpdateSsoConnection(ctx context.Context, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetStripeClientSecret request
+	GetStripeClientSecret(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListOrganizationTeams request
+	ListOrganizationTeams(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTeam request with any body
+	CreateTeamWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateTeam(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTeam request
+	DeleteTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTeam request
+	GetTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTeam request with any body
+	UpdateTeamWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateTeam(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AddTeamMembers request with any body
+	AddTeamMembersWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AddTeamMembers(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveTeamMember request
+	RemoveTeamMember(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOrgUsers request
 	ListOrgUsers(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1803,6 +2229,11 @@ type ClientInterface interface {
 	MutateOrgUserRoleWithBody(ctx context.Context, orgShortNameId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	MutateOrgUserRole(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateCreditCardPayment request with any body
+	ValidateCreditCardPaymentWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ValidateCreditCardPayment(ctx context.Context, orgShortNameId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaces request
 	ListWorkspaces(ctx context.Context, orgShortNameId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2408,6 +2839,18 @@ func (c *Client) VerifyManagedDomain(ctx context.Context, orgShortNameId string,
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetDraftInvoice(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDraftInvoiceRequest(c.Server, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) CreateUserInviteWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateUserInviteRequestWithBody(c.Server, orgShortNameId, contentType, body)
 	if err != nil {
@@ -2434,6 +2877,18 @@ func (c *Client) CreateUserInvite(ctx context.Context, orgShortNameId string, bo
 
 func (c *Client) DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUserInviteRequest(c.Server, orgShortNameId, inviteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetPaymentMethod(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPaymentMethodRequest(c.Server, orgShortNameId)
 	if err != nil {
 		return nil, err
 	}
@@ -2564,6 +3019,138 @@ func (c *Client) UpdateSsoConnection(ctx context.Context, orgShortNameId string,
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetStripeClientSecret(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetStripeClientSecretRequest(c.Server, orgShortNameId, pType)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListOrganizationTeams(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationTeamsRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateTeamWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTeamRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateTeam(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTeamRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTeamRequest(c.Server, orgShortNameId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetTeam(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTeamRequest(c.Server, orgShortNameId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTeamWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTeamRequestWithBody(c.Server, orgShortNameId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateTeam(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTeamRequest(c.Server, orgShortNameId, teamId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AddTeamMembersWithBody(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMembersRequestWithBody(c.Server, orgShortNameId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AddTeamMembers(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAddTeamMembersRequest(c.Server, orgShortNameId, teamId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RemoveTeamMember(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveTeamMemberRequest(c.Server, orgShortNameId, teamId, memberId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListOrgUsers(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListOrgUsersRequest(c.Server, orgShortNameId, params)
 	if err != nil {
@@ -2614,6 +3201,30 @@ func (c *Client) MutateOrgUserRoleWithBody(ctx context.Context, orgShortNameId s
 
 func (c *Client) MutateOrgUserRole(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMutateOrgUserRoleRequest(c.Server, orgShortNameId, userId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ValidateCreditCardPaymentWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateCreditCardPaymentRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ValidateCreditCardPayment(ctx context.Context, orgShortNameId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateCreditCardPaymentRequest(c.Server, orgShortNameId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4567,6 +5178,40 @@ func NewVerifyManagedDomainRequest(server string, orgShortNameId string, domainI
 	return req, nil
 }
 
+// NewGetDraftInvoiceRequest generates requests for GetDraftInvoice
+func NewGetDraftInvoiceRequest(server string, orgShortNameId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/draft-invoice", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewCreateUserInviteRequest calls the generic CreateUserInvite builder with application/json body
 func NewCreateUserInviteRequest(server string, orgShortNameId string, body CreateUserInviteJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -4648,6 +5293,40 @@ func NewDeleteUserInviteRequest(server string, orgShortNameId string, inviteId s
 	}
 
 	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetPaymentMethodRequest generates requests for GetPaymentMethod
+func NewGetPaymentMethodRequest(server string, orgShortNameId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/payment-method", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4964,12 +5643,440 @@ func NewUpdateSsoConnectionRequestWithBody(server string, orgShortNameId string,
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetStripeClientSecretRequest generates requests for GetStripeClientSecret
+func NewGetStripeClientSecretRequest(server string, orgShortNameId string, pType GetStripeClientSecretParamsType) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/stripe/client-secret/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListOrganizationTeamsRequest generates requests for ListOrganizationTeams
+func NewListOrganizationTeamsRequest(server string, orgShortNameId string, params *ListOrganizationTeamsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateTeamRequest calls the generic CreateTeam builder with application/json body
+func NewCreateTeamRequest(server string, orgShortNameId string, body CreateTeamJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTeamRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateTeamRequestWithBody generates requests for CreateTeam with any type of body
+func NewCreateTeamRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteTeamRequest generates requests for DeleteTeam
+func NewDeleteTeamRequest(server string, orgShortNameId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetTeamRequest generates requests for GetTeam
+func NewGetTeamRequest(server string, orgShortNameId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateTeamRequest calls the generic UpdateTeam builder with application/json body
+func NewUpdateTeamRequest(server string, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTeamRequestWithBody(server, orgShortNameId, teamId, "application/json", bodyReader)
+}
+
+// NewUpdateTeamRequestWithBody generates requests for UpdateTeam with any type of body
+func NewUpdateTeamRequestWithBody(server string, orgShortNameId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewAddTeamMembersRequest calls the generic AddTeamMembers builder with application/json body
+func NewAddTeamMembersRequest(server string, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAddTeamMembersRequestWithBody(server, orgShortNameId, teamId, "application/json", bodyReader)
+}
+
+// NewAddTeamMembersRequestWithBody generates requests for AddTeamMembers with any type of body
+func NewAddTeamMembersRequestWithBody(server string, orgShortNameId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s/members", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveTeamMemberRequest generates requests for RemoveTeamMember
+func NewRemoveTeamMemberRequest(server string, orgShortNameId string, teamId string, memberId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "memberId", runtime.ParamLocationPath, memberId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/teams/%s/members/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -5209,6 +6316,53 @@ func NewMutateOrgUserRoleRequestWithBody(server string, orgShortNameId string, u
 	}
 
 	operationPath := fmt.Sprintf("/organizations/%s/users/%s/role", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewValidateCreditCardPaymentRequest calls the generic ValidateCreditCardPayment builder with application/json body
+func NewValidateCreditCardPaymentRequest(server string, orgShortNameId string, body ValidateCreditCardPaymentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewValidateCreditCardPaymentRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewValidateCreditCardPaymentRequestWithBody generates requests for ValidateCreditCardPayment with any type of body
+func NewValidateCreditCardPaymentRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/validate-credit-card-payment", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -5904,7 +7058,7 @@ func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, work
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/pipelines", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/dag-filters", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -5918,6 +7072,265 @@ func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, work
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewListWorkspaceDagsRequest generates requests for ListWorkspaceDags
+func NewListWorkspaceDagsRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspaceDagsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/dags", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListWorkspaceTeamsRequest generates requests for ListWorkspaceTeams
+func NewListWorkspaceTeamsRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/teams", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Search != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteWorkspaceTeamRequest generates requests for DeleteWorkspaceTeam
+func NewDeleteWorkspaceTeamRequest(server string, orgShortNameId string, workspaceId string, teamId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/teams/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewMutateWorkspaceTeamRoleRequest calls the generic MutateWorkspaceTeamRole builder with application/json body
+func NewMutateWorkspaceTeamRoleRequest(server string, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMutateWorkspaceTeamRoleRequestWithBody(server, orgShortNameId, workspaceId, teamId, "application/json", bodyReader)
+}
+
+// NewMutateWorkspaceTeamRoleRequestWithBody generates requests for MutateWorkspaceTeamRole with any type of body
+func NewMutateWorkspaceTeamRoleRequestWithBody(server string, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "teamId", runtime.ParamLocationPath, teamId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/teams/%s/role", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -6399,6 +7812,9 @@ type ClientWithResponsesInterface interface {
 	// VerifyManagedDomain request
 	VerifyManagedDomainWithResponse(ctx context.Context, orgShortNameId string, domainId string, reqEditors ...RequestEditorFn) (*VerifyManagedDomainResponse, error)
 
+	// GetDraftInvoice request
+	GetDraftInvoiceWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetDraftInvoiceResponse, error)
+
 	// CreateUserInvite request with any body
 	CreateUserInviteWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error)
 
@@ -6406,6 +7822,9 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUserInvite request
 	DeleteUserInviteWithResponse(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*DeleteUserInviteResponse, error)
+
+	// GetPaymentMethod request
+	GetPaymentMethodWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error)
 
 	// DeleteSsoBypassKey request
 	DeleteSsoBypassKeyWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*DeleteSsoBypassKeyResponse, error)
@@ -6435,6 +7854,36 @@ type ClientWithResponsesInterface interface {
 
 	UpdateSsoConnectionWithResponse(ctx context.Context, orgShortNameId string, connectionId string, body UpdateSsoConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSsoConnectionResponse, error)
 
+	// GetStripeClientSecret request
+	GetStripeClientSecretWithResponse(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*GetStripeClientSecretResponse, error)
+
+	// ListOrganizationTeams request
+	ListOrganizationTeamsWithResponse(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error)
+
+	// CreateTeam request with any body
+	CreateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error)
+
+	CreateTeamWithResponse(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error)
+
+	// DeleteTeam request
+	DeleteTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteTeamResponse, error)
+
+	// GetTeam request
+	GetTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*GetTeamResponse, error)
+
+	// UpdateTeam request with any body
+	UpdateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error)
+
+	UpdateTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error)
+
+	// AddTeamMembers request with any body
+	AddTeamMembersWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error)
+
+	AddTeamMembersWithResponse(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error)
+
+	// RemoveTeamMember request
+	RemoveTeamMemberWithResponse(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*RemoveTeamMemberResponse, error)
+
 	// ListOrgUsers request
 	ListOrgUsersWithResponse(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error)
 
@@ -6448,6 +7897,11 @@ type ClientWithResponsesInterface interface {
 	MutateOrgUserRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, userId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
 
 	MutateOrgUserRoleWithResponse(ctx context.Context, orgShortNameId string, userId string, body MutateOrgUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateOrgUserRoleResponse, error)
+
+	// ValidateCreditCardPayment request with any body
+	ValidateCreditCardPaymentWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error)
+
+	ValidateCreditCardPaymentWithResponse(ctx context.Context, orgShortNameId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error)
 
 	// ListWorkspaces request
 	ListWorkspacesWithResponse(ctx context.Context, orgShortNameId string, params *ListWorkspacesParams, reqEditors ...RequestEditorFn) (*ListWorkspacesResponse, error)
@@ -7373,6 +8827,33 @@ func (r VerifyManagedDomainResponse) StatusCode() int {
 	return 0
 }
 
+type GetDraftInvoiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Invoice
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDraftInvoiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDraftInvoiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type CreateUserInviteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7420,6 +8901,33 @@ func (r DeleteUserInviteResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r DeleteUserInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetPaymentMethodResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PaymentMethod
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPaymentMethodResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPaymentMethodResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -7641,6 +9149,220 @@ func (r UpdateSsoConnectionResponse) StatusCode() int {
 	return 0
 }
 
+type GetStripeClientSecretResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *StripeClientSecret
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetStripeClientSecretResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetStripeClientSecretResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListOrganizationTeamsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamsPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListOrganizationTeamsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListOrganizationTeamsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Team
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type AddTeamMembersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r AddTeamMembersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AddTeamMembersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RemoveTeamMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveTeamMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveTeamMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListOrgUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7748,6 +9470,33 @@ func (r MutateOrgUserRoleResponse) StatusCode() int {
 	return 0
 }
 
+type ValidateCreditCardPaymentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ValidateCreditCardPayment
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ValidateCreditCardPaymentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ValidateCreditCardPaymentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspacesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7804,7 +9553,6 @@ func (r CreateWorkspaceResponse) StatusCode() int {
 type DeleteWorkspaceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *Workspace
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
@@ -8055,7 +9803,7 @@ type ListWorkspacePipelinesResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ListWorkspacePipelinesResponse) Status() string {
+func (r ListWorkspaceDagFiltersResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -8063,7 +9811,114 @@ func (r ListWorkspacePipelinesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListWorkspacePipelinesResponse) StatusCode() int {
+func (r ListWorkspaceDagFiltersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListWorkspaceDagsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListWorkspaceDags
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkspaceDagsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkspaceDagsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListWorkspaceTeamsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamsPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkspaceTeamsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkspaceTeamsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteWorkspaceTeamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteWorkspaceTeamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteWorkspaceTeamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MutateWorkspaceTeamRoleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *TeamRole
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MutateWorkspaceTeamRoleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MutateWorkspaceTeamRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -8596,6 +10451,15 @@ func (c *ClientWithResponses) VerifyManagedDomainWithResponse(ctx context.Contex
 	return ParseVerifyManagedDomainResponse(rsp)
 }
 
+// GetDraftInvoiceWithResponse request returning *GetDraftInvoiceResponse
+func (c *ClientWithResponses) GetDraftInvoiceWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetDraftInvoiceResponse, error) {
+	rsp, err := c.GetDraftInvoice(ctx, orgShortNameId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDraftInvoiceResponse(rsp)
+}
+
 // CreateUserInviteWithBodyWithResponse request with arbitrary body returning *CreateUserInviteResponse
 func (c *ClientWithResponses) CreateUserInviteWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserInviteResponse, error) {
 	rsp, err := c.CreateUserInviteWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
@@ -8620,6 +10484,15 @@ func (c *ClientWithResponses) DeleteUserInviteWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseDeleteUserInviteResponse(rsp)
+}
+
+// GetPaymentMethodWithResponse request returning *GetPaymentMethodResponse
+func (c *ClientWithResponses) GetPaymentMethodWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error) {
+	rsp, err := c.GetPaymentMethod(ctx, orgShortNameId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPaymentMethodResponse(rsp)
 }
 
 // DeleteSsoBypassKeyWithResponse request returning *DeleteSsoBypassKeyResponse
@@ -8710,6 +10583,102 @@ func (c *ClientWithResponses) UpdateSsoConnectionWithResponse(ctx context.Contex
 	return ParseUpdateSsoConnectionResponse(rsp)
 }
 
+// GetStripeClientSecretWithResponse request returning *GetStripeClientSecretResponse
+func (c *ClientWithResponses) GetStripeClientSecretWithResponse(ctx context.Context, orgShortNameId string, pType GetStripeClientSecretParamsType, reqEditors ...RequestEditorFn) (*GetStripeClientSecretResponse, error) {
+	rsp, err := c.GetStripeClientSecret(ctx, orgShortNameId, pType, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStripeClientSecretResponse(rsp)
+}
+
+// ListOrganizationTeamsWithResponse request returning *ListOrganizationTeamsResponse
+func (c *ClientWithResponses) ListOrganizationTeamsWithResponse(ctx context.Context, orgShortNameId string, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error) {
+	rsp, err := c.ListOrganizationTeams(ctx, orgShortNameId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOrganizationTeamsResponse(rsp)
+}
+
+// CreateTeamWithBodyWithResponse request with arbitrary body returning *CreateTeamResponse
+func (c *ClientWithResponses) CreateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error) {
+	rsp, err := c.CreateTeamWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTeamResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateTeamWithResponse(ctx context.Context, orgShortNameId string, body CreateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTeamResponse, error) {
+	rsp, err := c.CreateTeam(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTeamResponse(rsp)
+}
+
+// DeleteTeamWithResponse request returning *DeleteTeamResponse
+func (c *ClientWithResponses) DeleteTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteTeamResponse, error) {
+	rsp, err := c.DeleteTeam(ctx, orgShortNameId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTeamResponse(rsp)
+}
+
+// GetTeamWithResponse request returning *GetTeamResponse
+func (c *ClientWithResponses) GetTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, reqEditors ...RequestEditorFn) (*GetTeamResponse, error) {
+	rsp, err := c.GetTeam(ctx, orgShortNameId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTeamResponse(rsp)
+}
+
+// UpdateTeamWithBodyWithResponse request with arbitrary body returning *UpdateTeamResponse
+func (c *ClientWithResponses) UpdateTeamWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error) {
+	rsp, err := c.UpdateTeamWithBody(ctx, orgShortNameId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTeamResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateTeamWithResponse(ctx context.Context, orgShortNameId string, teamId string, body UpdateTeamJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTeamResponse, error) {
+	rsp, err := c.UpdateTeam(ctx, orgShortNameId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTeamResponse(rsp)
+}
+
+// AddTeamMembersWithBodyWithResponse request with arbitrary body returning *AddTeamMembersResponse
+func (c *ClientWithResponses) AddTeamMembersWithBodyWithResponse(ctx context.Context, orgShortNameId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error) {
+	rsp, err := c.AddTeamMembersWithBody(ctx, orgShortNameId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddTeamMembersResponse(rsp)
+}
+
+func (c *ClientWithResponses) AddTeamMembersWithResponse(ctx context.Context, orgShortNameId string, teamId string, body AddTeamMembersJSONRequestBody, reqEditors ...RequestEditorFn) (*AddTeamMembersResponse, error) {
+	rsp, err := c.AddTeamMembers(ctx, orgShortNameId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddTeamMembersResponse(rsp)
+}
+
+// RemoveTeamMemberWithResponse request returning *RemoveTeamMemberResponse
+func (c *ClientWithResponses) RemoveTeamMemberWithResponse(ctx context.Context, orgShortNameId string, teamId string, memberId string, reqEditors ...RequestEditorFn) (*RemoveTeamMemberResponse, error) {
+	rsp, err := c.RemoveTeamMember(ctx, orgShortNameId, teamId, memberId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveTeamMemberResponse(rsp)
+}
+
 // ListOrgUsersWithResponse request returning *ListOrgUsersResponse
 func (c *ClientWithResponses) ListOrgUsersWithResponse(ctx context.Context, orgShortNameId string, params *ListOrgUsersParams, reqEditors ...RequestEditorFn) (*ListOrgUsersResponse, error) {
 	rsp, err := c.ListOrgUsers(ctx, orgShortNameId, params, reqEditors...)
@@ -8752,6 +10721,23 @@ func (c *ClientWithResponses) MutateOrgUserRoleWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseMutateOrgUserRoleResponse(rsp)
+}
+
+// ValidateCreditCardPaymentWithBodyWithResponse request with arbitrary body returning *ValidateCreditCardPaymentResponse
+func (c *ClientWithResponses) ValidateCreditCardPaymentWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error) {
+	rsp, err := c.ValidateCreditCardPaymentWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateCreditCardPaymentResponse(rsp)
+}
+
+func (c *ClientWithResponses) ValidateCreditCardPaymentWithResponse(ctx context.Context, orgShortNameId string, body ValidateCreditCardPaymentJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateCreditCardPaymentResponse, error) {
+	rsp, err := c.ValidateCreditCardPayment(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateCreditCardPaymentResponse(rsp)
 }
 
 // ListWorkspacesWithResponse request returning *ListWorkspacesResponse
@@ -8891,7 +10877,51 @@ func (c *ClientWithResponses) ListWorkspacePipelinesWithResponse(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
-	return ParseListWorkspacePipelinesResponse(rsp)
+	return ParseListWorkspaceDagFiltersResponse(rsp)
+}
+
+// ListWorkspaceDagsWithResponse request returning *ListWorkspaceDagsResponse
+func (c *ClientWithResponses) ListWorkspaceDagsWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceDagsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceDagsResponse, error) {
+	rsp, err := c.ListWorkspaceDags(ctx, orgShortNameId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkspaceDagsResponse(rsp)
+}
+
+// ListWorkspaceTeamsWithResponse request returning *ListWorkspaceTeamsResponse
+func (c *ClientWithResponses) ListWorkspaceTeamsWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error) {
+	rsp, err := c.ListWorkspaceTeams(ctx, orgShortNameId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkspaceTeamsResponse(rsp)
+}
+
+// DeleteWorkspaceTeamWithResponse request returning *DeleteWorkspaceTeamResponse
+func (c *ClientWithResponses) DeleteWorkspaceTeamWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceTeamResponse, error) {
+	rsp, err := c.DeleteWorkspaceTeam(ctx, orgShortNameId, workspaceId, teamId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteWorkspaceTeamResponse(rsp)
+}
+
+// MutateWorkspaceTeamRoleWithBodyWithResponse request with arbitrary body returning *MutateWorkspaceTeamRoleResponse
+func (c *ClientWithResponses) MutateWorkspaceTeamRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error) {
+	rsp, err := c.MutateWorkspaceTeamRoleWithBody(ctx, orgShortNameId, workspaceId, teamId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateWorkspaceTeamRoleResponse(rsp)
+}
+
+func (c *ClientWithResponses) MutateWorkspaceTeamRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error) {
+	rsp, err := c.MutateWorkspaceTeamRole(ctx, orgShortNameId, workspaceId, teamId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMutateWorkspaceTeamRoleResponse(rsp)
 }
 
 // ListWorkspaceUsersWithResponse request returning *ListWorkspaceUsersResponse
@@ -10879,6 +12909,67 @@ func ParseVerifyManagedDomainResponse(rsp *http.Response) (*VerifyManagedDomainR
 	return response, nil
 }
 
+// ParseGetDraftInvoiceResponse parses an HTTP response from a GetDraftInvoiceWithResponse call
+func ParseGetDraftInvoiceResponse(rsp *http.Response) (*GetDraftInvoiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDraftInvoiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Invoice
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseCreateUserInviteResponse parses an HTTP response from a CreateUserInviteWithResponse call
 func ParseCreateUserInviteResponse(rsp *http.Response) (*CreateUserInviteResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10954,6 +13045,67 @@ func ParseDeleteUserInviteResponse(rsp *http.Response) (*DeleteUserInviteRespons
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPaymentMethodResponse parses an HTTP response from a GetPaymentMethodWithResponse call
+func ParseGetPaymentMethodResponse(rsp *http.Response) (*GetPaymentMethodResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPaymentMethodResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PaymentMethod
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -11475,6 +13627,480 @@ func ParseUpdateSsoConnectionResponse(rsp *http.Response) (*UpdateSsoConnectionR
 	return response, nil
 }
 
+// ParseGetStripeClientSecretResponse parses an HTTP response from a GetStripeClientSecretWithResponse call
+func ParseGetStripeClientSecretResponse(rsp *http.Response) (*GetStripeClientSecretResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetStripeClientSecretResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest StripeClientSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListOrganizationTeamsResponse parses an HTTP response from a ListOrganizationTeamsWithResponse call
+func ParseListOrganizationTeamsResponse(rsp *http.Response) (*ListOrganizationTeamsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOrganizationTeamsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateTeamResponse parses an HTTP response from a CreateTeamWithResponse call
+func ParseCreateTeamResponse(rsp *http.Response) (*CreateTeamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTeamResponse parses an HTTP response from a DeleteTeamWithResponse call
+func ParseDeleteTeamResponse(rsp *http.Response) (*DeleteTeamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTeamResponse parses an HTTP response from a GetTeamWithResponse call
+func ParseGetTeamResponse(rsp *http.Response) (*GetTeamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTeamResponse parses an HTTP response from a UpdateTeamWithResponse call
+func ParseUpdateTeamResponse(rsp *http.Response) (*UpdateTeamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Team
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAddTeamMembersResponse parses an HTTP response from a AddTeamMembersWithResponse call
+func ParseAddTeamMembersResponse(rsp *http.Response) (*AddTeamMembersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AddTeamMembersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveTeamMemberResponse parses an HTTP response from a RemoveTeamMemberWithResponse call
+func ParseRemoveTeamMemberResponse(rsp *http.Response) (*RemoveTeamMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveTeamMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListOrgUsersResponse parses an HTTP response from a ListOrgUsersWithResponse call
 func ParseListOrgUsersResponse(rsp *http.Response) (*ListOrgUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11712,6 +14338,67 @@ func ParseMutateOrgUserRoleResponse(rsp *http.Response) (*MutateOrgUserRoleRespo
 	return response, nil
 }
 
+// ParseValidateCreditCardPaymentResponse parses an HTTP response from a ValidateCreditCardPaymentWithResponse call
+func ParseValidateCreditCardPaymentResponse(rsp *http.Response) (*ValidateCreditCardPaymentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ValidateCreditCardPaymentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ValidateCreditCardPayment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListWorkspacesResponse parses an HTTP response from a ListWorkspacesWithResponse call
 func ParseListWorkspacesResponse(rsp *http.Response) (*ListWorkspacesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11841,13 +14528,6 @@ func ParseDeleteWorkspaceResponse(rsp *http.Response) (*DeleteWorkspaceResponse,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Workspace
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -12377,7 +15057,7 @@ func ParseListWorkspacePipelinesResponse(rsp *http.Response) (*ListWorkspacePipe
 		return nil, err
 	}
 
-	response := &ListWorkspacePipelinesResponse{
+	response := &ListWorkspaceDagFiltersResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
