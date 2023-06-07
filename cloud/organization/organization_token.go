@@ -145,15 +145,15 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 			}
 		}
 		if j > 1 {
-			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:", name)
+			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
 			token, err = selectTokens(tokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err
 			}
 		}
-		if token.Id == "" {
-			return astrocore.ApiToken{}, errOrganizationTokenNotFound
-		}
+	}
+	if token.Id == "" {
+		return astrocore.ApiToken{}, errOrganizationTokenNotFound
 	}
 	return token, nil
 }

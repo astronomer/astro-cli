@@ -395,9 +395,9 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 				return astrocore.ApiToken{}, err
 			}
 		}
-		if token.Id == "" {
-			return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
-		}
+	}
+	if token.Id == "" {
+		return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
 	}
 	return token, nil
 }
