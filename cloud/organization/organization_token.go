@@ -30,7 +30,7 @@ func newTokenSelectionTableOut() *printutil.Table {
 }
 
 // Update a workspace token
-func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -49,21 +49,9 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 	if err != nil {
 		return err
 	}
-	var token astrocore.ApiToken
-	if name == "" {
-		token, err = selectTokenForWorkspace(tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range tokens {
-			if tokens[i].Name == name {
-				token = tokens[i]
-			}
-		}
-		if token.Id == "" {
-			return errOrganizationTokenNotFound
-		}
+	token, err := getOrganizationToken(id, name, "\nPlease select the organization token you would like to add to the workspace:", tokens)
+	if err != nil {
+		return err
 	}
 	apiTokenID := token.Id
 
@@ -106,8 +94,7 @@ func AddOrgTokenToWorkspace(name, role, workspace string, out io.Writer, client 
 	return nil
 }
 
-func selectTokenForWorkspace(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
-	fmt.Println("\nPlease select the organization token you would like to add to the workspace:")
+func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	apiTokensMap := map[string]astrocore.ApiToken{}
 	tab := newTokenSelectionTableOut()
 	for i := range apiTokens {
@@ -130,6 +117,44 @@ func selectTokenForWorkspace(apiTokens []astrocore.ApiToken) (astrocore.ApiToken
 		return astrocore.ApiToken{}, errInvalidOrganizationTokenKey
 	}
 	return selected, nil
+}
+
+func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) {
+	if id == "" && name == "" {
+		fmt.Println(message)
+		token, err = selectTokens(tokens)
+		if err != nil {
+			return astrocore.ApiToken{}, err
+		}
+	} else if name == "" && id != "" {
+		for i := range tokens {
+			if tokens[i].Id == id {
+				token = tokens[i]
+			}
+		}
+		if token.Id == "" {
+			return astrocore.ApiToken{}, errOrganizationTokenNotFound
+		}
+	} else if name != "" && id == "" {
+		var j int
+		for i := range tokens {
+			if tokens[i].Name == name {
+				token = tokens[i]
+				j = +1
+			}
+		}
+		if j > 1 {
+			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:", name)
+			token, err = selectTokens(tokens)
+			if err != nil {
+				return astrocore.ApiToken{}, err
+			}
+		}
+		if token.Id == "" {
+			return astrocore.ApiToken{}, errOrganizationTokenNotFound
+		}
+	}
+	return token, nil
 }
 
 // get all workspace tokens

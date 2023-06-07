@@ -22,7 +22,7 @@ func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"TOKEN", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "EXPIRES", "CREATED", "CREATED BY"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
@@ -30,7 +30,7 @@ func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
-		Header:         []string{"#", "TOKEN", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "EXPIRES", "CREATED", "CREATED BY"},
+		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
@@ -61,7 +61,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 
 	tab := newTokenTableOut()
 	for i := range apiTokens {
-		token := apiTokens[i].ShortToken
+		id := apiTokens[i].Id
 		name := apiTokens[i].Name
 		description := apiTokens[i].Description
 		scope := apiTokens[i].Type
@@ -71,13 +71,13 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 				role = apiTokens[i].Roles[j].Role
 			}
 		}
-		expires := fmt.Sprint(apiTokens[i].ExpiryPeriodInDays)
-		if expires == "0" {
-			expires = "-"
-		}
+		// expires := fmt.Sprint(apiTokens[i].ExpiryPeriodInDays)
+		// if expires == "0" {
+		// 	expires = "-"
+		// }
 		created := TimeAgo(apiTokens[i].CreatedAt)
 		createdBy := apiTokens[i].CreatedBy.FullName
-		tab.AddRow([]string{token, name, *description, string(scope), role, expires, created, *createdBy}, false)
+		tab.AddRow([]string{id, name, *description, string(scope), role, created, *createdBy}, false)
 	}
 	tab.Print(out)
 
@@ -128,7 +128,7 @@ func CreateToken(name, description, role, workspace string, expiration int, out 
 }
 
 // Update a workspace token
-func UpdateToken(name, newName, description, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
+func UpdateToken(id, name, newName, description, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -143,22 +143,9 @@ func UpdateToken(name, newName, description, role, workspace string, out io.Writ
 	if err != nil {
 		return err
 	}
-	var token astrocore.ApiToken
-	if name == "" {
-		fmt.Println("\nPlease select the workspace token you would like to update:")
-		token, err = selectTokens(workspace, tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range tokens {
-			if tokens[i].Name == name {
-				token = tokens[i]
-			}
-		}
-		if token.Id == "" {
-			return ErrWorkspaceTokenNotFound
-		}
+	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the workspace token you would like to update:", tokens)
+	if err != nil {
+		return err
 	}
 	apiTokenID := token.Id
 
@@ -206,7 +193,7 @@ func UpdateToken(name, newName, description, role, workspace string, out io.Writ
 }
 
 // rotate a workspace API token
-func RotateToken(name, workspace string, force bool, out io.Writer, client astrocore.CoreClient) error {
+func RotateToken(id, name, workspace string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -221,22 +208,9 @@ func RotateToken(name, workspace string, force bool, out io.Writer, client astro
 	if err != nil {
 		return err
 	}
-	var token astrocore.ApiToken
-	if name == "" {
-		fmt.Println("\nPlease select the workspace token you would like to rotate:")
-		token, err = selectTokens(workspace, tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range tokens {
-			if tokens[i].Name == name {
-				token = tokens[i]
-			}
-		}
-		if token.Id == "" {
-			return ErrWorkspaceTokenNotFound
-		}
+	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the workspace token you would like to rotate:", tokens)
+	if err != nil {
+		return err
 	}
 	apiTokenID := token.Id
 
@@ -267,7 +241,7 @@ func RotateToken(name, workspace string, force bool, out io.Writer, client astro
 }
 
 // delete a workspaces api token
-func DeleteToken(id, workspace string, force bool, out io.Writer, client astrocore.CoreClient) error {
+func DeleteToken(id, name, workspace string, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -282,22 +256,9 @@ func DeleteToken(id, workspace string, force bool, out io.Writer, client astroco
 	if err != nil {
 		return err
 	}
-	var token astrocore.ApiToken
-	if id == "" {
-		fmt.Println("\nPlease select the workspace token you would like to delete or remove:")
-		token, err = selectTokens(workspace, tokens)
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range tokens {
-			if tokens[i].Id == id {
-				token = tokens[i]
-			}
-		}
-		if token.Id == "" {
-			return ErrWorkspaceTokenNotFound
-		}
+	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the workspace token you would like to delete or remove:", tokens)
+	if err != nil {
+		return err
 	}
 	apiTokenID := token.Id
 	if string(token.Type) == workspaceConst {
@@ -343,7 +304,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 	apiTokensMap := map[string]astrocore.ApiToken{}
 	tab := newTokenSelectionTableOut()
 	for i := range apiTokens {
-		token := apiTokens[i].ShortToken
+		id := apiTokens[i].Id
 		name := apiTokens[i].Name
 		description := apiTokens[i].Description
 		scope := apiTokens[i].Type
@@ -353,22 +314,17 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 				role = apiTokens[i].Roles[j].Role
 			}
 		}
-		expires := fmt.Sprint(apiTokens[i].ExpiryPeriodInDays)
-		if expires == "0" {
-			expires = "-"
-		}
 		created := TimeAgo(apiTokens[i].CreatedAt)
 		createdBy := apiTokens[i].CreatedBy.FullName
 
 		index := i + 1
 		tab.AddRow([]string{
 			strconv.Itoa(index),
-			token,
+			id,
 			name,
 			*description,
 			string(scope),
 			role,
-			expires,
 			created,
 			*createdBy,
 		}, false)
@@ -409,6 +365,44 @@ func getWorkspaceTokens(workspace string, client astrocore.CoreClient) ([]astroc
 	APITokens := resp.JSON200.ApiTokens
 
 	return APITokens, nil
+}
+
+func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) {
+	if id == "" && name == "" {
+		fmt.Println(message)
+		token, err = selectTokens(workspace, tokens)
+		if err != nil {
+			return astrocore.ApiToken{}, err
+		}
+	} else if name == "" && id != "" {
+		for i := range tokens {
+			if tokens[i].Id == id {
+				token = tokens[i]
+			}
+		}
+		if token.Id == "" {
+			return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
+		}
+	} else if name != "" && id == "" {
+		var j int
+		for i := range tokens {
+			if tokens[i].Name == name {
+				token = tokens[i]
+				j = +1
+			}
+		}
+		if j > 1 {
+			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:", name)
+			token, err = selectTokens(workspace, tokens)
+			if err != nil {
+				return astrocore.ApiToken{}, err
+			}
+		}
+		if token.Id == "" {
+			return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
+		}
+	}
+	return token, nil
 }
 
 func TimeAgo(date time.Time) string {
