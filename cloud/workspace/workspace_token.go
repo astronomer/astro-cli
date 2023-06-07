@@ -159,8 +159,9 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
 	if role == "" {
+		fmt.Println("role is empty")
 		for i := range token.Roles {
-			if token.Roles[i].EntityId == workspace {
+			if token.Roles[i].EntityId == workspaceConst {
 				role = token.Roles[i].Role
 			}
 		}
