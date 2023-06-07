@@ -20,10 +20,10 @@ var (
 	fullName1    = "User 1"
 	fullName2    = "User 2"
 	token        = "token"
-	apiToken1    = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: &description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
+	apiToken1    = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
 	apiTokens    = []astrocore.ApiToken{
 		apiToken1,
-		{Id: "token2", Name: "Token 2", Description: &description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
+		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
 	}
 	ListWorkspaceAPITokensResponseOK = astrocore.ListWorkspaceApiTokensResponse{
 		HTTPResponse: &http.Response{

@@ -73,7 +73,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 		}
 		created := TimeAgo(apiTokens[i].CreatedAt)
 		createdBy := apiTokens[i].CreatedBy.FullName
-		tab.AddRow([]string{id, name, *description, string(scope), role, created, *createdBy}, false)
+		tab.AddRow([]string{id, name, description, string(scope), role, created, *createdBy}, false)
 	}
 	tab.Print(out)
 
@@ -154,7 +154,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	}
 
 	if description == "" {
-		UpdateWorkspaceAPITokenRequest.Description = *token.Description
+		UpdateWorkspaceAPITokenRequest.Description = token.Description
 	} else {
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
@@ -319,7 +319,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 			strconv.Itoa(index),
 			id,
 			name,
-			*description,
+			description,
 			string(scope),
 			role,
 			created,

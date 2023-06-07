@@ -329,8 +329,10 @@ const (
 const (
 	BASIC            ListOrganizationsParamsProductTier = "BASIC"
 	BUSINESSCRITICAL ListOrganizationsParamsProductTier = "BUSINESS_CRITICAL"
+	POV              ListOrganizationsParamsProductTier = "POV"
 	PREMIUM          ListOrganizationsParamsProductTier = "PREMIUM"
 	STANDARD         ListOrganizationsParamsProductTier = "STANDARD"
+	TRIAL            ListOrganizationsParamsProductTier = "TRIAL"
 )
 
 // Defines values for ListOrganizationsParamsProduct.
@@ -441,6 +443,12 @@ const (
 	ListClustersParamsSortsVpcSubnetRangeDesc      ListClustersParamsSorts = "vpcSubnetRange:desc"
 )
 
+// Defines values for GetMetronomeDashboardParamsType.
+const (
+	Invoices GetMetronomeDashboardParamsType = "invoices"
+	Usage    GetMetronomeDashboardParamsType = "usage"
+)
+
 // Defines values for GetStripeClientSecretParamsType.
 const (
 	SetupIntent GetStripeClientSecretParamsType = "setup-intent"
@@ -520,6 +528,22 @@ const (
 	ListWorkspaceApiTokensParamsSortsUpdatedByIdDesc  ListWorkspaceApiTokensParamsSorts = "updatedById:desc"
 )
 
+// Defines values for ListWorkspaceTeamsParamsSorts.
+const (
+	ListWorkspaceTeamsParamsSortsCreatedAtAsc       ListWorkspaceTeamsParamsSorts = "createdAt:asc"
+	ListWorkspaceTeamsParamsSortsCreatedAtDesc      ListWorkspaceTeamsParamsSorts = "createdAt:desc"
+	ListWorkspaceTeamsParamsSortsDescriptionAsc     ListWorkspaceTeamsParamsSorts = "description:asc"
+	ListWorkspaceTeamsParamsSortsDescriptionDesc    ListWorkspaceTeamsParamsSorts = "description:desc"
+	ListWorkspaceTeamsParamsSortsIdAsc              ListWorkspaceTeamsParamsSorts = "id:asc"
+	ListWorkspaceTeamsParamsSortsIdDesc             ListWorkspaceTeamsParamsSorts = "id:desc"
+	ListWorkspaceTeamsParamsSortsNameAsc            ListWorkspaceTeamsParamsSorts = "name:asc"
+	ListWorkspaceTeamsParamsSortsNameDesc           ListWorkspaceTeamsParamsSorts = "name:desc"
+	ListWorkspaceTeamsParamsSortsUpdatedAtAsc       ListWorkspaceTeamsParamsSorts = "updatedAt:asc"
+	ListWorkspaceTeamsParamsSortsUpdatedAtDesc      ListWorkspaceTeamsParamsSorts = "updatedAt:desc"
+	ListWorkspaceTeamsParamsSortsWorkspaceRolesAsc  ListWorkspaceTeamsParamsSorts = "workspaceRoles:asc"
+	ListWorkspaceTeamsParamsSortsWorkspaceRolesDesc ListWorkspaceTeamsParamsSorts = "workspaceRoles:desc"
+)
+
 // Defines values for ListWorkspaceUsersParamsSorts.
 const (
 	CreatedAtAsc      ListWorkspaceUsersParamsSorts = "createdAt:asc"
@@ -538,13 +562,28 @@ const (
 	WorkspaceRoleDesc ListWorkspaceUsersParamsSorts = "workspaceRole:desc"
 )
 
+// AddTeamMembersRequest defines model for AddTeamMembersRequest.
+type AddTeamMembersRequest struct {
+	MemberIds []string `json:"memberIds"`
+}
+
+// Address defines model for Address.
+type Address struct {
+	City       string  `json:"city"`
+	Country    string  `json:"country"`
+	Line1      string  `json:"line1"`
+	Line2      *string `json:"line2,omitempty"`
+	PostalCode string  `json:"postalCode"`
+	State      string  `json:"state"`
+}
+
 // ApiToken defines model for ApiToken.
 type ApiToken struct {
 	CreatedAt          time.Time            `json:"createdAt"`
 	CreatedBy          *BasicSubjectProfile `json:"createdBy,omitempty"`
 	CreatedById        string               `json:"createdById"`
 	DeletedAt          *time.Time           `json:"deletedAt,omitempty"`
-	Description        *string              `json:"description,omitempty"`
+	Description        string               `json:"description"`
 	EndAt              *time.Time           `json:"endAt,omitempty"`
 	ExpiryPeriodInDays int                  `json:"expiryPeriodInDays"`
 	Id                 string               `json:"id"`
@@ -594,11 +633,12 @@ type AuConfigs struct {
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
 type BasicSubjectProfile struct {
-	AvatarUrl   *string                         `json:"avatarUrl,omitempty"`
-	FullName    *string                         `json:"fullName,omitempty"`
-	Id          string                          `json:"id"`
-	SubjectType *BasicSubjectProfileSubjectType `json:"subjectType,omitempty"`
-	Username    *string                         `json:"username,omitempty"`
+	ApiTokenName *string                         `json:"apiTokenName,omitempty"`
+	AvatarUrl    *string                         `json:"avatarUrl,omitempty"`
+	FullName     *string                         `json:"fullName,omitempty"`
+	Id           string                          `json:"id"`
+	SubjectType  *BasicSubjectProfileSubjectType `json:"subjectType,omitempty"`
+	Username     *string                         `json:"username,omitempty"`
 }
 
 // BasicSubjectProfileSubjectType defines model for BasicSubjectProfile.SubjectType.
@@ -782,7 +822,7 @@ type CreateGcpClusterRequest struct {
 	Name                string                      `json:"name"`
 	NodePools           *[]CreateNodePoolRequest    `json:"nodePools,omitempty"`
 	PodSubnetRange      string                      `json:"podSubnetRange"`
-	ProviderAccount     string                      `json:"providerAccount"`
+	ProviderAccount     *string                     `json:"providerAccount,omitempty"`
 	Region              string                      `json:"region"`
 	ServicePeeringRange string                      `json:"servicePeeringRange"`
 	ServiceSubnetRange  string                      `json:"serviceSubnetRange"`
@@ -819,6 +859,12 @@ type CreateOrganizationApiTokenRequest struct {
 	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
 }
 
+// CreateOrganizationRequest defines model for CreateOrganizationRequest.
+type CreateOrganizationRequest struct {
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+	Name     string                  `json:"name"`
+}
+
 // CreateSsoConnectionRequest defines model for CreateSsoConnectionRequest.
 type CreateSsoConnectionRequest struct {
 	Auth0ConnectionName      string                       `json:"auth0ConnectionName"`
@@ -847,6 +893,38 @@ type CreateWorkspaceApiTokenRequest struct {
 	Name                    string  `json:"name"`
 	Role                    string  `json:"role"`
 	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+}
+
+// CreditSummary defines model for CreditSummary.
+type CreditSummary struct {
+	TotalCreditsGrantedUSD   float32 `json:"totalCreditsGrantedUSD"`
+	TotalCreditsRemainingUSD float32 `json:"totalCreditsRemainingUSD"`
+}
+
+// CreditType defines model for CreditType.
+type CreditType struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// DagFilters defines model for DagFilters.
+type DagFilters struct {
+	Deployments map[string]string `json:"deployments"`
+	Owners      []string          `json:"owners"`
+	Tags        []string          `json:"tags"`
+	Warnings    *[]string         `json:"warnings,omitempty"`
+}
+
+// DagRun defines model for DagRun.
+type DagRun struct {
+	DataIntervalEnd   *string `json:"dataIntervalEnd,omitempty"`
+	DataIntervalStart *string `json:"dataIntervalStart,omitempty"`
+	EndDate           *string `json:"endDate,omitempty"`
+	LogicalDate       string  `json:"logicalDate"`
+	RunId             string  `json:"runId"`
+	RunType           string  `json:"runType"`
+	StartDate         *string `json:"startDate,omitempty"`
+	State             string  `json:"state"`
 }
 
 // DeploymentOptions defines model for DeploymentOptions.
@@ -1013,6 +1091,15 @@ type ListApiTokensPaginated struct {
 	TotalCount int        `json:"totalCount"`
 }
 
+// ListWorkspaceDags defines model for ListWorkspaceDags.
+type ListWorkspaceDags struct {
+	Items          []WorkspaceDag `json:"items"`
+	NextCursor     *string        `json:"nextCursor,omitempty"`
+	PreviousCursor *string        `json:"previousCursor,omitempty"`
+	TotalCount     *int           `json:"totalCount,omitempty"`
+	Warnings       *[]string      `json:"warnings,omitempty"`
+}
+
 // ManagedDomain defines model for ManagedDomain.
 type ManagedDomain struct {
 	CreatedAt      time.Time           `json:"createdAt"`
@@ -1026,6 +1113,11 @@ type ManagedDomain struct {
 
 // ManagedDomainStatus defines model for ManagedDomain.Status.
 type ManagedDomainStatus string
+
+// MetronomeDashboard defines model for MetronomeDashboard.
+type MetronomeDashboard struct {
+	Url string `json:"url"`
+}
 
 // MutateOrgUserRoleRequest defines model for MutateOrgUserRoleRequest.
 type MutateOrgUserRoleRequest struct {
@@ -1378,6 +1470,7 @@ type TaskInstance struct {
 	ExecutionDate  *string                 `json:"executionDate,omitempty"`
 	ExecutorConfig *string                 `json:"executorConfig,omitempty"`
 	Hostname       *string                 `json:"hostname,omitempty"`
+	MapIndex       *int                    `json:"mapIndex,omitempty"`
 	MaxTries       *int                    `json:"maxTries,omitempty"`
 	Note           *string                 `json:"note,omitempty"`
 	Operator       *string                 `json:"operator,omitempty"`
@@ -1518,6 +1611,14 @@ type UpdateOrganizationApiTokenRoles struct {
 	Workspace    *[]ApiTokenWorkspaceRole `json:"workspace,omitempty"`
 }
 
+// UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
+type UpdateOrganizationRequest struct {
+	BillingEmail  *string                 `json:"billingEmail,omitempty"`
+	IsScimEnabled bool                    `json:"isScimEnabled"`
+	Metadata      *map[string]interface{} `json:"metadata,omitempty"`
+	Name          string                  `json:"name"`
+}
+
 // UpdateSsoConnectionRequest defines model for UpdateSsoConnectionRequest.
 type UpdateSsoConnectionRequest struct {
 	Configuration            SsoConnectionConfig          `json:"configuration"`
@@ -1525,6 +1626,12 @@ type UpdateSsoConnectionRequest struct {
 	IdpInitiatedLoginEnabled *bool                        `json:"idpInitiatedLoginEnabled,omitempty"`
 	JitPolicy                *JitPolicy                   `json:"jitPolicy,omitempty"`
 	ManagedDomains           []SsoConnectionManagedDomain `json:"managedDomains"`
+}
+
+// UpdateTeamRequest defines model for UpdateTeamRequest.
+type UpdateTeamRequest struct {
+	Description string `json:"description"`
+	Name        string `json:"name"`
 }
 
 // UpdateWorkspaceApiTokenRequest defines model for UpdateWorkspaceApiTokenRequest.
@@ -1626,6 +1733,19 @@ type Workspace struct {
 	UserCount                    *int                 `json:"userCount,omitempty"`
 }
 
+// WorkspaceDag defines model for WorkspaceDag.
+type WorkspaceDag struct {
+	DagId        string    `json:"dagId"`
+	DeploymentId string    `json:"deploymentId"`
+	IsActive     *bool     `json:"isActive,omitempty"`
+	IsPaused     bool      `json:"isPaused"`
+	NextRunAt    *string   `json:"nextRunAt,omitempty"`
+	Owners       *[]string `json:"owners,omitempty"`
+	Runs         *[]DagRun `json:"runs,omitempty"`
+	Schedule     *string   `json:"schedule,omitempty"`
+	Tags         *[]string `json:"tags,omitempty"`
+}
+
 // WorkspaceRole defines model for WorkspaceRole.
 type WorkspaceRole struct {
 	WorkspaceId   string `json:"workspaceId"`
@@ -1638,6 +1758,39 @@ type WorkspacesPaginated struct {
 	Offset     int         `json:"offset"`
 	TotalCount int         `json:"totalCount"`
 	Workspaces []Workspace `json:"workspaces"`
+}
+
+// InternalOutlet defines model for internal_Outlet.
+type InternalOutlet struct {
+	Extra *map[string]string `json:"extra,omitempty"`
+	Type  *string            `json:"type,omitempty"`
+	Uri   *string            `json:"uri,omitempty"`
+}
+
+// InternalTask defines model for internal_Task.
+type InternalTask struct {
+	ExtraLinks        *[]string         `json:"extraLinks,omitempty"`
+	HasOutletDatasets *bool             `json:"hasOutletDatasets,omitempty"`
+	Id                *string           `json:"id,omitempty"`
+	IsMapped          *bool             `json:"isMapped,omitempty"`
+	Label             *string           `json:"label,omitempty"`
+	Operator          *string           `json:"operator,omitempty"`
+	Outlets           *[]InternalOutlet `json:"outlets,omitempty"`
+}
+
+// InternalTaskGroup defines model for internal_TaskGroup.
+type InternalTaskGroup struct {
+	Children *[]InternalTaskGroupChildrenInner `json:"children,omitempty"`
+	Id       *string                           `json:"id,omitempty"`
+	IsMapped *bool                             `json:"isMapped,omitempty"`
+	Label    *string                           `json:"label,omitempty"`
+	Tooltip  *string                           `json:"tooltip,omitempty"`
+}
+
+// InternalTaskGroupChildrenInner defines model for internal_TaskGroupChildrenInner.
+type InternalTaskGroupChildrenInner struct {
+	Task      *InternalTask      `json:"task,omitempty"`
+	TaskGroup *InternalTaskGroup `json:"taskGroup,omitempty"`
 }
 
 // GetSharedClusterParams defines parameters for GetSharedCluster.
@@ -1681,7 +1834,7 @@ type ListOrganizationsParams struct {
 	// TrialStatus filter by trial status, null for all orgs
 	TrialStatus *ListOrganizationsParamsTrialStatus `form:"trialStatus,omitempty" json:"trialStatus,omitempty"`
 
-	// ProductTier filter by product tier, null for all orgs
+	// ProductTier filter by product tier, should be one of POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
 	ProductTier *ListOrganizationsParamsProductTier `form:"productTier,omitempty" json:"productTier,omitempty"`
 
 	// Product filter by product, null for all orgs
@@ -1766,6 +1919,18 @@ type ListClustersParamsStatus string
 // ListClustersParamsSorts defines parameters for ListClusters.
 type ListClustersParamsSorts string
 
+// GetMetronomeDashboardParams defines parameters for GetMetronomeDashboard.
+type GetMetronomeDashboardParams struct {
+	// ShowZeroUsageLineItems optional flag to show zero usage line items for invoice dashboards
+	ShowZeroUsageLineItems *bool `form:"showZeroUsageLineItems,omitempty" json:"showZeroUsageLineItems,omitempty"`
+
+	// ColorOverrides optional list of colors ('gray_dark', 'gray_medium', 'gray_light', 'gray_extralight', 'white', 'primary_medium', or 'primary_light')  to  override  in  the  format  'color:#hex-color-value'  Eg.  'gray_dark:#ff0000'
+	ColorOverrides *[]string `form:"colorOverrides,omitempty" json:"colorOverrides,omitempty"`
+}
+
+// GetMetronomeDashboardParamsType defines parameters for GetMetronomeDashboard.
+type GetMetronomeDashboardParamsType string
+
 // GetStripeClientSecretParamsType defines parameters for GetStripeClientSecret.
 type GetStripeClientSecretParamsType string
 
@@ -1843,6 +2008,69 @@ type ListWorkspaceApiTokensParams struct {
 
 // ListWorkspaceApiTokensParamsSorts defines parameters for ListWorkspaceApiTokens.
 type ListWorkspaceApiTokensParamsSorts string
+
+// ListWorkspaceDagsParams defines parameters for ListWorkspaceDags.
+type ListWorkspaceDagsParams struct {
+	// PageSize page size, default of 20
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+
+	// OrderBy order-by fields, comma separated
+	OrderBy *[]string `form:"orderBy,omitempty" json:"orderBy,omitempty"`
+
+	// Cursor pagination cursor
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// NumRuns number of runs to include per dag, default of 0
+	NumRuns *int `form:"numRuns,omitempty" json:"numRuns,omitempty"`
+
+	// Name filter by name of DAG (dagId)
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// NameLike filter by pattern for name of DAG (dagId),  SQL  syntax
+	NameLike *string `form:"name__like,omitempty" json:"name__like,omitempty"`
+
+	// Owner filter by an owner of the dag
+	Owner *string `form:"owner,omitempty" json:"owner,omitempty"`
+
+	// IsPaused filter by paused dags
+	IsPaused *bool `form:"isPaused,omitempty" json:"isPaused,omitempty"`
+
+	// IsActive filter by active dags
+	IsActive *bool `form:"isActive,omitempty" json:"isActive,omitempty"`
+
+	// LastRunStateIn filter by dag runs with any of these run states for its last run
+	LastRunStateIn *[]string `form:"lastRunState__in,omitempty" json:"lastRunState__in,omitempty"`
+
+	// RunStateIn filter by dag runs with any of these run states
+	RunStateIn *[]string `form:"runState__in,omitempty" json:"runState__in,omitempty"`
+
+	// RunAfter filter by dag run after specified datetime (RFC3339 format)
+	RunAfter *time.Time `form:"runAfter,omitempty" json:"runAfter,omitempty"`
+
+	// TagIn filter by any of these tags
+	TagIn *[]string `form:"tag__in,omitempty" json:"tag__in,omitempty"`
+
+	// DeploymentIdIn filter by any of these deployment IDs
+	DeploymentIdIn *[]string `form:"deploymentId__in,omitempty" json:"deploymentId__in,omitempty"`
+}
+
+// ListWorkspaceTeamsParams defines parameters for ListWorkspaceTeams.
+type ListWorkspaceTeamsParams struct {
+	// Offset offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListWorkspaceTeamsParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+
+	// Search string to search for when listing teams
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
+// ListWorkspaceTeamsParamsSorts defines parameters for ListWorkspaceTeams.
+type ListWorkspaceTeamsParamsSorts string
 
 // ListWorkspaceUsersParams defines parameters for ListWorkspaceUsers.
 type ListWorkspaceUsersParams struct {
@@ -1942,6 +2170,9 @@ type CreateWorkspaceApiTokenJSONRequestBody = CreateWorkspaceApiTokenRequest
 
 // UpdateWorkspaceApiTokenJSONRequestBody defines body for UpdateWorkspaceApiToken for application/json ContentType.
 type UpdateWorkspaceApiTokenJSONRequestBody = UpdateWorkspaceApiTokenRequest
+
+// MutateWorkspaceTeamRoleJSONRequestBody defines body for MutateWorkspaceTeamRole for application/json ContentType.
+type MutateWorkspaceTeamRoleJSONRequestBody = MutateWorkspaceTeamRoleRequest
 
 // MutateWorkspaceUserRoleJSONRequestBody defines body for MutateWorkspaceUserRole for application/json ContentType.
 type MutateWorkspaceUserRoleJSONRequestBody = MutateWorkspaceUserRoleRequest
@@ -2155,6 +2386,12 @@ type ClientInterface interface {
 	// DeleteUserInvite request
 	DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetCreditSummary request
+	GetCreditSummary(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMetronomeDashboard request
+	GetMetronomeDashboard(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetPaymentMethod request
 	GetPaymentMethod(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2276,8 +2513,22 @@ type ClientInterface interface {
 	// RotateWorkspaceApiToken request
 	RotateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListWorkspacePipelines request
-	ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ListWorkspaceDagFilters request
+	ListWorkspaceDagFilters(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkspaceDags request
+	ListWorkspaceDags(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceDagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkspaceTeams request
+	ListWorkspaceTeams(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteWorkspaceTeam request
+	DeleteWorkspaceTeam(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MutateWorkspaceTeamRole request with any body
+	MutateWorkspaceTeamRoleWithBody(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MutateWorkspaceTeamRole(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceUsers request
 	ListWorkspaceUsers(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2887,6 +3138,30 @@ func (c *Client) DeleteUserInvite(ctx context.Context, orgShortNameId string, in
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetCreditSummary(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCreditSummaryRequest(c.Server, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetMetronomeDashboard(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMetronomeDashboardRequest(c.Server, orgShortNameId, pType, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetPaymentMethod(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPaymentMethodRequest(c.Server, orgShortNameId)
 	if err != nil {
@@ -3415,8 +3690,68 @@ func (c *Client) RotateWorkspaceApiToken(ctx context.Context, orgShortNameId str
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListWorkspacePipelines(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListWorkspacePipelinesRequest(c.Server, orgShortNameId, workspaceId)
+func (c *Client) ListWorkspaceDagFilters(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspaceDagFiltersRequest(c.Server, orgShortNameId, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkspaceDags(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceDagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspaceDagsRequest(c.Server, orgShortNameId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkspaceTeams(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspaceTeamsRequest(c.Server, orgShortNameId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteWorkspaceTeam(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWorkspaceTeamRequest(c.Server, orgShortNameId, workspaceId, teamId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateWorkspaceTeamRoleWithBody(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateWorkspaceTeamRoleRequestWithBody(c.Server, orgShortNameId, workspaceId, teamId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MutateWorkspaceTeamRole(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMutateWorkspaceTeamRoleRequest(c.Server, orgShortNameId, workspaceId, teamId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5300,6 +5635,117 @@ func NewDeleteUserInviteRequest(server string, orgShortNameId string, inviteId s
 	return req, nil
 }
 
+// NewGetCreditSummaryRequest generates requests for GetCreditSummary
+func NewGetCreditSummaryRequest(server string, orgShortNameId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/metronome/credit-summary", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMetronomeDashboardRequest generates requests for GetMetronomeDashboard
+func NewGetMetronomeDashboardRequest(server string, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/metronome/dashboard/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.ShowZeroUsageLineItems != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "showZeroUsageLineItems", runtime.ParamLocationQuery, *params.ShowZeroUsageLineItems); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.ColorOverrides != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "colorOverrides", runtime.ParamLocationQuery, *params.ColorOverrides); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetPaymentMethodRequest generates requests for GetPaymentMethod
 func NewGetPaymentMethodRequest(server string, orgShortNameId string) (*http.Request, error) {
 	var err error
@@ -7035,8 +7481,8 @@ func NewRotateWorkspaceApiTokenRequest(server string, orgShortNameId string, wor
 	return req, nil
 }
 
-// NewListWorkspacePipelinesRequest generates requests for ListWorkspacePipelines
-func NewListWorkspacePipelinesRequest(server string, orgShortNameId string, workspaceId string) (*http.Request, error) {
+// NewListWorkspaceDagFiltersRequest generates requests for ListWorkspaceDagFilters
+func NewListWorkspaceDagFiltersRequest(server string, orgShortNameId string, workspaceId string) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7108,6 +7554,234 @@ func NewListWorkspaceDagsRequest(server string, orgShortNameId string, workspace
 	if err != nil {
 		return nil, err
 	}
+
+	queryValues := queryURL.Query()
+
+	if params.PageSize != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "pageSize", runtime.ParamLocationQuery, *params.PageSize); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.OrderBy != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "orderBy", runtime.ParamLocationQuery, *params.OrderBy); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Cursor != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cursor", runtime.ParamLocationQuery, *params.Cursor); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.NumRuns != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "numRuns", runtime.ParamLocationQuery, *params.NumRuns); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Name != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name", runtime.ParamLocationQuery, *params.Name); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.NameLike != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "name__like", runtime.ParamLocationQuery, *params.NameLike); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Owner != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "owner", runtime.ParamLocationQuery, *params.Owner); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IsPaused != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "isPaused", runtime.ParamLocationQuery, *params.IsPaused); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.IsActive != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "isActive", runtime.ParamLocationQuery, *params.IsActive); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.LastRunStateIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "lastRunState__in", runtime.ParamLocationQuery, *params.LastRunStateIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.RunStateIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runState__in", runtime.ParamLocationQuery, *params.RunStateIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.RunAfter != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "runAfter", runtime.ParamLocationQuery, *params.RunAfter); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.TagIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "tag__in", runtime.ParamLocationQuery, *params.TagIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.DeploymentIdIn != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "deploymentId__in", runtime.ParamLocationQuery, *params.DeploymentIdIn); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
@@ -7823,6 +8497,12 @@ type ClientWithResponsesInterface interface {
 	// DeleteUserInvite request
 	DeleteUserInviteWithResponse(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*DeleteUserInviteResponse, error)
 
+	// GetCreditSummary request
+	GetCreditSummaryWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error)
+
+	// GetMetronomeDashboard request
+	GetMetronomeDashboardWithResponse(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error)
+
 	// GetPaymentMethod request
 	GetPaymentMethodWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error)
 
@@ -7944,8 +8624,22 @@ type ClientWithResponsesInterface interface {
 	// RotateWorkspaceApiToken request
 	RotateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateWorkspaceApiTokenResponse, error)
 
-	// ListWorkspacePipelines request
-	ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error)
+	// ListWorkspaceDagFilters request
+	ListWorkspaceDagFiltersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspaceDagFiltersResponse, error)
+
+	// ListWorkspaceDags request
+	ListWorkspaceDagsWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceDagsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceDagsResponse, error)
+
+	// ListWorkspaceTeams request
+	ListWorkspaceTeamsWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceTeamsParams, reqEditors ...RequestEditorFn) (*ListWorkspaceTeamsResponse, error)
+
+	// DeleteWorkspaceTeam request
+	DeleteWorkspaceTeamWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceTeamResponse, error)
+
+	// MutateWorkspaceTeamRole request with any body
+	MutateWorkspaceTeamRoleWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error)
+
+	MutateWorkspaceTeamRoleWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, teamId string, body MutateWorkspaceTeamRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*MutateWorkspaceTeamRoleResponse, error)
 
 	// ListWorkspaceUsers request
 	ListWorkspaceUsersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceUsersParams, reqEditors ...RequestEditorFn) (*ListWorkspaceUsersResponse, error)
@@ -8907,6 +9601,60 @@ func (r DeleteUserInviteResponse) StatusCode() int {
 	return 0
 }
 
+type GetCreditSummaryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreditSummary
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCreditSummaryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCreditSummaryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetMetronomeDashboardResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MetronomeDashboard
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMetronomeDashboardResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMetronomeDashboardResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetPaymentMethodResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -9791,10 +10539,10 @@ func (r RotateWorkspaceApiTokenResponse) StatusCode() int {
 	return 0
 }
 
-type ListWorkspacePipelinesResponse struct {
+type ListWorkspaceDagFiltersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *string
+	JSON200      *DagFilters
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
@@ -10486,6 +11234,24 @@ func (c *ClientWithResponses) DeleteUserInviteWithResponse(ctx context.Context, 
 	return ParseDeleteUserInviteResponse(rsp)
 }
 
+// GetCreditSummaryWithResponse request returning *GetCreditSummaryResponse
+func (c *ClientWithResponses) GetCreditSummaryWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error) {
+	rsp, err := c.GetCreditSummary(ctx, orgShortNameId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCreditSummaryResponse(rsp)
+}
+
+// GetMetronomeDashboardWithResponse request returning *GetMetronomeDashboardResponse
+func (c *ClientWithResponses) GetMetronomeDashboardWithResponse(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error) {
+	rsp, err := c.GetMetronomeDashboard(ctx, orgShortNameId, pType, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMetronomeDashboardResponse(rsp)
+}
+
 // GetPaymentMethodWithResponse request returning *GetPaymentMethodResponse
 func (c *ClientWithResponses) GetPaymentMethodWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error) {
 	rsp, err := c.GetPaymentMethod(ctx, orgShortNameId, reqEditors...)
@@ -10871,9 +11637,9 @@ func (c *ClientWithResponses) RotateWorkspaceApiTokenWithResponse(ctx context.Co
 	return ParseRotateWorkspaceApiTokenResponse(rsp)
 }
 
-// ListWorkspacePipelinesWithResponse request returning *ListWorkspacePipelinesResponse
-func (c *ClientWithResponses) ListWorkspacePipelinesWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspacePipelinesResponse, error) {
-	rsp, err := c.ListWorkspacePipelines(ctx, orgShortNameId, workspaceId, reqEditors...)
+// ListWorkspaceDagFiltersWithResponse request returning *ListWorkspaceDagFiltersResponse
+func (c *ClientWithResponses) ListWorkspaceDagFiltersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspaceDagFiltersResponse, error) {
+	rsp, err := c.ListWorkspaceDagFilters(ctx, orgShortNameId, workspaceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -13085,6 +13851,128 @@ func ParseDeleteUserInviteResponse(rsp *http.Response) (*DeleteUserInviteRespons
 	return response, nil
 }
 
+// ParseGetCreditSummaryResponse parses an HTTP response from a GetCreditSummaryWithResponse call
+func ParseGetCreditSummaryResponse(rsp *http.Response) (*GetCreditSummaryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCreditSummaryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreditSummary
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMetronomeDashboardResponse parses an HTTP response from a GetMetronomeDashboardWithResponse call
+func ParseGetMetronomeDashboardResponse(rsp *http.Response) (*GetMetronomeDashboardResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMetronomeDashboardResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MetronomeDashboard
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetPaymentMethodResponse parses an HTTP response from a GetPaymentMethodWithResponse call
 func ParseGetPaymentMethodResponse(rsp *http.Response) (*GetPaymentMethodResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -15049,8 +15937,8 @@ func ParseRotateWorkspaceApiTokenResponse(rsp *http.Response) (*RotateWorkspaceA
 	return response, nil
 }
 
-// ParseListWorkspacePipelinesResponse parses an HTTP response from a ListWorkspacePipelinesWithResponse call
-func ParseListWorkspacePipelinesResponse(rsp *http.Response) (*ListWorkspacePipelinesResponse, error) {
+// ParseListWorkspaceDagFiltersResponse parses an HTTP response from a ListWorkspaceDagFiltersWithResponse call
+func ParseListWorkspaceDagFiltersResponse(rsp *http.Response) (*ListWorkspaceDagFiltersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
@@ -15064,7 +15952,244 @@ func ParseListWorkspacePipelinesResponse(rsp *http.Response) (*ListWorkspacePipe
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
+		var dest DagFilters
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkspaceDagsResponse parses an HTTP response from a ListWorkspaceDagsWithResponse call
+func ParseListWorkspaceDagsResponse(rsp *http.Response) (*ListWorkspaceDagsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkspaceDagsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListWorkspaceDags
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkspaceTeamsResponse parses an HTTP response from a ListWorkspaceTeamsWithResponse call
+func ParseListWorkspaceTeamsResponse(rsp *http.Response) (*ListWorkspaceTeamsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkspaceTeamsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamsPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteWorkspaceTeamResponse parses an HTTP response from a DeleteWorkspaceTeamWithResponse call
+func ParseDeleteWorkspaceTeamResponse(rsp *http.Response) (*DeleteWorkspaceTeamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteWorkspaceTeamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMutateWorkspaceTeamRoleResponse parses an HTTP response from a MutateWorkspaceTeamRoleWithResponse call
+func ParseMutateWorkspaceTeamRoleResponse(rsp *http.Response) (*MutateWorkspaceTeamRoleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MutateWorkspaceTeamRoleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamRole
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

@@ -78,7 +78,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	}
 	updateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenRequest{
 		Name:        token.Name,
-		Description: *token.Description,
+		Description: token.Description,
 		Roles:       updateOrganizationAPITokenRoles,
 	}
 
@@ -105,7 +105,7 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 		tab.AddRow([]string{
 			strconv.Itoa(index),
 			name,
-			*description,
+			description,
 		}, false)
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
