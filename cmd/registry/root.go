@@ -166,8 +166,8 @@ func newRegistryInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "init",
 		//Aliases: []string{"r"},
-		Short: "Utilize the Astronomer Registry",
-		Long:  "Utilize the Astronomer Registry to initialize a project from a template.",
+		Short: "Download a project template from the Astronomer Registry",
+		Long:  "Download a project from the Astronomer Registry as a local Astro project.",
 	}
 	//cmd.AddCommand(
 	//	newRegistryAddDagCmd(),
@@ -192,8 +192,8 @@ func newRegistryAddDagCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dag [DAG ID]",
 		Aliases: []string{"d"},
-		Short:   "Utilize the Astronomer Registry to add a DAG",
-		Long:    "Utilize the Astronomer Registry to download a DAG to your local project.",
+		Short:   "Download a DAG from the Astronomer Registry",
+		Long:    "Download a DAG from the Astronomer Registry to your local Astro project.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var dagName string
 
@@ -202,12 +202,12 @@ func newRegistryAddDagCmd() *cobra.Command {
 				dagName = args[0]
 			} else {
 				// no dagName was provided so ask the user for it
-				dagName = input.Text("Enter DAG ID to download: ")
+				dagName = input.Text("Enter the DAG ID to download: ")
 			}
 			downloadDag(dagName, dagVersion)
 		},
 	}
-	cmd.Flags().StringVar(&dagVersion, "version", "latest", "Optional DAG Version to Download.")
+	cmd.Flags().StringVar(&dagVersion, "version", "latest", "The DAG version to download. Optional.")
 	return cmd
 }
 
@@ -215,14 +215,14 @@ func newRegistryAddProviderCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "provider [PROVIDER]",
 		//Aliases: []string{"p"},
-		Short: "Utilize the Astronomer Registry to add a Provider",
-		Long:  "Utilize the Astronomer Registry to download a Provider like Snowflake or Great Expectations to your project's dependencies.",
+		Short: "Download a provider package from the Astronomer Registry",
+		Long:  "Download a provider package as an Astro project dependency.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) > 0 {
 				providerName := args[0]
 				addProviderByName(providerName)
 			} else {
-				providerName := input.Text("Enter Provider ID to download: ")
+				providerName := input.Text("Enter the name of the provider package to download: ")
 				addProviderByName(providerName)
 			}
 		},
