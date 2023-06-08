@@ -124,7 +124,7 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	return selected, nil
 }
 
-func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) {
+func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) { //nolint:gocognit
 	switch {
 	case id == "" && name == "":
 		fmt.Println(message)

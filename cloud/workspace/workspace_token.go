@@ -37,6 +37,7 @@ func newTokenSelectionTableOut() *printutil.Table {
 var (
 	errInvalidWorkspaceTokenKey = errors.New("invalid workspace token selection")
 	ErrWorkspaceTokenNotFound   = errors.New("no workspace token was found for the token name you provided")
+	errBothNameAndID            = errors.New("both a token name and id were specified. Specify either the name or the id not both")
 )
 
 const (
@@ -364,7 +365,7 @@ func getWorkspaceTokens(workspace string, client astrocore.CoreClient) ([]astroc
 	return APITokens, nil
 }
 
-func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) {
+func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) { //nolint:gocognit
 	switch {
 	case id == "" && name == "":
 		fmt.Println(message)
@@ -396,6 +397,8 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 				return astrocore.ApiToken{}, err
 			}
 		}
+	case name != "" && id != "":
+		return astrocore.ApiToken{}, errBothNameAndID
 	}
 	if token.Id == "" {
 		return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound

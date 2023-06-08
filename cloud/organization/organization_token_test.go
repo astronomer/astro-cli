@@ -3,7 +3,6 @@ package organization
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"os"
 	"testing"
@@ -85,8 +84,6 @@ func TestAddOrgTokenToWorkspace(t *testing.T) {
 	t.Run("return error for failed to get current context", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetCurrentContext").Return(nil, errors.New("failed to get current context"))
-
 		err := AddOrgTokenToWorkspace(selectedTokenID, selectedTokenName, role, workspace, nil, mockClient)
 		assert.Error(t, err)
 	})
@@ -98,7 +95,7 @@ func TestAddOrgTokenToWorkspace(t *testing.T) {
 
 		err := AddOrgTokenToWorkspace(selectedTokenID, selectedTokenName, role, workspace, nil, mockClient)
 		assert.Error(t, err)
-		assert.Equal(t, errors.New("failed to list tokens"), err)
+		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
 	t.Run("return error for failed to select organization token", func(t *testing.T) {

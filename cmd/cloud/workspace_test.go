@@ -1143,6 +1143,7 @@ func TestWorkspaceTokenList(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
 func TestWorkspaceTokenCreate(t *testing.T) {
 	expectedHelp := "Create a token in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1221,6 +1222,7 @@ func TestWorkspaceTokenCreate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
 func TestWorkspaceTokenUpdate(t *testing.T) {
 	expectedHelp := "Update a token in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1283,6 +1285,7 @@ func TestWorkspaceTokenUpdate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
 func TestWorkspaceTokenRotate(t *testing.T) {
 	expectedHelp := "Rotate a workspace token's key"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1366,6 +1369,7 @@ func TestWorkspaceTokenRotate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
 func TestWorkspaceTokenDelete(t *testing.T) {
 	expectedHelp := "Delete a workspace token or remove an organization token from a workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
