@@ -228,7 +228,7 @@ func TestUpdateToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("happy path no id", func(t *testing.T) {
+	t.Run("happy path multiple name", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
@@ -245,7 +245,7 @@ func TestUpdateToken(t *testing.T) {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		err = UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		err = UpdateToken("", "Token 1", "", "", "", "", out, mockClient)
 		assert.NoError(t, err)
 	})
 
