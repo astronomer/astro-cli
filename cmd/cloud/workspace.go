@@ -32,6 +32,7 @@ var (
 	orgTokenName               string
 	tokenID                    string
 	orgTokenID                 string
+	forceRotate                bool
 	tokenExpiration            int
 )
 
@@ -317,7 +318,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&name, "token-name", "t", "", "The name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Rotate workspace token without showing a warning")
+	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate workspace token without showing a warning")
 
 	return cmd
 }
@@ -333,7 +334,7 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&name, "token-name", "t", "", "The name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Rotate workspace roken without showing a warning")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Rotate workspace roken without showing a warning")
 
 	return cmd
 }
@@ -584,7 +585,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace.RotateToken(tokenID, name, workspaceID, force, out, astroCoreClient)
+	return workspace.RotateToken(tokenID, name, workspaceID, forceRotate, out, astroCoreClient)
 }
 
 func DeleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -595,7 +596,7 @@ func DeleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace.DeleteToken(tokenID, name, workspaceID, force, out, astroCoreClient)
+	return workspace.DeleteToken(tokenID, name, workspaceID, forceDelete, out, astroCoreClient)
 }
 
 func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {

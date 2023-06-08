@@ -999,3 +999,453 @@ func TestWorkspaceTeamRemove(t *testing.T) {
 		assert.Contains(t, resp, expectedOut)
 	})
 }
+
+// test workspace token commands
+
+var (
+	description1 = "Description 1"
+	description2 = "Description 2"
+	fullName1    = "User 1"
+	fullName2    = "User 2"
+	token        = "token"
+	apiToken1    = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
+	apiTokens    = []astrocore.ApiToken{
+		apiToken1,
+		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
+	}
+	ListWorkspaceAPITokensResponseOK = astrocore.ListWorkspaceApiTokensResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ListApiTokensPaginated{
+			ApiTokens: apiTokens,
+			Limit:     1,
+			Offset:    0,
+		},
+	}
+	errorTokenList, _ = json.Marshal(astrocore.Error{
+		Message: "failed to list tokens",
+	})
+	ListWorkspaceAPITokensResponseError = astrocore.ListWorkspaceApiTokensResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorTokenList,
+		JSON200: nil,
+	}
+	CreateWorkspaceAPITokenResponseOK = astrocore.CreateWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &apiToken1,
+	}
+	CreateWorkspaceAPITokenResponseError = astrocore.CreateWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorBodyCreate,
+		JSON200: nil,
+	}
+	UpdateWorkspaceAPITokenResponseOK = astrocore.UpdateWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &apiToken1,
+	}
+	errorTokenUpdate, _ = json.Marshal(astrocore.Error{
+		Message: "failed to update token",
+	})
+	UpdateWorkspaceAPITokenResponseError = astrocore.UpdateWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorTokenUpdate,
+		JSON200: nil,
+	}
+	RotateWorkspaceAPITokenResponseOK = astrocore.RotateWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &apiToken1,
+	}
+	errorTokenRotate, _ = json.Marshal(astrocore.Error{
+		Message: "failed to rotate token",
+	})
+	RotateWorkspaceAPITokenResponseError = astrocore.RotateWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorTokenRotate,
+		JSON200: nil,
+	}
+	DeleteWorkspaceAPITokenResponseOK = astrocore.DeleteWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+	}
+	errorTokenDelete, _ = json.Marshal(astrocore.Error{
+		Message: "failed to delete token",
+	})
+	DeleteWorkspaceAPITokenResponseError = astrocore.DeleteWorkspaceApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body: errorTokenDelete,
+	}
+)
+
+func TestWorkspaceTokenRootCommand(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	buf := new(bytes.Buffer)
+	cmd := newWorkspaceCmd(os.Stdout)
+	cmd.SetOut(buf)
+	cmdArgs := []string{"token", "-h"}
+	_, err := execWorkspaceCmd(cmdArgs...)
+	assert.NoError(t, err)
+}
+
+func TestWorkspaceTokenList(t *testing.T) {
+	expectedHelp := "List all the tokens in an Astro Workspace"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "list", "-h"}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and tokens are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "list"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to list tokens")
+	})
+	t.Run("any context errors from api are returned and tokens are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "list"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+
+	t.Run("tokens are listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "list"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+func TestWorkspaceTokenCreate(t *testing.T) {
+	expectedHelp := "Create a token in an Astro Workspace"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "create", "-h"}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and token is not created", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseError, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "WORKSPACE_MEMBER"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to create workspace")
+	})
+	t.Run("any context errors from api are returned and token is not created", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "list"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("token is created", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "create", "--name", "Token 1", "--role", "WORKSPACE_MEMBER"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is created with no name provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("Token 1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "create", "--role", "WORKSPACE_MEMBER"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is created with no role provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "create", "--name", "Token 1"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+func TestWorkspaceTokenUpdate(t *testing.T) {
+	expectedHelp := "Update a token in an Astro Workspace"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "update", "-h"}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and token is not updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseError, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "update", "token1"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to update token")
+	})
+	t.Run("any context errors from api are returned and token is not updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "update", "token1"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("token is updated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "update", "token1"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is created with no ID provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "update"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+func TestWorkspaceTokenRotate(t *testing.T) {
+	expectedHelp := "Rotate a workspace token's key"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "rotate", "-h"}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and token is not rotated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseError, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "rotate", "token1", "--force"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to rotate token")
+	})
+	t.Run("any context errors from api are returned and token is not rotated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "rotate", "token1"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("token is rotated", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "rotate", "token1", "--force"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is rotated with no ID provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "rotate", "--force"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is rotated with and confirmed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("y")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "rotate", "token1"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+func TestWorkspaceTokenDelete(t *testing.T) {
+	expectedHelp := "Delete a workspace token or remove an organization token from a workspace"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "delete", "-h"}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and token is not deleted", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseError, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "delete", "token1", "--force"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to delete token")
+	})
+	t.Run("any context errors from api are returned and token is not deleted", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "delete", "token1"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("token is deleted", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "delete", "token1", "--force"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is deleted with no ID provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "delete", "--force"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is delete with and confirmed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("y")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "delete", "token1"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
