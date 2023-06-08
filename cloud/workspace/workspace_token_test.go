@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -25,12 +26,27 @@ var (
 		apiToken1,
 		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
 	}
+	apiTokens2 = []astrocore.ApiToken{
+		apiToken1,
+		apiToken1,
+		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
+	}
 	ListWorkspaceAPITokensResponseOK = astrocore.ListWorkspaceApiTokensResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.ListApiTokensPaginated{
 			ApiTokens: apiTokens,
+			Limit:     1,
+			Offset:    0,
+		},
+	}
+	ListWorkspaceAPITokensResponse2OK = astrocore.ListWorkspaceApiTokensResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ListApiTokensPaginated{
+			ApiTokens: apiTokens2,
 			Limit:     1,
 			Offset:    0,
 		},
@@ -191,6 +207,58 @@ func TestUpdateToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("happy path no id", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = UpdateToken("", "", "", "", "", "", out, mockClient)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path no id", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponse2OK, nil).Twice()
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		assert.NoError(t, err)
+	})
+
+	t.Run("happy path", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		err := UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		assert.NoError(t, err)
+	})
+
 	t.Run("error path when getWorkspaceTokens returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
@@ -225,9 +293,9 @@ func TestRotateToken(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
-		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, "testOrg", "testWorkspace", "token1").Return(&RotateWorkspaceAPITokenResponseOK, nil)
-		err := RotateToken("token1", "", "", false, out, mockClient)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
+		err := RotateToken("token1", "", "", true, out, mockClient)
 		assert.NoError(t, err)
 	})
 
