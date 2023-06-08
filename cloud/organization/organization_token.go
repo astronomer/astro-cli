@@ -19,6 +19,11 @@ var (
 	errInvalidOrganizationTokenKey = errors.New("invalid organization token selection")
 	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace         = errors.New("this organization token has already been added to the workspace")
+	errBothNameAndID               = errors.New("both a token name and id were specified. Specify either the name or the id not both")
+)
+
+const (
+	workspaceConst = "WORKSPACE"
 )
 
 func newTokenSelectionTableOut() *printutil.Table {
@@ -57,7 +62,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 
 	var orgRole string
 	for i := range token.Roles {
-		if token.Roles[i].EntityId == workspace {
+		if token.Roles[i].EntityId == workspaceConst {
 			return errOrgTokenInWorkspace
 		}
 
@@ -151,6 +156,8 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 				return astrocore.ApiToken{}, err
 			}
 		}
+	case name != "" && id != "":
+		return astrocore.ApiToken{}, errBothNameAndID
 	}
 	if token.Id == "" {
 		return astrocore.ApiToken{}, errOrganizationTokenNotFound
