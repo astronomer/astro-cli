@@ -287,7 +287,6 @@ func TestUpdateToken(t *testing.T) {
 		assert.Equal(t, "failed to update workspace", err.Error())
 	})
 }
-
 func TestRotateToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)

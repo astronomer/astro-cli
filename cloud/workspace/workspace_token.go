@@ -211,7 +211,6 @@ func RotateToken(id, name, workspace string, force bool, out io.Writer, client a
 		return err
 	}
 	apiTokenID := token.Id
-	fmt.Println("make it to 214")
 
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
@@ -223,7 +222,6 @@ func RotateToken(id, name, workspace string, force bool, out io.Writer, client a
 			return nil
 		}
 	}
-
 	resp, err := client.RotateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID)
 	if err != nil {
 		return err
