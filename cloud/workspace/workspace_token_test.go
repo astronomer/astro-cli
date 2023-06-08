@@ -259,6 +259,16 @@ func TestUpdateToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("error both id and name", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
+		err := UpdateToken("token1", "Token 1", "", "", "", "", out, mockClient)
+		assert.ErrorIs(t, errBothNameAndID, err)
+	})
+
 	t.Run("error path when getWorkspaceTokens returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
