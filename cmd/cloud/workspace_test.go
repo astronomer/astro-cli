@@ -1449,3 +1449,130 @@ func TestWorkspaceTokenDelete(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+var (
+	apiToken2  = astrocore.ApiToken{Id: "token1", Name: "Token 1", Token: &token, Description: description1, Type: "Type 1", Roles: []astrocore.ApiTokenRole{{EntityId: "WORKSPACE", Role: "WORKSPACE_MEMBER"}, {EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName1}}
+	apiTokens2 = []astrocore.ApiToken{
+		apiToken2,
+		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
+	}
+	ListOrganizationAPITokensResponseOK = astrocore.ListOrganizationApiTokensResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ListApiTokensPaginated{
+			ApiTokens: apiTokens2,
+			Limit:     1,
+			Offset:    0,
+		},
+	}
+	errorOrgTokenList, _ = json.Marshal(astrocore.Error{
+		Message: "failed to list tokens",
+	})
+	ListOrganizationAPITokensResponseError = astrocore.ListOrganizationApiTokensResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorOrgTokenList,
+		JSON200: nil,
+	}
+	UpdateOrganizationAPITokenResponseOK = astrocore.UpdateOrganizationApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &apiToken1,
+	}
+	errorOrgTokenUpdate, _ = json.Marshal(astrocore.Error{
+		Message: "failed to update tokens",
+	})
+	UpdateOrganizationAPITokenResponseError = astrocore.UpdateOrganizationApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    errorOrgTokenUpdate,
+		JSON200: nil,
+	}
+)
+
+func TestWorkspaceTokenAdd(t *testing.T) {
+	expectedHelp := "Add an Organization Token to an Astro Workspace"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "add", "-h"}
+		resp, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and token is not added", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "add", "token1", "--role", "WORKSPACE_MEMBER"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to list tokens")
+	})
+	t.Run("any context errors from api are returned and token is not added", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "update", "token1", "--role", "WORKSPACE_MEMBER"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+	t.Run("token is added", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "add", "token2", "--role", "WORKSPACE_MEMBER"}
+		_, err := execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is created with no ID provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "add", "--role", "WORKSPACE_MEMBER"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+	t.Run("token is created with no role provided", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("1")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "add", "token2"}
+		_, err = execWorkspaceCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
