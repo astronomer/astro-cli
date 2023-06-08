@@ -14,6 +14,7 @@ import (
 	goVersion "github.com/hashicorp/go-version"
 )
 
+// UTILS CAN GO HERE
 type CustomClaims struct {
 	OrgAuthServiceID      string   `json:"org_id"`
 	Scope                 string   `json:"scope"`

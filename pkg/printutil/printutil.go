@@ -1,7 +1,9 @@
 package printutil
 
 import (
+	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"strconv"
 )
@@ -184,5 +186,18 @@ func (t *Table) dynamicPadding(row Row) {
 		} else if t.altPadding[i] < colLength {
 			t.altPadding[i] = colLength
 		}
+	}
+}
+
+func LogFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func LogKeyNotExists(exists bool, key string, jsonValue map[string]interface{}) {
+	if !exists {
+		jsonString, _ := json.Marshal(jsonValue)
+		log.Fatalf("Couldn't find key %s in Response! %s", key, jsonString)
 	}
 }
