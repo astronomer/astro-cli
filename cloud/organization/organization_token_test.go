@@ -104,7 +104,7 @@ func TestAddOrgTokenToWorkspace(t *testing.T) {
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
 
-		err := AddOrgTokenToWorkspace("INVALID_ID", selectedTokenName, role, workspace, nil, mockClient)
+		err := AddOrgTokenToWorkspace("INVALID_ID", "", role, workspace, nil, mockClient)
 		assert.Error(t, err)
 		assert.Equal(t, errOrganizationTokenNotFound, err)
 	})
