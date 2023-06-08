@@ -126,6 +126,7 @@ deployment:
     scheduler_au: 5
     scheduler_count: 3
     cluster_id: cluster-id
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       id: test-wq-id
@@ -184,6 +185,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -245,6 +247,7 @@ deployment:
     scheduler_count: 3
     cluster_name: cluster-name
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -318,6 +321,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -391,6 +395,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -457,7 +462,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+            "deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -569,6 +575,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -672,7 +679,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+            "deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -782,7 +790,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+            "deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -891,6 +900,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -1015,7 +1025,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+			"deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -1144,6 +1155,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -1209,6 +1221,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -1294,6 +1307,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -1363,7 +1377,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+			"deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -1471,7 +1486,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+			"deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -1579,6 +1595,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -1725,7 +1742,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+			"deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -1886,6 +1904,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -1954,7 +1973,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+			"deployment_type": "HYBRID"
         },
         "worker_queues": [
             {
@@ -2066,7 +2086,8 @@ deployment:
             "scheduler_au": 5,
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
-            "workspace_name": "test-workspace"
+            "workspace_name": "test-workspace",
+			"deployment_type": "HYBRID"
         },
         "worker_queues": [
             {

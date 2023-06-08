@@ -270,6 +270,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -563,6 +564,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
