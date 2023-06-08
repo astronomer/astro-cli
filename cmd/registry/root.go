@@ -153,7 +153,7 @@ func newRegistryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "registry",
 		Aliases: []string{"r"},
-		Short:   "Utilize the Astronomer Registry",
+		Short:   "Interact with the Astronomer Registry",
 	}
 	cmd.AddCommand(
 		newRegistryAddCmd(),
