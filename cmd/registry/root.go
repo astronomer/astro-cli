@@ -13,7 +13,6 @@ func newRegistryCmd() *cobra.Command {
 	cmd.AddCommand(
 		newRegistryDagCmd(),
 		newRegistryProviderCmd(),
-		newRegistryInitCmd(),
 	)
 	return cmd
 }

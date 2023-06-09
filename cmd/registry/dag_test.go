@@ -2,7 +2,9 @@ package registry
 
 import (
 	"bytes"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -12,6 +14,10 @@ func execDagCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newRegistryDagCmd()
 	cmd.SetOut(buf)
+	log.SetOutput(buf)
+	defer func() {
+		log.SetOutput(os.Stderr)
+	}()
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
@@ -23,19 +29,14 @@ func TestDagAdd(t *testing.T) {
 
 	_ = os.Remove("dags/sagemaker-batch-inference.py")
 
-	//mockClient := new(astro_mocks.Client)
-	//mockClient.On("ListDeployments", mock.Anything, "").Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
-	//astroClient = mockClient
-
 	cmdArgs := []string{"add", "sagemaker-batch-inference"}
 	resp, err := execDagCmd(cmdArgs...)
 	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-id-1")
-	assert.Contains(t, resp, "test-id-2")
-	//mockClient.AssertExpectations(t)
-}
+	assert.Contains(t, resp, "dags/sagemaker-batch-inference.py", "we mention where we downloaded it in stdout")
 
-func TestDagList(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	assert.Equal(t, 1, 0)
+	fileContents, _ := fileutil.ReadFileToString("dags/sagemaker-batch-inference.py")
+	assert.Contains(t, fileContents, "airflow", "The DAG has words in it")
+	assert.Contains(t, fileContents, "DAG", "The DAG has words in it")
+
+	_ = os.Remove("dags/sagemaker-batch-inference.py")
 }

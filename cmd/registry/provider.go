@@ -19,9 +19,7 @@ func newRegistryProviderCmd() *cobra.Command {
 		Short:   "Interact with Airflow Providers from the Astronomer Registry",
 	}
 	cmd.AddCommand(
-
 		newRegistryAddProviderCmd(),
-		newRegistryListProviderCmd(),
 	)
 	return cmd
 }
@@ -44,24 +42,6 @@ func newRegistryAddProviderCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&providerVersion, "version", "latest", "Provider Version to add. Optional")
 	return cmd
-}
-
-func newRegistryListProviderCmd() *cobra.Command {
-	if false {
-		cmd := &cobra.Command{
-			Use: "list [PROVIDER]",
-			//Aliases: []string{"p"},
-			Short: "Download a provider package from the Astronomer Registry",
-			Long:  "Download a provider package as an Astro project dependency.",
-			Run: func(cmd *cobra.Command, args []string) {
-				// TODO - THIS DOESN'T EXIST YET
-				log.Fatal("THIS DOESN'T EXIST YET")
-			},
-		}
-		cmd.Flags().StringVar(&providerVersion, "version", "latest", "Provider Version to add. Optional")
-		return cmd
-	}
-	return &cobra.Command{Use: "list"}
 }
 
 func getProviderSearchRoute(providerName string) string {
@@ -114,27 +94,26 @@ func addProviderByIdAndVersion(providerId string, providerVersion string) {
 	printutil.LogKeyNotExists(exists, "version", providerJson)
 
 	addProviderToRequirementsTxt(name, version)
-	addProviderExampleDag(name)
 }
 
 func addProviderToRequirementsTxt(name string, version string) {
 	const filename = "requirements.txt"
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0655)
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 
 	b, err := os.ReadFile(filename)
 	printutil.LogFatal(err)
 
 	exists := strings.Contains(string(b), name)
 	if exists {
-		log.Infof("%s already exists in %s", name, filename)
+		fmt.Printf("%s already exists in %s", name, filename)
 	} else {
 		log.Debugf("Couldn't find %s already in %s", name, string(b))
 		providerString := fmt.Sprintf("%s==%s", name, version)
-		log.Infof("Writing %s to %s", providerString, filename)
 		_, err = f.WriteString(providerString + "\n")
 		printutil.LogFatal(err)
-		defer func(f *os.File) {
-			_ = f.Close()
-		}(f)
+		fmt.Printf("Wrote %s to %s", providerString, filename)
 	}
 }

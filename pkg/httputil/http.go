@@ -123,8 +123,8 @@ func DownloadResponseToFile(sourceUrl string, path string) {
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
-	_, err = io.Copy(file, resp.Body)
-	_ = fileutil.WriteToFile(path, resp.Body)
+	err = fileutil.WriteToFile(path, resp.Body)
+	printutil.LogFatal(err)
 
 	defer func(file *os.File) {
 		_ = file.Close()

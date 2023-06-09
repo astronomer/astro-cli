@@ -24,7 +24,6 @@ var (
 	dagVersion      string
 	providerVersion string
 	addProviders    bool
-	projectBranch   string
 )
 
 func newRegistryDagCmd() *cobra.Command {
@@ -35,7 +34,6 @@ func newRegistryDagCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newRegistryDagAddCmd(),
-		newRegistryDagListCmd(),
 	)
 	return cmd
 }
@@ -62,24 +60,6 @@ func newRegistryDagAddCmd() *cobra.Command {
 	return cmd
 }
 
-func newRegistryDagListCmd() *cobra.Command {
-	if false {
-		cmd := &cobra.Command{
-			Use:     "list [SEARCH]",
-			Aliases: []string{"a"},
-			Short:   "List DAGs from the Astronomer Registry",
-			Long:    "List DAGs from the Astronomer Registry to your local Astro project.",
-			Run: func(cmd *cobra.Command, args []string) {
-				// TODO - THIS DOESN'T EXIST YET
-				log.Fatal("THIS DOESN'T EXIST YET")
-			},
-		}
-		cmd.Flags().StringVar(&dagVersion, "version", "latest", "The DAG version to download. Optional.")
-		return cmd
-	}
-	return &cobra.Command{Use: "list"}
-}
-
 func downloadDag(dagId string, dagVersion string, addProviders bool) {
 	// https://api.astronomer.io/registryV2/v1alpha1/organizations/public/dags?sorts=displayName%3Aasc&limit=1&query=foo
 	filledDagRoute := getDagRoute(dagId, dagVersion)
@@ -92,6 +72,7 @@ func downloadDag(dagId string, dagVersion string, addProviders bool) {
 	printutil.LogKeyNotExists(exists, "filePath", dagJson)
 
 	httputil.DownloadResponseToFile(githubRawSourceUrl, filePath)
+	fmt.Printf("Successfully added DAG %s:%s to %s", dagId, dagVersion, filePath)
 
 	if addProviders {
 		providers, exists := dagJson["providers"].([]interface{})
