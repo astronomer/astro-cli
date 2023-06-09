@@ -386,7 +386,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 
 	if updateWorkspaceRole == "" {
 		// no role was provided so ask the user for it
-		updateWorkspaceRole = input.Text("Enter a user workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) to update user: ")
+		updateWorkspaceRole = input.Text("Enter a user Workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) to update user: ")
 	}
 
 	cmd.SilenceUsage = true
@@ -410,7 +410,7 @@ func coalesceWorkspace() (string, error) {
 	wsFlag := workspaceID
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get current workspace")
+		return "", errors.Wrap(err, "failed to get current Workspace")
 	}
 
 	if wsFlag != "" {
@@ -421,5 +421,5 @@ func coalesceWorkspace() (string, error) {
 		return wsCfg, nil
 	}
 
-	return "", errors.New("no valid workspace source found")
+	return "", errors.New("no valid Workspace source found")
 }
