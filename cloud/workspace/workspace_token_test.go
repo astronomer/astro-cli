@@ -309,6 +309,16 @@ func TestRotateToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("happy path with confirmation", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
+		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
+		err := RotateToken("token1", "", "", false, out, mockClient)
+		assert.NoError(t, err)
+	})
+
 	t.Run("error path when getWorkspaceTokens returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
@@ -344,7 +354,7 @@ func TestDeleteToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
-		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, "testOrg", "testWorkspace", "token1").Return(&DeleteWorkspaceAPITokenResponseOK, nil)
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
 		err := DeleteToken("token1", "", "", false, out, mockClient)
 		assert.NoError(t, err)
 	})
@@ -354,7 +364,7 @@ func TestDeleteToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Twice()
-		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, "testOrg", "testWorkspace", "token2").Return(&DeleteWorkspaceAPITokenResponseOK, nil)
+		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
 		err := DeleteToken("token2", "", "", false, out, mockClient)
 		assert.NoError(t, err)
 	})
