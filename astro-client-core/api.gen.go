@@ -160,6 +160,8 @@ const (
 const (
 	OrganizationProductTierBASIC            OrganizationProductTier = "BASIC"
 	OrganizationProductTierBUSINESSCRITICAL OrganizationProductTier = "BUSINESS_CRITICAL"
+	OrganizationProductTierINTERNAL         OrganizationProductTier = "INTERNAL"
+	OrganizationProductTierPOV              OrganizationProductTier = "POV"
 	OrganizationProductTierPREMIUM          OrganizationProductTier = "PREMIUM"
 	OrganizationProductTierSTANDARD         OrganizationProductTier = "STANDARD"
 	OrganizationProductTierTRIAL            OrganizationProductTier = "TRIAL"
@@ -329,6 +331,7 @@ const (
 const (
 	BASIC            ListOrganizationsParamsProductTier = "BASIC"
 	BUSINESSCRITICAL ListOrganizationsParamsProductTier = "BUSINESS_CRITICAL"
+	INTERNAL         ListOrganizationsParamsProductTier = "INTERNAL"
 	POV              ListOrganizationsParamsProductTier = "POV"
 	PREMIUM          ListOrganizationsParamsProductTier = "PREMIUM"
 	STANDARD         ListOrganizationsParamsProductTier = "STANDARD"
@@ -1834,7 +1837,7 @@ type ListOrganizationsParams struct {
 	// TrialStatus filter by trial status, null for all orgs
 	TrialStatus *ListOrganizationsParamsTrialStatus `form:"trialStatus,omitempty" json:"trialStatus,omitempty"`
 
-	// ProductTier filter by product tier, should be one of POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
+	// ProductTier filter by product tier, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
 	ProductTier *ListOrganizationsParamsProductTier `form:"productTier,omitempty" json:"productTier,omitempty"`
 
 	// Product filter by product, null for all orgs
