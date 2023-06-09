@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/astronomer/astro-cli/cmd/registry"
 	"os"
+
+	"github.com/astronomer/astro-cli/cmd/registry"
 
 	airflowclient "github.com/astronomer/astro-cli/airflow-client"
 	astro "github.com/astronomer/astro-cli/astro-client"

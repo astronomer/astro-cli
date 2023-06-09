@@ -3,9 +3,10 @@ package printutil
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Table represents a table to be printed

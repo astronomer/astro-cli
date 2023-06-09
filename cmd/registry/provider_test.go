@@ -2,12 +2,13 @@ package registry
 
 import (
 	"bytes"
+	"os"
+	"testing"
+
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func execProviderCmd(args ...string) (string, error) {
@@ -30,8 +31,9 @@ func TestProviderAdd(t *testing.T) {
 	_ = os.Remove("requirements.txt")
 
 	cmdArgs := []string{"add", "snowflake"}
-	_, err := execProviderCmd(cmdArgs...)
+	resp, err := execProviderCmd(cmdArgs...)
 	assert.NoError(t, err)
+	assert.NotContains(t, resp, "I don't know why this is empty", "I don't know why stdout is empty")
 
 	fileContents, _ := fileutil.ReadFileToString("requirements.txt")
 	assert.Regexp(t, `apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, fileContents, "We added the provider to the file")
@@ -39,7 +41,6 @@ func TestProviderAdd(t *testing.T) {
 	_, err = execProviderCmd(cmdArgs...)
 	assert.NoError(t, err)
 	// TODO - assert against stdout "apache-airflow-providers-snowflake already exists in requirements.txt"
-	// Failing - not collecting stdout right, not sure why.
 	fileContents, _ = fileutil.ReadFileToString("requirements.txt")
 	assert.Regexp(t, `apache-airflow-providers-snowflake==\d+\.\d+\.\d+\n$`, fileContents, "We didn't write it again")
 

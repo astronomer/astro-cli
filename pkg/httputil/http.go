@@ -5,16 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"os"
 
+	"github.com/sirupsen/logrus"
+
+	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/printutil"
+
 	"github.com/pkg/errors"
 	"golang.org/x/net/context/ctxhttp"
 )
+
+const LastSuccessfulHTTPResponseCode = 299
 
 // HTTPClient returns an HTTP Client struct that can execute HTTP requests
 type HTTPClient struct {
@@ -110,43 +114,47 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("API error (%d): %s", e.Status, e.Message)
 }
 
-func DownloadResponseToFile(sourceUrl string, path string) {
+func DownloadResponseToFile(sourceURL, path string) {
 	file, err := fileutil.CreateFile(path)
+	printutil.LogFatal(err)
+
 	client := http.Client{
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
 			r.URL.Opaque = r.URL.Path
 			return nil
 		},
 	}
-	resp, err := client.Get(sourceUrl)
-	printutil.LogFatal(err)
+	resp, err := client.Get(sourceURL) //nolint
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
+	printutil.LogFatal(err)
+
 	err = fileutil.WriteToFile(path, resp.Body)
 	printutil.LogFatal(err)
 
 	defer func(file *os.File) {
 		_ = file.Close()
 	}(file)
-	logrus.Infof("Downloaded %s from %s", path, sourceUrl)
+	logrus.Infof("Downloaded %s from %s", path, sourceURL)
 }
 
-func RequestAndGetJsonBody(route string) map[string]interface{} {
-	res, err := http.Get(route)
-	printutil.LogFatal(err)
-	body, err := io.ReadAll(res.Body)
-	printutil.LogFatal(err)
-	if res.StatusCode > 299 {
-		logrus.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
-	}
+func RequestAndGetJSONBody(route string) map[string]interface{} {
+	res, err := http.Get(route) //nolint
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(res.Body)
 	printutil.LogFatal(err)
-	var bodyJson map[string]interface{}
-	err = json.Unmarshal(body, &bodyJson)
+
+	body, err := io.ReadAll(res.Body)
+	printutil.LogFatal(err)
+	if res.StatusCode > LastSuccessfulHTTPResponseCode {
+		logrus.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
+	}
+
+	var bodyJSON map[string]interface{}
+	err = json.Unmarshal(body, &bodyJSON)
 	printutil.LogFatal(err)
 	logrus.Debugf("%s - GET %s %s", res.Status, route, string(body))
-	return bodyJson
+	return bodyJSON
 }

@@ -2,9 +2,10 @@ package registry
 
 import (
 	"bytes"
+	"testing"
+
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestRegistryCommand(t *testing.T) {

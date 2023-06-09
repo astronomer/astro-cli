@@ -2,17 +2,18 @@ package registry
 
 import (
 	"fmt"
+	"net/url"
+
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"net/url"
 )
 
 const (
 	registryHost        = "api.astronomer.io"
-	registryApi         = "registryV2/v1alpha1/organizations/public"
+	registryAPI         = "registryV2/v1alpha1/organizations/public"
 	dagRoute            = "dags/%s/versions/%s"
 	providerRoute       = "providers/%s/versions/%s"
 	providerSearchRoute = "providers"
@@ -20,7 +21,7 @@ const (
 )
 
 var (
-	dagId           string
+	dagID           string
 	dagVersion      string
 	providerVersion string
 	addProviders    bool
@@ -45,14 +46,14 @@ func newRegistryDagAddCmd() *cobra.Command {
 		Short:   "Download a DAG from the Astronomer Registry",
 		Long:    "Download a DAG from the Astronomer Registry to your local Astro project.",
 		Run: func(cmd *cobra.Command, args []string) {
-			// if a dagId was provided in the args we use it
+			// if a dagID was provided in the args we use it
 			if len(args) > 0 {
-				dagId = args[0]
+				dagID = args[0]
 			} else {
-				// no dagId was provided so ask the user for it
-				dagId = input.Text("Enter the DAG ID to add: ")
+				// no dagID was provided so ask the user for it
+				dagID = input.Text("Enter the DAG ID to add: ")
 			}
-			downloadDag(dagId, dagVersion, addProviders)
+			downloadDag(dagID, dagVersion, addProviders)
 		},
 	}
 	cmd.Flags().StringVar(&dagVersion, "version", "latest", "The DAG version to download. Optional.")
@@ -60,39 +61,39 @@ func newRegistryDagAddCmd() *cobra.Command {
 	return cmd
 }
 
-func downloadDag(dagId string, dagVersion string, addProviders bool) {
+func downloadDag(dagID, dagVersion string, addProviders bool) {
 	// https://api.astronomer.io/registryV2/v1alpha1/organizations/public/dags?sorts=displayName%3Aasc&limit=1&query=foo
-	filledDagRoute := getDagRoute(dagId, dagVersion)
-	dagJson := httputil.RequestAndGetJsonBody(filledDagRoute)
+	filledDagRoute := getDagRoute(dagID, dagVersion)
+	dagJSON := httputil.RequestAndGetJSONBody(filledDagRoute)
 
-	githubRawSourceUrl, exists := dagJson["githubRawSourceUrl"].(string)
-	printutil.LogKeyNotExists(exists, "githubRawSourceUrl", dagJson)
+	githubRawSourceURL, exists := dagJSON["githubRawSourceUrl"].(string)
+	printutil.LogKeyNotExists(exists, "githubRawSourceUrl", dagJSON)
 
-	filePath, exists := dagJson["filePath"].(string)
-	printutil.LogKeyNotExists(exists, "filePath", dagJson)
+	filePath, exists := dagJSON["filePath"].(string)
+	printutil.LogKeyNotExists(exists, "filePath", dagJSON)
 
-	httputil.DownloadResponseToFile(githubRawSourceUrl, filePath)
-	fmt.Printf("Successfully added DAG %s:%s to %s", dagId, dagVersion, filePath)
+	httputil.DownloadResponseToFile(githubRawSourceURL, filePath)
+	fmt.Printf("Successfully added DAG %s:%s to %s", dagID, dagVersion, filePath)
 
 	if addProviders {
-		providers, exists := dagJson["providers"].([]interface{})
-		printutil.LogKeyNotExists(exists, "providers", dagJson)
+		providers, exists := dagJSON["providers"].([]interface{})
+		printutil.LogKeyNotExists(exists, "providers", dagJSON)
 		for _, provider := range providers {
-			providerJson := provider.(map[string]interface{})
-			providerId, nexists := providerJson["name"].(string) // displayName??
-			printutil.LogKeyNotExists(nexists, "name", providerJson)
-			log.Infof("Adding provider required for DAG: %s", providerId)
-			addProviderByName(providerId)
+			providerJSON := provider.(map[string]interface{})
+			providerID, nexists := providerJSON["name"].(string) // displayName??
+			printutil.LogKeyNotExists(nexists, "name", providerJSON)
+			log.Infof("Adding provider required for DAG: %s", providerID)
+			addProviderByName(providerID)
 		}
 	}
 }
 
-func getDagRoute(dagId string, dagVersion string) string {
-	filledDagRoute := fmt.Sprintf(dagRoute, dagId, dagVersion)
-	getDagUrl := url.URL{
+func getDagRoute(dagID, dagVersion string) string {
+	filledDagRoute := fmt.Sprintf(dagRoute, dagID, dagVersion)
+	getDagURL := url.URL{
 		Scheme: "https",
 		Host:   registryHost,
-		Path:   fmt.Sprintf("%s/%s", registryApi, filledDagRoute),
+		Path:   fmt.Sprintf("%s/%s", registryAPI, filledDagRoute),
 	}
-	return getDagUrl.String()
+	return getDagURL.String()
 }
