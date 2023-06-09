@@ -27,12 +27,26 @@ var (
 		apiToken1,
 		{Id: "token2", Name: "Token 2", Description: description2, Type: "Type 2", Roles: []astrocore.ApiTokenRole{{EntityId: "ORGANIZATION", Role: "ORGANIZATION_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
 	}
+	apiTokens2 = []astrocore.ApiToken{
+		apiToken1,
+		apiToken1,
+	}
 	ListOrganizationAPITokensResponseOK = astrocore.ListOrganizationApiTokensResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 		},
 		JSON200: &astrocore.ListApiTokensPaginated{
 			ApiTokens: apiTokens,
+			Limit:     1,
+			Offset:    0,
+		},
+	}
+	ListOrganizationAPITokensResponse2OK = astrocore.ListOrganizationApiTokensResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.ListApiTokensPaginated{
+			ApiTokens: apiTokens2,
 			Limit:     1,
 			Offset:    0,
 		},
@@ -158,6 +172,27 @@ func TestAddOrgTokenToWorkspace(t *testing.T) {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		err = AddOrgTokenToWorkspace("", "", role, workspace, out, mockClient)
+		assert.NoError(t, err)
+	})
+
+	t.Run("successfully select and add organization token to workspace", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponse2OK, nil)
+		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		// mock os.Stdin
+		expectedInput := []byte("2")
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.Write(expectedInput)
+		assert.NoError(t, err)
+		w.Close()
+		stdin := os.Stdin
+		// Restore stdin right after the test.
+		defer func() { os.Stdin = stdin }()
+		os.Stdin = r
+		err = AddOrgTokenToWorkspace("", selectedTokenName, role, workspace, out, mockClient)
 		assert.NoError(t, err)
 	})
 }
