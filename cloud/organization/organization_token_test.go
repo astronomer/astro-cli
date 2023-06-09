@@ -162,7 +162,7 @@ func TestAddOrgTokenToWorkspace(t *testing.T) {
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
 		mockClient.On("UpdateOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
 		// mock os.Stdin
-		expectedInput := []byte("1")
+		expectedInput := []byte("2")
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
 		_, err = w.Write(expectedInput)
