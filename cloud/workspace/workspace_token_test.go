@@ -323,7 +323,6 @@ func TestUpdateToken(t *testing.T) {
 		mockClient.On("UpdateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
 		err := UpdateToken("token1", "", "", "", "WORKSPACE_MEMBER", "", out, mockClient)
 		assert.NoError(t, err)
-
 	})
 }
 
