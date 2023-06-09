@@ -298,6 +298,14 @@ func TestUpdateToken(t *testing.T) {
 		assert.Equal(t, "failed to update workspace", err.Error())
 	})
 
+	t.Run("error path when there is no context", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := UpdateToken("token1", "", "", "", "", "", out, mockClient)
+		assert.Error(t, err)
+	})
+
 	t.Run("error path when workspace role is invalid returns an error", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
@@ -338,6 +346,14 @@ func TestRotateToken(t *testing.T) {
 		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
 		err := RotateToken("token1", "", "", false, out, mockClient)
 		assert.NoError(t, err)
+	})
+
+	t.Run("error path when there is no context", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := RotateToken("token1", "", "", false, out, mockClient)
+		assert.Error(t, err)
 	})
 
 	t.Run("error path when getWorkspaceTokens returns an error", func(t *testing.T) {
@@ -388,6 +404,14 @@ func TestDeleteToken(t *testing.T) {
 		mockClient.On("DeleteWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceAPITokenResponseOK, nil)
 		err := DeleteToken("token2", "", "", false, out, mockClient)
 		assert.NoError(t, err)
+	})
+
+	t.Run("error path when there is no context", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		out := new(bytes.Buffer)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		err := DeleteToken("token1", "", "", false, out, mockClient)
+		assert.Error(t, err)
 	})
 
 	t.Run("error path when getWorkspaceTokens returns an error", func(t *testing.T) {
