@@ -119,7 +119,6 @@ var GetWorkspaceSelection = func(client astro.Client, out io.Writer) (string, er
 	return selected.ID, nil
 }
 
-// Switch switches workspaces
 func Switch(id string, client astro.Client, out io.Writer) error {
 	if id == "" {
 		_id, err := GetWorkspaceSelection(client, out)
@@ -177,7 +176,6 @@ func validateEnforceCD(enforceCD string) (bool, error) {
 	return enforce, nil
 }
 
-// Create creates workspaces
 func Create(name, description, enforceCD string, out io.Writer, client astrocore.CoreClient) error {
 	if name == "" {
 		return ErrInvalidName
@@ -210,7 +208,6 @@ func Create(name, description, enforceCD string, out io.Writer, client astrocore
 	return nil
 }
 
-// Update updates workspaces
 func Update(id, name, description, enforceCD string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -275,7 +272,6 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	return nil
 }
 
-// Delete deletes workspaces
 func Delete(id string, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
