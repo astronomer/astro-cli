@@ -222,7 +222,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenDeleteCmd(out),
 		newWorkspaceTokenAddCmd(out),
 	)
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you'd like to manage tokens")
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you would like to manage tokens")
 	return cmd
 }
 
@@ -293,7 +293,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a token in an Astro Workspace",
-		Long: "Update a token in an Astro Workspace\n$astro workspace token udpate [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
+		Long: "Update a token in an Astro Workspace\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
 			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceToken(cmd, args, out)
@@ -311,8 +311,8 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
-		Short:   "Rotate a workspace token's key",
-		Long:    "Rotate a workspace token's key",
+		Short:   "Rotate a workspace token",
+		Long:    "Rotate a workspace token",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
@@ -636,7 +636,7 @@ func coalesceWorkspace() (string, error) {
 	return "", errors.New("no valid workspace source found")
 }
 
-func selectTokenRole() (string, error) {
+func selectWorkspaceTokenRole() (string, error) {
 	tokenRolesMap := map[string]string{}
 	tab := &printutil.Table{
 		Padding:        []int{44, 50},
