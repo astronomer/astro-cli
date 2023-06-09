@@ -68,7 +68,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 		scope := apiTokens[i].Type
 		var role string
 		for j := range apiTokens[i].Roles {
-			if apiTokens[i].Roles[j].EntityId == workspaceConst {
+			if apiTokens[i].Roles[j].EntityId == workspace {
 				role = apiTokens[i].Roles[j].Role
 			}
 		}
@@ -307,7 +307,7 @@ func selectTokens(workspace string, apiTokens []astrocore.ApiToken) (astrocore.A
 		scope := apiTokens[i].Type
 		var role string
 		for j := range apiTokens[i].Roles {
-			if apiTokens[i].Roles[j].EntityId == workspaceConst {
+			if apiTokens[i].Roles[j].EntityId == workspace {
 				role = apiTokens[i].Roles[j].Role
 			}
 		}

@@ -297,6 +297,7 @@ func TestUpdateToken(t *testing.T) {
 		assert.Equal(t, "failed to update workspace", err.Error())
 	})
 }
+
 func TestRotateToken(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -336,6 +337,7 @@ func TestRotateToken(t *testing.T) {
 		assert.Equal(t, "failed to update workspace", err.Error())
 	})
 }
+
 func TestDeleteToken(t *testing.T) {
 	t.Run("happy path - delete workspace token", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -384,7 +386,6 @@ func TestDeleteToken(t *testing.T) {
 		err := DeleteToken("token1", "", "", true, out, mockClient)
 		assert.Equal(t, "failed to update workspace", err.Error())
 	})
-
 }
 
 func TestGetWorkspaceToken(t *testing.T) {
