@@ -95,7 +95,7 @@ func UpdateUserRole(email, role string, out io.Writer, client astrocore.CoreClie
 			return ErrUserNotFound
 		}
 	} else {
-		user, err := selectUser(users, false)
+		user, err := SelectUser(users, false)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -130,7 +130,7 @@ func IsRoleValid(role string) error {
 	return ErrInvalidRole
 }
 
-func selectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
+func SelectUser(users []astrocore.User, workspace bool) (astrocore.User, error) {
 	roleColumn := "ORGANIZATION ROLE"
 	if workspace {
 		roleColumn = "WORKSPACE ROLE"
@@ -433,7 +433,7 @@ func RemoveWorkspaceUser(email, workspace string, out io.Writer, client astrocor
 
 func getUserID(email string, users []astrocore.User, workspace bool) (userID, newEmail string, err error) {
 	if email == "" {
-		user, err := selectUser(users, workspace)
+		user, err := SelectUser(users, workspace)
 		userID = user.Id
 		email = user.Username
 		if err != nil {
@@ -447,4 +447,27 @@ func getUserID(email string, users []astrocore.User, workspace bool) (userID, ne
 		}
 	}
 	return userID, email, nil
+}
+
+func GetUser(client astrocore.CoreClient, userID string) (user astrocore.User, err error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return user, err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user, ErrNoShortName
+	}
+
+	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.OrganizationShortName, userID)
+	if err != nil {
+		return user, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return user, err
+	}
+
+	user = *resp.JSON200
+
+	return user, nil
 }

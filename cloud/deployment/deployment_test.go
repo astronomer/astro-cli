@@ -380,6 +380,18 @@ func TestIsDeploymentHosted(t *testing.T) {
 	})
 }
 
+func TestIsDeploymentDedicated(t *testing.T) {
+	t.Run("if deployment type is dedicated", func(t *testing.T) {
+		out := IsDeploymentDedicated("HOSTED_DEDICATED")
+		assert.Equal(t, out, true)
+	})
+
+	t.Run("if deployment type is hybrid", func(t *testing.T) {
+		out := IsDeploymentDedicated("")
+		assert.Equal(t, out, false)
+	})
+}
+
 func TestSelectRegion(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
