@@ -248,28 +248,15 @@ func TestInspect(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		deploymentResponse := []astro.Deployment{
 			{
-				ID:          deploymentID,
-				Label:       deploymentName,
-				ReleaseName: "great-release-name",
-				Workspace:   astro.Workspace{ID: workspaceID},
-				Type:        "HOSTED_SHARED",
+				ID:                 deploymentID,
+				Label:              deploymentName,
+				ReleaseName:        "great-release-name",
+				Workspace:          astro.Workspace{ID: workspaceID},
+				Type:               "HOSTED_SHARED",
+				IsHighAvailability: true,
 				Cluster: astro.Cluster{
 					ID:     "cluster-id",
 					Region: "us-central1",
-					NodePools: []astro.NodePool{
-						{
-							ID:               "test-pool-id",
-							IsDefault:        false,
-							NodeInstanceType: "test-instance-type",
-							CreatedAt:        time.Now(),
-						},
-						{
-							ID:               "test-pool-id-1",
-							IsDefault:        true,
-							NodeInstanceType: "test-instance-type-1",
-							CreatedAt:        time.Now(),
-						},
-					},
 				},
 				RuntimeRelease: astro.RuntimeRelease{Version: "6.0.0", AirflowVersion: "2.4.0"},
 				DeploymentSpec: astro.DeploymentSpec{
@@ -288,16 +275,7 @@ func TestInspect(t *testing.T) {
 						MaxWorkerCount:    130,
 						MinWorkerCount:    12,
 						WorkerConcurrency: 110,
-						NodePoolID:        "test-pool-id",
-					},
-					{
-						ID:                "test-wq-id-1",
-						Name:              "test-queue-1",
-						IsDefault:         false,
-						MaxWorkerCount:    175,
-						MinWorkerCount:    8,
-						WorkerConcurrency: 150,
-						NodePoolID:        "test-pool-id-1",
+						AstroMachine:      "a5",
 					},
 				},
 				UpdatedAt: time.Now(),
@@ -311,6 +289,7 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse[0].RuntimeRelease.Version)
 		assert.Contains(t, out.String(), "us-central1")
+		assert.Contains(t, out.String(), "a5")
 		mockClient.AssertExpectations(t)
 	})
 }
@@ -952,6 +931,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
         runtime_version: 6.0.0
         dag_deploy_enabled: true
         ci_cd_enforcement: true
+        scheduler_size: ""
+        is_high_availability: false
         executor: CeleryExecutor
         scheduler_au: 5
         scheduler_count: 3
@@ -1105,6 +1086,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "runtime_version": "6.0.0",
             "dag_deploy_enabled": true,
             "ci_cd_enforcement": true,
+            "scheduler_size": "",
+            "is_high_availability": false,
             "executor": "KubernetesExecutor",
             "scheduler_au": 5,
             "scheduler_count": 3,
@@ -1331,7 +1314,7 @@ func TestGetSpecificField(t *testing.T) {
 		}
 		actual, err := getSpecificField(printableDeployment, requestedField)
 		assert.NoError(t, err)
-		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor), actual)
+		assert.Equal(t, getQMap(sourceDeployment.WorkerQueues, sourceDeployment.Cluster.NodePools, sourceDeployment.DeploymentSpec.Executor, sourceDeployment.Type), actual)
 	})
 	t.Run("returns a value if key is metadata", func(t *testing.T) {
 		requestedField := "metadata"

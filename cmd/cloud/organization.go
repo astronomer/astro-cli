@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -29,6 +29,10 @@ var (
 	shouldDisplayLoginLink             bool
 	role                               string
 	updateRole                         string
+	teamDescription                    string
+	teamName                           string
+	teamID                             string
+	userID                             string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -42,10 +46,9 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationListCmd(out),
 		newOrganizationSwitchCmd(out),
 		newOrganizationUserRootCmd(out),
+		newOrganizationTeamRootCmd(out),
+		newOrganizationAuditLogs(out),
 	)
-	if config.CFG.AuditLogs.GetBool() {
-		cmd.AddCommand(newOrganizationAuditLogs(out))
-	}
 	return cmd
 }
 
@@ -251,4 +254,185 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	cmd.SilenceUsage = true
 	return user.UpdateUserRole(email, updateRole, out, astroCoreClient)
+}
+
+func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "team",
+		Aliases: []string{"te"},
+		Short:   "Manage teams in your Astro Organization",
+		Long:    "Manage teams in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newTeamCreateCmd(out),
+		newOrganizationTeamListCmd(out),
+		newTeamUpdateCmd(out),
+		newTeamDeleteCmd(out),
+		newOrganizationTeamUserRootCmd(out),
+	)
+	return cmd
+}
+
+func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the teams in your Astro Organization",
+		Long:    "List all the teams in your Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listTeams(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func listTeams(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.ListOrgTeams(out, astroCoreClient)
+}
+
+func newTeamUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [team-id]",
+		Aliases: []string{"up"},
+		Short:   "Update an Astro team",
+		Long:    "Update an Astro team",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return teamUpdate(cmd, out, args)
+		},
+	}
+	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	return cmd
+}
+
+func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	cmd.SilenceUsage = true
+
+	id := ""
+
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	return team.UpdateTeam(id, teamName, teamDescription, out, astroCoreClient)
+}
+
+func newTeamCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create an Astro Team",
+		Long:    "Create an Astro Team",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return teamCreate(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
+	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
+	return cmd
+}
+
+func teamCreate(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.CreateTeam(teamName, teamDescription, out, astroCoreClient)
+}
+
+func newTeamDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [team-id]",
+		Aliases: []string{"de"},
+		Short:   "Delete an Astro Team",
+		Long:    "Delete an Astro Team",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return teamDelete(cmd, out, args)
+		},
+	}
+	return cmd
+}
+
+func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+	cmd.SilenceUsage = true
+
+	id := ""
+
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	return team.Delete(id, out, astroCoreClient)
+}
+
+func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "user",
+		Short: "Manage users in your Astro Team",
+		Long:  "Manage users in your Astro Team.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newTeamRemoveUserCmd(out),
+		newTeamAddUserCmd(out),
+		newTeamListUsersCmd(out),
+	)
+	return cmd
+}
+
+func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove a user from an Astro Team",
+		Long:  "Remove a user from an Astro Team",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeTeamUser(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	return cmd
+}
+
+func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.RemoveUser(teamID, userID, out, astroCoreClient)
+}
+
+func newTeamAddUserCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add",
+		Short: "Add a user to an Astro Team",
+		Long:  "Add a user to an Astro Team",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addTeamUser(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
+	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	return cmd
+}
+
+func addTeamUser(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.AddUser(teamID, userID, out, astroCoreClient)
+}
+
+func newTeamListUsersCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "Lists users in an Astro Team",
+		Long:  "Lists users in an Astro Team",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listUsersCmd(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's id \"\" ")
+	return cmd
+}
+
+func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.ListTeamUsers(teamID, out, astroCoreClient)
 }

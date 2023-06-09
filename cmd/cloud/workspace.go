@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cloud/team"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -35,6 +36,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUpdateCmd(out),
 		newWorkspaceDeleteCmd(out),
 		newWorkspaceUserRootCmd(out),
+		newWorkspaceTeamRootCmd(out),
 	)
 	return cmd
 }
@@ -185,6 +187,126 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	return cmd
+}
+
+func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "team",
+		Aliases: []string{"te"},
+		Short:   "Manage teams in your Astro Workspace",
+		Long:    "Manage teams in your Astro Workspace.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newWorkspaceTeamListCmd(out),
+		newWorkspaceTeamUpdateCmd(out),
+		newWorkspaceTeamRemoveCmd(out),
+		newWorkspaceTeamAddCmd(out),
+	)
+	return cmd
+}
+
+func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the teams in an Astro Workspace",
+		Long:    "List all the teams in an Astro Workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listWorkspaceTeam(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return team.ListWorkspaceTeams(out, astroCoreClient, "")
+}
+
+func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "remove",
+		Aliases: []string{"rm"},
+		Short:   "Remove a team from an Astro Workspace",
+		Long:    "Remove a team from an Astro Workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeWorkspaceTeam(cmd, args, out)
+		},
+	}
+	return cmd
+}
+
+func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+	var id string
+
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		id = args[0]
+	}
+	cmd.SilenceUsage = true
+	return team.RemoveWorkspaceTeam(id, "", out, astroCoreClient)
+}
+
+func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [id]",
+		Short: "Add a team to an Astro Workspace with a specific role",
+		Long: "Add a team to an Astro Workspace with a specific role\n$astro workspace team add [id] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addWorkspaceTeam(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
+		"new team. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	return cmd
+}
+
+func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+	var id string
+
+	// if an email was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the email is lowercase
+		id = args[0]
+	}
+	cmd.SilenceUsage = true
+	return team.AddWorkspaceTeam(id, addWorkspaceRole, "", out, astroCoreClient)
+}
+
+func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [id]",
+		Aliases: []string{"up"},
+		Short:   "Update a the role of a team in an Astro Workspace",
+		Long: "Update the role of a team in an Astro Workspace\n$astro workspace team update [id] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateWorkspaceTeam(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
+		"team. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	return cmd
+}
+
+func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+	var id string
+
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		id = args[0]
+	}
+
+	if updateWorkspaceRole == "" {
+		// no role was provided so ask the user for it
+		updateWorkspaceRole = input.Text("Enter a team workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) to update team: ")
+	}
+
+	cmd.SilenceUsage = true
+	return team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, "", out, astroCoreClient)
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
