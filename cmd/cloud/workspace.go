@@ -435,10 +435,13 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if len(args) > 0 {
 		id = args[0]
 	}
-
+	var err error
 	if updateWorkspaceRole == "" {
 		// no role was provided so ask the user for it
-		updateWorkspaceRole = input.Text("Enter a team workspace role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER) to update team: ")
+		updateWorkspaceRole, err = selectWorkspaceRole()
+		if err != nil {
+			return err
+		}
 	}
 
 	cmd.SilenceUsage = true
@@ -545,13 +548,13 @@ func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	if tokenName == "" {
 		// no role was provided so ask the user for it
-		tokenName = input.Text("Enter a name for the new Workspace Token: ")
+		tokenName = input.Text("Enter a name for the new Workspace API token: ")
 	}
 	if tokenRole == "" {
-		fmt.Println("select a Workspace Role for the new Token:")
+		fmt.Println("select a Workspace Role for the new API token:")
 		// no role was provided so ask the user for it
 		var err error
-		tokenRole, err = selectWorkspaceTokenRole()
+		tokenRole, err = selectWorkspaceRole()
 		if err != nil {
 			return err
 		}
@@ -604,7 +607,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		fmt.Println("select a Workspace Role for the Organization Token:")
 		// no role was provided so ask the user for it
 		var err error
-		tokenRole, err = selectWorkspaceTokenRole()
+		tokenRole, err = selectWorkspaceRole()
 		if err != nil {
 			return err
 		}
@@ -631,7 +634,7 @@ func coalesceWorkspace() (string, error) {
 	return "", errors.New("no valid workspace source found")
 }
 
-func selectWorkspaceTokenRole() (string, error) {
+func selectWorkspaceRole() (string, error) {
 	tokenRolesMap := map[string]string{}
 	tab := &printutil.Table{
 		Padding:        []int{44, 50},
