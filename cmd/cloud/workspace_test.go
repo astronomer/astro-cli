@@ -1105,7 +1105,7 @@ func TestWorkspaceTokenRootCommand(t *testing.T) {
 }
 
 func TestWorkspaceTokenList(t *testing.T) {
-	expectedHelp := "List all the tokens in an Astro Workspace"
+	expectedHelp := "List all the API tokens in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
@@ -1145,7 +1145,7 @@ func TestWorkspaceTokenList(t *testing.T) {
 }
 
 func TestWorkspaceTokenCreate(t *testing.T) {
-	expectedHelp := "Create a token in an Astro Workspace"
+	expectedHelp := "Create an API token in an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
@@ -1224,7 +1224,7 @@ func TestWorkspaceTokenCreate(t *testing.T) {
 }
 
 func TestWorkspaceTokenUpdate(t *testing.T) {
-	expectedHelp := "Update a token in an Astro Workspace"
+	expectedHelp := "Update an Astro Workspace API token"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
@@ -1287,7 +1287,7 @@ func TestWorkspaceTokenUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTokenRotate(t *testing.T) {
-	expectedHelp := "Rotate a workspace token"
+	expectedHelp := "Rotate a Workspace API token"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
@@ -1371,7 +1371,7 @@ func TestWorkspaceTokenRotate(t *testing.T) {
 }
 
 func TestWorkspaceTokenDelete(t *testing.T) {
-	expectedHelp := "Delete a workspace token or remove an organization token from a workspace"
+	expectedHelp := "Delete a Workspace API token or remove an Organization API token from a Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
@@ -1499,7 +1499,7 @@ var (
 )
 
 func TestWorkspaceTokenAdd(t *testing.T) {
-	expectedHelp := "Add an Organization Token to an Astro Workspace"
+	expectedHelp := "Add an Organization API token to an Astro Workspace"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
