@@ -149,7 +149,7 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 			}
 		}
 		if len(matchedTokens) == 1 {
-		        token = matchedTokens[0]
+			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
 			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
 			token, err = selectTokens(matchedTokens)

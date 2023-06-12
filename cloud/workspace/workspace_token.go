@@ -388,7 +388,7 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 			}
 		}
 		if len(matchedTokens) == 1 {
-		        token = matchedTokens[0]
+			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
 			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
 			token, err = selectTokens(workspace, matchedTokens)
