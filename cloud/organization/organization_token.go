@@ -30,11 +30,10 @@ func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "DESCRIPTION"},
+		Header:         []string{"#", "NAME", "DESCRIPTION", "EXPIRES"},
 	}
 }
 
-// Update a workspace token
 func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
@@ -105,12 +104,14 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	for i := range apiTokens {
 		name := apiTokens[i].Name
 		description := apiTokens[i].Description
+		expires := apiTokens[i].ExpiryPeriodInDays
 
 		index := i + 1
 		tab.AddRow([]string{
 			strconv.Itoa(index),
 			name,
 			description,
+			fmt.Sprint(expires),
 		}, false)
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
@@ -165,7 +166,6 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 	return token, nil
 }
 
-// get all workspace tokens
 func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
