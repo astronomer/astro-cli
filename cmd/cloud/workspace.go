@@ -318,7 +318,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate workspace token without showing a warning")
+	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate Workspace token without showing a warning")
 
 	return cmd
 }
@@ -327,14 +327,14 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"de"},
-		Short:   "Delete a workspace token or remove an organization token from a workspace",
-		Long:    "Delete a workspace token or remove an organization token from a workspace",
+		Short:   "Delete a Workspace token or remove an Organization token from a Workspace",
+		Long:    "Delete a Workspace token or remove an Organization token from a Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return DeleteWorkspaceToken(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete the workspace token without showing a warning")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete the Workspace token without showing a warning")
 
 	return cmd
 }
@@ -342,16 +342,16 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 func newWorkspaceTokenAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
-		Short: "Add an Organization Token to an Astro Workspace",
-		Long: "Add an Organization Token to an Astro Workspace\n$astro workspace token add [ORG_TOKEN_NAME] --name [new token name] --role [WORKSPACE_MEMBER, " +
+		Short: "Add an Organization token to an Astro Workspace",
+		Long: "Add an Organization token to an Astro Workspace\n$astro workspace token add [ORG_TOKEN_NAME] --name [new token name] --role [WORKSPACE_MEMBER, " +
 			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToWorkspace(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the organization token you want to add to a workspace. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The workspace role to add to the "+
-		"organization token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization token you want to add to an Astro Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Workspace role to add to the "+
+		"Organization token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
 	return cmd
 }
 
