@@ -160,7 +160,6 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
 	if role == "" {
-		fmt.Println("role is empty")
 		for i := range token.Roles {
 			if token.Roles[i].EntityId == workspaceConst {
 				role = token.Roles[i].Role
@@ -382,16 +381,17 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 			return astrocore.ApiToken{}, ErrWorkspaceTokenNotFound
 		}
 	case name != "" && id == "":
-		var j int
+		var matchedTokens []astrocore.ApiToken
 		for i := range tokens {
 			if tokens[i].Name == name {
-				token = tokens[i]
-				j++
+				matchedTokens = append(matchedTokens, tokens[i])
 			}
 		}
-		if j > 1 {
+		if len(matchedTokens) == 1 {
+			token = matchedTokens[0]
+		} else if len(matchedTokens) > 1 {
 			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
-			token, err = selectTokens(workspace, tokens)
+			token, err = selectTokens(workspace, matchedTokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err
 			}
