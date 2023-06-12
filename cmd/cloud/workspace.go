@@ -317,7 +317,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate workspace token without showing a warning")
 
 	return cmd
@@ -333,8 +333,8 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 			return DeleteWorkspaceToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Rotate workspace roken without showing a warning")
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete the workspace token without showing a warning")
 
 	return cmd
 }
@@ -469,7 +469,6 @@ func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-
 	id := ""
 
 	if len(args) == 1 {
@@ -480,7 +479,6 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-
 	id := ""
 
 	if len(args) == 1 {
