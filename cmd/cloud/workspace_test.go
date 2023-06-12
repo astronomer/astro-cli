@@ -1224,7 +1224,7 @@ func TestWorkspaceTokenCreate(t *testing.T) {
 }
 
 func TestWorkspaceTokenUpdate(t *testing.T) {
-	expectedHelp := "Update an Astro Workspace API token"
+	expectedHelp := "Update a Workspace or Organaization API token"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
