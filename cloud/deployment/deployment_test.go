@@ -2509,7 +2509,7 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 			JSON200: &astrocore.SharedCluster{Id: csID},
 		}
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, getSharedClusterParams).Return(mockOKResponse, nil).Once()
-		actual, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", mockCoreClient)
+		actual, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", "standard", mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, csID, actual)
 		mockCoreClient.AssertExpectations(t)
@@ -2519,7 +2519,7 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 		region := "us-central1"
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(nil, errMock).Once()
-		_, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", mockCoreClient)
+		_, err := useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, "", "", "standard", mockCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})
@@ -2527,7 +2527,7 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
 		defer testUtil.MockUserInput(t, "1")()
-		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", mockCoreClient)
+		actual, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", "standard", mockCoreClient)
 		assert.NoError(t, err)
 		assert.Equal(t, csID, actual)
 		mockCoreClient.AssertExpectations(t)
@@ -2535,7 +2535,7 @@ func TestUseSharedClusterOrSelectCluster(t *testing.T) {
 	t.Run("returns error if selecting cluster fails", func(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&astrocore.ListClustersResponse{}, errMock).Once()
-		_, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", mockCoreClient)
+		_, err := useSharedClusterOrSelectDedicatedCluster("", "", mockOrgShortName, "", "standard", mockCoreClient)
 		assert.ErrorIs(t, err, errMock)
 		mockCoreClient.AssertExpectations(t)
 	})

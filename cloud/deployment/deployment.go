@@ -246,7 +246,7 @@ func Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeplo
 	}
 
 	// select and validate cluster
-	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, c.OrganizationShortName, clusterID, coreClient)
+	clusterID, err = useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, c.OrganizationShortName, clusterID, clusterType, coreClient)
 	if err != nil {
 		return err
 	}
@@ -522,9 +522,9 @@ func useSharedCluster(cloudProvider astrocore.SharedClusterCloudProvider, region
 // useSharedClusterOrSelectDedicatedCluster decides how to derive the clusterID to use for a deployment.
 // if cloudProvider and region are provided, it uses a useSharedCluster to get the ClusterID.
 // if not, it uses selectCluster to get the ClusterID.
-func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationShortName, clusterID string, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
+func useSharedClusterOrSelectDedicatedCluster(cloudProvider, region, organizationShortName, clusterID, clusterType string, coreClient astrocore.CoreClient) (derivedClusterID string, err error) {
 	// if cloud provider and region are requested
-	if cloudProvider != "" && region != "" {
+	if clusterType == standard && cloudProvider != "" && region != "" {
 		// use a shared cluster for the deployment
 		derivedClusterID, err = useSharedCluster(astrocore.SharedClusterCloudProvider(cloudProvider), region, coreClient)
 		if err != nil {
