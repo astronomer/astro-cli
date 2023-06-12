@@ -23,7 +23,7 @@ var (
 )
 
 const (
-	workspaceConst = "WORKSPACE"
+	workspaceEntity = "WORKSPACE"
 )
 
 func newTokenSelectionTableOut() *printutil.Table {
@@ -61,7 +61,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 
 	var orgRole string
 	for i := range token.Roles {
-		if token.Roles[i].EntityId == workspaceConst {
+		if token.Roles[i].EntityId == workspaceEntity {
 			return errOrgTokenInWorkspace
 		}
 

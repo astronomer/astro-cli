@@ -330,7 +330,7 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete a Workspace API token or remove an Organization API token from a Workspace",
 		Long:    "Delete a Workspace API token or remove an Organization API token from a Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return DeleteWorkspaceToken(cmd, args, out)
+			return deleteWorkspaceToken(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")

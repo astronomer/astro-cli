@@ -41,7 +41,7 @@ var (
 )
 
 const (
-	workspaceConst = "WORKSPACE"
+	workspaceEntity = "WORKSPACE"
 )
 
 // List all workspace Tokens
@@ -161,7 +161,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	}
 	if role == "" {
 		for i := range token.Roles {
-			if token.Roles[i].EntityId == workspaceConst {
+			if token.Roles[i].EntityId == workspaceEntity {
 				role = token.Roles[i].Role
 			}
 		}
@@ -257,7 +257,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 		return err
 	}
 	apiTokenID := token.Id
-	if string(token.Type) == workspaceConst {
+	if string(token.Type) == workspaceEntity {
 		if !force {
 			fmt.Println("WARNING: API Token deletion cannot be undone.")
 			i, _ := input.Confirm(
@@ -288,7 +288,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	if err != nil {
 		return err
 	}
-	if string(token.Type) == workspaceConst {
+	if string(token.Type) == workspaceEntity {
 		fmt.Fprintf(out, "Astro Workspace API token %s was successfully deleted\n", token.Name)
 	} else {
 		fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the workspace\n", token.Name)
