@@ -142,16 +142,17 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 			return astrocore.ApiToken{}, errOrganizationTokenNotFound
 		}
 	case name != "" && id == "":
-		var j int
+		var matchedTokens []astrocore.ApiToken
 		for i := range tokens {
 			if tokens[i].Name == name {
-				token = tokens[i]
-				j++
+				matchedTokens = append(matchedTokens, tokens[i])
 			}
 		}
-		if j > 1 {
+		if len(matchedTokens) == 1 {
+		        token = matchedTokens[0]
+		} else if len(matchedTokens) > 1 {
 			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
-			token, err = selectTokens(tokens)
+			token, err = selectTokens(matchedTokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err
 			}
@@ -165,7 +166,7 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 	return token, nil
 }
 
-// get all workspace tokens
+// get all organization tokens
 func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
