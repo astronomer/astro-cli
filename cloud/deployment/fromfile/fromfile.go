@@ -223,6 +223,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Description:           deploymentFromFile.Deployment.Configuration.Description,
 			RuntimeReleaseVersion: deploymentFromFile.Deployment.Configuration.RunTimeVersion,
 			DagDeployEnabled:      deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			SchedulerSize:         deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
@@ -244,6 +245,7 @@ func getCreateOrUpdateInput(deploymentFromFile *inspect.FormattedDeployment, clu
 			Label:            deploymentFromFile.Deployment.Configuration.Name,
 			Description:      deploymentFromFile.Deployment.Configuration.Description,
 			DagDeployEnabled: deploymentFromFile.Deployment.Configuration.DagDeployEnabled,
+			SchedulerSize:    deploymentFromFile.Deployment.Configuration.SchedulerSize,
 			DeploymentSpec: astro.DeploymentCreateSpec{
 				Executor: deploymentFromFile.Deployment.Configuration.Executor,
 				Scheduler: astro.Scheduler{
@@ -297,14 +299,14 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 			if queue.Name == defaultQueue {
 				hasDefaultQueue = true
 			}
-			if !hasDefaultQueue && queue.Name != defaultQueue {
-				missingField := fmt.Sprintf("deployment.worker_queues[%d].name = default", i)
-				return fmt.Errorf("%w: %s", errRequiredField, missingField)
-			}
 			if queue.WorkerType == "" {
 				missingField := fmt.Sprintf("deployment.worker_queues[%d].worker_type", i)
 				return fmt.Errorf("%w: %s", errRequiredField, missingField)
 			}
+		}
+		if !hasDefaultQueue {
+			missingField := "default queue is missing under deployment.worker_queues"
+			return fmt.Errorf("%w: %s", errRequiredField, missingField)
 		}
 	}
 	return nil
@@ -432,6 +434,7 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		err        error
 	)
 	requestedQueues := deploymentFromFile.Deployment.WorkerQs
+	deploymentType := deploymentFromFile.Deployment.Configuration.DeploymentType
 	// sort existing queues by name
 	if len(existingQueues) > 1 {
 		sort.Slice(existingQueues, func(i, j int) bool {
@@ -469,12 +472,16 @@ func getQueues(deploymentFromFile *inspect.FormattedDeployment, nodePools []astr
 		qList[i].WorkerConcurrency = requestedQueues[i].WorkerConcurrency
 		qList[i].PodCPU = requestedQueues[i].PodCPU
 		qList[i].PodRAM = requestedQueues[i].PodRAM
-		// map worker type to node pool id
-		nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
-		if err != nil {
-			return nil, err
+		if deployment.IsDeploymentDedicated(deploymentType) || deployment.IsDeploymentHosted(deploymentType) {
+			qList[i].AstroMachine = requestedQueues[i].WorkerType
+		} else {
+			// map worker type to node pool id
+			nodePoolID, err = getNodePoolIDFromWorkerType(requestedQueues[i].WorkerType, deploymentFromFile.Deployment.Configuration.ClusterName, nodePools)
+			if err != nil {
+				return nil, err
+			}
+			qList[i].NodePoolID = nodePoolID
 		}
-		qList[i].NodePoolID = nodePoolID
 	}
 	return qList, nil
 }

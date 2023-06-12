@@ -3289,7 +3289,7 @@ func TestCheckRequiredFields(t *testing.T) {
 		input.Deployment.WorkerQs = qList
 		err = checkRequiredFields(&input, "create")
 		assert.ErrorIs(t, err, errRequiredField)
-		assert.ErrorContains(t, err, "missing required field: deployment.worker_queues[0].name = default")
+		assert.ErrorContains(t, err, "missing required field: default queue is missing under deployment.worker_queues")
 	})
 	t.Run("if queues were requested, it returns an error if worker type is missing", func(t *testing.T) {
 		input.Deployment.Configuration.Name = "test-deployment"
