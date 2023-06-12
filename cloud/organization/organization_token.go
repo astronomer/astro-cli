@@ -17,7 +17,7 @@ import (
 
 var (
 	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
-	errOrganizationTokenNotFound   = errors.New("Organization token specified was not found")
+	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace         = errors.New("this Organization API token has already been added to the Workspace")
 	errBothNameAndID               = errors.New("both an API token name and id were specified. Specify either the name or the id not both")
 )
