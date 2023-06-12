@@ -84,6 +84,17 @@ func TestList(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 
+	t.Run("success with no deployments in a workspace", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
+
+		buf := new(bytes.Buffer)
+		err := List(ws, false, mockClient, buf)
+		assert.NoError(t, err)
+
+		mockClient.AssertExpectations(t)
+	})
+
 	t.Run("success with all true", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockClient.On("ListDeployments", org, "").Return([]astro.Deployment{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
@@ -165,6 +176,14 @@ func TestGetDeployment(t *testing.T) {
 
 		_, err := GetDeployment(ws, "", deploymentName, false, mockClient, nil)
 		assert.ErrorIs(t, err, errInvalidDeployment)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("no deployments in workspace", func(t *testing.T) {
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
+
+		_, err := GetDeployment(ws, "", deploymentName, true, mockClient, nil)
+		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
 
@@ -2246,6 +2265,15 @@ func TestDelete(t *testing.T) {
 
 		err := Delete("test-id", ws, "", false, mockClient)
 		assert.ErrorIs(t, err, errMock)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("no deployments in a workspace", func(t *testing.T) {
+		mockClient := new(astro_mocks.Client)
+		mockClient.On("ListDeployments", org, ws).Return([]astro.Deployment{}, nil).Once()
+
+		err := Delete("test-id", ws, "", true, mockClient)
+		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
 	})
 
