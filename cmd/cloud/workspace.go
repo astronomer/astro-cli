@@ -230,8 +230,8 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all the tokens in an Astro Workspace",
-		Long:    "List all the tokens in an Astro Workspace",
+		Short:   "List all the API tokens in an Astro Workspace",
+		Long:    "List all the API tokens in an Astro Workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceToken(cmd, out)
 		},
@@ -273,8 +273,8 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"cr"},
-		Short:   "Create a token in an Astro Workspace",
-		Long: "Create a token in an Astro Workspace\n$astro workspace token create --name [token name] --role [WORKSPACE_MEMBER, " +
+		Short:   "Create an API token in an Astro Workspace",
+		Long: "Create an API token in an Astro Workspace\n$astro workspace token create --name [token name] --role [WORKSPACE_MEMBER, " +
 			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createWorkspaceToken(cmd, out)
@@ -312,7 +312,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Workspace API token",
-		Long:    "Rotate a Workspace API token. You can only rotate Worspace API tokens. You cannot rotate Organiztion level API tokens with this command",
+		Long:    "Rotate a Workspace API token. You can only rotate Worspace API tokens. You cannot rotate Organization API tokens with this command",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
