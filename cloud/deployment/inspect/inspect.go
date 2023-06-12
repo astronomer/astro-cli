@@ -44,6 +44,9 @@ type deploymentConfig struct {
 	SchedulerCount        int    `mapstructure:"scheduler_count" yaml:"scheduler_count" json:"scheduler_count"`
 	ClusterName           string `mapstructure:"cluster_name" yaml:"cluster_name" json:"cluster_name"`
 	WorkspaceName         string `mapstructure:"workspace_name" yaml:"workspace_name" json:"workspace_name"`
+	DeploymentType        string `mapstructure:"deployment_type" yaml:"deployment_type" json:"deployment_type"`
+	CloudProvider         string `mapstructure:"cloud_provider" yaml:"cloud_provider" json:"cloud_provider"`
+	Region                string `mapstructure:"region" yaml:"region" json:"region"`
 }
 
 type Workerq struct {
@@ -176,6 +179,9 @@ func getDeploymentConfig(sourceDeployment *astro.Deployment) map[string]interfac
 		"name":                 sourceDeployment.Label,
 		"description":          sourceDeployment.Description,
 		"workspace_name":       sourceDeployment.Workspace.Label,
+		"deployment_type":      sourceDeployment.Type,
+		"cloud_provider":       sourceDeployment.Cluster.CloudProvider,
+		"region":               sourceDeployment.Cluster.Region,
 		"cluster_name":         clusterName,
 		"runtime_version":      sourceDeployment.RuntimeRelease.Version,
 		"dag_deploy_enabled":   sourceDeployment.DagDeployEnabled,
