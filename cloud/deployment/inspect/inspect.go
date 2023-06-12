@@ -100,7 +100,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, client ast
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, nil)
 	if err != nil {
 		return err
 	}
@@ -209,7 +209,7 @@ func ReturnSpecifiedValue(wsID, deploymentName, deploymentID string, client astr
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, false, client, nil)
 	if err != nil {
 		return nil, err
 	}
