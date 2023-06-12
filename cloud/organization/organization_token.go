@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	errInvalidOrganizationTokenKey = errors.New("invalid organization token selection")
-	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
-	errOrgTokenInWorkspace         = errors.New("this organization token has already been added to the workspace")
-	errBothNameAndID               = errors.New("both a token name and id were specified. Specify either the name or the id not both")
+	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
+	errOrganizationTokenNotFound   = errors.New("Organization token specified was not found")
+	errOrgTokenInWorkspace         = errors.New("this Organization API token has already been added to the Workspace")
+	errBothNameAndID               = errors.New("both an API token name and id were specified. Specify either the name or the id not both")
 )
 
 const (
@@ -53,7 +53,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	if err != nil {
 		return err
 	}
-	token, err := getOrganizationToken(id, name, "\nPlease select the organization token you would like to add to the workspace:", tokens)
+	token, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Organization Token %s was successfully added to the Workspace\n", token.Name)
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully added to the Workspace\n", token.Name)
 	return nil
 }
 
@@ -152,7 +152,7 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 		if len(matchedTokens) == 1 {
 			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
-			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
+			fmt.Printf("\nThere are more than one API tokens with name %s. Please select an API token:\n", name)
 			token, err = selectTokens(matchedTokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err

@@ -35,9 +35,9 @@ func newTokenSelectionTableOut() *printutil.Table {
 }
 
 var (
-	errInvalidWorkspaceTokenKey = errors.New("invalid workspace token selection")
-	ErrWorkspaceTokenNotFound   = errors.New("no workspace token was found for the token name you provided")
-	errBothNameAndID            = errors.New("both a token name and id were specified. Specify either the name or the id not both")
+	errInvalidWorkspaceTokenKey = errors.New("invalid Workspace API token selection")
+	ErrWorkspaceTokenNotFound   = errors.New("no Workspace API token was found for the API token name you provided")
+	errBothNameAndID            = errors.New("both an API token name and id were specified. Specify either the name or the id not both")
 )
 
 const (
@@ -116,10 +116,10 @@ func CreateToken(name, description, role, workspace string, expiration int, out 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace Token %s was successfully created\nCopy and paste this Token for your records.\n\n", name)
+	fmt.Fprintf(out, "Astro Workspace API token %s was successfully created\nCopy and paste this API token for your records.\n\n", name)
 	APIToken := resp.JSON200
 	fmt.Println(*APIToken.Token)
-	fmt.Println("\nYou will not be shown this API Token value again.")
+	fmt.Println("\nYou will not be shown this API token value again.")
 
 	return nil
 }
@@ -140,7 +140,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	if err != nil {
 		return err
 	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the workspace token you would like to update:", tokens)
+	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace Token %s was successfully updated\n", token.Name)
+	fmt.Fprintf(out, "Astro Workspace API token %s was successfully updated\n", token.Name)
 	return nil
 }
 
@@ -205,7 +205,7 @@ func RotateToken(id, name, workspace string, force bool, out io.Writer, client a
 	if err != nil {
 		return err
 	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the workspace token you would like to rotate:", tokens)
+	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to rotate:", tokens)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func RotateToken(id, name, workspace string, force bool, out io.Writer, client a
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
 		i, _ := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to rotate the %s token?", ansi.Bold(token.Name)))
+			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 
 		if !i {
 			fmt.Println("Canceling token rotation")
@@ -229,10 +229,10 @@ func RotateToken(id, name, workspace string, force bool, out io.Writer, client a
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace Token %s was successfully rotated\n\n", token.Name)
+	fmt.Fprintf(out, "Astro Workspace API token %s was successfully rotated\n\n", token.Name)
 	APIToken := resp.JSON200
 	fmt.Println(*APIToken.Token)
-	fmt.Println("\nYou will not be shown this API Token value again.")
+	fmt.Println("\nYou will not be shown this API token value again.")
 	return nil
 }
 
@@ -252,29 +252,29 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	if err != nil {
 		return err
 	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the workspace token you would like to delete or remove:", tokens)
+	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace APItoken you would like to delete or remove:", tokens)
 	if err != nil {
 		return err
 	}
 	apiTokenID := token.Id
 	if string(token.Type) == workspaceEntity {
 		if !force {
-			fmt.Println("WARNING: API Token deletion cannot be undone.")
+			fmt.Println("WARNING: API token deletion cannot be undone.")
 			i, _ := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to delete the %s token?", ansi.Bold(token.Name)))
+				fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
 
 			if !i {
-				fmt.Println("Canceling token deletion")
+				fmt.Println("Canceling API Token deletion")
 				return nil
 			}
 		}
 	} else {
 		if !force {
 			i, _ := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to remove the %s token from the workspace?", ansi.Bold(token.Name)))
+				fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Workspace?", ansi.Bold(token.Name)))
 
 			if !i {
-				fmt.Println("Canceling token removal")
+				fmt.Println("Canceling API Token removal")
 				return nil
 			}
 		}
@@ -291,7 +291,7 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	if string(token.Type) == workspaceEntity {
 		fmt.Fprintf(out, "Astro Workspace API token %s was successfully deleted\n", token.Name)
 	} else {
-		fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the workspace\n", token.Name)
+		fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the Workspace\n", token.Name)
 	}
 	return nil
 }
@@ -390,7 +390,7 @@ func getWorkspaceToken(id, name, workspace, message string, tokens []astrocore.A
 		if len(matchedTokens) == 1 {
 			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
-			fmt.Printf("\nThere are more than one tokens with name %s. Please select a token:\n", name)
+			fmt.Printf("\nThere are more than one API tokens with name %s. Please select an API token:\n", name)
 			token, err = selectTokens(workspace, matchedTokens)
 			if err != nil {
 				return astrocore.ApiToken{}, err

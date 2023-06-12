@@ -293,7 +293,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro Workspace API token",
-		Long: "Update a token in an Astro Workspace\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
+		Long: "Update a Workspace or Organaization API token that has a role in an Astro Workspace\n$astro workspace token update [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
 			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceToken(cmd, args, out)
@@ -312,7 +312,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Workspace API token",
-		Long:    "Rotate a Workspace API token",
+		Long:    "Rotate a Workspace API token. You can only rotate Worspace API tokens. You cannot rotate Organiztion level API tokens with this command",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
