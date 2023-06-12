@@ -939,6 +939,8 @@ func TestFormatPrintableDeployment(t *testing.T) {
         cluster_name: test-cluster
         workspace_name: test-ws
         deployment_type: ""
+        cloud_provider: ""
+        region: ""
     worker_queues:
         - name: default
           max_worker_count: 130
@@ -1094,7 +1096,9 @@ func TestFormatPrintableDeployment(t *testing.T) {
             "scheduler_count": 3,
             "cluster_name": "test-cluster",
             "workspace_name": "test-ws",
-            "deployment_type": ""
+            "deployment_type": "",
+            "cloud_provider": "",
+            "region": ""
         },
         "worker_queues": [
             {

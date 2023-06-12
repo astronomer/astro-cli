@@ -1,6 +1,7 @@
 package fromfile
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ const (
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error {
+func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient astrocore.CoreClient, out io.Writer) error { //nolint
 	var (
 		err                                            error
 		errHelp, clusterID, workspaceID, outputFormat  string
@@ -80,10 +81,27 @@ func CreateOrUpdate(inputFile, action string, client astro.Client, coreClient as
 	if err != nil {
 		return err
 	}
-	// map cluster name to id and collect node pools for cluster
-	clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
-	if err != nil {
-		return err
+
+	if deployment.IsDeploymentHosted(formattedDeployment.Deployment.Configuration.DeploymentType) {
+		getSharedClusterParams := astrocore.GetSharedClusterParams{
+			Region:        formattedDeployment.Deployment.Configuration.Region,
+			CloudProvider: astrocore.GetSharedClusterParamsCloudProvider(formattedDeployment.Deployment.Configuration.CloudProvider),
+		}
+		response, err := coreClient.GetSharedClusterWithResponse(context.Background(), &getSharedClusterParams)
+		if err != nil {
+			return err
+		}
+		err = astrocore.NormalizeAPIError(response.HTTPResponse, response.Body)
+		if err != nil {
+			return err
+		}
+		clusterID = response.JSON200.Id
+	} else {
+		// map cluster name to id and collect node pools for cluster
+		clusterID, nodePools, err = getClusterInfoFromName(formattedDeployment.Deployment.Configuration.ClusterName, c.OrganizationShortName, coreClient)
+		if err != nil {
+			return err
+		}
 	}
 
 	existingDeployments, err = deployment.GetDeployments(workspaceID, c.Organization, client)

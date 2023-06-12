@@ -1373,7 +1373,13 @@ deployment:
 			fileutil.WriteStringToFile(filePath, data)
 			defer afero.NewOsFs().Remove(filePath)
 			mockClient.On("ListWorkspaces", orgID).Return(existingWorkspaces, nil)
-			mockCoreClient.On("ListClustersWithResponse", mock.Anything, mockOrgShortName, clusterListParams).Return(&mockListClustersResponse, nil).Once()
+			mockOKResponse := &astrocore.GetSharedClusterResponse{
+				HTTPResponse: &http.Response{
+					StatusCode: 200,
+				},
+				JSON200: &astrocore.SharedCluster{Id: "test-cluster-id"},
+			}
+			mockCoreClient.On("GetSharedClusterWithResponse", mock.Anything, mock.Anything).Return(mockOKResponse, nil).Once()
 			mockClient.On("ListDeployments", orgID, "").Return([]astro.Deployment{}, nil).Once()
 			mockClient.On("GetWorkerQueueOptions").Return(mockWorkerQueueDefaultOptions, nil).Once()
 			mockClient.On("CreateDeployment", mock.Anything).Return(createdDeployment, nil)
