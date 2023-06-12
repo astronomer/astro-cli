@@ -1287,7 +1287,7 @@ func TestWorkspaceTokenUpdate(t *testing.T) {
 }
 
 func TestWorkspaceTokenRotate(t *testing.T) {
-	expectedHelp := "Rotate a workspace token's key"
+	expectedHelp := "Rotate a workspace token"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 	t.Run("-h prints list help", func(t *testing.T) {
