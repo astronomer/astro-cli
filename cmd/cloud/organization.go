@@ -3,10 +3,12 @@ package cloud
 import (
 	"bufio"
 	"fmt"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 	"io"
 	"io/fs"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +35,7 @@ var (
 	teamName                           string
 	teamID                             string
 	userID                             string
+	organizationID                     string
 )
 
 func newOrganizationCmd(out io.Writer) *cobra.Command {
@@ -48,6 +51,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationUserRootCmd(out),
 		newOrganizationTeamRootCmd(out),
 		newOrganizationAuditLogs(out),
+		newOrganizationTokenRootCmd(out),
 	)
 	return cmd
 }
@@ -435,4 +439,193 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 	return team.ListTeamUsers(teamID, out, astroCoreClient)
+}
+
+// org tokens
+
+func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "token",
+		Aliases: []string{"to"},
+		Short:   "Manage tokens in your Astro Organization",
+		Long:    "Manage tokens in your Astro Organization.",
+	}
+	cmd.SetOut(out)
+	cmd.AddCommand(
+		newOrganizationTokenListCmd(out),
+		newOrganizationTokenCreateCmd(out),
+		newOrganizationTokenUpdateCmd(out),
+		newOrganizationTokenRotateCmd(out),
+		newOrganizationTokenDeleteCmd(out),
+	)
+	cmd.PersistentFlags().StringVar(&organizationID, "organization-id", "", "organization where you would like to manage tokens")
+	return cmd
+}
+
+func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all the API tokens in an Astro Organization",
+		Long:    "List all the API tokens in an Astro Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listOrganizationToken(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"cr"},
+		Short:   "Create an API token in an Astro Organization",
+		Long: "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createOrganizationToken(cmd, out)
+		},
+	}
+	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
+		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER")
+	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
+	return cmd
+}
+
+func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "update [TOKEN_ID]",
+		Aliases: []string{"up"},
+		Short:   "Update a Organization or Organaization API token",
+		Long: "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
+			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return updateOrganizationToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
+		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+	return cmd
+}
+
+func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "rotate [TOKEN_ID]",
+		Aliases: []string{"ro"},
+		Short:   "Rotate a Organization API token",
+		Long:    "Rotate a Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return rotateOrganizationToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate the Organization API token without showing a warning")
+
+	return cmd
+}
+
+func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [TOKEN_ID]",
+		Aliases: []string{"de"},
+		Short:   "Delete a Organization API token or remove an Organization API token from a Organization",
+		Long:    "Delete a Organization API token or remove an Organization API token from a Organization",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deleteOrganizationToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete or remove the API token without showing a warning")
+
+	return cmd
+}
+
+func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return organization.ListTokens(astroCoreClient, out)
+}
+
+func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
+	if tokenName == "" {
+		// no role was provided so ask the user for it
+		tokenName = input.Text("Enter a name for the new Organization API token: ")
+	}
+	if tokenRole == "" {
+		fmt.Println("select a Organization Role for the new API token:")
+		// no role was provided so ask the user for it
+		var err error
+		tokenRole, err = selectOrganizationRole()
+		if err != nil {
+			return err
+		}
+	}
+	cmd.SilenceUsage = true
+
+	return organization.CreateToken(tokenName, tokenDescription, tokenRole, organizationID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
+}
+
+func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, organizationID, out, astroCoreClient)
+}
+
+func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.RotateToken(tokenID, name, organizationID, cleanTokenOutput, forceRotate, out, astroCoreClient)
+}
+
+func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.DeleteToken(tokenID, name, organizationID, forceDelete, out, astroCoreClient)
+}
+
+func selectOrganizationRole() (string, error) {
+	tokenRolesMap := map[string]string{}
+	tab := &printutil.Table{
+		Padding:        []int{44, 50},
+		DynamicPadding: true,
+		Header:         []string{"#", "ROLE"},
+	}
+	roles := []string{"ORGANIZATION_MEMBER", "ORGANIZATION_BILLING_ADMIN", "ORGANIZATION_OWNER"}
+	for i := range roles {
+		index := i + 1
+		tab.AddRow([]string{
+			strconv.Itoa(index),
+			roles[i],
+		}, false)
+		tokenRolesMap[strconv.Itoa(index)] = roles[i]
+	}
+
+	tab.Print(os.Stdout)
+	choice := input.Text("\n> ")
+	selected, ok := tokenRolesMap[choice]
+	if !ok {
+		return "", errInvalidWorkspaceRoleKey
+	}
+	return selected, nil
 }

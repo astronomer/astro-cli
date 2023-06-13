@@ -20,7 +20,6 @@ import (
 
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
@@ -28,7 +27,6 @@ func newTokenTableOut() *printutil.Table {
 
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
 		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
@@ -88,7 +86,7 @@ func CreateToken(name, description, role, workspace string, expiration int, clea
 		return err
 	}
 	if name == "" {
-		return ErrInvalidName
+		return ErrInvalidTokenName
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -164,11 +162,8 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
 	if role == "" {
-		for i := range token.Roles {
-			if token.Roles[i].EntityId == workspaceEntity {
-				role = token.Roles[i].Role
-			}
-		}
+		// no role was provided so ask the user for it
+		role = input.Text("enter a user Organization role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER) to update user: ")
 		err := user.IsWorkspaceRoleValid(role)
 		if err != nil {
 			return err

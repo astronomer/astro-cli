@@ -2,20 +2,24 @@ package organization
 
 import (
 	httpContext "context"
-	"errors"
 	"fmt"
+	"github.com/astronomer/astro-cli/astro-client"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	astrocore "github.com/astronomer/astro-cli/astro-client-core"
 	"github.com/astronomer/astro-cli/cloud/user"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/pkg/errors"
 )
 
 var (
+	ErrInvalidName                 = errors.New("no name provided for the organization token. Retry with a valid name")
 	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
 	errOrganizationTokenNotFound   = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace         = errors.New("this Organization API token has already been added to the Workspace")
@@ -23,14 +27,21 @@ var (
 )
 
 const (
-	workspaceEntity = "WORKSPACE"
+	workspaceEntity    = "WORKSPACE"
+	organizationEntity = "ORGANIZATION"
 )
+
+func newTokenTableOut() *printutil.Table {
+	return &printutil.Table{
+		DynamicPadding: true,
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "ORGANIZATION ROLE", "CREATED", "CREATED BY"},
+	}
+}
 
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
-		Padding:        []int{44, 50},
 		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "DESCRIPTION", "EXPIRES"},
+		Header:         []string{"#", "NAME", "DESCRIPTION", "ROLE", "EXPIRES"},
 	}
 }
 
@@ -104,6 +115,13 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 	for i := range apiTokens {
 		name := apiTokens[i].Name
 		description := apiTokens[i].Description
+		var orgRole string
+
+		for _, role := range apiTokens[i].Roles {
+			if role.EntityType == organizationEntity {
+				orgRole = role.Role
+			}
+		}
 		expires := apiTokens[i].ExpiryPeriodInDays
 
 		index := i + 1
@@ -111,6 +129,7 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 			strconv.Itoa(index),
 			name,
 			description,
+			orgRole,
 			fmt.Sprint(expires),
 		}, false)
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
@@ -123,6 +142,30 @@ func selectTokens(apiTokens []astrocore.ApiToken) (astrocore.ApiToken, error) {
 		return astrocore.ApiToken{}, errInvalidOrganizationTokenKey
 	}
 	return selected, nil
+}
+
+// get all organization tokens
+func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return []astrocore.ApiToken{}, err
+	}
+	if ctx.OrganizationShortName == "" {
+		return []astrocore.ApiToken{}, user.ErrNoShortName
+	}
+
+	resp, err := client.ListOrganizationApiTokensWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrganizationApiTokensParams{})
+	if err != nil {
+		return []astrocore.ApiToken{}, err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return []astrocore.ApiToken{}, err
+	}
+
+	APITokens := resp.JSON200.ApiTokens
+
+	return APITokens, nil
 }
 
 func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) { //nolint:gocognit
@@ -167,26 +210,275 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 	return token, nil
 }
 
-// get all organization tokens
-func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, error) {
+// List all organization Tokens
+func ListTokens(client astrocore.CoreClient, out io.Writer) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return []astrocore.ApiToken{}, err
+		return err
 	}
-	if ctx.OrganizationShortName == "" {
-		return []astrocore.ApiToken{}, user.ErrNoShortName
+	organization := ctx.Organization
+
+	apiTokens, err := getOrganizationTokens(client)
+	if err != nil {
+		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
 	}
 
-	resp, err := client.ListOrganizationApiTokensWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListOrganizationApiTokensParams{})
+	tab := newTokenTableOut()
+	for i := range apiTokens {
+		id := apiTokens[i].Id
+		name := apiTokens[i].Name
+		description := apiTokens[i].Description
+		scope := apiTokens[i].Type
+		var role string
+		for j := range apiTokens[i].Roles {
+			if apiTokens[i].Roles[j].EntityId == organization {
+				role = apiTokens[i].Roles[j].Role
+			}
+		}
+		created := TimeAgo(apiTokens[i].CreatedAt)
+		createdBy := apiTokens[i].CreatedBy.FullName
+		tab.AddRow([]string{id, name, description, string(scope), role, created, *createdBy}, false)
+	}
+	tab.Print(out)
+
+	return nil
+}
+
+// create a organization token
+func CreateToken(name, description, role, organization string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
+	err := user.IsOrganizationRoleValid(role)
 	if err != nil {
-		return []astrocore.ApiToken{}, err
+		return err
+	}
+	if name == "" {
+		return ErrInvalidName
+	}
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user.ErrNoShortName
+	}
+	if organization == "" {
+		organization = ctx.Organization
+	}
+	CreateOrganizationAPITokenRequest := astrocore.CreateOrganizationApiTokenJSONRequestBody{
+		Description: &description,
+		Name:        name,
+		Role:        role,
+	}
+	if expiration != 0 {
+		CreateOrganizationAPITokenRequest.TokenExpiryPeriodInDays = &expiration
+	}
+	resp, err := client.CreateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, CreateOrganizationAPITokenRequest)
+	if err != nil {
+		return err
 	}
 	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return []astrocore.ApiToken{}, err
+		return err
+	}
+	APIToken := resp.JSON200
+	if cleanOutput {
+		fmt.Println(*APIToken.Token)
+	} else {
+		fmt.Fprintf(out, "\nAstro Organization API token %s was successfully created\n", name)
+		fmt.Println("Copy and paste this API token for your records.")
+		fmt.Println("\n" + *APIToken.Token)
+		fmt.Println("\nYou will not be shown this API token value again.")
+	}
+	return nil
+}
+
+// Update a organization token
+func UpdateToken(id, name, newName, description, role, organization string, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user.ErrNoShortName
+	}
+	if organization == "" {
+		organization = ctx.Organization
+	}
+	tokens, err := getOrganizationTokens(client)
+	if err != nil {
+		return err
+	}
+	token, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to update:", tokens)
+	if err != nil {
+		return err
+	}
+	apiTokenID := token.Id
+
+	UpdateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenJSONRequestBody{}
+
+	if newName == "" {
+		UpdateOrganizationAPITokenRequest.Name = token.Name
+	} else {
+		UpdateOrganizationAPITokenRequest.Name = newName
 	}
 
-	APITokens := resp.JSON200.ApiTokens
+	if description == "" {
+		UpdateOrganizationAPITokenRequest.Description = token.Description
+	} else {
+		UpdateOrganizationAPITokenRequest.Description = description
+	}
+	if role == "" {
+		// no role was provided so ask the user for it
+		role = input.Text("enter a user Organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
+		err := user.IsOrganizationRoleValid(role)
+		if err != nil {
+			return err
+		}
+		UpdateOrganizationAPITokenRequest.Roles = astrocore.UpdateOrganizationApiTokenRoles{Organization: role}
+	} else {
+		err := user.IsOrganizationRoleValid(role)
+		if err != nil {
+			return err
+		}
+		UpdateOrganizationAPITokenRequest.Roles = astrocore.UpdateOrganizationApiTokenRoles{Organization: role}
+	}
+	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID, UpdateOrganizationAPITokenRequest)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Astro Organization API token %s was successfully updated\n", token.Name)
+	return nil
+}
 
-	return APITokens, nil
+// rotate a organization API token
+func RotateToken(id, name, organization string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user.ErrNoShortName
+	}
+	if organization == "" {
+		organization = ctx.Organization
+	}
+	tokens, err := getOrganizationTokens(client)
+	if err != nil {
+		return err
+	}
+	token, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to rotate:", tokens)
+	if err != nil {
+		return err
+	}
+	apiTokenID := token.Id
+
+	if !force {
+		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
+		i, _ := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
+
+		if !i {
+			fmt.Println("Canceling token rotation")
+			return nil
+		}
+	}
+	resp, err := client.RotateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	APIToken := resp.JSON200
+	if cleanOutput {
+		fmt.Println(*APIToken.Token)
+	} else {
+		fmt.Fprintf(out, "\nAstro Organization API token %s was successfully rotated\n", name)
+		fmt.Println("Copy and paste this API token for your records.")
+		fmt.Println("\n" + *APIToken.Token)
+		fmt.Println("\nYou will not be shown this API token value again.")
+	}
+	return nil
+}
+
+// delete a organizations api token
+func DeleteToken(id, name, organization string, force bool, out io.Writer, client astrocore.CoreClient) error {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return err
+	}
+	if ctx.OrganizationShortName == "" {
+		return user.ErrNoShortName
+	}
+	if organization == "" {
+		organization = ctx.Organization
+	}
+	tokens, err := getOrganizationTokens(client)
+	if err != nil {
+		return err
+	}
+	token, err := getOrganizationToken(id, name, "\nPlease select the Organization APItoken you would like to delete or remove:", tokens)
+	if err != nil {
+		return err
+	}
+	apiTokenID := token.Id
+	if string(token.Type) == organizationEntity {
+		if !force {
+			fmt.Println("WARNING: API token deletion cannot be undone.")
+			i, _ := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
+
+			if !i {
+				fmt.Println("Canceling API Token deletion")
+				return nil
+			}
+		}
+	} else {
+		if !force {
+			i, _ := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Organization?", ansi.Bold(token.Name)))
+
+			if !i {
+				fmt.Println("Canceling API Token removal")
+				return nil
+			}
+		}
+	}
+
+	resp, err := client.DeleteOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID)
+	if err != nil {
+		return err
+	}
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return err
+	}
+	if string(token.Type) == organizationEntity {
+		fmt.Fprintf(out, "Astro Organization API token %s was successfully deleted\n", token.Name)
+	} else {
+		fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the Organization\n", token.Name)
+	}
+	return nil
+}
+
+func TimeAgo(date time.Time) string {
+	duration := time.Since(date)
+	days := int(duration.Hours() / 24) //nolint:gomnd
+	hours := int(duration.Hours())
+	minutes := int(duration.Minutes())
+
+	switch {
+	case days > 0:
+		return fmt.Sprintf("%d days ago", days)
+	case hours > 0:
+		return fmt.Sprintf("%d hours ago", hours)
+	case minutes > 0:
+		return fmt.Sprintf("%d minutes ago", minutes)
+	default:
+		return "Just now"
+	}
 }

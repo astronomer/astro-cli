@@ -314,7 +314,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Workspace API token",
-		Long:    "Rotate a Workspace API token. You can only rotate Worspace API tokens. You cannot rotate Organization API tokens with this command",
+		Long:    "Rotate a Workspace API token. You can only rotate Workspace API tokens. You cannot rotate Organization API tokens with this command",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
