@@ -453,6 +453,7 @@ func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 	cmd.SetOut(out)
 	cmd.AddCommand(
 		newOrganizationTokenListCmd(out),
+		newOrganizationTokenListRolesCmd(out),
 		newOrganizationTokenCreateCmd(out),
 		newOrganizationTokenUpdateCmd(out),
 		newOrganizationTokenRotateCmd(out),
@@ -470,6 +471,18 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all the API tokens in an Astro Organization",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listOrganizationToken(cmd, out)
+		},
+	}
+	return cmd
+}
+
+func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "roles",
+		Short: "List roles for an organization API token",
+		Long:  "List roles for an organization API token\n$astro organization token roles [TOKEN_ID] ",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listOrganizationTokenRoles(cmd, args, out)
 		},
 	}
 	return cmd
@@ -552,6 +565,16 @@ func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	return organization.ListTokens(astroCoreClient, out)
 }
 
+func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer) error {
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+
+	cmd.SilenceUsage = true
+	return organization.ListTokenRoles(tokenID, astroCoreClient, out)
+}
+
 func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	if tokenName == "" {
 		// no role was provided so ask the user for it
@@ -576,6 +599,16 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	if len(args) > 0 {
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
+	}
+
+	if tokenRole == "" {
+		fmt.Println("select a Organization Role for the API token:")
+		// no role was provided so ask the user for it
+		var err error
+		tokenRole, err = selectOrganizationRole()
+		if err != nil {
+			return err
+		}
 	}
 
 	cmd.SilenceUsage = true

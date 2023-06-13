@@ -38,6 +38,13 @@ func newTokenTableOut() *printutil.Table {
 	}
 }
 
+func newTokenRolesTableOut() *printutil.Table {
+	return &printutil.Table{
+		DynamicPadding: true,
+		Header:         []string{"ENTITY_TYPE", "ENTITY_ID", "ROLE"},
+	}
+}
+
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
@@ -60,14 +67,23 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getOrganizationTokens(client)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getOrganizationTokens(client)
+		if err != nil {
+			return err
+		}
+		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
-	token, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
-	if err != nil {
-		return err
-	}
+
 	apiTokenID := token.Id
 
 	var orgRole string
@@ -168,6 +184,15 @@ func getOrganizationTokens(client astrocore.CoreClient) ([]astrocore.ApiToken, e
 	return APITokens, nil
 }
 
+func getOrganizationTokenById(id string, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+	resp, err := client.GetOrganizationApiTokenWithResponse(httpContext.Background(), orgShortName, id)
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return astrocore.ApiToken{}, err
+	}
+	return *resp.JSON200, nil
+}
+
 func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken) (token astrocore.ApiToken, err error) { //nolint:gocognit
 	switch {
 	case id == "" && name == "":
@@ -244,6 +269,41 @@ func ListTokens(client astrocore.CoreClient, out io.Writer) error {
 	return nil
 }
 
+// List all roles for a given organization Token
+func ListTokenRoles(id string, client astrocore.CoreClient, out io.Writer) (err error) {
+	var apiToken astrocore.ApiToken
+	if id == "" {
+		tokens, err := getOrganizationTokens(client)
+		if err != nil {
+			return err
+		}
+		apiToken, err = getOrganizationToken(id, "", "\nPlease select the Organization API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		ctx, err := context.GetCurrentContext()
+		if err != nil {
+			return err
+		}
+		apiToken, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
+	}
+
+	tab := newTokenRolesTableOut()
+	for _, tokenRole := range apiToken.Roles {
+		role := tokenRole.Role
+		entityId := tokenRole.EntityId
+		entityType := string(tokenRole.EntityType)
+		tab.AddRow([]string{entityType, entityId, role}, false)
+	}
+	tab.Print(out)
+
+	return nil
+}
+
 // create a organization token
 func CreateToken(name, description, role, organization string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsOrganizationRoleValid(role)
@@ -303,14 +363,23 @@ func UpdateToken(id, name, newName, description, role, organization string, out 
 	if organization == "" {
 		organization = ctx.Organization
 	}
-	tokens, err := getOrganizationTokens(client)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getOrganizationTokens(client)
+		if err != nil {
+			return err
+		}
+		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
-	token, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to update:", tokens)
-	if err != nil {
-		return err
-	}
+
 	apiTokenID := token.Id
 
 	UpdateOrganizationAPITokenRequest := astrocore.UpdateOrganizationApiTokenJSONRequestBody{}
@@ -326,21 +395,13 @@ func UpdateToken(id, name, newName, description, role, organization string, out 
 	} else {
 		UpdateOrganizationAPITokenRequest.Description = description
 	}
-	if role == "" {
-		// no role was provided so ask the user for it
-		role = input.Text("enter a user Organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
-		err := user.IsOrganizationRoleValid(role)
-		if err != nil {
-			return err
-		}
-		UpdateOrganizationAPITokenRequest.Roles = astrocore.UpdateOrganizationApiTokenRoles{Organization: role}
-	} else {
-		err := user.IsOrganizationRoleValid(role)
-		if err != nil {
-			return err
-		}
-		UpdateOrganizationAPITokenRequest.Roles = astrocore.UpdateOrganizationApiTokenRoles{Organization: role}
+
+	err = user.IsOrganizationRoleValid(role)
+	if err != nil {
+		return err
 	}
+	UpdateOrganizationAPITokenRequest.Roles = astrocore.UpdateOrganizationApiTokenRoles{Organization: role}
+
 	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID, UpdateOrganizationAPITokenRequest)
 	if err != nil {
 		return err
@@ -365,13 +426,22 @@ func RotateToken(id, name, organization string, cleanOutput, force bool, out io.
 	if organization == "" {
 		organization = ctx.Organization
 	}
-	tokens, err := getOrganizationTokens(client)
-	if err != nil {
-		return err
-	}
-	token, err := getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to rotate:", tokens)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+
+	if id == "" {
+		tokens, err := getOrganizationTokens(client)
+		if err != nil {
+			return err
+		}
+		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
 	apiTokenID := token.Id
 
@@ -417,13 +487,22 @@ func DeleteToken(id, name, organization string, force bool, out io.Writer, clien
 	if organization == "" {
 		organization = ctx.Organization
 	}
-	tokens, err := getOrganizationTokens(client)
-	if err != nil {
-		return err
-	}
-	token, err := getOrganizationToken(id, name, "\nPlease select the Organization APItoken you would like to delete or remove:", tokens)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+
+	if id == "" {
+		tokens, err := getOrganizationTokens(client)
+		if err != nil {
+			return err
+		}
+		token, err = getOrganizationToken(id, name, "\nPlease select the Organization API token you would like to add to the Workspace:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getOrganizationTokenById(id, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
 	apiTokenID := token.Id
 	if string(token.Type) == organizationEntity {

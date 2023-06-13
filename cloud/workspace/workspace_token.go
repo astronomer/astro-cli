@@ -138,14 +138,23 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getWorkspaceTokens(workspace, client)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, client)
+		if err != nil {
+			return err
+		}
+		token, err = getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getWorkspaceTokenById(id, workspace, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
-	if err != nil {
-		return err
-	}
+
 	apiTokenID := token.Id
 
 	UpdateWorkspaceAPITokenRequest := astrocore.UpdateWorkspaceApiTokenJSONRequestBody{}
@@ -161,21 +170,13 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 	} else {
 		UpdateWorkspaceAPITokenRequest.Description = description
 	}
-	if role == "" {
-		// no role was provided so ask the user for it
-		role = input.Text("enter a user Organization role(WORKSPACE_MEMBER, WORKSPACE_OPERATOR, WORKSPACE_OWNER) to update user: ")
-		err := user.IsWorkspaceRoleValid(role)
-		if err != nil {
-			return err
-		}
-		UpdateWorkspaceAPITokenRequest.Role = role
-	} else {
-		err := user.IsWorkspaceRoleValid(role)
-		if err != nil {
-			return err
-		}
-		UpdateWorkspaceAPITokenRequest.Role = role
+
+	err = user.IsWorkspaceRoleValid(role)
+	if err != nil {
+		return err
 	}
+	UpdateWorkspaceAPITokenRequest.Role = role
+
 	resp, err := client.UpdateWorkspaceApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspace, apiTokenID, UpdateWorkspaceAPITokenRequest)
 	if err != nil {
 		return err
@@ -200,13 +201,21 @@ func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Wri
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getWorkspaceTokens(workspace, client)
-	if err != nil {
-		return err
-	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to rotate:", tokens)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, client)
+		if err != nil {
+			return err
+		}
+		token, err = getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getWorkspaceTokenById(id, workspace, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
 	apiTokenID := token.Id
 
@@ -252,13 +261,21 @@ func DeleteToken(id, name, workspace string, force bool, out io.Writer, client a
 	if workspace == "" {
 		workspace = ctx.Workspace
 	}
-	tokens, err := getWorkspaceTokens(workspace, client)
-	if err != nil {
-		return err
-	}
-	token, err := getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace APItoken you would like to delete or remove:", tokens)
-	if err != nil {
-		return err
+	var token astrocore.ApiToken
+	if id == "" {
+		tokens, err := getWorkspaceTokens(workspace, client)
+		if err != nil {
+			return err
+		}
+		token, err = getWorkspaceToken(id, name, workspace, "\nPlease select the Workspace API token you would like to update:", tokens)
+		if err != nil {
+			return err
+		}
+	} else {
+		token, err = getWorkspaceTokenById(id, workspace, ctx.OrganizationShortName, client)
+		if err != nil {
+			return err
+		}
 	}
 	apiTokenID := token.Id
 	if string(token.Type) == workspaceEntity {
@@ -425,4 +442,13 @@ func TimeAgo(date time.Time) string {
 	default:
 		return "Just now"
 	}
+}
+
+func getWorkspaceTokenById(id, workspaceId, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgShortName, workspaceId, id)
+	err = astrocore.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err != nil {
+		return astrocore.ApiToken{}, err
+	}
+	return *resp.JSON200, nil
 }
