@@ -56,7 +56,6 @@ type Deployment struct {
 	ReleaseName           string         `json:"releaseName"`
 	Version               string         `json:"version"`
 	Type                  string         `json:"type"`
-	WorkloadIdentity      string         `json:"workloadIdentity"`
 	DagDeployEnabled      bool           `json:"dagDeployEnabled"`
 	APIKeyOnlyDeployments bool           `json:"apiKeyOnlyDeployments"`
 	AlertEmails           []string       `json:"alertEmails"`

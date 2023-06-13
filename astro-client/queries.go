@@ -106,7 +106,6 @@ var (
 			createdAt
 			status
 			dagDeployEnabled
-			workloadIdentity
 			schedulerSize
 			type
 			isHighAvailability
