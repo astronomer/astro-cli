@@ -32,6 +32,7 @@ var (
 	orgTokenName               string
 	tokenID                    string
 	orgTokenID                 string
+	cleanTokenOutput           bool
 	forceRotate                bool
 	tokenExpiration            int
 )
@@ -281,6 +282,7 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
 		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER")
@@ -317,6 +319,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 			return rotateWorkspaceToken(cmd, args, out)
 		},
 	}
+	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate the Workspace API token without showing a warning")
 
@@ -561,7 +564,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	}
 	cmd.SilenceUsage = true
 
-	return workspace.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, out, astroCoreClient)
+	return workspace.CreateToken(tokenName, tokenDescription, tokenRole, workspaceID, tokenExpiration, cleanTokenOutput, out, astroCoreClient)
 }
 
 func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -583,7 +586,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return workspace.RotateToken(tokenID, name, workspaceID, forceRotate, out, astroCoreClient)
+	return workspace.RotateToken(tokenID, name, workspaceID, cleanTokenOutput, forceRotate, out, astroCoreClient)
 }
 
 func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {

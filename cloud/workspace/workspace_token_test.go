@@ -161,7 +161,7 @@ func TestCreateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceAPITokenResponseOK, nil)
 
-		err := CreateToken("Token 1", "Description 1", "WORKSPACE_MEMBER", "", 0, out, mockClient)
+		err := CreateToken("Token 1", "Description 1", "WORKSPACE_MEMBER", "", 0, false, out, mockClient)
 
 		assert.NoError(t, err)
 	})
@@ -171,7 +171,7 @@ func TestCreateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		err := CreateToken("Token 1", "Description 1", "WORKSPACE_MEMBER", "", 0, out, mockClient)
+		err := CreateToken("Token 1", "Description 1", "WORKSPACE_MEMBER", "", 0, false, out, mockClient)
 
 		assert.Error(t, err)
 	})
@@ -181,7 +181,7 @@ func TestCreateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		err := CreateToken("Token 1", "Description 1", "InvalidRole", "", 0, out, mockClient)
+		err := CreateToken("Token 1", "Description 1", "InvalidRole", "", 0, false, out, mockClient)
 
 		assert.Error(t, err)
 	})
@@ -191,7 +191,7 @@ func TestCreateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 
-		err := CreateToken("", "Description 1", "WORKSPACE_MEMBER", "", 0, out, mockClient)
+		err := CreateToken("", "Description 1", "WORKSPACE_MEMBER", "", 0, true, out, mockClient)
 
 		assert.Equal(t, ErrInvalidName, err)
 	})
@@ -333,7 +333,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
 		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
-		err := RotateToken("token1", "", "", true, out, mockClient)
+		err := RotateToken("token1", "", "", false, true, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -343,7 +343,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
 		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseOK, nil)
-		err := RotateToken("token1", "", "", false, out, mockClient)
+		err := RotateToken("token1", "", "", true, false, out, mockClient)
 		assert.NoError(t, err)
 	})
 
@@ -351,7 +351,7 @@ func TestRotateToken(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
-		err := RotateToken("token1", "", "", false, out, mockClient)
+		err := RotateToken("token1", "", "", false, false, out, mockClient)
 		assert.Error(t, err)
 	})
 
@@ -360,7 +360,7 @@ func TestRotateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil)
-		err := RotateToken("token1", "", "", false, out, mockClient)
+		err := RotateToken("token1", "", "", false, false, out, mockClient)
 		assert.ErrorContains(t, err, "failed to list tokens")
 	})
 
@@ -369,7 +369,7 @@ func TestRotateToken(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
-		err := RotateToken("token3", "", "", false, out, mockClient)
+		err := RotateToken("token3", "", "", false, false, out, mockClient)
 		assert.Equal(t, ErrWorkspaceTokenNotFound, err)
 	})
 
@@ -379,7 +379,7 @@ func TestRotateToken(t *testing.T) {
 		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspaceApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil)
 		mockClient.On("RotateWorkspaceApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateWorkspaceAPITokenResponseError, nil)
-		err := RotateToken("token1", "", "", true, out, mockClient)
+		err := RotateToken("token1", "", "", false, true, out, mockClient)
 		assert.Equal(t, "failed to update workspace", err.Error())
 	})
 }

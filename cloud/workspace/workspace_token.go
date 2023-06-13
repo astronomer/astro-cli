@@ -82,7 +82,7 @@ func ListTokens(client astrocore.CoreClient, workspace string, out io.Writer) er
 }
 
 // create a workspace token
-func CreateToken(name, description, role, workspace string, expiration int, out io.Writer, client astrocore.CoreClient) error {
+func CreateToken(name, description, role, workspace string, expiration int, cleanOutput bool, out io.Writer, client astrocore.CoreClient) error {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return err
@@ -116,11 +116,15 @@ func CreateToken(name, description, role, workspace string, expiration int, out 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace API token %s was successfully created\nCopy and paste this API token for your records.\n\n", name)
 	APIToken := resp.JSON200
-	fmt.Println(*APIToken.Token)
-	fmt.Println("\nYou will not be shown this API token value again.")
-
+	if cleanOutput {
+		fmt.Println(*APIToken.Token)
+	} else {
+		fmt.Fprintf(out, "\nAstro Workspace API token %s was successfully created\n", name)
+		fmt.Println("Copy and paste this API token for your records.")
+		fmt.Println("\n" + *APIToken.Token)
+		fmt.Println("\nYou will not be shown this API token value again.")
+	}
 	return nil
 }
 
@@ -190,7 +194,7 @@ func UpdateToken(id, name, newName, description, role, workspace string, out io.
 }
 
 // rotate a workspace API token
-func RotateToken(id, name, workspace string, force bool, out io.Writer, client astrocore.CoreClient) error {
+func RotateToken(id, name, workspace string, cleanOutput, force bool, out io.Writer, client astrocore.CoreClient) error {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -229,10 +233,15 @@ func RotateToken(id, name, workspace string, force bool, out io.Writer, client a
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Astro Workspace API token %s was successfully rotated\n\n", token.Name)
 	APIToken := resp.JSON200
-	fmt.Println(*APIToken.Token)
-	fmt.Println("\nYou will not be shown this API token value again.")
+	if cleanOutput {
+		fmt.Println(*APIToken.Token)
+	} else {
+		fmt.Fprintf(out, "\nAstro Workspace API token %s was successfully rotated\n", name)
+		fmt.Println("Copy and paste this API token for your records.")
+		fmt.Println("\n" + *APIToken.Token)
+		fmt.Println("\nYou will not be shown this API token value again.")
+	}
 	return nil
 }
 
