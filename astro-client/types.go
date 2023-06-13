@@ -56,6 +56,7 @@ type Deployment struct {
 	ReleaseName           string         `json:"releaseName"`
 	Version               string         `json:"version"`
 	Type                  string         `json:"type"`
+	WorkloadIdentity      string         `json:"workloadIdentity"`
 	DagDeployEnabled      bool           `json:"dagDeployEnabled"`
 	APIKeyOnlyDeployments bool           `json:"apiKeyOnlyDeployments"`
 	AlertEmails           []string       `json:"alertEmails"`
@@ -72,11 +73,12 @@ type Deployment struct {
 
 // Cluster contains all components of an Astronomer Cluster
 type Cluster struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	CloudProvider string     `json:"cloudProvider"`
-	Region        string     `json:"region"`
-	NodePools     []NodePool `json:"nodePools"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	CloudProvider   string     `json:"cloudProvider"`
+	ProviderAccount string     `json:"providerAccount"`
+	Region          string     `json:"region"`
+	NodePools       []NodePool `json:"nodePools"`
 }
 
 type RuntimeRelease struct {

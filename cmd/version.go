@@ -8,7 +8,7 @@ import (
 func newVersionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "List running version of Astro CLI",
+		Short: "List running version of the Astro CLI",
 		Long:  `The astro semantic version.`,
 		Run:   printVersion,
 	}

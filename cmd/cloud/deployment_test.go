@@ -270,6 +270,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true
@@ -536,7 +537,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		expectedOut := "Usage:\n"
 		cmdArgs := []string{"update", "-n", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.ErrorContains(t, err, "failed to find a valid workspace")
+		assert.ErrorContains(t, err, "failed to find a valid Workspace")
 		assert.Contains(t, resp, expectedOut)
 	})
 	t.Run("updates a deployment from file", func(t *testing.T) {
@@ -563,6 +564,7 @@ deployment:
     scheduler_count: 3
     cluster_name: test-cluster
     workspace_name: test-workspace
+    deployment_type: HYBRID
   worker_queues:
     - name: default
       is_default: true

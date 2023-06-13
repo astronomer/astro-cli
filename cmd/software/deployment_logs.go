@@ -39,8 +39,8 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Aliases: []string{"log", "l"},
-		Short:   "Stream logs from an Airflow deployment",
-		Long:    "Stream logs from an Airflow deployment",
+		Short:   "Stream logs from an Airflow Deployment",
+		Long:    "Stream logs from an Airflow Deployment",
 		Example: logsExample,
 	}
 	cmd.AddCommand(
