@@ -46,7 +46,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		defaultOptions                       astro.WorkerQueueDefaultOptions
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, client as
 		queue                        astro.WorkerQueue
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, client, nil)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, false, client, nil)
 	if err != nil {
 		return err
 	}

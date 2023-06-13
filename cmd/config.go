@@ -29,8 +29,8 @@ var (
 func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
-		Short:             "Manage a project's configuration settings",
-		Long:              "Manage the project configuration settings stored at '.astro/config.yaml'",
+		Short:             "Manage a project's configurations",
+		Long:              "Manage the project configurations stored at '.astro/config.yaml'",
 		PersistentPreRunE: ensureGlobalFlag,
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
@@ -44,7 +44,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 func newConfigGetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get [setting-name]",
-		Short:   "Get project's configuration settings",
+		Short:   "Get project's configurations",
 		Long:    "List the value for a particular setting in your config.yaml file",
 		Args:    cobra.ExactArgs(1),
 		Example: configGetExample,
@@ -56,7 +56,7 @@ func newConfigGetCmd(_ io.Writer) *cobra.Command {
 func newConfigSetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "set [setting-name]",
-		Short:   "Set project's configuration settings",
+		Short:   "Set project's configurations",
 		Long:    "Update or override a particular setting in your config.yaml file",
 		Example: configSetExample,
 		RunE:    configSet,

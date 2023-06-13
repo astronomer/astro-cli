@@ -166,7 +166,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a local Airflow environment",
-		Long:  "Start a local Airflow environment. This command will spin up 3 Docker containers on your machine, each for a different Airflow component: Webserver, Scheduler, and Postgres.",
+		Long:  "Start a local Airflow environment. This command will spin up 4 Docker containers on your machine, each for a different Airflow component: Webserver, scheduler, triggerer and metadata database.",
 		Args:  cobra.MaximumNArgs(1),
 		// ignore PersistentPreRunE of root command
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -181,7 +181,7 @@ func newAirflowStartCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file from which to import airflow objects")
 	cmd.Flags().BoolVarP(&noBrowser, "no-browser", "n", false, "Don't bring up the browser once the Webserver is healthy")
 	cmd.Flags().DurationVar(&waitTime, "wait", 1*time.Minute, "Duration to wait for webserver to get healthy. The default is 5 minutes on M1 architecture and 1 minute for everything else. Use --wait 2m to wait for 2 minutes.")
-	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Provide the location of compose file if you wish to use a custom compose file with the start command")
+	cmd.Flags().StringVarP(&composeFile, "compose-file", "", "", "Location of a custom compose file to use for starting Airflow")
 
 	return cmd
 }
@@ -205,7 +205,7 @@ func newAirflowRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "run",
 		Short:              "Run Airflow CLI commands within your local Airflow environment",
-		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands are run in the Webserver container but can interact with your local Scheduler, Workers, and Postgres Database.",
+		Long:               "Run Airflow CLI commands within your local Airflow environment. These commands run in the webserver container but can interact with your local scheduler, workers, and metadata database.",
 		PreRunE:            utils.EnsureProjectDir,
 		RunE:               airflowRun,
 		Example:            RunExample,
@@ -222,7 +222,7 @@ func newAirflowLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs",
 		Short:   "Display component logs for your local Airflow environment",
-		Long:    "Display Scheduler, Worker, and Webserver logs for your local Airflow environment",
+		Long:    "Display scheduler, worker, and webserver logs for your local Airflow environment",
 		PreRunE: utils.EnsureProjectDir,
 		RunE:    airflowLogs,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

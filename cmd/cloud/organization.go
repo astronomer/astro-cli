@@ -85,8 +85,8 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "audit-logs",
 		Aliases: []string{"al"},
-		Short:   "Manage your organization audit logs.",
-		Long:    "Manage your organization audit logs.",
+		Short:   "Manage your Organization audit logs.",
+		Long:    "Manage your Organization audit logs.",
 	}
 	cmd.AddCommand(
 		newOrganizationExportAuditLogs(out),
@@ -98,16 +98,16 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "export",
 		Aliases: []string{"e"},
-		Short:   "Export your organization audit logs in GZIP. Requires being an organization owner.",
-		Long:    "Export your organization audit logs in GZIP. Requires being an organization owner.",
+		Short:   "Export your Organization audit logs in GZIP. Requires Organization Owner permissions.",
+		Long:    "Export your Organization audit logs in GZIP. Requires Organization Owner permissions.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationExportAuditLogs(cmd)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the organization to manage audit logs for.")
+	cmd.PersistentFlags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
 	err := cmd.MarkPersistentFlagRequired("organization-name")
 	if err != nil {
-		log.Fatalf("Error marking organization-name flag as required in astro organization audit-logs command: %s", err.Error())
+		log.Fatalf("Error marking organization-name flag as required in astro Organization audit-logs command: %s", err.Error())
 	}
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
@@ -249,7 +249,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	if updateRole == "" {
 		// no role was provided so ask the user for it
-		updateRole = input.Text("enter a user organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
+		updateRole = input.Text("enter a user Organization role(ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER) to update user: ")
 	}
 
 	cmd.SilenceUsage = true
