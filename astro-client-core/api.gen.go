@@ -21,6 +21,18 @@ const (
 	JWTScopes = "JWT.Scopes"
 )
 
+// Defines values for ApiTokenType.
+const (
+	ApiTokenTypeORGANIZATION ApiTokenType = "ORGANIZATION"
+	ApiTokenTypeWORKSPACE    ApiTokenType = "WORKSPACE"
+)
+
+// Defines values for ApiTokenRoleEntityType.
+const (
+	ApiTokenRoleEntityTypeORGANIZATION ApiTokenRoleEntityType = "ORGANIZATION"
+	ApiTokenRoleEntityTypeWORKSPACE    ApiTokenRoleEntityType = "WORKSPACE"
+)
+
 // Defines values for BasicSubjectProfileSubjectType.
 const (
 	SERVICEKEY BasicSubjectProfileSubjectType = "SERVICEKEY"
@@ -148,6 +160,8 @@ const (
 const (
 	OrganizationProductTierBASIC            OrganizationProductTier = "BASIC"
 	OrganizationProductTierBUSINESSCRITICAL OrganizationProductTier = "BUSINESS_CRITICAL"
+	OrganizationProductTierINTERNAL         OrganizationProductTier = "INTERNAL"
+	OrganizationProductTierPOV              OrganizationProductTier = "POV"
 	OrganizationProductTierPREMIUM          OrganizationProductTier = "PREMIUM"
 	OrganizationProductTierSTANDARD         OrganizationProductTier = "STANDARD"
 	OrganizationProductTierTRIAL            OrganizationProductTier = "TRIAL"
@@ -317,8 +331,11 @@ const (
 const (
 	BASIC            ListOrganizationsParamsProductTier = "BASIC"
 	BUSINESSCRITICAL ListOrganizationsParamsProductTier = "BUSINESS_CRITICAL"
+	INTERNAL         ListOrganizationsParamsProductTier = "INTERNAL"
+	POV              ListOrganizationsParamsProductTier = "POV"
 	PREMIUM          ListOrganizationsParamsProductTier = "PREMIUM"
 	STANDARD         ListOrganizationsParamsProductTier = "STANDARD"
+	TRIAL            ListOrganizationsParamsProductTier = "TRIAL"
 )
 
 // Defines values for ListOrganizationsParamsProduct.
@@ -346,6 +363,28 @@ const (
 	ListOrganizationsParamsSortsShortNameDesc     ListOrganizationsParamsSorts = "shortName:desc"
 	ListOrganizationsParamsSortsUpdatedAtAsc      ListOrganizationsParamsSorts = "updatedAt:asc"
 	ListOrganizationsParamsSortsUpdatedAtDesc     ListOrganizationsParamsSorts = "updatedAt:desc"
+)
+
+// Defines values for ListOrganizationApiTokensParamsSorts.
+const (
+	ListOrganizationApiTokensParamsSortsCreatedAtAsc     ListOrganizationApiTokensParamsSorts = "createdAt:asc"
+	ListOrganizationApiTokensParamsSortsCreatedAtDesc    ListOrganizationApiTokensParamsSorts = "createdAt:desc"
+	ListOrganizationApiTokensParamsSortsCreatedByIdAsc   ListOrganizationApiTokensParamsSorts = "createdById:asc"
+	ListOrganizationApiTokensParamsSortsCreatedByIdDesc  ListOrganizationApiTokensParamsSorts = "createdById:desc"
+	ListOrganizationApiTokensParamsSortsDescriptionAsc   ListOrganizationApiTokensParamsSorts = "description:asc"
+	ListOrganizationApiTokensParamsSortsDescriptionDesc  ListOrganizationApiTokensParamsSorts = "description:desc"
+	ListOrganizationApiTokensParamsSortsIdAsc            ListOrganizationApiTokensParamsSorts = "id:asc"
+	ListOrganizationApiTokensParamsSortsIdDesc           ListOrganizationApiTokensParamsSorts = "id:desc"
+	ListOrganizationApiTokensParamsSortsNameAsc          ListOrganizationApiTokensParamsSorts = "name:asc"
+	ListOrganizationApiTokensParamsSortsNameDesc         ListOrganizationApiTokensParamsSorts = "name:desc"
+	ListOrganizationApiTokensParamsSortsShortTokenAsc    ListOrganizationApiTokensParamsSorts = "shortToken:asc"
+	ListOrganizationApiTokensParamsSortsShortTokenDesc   ListOrganizationApiTokensParamsSorts = "shortToken:desc"
+	ListOrganizationApiTokensParamsSortsTokenStartAtAsc  ListOrganizationApiTokensParamsSorts = "tokenStartAt:asc"
+	ListOrganizationApiTokensParamsSortsTokenStartAtDesc ListOrganizationApiTokensParamsSorts = "tokenStartAt:desc"
+	ListOrganizationApiTokensParamsSortsUpdatedAtAsc     ListOrganizationApiTokensParamsSorts = "updatedAt:asc"
+	ListOrganizationApiTokensParamsSortsUpdatedAtDesc    ListOrganizationApiTokensParamsSorts = "updatedAt:desc"
+	ListOrganizationApiTokensParamsSortsUpdatedByIdAsc   ListOrganizationApiTokensParamsSorts = "updatedById:asc"
+	ListOrganizationApiTokensParamsSortsUpdatedByIdDesc  ListOrganizationApiTokensParamsSorts = "updatedById:desc"
 )
 
 // Defines values for ListClustersParamsProvider.
@@ -407,6 +446,12 @@ const (
 	ListClustersParamsSortsVpcSubnetRangeDesc      ListClustersParamsSorts = "vpcSubnetRange:desc"
 )
 
+// Defines values for GetMetronomeDashboardParamsType.
+const (
+	Invoices GetMetronomeDashboardParamsType = "invoices"
+	Usage    GetMetronomeDashboardParamsType = "usage"
+)
+
 // Defines values for GetStripeClientSecretParamsType.
 const (
 	SetupIntent GetStripeClientSecretParamsType = "setup-intent"
@@ -464,6 +509,28 @@ const (
 	ListWorkspacesParamsSortsUpdatedAtDesc      ListWorkspacesParamsSorts = "updatedAt:desc"
 )
 
+// Defines values for ListWorkspaceApiTokensParamsSorts.
+const (
+	ListWorkspaceApiTokensParamsSortsCreatedAtAsc     ListWorkspaceApiTokensParamsSorts = "createdAt:asc"
+	ListWorkspaceApiTokensParamsSortsCreatedAtDesc    ListWorkspaceApiTokensParamsSorts = "createdAt:desc"
+	ListWorkspaceApiTokensParamsSortsCreatedByIdAsc   ListWorkspaceApiTokensParamsSorts = "createdById:asc"
+	ListWorkspaceApiTokensParamsSortsCreatedByIdDesc  ListWorkspaceApiTokensParamsSorts = "createdById:desc"
+	ListWorkspaceApiTokensParamsSortsDescriptionAsc   ListWorkspaceApiTokensParamsSorts = "description:asc"
+	ListWorkspaceApiTokensParamsSortsDescriptionDesc  ListWorkspaceApiTokensParamsSorts = "description:desc"
+	ListWorkspaceApiTokensParamsSortsIdAsc            ListWorkspaceApiTokensParamsSorts = "id:asc"
+	ListWorkspaceApiTokensParamsSortsIdDesc           ListWorkspaceApiTokensParamsSorts = "id:desc"
+	ListWorkspaceApiTokensParamsSortsNameAsc          ListWorkspaceApiTokensParamsSorts = "name:asc"
+	ListWorkspaceApiTokensParamsSortsNameDesc         ListWorkspaceApiTokensParamsSorts = "name:desc"
+	ListWorkspaceApiTokensParamsSortsShortTokenAsc    ListWorkspaceApiTokensParamsSorts = "shortToken:asc"
+	ListWorkspaceApiTokensParamsSortsShortTokenDesc   ListWorkspaceApiTokensParamsSorts = "shortToken:desc"
+	ListWorkspaceApiTokensParamsSortsTokenStartAtAsc  ListWorkspaceApiTokensParamsSorts = "tokenStartAt:asc"
+	ListWorkspaceApiTokensParamsSortsTokenStartAtDesc ListWorkspaceApiTokensParamsSorts = "tokenStartAt:desc"
+	ListWorkspaceApiTokensParamsSortsUpdatedAtAsc     ListWorkspaceApiTokensParamsSorts = "updatedAt:asc"
+	ListWorkspaceApiTokensParamsSortsUpdatedAtDesc    ListWorkspaceApiTokensParamsSorts = "updatedAt:desc"
+	ListWorkspaceApiTokensParamsSortsUpdatedByIdAsc   ListWorkspaceApiTokensParamsSorts = "updatedById:asc"
+	ListWorkspaceApiTokensParamsSortsUpdatedByIdDesc  ListWorkspaceApiTokensParamsSorts = "updatedById:desc"
+)
+
 // Defines values for ListWorkspaceTeamsParamsSorts.
 const (
 	ListWorkspaceTeamsParamsSortsCreatedAtAsc       ListWorkspaceTeamsParamsSorts = "createdAt:asc"
@@ -513,6 +580,47 @@ type Address struct {
 	State      string  `json:"state"`
 }
 
+// ApiToken defines model for ApiToken.
+type ApiToken struct {
+	CreatedAt          time.Time            `json:"createdAt"`
+	CreatedBy          *BasicSubjectProfile `json:"createdBy,omitempty"`
+	CreatedById        string               `json:"createdById"`
+	DeletedAt          *time.Time           `json:"deletedAt,omitempty"`
+	Description        string               `json:"description"`
+	EndAt              *time.Time           `json:"endAt,omitempty"`
+	ExpiryPeriodInDays int                  `json:"expiryPeriodInDays"`
+	Id                 string               `json:"id"`
+	LastUsedAt         *time.Time           `json:"lastUsedAt,omitempty"`
+	Name               string               `json:"name"`
+	Roles              []ApiTokenRole       `json:"roles"`
+	ShortToken         string               `json:"shortToken"`
+	StartAt            time.Time            `json:"startAt"`
+	Token              *string              `json:"token,omitempty"`
+	Type               ApiTokenType         `json:"type"`
+	UpdatedAt          time.Time            `json:"updatedAt"`
+	UpdatedBy          *BasicSubjectProfile `json:"updatedBy,omitempty"`
+	UpdatedById        string               `json:"updatedById"`
+}
+
+// ApiTokenType defines model for ApiToken.Type.
+type ApiTokenType string
+
+// ApiTokenRole defines model for ApiTokenRole.
+type ApiTokenRole struct {
+	EntityId   string                 `json:"entityId"`
+	EntityType ApiTokenRoleEntityType `json:"entityType"`
+	Role       string                 `json:"role"`
+}
+
+// ApiTokenRoleEntityType defines model for ApiTokenRole.EntityType.
+type ApiTokenRoleEntityType string
+
+// ApiTokenWorkspaceRole defines model for ApiTokenWorkspaceRole.
+type ApiTokenWorkspaceRole struct {
+	EntityId string `json:"entityId"`
+	Role     string `json:"role"`
+}
+
 // AstroBaseUnit defines model for AstroBaseUnit.
 type AstroBaseUnit struct {
 	Cpu    int `json:"cpu"`
@@ -528,11 +636,12 @@ type AuConfigs struct {
 
 // BasicSubjectProfile defines model for BasicSubjectProfile.
 type BasicSubjectProfile struct {
-	AvatarUrl   *string                         `json:"avatarUrl,omitempty"`
-	FullName    *string                         `json:"fullName,omitempty"`
-	Id          string                          `json:"id"`
-	SubjectType *BasicSubjectProfileSubjectType `json:"subjectType,omitempty"`
-	Username    *string                         `json:"username,omitempty"`
+	ApiTokenName *string                         `json:"apiTokenName,omitempty"`
+	AvatarUrl    *string                         `json:"avatarUrl,omitempty"`
+	FullName     *string                         `json:"fullName,omitempty"`
+	Id           string                          `json:"id"`
+	SubjectType  *BasicSubjectProfileSubjectType `json:"subjectType,omitempty"`
+	Username     *string                         `json:"username,omitempty"`
 }
 
 // BasicSubjectProfileSubjectType defines model for BasicSubjectProfile.SubjectType.
@@ -745,6 +854,14 @@ type CreateNodePoolRequest struct {
 	NodeInstanceType string `json:"nodeInstanceType"`
 }
 
+// CreateOrganizationApiTokenRequest defines model for CreateOrganizationApiTokenRequest.
+type CreateOrganizationApiTokenRequest struct {
+	Description             *string `json:"description,omitempty"`
+	Name                    string  `json:"name"`
+	Role                    string  `json:"role"`
+	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+}
+
 // CreateOrganizationRequest defines model for CreateOrganizationRequest.
 type CreateOrganizationRequest struct {
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
@@ -771,6 +888,20 @@ type CreateTeamRequest struct {
 type CreateUserInviteRequest struct {
 	InviteeEmail string `json:"inviteeEmail"`
 	Role         string `json:"role"`
+}
+
+// CreateWorkspaceApiTokenRequest defines model for CreateWorkspaceApiTokenRequest.
+type CreateWorkspaceApiTokenRequest struct {
+	Description             *string `json:"description,omitempty"`
+	Name                    string  `json:"name"`
+	Role                    string  `json:"role"`
+	TokenExpiryPeriodInDays *int    `json:"tokenExpiryPeriodInDays,omitempty"`
+}
+
+// CreditSummary defines model for CreditSummary.
+type CreditSummary struct {
+	TotalCreditsGrantedUSD   float32 `json:"totalCreditsGrantedUSD"`
+	TotalCreditsRemainingUSD float32 `json:"totalCreditsRemainingUSD"`
 }
 
 // CreditType defines model for CreditType.
@@ -955,6 +1086,14 @@ type JitPolicy struct {
 	DefaultWorkspaceRoles *[]WorkspaceRole `json:"defaultWorkspaceRoles,omitempty"`
 }
 
+// ListApiTokensPaginated defines model for ListApiTokensPaginated.
+type ListApiTokensPaginated struct {
+	ApiTokens  []ApiToken `json:"apiTokens"`
+	Limit      int        `json:"limit"`
+	Offset     int        `json:"offset"`
+	TotalCount int        `json:"totalCount"`
+}
+
 // ListWorkspaceDags defines model for ListWorkspaceDags.
 type ListWorkspaceDags struct {
 	Items          []WorkspaceDag `json:"items"`
@@ -977,6 +1116,11 @@ type ManagedDomain struct {
 
 // ManagedDomainStatus defines model for ManagedDomain.Status.
 type ManagedDomainStatus string
+
+// MetronomeDashboard defines model for MetronomeDashboard.
+type MetronomeDashboard struct {
+	Url string `json:"url"`
+}
 
 // MutateOrgUserRoleRequest defines model for MutateOrgUserRoleRequest.
 type MutateOrgUserRoleRequest struct {
@@ -1457,6 +1601,19 @@ type UpdateNodePoolRequest struct {
 	NodeInstanceType string  `json:"nodeInstanceType"`
 }
 
+// UpdateOrganizationApiTokenRequest defines model for UpdateOrganizationApiTokenRequest.
+type UpdateOrganizationApiTokenRequest struct {
+	Description string                          `json:"description"`
+	Name        string                          `json:"name"`
+	Roles       UpdateOrganizationApiTokenRoles `json:"roles"`
+}
+
+// UpdateOrganizationApiTokenRoles defines model for UpdateOrganizationApiTokenRoles.
+type UpdateOrganizationApiTokenRoles struct {
+	Organization string                   `json:"organization"`
+	Workspace    *[]ApiTokenWorkspaceRole `json:"workspace,omitempty"`
+}
+
 // UpdateOrganizationRequest defines model for UpdateOrganizationRequest.
 type UpdateOrganizationRequest struct {
 	BillingEmail  *string                 `json:"billingEmail,omitempty"`
@@ -1478,6 +1635,13 @@ type UpdateSsoConnectionRequest struct {
 type UpdateTeamRequest struct {
 	Description string `json:"description"`
 	Name        string `json:"name"`
+}
+
+// UpdateWorkspaceApiTokenRequest defines model for UpdateWorkspaceApiTokenRequest.
+type UpdateWorkspaceApiTokenRequest struct {
+	Description string `json:"description"`
+	Name        string `json:"name"`
+	Role        string `json:"role"`
 }
 
 // User defines model for User.
@@ -1673,7 +1837,7 @@ type ListOrganizationsParams struct {
 	// TrialStatus filter by trial status, null for all orgs
 	TrialStatus *ListOrganizationsParamsTrialStatus `form:"trialStatus,omitempty" json:"trialStatus,omitempty"`
 
-	// ProductTier filter by product tier, null for all orgs
+	// ProductTier filter by product tier, should be one of INTERNAL, POV, TRIAL, BASIC, STANDARD, PREMIUM, BUSINESS_CRITICAL, or null for all orgs
 	ProductTier *ListOrganizationsParamsProductTier `form:"productTier,omitempty" json:"productTier,omitempty"`
 
 	// Product filter by product, null for all orgs
@@ -1700,6 +1864,21 @@ type GetOrganizationParams struct {
 	// IsLookUpOnly only look up organization metadata if true
 	IsLookUpOnly *bool `form:"isLookUpOnly,omitempty" json:"isLookUpOnly,omitempty"`
 }
+
+// ListOrganizationApiTokensParams defines parameters for ListOrganizationApiTokens.
+type ListOrganizationApiTokensParams struct {
+	// Offset Offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListOrganizationApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListOrganizationApiTokensParamsSorts defines parameters for ListOrganizationApiTokens.
+type ListOrganizationApiTokensParamsSorts string
 
 // GetOrganizationAuditLogsParams defines parameters for GetOrganizationAuditLogs.
 type GetOrganizationAuditLogsParams struct {
@@ -1742,6 +1921,18 @@ type ListClustersParamsStatus string
 
 // ListClustersParamsSorts defines parameters for ListClusters.
 type ListClustersParamsSorts string
+
+// GetMetronomeDashboardParams defines parameters for GetMetronomeDashboard.
+type GetMetronomeDashboardParams struct {
+	// ShowZeroUsageLineItems optional flag to show zero usage line items for invoice dashboards
+	ShowZeroUsageLineItems *bool `form:"showZeroUsageLineItems,omitempty" json:"showZeroUsageLineItems,omitempty"`
+
+	// ColorOverrides optional list of colors ('gray_dark', 'gray_medium', 'gray_light', 'gray_extralight', 'white', 'primary_medium', or 'primary_light')  to  override  in  the  format  'color:#hex-color-value'  Eg.  'gray_dark:#ff0000'
+	ColorOverrides *[]string `form:"colorOverrides,omitempty" json:"colorOverrides,omitempty"`
+}
+
+// GetMetronomeDashboardParamsType defines parameters for GetMetronomeDashboard.
+type GetMetronomeDashboardParamsType string
 
 // GetStripeClientSecretParamsType defines parameters for GetStripeClientSecret.
 type GetStripeClientSecretParamsType string
@@ -1805,6 +1996,21 @@ type ListWorkspacesParams struct {
 
 // ListWorkspacesParamsSorts defines parameters for ListWorkspaces.
 type ListWorkspacesParamsSorts string
+
+// ListWorkspaceApiTokensParams defines parameters for ListWorkspaceApiTokens.
+type ListWorkspaceApiTokensParams struct {
+	// Offset Offset for pagination
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit Limit for pagination
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Sorts Sorting criteria, each criterion should conform to format 'fieldName:asc' or 'fieldName:desc'
+	Sorts *[]ListWorkspaceApiTokensParamsSorts `form:"sorts,omitempty" json:"sorts,omitempty"`
+}
+
+// ListWorkspaceApiTokensParamsSorts defines parameters for ListWorkspaceApiTokens.
+type ListWorkspaceApiTokensParamsSorts string
 
 // ListWorkspaceDagsParams defines parameters for ListWorkspaceDags.
 type ListWorkspaceDagsParams struct {
@@ -1902,6 +2108,12 @@ type CreateOrganizationJSONRequestBody = CreateOrganizationRequest
 // UpdateOrganizationJSONRequestBody defines body for UpdateOrganization for application/json ContentType.
 type UpdateOrganizationJSONRequestBody = UpdateOrganizationRequest
 
+// CreateOrganizationApiTokenJSONRequestBody defines body for CreateOrganizationApiToken for application/json ContentType.
+type CreateOrganizationApiTokenJSONRequestBody = CreateOrganizationApiTokenRequest
+
+// UpdateOrganizationApiTokenJSONRequestBody defines body for UpdateOrganizationApiToken for application/json ContentType.
+type UpdateOrganizationApiTokenJSONRequestBody = UpdateOrganizationApiTokenRequest
+
 // CreateAwsClusterJSONRequestBody defines body for CreateAwsCluster for application/json ContentType.
 type CreateAwsClusterJSONRequestBody = CreateAwsClusterRequest
 
@@ -1955,6 +2167,12 @@ type CreateWorkspaceJSONRequestBody = MutateWorkspaceRequest
 
 // UpdateWorkspaceJSONRequestBody defines body for UpdateWorkspace for application/json ContentType.
 type UpdateWorkspaceJSONRequestBody = MutateWorkspaceRequest
+
+// CreateWorkspaceApiTokenJSONRequestBody defines body for CreateWorkspaceApiToken for application/json ContentType.
+type CreateWorkspaceApiTokenJSONRequestBody = CreateWorkspaceApiTokenRequest
+
+// UpdateWorkspaceApiTokenJSONRequestBody defines body for UpdateWorkspaceApiToken for application/json ContentType.
+type UpdateWorkspaceApiTokenJSONRequestBody = UpdateWorkspaceApiTokenRequest
 
 // MutateWorkspaceTeamRoleJSONRequestBody defines body for MutateWorkspaceTeamRole for application/json ContentType.
 type MutateWorkspaceTeamRoleJSONRequestBody = MutateWorkspaceTeamRoleRequest
@@ -2074,6 +2292,28 @@ type ClientInterface interface {
 
 	UpdateOrganization(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListOrganizationApiTokens request
+	ListOrganizationApiTokens(ctx context.Context, orgShortNameId string, params *ListOrganizationApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateOrganizationApiToken request with any body
+	CreateOrganizationApiTokenWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateOrganizationApiToken(ctx context.Context, orgShortNameId string, body CreateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteOrganizationApiToken request
+	DeleteOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetOrganizationApiToken request
+	GetOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateOrganizationApiToken request with any body
+	UpdateOrganizationApiTokenWithBody(ctx context.Context, orgShortNameId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, body UpdateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateOrganizationApiToken request
+	RotateOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogs(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2148,6 +2388,12 @@ type ClientInterface interface {
 
 	// DeleteUserInvite request
 	DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetCreditSummary request
+	GetCreditSummary(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMetronomeDashboard request
+	GetMetronomeDashboard(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPaymentMethod request
 	GetPaymentMethod(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2247,6 +2493,28 @@ type ClientInterface interface {
 	UpdateWorkspaceWithBody(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWorkspaceApiTokens request
+	ListWorkspaceApiTokens(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateWorkspaceApiToken request with any body
+	CreateWorkspaceApiTokenWithBody(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, body CreateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteWorkspaceApiToken request
+	DeleteWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetWorkspaceApiToken request
+	GetWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateWorkspaceApiToken request with any body
+	UpdateWorkspaceApiTokenWithBody(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, body UpdateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateWorkspaceApiToken request
+	RotateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceDagFilters request
 	ListWorkspaceDagFilters(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2431,6 +2699,102 @@ func (c *Client) UpdateOrganizationWithBody(ctx context.Context, orgShortNameId 
 
 func (c *Client) UpdateOrganization(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateOrganizationRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListOrganizationApiTokens(ctx context.Context, orgShortNameId string, params *ListOrganizationApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationApiTokensRequest(c.Server, orgShortNameId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateOrganizationApiTokenWithBody(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateOrganizationApiTokenRequestWithBody(c.Server, orgShortNameId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateOrganizationApiToken(ctx context.Context, orgShortNameId string, body CreateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateOrganizationApiTokenRequest(c.Server, orgShortNameId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteOrganizationApiTokenRequest(c.Server, orgShortNameId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetOrganizationApiTokenRequest(c.Server, orgShortNameId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateOrganizationApiTokenWithBody(ctx context.Context, orgShortNameId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateOrganizationApiTokenRequestWithBody(c.Server, orgShortNameId, apiTokenId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, body UpdateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateOrganizationApiTokenRequest(c.Server, orgShortNameId, apiTokenId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RotateOrganizationApiToken(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateOrganizationApiTokenRequest(c.Server, orgShortNameId, apiTokenId)
 	if err != nil {
 		return nil, err
 	}
@@ -2767,6 +3131,30 @@ func (c *Client) CreateUserInvite(ctx context.Context, orgShortNameId string, bo
 
 func (c *Client) DeleteUserInvite(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUserInviteRequest(c.Server, orgShortNameId, inviteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetCreditSummary(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCreditSummaryRequest(c.Server, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetMetronomeDashboard(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMetronomeDashboardRequest(c.Server, orgShortNameId, pType, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3199,6 +3587,102 @@ func (c *Client) UpdateWorkspaceWithBody(ctx context.Context, orgShortNameId str
 
 func (c *Client) UpdateWorkspace(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateWorkspaceRequest(c.Server, orgShortNameId, workspaceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListWorkspaceApiTokens(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceApiTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspaceApiTokensRequest(c.Server, orgShortNameId, workspaceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkspaceApiTokenWithBody(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkspaceApiTokenRequestWithBody(c.Server, orgShortNameId, workspaceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, body CreateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkspaceApiTokenRequest(c.Server, orgShortNameId, workspaceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWorkspaceApiTokenRequest(c.Server, orgShortNameId, workspaceId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetWorkspaceApiTokenRequest(c.Server, orgShortNameId, workspaceId, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkspaceApiTokenWithBody(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkspaceApiTokenRequestWithBody(c.Server, orgShortNameId, workspaceId, apiTokenId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, body UpdateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkspaceApiTokenRequest(c.Server, orgShortNameId, workspaceId, apiTokenId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RotateWorkspaceApiToken(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateWorkspaceApiTokenRequest(c.Server, orgShortNameId, workspaceId, apiTokenId)
 	if err != nil {
 		return nil, err
 	}
@@ -3871,6 +4355,316 @@ func NewUpdateOrganizationRequestWithBody(server string, orgShortNameId string, 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListOrganizationApiTokensRequest generates requests for ListOrganizationApiTokens
+func NewListOrganizationApiTokensRequest(server string, orgShortNameId string, params *ListOrganizationApiTokensParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/api-tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateOrganizationApiTokenRequest calls the generic CreateOrganizationApiToken builder with application/json body
+func NewCreateOrganizationApiTokenRequest(server string, orgShortNameId string, body CreateOrganizationApiTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateOrganizationApiTokenRequestWithBody(server, orgShortNameId, "application/json", bodyReader)
+}
+
+// NewCreateOrganizationApiTokenRequestWithBody generates requests for CreateOrganizationApiToken with any type of body
+func NewCreateOrganizationApiTokenRequestWithBody(server string, orgShortNameId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/api-tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteOrganizationApiTokenRequest generates requests for DeleteOrganizationApiToken
+func NewDeleteOrganizationApiTokenRequest(server string, orgShortNameId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/api-tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetOrganizationApiTokenRequest generates requests for GetOrganizationApiToken
+func NewGetOrganizationApiTokenRequest(server string, orgShortNameId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/api-tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateOrganizationApiTokenRequest calls the generic UpdateOrganizationApiToken builder with application/json body
+func NewUpdateOrganizationApiTokenRequest(server string, orgShortNameId string, apiTokenId string, body UpdateOrganizationApiTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateOrganizationApiTokenRequestWithBody(server, orgShortNameId, apiTokenId, "application/json", bodyReader)
+}
+
+// NewUpdateOrganizationApiTokenRequestWithBody generates requests for UpdateOrganizationApiToken with any type of body
+func NewUpdateOrganizationApiTokenRequestWithBody(server string, orgShortNameId string, apiTokenId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/api-tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateOrganizationApiTokenRequest generates requests for RotateOrganizationApiToken
+func NewRotateOrganizationApiTokenRequest(server string, orgShortNameId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/api-tokens/%s/rotate", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -4837,6 +5631,117 @@ func NewDeleteUserInviteRequest(server string, orgShortNameId string, inviteId s
 	}
 
 	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetCreditSummaryRequest generates requests for GetCreditSummary
+func NewGetCreditSummaryRequest(server string, orgShortNameId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/metronome/credit-summary", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMetronomeDashboardRequest generates requests for GetMetronomeDashboard
+func NewGetMetronomeDashboardRequest(server string, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "type", runtime.ParamLocationPath, pType)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/metronome/dashboard/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.ShowZeroUsageLineItems != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "showZeroUsageLineItems", runtime.ParamLocationQuery, *params.ShowZeroUsageLineItems); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.ColorOverrides != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "colorOverrides", runtime.ParamLocationQuery, *params.ColorOverrides); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -6227,6 +7132,358 @@ func NewUpdateWorkspaceRequestWithBody(server string, orgShortNameId string, wor
 	return req, nil
 }
 
+// NewListWorkspaceApiTokensRequest generates requests for ListWorkspaceApiTokens
+func NewListWorkspaceApiTokensRequest(server string, orgShortNameId string, workspaceId string, params *ListWorkspaceApiTokensParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/api-tokens", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	queryValues := queryURL.Query()
+
+	if params.Offset != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Limit != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	if params.Sorts != nil {
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sorts", runtime.ParamLocationQuery, *params.Sorts); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+	}
+
+	queryURL.RawQuery = queryValues.Encode()
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateWorkspaceApiTokenRequest calls the generic CreateWorkspaceApiToken builder with application/json body
+func NewCreateWorkspaceApiTokenRequest(server string, orgShortNameId string, workspaceId string, body CreateWorkspaceApiTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateWorkspaceApiTokenRequestWithBody(server, orgShortNameId, workspaceId, "application/json", bodyReader)
+}
+
+// NewCreateWorkspaceApiTokenRequestWithBody generates requests for CreateWorkspaceApiToken with any type of body
+func NewCreateWorkspaceApiTokenRequestWithBody(server string, orgShortNameId string, workspaceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/api-tokens", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteWorkspaceApiTokenRequest generates requests for DeleteWorkspaceApiToken
+func NewDeleteWorkspaceApiTokenRequest(server string, orgShortNameId string, workspaceId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/api-tokens/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetWorkspaceApiTokenRequest generates requests for GetWorkspaceApiToken
+func NewGetWorkspaceApiTokenRequest(server string, orgShortNameId string, workspaceId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/api-tokens/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateWorkspaceApiTokenRequest calls the generic UpdateWorkspaceApiToken builder with application/json body
+func NewUpdateWorkspaceApiTokenRequest(server string, orgShortNameId string, workspaceId string, apiTokenId string, body UpdateWorkspaceApiTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateWorkspaceApiTokenRequestWithBody(server, orgShortNameId, workspaceId, apiTokenId, "application/json", bodyReader)
+}
+
+// NewUpdateWorkspaceApiTokenRequestWithBody generates requests for UpdateWorkspaceApiToken with any type of body
+func NewUpdateWorkspaceApiTokenRequestWithBody(server string, orgShortNameId string, workspaceId string, apiTokenId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/api-tokens/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateWorkspaceApiTokenRequest generates requests for RotateWorkspaceApiToken
+func NewRotateWorkspaceApiTokenRequest(server string, orgShortNameId string, workspaceId string, apiTokenId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "orgShortNameId", runtime.ParamLocationPath, orgShortNameId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "workspaceId", runtime.ParamLocationPath, workspaceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "apiTokenId", runtime.ParamLocationPath, apiTokenId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/workspaces/%s/api-tokens/%s/rotate", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListWorkspaceDagFiltersRequest generates requests for ListWorkspaceDagFilters
 func NewListWorkspaceDagFiltersRequest(server string, orgShortNameId string, workspaceId string) (*http.Request, error) {
 	var err error
@@ -7146,6 +8403,28 @@ type ClientWithResponsesInterface interface {
 
 	UpdateOrganizationWithResponse(ctx context.Context, orgShortNameId string, body UpdateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationResponse, error)
 
+	// ListOrganizationApiTokens request
+	ListOrganizationApiTokensWithResponse(ctx context.Context, orgShortNameId string, params *ListOrganizationApiTokensParams, reqEditors ...RequestEditorFn) (*ListOrganizationApiTokensResponse, error)
+
+	// CreateOrganizationApiToken request with any body
+	CreateOrganizationApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrganizationApiTokenResponse, error)
+
+	CreateOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, body CreateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationApiTokenResponse, error)
+
+	// DeleteOrganizationApiToken request
+	DeleteOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*DeleteOrganizationApiTokenResponse, error)
+
+	// GetOrganizationApiToken request
+	GetOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*GetOrganizationApiTokenResponse, error)
+
+	// UpdateOrganizationApiToken request with any body
+	UpdateOrganizationApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOrganizationApiTokenResponse, error)
+
+	UpdateOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, body UpdateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationApiTokenResponse, error)
+
+	// RotateOrganizationApiToken request
+	RotateOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateOrganizationApiTokenResponse, error)
+
 	// GetOrganizationAuditLogs request
 	GetOrganizationAuditLogsWithResponse(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error)
 
@@ -7220,6 +8499,12 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUserInvite request
 	DeleteUserInviteWithResponse(ctx context.Context, orgShortNameId string, inviteId string, reqEditors ...RequestEditorFn) (*DeleteUserInviteResponse, error)
+
+	// GetCreditSummary request
+	GetCreditSummaryWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error)
+
+	// GetMetronomeDashboard request
+	GetMetronomeDashboardWithResponse(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error)
 
 	// GetPaymentMethod request
 	GetPaymentMethodWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetPaymentMethodResponse, error)
@@ -7319,6 +8604,28 @@ type ClientWithResponsesInterface interface {
 	UpdateWorkspaceWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error)
 
 	UpdateWorkspaceWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body UpdateWorkspaceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceResponse, error)
+
+	// ListWorkspaceApiTokens request
+	ListWorkspaceApiTokensWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceApiTokensParams, reqEditors ...RequestEditorFn) (*ListWorkspaceApiTokensResponse, error)
+
+	// CreateWorkspaceApiToken request with any body
+	CreateWorkspaceApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkspaceApiTokenResponse, error)
+
+	CreateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body CreateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkspaceApiTokenResponse, error)
+
+	// DeleteWorkspaceApiToken request
+	DeleteWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceApiTokenResponse, error)
+
+	// GetWorkspaceApiToken request
+	GetWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*GetWorkspaceApiTokenResponse, error)
+
+	// UpdateWorkspaceApiToken request with any body
+	UpdateWorkspaceApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceApiTokenResponse, error)
+
+	UpdateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, body UpdateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceApiTokenResponse, error)
+
+	// RotateWorkspaceApiToken request
+	RotateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateWorkspaceApiTokenResponse, error)
 
 	// ListWorkspaceDagFilters request
 	ListWorkspaceDagFiltersWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, reqEditors ...RequestEditorFn) (*ListWorkspaceDagFiltersResponse, error)
@@ -7618,6 +8925,167 @@ func (r UpdateOrganizationResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateOrganizationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListOrganizationApiTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListApiTokensPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListOrganizationApiTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListOrganizationApiTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateOrganizationApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateOrganizationApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateOrganizationApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteOrganizationApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteOrganizationApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteOrganizationApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetOrganizationApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetOrganizationApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetOrganizationApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateOrganizationApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateOrganizationApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateOrganizationApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RotateOrganizationApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateOrganizationApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateOrganizationApiTokenResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -8130,6 +9598,60 @@ func (r DeleteUserInviteResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r DeleteUserInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetCreditSummaryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *CreditSummary
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetCreditSummaryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetCreditSummaryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetMetronomeDashboardResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MetronomeDashboard
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMetronomeDashboardResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMetronomeDashboardResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -8859,6 +10381,167 @@ func (r UpdateWorkspaceResponse) StatusCode() int {
 	return 0
 }
 
+type ListWorkspaceApiTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListApiTokensPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWorkspaceApiTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWorkspaceApiTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateWorkspaceApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateWorkspaceApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateWorkspaceApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteWorkspaceApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteWorkspaceApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteWorkspaceApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetWorkspaceApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetWorkspaceApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetWorkspaceApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateWorkspaceApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateWorkspaceApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateWorkspaceApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RotateWorkspaceApiTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ApiToken
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateWorkspaceApiTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateWorkspaceApiTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListWorkspaceDagFiltersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -9241,6 +10924,76 @@ func (c *ClientWithResponses) UpdateOrganizationWithResponse(ctx context.Context
 	return ParseUpdateOrganizationResponse(rsp)
 }
 
+// ListOrganizationApiTokensWithResponse request returning *ListOrganizationApiTokensResponse
+func (c *ClientWithResponses) ListOrganizationApiTokensWithResponse(ctx context.Context, orgShortNameId string, params *ListOrganizationApiTokensParams, reqEditors ...RequestEditorFn) (*ListOrganizationApiTokensResponse, error) {
+	rsp, err := c.ListOrganizationApiTokens(ctx, orgShortNameId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOrganizationApiTokensResponse(rsp)
+}
+
+// CreateOrganizationApiTokenWithBodyWithResponse request with arbitrary body returning *CreateOrganizationApiTokenResponse
+func (c *ClientWithResponses) CreateOrganizationApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrganizationApiTokenResponse, error) {
+	rsp, err := c.CreateOrganizationApiTokenWithBody(ctx, orgShortNameId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateOrganizationApiTokenResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, body CreateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationApiTokenResponse, error) {
+	rsp, err := c.CreateOrganizationApiToken(ctx, orgShortNameId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateOrganizationApiTokenResponse(rsp)
+}
+
+// DeleteOrganizationApiTokenWithResponse request returning *DeleteOrganizationApiTokenResponse
+func (c *ClientWithResponses) DeleteOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*DeleteOrganizationApiTokenResponse, error) {
+	rsp, err := c.DeleteOrganizationApiToken(ctx, orgShortNameId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteOrganizationApiTokenResponse(rsp)
+}
+
+// GetOrganizationApiTokenWithResponse request returning *GetOrganizationApiTokenResponse
+func (c *ClientWithResponses) GetOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*GetOrganizationApiTokenResponse, error) {
+	rsp, err := c.GetOrganizationApiToken(ctx, orgShortNameId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetOrganizationApiTokenResponse(rsp)
+}
+
+// UpdateOrganizationApiTokenWithBodyWithResponse request with arbitrary body returning *UpdateOrganizationApiTokenResponse
+func (c *ClientWithResponses) UpdateOrganizationApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOrganizationApiTokenResponse, error) {
+	rsp, err := c.UpdateOrganizationApiTokenWithBody(ctx, orgShortNameId, apiTokenId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateOrganizationApiTokenResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, body UpdateOrganizationApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationApiTokenResponse, error) {
+	rsp, err := c.UpdateOrganizationApiToken(ctx, orgShortNameId, apiTokenId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateOrganizationApiTokenResponse(rsp)
+}
+
+// RotateOrganizationApiTokenWithResponse request returning *RotateOrganizationApiTokenResponse
+func (c *ClientWithResponses) RotateOrganizationApiTokenWithResponse(ctx context.Context, orgShortNameId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateOrganizationApiTokenResponse, error) {
+	rsp, err := c.RotateOrganizationApiToken(ctx, orgShortNameId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateOrganizationApiTokenResponse(rsp)
+}
+
 // GetOrganizationAuditLogsWithResponse request returning *GetOrganizationAuditLogsResponse
 func (c *ClientWithResponses) GetOrganizationAuditLogsWithResponse(ctx context.Context, orgShortNameId string, params *GetOrganizationAuditLogsParams, reqEditors ...RequestEditorFn) (*GetOrganizationAuditLogsResponse, error) {
 	rsp, err := c.GetOrganizationAuditLogs(ctx, orgShortNameId, params, reqEditors...)
@@ -9482,6 +11235,24 @@ func (c *ClientWithResponses) DeleteUserInviteWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseDeleteUserInviteResponse(rsp)
+}
+
+// GetCreditSummaryWithResponse request returning *GetCreditSummaryResponse
+func (c *ClientWithResponses) GetCreditSummaryWithResponse(ctx context.Context, orgShortNameId string, reqEditors ...RequestEditorFn) (*GetCreditSummaryResponse, error) {
+	rsp, err := c.GetCreditSummary(ctx, orgShortNameId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCreditSummaryResponse(rsp)
+}
+
+// GetMetronomeDashboardWithResponse request returning *GetMetronomeDashboardResponse
+func (c *ClientWithResponses) GetMetronomeDashboardWithResponse(ctx context.Context, orgShortNameId string, pType GetMetronomeDashboardParamsType, params *GetMetronomeDashboardParams, reqEditors ...RequestEditorFn) (*GetMetronomeDashboardResponse, error) {
+	rsp, err := c.GetMetronomeDashboard(ctx, orgShortNameId, pType, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMetronomeDashboardResponse(rsp)
 }
 
 // GetPaymentMethodWithResponse request returning *GetPaymentMethodResponse
@@ -9797,6 +11568,76 @@ func (c *ClientWithResponses) UpdateWorkspaceWithResponse(ctx context.Context, o
 		return nil, err
 	}
 	return ParseUpdateWorkspaceResponse(rsp)
+}
+
+// ListWorkspaceApiTokensWithResponse request returning *ListWorkspaceApiTokensResponse
+func (c *ClientWithResponses) ListWorkspaceApiTokensWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, params *ListWorkspaceApiTokensParams, reqEditors ...RequestEditorFn) (*ListWorkspaceApiTokensResponse, error) {
+	rsp, err := c.ListWorkspaceApiTokens(ctx, orgShortNameId, workspaceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWorkspaceApiTokensResponse(rsp)
+}
+
+// CreateWorkspaceApiTokenWithBodyWithResponse request with arbitrary body returning *CreateWorkspaceApiTokenResponse
+func (c *ClientWithResponses) CreateWorkspaceApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkspaceApiTokenResponse, error) {
+	rsp, err := c.CreateWorkspaceApiTokenWithBody(ctx, orgShortNameId, workspaceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkspaceApiTokenResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, body CreateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkspaceApiTokenResponse, error) {
+	rsp, err := c.CreateWorkspaceApiToken(ctx, orgShortNameId, workspaceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateWorkspaceApiTokenResponse(rsp)
+}
+
+// DeleteWorkspaceApiTokenWithResponse request returning *DeleteWorkspaceApiTokenResponse
+func (c *ClientWithResponses) DeleteWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*DeleteWorkspaceApiTokenResponse, error) {
+	rsp, err := c.DeleteWorkspaceApiToken(ctx, orgShortNameId, workspaceId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteWorkspaceApiTokenResponse(rsp)
+}
+
+// GetWorkspaceApiTokenWithResponse request returning *GetWorkspaceApiTokenResponse
+func (c *ClientWithResponses) GetWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*GetWorkspaceApiTokenResponse, error) {
+	rsp, err := c.GetWorkspaceApiToken(ctx, orgShortNameId, workspaceId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetWorkspaceApiTokenResponse(rsp)
+}
+
+// UpdateWorkspaceApiTokenWithBodyWithResponse request with arbitrary body returning *UpdateWorkspaceApiTokenResponse
+func (c *ClientWithResponses) UpdateWorkspaceApiTokenWithBodyWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceApiTokenResponse, error) {
+	rsp, err := c.UpdateWorkspaceApiTokenWithBody(ctx, orgShortNameId, workspaceId, apiTokenId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkspaceApiTokenResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, body UpdateWorkspaceApiTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceApiTokenResponse, error) {
+	rsp, err := c.UpdateWorkspaceApiToken(ctx, orgShortNameId, workspaceId, apiTokenId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateWorkspaceApiTokenResponse(rsp)
+}
+
+// RotateWorkspaceApiTokenWithResponse request returning *RotateWorkspaceApiTokenResponse
+func (c *ClientWithResponses) RotateWorkspaceApiTokenWithResponse(ctx context.Context, orgShortNameId string, workspaceId string, apiTokenId string, reqEditors ...RequestEditorFn) (*RotateWorkspaceApiTokenResponse, error) {
+	rsp, err := c.RotateWorkspaceApiToken(ctx, orgShortNameId, workspaceId, apiTokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateWorkspaceApiTokenResponse(rsp)
 }
 
 // ListWorkspaceDagFiltersWithResponse request returning *ListWorkspaceDagFiltersResponse
@@ -10457,6 +12298,365 @@ func ParseUpdateOrganizationResponse(rsp *http.Response) (*UpdateOrganizationRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Organization
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListOrganizationApiTokensResponse parses an HTTP response from a ListOrganizationApiTokensWithResponse call
+func ParseListOrganizationApiTokensResponse(rsp *http.Response) (*ListOrganizationApiTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOrganizationApiTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListApiTokensPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateOrganizationApiTokenResponse parses an HTTP response from a CreateOrganizationApiTokenWithResponse call
+func ParseCreateOrganizationApiTokenResponse(rsp *http.Response) (*CreateOrganizationApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateOrganizationApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteOrganizationApiTokenResponse parses an HTTP response from a DeleteOrganizationApiTokenWithResponse call
+func ParseDeleteOrganizationApiTokenResponse(rsp *http.Response) (*DeleteOrganizationApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteOrganizationApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetOrganizationApiTokenResponse parses an HTTP response from a GetOrganizationApiTokenWithResponse call
+func ParseGetOrganizationApiTokenResponse(rsp *http.Response) (*GetOrganizationApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetOrganizationApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateOrganizationApiTokenResponse parses an HTTP response from a UpdateOrganizationApiTokenWithResponse call
+func ParseUpdateOrganizationApiTokenResponse(rsp *http.Response) (*UpdateOrganizationApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateOrganizationApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRotateOrganizationApiTokenResponse parses an HTTP response from a RotateOrganizationApiTokenWithResponse call
+func ParseRotateOrganizationApiTokenResponse(rsp *http.Response) (*RotateOrganizationApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateOrganizationApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -11614,6 +13814,128 @@ func ParseDeleteUserInviteResponse(rsp *http.Response) (*DeleteUserInviteRespons
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetCreditSummaryResponse parses an HTTP response from a GetCreditSummaryWithResponse call
+func ParseGetCreditSummaryResponse(rsp *http.Response) (*GetCreditSummaryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetCreditSummaryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreditSummary
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMetronomeDashboardResponse parses an HTTP response from a GetMetronomeDashboardWithResponse call
+func ParseGetMetronomeDashboardResponse(rsp *http.Response) (*GetMetronomeDashboardResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMetronomeDashboardResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MetronomeDashboard
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -13214,6 +15536,365 @@ func ParseUpdateWorkspaceResponse(rsp *http.Response) (*UpdateWorkspaceResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Workspace
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWorkspaceApiTokensResponse parses an HTTP response from a ListWorkspaceApiTokensWithResponse call
+func ParseListWorkspaceApiTokensResponse(rsp *http.Response) (*ListWorkspaceApiTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWorkspaceApiTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListApiTokensPaginated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateWorkspaceApiTokenResponse parses an HTTP response from a CreateWorkspaceApiTokenWithResponse call
+func ParseCreateWorkspaceApiTokenResponse(rsp *http.Response) (*CreateWorkspaceApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateWorkspaceApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteWorkspaceApiTokenResponse parses an HTTP response from a DeleteWorkspaceApiTokenWithResponse call
+func ParseDeleteWorkspaceApiTokenResponse(rsp *http.Response) (*DeleteWorkspaceApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteWorkspaceApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetWorkspaceApiTokenResponse parses an HTTP response from a GetWorkspaceApiTokenWithResponse call
+func ParseGetWorkspaceApiTokenResponse(rsp *http.Response) (*GetWorkspaceApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetWorkspaceApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateWorkspaceApiTokenResponse parses an HTTP response from a UpdateWorkspaceApiTokenWithResponse call
+func ParseUpdateWorkspaceApiTokenResponse(rsp *http.Response) (*UpdateWorkspaceApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateWorkspaceApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRotateWorkspaceApiTokenResponse parses an HTTP response from a RotateWorkspaceApiTokenWithResponse call
+func ParseRotateWorkspaceApiTokenResponse(rsp *http.Response) (*RotateWorkspaceApiTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateWorkspaceApiTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiToken
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
