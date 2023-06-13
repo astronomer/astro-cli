@@ -174,7 +174,7 @@ func checkToken(client astro.Client, coreClient astrocore.CoreClient, out io.Wri
 		if err != nil {
 			return err
 		}
-		err = c.SetContextKey("Organization", c.Organization)
+		err = c.SetContextKey("organization", c.Organization)
 		if err != nil {
 			return err
 		}
