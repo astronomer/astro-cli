@@ -456,8 +456,8 @@ func TimeAgo(date time.Time) string {
 	}
 }
 
-func getWorkspaceTokenByID(id, workspaceId, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
-	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgShortName, workspaceId, id)
+func getWorkspaceTokenByID(id, workspaceID, orgShortName string, client astrocore.CoreClient) (token astrocore.ApiToken, err error) {
+	resp, err := client.GetWorkspaceApiTokenWithResponse(httpContext.Background(), orgShortName, workspaceID, id)
 	if err != nil {
 		return astrocore.ApiToken{}, err
 	}
