@@ -41,18 +41,43 @@ func TestWorkspaceRootCommand(t *testing.T) {
 	assert.Contains(t, buf.String(), "workspace")
 }
 
+var (
+	workspaceTestDescription = "test workspace"
+	workspace1               = astrocore.Workspace{
+		Name:                         "test-workspace",
+		Description:                  &workspaceTestDescription,
+		ApiKeyOnlyDeploymentsDefault: false,
+		Id:                           "workspace-id",
+	}
+
+	workspaces = []astrocore.Workspace{
+		workspace1,
+	}
+	ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.WorkspacesPaginated{
+			Limit:      1,
+			Offset:     0,
+			TotalCount: 1,
+			Workspaces: workspaces,
+		},
+	}
+)
+
 func TestWorkspaceList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 
-	mockClient := new(astro_mocks.Client)
-	mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1", Label: "test-label-1"}}, nil).Once()
-	astroClient = mockClient
+	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	astroCoreClient = mockClient
 
 	cmdArgs := []string{"list"}
 	resp, err := execWorkspaceCmd(cmdArgs...)
 	assert.NoError(t, err)
-	assert.Contains(t, resp, "test-id-1")
-	assert.Contains(t, resp, "test-label-1")
+	assert.Contains(t, resp, "workspace-id")
+	assert.Contains(t, resp, "test-workspace")
 	mockClient.AssertExpectations(t)
 }
 
@@ -542,29 +567,6 @@ var (
 			StatusCode: 500,
 		},
 		Body: errorBodyDelete,
-	}
-	workspaceTestDescription = "test workspace"
-	workspace1               = astrocore.Workspace{
-		Name:                         "test-workspace",
-		Description:                  &workspaceTestDescription,
-		ApiKeyOnlyDeploymentsDefault: false,
-		Id:                           "workspace-id",
-	}
-
-	workspaces = []astrocore.Workspace{
-		workspace1,
-	}
-
-	ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.WorkspacesPaginated{
-			Limit:      1,
-			Offset:     0,
-			TotalCount: 1,
-			Workspaces: workspaces,
-		},
 	}
 )
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -20,82 +19,43 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var errMock = errors.New("mock error")
+var (
+	errMock     = errors.New("mock error")
+	description = "test workspace"
+	workspace1  = astrocore.Workspace{
+		Name:                         "test-workspace",
+		Description:                  &description,
+		ApiKeyOnlyDeploymentsDefault: false,
+		Id:                           "workspace-id",
+	}
+
+	workspaces = []astrocore.Workspace{
+		workspace1,
+	}
+
+	ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &astrocore.WorkspacesPaginated{
+			Limit:      1,
+			Offset:     0,
+			TotalCount: 1,
+			Workspaces: workspaces,
+		},
+	}
+)
 
 func TestList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-
-	okResponse := `{
-  "data": {
-    "workspaces": [
-      {
-        "id": "ckbv7zvb100pe0760xp98qnh9",
-        "label": "w1",
-        "description": "",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "test@test.com"
-            }
-          },
-          {
-            "role": "WORKSPACE_VIEWER",
-            "user": {
-              "id": "ckc0eilr201fl07602i8gq4vo",
-              "username": "test1@test.com"
-            }
-          }
-        ]
-      },
-      {
-        "id": "ckbv8pwbq00wk0760us7ktcgd",
-        "label": "wwww",
-        "description": "",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "test@test.com"
-            }
-          }
-        ]
-      },
-      {
-        "id": "ckc0j8y1101xo0760or02jdi7",
-        "label": "test",
-        "description": "test",
-        "roleBindings": [
-          {
-            "role": "WORKSPACE_ADMIN",
-            "user": {
-              "id": "ckbv7zpkh00og0760ki4mhl6r",
-              "username": "test@test.com"
-            }
-          }
-        ]
-      }
-    ]
-  }
-}`
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString(okResponse)),
-			Header:     make(http.Header),
-		}
-	})
-	astroAPI := astro.NewAstroClient(client)
+	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 	buf := new(bytes.Buffer)
-	err := List(astroAPI, buf)
+	err := List(mockClient, buf)
 	assert.NoError(t, err)
-	expected := ` NAME     ID                            
- w1       ckbv7zvb100pe0760xp98qnh9     
- wwww     ckbv8pwbq00wk0760us7ktcgd     
- test     ckc0j8y1101xo0760or02jdi7     
+	expected := ` NAME               ID               
+ test-workspace     workspace-id     
 `
 	assert.Equal(t, buf.String(), expected)
 }
@@ -103,18 +63,12 @@ func TestList(t *testing.T) {
 func TestListError(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
-		return &http.Response{
-			StatusCode: 500,
-			Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
-			Header:     make(http.Header),
-		}
-	})
-	astroAPI := astro.NewAstroClient(client)
+	mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 	buf := new(bytes.Buffer)
-	err := List(astroAPI, buf)
-	assert.EqualError(t, err, "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using an API Key or Token make sure your context is correct.\n\nDetails: Error processing GraphQL request: API error (500): Internal Server Error")
+	err := List(mockClient, buf)
+	assert.ErrorIs(t, err, errMock)
 }
 
 func TestGetWorkspaceSelection(t *testing.T) {
@@ -418,29 +372,6 @@ var (
 			StatusCode: 500,
 		},
 		Body: errorBodyDelete,
-	}
-	description = "test workspace"
-	workspace1  = astrocore.Workspace{
-		Name:                         "test-workspace",
-		Description:                  &description,
-		ApiKeyOnlyDeploymentsDefault: false,
-		Id:                           "workspace-id",
-	}
-
-	workspaces = []astrocore.Workspace{
-		workspace1,
-	}
-
-	ListWorkspacesResponseOK = astrocore.ListWorkspacesResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrocore.WorkspacesPaginated{
-			Limit:      1,
-			Offset:     0,
-			TotalCount: 1,
-			Workspaces: workspaces,
-		},
 	}
 )
 

@@ -50,25 +50,25 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 // List all workspaces
-func List(client astro.Client, out io.Writer) error {
+func List(client astrocore.CoreClient, out io.Writer) error {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return err
 	}
 
-	ws, err := client.ListWorkspaces(c.Organization)
+	ws, err := GetWorkspaces(client)
 	if err != nil {
-		return errors.Wrap(err, astro.AstronomerConnectionErrMsg)
+		return err
 	}
 
 	tab := newTableOut()
 	for i := range ws {
-		name := ws[i].Label
-		workspace := ws[i].ID
+		name := ws[i].Name
+		workspace := ws[i].Id
 
 		var color bool
 
-		if c.Workspace == ws[i].ID {
+		if c.Workspace == ws[i].Id {
 			color = true
 		} else {
 			color = false
@@ -352,7 +352,14 @@ func GetWorkspaces(client astrocore.CoreClient) ([]astrocore.Workspace, error) {
 		return []astrocore.Workspace{}, user.ErrNoShortName
 	}
 
-	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.OrganizationShortName, &astrocore.ListWorkspacesParams{})
+	sorts := []astrocore.ListWorkspacesParamsSorts{"name:asc"}
+	limit := 1000
+	workspaceListParams := &astrocore.ListWorkspacesParams{
+		Limit: &limit,
+		Sorts: &sorts,
+	}
+
+	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.OrganizationShortName, workspaceListParams)
 	if err != nil {
 		return []astrocore.Workspace{}, err
 	}
