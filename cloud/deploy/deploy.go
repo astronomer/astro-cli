@@ -15,6 +15,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	astro "github.com/astronomer/astro-cli/astro-client"
 	"github.com/astronomer/astro-cli/cloud/deployment"
+	"github.com/astronomer/astro-cli/cloud/organization"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -140,14 +141,16 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 	// Check the dags directory
 	monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
-	// Create monitoring dag file
-	err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
-	if err != nil {
-		return "", err
+	if !organization.IsOrgHosted() {
+		// Create monitoring dag file
+		err := fileutil.WriteStringToFile(monitoringDagPath, airflow.MonitoringDag)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Generate the dags tar
-	err = fileutil.Tar(dagsPath, path)
+	err := fileutil.Tar(dagsPath, path)
 	if err != nil {
 		return "", err
 	}
@@ -172,7 +175,9 @@ func deployDags(path, dagsPath, runtimeID string, client astro.Client) (string, 
 	// Delete the tar file
 	defer func() {
 		dagFile.Close()
-		os.Remove(monitoringDagPath)
+		if !organization.IsOrgHosted() {
+			os.Remove(monitoringDagPath)
+		}
 		err = os.Remove(dagFile.Name())
 		if err != nil {
 			fmt.Println("\nFailed to delete dags tar file: ", err.Error())
