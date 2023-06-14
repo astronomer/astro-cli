@@ -798,3 +798,16 @@ func TestGetUser(t *testing.T) {
 		assert.Equal(t, expectedOutMessage, out.String())
 	})
 }
+
+func TestIsOrganizationRoleValid(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		err := IsOrganizationRoleValid("ORGANIZATION_MEMBER")
+		assert.NoError(t, err)
+	})
+
+	t.Run("error path", func(t *testing.T) {
+		err := IsOrganizationRoleValid("Invalid Role")
+		assert.Error(t, err)
+		assert.Equal(t, ErrInvalidOrganizationRole, err)
+	})
+}
