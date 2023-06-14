@@ -1229,6 +1229,7 @@ func TestWorkspaceTokenCreate(t *testing.T) {
 func TestWorkspaceTokenUpdate(t *testing.T) {
 	expectedHelp := "Update a Workspace or Organaization API token"
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	tokenID = ""
 
 	t.Run("-h prints list help", func(t *testing.T) {
 		cmdArgs := []string{"token", "update", "-h"}
