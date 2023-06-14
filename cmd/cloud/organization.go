@@ -493,8 +493,8 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Organization",
-		Long: "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		Long: "Create an API token in an Astro Organization\n$astro organization token create --name [token name] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_MEMBER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createOrganizationToken(cmd, out)
 		},
@@ -503,7 +503,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
-		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER")
+		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER")
 	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
 	return cmd
 }
@@ -513,8 +513,8 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a Organization or Organaization API token",
-		Long: "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [WORKSPACE_MEMBER, " +
-			"WORKSPACE_OPERATOR, WORKSPACE_OWNER].",
+		Long: "Update a Organization or Organaization API token that has a role in an Astro Organization\n$astro organization token update [TOKEN_ID] --name [new token name] --role [ORGANIZATION_MEMBER, " +
+			"ORGANIZATION_BILLING_ADMIN, ORGANIZATION_OWNER].",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrganizationToken(cmd, args, out)
 		},
@@ -523,7 +523,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
-		"token. Possible values are WORKSPACE_MEMBER, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
+		"token. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
 	return cmd
 }
 
