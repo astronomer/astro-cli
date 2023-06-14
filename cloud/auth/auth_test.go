@@ -65,9 +65,9 @@ var (
 			StatusCode: 200,
 		},
 		JSON200: &[]astrocore.Organization{
-			{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org", Product: &mockOrganizationProduct},
-			{AuthServiceId: "auth-service-id", Id: "test-org-id-2", Name: "test-org-2", Product: &mockOrganizationProduct},
-			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1", Product: &mockOrganizationProduct},
+			{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org", Product: &mockOrganizationProduct, ShortName: "test-org"},
+			{AuthServiceId: "auth-service-id", Id: "test-org-id-2", Name: "test-org-2", Product: &mockOrganizationProduct, ShortName: "test-org-2"},
+			{AuthServiceId: "auth-service-id", Id: "org1", Name: "org1", Product: &mockOrganizationProduct, ShortName: "org1"},
 		},
 	}
 	mockOrganizationsResponseEmpty = astrocore.ListOrganizationsResponse{
@@ -423,10 +423,10 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 		ctx := &config.Context{
 			LastUsedWorkspace: "test-id",
 		}
-		resp, found, err := switchToLastUsedWorkspace(ctx, []astro.Workspace{{ID: "test-id"}})
+		resp, found, err := switchToLastUsedWorkspace(ctx, []astrocore.Workspace{{Id: "test-id"}})
 		assert.ErrorIs(t, err, config.ErrCtxConfigErr)
 		assert.False(t, found)
-		assert.Equal(t, astro.Workspace{}, resp)
+		assert.Equal(t, astrocore.Workspace{}, resp)
 	})
 
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -435,20 +435,20 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 			LastUsedWorkspace: "test-id",
 			Domain:            "test-domain",
 		}
-		resp, found, err := switchToLastUsedWorkspace(ctx, []astro.Workspace{{ID: "test-id"}})
+		resp, found, err := switchToLastUsedWorkspace(ctx, []astrocore.Workspace{{Id: "test-id"}})
 		assert.NoError(t, err)
 		assert.True(t, found)
-		assert.Equal(t, ctx.LastUsedWorkspace, resp.ID)
+		assert.Equal(t, ctx.LastUsedWorkspace, resp.Id)
 	})
 
 	t.Run("failure, workspace not found", func(t *testing.T) {
 		ctx := &config.Context{
 			LastUsedWorkspace: "test-invalid-id",
 		}
-		resp, found, err := switchToLastUsedWorkspace(ctx, []astro.Workspace{{ID: "test-id"}})
+		resp, found, err := switchToLastUsedWorkspace(ctx, []astrocore.Workspace{{Id: "test-id"}})
 		assert.NoError(t, err)
 		assert.False(t, found)
-		assert.Equal(t, astro.Workspace{}, resp)
+		assert.Equal(t, astrocore.Workspace{}, resp)
 	})
 }
 
@@ -456,8 +456,8 @@ func TestCheckUserSession(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Run("success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
@@ -523,8 +523,8 @@ func TestCheckUserSession(t *testing.T) {
 
 	t.Run("list workspace failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{}, errMock).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
@@ -536,12 +536,12 @@ func TestCheckUserSession(t *testing.T) {
 
 	t.Run("success with more than one workspace", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 
-		ctx := config.Context{Domain: "test-domain", LastUsedWorkspace: "test-id-1", Organization: "test-org-id"}
+		ctx := config.Context{Domain: "test-domain", LastUsedWorkspace: "workspace-id", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockClient, mockCoreClient, buf)
 		assert.NoError(t, err)
@@ -555,7 +555,6 @@ func TestCheckUserSession(t *testing.T) {
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil)
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
 		err := CheckUserSession(&ctx, mockClient, mockCoreClient, buf)
@@ -567,9 +566,31 @@ func TestCheckUserSession(t *testing.T) {
 	t.Run("success but with workspace switch failure", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		workspace2 := astrocore.Workspace{
+			Name:                         "test-workspace-2",
+			Description:                  &description,
+			ApiKeyOnlyDeploymentsDefault: false,
+			Id:                           "workspace-id-2",
+		}
+
+		workspaces = []astrocore.Workspace{
+			workspace1,
+			workspace2,
+		}
+		tempListWorkspacesResponseOK := astrocore.ListWorkspacesResponse{
+			HTTPResponse: &http.Response{
+				StatusCode: 200,
+			},
+			JSON200: &astrocore.WorkspacesPaginated{
+				Limit:      1,
+				Offset:     0,
+				TotalCount: 1,
+				Workspaces: workspaces,
+			},
+		}
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id-1"}, {ID: "test-id-2"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&tempListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 		ctx := config.Context{Domain: "test-domain", Organization: "test-org-id"}
 		buf := new(bytes.Buffer)
@@ -581,8 +602,8 @@ func TestCheckUserSession(t *testing.T) {
 
 	t.Run("success with identity first auth flow", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id-2").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		// context org  "test-org-id-2" takes precedence over the getSelf org "test-org-id"
@@ -600,12 +621,12 @@ func TestCheckUserSession(t *testing.T) {
 				StatusCode: 200,
 			},
 			JSON200: &[]astrocore.Organization{
-				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org"},
+				{AuthServiceId: "auth-service-id", Id: "test-org-id", Name: "test-org", ShortName: "test-org"},
 			},
 		}
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
@@ -639,7 +660,7 @@ func TestLogin(t *testing.T) {
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		err := Login("astronomer.io", "", mockClient, mockCoreClient, os.Stdout, false)
 		assert.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -678,8 +699,8 @@ func TestLogin(t *testing.T) {
 		}
 		authenticator = Authenticator{userInfoRequester, tokenRequester, callbackHandler}
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 
@@ -691,8 +712,8 @@ func TestLogin(t *testing.T) {
 
 	t.Run("oauth token success", func(t *testing.T) {
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{ID: "test-id"}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 
@@ -748,11 +769,8 @@ func TestLogin(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		// initialize the mock client
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{
-			ID:    "test-workspace",
-			Label: "something-label",
-		}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator
@@ -785,11 +803,8 @@ func TestLogin(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		// initialize the mock client
 		mockClient := new(astro_mocks.Client)
-		mockClient.On("ListWorkspaces", "test-org-id").Return([]astro.Workspace{{
-			ID:    "test-workspace",
-			Label: "something-label",
-		}}, nil).Once()
 		mockCoreClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockCoreClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockCoreClient.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
 		mockCoreClient.On("ListOrganizationsWithResponse", mock.Anything, &astrocore.ListOrganizationsParams{}).Return(&mockOrganizationsResponse, nil).Once()
 		// initialize the test authenticator

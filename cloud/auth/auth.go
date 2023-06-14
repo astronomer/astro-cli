@@ -237,19 +237,19 @@ func (a *Authenticator) authDeviceLogin(authConfig astro.AuthConfig, shouldDispl
 	return res, nil
 }
 
-func switchToLastUsedWorkspace(c *config.Context, workspaces []astro.Workspace) (astro.Workspace, bool, error) {
+func switchToLastUsedWorkspace(c *config.Context, workspaces []astrocore.Workspace) (astrocore.Workspace, bool, error) {
 	if c.LastUsedWorkspace != "" {
 		for i := range workspaces {
-			if c.LastUsedWorkspace == workspaces[i].ID {
-				err := c.SetContextKey("workspace", workspaces[i].ID)
+			if c.LastUsedWorkspace == workspaces[i].Id {
+				err := c.SetContextKey("workspace", workspaces[i].Id)
 				if err != nil {
-					return astro.Workspace{}, false, err
+					return astrocore.Workspace{}, false, err
 				}
 				return workspaces[i], true, nil
 			}
 		}
 	}
-	return astro.Workspace{}, false, nil
+	return astrocore.Workspace{}, false, nil
 }
 
 // check client status after a successfully login
@@ -300,23 +300,22 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 		return err
 	}
 
-	workspaces, err := client.ListWorkspaces(activeOrg.Id)
+	workspaces, err := workspace.GetWorkspaces(coreClient)
 	if err != nil {
 		return err
 	}
-
 	if len(workspaces) == 1 {
 		w := workspaces[0]
-		err = c.SetContextKey("workspace", w.ID)
+		err = c.SetContextKey("workspace", w.Id)
 		if err != nil {
 			return err
 		}
 		// update last used workspace ID
-		err = c.SetContextKey("last_used_workspace", w.ID)
+		err = c.SetContextKey("last_used_workspace", w.Id)
 		if err != nil {
 			return err
 		}
-		fmt.Printf(configSetDefaultWorkspace, w.Label)
+		fmt.Printf(configSetDefaultWorkspace, w.Name)
 	}
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in context
@@ -333,10 +332,10 @@ func CheckUserSession(c *config.Context, client astro.Client, coreClient astroco
 				fmt.Print(cliSetWorkspaceExample)
 			}
 		} else {
-			fmt.Printf(configSetDefaultWorkspace, w.Label)
+			fmt.Printf(configSetDefaultWorkspace, w.Name)
 		}
 	}
-
+	fmt.Println("ssorijor")
 	return nil
 }
 
