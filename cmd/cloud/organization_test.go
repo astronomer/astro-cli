@@ -312,6 +312,22 @@ var (
 		},
 		Body: errorBodyUpdateTeamMembership,
 	}
+	getTokenErrorBodyList, _ = json.Marshal(astrocore.Error{
+		Message: "failed to get token",
+	})
+	GetOrganizationAPITokenResponseError = astrocore.GetOrganizationApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 500,
+		},
+		Body:    getTokenErrorBodyList,
+		JSON200: nil,
+	}
+	GetOrganizationAPITokenResponseOK = astrocore.GetOrganizationApiTokenResponse{
+		HTTPResponse: &http.Response{
+			StatusCode: 200,
+		},
+		JSON200: &apiToken1,
+	}
 )
 
 func TestUserInvite(t *testing.T) {
@@ -1026,6 +1042,47 @@ func TestOrganizationTokenList(t *testing.T) {
 		mockClient.On("ListOrganizationApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Twice()
 		astroCoreClient = mockClient
 		cmdArgs := []string{"token", "list"}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+	})
+}
+
+func TestOrganizationTokenListRoles(t *testing.T) {
+	expectedHelp := "List roles for an organization API token"
+	mockTokenID := "mockTokenID"
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+
+	t.Run("-h prints list help", func(t *testing.T) {
+		cmdArgs := []string{"token", "roles", "-h"}
+		resp, err := execOrganizationCmd(cmdArgs...)
+		assert.NoError(t, err)
+		assert.Contains(t, resp, expectedHelp)
+	})
+	t.Run("any errors from api are returned and token roles are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseError, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "roles", mockTokenID}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.ErrorContains(t, err, "failed to get token")
+	})
+	t.Run("any context errors from api are returned and token roles are not listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.Initial)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "roles", mockTokenID}
+		_, err := execOrganizationCmd(cmdArgs...)
+		assert.Error(t, err)
+	})
+
+	t.Run("token roles are listed", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		mockClient := new(astrocore_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetOrganizationApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&GetOrganizationAPITokenResponseOK, nil).Twice()
+		astroCoreClient = mockClient
+		cmdArgs := []string{"token", "roles", mockTokenID}
 		_, err := execOrganizationCmd(cmdArgs...)
 		assert.NoError(t, err)
 	})

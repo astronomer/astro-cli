@@ -484,7 +484,7 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
 //nolint:dupl
 func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "roles",
+		Use:   "roles [TOKEN_ID]",
 		Short: "List roles for an organization API token",
 		Long:  "List roles for an organization API token\n$astro organization token roles [TOKEN_ID] ",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -582,7 +582,6 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-
 	cmd.SilenceUsage = true
 	return organization.ListTokenRoles(tokenID, astroCoreClient, out)
 }
