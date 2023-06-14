@@ -85,10 +85,9 @@ func AddOrgTokenToWorkspace(id, name, role, workspace string, out io.Writer, cli
 	}
 
 	apiTokenID := token.Id
-
 	var orgRole string
 	for i := range token.Roles {
-		if token.Roles[i].EntityId == workspaceEntity {
+		if token.Roles[i].EntityId == workspace {
 			return errOrgTokenInWorkspace
 		}
 
@@ -226,8 +225,6 @@ func getOrganizationToken(id, name, message string, tokens []astrocore.ApiToken)
 				return astrocore.ApiToken{}, err
 			}
 		}
-	case name != "" && id != "":
-		return astrocore.ApiToken{}, errBothNameAndID
 	}
 	if token.Id == "" {
 		return astrocore.ApiToken{}, errOrganizationTokenNotFound
@@ -396,22 +393,39 @@ func UpdateToken(id, name, newName, description, role, organization string, out 
 		UpdateOrganizationAPITokenRequest.Description = description
 	}
 
-	//if role == "" {
-	//
-	//	UpdateOrganizationAPITokenRequest.Roles = token.Roles
-	//} else {
-	//	err := user.IsOrganizationRoleValid(role)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	UpdateOrganizationAPITokenRequest.Roles = role
-	//}
+	var currentOrgRole string
+	apiTokenWorkspaceRoles := []astrocore.ApiTokenWorkspaceRole{}
 
-	err = user.IsOrganizationRoleValid(role)
-	if err != nil {
-		return err
+	for i := range token.Roles {
+		if token.Roles[i].EntityType == workspaceEntity {
+			apiTokenWorkspaceRoles = append(apiTokenWorkspaceRoles, astrocore.ApiTokenWorkspaceRole{
+				EntityId: token.Roles[i].EntityId,
+				Role:     token.Roles[i].Role,
+			})
+		}
+
+		if token.Roles[i].EntityType == organizationEntity {
+			currentOrgRole = token.Roles[i].Role
+		}
 	}
-	UpdateOrganizationAPITokenRequest.Roles = astrocore.UpdateOrganizationApiTokenRoles{Organization: role}
+	if role == "" {
+		updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
+			Organization: currentOrgRole,
+			Workspace:    &apiTokenWorkspaceRoles,
+		}
+
+		UpdateOrganizationAPITokenRequest.Roles = updateOrganizationAPITokenRoles
+	} else {
+		err := user.IsOrganizationRoleValid(role)
+		if err != nil {
+			return err
+		}
+		updateOrganizationAPITokenRoles := astrocore.UpdateOrganizationApiTokenRoles{
+			Organization: role,
+			Workspace:    &apiTokenWorkspaceRoles,
+		}
+		UpdateOrganizationAPITokenRequest.Roles = updateOrganizationAPITokenRoles
+	}
 
 	resp, err := client.UpdateOrganizationApiTokenWithResponse(httpContext.Background(), ctx.OrganizationShortName, apiTokenID, UpdateOrganizationAPITokenRequest)
 	if err != nil {

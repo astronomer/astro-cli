@@ -30,7 +30,6 @@ var (
 	}
 	apiTokens2 = []astrocore.ApiToken{
 		apiToken1,
-		apiToken1,
 		{Id: "token2", Name: "Token 2", Description: description2, Type: "WORKSPACE", Roles: []astrocore.ApiTokenRole{{EntityId: workspaceId, EntityType: "WORKSPACE", Role: "WORKSPACE_MEMBER"}}, CreatedAt: time.Now(), CreatedBy: &astrocore.BasicSubjectProfile{FullName: &fullName2}},
 	}
 	GetWorkspaceAPITokenResponseOK = astrocore.GetWorkspaceApiTokenResponse{
